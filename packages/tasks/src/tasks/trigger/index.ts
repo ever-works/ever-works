@@ -34,6 +34,8 @@ export * from './agent-heartbeat-dispatcher.task';
 export * from './agent-heartbeat.task';
 export * from './agent-task-execute.task';
 export * from './agent-chat-reply.task';
+// Named Conversations — an Agent answers a message in a Conversation.
+export * from './agent-conversation-reply.task';
 export * from './task-recurrence-dispatcher.task';
 // AW-20 P1 — provisions a wired roster (coordinator + lane owners) for
 // the setup wizard's "Your agents" step.
@@ -55,3 +57,7 @@ export * from './credits-meter-flush.task';
 // Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
 // dry-run by default, never auto-applied).
 export * from './memory-consolidation-tick.task';
+// Model accounts (AW-16) — six-hourly credential health check per account.
+export * from './model-account-health.task';
+// Skills shelf — hourly readiness sweep.
+export * from './skill-readiness-sweep.task';

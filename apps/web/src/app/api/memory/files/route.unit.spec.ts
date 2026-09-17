@@ -214,6 +214,123 @@ describe('/api/memory/files workspace scope', () => {
     });
 
     /**
+     * The Knowledge library's shared folders ride the same folder routes, and
+     * for those the handlers read the Organization in scope. Only a call that
+     * names the organization scope is scoped; the personal cases above prove
+     * every other call is unchanged.
+     */
+    describe('shared (organization) folders — scoped when the call names the scope', () => {
+        async function readBody(init: RequestInit): Promise<string> {
+            return new Response(init.body as BodyInit).text();
+        }
+
+        it('GET /files/tree?scope=organization forwards the selector and the scope query', async () => {
+            await getTree(
+                request('/api/memory/files/tree?scope=organization', { selector: 'org:ever' }),
+            );
+
+            const [url] = fetchMock.mock.calls[0] as [string];
+            expect(url).toBe('http://api.example/memory/files/tree?scope=organization');
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBe('ever');
+        });
+
+        it('POST /files/folders with scope organization forwards the selector and the whole body', async () => {
+            const body = JSON.stringify({ name: 'Playbooks', scope: 'organization' });
+
+            const response = await createFolder(
+                request('/api/memory/files/folders', {
+                    method: 'POST',
+                    selector: 'org:ever',
+                    body,
+                }),
+            );
+
+            expect(response.status).toBe(200);
+            const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+            expect(url).toBe('http://api.example/memory/files/folders');
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBe('ever');
+            expect(await readBody(init)).toBe(body);
+        });
+
+        it('POST /files/folders for a personal folder still streams its body unscoped', async () => {
+            const body = JSON.stringify({ name: 'Receipts' });
+
+            await createFolder(
+                request('/api/memory/files/folders', {
+                    method: 'POST',
+                    selector: 'org:ever',
+                    body,
+                }),
+            );
+
+            const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBeNull();
+            expect(await readBody(init)).toBe(body);
+        });
+
+        it('PATCH /files/folders/:id?scope=organization scopes the call and consumes the marker', async () => {
+            await updateFolder(
+                request('/api/memory/files/folders/fold-1?scope=organization', {
+                    method: 'PATCH',
+                    selector: 'org:ever',
+                    body: JSON.stringify({ name: 'Runbooks' }),
+                }),
+                params('fold-1'),
+            );
+
+            const [url] = fetchMock.mock.calls[0] as [string];
+            expect(url).toBe('http://api.example/memory/files/folders/fold-1');
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBe('ever');
+        });
+
+        it('DELETE /files/folders/:id?scope=organization keeps the other query keys', async () => {
+            await deleteFolder(
+                request('/api/memory/files/folders/fold-1?scope=organization&recursive=true', {
+                    method: 'DELETE',
+                    selector: 'org:ever',
+                }),
+                params('fold-1'),
+            );
+
+            const [url] = fetchMock.mock.calls[0] as [string];
+            expect(url).toBe('http://api.example/memory/files/folders/fold-1?recursive=true');
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBe('ever');
+        });
+
+        it.each([
+            [
+                'GET /files/tree?scope=organization',
+                () => getTree(request('/api/memory/files/tree?scope=organization')),
+            ],
+            [
+                'POST /files/folders (organization)',
+                () =>
+                    createFolder(
+                        request('/api/memory/files/folders', {
+                            method: 'POST',
+                            body: JSON.stringify({ name: 'X', scope: 'organization' }),
+                        }),
+                    ),
+            ],
+            [
+                'DELETE /files/folders/:id?scope=organization',
+                () =>
+                    deleteFolder(
+                        request('/api/memory/files/folders/fold-1?scope=organization', {
+                            method: 'DELETE',
+                        }),
+                        params('fold-1'),
+                    ),
+            ],
+        ])('%s fails closed before upstream without a selector', async (_label, call) => {
+            const response = await call();
+
+            expect(response.status).toBe(400);
+            expect(fetchMock).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
      * Download is reached by document requests — the `<a href>` in
      * `MemoryFilesPanel`, the same anchor in `MemoryFilePreview`, the KB
      * binary viewers' `<img>`/`<video>` sources — which cannot carry a

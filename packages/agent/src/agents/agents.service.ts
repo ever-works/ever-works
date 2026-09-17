@@ -957,6 +957,57 @@ export class AgentsService {
     }
 
     /**
+     * Schedules — pause this Agent's heartbeat WITHOUT pausing the Agent.
+     *
+     * Writes only `heartbeatPausedAt`. `status`, `heartbeatCadence` and
+     * `nextHeartbeatAt` are untouched, so the Agent keeps answering assigned
+     * Tasks, chat and manual run-now while the heartbeat dispatcher skips
+     * it. Idempotent: pausing a paused heartbeat keeps the original instant.
+     * An Agent with no scheduled heartbeat (null or `manual`) has nothing to
+     * pause — a 400, not a silent success.
+     */
+    async pauseHeartbeat(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
+        if (!agent.heartbeatCadence || agent.heartbeatCadence === 'manual') {
+            throw new BadRequestException('This Agent has no scheduled heartbeat to pause.');
+        }
+        if (!agent.heartbeatPausedAt) {
+            await this.agents.updateById(id, { heartbeatPausedAt: new Date() });
+        }
+        const refreshed = await this.agents.findById(id);
+        return toAgentDto(refreshed ?? agent);
+    }
+
+    /**
+     * Schedules — resume a paused heartbeat. Clears `heartbeatPausedAt`; the
+     * cadence is whatever it was before the pause. A slot that fell due
+     * while paused is NOT replayed: when `nextHeartbeatAt` is already in the
+     * past it moves to the next slot after now, so resuming never produces a
+     * burst of catch-up wakes. Idempotent on an un-paused heartbeat.
+     */
+    async resumeHeartbeat(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
+        if (agent.heartbeatPausedAt) {
+            const now = new Date();
+            const patch: Partial<Agent> = { heartbeatPausedAt: null };
+            if (agent.nextHeartbeatAt && agent.nextHeartbeatAt.getTime() <= now.getTime()) {
+                patch.nextHeartbeatAt = computeNextHeartbeat(agent.heartbeatCadence ?? null, now);
+            }
+            await this.agents.updateById(id, patch);
+        }
+        const refreshed = await this.agents.findById(id);
+        return toAgentDto(refreshed ?? agent);
+    }
+
+    /**
      * Inverse of `archive`. Deliberately NOT routed through
      * `transition`/`USER_TRANSITIONS`: opening ARCHIVED in that table
      * would also make `pause`/`resume` silently un-archive an Agent.

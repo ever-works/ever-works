@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { BadRequestException, ValidationPipe, type ArgumentMetadata } from '@nestjs/common';
 import { getMetadataStorage } from 'class-validator';
 import { ScheduleQueryDto } from './schedules-query.dto';
+import { PauseScheduleDto, SchedulePageQueryDto } from './schedules-page-query.dto';
 
 /**
  * Contract pin for `GET /api/schedules`' query surface.
@@ -157,5 +158,85 @@ describe('ScheduleQueryDto — GET /api/schedules query contract', () => {
             const messages = await rejectionMessages({ enabledOnly: 'yes' });
             expect(messages.join(' ')).toMatch(/enabledOnly/);
         });
+    });
+});
+
+describe('SchedulePageQueryDto — GET /api/schedules/page query contract', () => {
+    const pageMetadata: ArgumentMetadata = {
+        type: 'query',
+        metatype: SchedulePageQueryDto,
+        data: undefined,
+    };
+    const transformPage = (query: Record<string, unknown>) => pipe.transform(query, pageMetadata);
+
+    it('accepts every workspace filter plus the flat filters, coercing limit to a number', async () => {
+        await expect(
+            transformPage({
+                sourceType: 'recurring_task',
+                entityKind: 'task',
+                enabledOnly: 'true',
+                agentId: '3f2b8c1e-5a4d-4e6f-9a7b-1c2d3e4f5a6b',
+                status: 'paused',
+                health: 'never-runs',
+                q: '  inbox  ',
+                cursor: 'abc',
+                limit: '25',
+            }),
+        ).resolves.toEqual({
+            sourceType: 'recurring_task',
+            entityKind: 'task',
+            enabledOnly: true,
+            agentId: '3f2b8c1e-5a4d-4e6f-9a7b-1c2d3e4f5a6b',
+            status: 'paused',
+            health: 'never-runs',
+            q: 'inbox',
+            cursor: 'abc',
+            limit: 25,
+        });
+    });
+
+    it.each([
+        ['an unknown parameter', { sort: 'nextRunAt' }],
+        ['a parameter naming another user', { userId: 'someone-else' }],
+        ['a parameter naming another organization', { organizationId: 'org-2' }],
+        ['a limit above 50', { limit: '51' }],
+        ['a limit below 1', { limit: '0' }],
+        ['a non-uuid agentId', { agentId: 'agent-1' }],
+        ['an unknown status', { status: 'running' }],
+        ['an unknown health value', { health: 'overlap' }],
+        ['an over-long search', { q: 'x'.repeat(121) }],
+    ])('rejects %s', async (_label, query) => {
+        await expect(transformPage(query)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('leaves the flat list contract untouched — the page filters are not accepted there', async () => {
+        const messages = await rejectionMessages({ status: 'paused', limit: '10', cursor: 'x' });
+        expect(messages).toEqual(
+            expect.arrayContaining([
+                'property status should not exist',
+                'property limit should not exist',
+                'property cursor should not exist',
+            ]),
+        );
+    });
+});
+
+describe('PauseScheduleDto', () => {
+    const bodyMetadata: ArgumentMetadata = { type: 'body', metatype: PauseScheduleDto, data: '' };
+
+    it('accepts an empty body and a boolean acknowledgement', async () => {
+        await expect(pipe.transform({}, bodyMetadata)).resolves.toEqual({});
+        await expect(
+            pipe.transform({ acknowledgeMissionPause: true }, bodyMetadata),
+        ).resolves.toEqual({ acknowledgeMissionPause: true });
+    });
+
+    it('rejects anything else', async () => {
+        await expect(
+            pipe.transform({ acknowledgeMissionPause: 'yes' }, bodyMetadata),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(pipe.transform({ force: true }, bodyMetadata)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
     });
 });

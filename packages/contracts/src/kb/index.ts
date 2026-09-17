@@ -8,3 +8,4 @@ export * from './kb-tree.types.js';
 export * from './kb-context-bundle.types.js';
 export * from './decision-conflict.types.js';
 export * from './kb-memory-facets.js';
+export * from './kb-library.types.js';

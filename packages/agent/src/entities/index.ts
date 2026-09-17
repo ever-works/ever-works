@@ -25,6 +25,7 @@ export * from './activity-log.types';
 export * from './cache.entity';
 export * from './conversation.entity';
 export * from './conversation-message.entity';
+export * from './conversation-participant.entity';
 export * from './auth-account.entity';
 export * from './auth-session.entity';
 export * from './auth-verification.entity';
@@ -70,11 +71,13 @@ export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
 export * from './skill-file.entity';
+export * from './skill-tag.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
 export * from './task-review-rejection.entity';
 export * from './task-ci-auto-resume-attempt.entity';
+export * from './task-agent-review.entity';
 export * from './task-approver.entity';
 export * from './task-block.entity';
 export * from './task-relation.entity';
@@ -174,6 +177,9 @@ export * from './fleet-execution-preference.entity';
 // profile (logins and files) on each Node.
 export * from './computer-session.entity';
 export * from './node-agent-profile.entity';
+// Model accounts (AW-16) — provider accounts + the model ladder
+export * from './model-account.entity';
+export * from './model-policy.entity';
 // Fleet cost accounting (EW-777) — the owner's fleet-wide daily
 // model-spend ceiling and its one-notice trip marker.
 export * from './fleet-cost-policy.entity';
@@ -192,6 +198,7 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+export * from './knowledge-document-reader-state.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';
 export * from './agent-plugin-package-allowlist.entity';
@@ -202,3 +209,5 @@ export * from './agent-repo-attachment.entity';
 export * from './release-promotion.entity';
 // AW-14 What's new — per-person read state for product changelog entries.
 export * from './product-changelog-read.entity';
+// AW-18 Shared view — a Workspace's read-only published projection.
+export * from './shared-view.entity';

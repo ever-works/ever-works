@@ -1,6 +1,7 @@
 import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
+import { redactSecretUrl } from '@ever-works/monitoring';
 import { config } from './config/constants';
 
 @Injectable()
@@ -14,7 +15,9 @@ export class LoggingInterceptor implements NestInterceptor {
 
         const now = Date.now();
         const request = context.switchToHttp().getRequest();
-        const { method, originalUrl } = request;
+        const { method } = request;
+        // Never write a share token or a view session into a log line.
+        const originalUrl: string = redactSecretUrl(request.originalUrl);
 
         // Health-check / probe endpoints are hit every few seconds by k8s
         // liveness/readiness probes + uptime monitors on every replica, around

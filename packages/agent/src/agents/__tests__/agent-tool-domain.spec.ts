@@ -252,6 +252,67 @@ describe('AgentToolService — domain chat tool assembly', () => {
         expect(withPerm).toContain('validate_workflow_graph');
     });
 
+    it('offers submitTaskReview from the tasks bundle, bound to the RUN the tools are built for', async () => {
+        // Reviewer agent stage (slice AD). Review found the one line that
+        // forwards `agentReviews` into `buildAgentTaskTools` untested:
+        // deleting it left every spec green while no review run in
+        // production could ever record a verdict. Pinned here through the
+        // real assembly, including the run id the verdict authorizes on.
+        const submitVerdict = jest.fn().mockResolvedValue({
+            reason: 'recorded',
+            verdict: 'approve',
+            headSha: 'abc1234',
+        });
+        const svc = makeSvc({
+            ...sources,
+            tasks: { ...sources.tasks!, agentReviews: { submitVerdict } as any },
+        });
+        const tools = svc.resolveAllowedTools(makeAgent(), {
+            runId: 'run-review-1',
+            editsThisRunByFile: new Set(),
+        });
+        const tool = tools.find((candidate) => candidate.name === 'submitTaskReview');
+        expect(tool).toBeDefined();
+
+        await tool!.invoke({ verdict: 'approve', taskId: 't1' } as never);
+        expect(submitVerdict).toHaveBeenCalledWith({
+            runId: 'run-review-1',
+            taskId: 't1',
+            reviewerAgentId: makeAgent().id,
+            verdict: 'approve',
+            summary: null,
+        });
+    });
+
+    it('closes a brief-less review run through the SAME tasks bundle, and never throws', async () => {
+        // Slice AD verification, finding C — the tool loop's second closure
+        // for a review run that started without its brief.
+        const abandonRunWithoutBrief = jest.fn().mockResolvedValue(true);
+        const bound = makeSvc({
+            ...sources,
+            tasks: {
+                ...sources.tasks!,
+                agentReviews: { submitVerdict: jest.fn(), abandonRunWithoutBrief } as any,
+            },
+        });
+        await expect(bound.abandonAgentReviewRun('run-review-1')).resolves.toBe(true);
+        expect(abandonRunWithoutBrief).toHaveBeenCalledWith('run-review-1');
+
+        abandonRunWithoutBrief.mockRejectedValueOnce(new Error('db down'));
+        await expect(bound.abandonAgentReviewRun('run-review-1')).resolves.toBe(false);
+
+        // No review service (or one that only records verdicts): nothing to close.
+        await expect(makeSvc().abandonAgentReviewRun('run-review-1')).resolves.toBe(false);
+        await expect(makeSvc(null).abandonAgentReviewRun('run-review-1')).resolves.toBe(false);
+    });
+
+    it('does not offer submitTaskReview when the tasks bundle carries no review service', () => {
+        const names = makeSvc()
+            .resolveAllowedTools(makeAgent())
+            .map((tool) => tool.name);
+        expect(names).not.toContain('submitTaskReview');
+    });
+
     it('registers only the domains the bundle actually carries', () => {
         const names = makeSvc({ fleet: sources.fleet })
             .resolveAllowedTools(makeAgent())

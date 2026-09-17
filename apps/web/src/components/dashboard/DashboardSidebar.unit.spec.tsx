@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { AuthUser } from '@/lib/auth';
 import { DashboardSidebar } from './DashboardSidebar';
 
@@ -184,5 +184,59 @@ describe('DashboardSidebar — untouched entries', () => {
         expect(teams?.textContent?.trim()).toBe('');
         expect(teams?.querySelector('svg')).not.toBeNull();
         expect(screen.getByRole('tooltip', { name: 'navigation.teams' })).toBeDefined();
+    });
+});
+
+describe('DashboardSidebar — Help entries in the profile menu (AW-25)', () => {
+    function openProfileMenu() {
+        const trigger = screen
+            .getAllByText('operator')
+            .map((element) => element.closest('button[aria-haspopup]'))
+            .find((element): element is HTMLButtonElement => element !== null);
+        fireEvent.click(trigger!);
+    }
+
+    it('opens the manual from "Help & Docs" and keeps the documentation site as its own row', () => {
+        const onOpenHelp = vi.fn();
+        const onOpenHelpTab = vi.fn();
+        const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+        render(
+            <DashboardSidebar
+                user={user}
+                isOpen
+                onToggle={() => {}}
+                onOpenHelp={onOpenHelp}
+                onOpenHelpTab={onOpenHelpTab}
+            />,
+        );
+        openProfileMenu();
+        fireEvent.click(screen.getByRole('menuitem', { name: 'profileMenu.helpDocs' }));
+        expect(onOpenHelpTab).toHaveBeenCalledWith('manual');
+        expect(open).not.toHaveBeenCalled();
+
+        openProfileMenu();
+        fireEvent.click(screen.getByRole('menuitem', { name: 'profileMenu.docsSite' }));
+        expect(open).toHaveBeenCalledWith('https://docs.ever.works', '_blank');
+
+        openProfileMenu();
+        fireEvent.click(screen.getByRole('menuitem', { name: 'profileMenu.keyboardShortcuts' }));
+        expect(onOpenHelpTab).toHaveBeenLastCalledWith('shortcuts');
+        expect(onOpenHelp).not.toHaveBeenCalled();
+        open.mockRestore();
+    });
+
+    it('keeps the earlier behaviour for a caller that does not pass onOpenHelpTab', () => {
+        const onOpenHelp = vi.fn();
+        const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+        render(<DashboardSidebar user={user} isOpen onToggle={() => {}} onOpenHelp={onOpenHelp} />);
+        openProfileMenu();
+        expect(screen.queryByRole('menuitem', { name: 'profileMenu.docsSite' })).toBeNull();
+        fireEvent.click(screen.getByRole('menuitem', { name: 'profileMenu.helpDocs' }));
+        expect(open).toHaveBeenCalledWith('https://docs.ever.works', '_blank');
+
+        openProfileMenu();
+        fireEvent.click(screen.getByRole('menuitem', { name: 'profileMenu.keyboardShortcuts' }));
+        expect(onOpenHelp).toHaveBeenCalledTimes(1);
+        open.mockRestore();
     });
 });

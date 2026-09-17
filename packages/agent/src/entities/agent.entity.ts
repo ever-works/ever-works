@@ -203,6 +203,8 @@ export enum AgentIdleBehavior {
 })
 @Index('idx_agents_user_status', ['userId', 'status'])
 @Index('idx_agents_next_heartbeat', ['status', 'nextHeartbeatAt'])
+// Schedules — the heartbeat due-scan also filters `heartbeatPausedAt IS NULL`.
+@Index('idx_agents_heartbeat_due', ['status', 'heartbeatPausedAt', 'nextHeartbeatAt'])
 @Index('idx_agents_mission', ['missionId'])
 @Index('idx_agents_work', ['workId'])
 @Index('idx_agents_idea', ['ideaId'])
@@ -365,6 +367,16 @@ export class Agent {
     // TypeORM pick the right column type per dialect.
     @PortableDateColumn({ nullable: true })
     nextHeartbeatAt?: Date | null;
+
+    /**
+     * Schedules — pause the heartbeat WITHOUT pausing the Agent. Non-null
+     * means the heartbeat dispatcher skips this Agent; `heartbeatCadence`
+     * and `nextHeartbeatAt` are preserved. Orthogonal to `AgentStatus`: an
+     * ACTIVE Agent with a paused heartbeat keeps answering its assigned
+     * Tasks, chat and manual run-now. `null` reads as "not paused".
+     */
+    @PortableDateColumn({ nullable: true })
+    heartbeatPausedAt?: Date | null;
 
     @PortableDateColumn({ nullable: true })
     lastRunAt?: Date | null;

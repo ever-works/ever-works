@@ -105,6 +105,38 @@ describe('SchedulesController.list — response shape', () => {
         expect(getSchedules).toHaveBeenCalledWith({ userId: 'user-1', organizationId: null }, {});
     });
 
+    it('keeps the bare-array shape when rows carry the additive workspace fields', async () => {
+        const row = view({
+            agentId: null,
+            agentName: null,
+            pausedAt: null,
+            health: { ok: true, reason: null, reasonKey: null, repair: 'none', checkedAt: null },
+        });
+        const { controller } = build([row]);
+
+        const result = await controller.list(auth, {});
+
+        expect(Array.isArray(result)).toBe(true);
+        // Every original key is still there, untouched…
+        expect(result[0]).toMatchObject({
+            id: 'work_schedule:w1',
+            sourceType: 'work_schedule',
+            ownerType: 'work',
+            ownerId: 'w1',
+            ownerName: 'Directory refresh',
+            ownerLink: '/works/w1',
+            cadenceRaw: '0 9 * * *',
+            cadenceHuman: 'Every day at 09:00',
+            nextRunAt: '2026-08-12T09:00:00.000Z',
+            lastRunAt: null,
+            lastRunStatus: null,
+            status: 'active',
+            enabled: true,
+        });
+        // …and the additions ride alongside them.
+        expect(result[0].health?.ok).toBe(true);
+    });
+
     it('does not limit or re-slice the service result — the aggregation is un-paginated', async () => {
         const rows = Array.from({ length: 25 }, (_, i) =>
             view({ id: `work_schedule:w${i}`, ownerId: `w${i}` }),

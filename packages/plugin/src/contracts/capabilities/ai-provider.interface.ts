@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import type { ReasoningEffort } from '@ever-works/contracts';
 import type { IPlugin } from '../plugin.interface.js';
 import type { PluginSettings } from '../../settings/settings.types.js';
 
@@ -428,6 +429,39 @@ export interface IAiProviderPlugin extends IPlugin {
 	 * Get provider capabilities
 	 */
 	getCapabilities(): AiModelCapabilities;
+
+	/**
+	 * Model accounts (AW-16) — which reasoning-effort levels a model actually
+	 * exposes, so a requested effort is mapped by the provider that knows its
+	 * models rather than guessed by core.
+	 *
+	 * Optional. Absent → the existing per-model reasoning rules in
+	 * `ai/reasoning.utils.ts` keep applying unchanged. Returning `null` or an
+	 * empty array means the model takes no thinking setting.
+	 */
+	reasoningSupport?(modelId: string): readonly ReasoningEffort[] | null;
+
+	/**
+	 * Model accounts (AW-16) — a cheap identity check for one set of
+	 * credentials, used before an account is saved and by the periodic health
+	 * check. MUST NOT spend a paid model call where the provider offers an
+	 * identity or catalogue endpoint.
+	 *
+	 * Optional. Absent → core falls back to `isAvailable(settings)`.
+	 * `expiresAt` is reported only when the provider exposes the credential's
+	 * expiry.
+	 */
+	checkCredential?(settings: PluginSettings): Promise<AiCredentialCheckResult>;
+}
+
+/**
+ * Result of {@link IAiProviderPlugin.checkCredential}. `rejected` separates
+ * "the provider refused this credential" from "the check could not run".
+ */
+export interface AiCredentialCheckResult {
+	readonly ok: boolean;
+	readonly rejected?: boolean;
+	readonly expiresAt?: Date;
 }
 
 /**

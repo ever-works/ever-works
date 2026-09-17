@@ -93,6 +93,11 @@ RUN cd apps/web && pnpm install --frozen-lockfile
 
 # Build the project
 COPY --from=builder /app/out/full/ .
+# The in-product manual (AW-25) is built from the documentation pages in docs/,
+# which `turbo prune` does not carry because docs/ is not a workspace package.
+# `apps/web` prebuild reads them here and writes public/help-content/, which the
+# runner stage already copies with public/.
+COPY --from=builder /app/docs ./docs
 # Build the apps
 RUN turbo build --filter=ever-works-web...
 # Prune dev deps

@@ -142,6 +142,9 @@ const sidebars: SidebarsConfig = {
 				// Reads straight after the KB it generalizes; its two
 				// sources, Decisions and Meetings, are listed above.
 				'features/memory',
+				// The Library view of the Memory page: the same documents on
+				// one shelf with shared folders, archive and export.
+				'features/knowledge-library',
 				'features/autonomous-operation',
 				'features/workers',
 				'features/job-runtimes',

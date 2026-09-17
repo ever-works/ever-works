@@ -10,6 +10,7 @@ import {
 } from '@src/entities/notification.types';
 import { sanitizeName, sanitizeDescription } from '@src/utils/sanitize.util';
 import { redactSecrets } from '@src/utils/secret-scan';
+import { UserNotificationSubscriptionService } from './user-notification-subscription.service';
 
 /**
  * Notifications v2 (EW-664 / EW-678) — payload emitted on
@@ -27,6 +28,13 @@ export interface NotificationFanoutEvent {
     readonly actionUrl?: string;
     readonly actionLabel?: string;
     readonly urgent: boolean;
+    /**
+     * Attention controls (AW-13) — true when the in-app row for this call
+     * already existed (a live notification with the same deduplication key),
+     * so no new in-app notification was written. Routing uses it to avoid
+     * emailing the owner again about the same still-open notification.
+     */
+    readonly deduplicated?: boolean;
 }
 
 export const NOTIFICATION_FANOUT_EVENT = 'notifications-v2.fanout-requested';
@@ -38,6 +46,11 @@ export class NotificationService {
     constructor(
         private readonly repository: NotificationRepository,
         @Optional() private readonly eventEmitter?: EventEmitter2,
+        // Attention controls (AW-13) — decides whether a row is written
+        // silently (the user turned in-app off for its event). Optional so
+        // every context that builds this service without it keeps writing
+        // loud rows exactly as before.
+        @Optional() private readonly subscriptionResolver?: UserNotificationSubscriptionService,
     ) {}
 
     /**
@@ -102,6 +115,30 @@ export class NotificationService {
      * Without a `deduplicationKey`, every call writes a new row.
      */
     async create(dto: CreateNotificationDto): Promise<Notification> {
+        return (await this.writeInApp(dto)).notification;
+    }
+
+    /**
+     * {@link create} plus the one fact its return value hides: whether THIS
+     * call inserted the row, or handed back one an earlier call had already
+     * written under the same deduplication key.
+     *
+     * A producer that also fans the notification out to email/push needs the
+     * difference. `create()` is retry-safe by design — the second call is a
+     * no-op that returns the first row — but an unconditional fanout after it
+     * is not: the retry would ring the owner a second time for a single
+     * event. Producers whose fanout must happen exactly once per
+     * deduplication key branch on `created`.
+     *
+     * Attention controls (AW-13): when `dto.eventKey` is set and the user's
+     * own choice for that event leaves in-app out, the row is written with
+     * `isSilent = true`. Persistent rows are never silent. Any failure while
+     * resolving the choice writes a normal row — the in-app record is the
+     * floor and a routing fault can never take it away.
+     */
+    private async writeInApp(
+        dto: CreateNotificationDto,
+    ): Promise<{ notification: Notification; created: boolean }> {
         // Check deduplication - if a notification with this key already exists and isn't dismissed, return it
         if (dto.deduplicationKey) {
             const existing = await this.repository.findByDeduplicationKey(
@@ -112,18 +149,20 @@ export class NotificationService {
                 this.logger.debug(
                     `Notification with deduplication key ${dto.deduplicationKey} already exists`,
                 );
-                return existing;
+                return { notification: existing, created: false };
             }
         }
 
+        const toWrite = (await this.resolveSilent(dto)) ? { ...dto, isSilent: true } : dto;
+
         try {
-            const notification = await this.repository.create(dto);
+            const notification = await this.repository.create(toWrite);
 
             this.logger.log(
                 `Created notification ${notification.id} for user ${dto.userId}: ${dto.title}`,
             );
 
-            return notification;
+            return { notification, created: true };
         } catch (error) {
             // Handle race condition: another request created the notification between our check and insert
             if (dto.deduplicationKey && this.isUniqueConstraintError(error)) {
@@ -135,10 +174,24 @@ export class NotificationService {
                     dto.deduplicationKey,
                 );
                 if (existing) {
-                    return existing;
+                    return { notification: existing, created: false };
                 }
             }
             throw error;
+        }
+    }
+
+    private async resolveSilent(dto: CreateNotificationDto): Promise<boolean> {
+        if (dto.isPersistent || !dto.eventKey || !this.subscriptionResolver) {
+            return false;
+        }
+        try {
+            return !(await this.subscriptionResolver.isInAppSelected(dto.userId, dto.eventKey));
+        } catch (err) {
+            this.logger.warn(
+                `In-app choice lookup failed for user=${dto.userId} event=${dto.eventKey}; writing a normal notification: ${String(err)}`,
+            );
+            return false;
         }
     }
 
@@ -236,7 +289,8 @@ export class NotificationService {
         provider: string,
         errorMessage?: string,
     ): Promise<void> {
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'ai_credits_depleted',
             userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.AI_CREDITS,
@@ -252,6 +306,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId,
             eventKey: 'ai_credits_depleted',
+            deduplicated: !inApp.created,
             title: 'AI Credits Depleted',
             message:
                 errorMessage ||
@@ -281,7 +336,8 @@ export class NotificationService {
             `A run's metered usage needed ${Math.trunc(args.requiredCredits)} credits but your ` +
             `balance is ${balance}. The run finished normally; the uncovered remainder was not ` +
             `debited. Top up credits to keep usage billing normally.`;
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'credits_balance_exhausted',
             userId: args.userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.AI_CREDITS,
@@ -300,6 +356,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'credits_balance_exhausted',
+            deduplicated: !inApp.created,
             title: 'Credits Balance Exhausted',
             message,
             actionUrl: '/settings',
@@ -335,7 +392,8 @@ export class NotificationService {
               `resets.${resets}`
             : `Your pay-as-you-go usage is at ${used} of ${cap} credits this cycle (80%). Raise the cap ` +
               `in Billing if you want to keep going past it.${resets}`;
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: `payg_cap_${args.percent}`,
             userId: args.userId,
             type: reached ? NotificationType.WARNING : NotificationType.INFO,
             category: NotificationCategory.AI_CREDITS,
@@ -350,6 +408,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: `payg_cap_${args.percent}`,
+            deduplicated: !inApp.created,
             title,
             message,
             actionUrl: '/settings/billing',
@@ -383,7 +442,8 @@ export class NotificationService {
             `We could not collect your latest pay-as-you-go invoice${amount}. Pay-as-you-go is paused ` +
             `until it is settled; prepaid credits keep working. Update your card or retry the payment ` +
             `from Billing.`;
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'payg_past_due',
             userId: args.userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.AI_CREDITS,
@@ -400,6 +460,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'payg_past_due',
+            deduplicated: !inApp.created,
             title: 'Pay-as-you-go payment failed',
             message,
             actionUrl: '/settings/billing',
@@ -416,7 +477,8 @@ export class NotificationService {
         // Security: cap error message to 500 chars to prevent AI provider SDK
         // details (URLs, request IDs, stack traces) from leaking into stored notifications.
         const safeError = this.sanitizeErrorMessage(errorMessage);
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'ai_provider_error',
             userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.AI_CREDITS,
@@ -429,6 +491,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId,
             eventKey: 'ai_provider_error',
+            deduplicated: !inApp.created,
             title: 'AI Provider Error',
             message: `Error with ${provider}: ${safeError}`,
             actionUrl: '/settings',
@@ -447,7 +510,8 @@ export class NotificationService {
         // and cap error message to prevent internal detail leakage.
         const safeName = this.sanitizeLabel(workName);
         const safeError = this.sanitizeErrorMessage(errorMessage);
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'generation_error',
             userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.GENERATION,
@@ -461,6 +525,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId,
             eventKey: 'generation_error',
+            deduplicated: !inApp.created,
             title: 'Generation Failed',
             message: `Generation for "${safeName}" failed: ${safeError}`,
             actionUrl: `/works/${workId}`,
@@ -477,7 +542,8 @@ export class NotificationService {
     ): Promise<void> {
         // Security: strip HTML from user-supplied work name (defence-in-depth vs XSS).
         const safeName = this.sanitizeLabel(workName);
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'schedule_paused',
             userId,
             type: NotificationType.WARNING,
             category: NotificationCategory.GENERATION,
@@ -491,6 +557,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId,
             eventKey: 'schedule_paused',
+            deduplicated: !inApp.created,
             title: 'Schedule Paused',
             message: `Scheduled updates for "${safeName}" paused: ${reason}`,
             actionUrl: `/works/${workId}/generator/schedule`,
@@ -522,15 +589,22 @@ export class NotificationService {
             '100': 'Budget cap reached',
             overage: 'Budget overage in progress',
         };
-        await this.create({
+        // Attention controls (AW-13): the threshold-to-event-key mapping lives
+        // here and nowhere else. The cap (or overage past it) is urgent; the
+        // 75% and 90% crossings are a warning.
+        const budgetEventKey = isError ? 'budget_threshold_reached' : 'budget_threshold_warning';
+        const message = `${scopeLabel} has used ${args.currentSpendCents} / ${args.capCents} ${args.currency.toUpperCase()} cents this period.`;
+        // EW-602 review fix (Codex P2 + Greptile P1): per-Work page,
+        // not the per-User /settings namespace.
+        const actionUrl = `/works/${args.workId}/settings/budgets-usage`;
+        const inApp = await this.writeInApp({
+            eventKey: budgetEventKey,
             userId: args.userId,
             type: isError ? NotificationType.ERROR : NotificationType.WARNING,
             category: NotificationCategory.AI_CREDITS,
             title: titleByThreshold[args.threshold],
-            message: `${scopeLabel} has used ${args.currentSpendCents} / ${args.capCents} ${args.currency.toUpperCase()} cents this period.`,
-            // EW-602 review fix (Codex P2 + Greptile P1): per-Work page,
-            // not the per-User /settings namespace.
-            actionUrl: `/works/${args.workId}/settings/budgets-usage`,
+            message,
+            actionUrl,
             actionLabel: 'Manage budgets',
             isPersistent: isError,
             metadata: {
@@ -541,6 +615,16 @@ export class NotificationService {
                 pluginId: args.pluginId,
             },
             deduplicationKey: `budget_${args.budgetId}_${args.threshold}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: budgetEventKey,
+            title: titleByThreshold[args.threshold],
+            message,
+            actionUrl,
+            actionLabel: 'Manage budgets',
+            urgent: isError,
+            deduplicated: !inApp.created,
         });
     }
 
@@ -574,7 +658,8 @@ export class NotificationService {
             `An agent run has been queued for ${args.waitedMinutes} minutes without ` +
             `starting${reasonSuffix}. It has NOT been cancelled.`;
         const actionUrl = '/agents/sessions?attention=1';
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'agent_run_queued_too_long',
             userId: args.userId,
             type: NotificationType.WARNING,
             category: NotificationCategory.AGENT,
@@ -593,6 +678,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'agent_run_queued_too_long',
+            deduplicated: !inApp.created,
             title: 'Agent run queued too long',
             message,
             actionUrl,
@@ -617,7 +703,8 @@ export class NotificationService {
     }): Promise<void> {
         const safeSummary = sanitizeDescription(args.summary, 300);
         const actionUrl = args.taskId ? `/tasks/${args.taskId}` : '/agents/sessions?attention=1';
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'agent_run_escalated',
             userId: args.userId,
             type: NotificationType.WARNING,
             category: NotificationCategory.AGENT,
@@ -636,6 +723,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'agent_run_escalated',
+            deduplicated: !inApp.created,
             title: 'Agent needs a decision',
             message: safeSummary,
             actionUrl,
@@ -702,7 +790,8 @@ export class NotificationService {
             `A run that preferred your local runner ran in the cloud instead because ${detail}. ` +
             'Set the Work to "Local runner (wait for a free slot)" if it must run on your machine.';
         const actionUrl = '/settings/fleet';
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'fleet_runner_fallback',
             userId: args.userId,
             type: NotificationType.INFO,
             category: NotificationCategory.AGENT,
@@ -722,6 +811,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'fleet_runner_fallback',
+            deduplicated: !inApp.created,
             title,
             message,
             actionUrl,
@@ -731,7 +821,8 @@ export class NotificationService {
     }
 
     async notifyGitAuthExpired(userId: string, provider: string): Promise<void> {
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'git_auth_expired',
             userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.SECURITY,
@@ -745,6 +836,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId,
             eventKey: 'git_auth_expired',
+            deduplicated: !inApp.created,
             title: 'Git Authentication Expired',
             message: `Your ${provider} authentication has expired. Please reconnect.`,
             actionUrl: '/settings/oauth',
@@ -777,7 +869,8 @@ export class NotificationService {
             metadata.markdown =
                 args.markdown.length > 8000 ? args.markdown.slice(0, 8000) : args.markdown;
         }
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'digest_ready',
             userId: args.userId,
             type: NotificationType.INFO,
             category: NotificationCategory.DIGEST,
@@ -791,6 +884,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'digest_ready',
+            deduplicated: !inApp.created,
             title: args.title,
             message: safeMessage,
             actionUrl: '/activity',
@@ -823,7 +917,8 @@ export class NotificationService {
     }): Promise<void> {
         const safeMessage = sanitizeDescription(args.message, 500);
         const actionUrl = '/memory';
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: 'memory_consolidation_ready',
             userId: args.userId,
             type: NotificationType.INFO,
             category: NotificationCategory.SYSTEM,
@@ -842,6 +937,7 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'memory_consolidation_ready',
+            deduplicated: !inApp.created,
             title: args.title,
             message: safeMessage,
             actionUrl,
@@ -889,7 +985,8 @@ export class NotificationService {
         // encode it rather than trusting the shape of a value that reaches
         // here through a producer input.
         const actionUrl = `/inbox?id=${encodeURIComponent(args.itemId)}`;
-        await this.create({
+        const inApp = await this.writeInApp({
+            eventKey: eventKeyByKind[args.kind],
             userId: args.userId,
             type: urgent ? NotificationType.WARNING : NotificationType.INFO,
             category: NotificationCategory.AGENT,
@@ -903,11 +1000,58 @@ export class NotificationService {
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: eventKeyByKind[args.kind],
+            deduplicated: !inApp.created,
             title: safeTitle,
             message: safeMessage,
             actionUrl,
             actionLabel: 'Open inbox',
             urgent,
+        });
+    }
+
+    /**
+     * Shared view (AW-18) — the first time a freshly generated share link is
+     * opened, tell the Workspace owner once. The caller has already claimed
+     * the first view atomically, and the deduplication key carries the link's
+     * rotation count, so a retried producer cannot ring twice for one link
+     * while a regenerated link still notifies once more. "Once" covers the
+     * fanout too: a retry that finds the row already filed emits no second
+     * event, so the owner cannot be mailed twice for one opening.
+     *
+     * Registered as `shared_view_first_view` (in-app by default) so the
+     * owner can route it to a channel from the preference matrix. The share
+     * token is never part of the payload.
+     */
+    async notifySharedViewFirstView(args: {
+        userId: string;
+        sharedViewId: string;
+        rotationCount: number;
+    }): Promise<void> {
+        const title = 'Shared view opened';
+        const message = 'Your shared view was opened for the first time.';
+        const actionUrl = '/settings/sharing';
+        const { created } = await this.writeInApp({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.SYSTEM,
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'Open sharing',
+            metadata: { sharedViewId: args.sharedViewId },
+            deduplicationKey: `shared_view_first_view_${args.sharedViewId}_${args.rotationCount}`,
+        });
+        // The row was already filed by an earlier call for this link and
+        // rotation: this is a retry, and the fanout has already gone out.
+        if (!created) return;
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'shared_view_first_view',
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'Open sharing',
+            urgent: false,
         });
     }
 
