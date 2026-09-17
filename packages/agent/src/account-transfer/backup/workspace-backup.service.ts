@@ -575,6 +575,41 @@ export class WorkspaceBackupService {
         return moved ? this.backups.findInScope(scope, backupId) : backup;
     }
 
+    /**
+     * Sweeper pass — fail backups still running past the hour (spec FR-6).
+     *
+     * The runner stops itself at its ceiling, and the job runtime's
+     * `maxDuration` sits just above that. This pass is the backstop for a run
+     * that neither of them ended while its heartbeat kept the stall rule away
+     * — without it, such a row stays `running`, and because `create()` adopts
+     * an active row, the owner cannot start another backup for as long as it
+     * does. A compare-and-set out of `running`, so an outcome that lands
+     * first keeps its own result, and the runner sees its heartbeat miss and
+     * stops.
+     */
+    async failOverdueBackups(now: Date, limit = 200): Promise<number> {
+        const minutes = BACKUP_DEFAULT_LIMITS.timeoutMinutes;
+        const startedBefore = new Date(now.getTime() - minutes * 60 * 1000);
+        const overdue = await this.backups.findOverdue(startedBefore, limit);
+
+        let failed = 0;
+        for (const backup of overdue) {
+            const moved = await this.backups.markTerminal(
+                backup.id,
+                {
+                    status: 'failed',
+                    failureReason: 'timeout',
+                    failureDetail: `The backup did not finish within ${minutes} minutes and was stopped`,
+                    finishedAt: now,
+                    currentDomain: null,
+                },
+                ['running'],
+            );
+            if (moved) failed += 1;
+        }
+        return failed;
+    }
+
     /** Fail one backup as `stalled` and delete whatever partial object it left. */
     private async settleStalled(backup: WorkspaceBackup, now: Date): Promise<boolean> {
         if (backup.storageKey && this.storage) {
@@ -598,7 +633,7 @@ export class WorkspaceBackupService {
     }
 
     /**
-     * All three sweeper passes, each under its own distributed lock.
+     * Every sweeper pass, each under its own distributed lock.
      *
      * The hourly cron used to take the locks itself, from the Trigger worker
      * — which cannot construct `DistributedTaskLockService` at all: the lock
@@ -623,7 +658,7 @@ export class WorkspaceBackupService {
     async runSweep(
         now: Date = new Date(),
         limit = 200,
-    ): Promise<{ expired: number; stalled: number; pruned: number }> {
+    ): Promise<{ expired: number; timedOut: number; stalled: number; pruned: number }> {
         const exclusively = async (key: string, pass: () => Promise<number>): Promise<number> => {
             if (!this.locks) {
                 return pass();
@@ -635,6 +670,11 @@ export class WorkspaceBackupService {
         return {
             expired: await exclusively('workspace-backup:expire', () =>
                 this.expireDueArchives(now, limit),
+            ),
+            // Before the stall pass, so a row that is both past the hour and
+            // silent is reported as what it most specifically is.
+            timedOut: await exclusively('workspace-backup:timeouts', () =>
+                this.failOverdueBackups(now, limit),
             ),
             stalled: await exclusively('workspace-backup:stalls', () =>
                 this.failStalledBackups(now, limit),

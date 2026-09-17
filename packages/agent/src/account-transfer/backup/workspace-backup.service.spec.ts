@@ -65,6 +65,7 @@ function build(
         recordDownload: jest.fn().mockResolvedValue(undefined),
         findExpirable: jest.fn().mockResolvedValue([]),
         findStalled: jest.fn().mockResolvedValue([]),
+        findOverdue: jest.fn().mockResolvedValue([]),
         findPrunable: jest.fn().mockResolvedValue([]),
         deleteByIds: jest.fn().mockResolvedValue(0),
     };
@@ -558,6 +559,48 @@ describe('WorkspaceBackupService — the sweeper passes', () => {
         );
     });
 
+    it('fails a backup still running past the hour, however recently it heartbeat (spec FR-6)', async () => {
+        // The stall rule only sees silence. A run that keeps heartbeating
+        // past its ceiling — its own deadline missed, the job runtime's
+        // `maxDuration` not applied — used to stay `running` for as long as
+        // it went on, with `create()` adopting it every time the owner asked
+        // for a new one. Driven through `runSweep`, the cron's one call.
+        const { service, repository } = build();
+        const now = new Date('2026-09-17T12:00:00.000Z');
+        repository.findOverdue.mockResolvedValue([
+            row({
+                id: 'long-1',
+                status: 'running',
+                startedAt: new Date('2026-09-17T10:30:00.000Z'),
+                lastHeartbeatAt: new Date('2026-09-17T11:59:50.000Z'),
+            }),
+        ]);
+
+        const summary = await service.runSweep(now);
+
+        expect(repository.findOverdue).toHaveBeenCalledWith(
+            new Date('2026-09-17T11:00:00.000Z'),
+            200,
+        );
+        expect(repository.markTerminal).toHaveBeenCalledWith(
+            'long-1',
+            expect.objectContaining({ status: 'failed', failureReason: 'timeout', finishedAt: now }),
+            // A compare-and-set out of `running`: an archive that settled a
+            // moment earlier keeps its own outcome.
+            ['running'],
+        );
+        expect(summary).toMatchObject({ timedOut: 1 });
+    });
+
+    it('counts only the overdue runs it actually moved', async () => {
+        const { service, repository } = build();
+        repository.findOverdue.mockResolvedValue([row({ id: 'long-1', status: 'running' })]);
+        repository.markTerminal.mockResolvedValue(false);
+
+        await expect(service.runSweep(new Date())).resolves.toMatchObject({ timedOut: 0 });
+        expect(repository.markTerminal).toHaveBeenCalledTimes(1);
+    });
+
     it('prunes records whose bytes went long ago (spec FR-29)', async () => {
         const { service, repository } = build();
         repository.findPrunable.mockResolvedValue([row({ id: 'ancient-1' })]);
@@ -600,16 +643,18 @@ describe('WorkspaceBackupService — the sweeper passes', () => {
             return { service: composed, repository, storage };
         }
 
-        it('runs all three passes and reports what each one did', async () => {
+        it('runs every pass and reports what each one did', async () => {
             const locks = locked();
             const { service, repository } = withLocks(locks);
             repository.findExpirable.mockResolvedValue([row({ id: 'old-1' })]);
+            repository.findOverdue.mockResolvedValue([row({ id: 'long-1', status: 'running' })]);
             repository.findStalled.mockResolvedValue([row({ id: 'stuck-1', status: 'running' })]);
             repository.findPrunable.mockResolvedValue([row({ id: 'ancient-1' })]);
             repository.deleteByIds.mockResolvedValue(1);
 
             await expect(service.runSweep(new Date())).resolves.toEqual({
                 expired: 1,
+                timedOut: 1,
                 stalled: 1,
                 pruned: 1,
             });
@@ -623,6 +668,7 @@ describe('WorkspaceBackupService — the sweeper passes', () => {
 
             expect(locks.runExclusive.mock.calls.map((call) => call[0])).toEqual([
                 'workspace-backup:expire',
+                'workspace-backup:timeouts',
                 'workspace-backup:stalls',
                 'workspace-backup:prune',
             ]);
@@ -637,6 +683,7 @@ describe('WorkspaceBackupService — the sweeper passes', () => {
 
             await expect(service.runSweep(new Date())).resolves.toEqual({
                 expired: 0,
+                timedOut: 0,
                 stalled: 0,
                 pruned: 0,
             });

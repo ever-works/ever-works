@@ -390,6 +390,26 @@ export class WorkspaceBackupRepository {
     }
 
     /**
+     * Sweeper pass — backups still `running` after the hour (spec FR-6),
+     * whatever their heartbeat says.
+     *
+     * Kept apart from {@link findStalled} on purpose: a stalled row stopped
+     * reporting, while an overdue one may be reporting perfectly well. The
+     * runner stops itself at its ceiling, so a row here means the process that
+     * owned it could not — and without this nothing else would ever end it.
+     */
+    async findOverdue(startedBefore: Date, limit: number): Promise<WorkspaceBackup[]> {
+        return this.repository
+            .createQueryBuilder('backup')
+            .where('backup.status = :running', { running: 'running' })
+            .andWhere('backup.startedAt IS NOT NULL')
+            .andWhere('backup.startedAt < :cutoff', { cutoff: startedBefore })
+            .orderBy('backup.startedAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /**
      * Sweeper pass 3 — records terminal for longer than the record retention
      * window (spec FR-29). Only rows whose bytes are already gone are
      * eligible, so a prune can never orphan an archive on storage.

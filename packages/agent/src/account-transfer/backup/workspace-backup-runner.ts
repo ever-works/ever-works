@@ -112,6 +112,32 @@ export interface WorkspaceBackupRunOptions {
     readonly instance?: string;
     readonly retentionDays?: number;
     readonly formatReferenceUrl?: string;
+    /**
+     * The latest moment this run may still be producing, when the caller has
+     * a harder limit than the hour of spec FR-6 — the job runtime's own
+     * ceiling for the task, less the time the task needs to report the
+     * outcome. The run stops at whichever comes first.
+     */
+    readonly deadline?: Date;
+}
+
+/**
+ * The run reached its ceiling (spec FR-6). Raised into the writer so every
+ * pending append and the upload stop at once; never escapes the runner.
+ */
+class WorkspaceBackupTimeoutError extends Error {
+    constructor(readonly minutes: number) {
+        super(`The backup did not finish within ${minutes} minutes and was stopped`);
+        this.name = 'WorkspaceBackupTimeoutError';
+    }
+}
+
+/** Shared between a run and the timer that bounds it. */
+interface RunCeiling {
+    /** Set by the timer; read at every stop probe. */
+    reached: WorkspaceBackupTimeoutError | null;
+    /** The run's writer, once it has one, so the timer can abort it. */
+    writer: BackupArchiveWriter | null;
 }
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
@@ -170,12 +196,19 @@ export class WorkspaceBackupRunner {
      * real workspace, which is why the archive task calls
      * {@link startFromPayload} instead.
      */
-    async runFromPayload(payload: {
-        backupId: string;
-        userId: string;
-        organizationId?: string | null;
-    }): Promise<WorkspaceBackupRunResult> {
-        return this.run(payload.backupId, await this.optionsFromPayload(payload));
+    async runFromPayload(
+        payload: {
+            backupId: string;
+            userId: string;
+            organizationId?: string | null;
+        },
+        control: { readonly deadline?: Date } = {},
+    ): Promise<WorkspaceBackupRunResult> {
+        const options = await this.optionsFromPayload(payload);
+        return this.run(
+            payload.backupId,
+            control.deadline ? { ...options, deadline: control.deadline } : options,
+        );
     }
 
     /**
@@ -279,7 +312,31 @@ export class WorkspaceBackupRunner {
         return { row, startedAt, storage: this.storage };
     }
 
-    /** Produce a claimed row's archive, settling the row on every failure it can name. */
+    /**
+     * Produce a claimed row's archive, settling the row on every failure it
+     * can name — including running out of time.
+     *
+     * ## The ceiling is the runner's own
+     *
+     * Spec FR-6 says a backup that has not finished within the hour is stopped
+     * and marked `timeout`. That used to rest on something OUTSIDE the run: the
+     * job runtime's `maxDuration`, which kills the process without settling
+     * anything, and later a watcher polling the row, which enforced nothing
+     * once it was gone. Either way a run could outlive its ceiling with the row
+     * still `running`, or be killed and left for the stall sweep with no
+     * notification.
+     *
+     * So the run carries its ceiling itself: the earlier of `startedAt` plus
+     * `timeoutMinutes` and the caller's `deadline`. A timer at that moment
+     * aborts the writer — which rejects every pending append and the upload —
+     * and every stop probe reads it. And because a hung await that is not the
+     * writer's (a clone, a storage read, an upload that never answers) would
+     * not notice either, the production RACES the timer: at the ceiling the
+     * row is settled `timeout` and this method returns, whatever the
+     * production is still waiting on. What it later wakes up to is an aborted
+     * writer and a row that is no longer `running`, so it cannot settle
+     * anything or leave an object behind.
+     */
     private async execute(
         row: WorkspaceBackup,
         startedAt: Date,
@@ -287,9 +344,38 @@ export class WorkspaceBackupRunner {
         storage: BackupStorage,
     ): Promise<WorkspaceBackupRunResult> {
         const backupId = row.id;
+        const limitMinutes = BACKUP_DEFAULT_LIMITS.timeoutMinutes;
+        const ceiling = Math.min(
+            startedAt.getTime() + limitMinutes * 60 * 1000,
+            options.deadline?.getTime() ?? Number.POSITIVE_INFINITY,
+        );
+
+        const run: RunCeiling = { reached: null, writer: null };
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const ceilingReached = new Promise<'timeout'>((resolve) => {
+            timer = setTimeout(
+                () => {
+                    run.reached = new WorkspaceBackupTimeoutError(limitMinutes);
+                    run.writer?.abort(run.reached);
+                    resolve('timeout');
+                },
+                Math.max(0, ceiling - Date.now()),
+            );
+            timer.unref?.();
+        });
+
+        const production = this.produce(row, startedAt, options, storage, run);
+        // Whichever loses the race below still settles on its own; its
+        // rejection must never surface as an unhandled one.
+        production.catch(() => undefined);
+
         try {
-            return await this.produce(row, startedAt, options, storage);
+            const outcome = await Promise.race([production, ceilingReached]);
+            return outcome === 'timeout' ? await this.settleTimeout(backupId) : outcome;
         } catch (error) {
+            if (run.reached) {
+                return this.settleTimeout(backupId);
+            }
             if (error instanceof BackupArchiveTooLargeError) {
                 await this.fail(backupId, 'too_large', error.message);
                 return { status: 'failed', reason: 'too_large', backupId };
@@ -298,7 +384,36 @@ export class WorkspaceBackupRunner {
             this.logger.error(`Workspace backup ${backupId} failed: ${detail}`);
             await this.fail(backupId, 'internal', detail);
             return { status: 'failed', reason: 'internal', backupId };
+        } finally {
+            clearTimeout(timer);
         }
+    }
+
+    /**
+     * Settle a run that reached its ceiling as `timeout` (spec FR-6).
+     *
+     * A compare-and-set out of `running`: an outcome that landed a moment
+     * earlier — the archive finishing, the owner cancelling — keeps its own
+     * result, and is what this reports.
+     */
+    private async settleTimeout(backupId: string): Promise<WorkspaceBackupRunResult> {
+        const limitMinutes = BACKUP_DEFAULT_LIMITS.timeoutMinutes;
+        const moved = await this.backups.markTerminal(
+            backupId,
+            {
+                status: 'failed',
+                failureReason: 'timeout',
+                failureDetail: new WorkspaceBackupTimeoutError(limitMinutes).message,
+                finishedAt: new Date(),
+                currentDomain: null,
+            },
+            ['running'],
+        );
+        if (moved) {
+            this.logger.warn(`Workspace backup ${backupId} reached its ceiling and was stopped`);
+            return { status: 'failed', reason: 'timeout', backupId };
+        }
+        return this.outcomeOfStoppedRun(backupId);
     }
 
     /** The manifest identity for a payload, read fresh (spec FR-11). */
@@ -351,6 +466,7 @@ export class WorkspaceBackupRunner {
         startedAt: Date,
         options: WorkspaceBackupRunOptions,
         storage: BackupStorage,
+        run: RunCeiling,
     ): Promise<WorkspaceBackupRunResult> {
         await storage.warmUp?.();
 
@@ -364,6 +480,13 @@ export class WorkspaceBackupRunner {
             maxAttachmentBytes: limits.maxAttachmentBytes,
             maxFileBytes: limits.maxFileBytes,
         });
+        // Handed to the ceiling's timer. If the ceiling already passed while
+        // the backend warmed up, the writer is aborted before a byte is read.
+        run.writer = writer;
+        if (run.reached) {
+            writer.abort(run.reached);
+            throw run.reached;
+        }
 
         const scope: BackupScope = {
             userId: row.userId,
@@ -420,7 +543,7 @@ export class WorkspaceBackupRunner {
             idsFor: (name) => registeredIds.get(name)?.ids ?? [],
             // An unregistered name is the "no rows" case, which is honest.
             idsComplete: (name) => registeredIds.get(name)?.complete ?? true,
-            shouldStop: () => cancelled.value,
+            shouldStop: () => cancelled.value || run.reached !== null,
             heartbeat,
         };
 
@@ -435,6 +558,11 @@ export class WorkspaceBackupRunner {
          * the archive.
          */
         const stopIfNotRunning = async (): Promise<WorkspaceBackupRunResult | null> => {
+            if (run.reached) {
+                // The ceiling's own settle already ran; this production only
+                // has to stop.
+                throw run.reached;
+            }
             if (!cancelled.value && !(await this.isCancelled(row.id))) {
                 return null;
             }
@@ -586,6 +714,11 @@ export class WorkspaceBackupRunner {
         const current = await this.dataSource
             .getRepository<WorkspaceBackup>('WorkspaceBackup')
             .findOne({ where: { id: backupId }, select: { id: true, status: true } });
+        if (current?.status === 'ready' || current?.status === 'ready_with_gaps') {
+            // Only reachable from the ceiling's settle, racing an archive that
+            // finished in the same moment: the archive won.
+            return { status: current.status, backupId };
+        }
         return {
             status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
             reason: current?.status ?? 'settled-elsewhere',
