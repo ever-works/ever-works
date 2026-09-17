@@ -31,6 +31,8 @@ import {
     type AgentRunTaskFinisher,
 } from './agent-run-post-processor';
 import { AgentToolService, type AgentToolDescriptor } from './agent-tool.service';
+// Safety rails (AW-24) — the leaf port, so this file gains no runtime graph.
+import { SAFETY_GATE, type SafetyGate } from '../safety/safety-gate.port';
 import {
     AGENT_AI_DISPATCH_FACADE,
     type AgentAiDispatchFacade,
@@ -90,6 +92,13 @@ export interface AgentRunContext {
      */
     taskId?: string | null;
     /**
+     * AW-17 — the Mission of the originating Task (`tasks.missionId`), read
+     * by the host from the Task row it already loaded. Threaded onto every
+     * facade call so usage rows roll up to the Mission that raised the work.
+     * NEVER `agents.missionId`. Null/undefined for runs with no Task.
+     */
+    missionId?: string | null;
+    /**
      * Judgment layer G9 — the effective scope a DELEGATED run was
      * admitted under, read off `agent_runs.delegationScope` by the host
      * that starts the run.
@@ -130,6 +139,21 @@ export interface AgentRunContext {
      * Absent for non-isolated runs.
      */
     workspaceCwd?: string | null;
+}
+
+/**
+ * Safety rails (AW-24) — what the gate is told about the caller.
+ *
+ * Identifiers only. There is deliberately no field for a tool argument, a
+ * prompt, an instruction or a document: the classification comes from the
+ * platform's own descriptor and the rung comes from a persisted row, so
+ * nothing the model produced is an input to a rail decision (FR-15).
+ */
+export interface AgentRunSafetySubject {
+    userId: string;
+    agentId: string;
+    tenantId: string | null;
+    organizationId: string | null;
 }
 
 export interface AgentRunBudgetCheck {
@@ -268,6 +292,16 @@ export class AgentRunService {
         @Optional()
         @Inject(AGENT_RUN_CONVERSATION_REPLY_POSTER)
         private readonly conversationReplyPoster?: AgentRunConversationReplyPoster,
+        // Safety rails (AW-24) — the one place every tool call converges is
+        // `invokeTool`, which is what makes "every rail is evaluated in the
+        // platform, after the model has produced its intent and before the
+        // side effect happens" a satisfiable claim rather than a hope.
+        // Trailing + `@Optional()` so every existing positional constructor
+        // call keeps working; UNBOUND, every tool call behaves exactly as it
+        // did before this epic landed.
+        @Optional()
+        @Inject(SAFETY_GATE)
+        private readonly safetyGate?: SafetyGate,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -811,6 +845,8 @@ export class AgentRunService {
                   context.runId,
                   editsThisRunByFile,
                   context.delegationScope,
+                  context.missionId,
+                  context.taskId,
               )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
@@ -1015,6 +1051,8 @@ export class AgentRunService {
                         // records with the run id so the run-cost
                         // accumulator can sum exactly this run's spend.
                         runId: context.runId,
+                        // AW-17 — and with the Task's Mission.
+                        missionId: context.missionId ?? undefined,
                         providerOverride: agent.aiProviderId ?? undefined,
                     },
                 });
@@ -1089,6 +1127,12 @@ export class AgentRunService {
                         descriptorByName,
                         call,
                         capture,
+                        {
+                            userId: context.userId,
+                            agentId: agent.id,
+                            tenantId: agent.tenantId ?? null,
+                            organizationId: agent.organizationId ?? null,
+                        },
                     );
                     // Security (prompt-injection): tool results frequently
                     // carry attacker-controlled text (fetched web pages, repo
@@ -1360,6 +1404,7 @@ export class AgentRunService {
         descriptorByName: Map<string, AgentToolDescriptor>,
         call: AgentAiToolCall,
         capture?: RunCaptureState,
+        safetySubject?: AgentRunSafetySubject,
     ): Promise<unknown> {
         // Session detail (Feature K) — redacted, capped preview of the args
         // the model sent. Built once and attached to whichever log row this
@@ -1380,6 +1425,18 @@ export class AgentRunService {
                 .catch(() => undefined);
             return { error: `tool "${call.name}" is not available to this Agent.` };
         }
+
+        // Safety rails (AW-24) — the single enforcement point. It runs AFTER
+        // the descriptor has been resolved (so the entry point is the
+        // platform's own, never a model-supplied string) and BEFORE the side
+        // effect. A refusal returns a tool result and NEVER throws: FR-30 —
+        // a run whose action was held must not be failed, it must continue
+        // and be able to proceed differently.
+        const verdict = safetySubject
+            ? await this.evaluateSafety(runId, call, safetySubject, argsMeta, capture)
+            : null;
+        if (verdict) return verdict;
+
         const startedAt = Date.now();
         try {
             const result = await descriptor.invoke(call.args as never);
@@ -1434,6 +1491,93 @@ export class AgentRunService {
                 .catch(() => undefined);
             return { error: errorMessage };
         }
+    }
+
+    /**
+     * Safety rails (AW-24) — ask the gate, and turn a non-allow verdict into
+     * a tool result.
+     *
+     * Returns `null` when the action may proceed (including when the gate is
+     * not bound at all), and a result object when it may not. It never
+     * throws: the gate itself converts every internal failure into the
+     * fail-closed verdict, and a rail that somehow threw anyway would
+     * otherwise turn a policy question into a failed run.
+     *
+     * The result the model sees names the rail, the category and the rung —
+     * an agent that is told WHY it was stopped can do something else, while
+     * one that is told only "error" retries.
+     */
+    private async evaluateSafety(
+        runId: string,
+        call: AgentAiToolCall,
+        subject: AgentRunSafetySubject,
+        argsMeta: Record<string, unknown>,
+        capture?: RunCaptureState,
+    ): Promise<Record<string, unknown> | null> {
+        if (!this.safetyGate) return null;
+
+        let verdict: Awaited<ReturnType<SafetyGate['evaluate']>>;
+        try {
+            verdict = await this.safetyGate.evaluate({
+                entryPointId: call.name,
+                toolName: call.name,
+                userId: subject.userId,
+                agentId: subject.agentId,
+                runId,
+                subjectType: 'run',
+                subjectId: runId,
+                tenantId: subject.tenantId,
+                organizationId: subject.organizationId,
+            });
+        } catch (err) {
+            this.logger.error(
+                `Safety gate threw for tool "${call.name}" on run ${runId} — allowing the call ` +
+                    `to proceed to its own enforcement: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+            );
+            return null;
+        }
+        if (verdict.decision === 'allow') return null;
+
+        this.countCaptureEntry(capture);
+        await this.runLogs
+            .append({
+                runId,
+                level: 'WARN',
+                step: 'safety-gate',
+                message: `Tool "${call.name}" was ${verdict.decision} by the ${verdict.railId ?? 'safety'} rail.`,
+                metadata: {
+                    toolName: call.name,
+                    callId: call.id,
+                    railId: verdict.railId,
+                    category: verdict.category,
+                    rung: verdict.rung,
+                    reasonCode: verdict.reasonCode,
+                    ...argsMeta,
+                },
+            })
+            .catch(() => undefined);
+
+        if (verdict.decision === 'held') {
+            return {
+                held: true,
+                reason: verdict.summary,
+                category: verdict.category,
+                rung: verdict.rung,
+                // Said explicitly so the model does not retry a send that is
+                // waiting for a person — a retry loop against a hold is the
+                // failure mode this wording exists to prevent.
+                retryable: false,
+            };
+        }
+        return {
+            error: verdict.summary ?? 'A safety rail refused this action.',
+            refusedBy: verdict.railId,
+            category: verdict.category,
+            rung: verdict.rung,
+            retryable: false,
+        };
     }
 
     // ── Session detail (Feature K) — timeline capture helpers ─────────
@@ -2005,10 +2149,18 @@ export class AgentRunService {
         runId: string,
         editsThisRunByFile: Set<string>,
         delegationScope?: SubAgentScope | null,
+        missionId?: string | null,
+        taskId?: string | null,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
-        const runContext = { runId, editsThisRunByFile };
+        const runContext = {
+            runId,
+            editsThisRunByFile,
+            missionId: missionId ?? undefined,
+            // AW-17 — the run's Task, so MCP tool calls are attributed to it.
+            taskId: taskId ?? undefined,
+        };
         if (typeof service.resolveGrantedTools !== 'function') {
             return this.applyDelegationScope(
                 await service.resolveAllowedTools(agent, runContext),

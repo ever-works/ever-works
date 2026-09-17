@@ -17,7 +17,9 @@ import {
     COSTS_WINDOW_DAYS,
     CostsSummaryService,
     InvalidCostsWindowError,
+    type CostsBreakdown,
     type CostsByAgent,
+    type CostsByMeter,
     type CostsByModel,
     type CostsDaily,
     type CostsSummary,
@@ -48,6 +50,16 @@ export class CostsTopRunsQueryDto extends CostsWindowQueryDto {
     @Min(1)
     @Max(COSTS_TOP_RUNS_MAX_LIMIT)
     limit?: number;
+}
+
+/**
+ * AW-17 — the by-tool / by-Mission breakdowns show the top 10 plus
+ * "Everything else"; `full=true` returns every row unfolded ("See all").
+ */
+export class CostsBreakdownQueryDto extends CostsWindowQueryDto {
+    @IsOptional()
+    @IsIn(['true', 'false'], { message: 'full must be true or false' })
+    full?: 'true' | 'false';
 }
 
 /**
@@ -137,6 +149,70 @@ export class CostsController {
         @Query() query: CostsWindowQueryDto,
     ): Promise<{ status: string } & CostsByModel> {
         return this.run(() => this.costsSummaryService.getByModel(auth.userId, query.windowDays));
+    }
+
+    @Get('by-tool')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Where the credits went, by kind of call (price-list key).',
+        description:
+            'Ranked by credits, then provider cost: the top 10 kinds plus an exact "Everything ' +
+            'else" remainder (full=true returns all). Keys are capability.operation, never a ' +
+            'Plugin id. Usage recorded before meters were separated is reported by by-meter, ' +
+            'never here.',
+    })
+    @ApiResponse({ status: 200, description: 'Ranked per-kind rows' })
+    @ApiResponse({ status: 400, description: 'Invalid windowDays or full' })
+    async byTool(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: CostsBreakdownQueryDto,
+    ): Promise<{ status: string } & CostsBreakdown> {
+        return this.run(() =>
+            this.costsSummaryService.getByTool(auth.userId, query.windowDays, {
+                full: query.full === 'true',
+            }),
+        );
+    }
+
+    @Get('by-mission')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Where the credits went, by the Mission of each Task.',
+        description:
+            'A Mission row totals the spend of the Tasks that Mission raised. The row with a null ' +
+            'key is "Not in a Mission": Runs with no Task and Tasks filed against no Mission. ' +
+            'Attribution comes from the Task, never from the Agent that ran it.',
+    })
+    @ApiResponse({ status: 200, description: 'Ranked per-Mission rows' })
+    @ApiResponse({ status: 400, description: 'Invalid windowDays or full' })
+    async byMission(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: CostsBreakdownQueryDto,
+    ): Promise<{ status: string } & CostsBreakdown> {
+        return this.run(() =>
+            this.costsSummaryService.getByMission(auth.userId, query.windowDays, {
+                full: query.full === 'true',
+            }),
+        );
+    }
+
+    @Get('by-meter')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'The three meters for the window: model usage, credits, add-ons.',
+        description:
+            'Every unit of spend belongs to exactly one meter. Model usage is paid by the ' +
+            'Workspace own accounts and is never charged. A meter with no rows reports ' +
+            'costCents null (not measured). Usage recorded before meters were separated is ' +
+            'returned apart as preMeterResidual and never folded into a meter.',
+    })
+    @ApiResponse({ status: 200, description: 'Three meter totals plus the pre-meter residual' })
+    @ApiResponse({ status: 400, description: 'Invalid windowDays' })
+    async byMeter(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: CostsWindowQueryDto,
+    ): Promise<{ status: string } & CostsByMeter> {
+        return this.run(() => this.costsSummaryService.getByMeter(auth.userId, query.windowDays));
     }
 
     @Get('top-runs')

@@ -1,4 +1,4 @@
-import { UserUploadRepository } from './user-upload.repository';
+import { UserUploadRepository, uploadServeUrl } from './user-upload.repository';
 
 describe('UserUploadRepository — ownership scope', () => {
     const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -222,5 +222,71 @@ describe('UserUploadRepository — ownership scope', () => {
         expect(orm.findOne).toHaveBeenCalledWith({
             where: [{ sha256, userId, ...everScope }],
         });
+    });
+});
+
+describe('UserUploadRepository — several attachments at once', () => {
+    const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const scope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+
+    it('reads the caller’s uploads for every hash in one scoped query, deduped and normalized', async () => {
+        const orm = { find: jest.fn().mockResolvedValue([]) };
+        const uploads = new UserUploadRepository(orm as never);
+
+        await uploads.findOwnedBySha256s(
+            ['A'.repeat(64), 'a'.repeat(64), 'c'.repeat(64)],
+            userId,
+            scope,
+        );
+
+        expect(orm.find).toHaveBeenCalledTimes(1);
+        const where = orm.find.mock.calls[0][0].where as Array<Record<string, unknown>>;
+        expect(where).toEqual([
+            expect.objectContaining({
+                userId,
+                ...scope,
+                sha256: expect.objectContaining({ _type: 'in' }),
+            }),
+        ]);
+        expect((where[0].sha256 as { _value: string[] })._value).toEqual([
+            'a'.repeat(64),
+            'c'.repeat(64),
+        ]);
+    });
+
+    it('asks nothing when there is nothing to look up', async () => {
+        const orm = { find: jest.fn() };
+        const uploads = new UserUploadRepository(orm as never);
+        await expect(uploads.findOwnedBySha256s([], userId, scope)).resolves.toEqual([]);
+        expect(orm.find).not.toHaveBeenCalled();
+    });
+});
+
+describe('uploadServeUrl', () => {
+    const sha = 'd'.repeat(64);
+
+    it('rebuilds the owner-gated URL an upload was first served under', () => {
+        expect(
+            uploadServeUrl('u 1', { sha256: sha, storagePath: `u 1/${sha}.pdf`, workId: null }),
+        ).toBe(`/api/uploads/u%201/${sha}.pdf`);
+    });
+
+    it('keeps the Work round-trip for a per-Work storage key', () => {
+        expect(
+            uploadServeUrl('u1', {
+                sha256: sha,
+                storagePath: `dr:w-1:u1/${sha}.png`,
+                workId: 'w-1',
+            }),
+        ).toBe(`/api/uploads/u1/${sha}.png?workId=w-1`);
+    });
+
+    it('has no URL for a key that does not carry the hash', () => {
+        expect(
+            uploadServeUrl('u1', { sha256: sha, storagePath: 'elsewhere/file.pdf', workId: null }),
+        ).toBeNull();
     });
 });

@@ -1,4 +1,5 @@
 import {
+    QUEUED_REASON_AGENT_PAUSED,
     QUEUED_REASON_CONCURRENCY,
     QUEUED_REASON_KILL_SWITCH,
     RunDispatchGateService,
@@ -369,10 +370,14 @@ describe('AgentRunSweeperService — kill-switch-parked runs are never reaped (E
 
     it('asks the repository to exempt kill-switch-parked rows in the SQL', async () => {
         await makeSvc().sweepStuckRuns();
+        // AW-23 APPENDED `agent-paused` to the same exemption list — work
+        // held by a paused agent is waiting for a person too. Still an
+        // exact match, and `kill-switch` still leads it: this assertion
+        // is what stops a future exemption from quietly displacing it.
         expect(runs.findStuckNonTerminal).toHaveBeenCalledWith(
             expect.any(Date),
             expect.any(Number),
-            [QUEUED_REASON_KILL_SWITCH],
+            [QUEUED_REASON_KILL_SWITCH, QUEUED_REASON_AGENT_PAUSED],
         );
     });
 

@@ -10,7 +10,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { MergePolicyOverride } from '@ever-works/contracts';
+import type { AgentHaltDetailDto, MergePolicyOverride } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
 // Type-only import (erased at compile time) — no runtime cycle with the
@@ -54,6 +54,37 @@ export enum AgentStatus {
     ERROR = 'error',
     ARCHIVED = 'archived',
 }
+
+/**
+ * Why an Agent is not working (AW-23). NULL on the row = it is not halted.
+ *
+ * This adds NO status member and NO transition: the six statuses above
+ * keep their names and their lattice. A halt reason is a fact recorded
+ * ALONGSIDE the status at the moment the agent stops, so the product can
+ * state a reason instead of recomputing a story out of run history.
+ *
+ * The string values mirror `AgentHaltReasonCode` in `@ever-works/contracts`
+ * and are persisted, so members are added, never renamed.
+ */
+export enum AgentHaltReason {
+    /** A person pressed Pause. */
+    USER = 'user',
+    /** A provider rejected this agent's account — halts after ONE failure. */
+    CREDENTIAL = 'credential',
+    /** Consecutive run failures reached `pauseAfterFailures`. */
+    FAILURES = 'failures',
+    /** A spend cap stopped it. Rendered today; raised by the caps work. */
+    CAP = 'cap',
+    /** An operator stopped agents platform-wide. */
+    PLATFORM = 'platform',
+}
+
+/**
+ * Non-secret descriptor of what refused the Agent — the shape stored in
+ * `agents.haltDetail`. Display names only; the contracts package owns the
+ * definition so the API, the web renderer and this column cannot drift.
+ */
+export type AgentHaltDetail = AgentHaltDetailDto;
 
 /**
  * Avatar rendering mode (agents/spec.md §5.10a — operator H3 override:
@@ -389,6 +420,61 @@ export class Agent {
 
     @Column({ type: 'int', default: 3 })
     pauseAfterFailures: number;
+
+    // ── Halt reason (AW-23) ──
+    // Eight columns that turn "this agent is paused" into an answer.
+    // Every one is additive and nullable except the counter, so an
+    // existing paused agent reads as "Paused by you" with no time and no
+    // author — the truthful rendering of everything we know about it.
+    //
+    // 🛑 `haltDetail` is a DISPLAY NAME and a coarse kind. No credential,
+    // no token fragment and no raw provider error body may ever be
+    // written here: it is rendered on the card, written to the activity
+    // feed and returned by the API.
+
+    /** Why this agent is not working. NULL = it is not halted. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    haltReason?: AgentHaltReason | null;
+
+    /** The optional human note from the pause dialog. Secret-scanned on write. */
+    @Column({ type: 'varchar', length: 200, nullable: true })
+    haltNote?: string | null;
+
+    @PortableDateColumn({ nullable: true })
+    haltedAt?: Date | null;
+
+    /** Who pressed Pause. Set only for `haltReason = 'user'`. */
+    @Column({ type: 'uuid', nullable: true })
+    haltedByUserId?: string | null;
+
+    /** The run that caused an automatic halt. */
+    @Column({ type: 'uuid', nullable: true })
+    haltedRunId?: string | null;
+
+    @Column({ type: 'simple-json', nullable: true })
+    haltDetail?: AgentHaltDetail | null;
+
+    /**
+     * Consecutive halts carrying the SAME reason. `2` is what lets the
+     * card say "Halted for this reason twice", which is how a
+     * resume/halt loop stops being mysterious.
+     *
+     * Paired with {@link haltRepeatReason}, and deliberately NOT cleared
+     * on resume: resuming an agent whose credential is still broken
+     * clears the halt RECORD, and the very next failing run must still
+     * be able to report the second occurrence.
+     */
+    @Column({ type: 'int', default: 0 })
+    haltRepeatCount: number;
+
+    /**
+     * WHICH reason {@link haltRepeatCount} is counting. Survives a
+     * resume so the counter has something to compare the next halt
+     * against; a halt carrying a DIFFERENT reason resets both to a
+     * fresh 1.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    haltRepeatReason?: AgentHaltReason | null;
 
     // ── Avatar (H3 — all three modes in v1) ──
 

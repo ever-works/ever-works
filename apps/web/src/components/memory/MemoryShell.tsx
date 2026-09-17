@@ -25,6 +25,8 @@ import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
 import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
 import { MemoryMeetingsPanel, type MemoryMeetingsData } from './MemoryMeetingsPanel';
+import { FactsPanel } from './FactsPanel';
+import type { MemoryFactListDto } from '@/lib/api/memory-facts-types';
 import { LibraryPanel } from '@/components/knowledge/LibraryPanel';
 import type { KnowledgeLibraryInitialData } from '@/lib/api/knowledge-library-types';
 import {
@@ -43,6 +45,17 @@ interface MemoryShellProps {
      * without it — the block is simply absent.
      */
     meetings?: MemoryMeetingsData;
+    /**
+     * First page of memory facts (AW-07), server-fetched by the page. Optional
+     * for the same reason as `meetings`: the shell still renders standalone
+     * (and in specs) without it — the Facts block is simply absent.
+     */
+    facts?: MemoryFactListDto;
+    /**
+     * `true` when the page's server fetch of `facts` failed. The Facts block
+     * then shows its load error with Retry instead of an empty workspace.
+     */
+    factsLoadFailed?: boolean;
     /**
      * The view the page was requested with (`?view=library`). Omitted = the
      * overview, which is the page exactly as it has always rendered.
@@ -92,7 +105,14 @@ function formatDate(iso: string): string {
  * (they depend on cross-feature prerequisites — see the Memory spec
  * §2.4 / §4.3).
  */
-export function MemoryShell({ initial, meetings, initialView, library }: MemoryShellProps) {
+export function MemoryShell({
+    initial,
+    meetings,
+    facts,
+    factsLoadFailed,
+    initialView,
+    library,
+}: MemoryShellProps) {
     const t = useTranslations('dashboard.memoryPage');
 
     // Overview | Library. The server passes the URL's `?view=` so the first
@@ -373,6 +393,20 @@ export function MemoryShell({ initial, meetings, initialView, library }: MemoryS
                 />
             ) : (
                 <>
+                    {/* Facts (AW-07) — the atomic tier of Memory, with the section
+                        rail that jumps to every panel below. It belongs to the
+                        overview: the Library view is the shelf, and the rail's
+                        targets are the panels underneath this branch. Additive —
+                        nothing below moved. "Tidy up" reuses the existing
+                        consolidation pass. */}
+                    {facts && (
+                        <FactsPanel
+                            initial={facts}
+                            initialLoadFailed={factsLoadFailed}
+                            onTidyUp={() => void runConsolidation(false)}
+                        />
+                    )}
+
                     {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
                     <MemoryReviewPanel />
 

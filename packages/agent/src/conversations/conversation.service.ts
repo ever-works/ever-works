@@ -47,6 +47,8 @@ export interface ConversationListRow {
     contextId: string | null;
     lastMessageAt: Date | null;
     unreadCount: number;
+    /** The first message a person wrote, shortened; `null` before anyone wrote. */
+    preview: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -195,10 +197,11 @@ export class ConversationService {
             { ...filter, limit, offset },
             scope,
         );
-        const unread = await this.conversations.unreadCountsFor(
-            userId,
-            conversations.map((conversation) => conversation.id),
-        );
+        const ids = conversations.map((conversation) => conversation.id);
+        const [unread, previews] = await Promise.all([
+            this.conversations.unreadCountsFor(userId, ids),
+            this.conversations.firstMessagePreviews(ids),
+        ]);
         return {
             total,
             conversations: conversations.map((conversation) => ({
@@ -213,6 +216,7 @@ export class ConversationService {
                 contextId: conversation.contextId ?? null,
                 lastMessageAt: conversation.lastMessageAt ?? null,
                 unreadCount: unread.get(conversation.id) ?? 0,
+                preview: previews.get(conversation.id) ?? null,
                 createdAt: conversation.createdAt,
                 updatedAt: conversation.updatedAt,
             })),

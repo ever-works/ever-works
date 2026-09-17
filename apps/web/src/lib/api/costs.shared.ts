@@ -25,7 +25,18 @@ export const COSTS_UNATTRIBUTED_SERIES_KEY = 'unattributed';
 export const COSTS_OTHER_SERIES_KEY = 'other';
 
 /** The sections of the Costs API, used by the proxy route's allow-list. */
-export const COSTS_SECTIONS = ['summary', 'daily', 'by-agent', 'by-model', 'top-runs'] as const;
+export const COSTS_SECTIONS = [
+    'summary',
+    'daily',
+    'by-agent',
+    'by-model',
+    'top-runs',
+    // AW-17 — where the credits went (by kind of call, by Mission) and the
+    // three meters. Appended; the five sections above are unchanged.
+    'by-tool',
+    'by-mission',
+    'by-meter',
+] as const;
 export type CostsSection = (typeof COSTS_SECTIONS)[number];
 
 // ── Wire types ──────────────────────────────────────────────────────
@@ -100,6 +111,59 @@ export interface CostsTopRunRow {
 
 export interface CostsTopRuns extends CostsWindowEcho {
     rows: CostsTopRunRow[];
+}
+
+/** AW-17 — the three meters, named identically on every surface. */
+export type CostsMeterId = 'model' | 'credits' | 'addon';
+
+/** AW-17 — one meter's totals for the window. */
+export interface CostsMeterTotals {
+    meter: CostsMeterId;
+    calls: number;
+    /** Null when the meter has no rows — not measured, never zero. */
+    costCents: number | null;
+    credits: number;
+    cachedCalls: number;
+    failedCalls: number;
+    unconfirmedCalls: number;
+}
+
+/**
+ * AW-17 — how runs are debited: `provider_cost` (default) means `credits`
+ * figures are list-price figures beside a debit from provider cost;
+ * `price_list` means they are what was debited.
+ */
+export type CostsSettlementMode = 'provider_cost' | 'price_list';
+
+/** AW-17 — `GET /api/usage/costs/by-meter`. */
+export interface CostsByMeter extends CostsWindowEcho {
+    meters: CostsMeterTotals[];
+    /** Usage recorded before meters were separated; null when there is none. */
+    preMeterResidual: { calls: number; costCents: number } | null;
+    /** Optional: older APIs omit it. */
+    settlementMode?: CostsSettlementMode;
+}
+
+/** AW-17 — one row of `by-tool` / `by-mission`. */
+export interface CostsBreakdownRow {
+    /** Price key / Mission id; null = "Not in a Mission"; `everything-else` = folded tail. */
+    key: string | null;
+    label: string | null;
+    calls: number;
+    credits: number;
+    costCents: number;
+    sharePercent: number;
+}
+
+/** AW-17 — `GET /api/usage/costs/by-tool` and `/by-mission`. */
+export interface CostsBreakdown extends CostsWindowEcho {
+    dimension: 'tool' | 'mission';
+    totalCredits: number;
+    totalCostCents: number;
+    rows: CostsBreakdownRow[];
+    foldedCount: number;
+    /** Optional: older APIs omit it. */
+    settlementMode?: CostsSettlementMode;
 }
 
 /** Everything the Costs tab renders for ONE window. */

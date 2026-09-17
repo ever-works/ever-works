@@ -6,6 +6,7 @@ import { KB_NORMALIZE_MEDIA_DISPATCHER } from '../kb-normalize-media-dispatcher'
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../kb-org-overlay-fanout-dispatcher';
 import { KB_REEMBED_WORK_DISPATCHER } from '../kb-reembed-work-dispatcher';
 import { KB_TRANSCRIBE_DISPATCHER } from '../kb-transcribe-dispatcher';
+import { MEMORY_FACT_EMBED_DISPATCHER } from '../memory-fact-embed-dispatcher';
 import { ROSTER_PROVISION_DISPATCHER } from '../roster-provision-dispatcher';
 import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from '../template-customization-dispatcher';
 import { WEBHOOK_DELIVERY_DISPATCHER } from '../webhook-delivery-dispatcher';
@@ -130,13 +131,16 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
     });
 
     describe('buildJobRuntimeProviders()', () => {
-        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 13)', () => {
+        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 14)', () => {
             const providers = buildJobRuntimeProviders();
-            // COUNTED off the merged DISPATCHER_SYMBOLS array, not added up
-            // from two branches: develop reached 12 with ROSTER_PROVISION and
+            // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER +
+            // develop's ROSTER_PROVISION_DISPATCHER + AW-22's
+            // WORKSPACE_BACKUP_DISPATCHER. COUNTED off the merged
+            // DISPATCHER_SYMBOLS list, not added up from either branch:
+            // develop reached 13 with MEMORY_FACT_EMBED + ROSTER_PROVISION and
             // this branch reached 12 with WORKSPACE_BACKUP from a base of 11.
-            // The merged list carries both -> 13.
-            expect(providers).toHaveLength(13);
+            // The merged list carries all of them -> 14.
+            expect(providers).toHaveLength(14);
         });
 
         it('binds every *_DISPATCHER symbol exported from @ever-works/agent/tasks', () => {
@@ -148,7 +152,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 13-symbol list is the actual invariant we care about.
+            // 14-symbol list is the actual invariant we care about.
             const expected = new Set<symbol>([
                 KB_BACKFILL_SKELETON_DISPATCHER,
                 KB_EMBED_DOCUMENT_DISPATCHER,
@@ -157,6 +161,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
                 KB_ORG_OVERLAY_FANOUT_DISPATCHER,
                 KB_REEMBED_WORK_DISPATCHER,
                 KB_TRANSCRIBE_DISPATCHER,
+                MEMORY_FACT_EMBED_DISPATCHER,
                 ROSTER_PROVISION_DISPATCHER,
                 TEMPLATE_CUSTOMIZATION_DISPATCHER,
                 WEBHOOK_DELIVERY_DISPATCHER,

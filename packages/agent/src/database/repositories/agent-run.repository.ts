@@ -13,6 +13,7 @@ import { Work } from '../../entities/work.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../insertion-order';
+import { timeSortKeyColumnSql, timeSortKeyParameterSql } from '../time-sort-key';
 import type { SubAgentScope } from '@ever-works/contracts';
 // Pure leaf (type-only imports of its own) — no runtime graph, no cycle.
 import { isAgentReviewRunScope } from '../../tasks-domain/task-agent-review';
@@ -1371,6 +1372,29 @@ export class AgentRunRepository {
             .andWhere(`${alias}.queuedReason IS NULL`);
     }
 
+    /**
+     * Runs a user created inside `[from, to)`, narrowed to one workspace
+     * scope when one is given — the scoped twin of the run count the Costs
+     * summary reads, so a scoped spend headline divides by scoped runs.
+     */
+    async countCreatedForUserInWindow(
+        userId: string,
+        from: Date,
+        to: Date,
+        ownershipScope?: OwnershipScope,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('run')
+            .where('run.userId = :userId', { userId })
+            .andWhere('run.createdAt >= :createdFrom', { createdFrom: from })
+            .andWhere('run.createdAt < :createdTo', { createdTo: to });
+        const ownership = ownershipSqlPredicate('run', ownershipScope, 'createdWindow');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        return qb.getCount();
+    }
+
     /** Per-Work in-flight count for the dispatch gate. */
     async countInFlightForWork(workId: string): Promise<number> {
         return this.inFlightQb().andWhere('run.workId = :workId', { workId }).getCount();
@@ -1404,6 +1428,115 @@ export class AgentRunRepository {
                 .andWhere('run.queuedReason = :queuedReason', { queuedReason })
                 .orderBy('run.createdAt', 'ASC'),
             'ASC',
+        ).getOne();
+    }
+
+    /**
+     * AW-23 — oldest run parked for this AGENT with `queuedReason`, so a
+     * Resume can release held work oldest-first.
+     *
+     * Deliberately keyed on `agentId` rather than `workId`: work held by
+     * a pause belongs to the agent that was paused, and a heartbeat run
+     * carries no Work at all. The Work-keyed
+     * {@link findOldestQueuedForConcurrency} therefore cannot see it —
+     * which is exactly why a paused agent needs its own drain.
+     *
+     * Same predicate and same insertion-order tie-break as the Work-keyed
+     * query, so two runs created in the same millisecond still release in
+     * the order they arrived.
+     */
+    async findOldestQueuedForAgent(
+        agentId: string,
+        queuedReason: string,
+    ): Promise<AgentRun | null> {
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+                .andWhere('run.queuedReason = :queuedReason', { queuedReason })
+                .orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        ).getOne();
+    }
+
+    /**
+     * AW-23 — what is being HELD for this agent, for the panel that
+     * answers "nothing is lost" with a list instead of a promise.
+     *
+     * Returns the total (uncapped, so the panel can say "3 items" while
+     * showing two) alongside a bounded, oldest-first preview in the exact
+     * order a Resume will release them.
+     */
+    async listQueuedForAgent(
+        agentId: string,
+        queuedReason: string,
+        limit: number,
+    ): Promise<{ total: number; items: AgentRun[] }> {
+        const bounded = Math.max(0, Math.trunc(limit));
+        const where = () =>
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+                .andWhere('run.queuedReason = :queuedReason', { queuedReason });
+        const total = await where().getCount();
+        if (bounded === 0 || total === 0) return { total, items: [] };
+        const items = await addInsertionOrderTieBreak(
+            where().orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        )
+            .take(bounded)
+            .getMany();
+        return { total, items };
+    }
+
+    /**
+     * AW-23 — runs of this agent that are still finishing.
+     *
+     * A pause lets an in-flight run finish rather than killing it, so the
+     * card has to be able to say how many are still going before it
+     * offers the second, explicit stop.
+     */
+    async countInFlightForAgent(agentId: string): Promise<number> {
+        return this.inFlightQb().andWhere('run.agentId = :agentId', { agentId }).getCount();
+    }
+
+    /**
+     * AW-23 — the run this agent is actually working on, for the card's
+     * "Working on" row.
+     *
+     * Deliberately NOT {@link findInFlightForAgent}, which counts parked
+     * rows as in-flight: a paused agent with three held runs is not
+     * working on anything, and saying it is would be the exact lie this
+     * epic exists to remove. `inFlightQb` excludes parked rows by
+     * construction.
+     */
+    async findNewestInFlightForAgent(agentId: string): Promise<AgentRun | null> {
+        return addInsertionOrderTieBreak(
+            this.inFlightQb()
+                .andWhere('run.agentId = :agentId', { agentId })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
+        ).getOne();
+    }
+
+    /**
+     * AW-23 — the newest FAILED run of this agent, so "Hit an error" can
+     * link to the run that caused it in one click.
+     *
+     * The fallback for an agent that hit the failure threshold before the
+     * halt columns existed: its halt record has no `haltedRunId`, and
+     * without this the reason would be a sentence with nowhere to go.
+     */
+    async findNewestFailedForAgent(agentId: string): Promise<AgentRun | null> {
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status = :status', { status: 'failed' satisfies AgentRunStatus })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
         ).getOne();
     }
 
@@ -1761,6 +1894,19 @@ export class AgentRunRepository {
              * answer "what is waiting on me?".
              */
             attention?: boolean;
+            /**
+             * Narrow to runs that are (`true`) or are not (`false`) waiting
+             * on a human. Home's Working now reads `status: 'running'` with
+             * `awaitingInput: false`: a run parked on a question is not
+             * acting, and it already shows as a decision.
+             */
+            awaitingInput?: boolean;
+            /**
+             * `newest` (default) — most recently created first, the Sessions
+             * list order. `longest-running` — earliest start first, so the
+             * run that has been going longest leads.
+             */
+            order?: 'newest' | 'longest-running';
         },
         limit = 25,
         offset = 0,
@@ -1792,6 +1938,24 @@ export class AgentRunRepository {
         }
         if (filters.triggerKind) {
             qb.andWhere('run.triggerKind = :triggerKind', { triggerKind: filters.triggerKind });
+        }
+        if (typeof filters.awaitingInput === 'boolean') {
+            qb.andWhere('run.awaitingInput = :awaitingInputFilter', {
+                awaitingInputFilter: filters.awaitingInput,
+            });
+        }
+        if (filters.order === 'longest-running') {
+            // `startedAt` is null only before a run is picked up; those sort
+            // after every started run, oldest created first. The insertion-order
+            // tie-break keeps the page stable on SQLite, where whole-second
+            // timestamps make ties routine.
+            return addInsertionOrderTieBreak(
+                qb.orderBy('run.startedAt', 'ASC', 'NULLS LAST').addOrderBy('run.createdAt', 'ASC'),
+                'ASC',
+            )
+                .take(limit)
+                .skip(offset)
+                .getManyAndCount();
         }
         return addInsertionOrderTieBreak(qb.orderBy('run.createdAt', 'DESC'), 'DESC')
             .take(limit)
@@ -1953,6 +2117,38 @@ export class AgentRunRepository {
     // scope inside the repository, exactly like `listSessionsForUser`.
 
     /**
+     * The ledger instant as a canonical millisecond text key, or `null` on
+     * a driver `time-sort-key.ts` does not canonicalise.
+     *
+     * Every ledger comparison — the window bounds, the cursor and the
+     * ORDER BY — goes through this ONE expression, so the three can never
+     * disagree. Comparing the raw `COALESCE(startedAt, createdAt)` against
+     * a bound `Date` instead (what these reads used to do) is wrong on both
+     * shipped drivers: on the sqlite family a run that never started
+     * carries whole-second `datetime('now')` text, which a
+     * `'… HH:MM:SS.000'` cursor sorts AFTER, so such a page restarts at the
+     * top of that second and serves its rows twice; on Postgres a
+     * millisecond cursor cannot name a microsecond row, so the cursor row
+     * satisfies the predicate again. It also fixes the window bound for a
+     * run whose ledger instant lands exactly on the boundary second, which
+     * the same string-shape mismatch used to exclude.
+     */
+    private ledgerInstantKeySql(): string | null {
+        return timeSortKeyColumnSql(
+            this.repository.manager?.connection?.options?.type,
+            LEDGER_INSTANT,
+        );
+    }
+
+    /** The same key for a bound `Date` parameter; `null` pairs with above. */
+    private ledgerInstantParameterKeySql(parameterName: string): string | null {
+        return timeSortKeyParameterSql(
+            this.repository.manager?.connection?.options?.type,
+            parameterName,
+        );
+    }
+
+    /**
      * Base query for one user's runs inside `[from, to)` narrowed by the
      * ledger filters. Private so no caller can obtain an unscoped builder.
      */
@@ -1962,11 +2158,21 @@ export class AgentRunRepository {
         filters: RunLedgerQueryFilters,
         ownershipScope?: OwnershipScope,
     ) {
+        const key = this.ledgerInstantKeySql();
+        const fromKey = this.ledgerInstantParameterKeySql('ledgerFrom');
+        const toKey = this.ledgerInstantParameterKeySql('ledgerTo');
         const qb = this.repository
             .createQueryBuilder('run')
             .where('run.userId = :userId', { userId })
-            .andWhere(`${LEDGER_INSTANT} >= :ledgerFrom`, { ledgerFrom: window.from })
-            .andWhere(`${LEDGER_INSTANT} < :ledgerTo`, { ledgerTo: window.to });
+            .andWhere(
+                key && fromKey ? `${key} >= ${fromKey}` : `${LEDGER_INSTANT} >= :ledgerFrom`,
+                {
+                    ledgerFrom: window.from,
+                },
+            )
+            .andWhere(key && toKey ? `${key} < ${toKey}` : `${LEDGER_INSTANT} < :ledgerTo`, {
+                ledgerTo: window.to,
+            });
         const ownership = ownershipSqlPredicate('run', ownershipScope, 'ledger');
         if (ownership) {
             qb.andWhere(ownership.clause, ownership.parameters);
@@ -2014,6 +2220,18 @@ export class AgentRunRepository {
      * rows; the caller asks for one extra to learn whether a next page
      * exists. The cursor is `(instant, id)`, so rows inserted above the
      * cursor while someone pages never shift the pages below it.
+     *
+     * The instant half is compared as the canonical millisecond key (see
+     * {@link ledgerInstantKeySql}) and not as a raw `Date`. Without that,
+     * a page whose last row never started — still queued, dispatch-failed,
+     * or cancelled before start, so its instant is the whole-second
+     * `createdAt` the sqlite family defaults — hands out a cursor the
+     * predicate places BEFORE that row, and the next page restarts at the
+     * top of its second. With 50+ runs enqueued in one second (a fan-out
+     * dispatch or a schedule sweep) that page is identical to the previous
+     * one and "load more" never advances. The cursor's own wire format is
+     * unchanged: it names a millisecond, which is exactly the resolution
+     * this key compares at.
      */
     async listLedgerPage(
         userId: string,
@@ -2024,16 +2242,20 @@ export class AgentRunRepository {
         ownershipScope?: OwnershipScope,
     ): Promise<AgentRun[]> {
         const qb = this.ledgerQuery(userId, window, filters, ownershipScope);
+        const key = this.ledgerInstantKeySql();
         if (cursor) {
+            const cursorKey = this.ledgerInstantParameterKeySql('ledgerCursorAt');
             qb.andWhere(
-                `(${LEDGER_INSTANT} < :ledgerCursorAt OR (${LEDGER_INSTANT} = :ledgerCursorAt AND run.id < :ledgerCursorId))`,
+                key && cursorKey
+                    ? `(${key} < ${cursorKey} OR (${key} = ${cursorKey} AND run.id < :ledgerCursorId))`
+                    : `(${LEDGER_INSTANT} < :ledgerCursorAt OR (${LEDGER_INSTANT} = :ledgerCursorAt AND run.id < :ledgerCursorId))`,
                 { ledgerCursorAt: cursor.at, ledgerCursorId: cursor.id },
             );
         }
         const take = Math.min(Math.max(Math.trunc(limit), 1), 201);
         return (
             qb
-                .orderBy(LEDGER_INSTANT, 'DESC')
+                .orderBy(key ?? LEDGER_INSTANT, 'DESC')
                 // No rowid tie-break: run.id is already unique here and is part of the cursor.
                 .addOrderBy('run.id', 'DESC')
                 .limit(take)

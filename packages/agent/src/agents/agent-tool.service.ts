@@ -49,7 +49,11 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     type AgentDomainToolSources,
 } from './agent-domain-tool-sources';
-import { AGENT_MCP_TOOL_SOURCE, type AgentMcpToolSource } from './agent-mcp-tool-source';
+import {
+    AGENT_MCP_TOOL_SOURCE,
+    type AgentMcpRunHandle,
+    type AgentMcpToolSource,
+} from './agent-mcp-tool-source';
 // Domain chat-tool factories. VALUE imports on purpose — every one of
 // these modules imports its own domain only with `import type`, so
 // pulling the factory functions in here adds ZERO runtime graph to the
@@ -272,7 +276,7 @@ export class AgentToolService {
      */
     resolveAllowedTools(
         agent: Agent,
-        runContext: { runId: string; editsThisRunByFile: Set<string> } = {
+        runContext: { runId: string; editsThisRunByFile: Set<string>; missionId?: string } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
@@ -665,7 +669,12 @@ export class AgentToolService {
      */
     async resolveGrantedTools(
         agent: Agent,
-        runContext: { runId: string; editsThisRunByFile: Set<string> } = {
+        runContext: {
+            runId: string;
+            editsThisRunByFile: Set<string>;
+            missionId?: string;
+            taskId?: string;
+        } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
@@ -679,9 +688,16 @@ export class AgentToolService {
         // broken source contributes zero tools — never a failed run.
         if (this.mcpTools) {
             try {
-                const mcpDescriptors = await this.mcpTools.buildTools(agent, {
+                // AW-17 — the run's Task and Mission ride along so a tool
+                // call's usage row lands in the run's receipt, the Task's
+                // cost and the Mission's totals, like every other call the
+                // run makes.
+                const runHandle: AgentMcpRunHandle = {
                     runId: runContext.runId,
-                });
+                    ...(runContext.taskId ? { taskId: runContext.taskId } : {}),
+                    ...(runContext.missionId ? { missionId: runContext.missionId } : {}),
+                };
+                const mcpDescriptors = await this.mcpTools.buildTools(agent, runHandle);
                 const existing = new Set(tools.map((tool) => tool.name));
                 for (const descriptor of mcpDescriptors) {
                     // A server-supplied name must never shadow a built-in —
@@ -1376,7 +1392,7 @@ export class AgentToolService {
 
     private buildSearchWebTool(
         agent: Agent,
-        runContext: { runId: string },
+        runContext: { runId: string; missionId?: string },
     ): AgentToolDescriptor<
         {
             query: string;
@@ -1425,6 +1441,8 @@ export class AgentToolService {
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
                         runId: this.runIdFor(runContext),
+                        // AW-17 — the Task's Mission, when the run has one.
+                        missionId: runContext.missionId,
                         query: args.query,
                         maxResults: args.maxResults,
                         includeDomains: args.includeDomains,
@@ -1646,7 +1664,7 @@ export class AgentToolService {
 
     private buildScreenshotTool(
         agent: Agent,
-        runContext: { runId: string },
+        runContext: { runId: string; missionId?: string },
     ): AgentToolDescriptor<
         { url: string; viewportWidth?: number; viewportHeight?: number; fullPage?: boolean },
         AgentScreenshotResult
@@ -1695,6 +1713,8 @@ export class AgentToolService {
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
                         runId: this.runIdFor(runContext),
+                        // AW-17 — the Task's Mission, when the run has one.
+                        missionId: runContext.missionId,
                         url: args.url,
                         viewportWidth: args.viewportWidth,
                         viewportHeight: args.viewportHeight,
@@ -1709,7 +1729,7 @@ export class AgentToolService {
 
     private buildExtractContentTool(
         agent: Agent,
-        runContext: { runId: string },
+        runContext: { runId: string; missionId?: string },
     ): AgentToolDescriptor<{ url: string; maxChars?: number }, AgentExtractContentResult> {
         return {
             name: 'extractContent',
@@ -1750,6 +1770,8 @@ export class AgentToolService {
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
                         runId: this.runIdFor(runContext),
+                        // AW-17 — the Task's Mission, when the run has one.
+                        missionId: runContext.missionId,
                         url: args.url,
                         maxChars: args.maxChars,
                     });

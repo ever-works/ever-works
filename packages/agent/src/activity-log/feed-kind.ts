@@ -152,6 +152,21 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.KB_REEMBED_COMPLETED]: 'delivery',
     [ActivityActionType.KB_REEMBED_FAILED]: 'problem',
 
+    // Memory facts + context files (AW-07) — fact edits and context-file
+    // saves are work, a load-mode change is configuration, and a segment
+    // over its budget is a tripped limit.
+    [ActivityActionType.MEMORY_FACT_CREATED]: 'work',
+    [ActivityActionType.MEMORY_FACT_UPDATED]: 'work',
+    [ActivityActionType.MEMORY_FACT_FORGOTTEN]: 'work',
+    [ActivityActionType.MEMORY_FACT_RESTORED]: 'work',
+    [ActivityActionType.MEMORY_FACT_ACCEPTED]: 'work',
+    [ActivityActionType.MEMORY_FACT_DISCARDED]: 'work',
+    [ActivityActionType.MEMORY_FACTS_CLEARED]: 'work',
+    [ActivityActionType.CONTEXT_FILE_UPDATED]: 'work',
+    [ActivityActionType.CONTEXT_FILE_RESTORED]: 'work',
+    [ActivityActionType.CONTEXT_FILE_MODE_CHANGED]: 'system',
+    [ActivityActionType.CONTEXT_BUDGET_EXCEEDED]: 'problem',
+
     // Missions
     [ActivityActionType.MISSION_CREATED]: 'work',
     [ActivityActionType.MISSION_PAUSED]: 'work',
@@ -203,6 +218,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.AGENT_BUDGET_EXCEEDED]: 'problem',
     [ActivityActionType.AGENT_EXPORTED]: 'work',
     [ActivityActionType.AGENT_IMPORTED]: 'work',
+    // AW-23 — a dead credential is a PROBLEM: it is the one halt the
+    // owner has to go and fix, and it stopped the agent after a single
+    // failure rather than three. A held run and a released batch are
+    // ordinary `work`: nothing failed, the brake did exactly its job.
+    [ActivityActionType.AGENT_BLOCKED_ON_CREDENTIAL]: 'problem',
+    [ActivityActionType.AGENT_RUN_HELD]: 'work',
+    [ActivityActionType.AGENT_RUNS_RELEASED]: 'work',
     [ActivityActionType.AGENT_COLLABORATOR_ENABLED]: 'system',
     [ActivityActionType.AGENT_COLLABORATOR_DISABLED]: 'system',
     [ActivityActionType.AGENT_COLLABORATOR_REMOVED]: 'system',

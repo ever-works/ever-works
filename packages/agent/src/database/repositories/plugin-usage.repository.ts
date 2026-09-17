@@ -1,11 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, LessThan, Repository } from 'typeorm';
+import {
+    Between,
+    In,
+    LessThan,
+    Repository,
+    type ObjectLiteral,
+    type SelectQueryBuilder,
+} from 'typeorm';
 import { PluginUsageCapability, PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
+import { UsageOutcome } from '@src/entities/_types';
 import { Agent } from '@src/entities/agent.entity';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import { Task, TaskStatus } from '@src/entities/task.entity';
 import { Work } from '@src/entities/work.entity';
+import { Mission } from '@src/entities/mission.entity';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 
 export type PerPluginSpend = {
     pluginId: string;
@@ -73,6 +83,62 @@ export type UserSpendGroupRow = {
     costCents: number;
 };
 
+/**
+ * AW-17 — one run's rows grouped by how they settle: plugin, meter, payer and
+ * the fixed price (if any) that priced them. The run settlement reads this
+ * beside `getRunCostByPlugin` to debit fixed prices and convert the rest.
+ */
+export type RunMeterGroup = {
+    pluginId: string;
+    meter: string | null;
+    payer: string | null;
+    priceKey: string | null;
+    priceVersion: number | null;
+    calls: number;
+    costCents: number;
+    creditsCharged: number;
+};
+
+/**
+ * AW-17 — one run's rows grouped for the receipt's meter itemisation:
+ * meter × price key × capability × outcome × payer.
+ */
+export type RunMeterLine = {
+    meter: string | null;
+    priceKey: string | null;
+    priceVersion: number | null;
+    capability: string;
+    outcome: string | null;
+    payer: string | null;
+    calls: number;
+    costCents: number;
+    creditsCharged: number;
+};
+
+/**
+ * AW-17 — one account-wide grouped row with the meter figures: calls,
+ * provider cost and credits. `key` is the raw grouping value (price key /
+ * Mission id); NULL is surfaced honestly (e.g. "Not in a Mission").
+ */
+export type UserMeteredGroupRow = {
+    key: string | null;
+    /** A representative capability for the group (a price key maps to one). */
+    capability: string | null;
+    calls: number;
+    costCents: number;
+    credits: number;
+};
+
+/** AW-17 — one user's rows in a window grouped by meter × outcome × payer. */
+export type UserMeterSpendRow = {
+    meter: string | null;
+    outcome: string | null;
+    payer: string | null;
+    calls: number;
+    costCents: number;
+    credits: number;
+};
+
 /** Wave 13 — §4.2 consumption counts for the Usage & Credits page. */
 export type UserUsageCounts = {
     tasksCompleted: number;
@@ -105,6 +171,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (pluginId) {
             qb.andWhere('e.pluginId = :pluginId', { pluginId });
@@ -138,6 +205,12 @@ export class PluginUsageRepository {
         periodStart: Date,
         periodEnd: Date,
         currency?: string,
+        /**
+         * Home (AW-19) — narrow the sum to one workspace scope (an
+         * Organization, or personal usage). Omitted = every scope, which is
+         * what budget enforcement and the account-wide surfaces keep reading.
+         */
+        scope?: OwnershipScope,
     ): Promise<number> {
         const qb = this.repository
             .createQueryBuilder('e')
@@ -145,13 +218,34 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (currency) {
             qb.andWhere('e.currency = :currency', { currency });
         }
 
+        const ownership = ownershipSqlPredicate('e', scope, 'spendScope');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+
         const row = await qb.getRawOne<{ total: string }>();
         return Number(row?.total ?? 0);
+    }
+
+    /**
+     * Home (AW-19) — has this user ever recorded metered usage, in any
+     * scope? One indexed probe (`userId, occurredAt`), used only to hide the
+     * spend panel from an account that has never spent anything.
+     */
+    async hasAnyUsageForUser(userId: string): Promise<boolean> {
+        const row = await this.repository
+            .createQueryBuilder('e')
+            .select('e.id', 'id')
+            .where('e.userId = :userId', { userId })
+            .limit(1)
+            .getRawOne<{ id: string }>();
+        return Boolean(row);
     }
 
     /**
@@ -180,6 +274,7 @@ export class PluginUsageRepository {
             .andWhere('e.ownerId = :ownerId', { ownerId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (pluginId) {
             qb.andWhere('e.pluginId = :pluginId', { pluginId });
@@ -214,6 +309,7 @@ export class PluginUsageRepository {
             .andWhere('e.agentId = :agentId', { agentId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
         if (currency) {
             qb.andWhere('e.currency = :currency', { currency });
         }
@@ -236,6 +332,7 @@ export class PluginUsageRepository {
             .createQueryBuilder('e')
             .select('COALESCE(SUM(e.costCents), 0)', 'total')
             .where('e.taskId = :taskId', { taskId });
+        excludeFailedCalls(qb);
         if (opts.since) {
             qb.andWhere('e.occurredAt >= :since', { since: opts.since });
         }
@@ -264,6 +361,7 @@ export class PluginUsageRepository {
             .select('e.pluginId', 'pluginId')
             .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
             .where('e.runId = :runId', { runId })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.pluginId')
             .getRawMany<{ pluginId: string; costCents: string }>();
 
@@ -321,6 +419,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.pluginId')
             .addGroupBy('e.capability')
             .orderBy('"costCents"', 'DESC')
@@ -356,6 +455,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .getMany();
 
         const byDay = new Map<string, number>();
@@ -386,6 +486,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .getMany();
 
         const byDay = new Map<string, number>();
@@ -417,6 +518,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy(`e.${column}`)
             .orderBy('"costCents"', 'DESC')
             .getRawMany<{ key: string | null; units: string; costCents: string }>();
@@ -520,6 +622,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .getRawMany<{ occurredAt: Date | string; agentId: string | null; costCents: number }>();
 
         // Composite map key: the day and the agent id can never collide
@@ -564,6 +667,7 @@ export class PluginUsageRepository {
             .addSelect('COALESCE(SUM(e.units), 0)', 'units')
             .where('e.runId IN (:...runIds)', { runIds })
             .andWhere('e.modelId IS NOT NULL')
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.runId')
             .addGroupBy('e.modelId')
             .getRawMany<{
@@ -605,6 +709,7 @@ export class PluginUsageRepository {
             .addSelect('COALESCE(SUM(e.units), 0)', 'units')
             .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
             .where('e.runId = :runId', { runId })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.capability')
             .addGroupBy('e.modelId')
             .getRawMany<{
@@ -629,6 +734,229 @@ export class PluginUsageRepository {
                     a.capability.localeCompare(b.capability) ||
                     (a.modelId ?? '').localeCompare(b.modelId ?? ''),
             );
+    }
+
+    /**
+     * AW-17 — the run settlement's classified view of one run: rows grouped by
+     * (plugin, meter, payer, price key, price version). Same `(runId,
+     * occurredAt)` index as `getRunCostByPlugin`; the two reads cover the
+     * same rows (this one also counts failed calls, which carry no cost), so
+     * their cost sums always agree.
+     */
+    async getRunMeterGroups(runId: string): Promise<RunMeterGroup[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.pluginId', 'pluginId')
+            .addSelect('e.meter', 'meter')
+            .addSelect('e.payer', 'payer')
+            .addSelect('e.priceKey', 'priceKey')
+            .addSelect('e.priceVersion', 'priceVersion')
+            .addSelect('COUNT(e.id)', 'calls')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .addSelect('COALESCE(SUM(e.creditsCharged), 0)', 'creditsCharged')
+            .where('e.runId = :runId', { runId })
+            .groupBy('e.pluginId')
+            .addGroupBy('e.meter')
+            .addGroupBy('e.payer')
+            .addGroupBy('e.priceKey')
+            .addGroupBy('e.priceVersion')
+            .getRawMany<Record<string, string | number | null>>();
+
+        return rows.map((row) => ({
+            pluginId: String(row.pluginId),
+            meter: nullableString(row.meter),
+            payer: nullableString(row.payer),
+            priceKey: nullableString(row.priceKey),
+            priceVersion: nullableNumber(row.priceVersion),
+            calls: Number(row.calls ?? 0) || 0,
+            costCents: Number(row.costCents ?? 0) || 0,
+            creditsCharged: Number(row.creditsCharged ?? 0) || 0,
+        }));
+    }
+
+    /**
+     * AW-17 — the run receipt's meter itemisation input: one run's rows
+     * grouped by (meter, price key, price version, capability, outcome,
+     * payer). The service folds these into per-meter lines.
+     */
+    async getRunMeterLines(runId: string): Promise<RunMeterLine[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.meter', 'meter')
+            .addSelect('e.priceKey', 'priceKey')
+            .addSelect('e.priceVersion', 'priceVersion')
+            .addSelect('e.capability', 'capability')
+            .addSelect('e.outcome', 'outcome')
+            .addSelect('e.payer', 'payer')
+            .addSelect('COUNT(e.id)', 'calls')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .addSelect('COALESCE(SUM(e.creditsCharged), 0)', 'creditsCharged')
+            .where('e.runId = :runId', { runId })
+            .groupBy('e.meter')
+            .addGroupBy('e.priceKey')
+            .addGroupBy('e.priceVersion')
+            .addGroupBy('e.capability')
+            .addGroupBy('e.outcome')
+            .addGroupBy('e.payer')
+            .getRawMany<Record<string, string | number | null>>();
+
+        return rows.map((row) => ({
+            meter: nullableString(row.meter),
+            priceKey: nullableString(row.priceKey),
+            priceVersion: nullableNumber(row.priceVersion),
+            capability: String(row.capability ?? ''),
+            outcome: nullableString(row.outcome),
+            payer: nullableString(row.payer),
+            calls: Number(row.calls ?? 0) || 0,
+            costCents: Number(row.costCents ?? 0) || 0,
+            creditsCharged: Number(row.creditsCharged ?? 0) || 0,
+        }));
+    }
+
+    /**
+     * AW-17 — the meter cards' input: one user's rows in the window grouped
+     * by (meter, outcome, payer). Rows with `meter IS NULL` come back as
+     * their own group and are NEVER folded into a named meter here — the
+     * caller reports them as recorded before meters were separated. Leads
+     * with `userId, meter` for `idx_plugin_usage_meter_user_occurred`.
+     */
+    async getSpendByMeterForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserMeterSpendRow[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.meter', 'meter')
+            .addSelect('e.outcome', 'outcome')
+            .addSelect('e.payer', 'payer')
+            .addSelect('COUNT(e.id)', 'calls')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .addSelect('COALESCE(SUM(e.creditsCharged), 0)', 'credits')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .groupBy('e.meter')
+            .addGroupBy('e.outcome')
+            .addGroupBy('e.payer')
+            .getRawMany<Record<string, string | number | null>>();
+
+        return rows.map((row) => ({
+            meter: nullableString(row.meter),
+            outcome: nullableString(row.outcome),
+            payer: nullableString(row.payer),
+            calls: Number(row.calls ?? 0) || 0,
+            costCents: Number(row.costCents ?? 0) || 0,
+            credits: Number(row.credits ?? 0) || 0,
+        }));
+    }
+
+    /**
+     * AW-17 — "by tool": one user's CLASSIFIED rows in the window grouped by
+     * price key, ranked by credits then provider cost. Pre-meter rows
+     * (`meter IS NULL`) are excluded; the meter summary reports them apart.
+     */
+    async getSpendByPriceKeyForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserMeteredGroupRow[]> {
+        return this.getMeteredGroupedForUser('priceKey', userId, periodStart, periodEnd);
+    }
+
+    /**
+     * AW-17 — "by Mission": one user's CLASSIFIED rows grouped by the Mission
+     * of their Task. NULL is spend with no Mission (no Task, or a Task filed
+     * against none) and is returned as its own row, never attributed by
+     * inference.
+     */
+    async getSpendByMissionForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserMeteredGroupRow[]> {
+        return this.getMeteredGroupedForUser('missionId', userId, periodStart, periodEnd);
+    }
+
+    /**
+     * AW-17 — shared grouped rollup over classified rows. The column is an
+     * internal whitelist — never caller-supplied.
+     */
+    private async getMeteredGroupedForUser(
+        column: 'priceKey' | 'missionId',
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserMeteredGroupRow[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select(`e.${column}`, 'key')
+            .addSelect('MIN(e.capability)', 'capability')
+            .addSelect('COUNT(e.id)', 'calls')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .addSelect('COALESCE(SUM(e.creditsCharged), 0)', 'credits')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere('e.meter IS NOT NULL')
+            .groupBy(`e.${column}`)
+            .getRawMany<Record<string, string | number | null>>();
+
+        return rows
+            .map((row) => ({
+                key: nullableString(row.key),
+                capability: nullableString(row.capability),
+                calls: Number(row.calls ?? 0) || 0,
+                costCents: Number(row.costCents ?? 0) || 0,
+                credits: Number(row.credits ?? 0) || 0,
+            }))
+            .sort(
+                (a, b) =>
+                    b.credits - a.credits ||
+                    b.costCents - a.costCents ||
+                    (a.key ?? '').localeCompare(b.key ?? ''),
+            );
+    }
+
+    /**
+     * AW-17 — Mission titles for grouped rows (one `IN` query, never per
+     * row). Sibling of `getAgentNames` / `getTaskTitles`.
+     */
+    async getMissionTitles(ids: string[]): Promise<Map<string, string>> {
+        if (ids.length === 0) {
+            return new Map();
+        }
+        const missions = await this.repository.manager.find(Mission, {
+            where: { id: In(ids) },
+            select: ['id', 'title'],
+        });
+        return new Map(missions.map((mission) => [mission.id, mission.title]));
+    }
+
+    /**
+     * AW-17 — how many rows `findPageForUserExport` would stream for the same
+     * (user, window, organization). The export is refused BEFORE streaming
+     * when this exceeds the published row limit.
+     */
+    async countForUserExport(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        options: { organizationId?: string | null } = {},
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+        // The same rows the export streams: failed calls are not exported.
+        excludeFailedCalls(qb);
+        if (options.organizationId) {
+            qb.andWhere('e.organizationId = :organizationId', {
+                organizationId: options.organizationId,
+            });
+        }
+        return qb.getCount();
     }
 
     /**
@@ -703,6 +1031,7 @@ export class PluginUsageRepository {
             .addSelect('SUM(e.costCents)', 'costCents')
             .where('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (tenantId) {
             qb.andWhere('e.tenantId = :tenantId', { tenantId });
@@ -759,6 +1088,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (options.organizationId) {
             qb.andWhere('e.organizationId = :organizationId', {
@@ -792,6 +1122,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .orderBy('e.occurredAt', 'ASC')
             .getMany();
     }
@@ -805,4 +1136,36 @@ export class PluginUsageRepository {
             .execute();
         return result.affected ?? 0;
     }
+}
+
+/**
+ * AW-17 — the predicate every reader that predates meters applies.
+ *
+ * Failed calls are now recorded (outcome `failed`, zero-rated) so a receipt
+ * and the meter cards can show them. Before meters a failure wrote NO row, so
+ * each earlier reader — budget and limit spend, per-plugin units, daily
+ * buckets, per-model / Agent / Work groups, the run's settlement input and
+ * receipt lines, the admin report, both CSV exports — excludes them and
+ * returns exactly what it returned before. Rows recorded before meters
+ * (`outcome IS NULL`) are kept. The meter and breakdown reads count failures
+ * on purpose and do not apply this.
+ */
+const FAILED_CALLS_EXCLUDED = '(e.outcome IS NULL OR e.outcome <> :failedOutcome)';
+
+function excludeFailedCalls<Entity extends ObjectLiteral>(
+    qb: SelectQueryBuilder<Entity>,
+): SelectQueryBuilder<Entity> {
+    return qb.andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED });
+}
+
+function nullableString(value: unknown): string | null {
+    return value === null || value === undefined ? null : String(value);
+}
+
+function nullableNumber(value: unknown): number | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
 }

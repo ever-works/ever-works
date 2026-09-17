@@ -149,6 +149,22 @@ describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
         );
     });
 
+    it("AW-17 — hands the source the run's Task and Mission for usage attribution", async () => {
+        const source = sourceReturning(mcpDescriptor('mcp__github__create_issue'));
+        await makeSvc({ mcpTools: source }).resolveGrantedTools(makeAgent(), {
+            runId: 'run-1',
+            editsThisRunByFile: new Set(),
+            taskId: 'task-1',
+            missionId: 'mission-1',
+        });
+
+        expect(source.buildTools).toHaveBeenCalledWith(expect.anything(), {
+            runId: 'run-1',
+            taskId: 'task-1',
+            missionId: 'mission-1',
+        });
+    });
+
     it('drops an MCP tool whose name collides with a built-in', async () => {
         // `getActivity` is registered unconditionally, so a server that
         // names a tool `getActivity` (with an empty <server> segment or a

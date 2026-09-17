@@ -28,6 +28,7 @@ import { TerminalStreamFacadeService } from './terminal-stream.facade';
 import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
+import { PlaybookCatalogFacadeService } from './playbook-catalog.facade';
 import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 
 const FACADES = [
@@ -60,6 +61,9 @@ const FACADES = [
     // BudgetsModule already imported by this module. Goal evaluation
     // (PR-8) consumes it through FacadesModule.
     MetricsFacadeService,
+    // Capability & playbook catalogue (AW-21) — read-only fan-out across
+    // enabled playbook-provider plugins; consumed by the API catalog module.
+    PlaybookCatalogFacadeService,
     // AW-15 — `connection-scopes` capability lookup (which access levels a
     // provider declares). Depends only on the global PluginRegistryService.
     ConnectionScopesFacadeService,
