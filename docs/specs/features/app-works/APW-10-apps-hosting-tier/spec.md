@@ -270,7 +270,9 @@ all App Works (Resolution R-24).
 - **FR-21.** Tenant networking is deny-by-default in both directions. Allowed: DNS resolution; inbound
   from the tier's edge to declared component ports; outbound to the public internet excluding private,
   shared, link-local, loopback, multicast and reserved ranges, and excluding the blocked ports of LG-08;
-  outbound to the App Work's own dependency endpoints.
+  outbound to the App Work's own dependency endpoints. **A mail dependency is served by the platform's own relay
+  over its HTTPS endpoint, never by opening 25, 465 or 587 to the tenant:** an app that declares `smtp` reaches ready
+  and sends mail, and the blocked ports stay blocked (GAP-22).
 - **FR-22.** A tenant namespace can create no load balancer and no node port, and its labels and
   annotations can be changed only by the zone controller.
 - **FR-23.** No credential issued to the platform, to an organization, or to another App Work is ever
@@ -284,12 +286,13 @@ all App Works (Resolution R-24).
   else (LG-12). The platform never applies workloads to the tier: the App runtime (APW-06) renders the App Work
   into desired state, and the zone's provisioning controller reconciles that desired state into workloads with the
   same renderer, inside the zone (Resolution R-5).
-- **FR-25.** Desired state carries: components, jobs, schedules, hosts, a sealed environment, dependency
-  references, image references by digest, the quota profile name and whether the App Work should be
-  running or quarantined. Secrets travel sealed to the controller's public key; the platform never
+- **FR-25.** Desired state carries: components, jobs, schedules, **smoke checks**, hosts, a sealed environment,
+  dependency references (postgres, cache, object storage and mail), image references by digest, the quota profile name,
+  whether the App Work should be **running, paused or quarantined**, and — when paused — the replica counts to restore.
+  Secrets travel sealed to the controller's public key; the platform never
   creates a secret in the zone.
 - **FR-26.** The controller validates desired state against hard limits — at most 8 components, 10 jobs,
-  10 schedules, 20 hosts, 200 environment variables, 4 volumes per component, a sealed environment of at
+  10 schedules, **20 smoke checks**, 20 hosts, 200 environment variables, 4 volumes per component, a sealed environment of at
   most 256 KiB and a desired-state object of at most 512 KiB — and refuses anything outside them with a
   named reason.
 - **FR-27.** Status reports a phase (**Pending**, **Promoting**, **Provisioning**, **Ready**, **Degraded**,
@@ -351,7 +354,9 @@ all App Works (Resolution R-24).
 > pauses an Agent or a workspace. No copy in this epic calls quarantine a "kill switch".
 
 - **FR-41.** Quarantine takes a category (**Abuse**, **Security**, **Billing**, **Legal**) and a reason of
-  at least 10 characters. It isolates the network first, then scales every workload to zero and suspends
+  at least 10 characters. It isolates the network first — measurably, not by record: while quarantined a workload can
+  reach nothing outside its namespace, including the public internet and the tier's edge — then scales every workload
+  to zero and suspends
   schedules and jobs, then replaces the App Work's addresses with an unavailable page — within the LG-18
   timings when the controller is healthy.
 - **FR-42.** Quarantine never deletes or modifies volumes, databases, buckets, secrets or images, and
@@ -392,6 +397,44 @@ all App Works (Resolution R-24).
   found** otherwise.
 - **FR-53.** No operator surface, log, Activity entry or telemetry event contains an environment value, a
   sealed payload, a credential, or a probe target address.
+
+### 4.14 Managed dependencies inside the zone (added 2026-09-17, APW10-G01 / GAP-22)
+
+- **FR-54.** The zone creates the dependencies an App Work's desired state declares and reports each one back with a
+  phase — **Pending**, **Ready**, **Failed** (with a reason) or **Released** — and, for anything with stored data, the
+  time of its last completed backup. A dependency the zone cannot resolve is reported **Failed** by name rather than
+  left pending, and an App Work is never reported **Ready** while one of its dependencies is not.
+- **FR-55.** A dependency reference the platform sealed into the environment is replaced with the real value inside the
+  zone, after unsealing and before the app's own secret is written. A reference the zone does not recognise fails the
+  deployment with a named reason; a placeholder is never delivered to an app.
+- **FR-56.** Each App Work's database is created with its own owner role, closed to every other role, capped at 20
+  connections for that role with a 60-second default statement timeout and a 60-second idle-in-transaction timeout;
+  its cache is its own instance; its buckets carry its own prefix and credential; and each of these is backed up at
+  least once every 24 hours. These properties are **probed on the live servers**, not asserted from configuration.
+- **FR-57.** Mail on the tier is a first-class managed dependency: an App Work that declares it receives a relay
+  endpoint, a per-App-Work credential and a from-address, and reaches **Ready** like any other dependency, while the
+  tier's outbound mail ports stay blocked (FR-21). The relay is the platform's own, rate-limited per App Work per day,
+  and its use is metered.
+- **FR-58.** Releasing a dependency on removal is reported before stored data is deleted, and the tier deletes a
+  dependency's data only after every one of them reports **Released**.
+- **FR-59.** Every dependency's storage is metered per App Work and appears in the daily receipt, like the compute
+  units of FR-49.
+
+### 4.15 Spending, suspension and retention (added 2026-09-17, XC-12 / XC-13 / EXT-18)
+
+- **FR-60.** While an App Work on the tier is running, its owner is told before they run out rather than after: a
+  notification at 80 % and at 100 % of their available credits, and the owner can set a monthly cap per App Work. When
+  credits reach zero or the subscription lapses, the App Work is **Quarantined** with category **Billing** after a
+  7-day grace period — data untouched, an owner banner with a **Go to billing** link, and automatic release once
+  payment resumes.
+- **FR-61.** Choosing the tier shows an estimate of the App Work's monthly cost from its quota profile before the
+  owner commits, and the tier's own price list is the source of the numbers.
+- **FR-62.** Retained data is deleted only by the owner's own action or by an operator action recorded in the audit
+  trail; backups of deleted tenant data expire within 30 days of the deletion, and the owner's export request is
+  answered within 30 days. Retention is never extended silently and never shortened by a removal.
+- **FR-63.** Hosting user apps requires a current hosting terms addendum and acceptable-use policy, recorded as
+  accepted documents through the platform's existing terms-acceptance mechanism before an owner's first deployment to
+  the tier, and the abuse contact and takedown process LG-19 attests to are the same ones those documents name.
 
 ---
 
@@ -511,8 +554,13 @@ All copy is final English copy.
 ## 7. Out of scope
 
 - The concrete infrastructure (hosts, networks, providers, accounts) — private operations repository.
-- Rendering App specs into workloads (APW-06), provisioning dependencies (APW-07), building images
-  (APW-05) — this epic defines the tier they target and the rules they must meet.
+- Rendering App specs into workloads (APW-06), building images
+  (APW-05) — this epic defines the tier they target and the rules they must meet. **Dependency *provisioning* is
+  jointly owned and is in scope here (corrected 2026-09-17, APW10-G01):** what a dependency *is* and how it is
+  configured stays APW-07's, but the tier **runs** it — this epic's zone controller creates the tenant database, the
+  per-App-Work cache, the prefixed buckets and the mail credential, substitutes the dependency references inside the
+  sealed environment, reports their phase and last backup, and releases them on removal. Without that, nothing ever
+  sets the `released` phase APW-06's removal waits for, and no managed dependency can become ready.
 - A free tier; pricing values; refunds.
 - Deleting retained tenant data; data export for quarantined users (support process).
 - Hosting anything other than App Works (generated websites keep their current clusters).
@@ -608,6 +656,40 @@ All copy is final English copy.
       released, and without it they are still present.
 - [ ] **ACC-10-48** Setting the platform stop flag, pausing an Agent and pausing a workspace leave every App Work on
       the tier in its previous phase with no quarantine recorded.
+
+**Managed dependencies in the zone** (added with §4.14–§4.15)
+
+- [ ] **ACC-10-49** An App Work whose desired state declares a database, a cache and a bucket gets each one created in
+      the zone, each reported **Ready** with a `lastBackupAt` no older than 24 hours, and each reference in its sealed
+      environment replaced by the real value before its secret is written; a reference the zone does not recognise
+      fails the deployment with `DEPENDENCY_TOKEN_UNKNOWN` and the app never receives a placeholder (FR-54, FR-55,
+      FR-56).
+- [ ] **ACC-10-50** An App Work that declares mail reaches **Ready** on the tier with a per-App-Work relay credential,
+      sends a message through the relay, and still cannot open outbound 25, 465 or 587 (FR-57, FR-21, GAP-22).
+- [ ] **ACC-10-51** On removal without data deletion every dependency reports **Released** and its data is still
+      present 30 days later; with **Also delete stored data** confirmed, no dependency's data is deleted before every
+      one reports **Released** (FR-58).
+- [ ] **ACC-10-52** A quarantined App Work's live canary sees both the public control and the edge path refused within
+      15 s — the drill fails with `QUARANTINE_NOT_ISOLATING` if only the timestamp is right — and release restores the
+      previous replica counts and reachability within 180 s (FR-41, FR-43, LG-18).
+- [ ] **ACC-10-53** A deployment on the tier runs its phases in one order — pre-deploy jobs, rollout, first-deploy jobs,
+      in-cluster smoke, hosts published, post-deploy jobs, schedules — with job and smoke results visible in the App
+      Work's status, and a scheduled call declared with `authScheme: raw` sends the declared header form (GAP-25,
+      FR-25).
+- [ ] **ACC-10-54** The owner of a running tier App Work is notified at 80 % and 100 % of their credits; at zero with a
+      lapsed subscription and after the 7-day grace period the App Work is **Quarantined** with category **Billing**,
+      its data untouched, and it is released automatically once payment resumes; a monthly cap set by the owner is
+      enforced (FR-60).
+- [ ] **ACC-10-55** Every hosting price key resolves through a `credit-pricebook` version that carries an effective
+      date, `hosting` is a valid price group, the whole-unit conversions are applied with their remainder carried, and
+      the daily receipt's credits are debited once per App Work per day with the stated idempotency key (FR-61,
+      APW10-G07).
+- [ ] **ACC-10-56** A custom hostname on the tier is stored with its edge id, status and validation record; the owner
+      sees the TXT record and the CNAME target; the host routes only once both statuses are `active`; and the hostname
+      is deleted when the domain or the App Work is removed (FR-34, ACC-10-31).
+- [ ] **ACC-10-57** A P1 self-check run completes on a real zone, its probe and canary workloads are admitted because
+      P1 promotes the controller's and the canary's images, and the P2-only items report **Inconclusive** with
+      `PHASE_NOT_ENABLED` rather than passing (APW10-G08).
 
 ---
 

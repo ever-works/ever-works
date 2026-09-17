@@ -16,9 +16,24 @@
 - Every task names the exact files to create or modify (**Create** / **Modify**), the test that proves it
   (**Test** — for a test-only task, the command that runs it) and an observable **Done when**.
 - Add new tasks at the bottom rather than renumbering (T53+ were added by the program audit; each names the phase
-  it ships in).
+  it ships in). T55–T58 were added by the 2026-09-17 ordering and wiring pass.
 - Phase boundaries are ship boundaries: `develop` is green and deployable at the end of each phase.
 - Commands run from the monorepo root; migrations are authored from `apps/api/`.
+- **Prerequisites (exact tasks).** **P1: none** — T1–T21, T54 depend on no other App Works epic. **T11 (the Wave 1
+  catalog seam) lands first, on its own, immediately after APW-02 T15**, because T26 below binds
+  `APP_SOURCE_CATALOG_PORT` in `packages/agent/src/app-works/` — the folder APW-02 T15 creates. **P2: APW-01 T11
+  (the port file and its barrel export) and APW-06 T1–T3** (`packages/contracts/src/apps/app-runtime.ts`, the
+  `IDeploymentPlugin` App additions and `packages/agent/src/app-runtime/ports.ts` with `APPS_TIER_POLICY` and
+  `DisabledAppsTierPolicy`) are merged. Two pieces of P2 are **interface-first and merge ahead of APW-01 P1** —
+  T22's `commitFiles?`, and T26's `AppSourceCatalogAdapter` — and the whole of P2 merges ahead of APW-01 P1, so no
+  phase-level loop exists (T55 below states the ordering). **P3: P1 and P2** (plan §11 snapshot exception).
+  **If `packages/agent/src/app-runtime/ports.ts` does not exist when T24 or T26 lands** (APW-06 T3 not yet merged),
+  that task **creates it from CONTRACTS §3 verbatim** — the `AppsTierPolicy` interface, the `APPS_TIER_POLICY`
+  symbol and `DisabledAppsTierPolicy` — and APW-06 T3 then **modifies** it instead of creating it; nothing here
+  ever removes or renames what APW-06 declared.
+- **Own-PR seam (no phase-level loop).** The program merge order runs **APW-01 T11 → the APW-03 P2 seam
+  (T22, T24, T26, T28 + T53, T32) → APW-01 P1 (its remaining tasks) → APW-05 P1 → APW-06 P1 (T4 onward)**. T55
+  restates that ordering in one place; no task in this file waits on APW-01 P1.
 - Test commands: agent package `pnpm --filter @ever-works/agent test -- <pattern>` (Jest); API
   `pnpm --filter ever-works-api test -- <pattern>` (Jest); web unit `pnpm --filter ever-works-web test -- <pattern>`
   (Vitest); web e2e `pnpm --filter ever-works-web test:e2e -- <file>` (Playwright, `apps/web/e2e/`). Nothing is placed
@@ -43,11 +58,15 @@ gate._
       [plan §3.2](./plan.md) — every constant; `APP_SPEC_ISSUE_CODES` with every code of
       [schema.md §22–§23](./schema.md) including `keypair_format_unsupported` and `keypair_password_invalid`;
       `ManagedHostingReason` with `upstreamAgreementMissing`; `BlueprintMatchSource` with `explicit`;
-      `AppSpecBuildStrategy = 'dockerfile' | 'image' | 'auto' | 'none'` (R-13); `AppSpecKeypairFormat = 'pem' | 'base64url-raw' | 'pkcs12'` (R-11).
+      `AppSpecBuildStrategy = 'dockerfile' | 'image' | 'auto' | 'none'` (R-13); `AppSpecKeypairFormat` as
+      `'pem' | 'base64url-raw' | 'pkcs12'` (R-11); `AppSpecValidationMode` as
+      `'draft' | 'data-repository' | 'blueprint'` (schema.md §3); the pure `isSourceOnlyAppSpec(spec)` helper that
+      T12 and APW-01 consume; and `spec.agents.requireHumanMergePaths` (a `string[]` of globs, ≤ 50, default `[]`)
+      on the App spec types (CONTRACTS §1 "Additions (APW-08)"; T3 owns the schema and schema.md §18 defines it).
       **Modify** `packages/contracts/src/index.ts` — `export * from './apps/index.js';`.
       **Test**: `packages/contracts/src/apps/__tests__/apps-contracts.spec.ts` — pins the issue-code tuple
       (append-only snapshot), the `ManagedHostingReason` union in evaluation order, `BlueprintMatchSource`, both new
-      string unions and every numeric constant.
+      string unions, the `AppSpecValidationMode` tuple and every numeric constant.
       **Done when**: `pnpm --filter @ever-works/contracts build` emits the declarations and `apps/api` imports
       `AppSpecIssue` from `@ever-works/contracts`; no file is created under a `src/app-works/` folder.
 
@@ -72,7 +91,13 @@ gate._
       **Create** `packages/agent/src/works-config/schema/app-spec.schema.ts` — `z.strictObject` for every
       block of schema.md §5–§20 with bounds, enums and `.describe()` defaults (`build.strategy` enum
       `dockerfile | image | auto | none` — no builder name, R-13; `generate.keypair` `{ type, format, passwordEnv }`,
-      R-11); `appSpecSchema`; `stripExtensionKeys(value)` returning a copy without `x-*` keys at any depth.
+      R-11; **`agents.requireHumanMergePaths`: an array of glob strings, ≤ 50, default `[]`** — schema.md §18,
+      CONTRACTS §1 "Additions (APW-08)", R-11-style additive key); `appSpecSchema`;
+      `stripExtensionKeys(value)` returning a copy without `x-*` keys at any depth; and the validation modes of
+      schema.md §3 exactly as that table now reads — `blueprint` mode **allows and expects `spec.source` and
+      `spec.blueprint`** (the 2026-09-17 correction to §3's row; `blueprint_mode_forbidden_key` stays in §23's list
+      for the structural cases §2 describes but is no longer emitted for those two keys), so a Blueprint
+      repository's own file is validatable with the same rules the platform runs.
       **Modify** `packages/agent/src/works-config/schema/works-config.schema.ts` — add `app: appSpecSchema`
       to `KIND_SPEC_SCHEMAS`.
       **Test**: `packages/agent/src/works-config/schema/__tests__/app-spec.schema.spec.ts` — the three
@@ -108,14 +133,34 @@ gate._
       **Create** `packages/agent/src/works-config/schema/app-spec.validate.ts` — `validateAppSpecDocument(text, { mode, context? })` and `validateAppSpecObject(obj, options)` per [plan §2.2](./plan.md): 256 KiB,
       `uniqueKeys`, `maxAliasCount: 100`, depth 12, `LineCounter` pointer map, nearest-ancestor positions,
       `displayPath` by names, sort, 200 cap, newer `appSpecVersion` downgrade, never throws; server-only
-      `build_strategy_unavailable` when `context.buildStrategies` lacks the declared strategy (e.g. `auto`).
+      `build_strategy_unavailable` when `context.buildStrategies` lacks the declared strategy **and that strategy is
+      `dockerfile` or `auto`** (`image` and `none` need no builder, so they never warn). **`RuleContext` is defined
+      here and is the only place the server-only rules read from:** `recordedRelation` (`link` · `fork` ·
+      `private-copy`), `catalogIds` or `catalogUnavailable`, `buildStrategies` or `null`, `dependencyProviders`
+      keyed by deploy target or `null`, `trackedBranchExists`. **A `null` (unknown) field skips its rule**, so
+      before APW-05 and APW-07 exist nothing is reported for a strategy or a dependency nobody could have resolved;
+      `AppSpecService.evaluate` fills each field from `Work.sourceRepository`, `AppsCatalogService`'s registry,
+      `IBuildPlugin.supportedStrategies` over the enabled build plugins and `IAppDependencyProvider.supports` over
+      the configured providers for the Work's target — an unavailable source is `null`, never an empty list.
+      **The rule set runs whenever the document parses** (plan §2.2, ACC-03-01/S5): structural errors that stop
+      parsing are `yaml_syntax`, `file_too_large` and `yaml_alias_limit`/depth failures; every other structural
+      error is reported **and** R1–R26 run on a best-effort copy with the offending keys and invalid leaves removed,
+      so §24.4 yields its six codes together and a single invalid leaf never produces a duplicate report. A subtree
+      that cannot be copied is named in the issue's `details` and suppresses only the rules that read it.
       **Test**: `packages/agent/src/works-config/schema/__tests__/app-spec.validate.spec.ts` — schema.md §24.4 yields
-      exactly its six codes and display paths (ACC-03-01); unknown key suggestion, `x-` silence, newer version warning
-      (ACC-03-02); line/column for present and absent keys; a property test inserting random secret-shaped strings
+      exactly its six codes and display paths **with the rules having run despite the structural `unknown_field`**
+      (ACC-03-01); S5's pair (`unknown_field` + `web_component_needs_port`) together; `yaml_syntax`,
+      `file_too_large` and the alias/depth failures are the only inputs that suppress the rule set, each asserted;
+      a case where one invalid leaf suppresses exactly the rules that read it and no others; unknown key suggestion,
+      `x-` silence, newer version warning (ACC-03-02); line/column for present and absent keys; a property test inserting random secret-shaped strings
       into `build.args`, secret `value`s and `prompt.example` and asserting no issue string contains them
       (ACC-03-04); 300 KiB, 101-alias and 13-level files each report one error (ACC-03-05); a 256 KiB draft validates
       under 2 s (ACC-03-08); `auto` with an empty `buildStrategies` context reports `build_strategy_unavailable`
-      (ACC-03-49).
+      (ACC-03-49); `auto` with an empty `buildStrategies` context reports `build_strategy_unavailable`, while
+      `image` and `none` never do (ACC-03-49); every `RuleContext` field left `null` skips its rule, so a default
+      context produces no server-only issue at all (ACC-03-58); the `blueprint-draft` mode accepts a draft carrying
+      `source` and `blueprint` that the strict `blueprint` mode reports as `blueprint_mode_forbidden_key`
+      (ACC-03-52).
       **Done when**: a 256 KiB fixture validates in under 2 seconds on CI.
 
 - [ ] **T7. Route `kind: app` through the new validator.**
@@ -171,6 +216,15 @@ gate._
       `writeEvaluation(workId, seq, result)` guarded by `evaluatedSeq < :seq`, `writeLicense`,
       `markBlueprintMatched(workId, blueprintId, version, matchSource)` (the once-only guard of plan §2.5 step 0),
       `findUpgradeCandidates`, `findStaleRegistry`.
+      **Modify** `packages/agent/src/database/repositories/work.repository.ts` — **add**
+      `findAppWorksByDataRepoFullName(fullName, { userId?, organizationId? })`: kind `app` only, matching the Work
+      Repository (`website` role) case-insensitively, with **no `githubAppInstalled` filter** and scoped to the
+      binding's user or organization. This is the lookup the push consumer of T14 uses —
+      `findByDataRepoFullName` selects only Works with the platform GitHub App installed
+      (`work.repository.ts:263-277`), so an App Work on a member's own fork (the normal Wave 1 case, whose webhook
+      APW-02 created) would never be found, and it ignores the delivery's owner binding, so one tenant's delivery
+      would request evaluations for every tenant's Works on that repository. `findByDataRepoFullName` itself is
+      unchanged.
       **Modify** `packages/agent/src/database/index.ts` — export it.
       **Test**: `packages/agent/src/database/repositories/__tests__/work-app-spec-state.repository.spec.ts` —
       coalescing arithmetic (dispatch / skip), an older seq writes nothing so the newer result stays (ACC-03-12), a
@@ -190,7 +244,22 @@ gate._
       `ActivityLogService.log` with `actionType: APP_SPEC` and the dotted `action` only on head-hash change, emit
       `AppSpecAppliedEvent` on effective-hash change, tracked-branch move per plan §2.3),
       `getEffectiveSpec(workId, commitSha?)`, `validateDraft(workId, text)`, `getState(workId)` with the
-      60-second lazy head check.
+      60-second lazy head check, and
+      **`hasValidAppSpec(workId, commitSha): Promise<boolean>`** — true only when `.works/works.yml` at `commitSha`
+      parses, selects kind `app`, validates with **zero errors** (warnings allowed) and its `spec` holds at least
+      one key outside `{ kind, appSpecVersion, source }`; `x-*` keys are ignored, and a file holding only `source` is
+      therefore **false**. It reads that commit synchronously through `GitFacadeService`, never
+      `WorkAppSpecState.validationStatus` or the effective-spec cache (both are asynchronous — the row APW-01 just
+      initialized has not been evaluated yet), and it never writes state. The key set comes from one pure helper,
+      `isSourceOnlyAppSpec(spec)` in `packages/contracts/src/apps/`, which APW-03's apply-job fresh rule and APW-01
+      use too. Without this predicate the minimal path's `{version, kind, spec.source}` file would read as _valid_
+      (R2 requires `build`/`components` only when one of them is present), so the App Provisioner would never start
+      and APW-01 FR-29a could not hold.
+      `diffGuardedSpecBlocks` reports **removals** from `display.protectedPaths` and
+      `agents.requireHumanMergePaths` (additions stay allowed) over `source`, `blueprint`, `license`, both path
+      lists, `upstreamPullRequests` and `provisioning`; `isProtectedPath` uses **`minimatch` with `{ dot: true }`**
+      — the matcher APW-08 plan §4 uses — added to `packages/agent/package.json` at the version the lockfile
+      resolves, so both epics match globs identically.
       **Modify** `packages/agent/package.json` — add the `./app-spec` export.
       **Test**: `packages/agent/src/app-spec/__tests__/app-spec.service.spec.ts` — every branch in plan §10.1 for
       this file: a push that changes the spec updates the state and one on another branch changes nothing
@@ -199,7 +268,11 @@ gate._
       minute (ACC-03-14); `unreadable` keeps the effective spec.
       `packages/agent/src/app-spec/__tests__/app-spec-hash.spec.ts` — canonical hash stability;
       `packages/agent/src/app-spec/__tests__/app-spec-guarded-blocks.spec.ts` — a `license.class` change and a
-      removed protected path are reported (ACC-03-15).
+      removed protected path are reported (ACC-03-15), and so is a removal from `agents.requireHumanMergePaths`
+      while an addition to either list is not;
+      `hasValidAppSpec` cases in the same spec: file absent ⇒ false; `source` only ⇒ false; `source` plus an `x-`
+      key ⇒ false; `source` + a valid `build` + `components` ⇒ true; the same with an R1 error ⇒ false; and it
+      returns the right answer **while `validationStatus` is still `missing`** (nothing evaluated yet) (ACC-03-57).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-spec` passes and `getEffectiveSpec` is exported from
       `@ever-works/agent/app-spec`.
 
@@ -225,7 +298,10 @@ gate._
       **Modify** `apps/api/src/ingest/ingest.module.ts` — provide the new consumer next to `GitHubCheckIntakeService`.
       **Test**: `apps/api/src/ingest/github/app-spec-github-intake.service.spec.ts` — a push to the tracked branch
       requests evaluation and a push to another branch does not (ACC-03-09); merged vs closed-unmerged; non-app Works
-      ignored; the cap.
+      ignored; the cap; **an App Work whose repository has no platform GitHub App installed is still found**; **a
+      delivery bound to another user or organization matches nothing** (ACC-03-56); extend
+      `packages/agent/src/database/repositories/__tests__/work.repository.spec.ts` — the new lookup ignores
+      `githubAppInstalled`, matches case-insensitively and honours the owner binding.
       **Done when**: `pnpm --filter ever-works-api test -- app-spec-github-intake` passes and existing
       `github-check-intake` specs pass unchanged.
 
@@ -341,8 +417,10 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Create** `packages/agent/src/apps-catalog/apps-catalog.service.ts`, `packages/agent/src/apps-catalog/apps-catalog.module.ts`,
       `packages/agent/src/apps-catalog/index.ts` per [plan §2.4](./plan.md) (tokenless → authenticated, byte-counted
       bodies, 1 h / 30 s cache, last-good registry for 7 days, mutable-ref warning, `getDetail` README ≤ 64 KiB and spec
-      summary at the pinned sha, `refresh()`); tier state read from `APPS_TIER_POLICY` (`isOpen()`, `managedScope()`,
-      `@Optional()`, unbound ⇒ closed — R-5).
+      summary at the pinned sha, `refresh()`); tier state read from `APPS_TIER_POLICY` —
+      **imported from `packages/agent/src/app-runtime/ports.ts` (APW-06 T3, merged before this phase); if that file
+      does not exist yet, create it from CONTRACTS §3 verbatim and let APW-06 T3 modify it** — (`isOpen()`,
+      `managedScope()`, `@Optional()`, unbound ⇒ closed — R-5).
       **Modify** `packages/agent/package.json` — `./apps-catalog` export.
       **Test**: `packages/agent/src/apps-catalog/__tests__/apps-catalog.service.spec.ts` — both read paths, TTLs, size
       guards; an unreachable catalog yields an empty `available: false` result and no refetch within 30 s (ACC-03-16);
@@ -371,8 +449,13 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       parser in `packages/agent/src/works/repository-work-source.ts`.
       **Create** `packages/agent/src/apps-catalog/app-source-catalog.adapter.ts` — binds APW-01's
       `APP_SOURCE_CATALOG_PORT` (`matchBlueprint({ owner, repo, blueprintId? })` → resolver, `null` on `none`,
-      `refMismatch` or an unconfirmed fork match; `classifyLicense` → the registry, `unknown` until P3 lands) in
-      `packages/agent/src/apps-catalog/apps-catalog.module.ts`.
+      `refMismatch` or an unconfirmed fork match; `classifyLicense` → the registry, `unknown` until P3 lands), and
+      maps the resolver's match source onto the port's `matchSource`, carries `displayName` (FR-63's default Work
+      name, APW-01 T13 consumes it) and the entry's `prompts` descriptors (names and descriptions only, never a
+      value — APW-01 FR-55), in `packages/agent/src/apps-catalog/apps-catalog.module.ts`. **The port is APW-01
+      T11's file** (`packages/agent/src/app-works/app-source-catalog.port.ts`, an own PR that merges first); this
+      task binds it and declares no port of its own. If `packages/agent/src/app-runtime/ports.ts` is absent, create
+      it from CONTRACTS §3 verbatim (see "How to use").
       **Test**: `packages/agent/src/apps-catalog/__tests__/app-blueprint-resolver.spec.ts` — `calcom/cal.com` and
       `CALCOM/CAL.DIY` resolve to `cal-diy` (ACC-03-23); a fork of a listed upstream needs confirmation and an
       excluded tag gives the ref reason (ACC-03-24); the probe finds a topic-carrying template as Unlisted with ≤ 3
@@ -380,8 +463,9 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       unknown id gives `blueprintNotFound` (ACC-03-44); a fork of a fork resolves through the root `source`
       (ACC-03-45). `packages/agent/src/apps-catalog/__tests__/app-source-catalog.adapter.spec.ts` — each `null` case,
       `blueprintId` passed through, a throwing resolver mapped to `null` (ACC-03-24).
-      **Done when**: APW-01's inspect endpoint returns a match through the port with no APW-01 code change, and resolving
-      writes no Activity.
+      **Done when**: APW-01's inspect endpoint returns a match through the port with no APW-01 code change, the
+      adapter spec satisfies APW-01's `AppSourceCatalogPort` interface for every `null` case and a match, and
+      resolving writes no Activity.
 
 - [ ] **T27 (parallel). Three-way spec merge.**
       **Create** `packages/agent/src/apps-catalog/app-spec-merge.ts` — key-wise merge, named-array merge by
@@ -401,12 +485,35 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       `source`-only) gets `source` from `Work.sourceRepository` + the Blueprint spec in one `commitFiles` commit (no
       clone); Link and everything else get a pull request and never a push; after apply, request spec **and** license
       evaluation. Activity `app.blueprint.applied` / `app.blueprint.apply_failed` with `actionType: APP_BLUEPRINT`
-      (R-2). The `app.blueprint.matched` record is T53.
+      (R-2). The `app.blueprint.matched` record is T53. Three bindings this task must honour: - **Resolve against the right repository (G05).** `request` resolves the Blueprint against
+      `sourceRepository.upstream` for relations `fork` and `private-copy`, and against the Work Repository for
+      `link` — never against the fork itself. `userId` is optional with a documented fallback: the Work owner for
+      a system-triggered apply. The match source and any fork confirmation APW-01 persisted
+      (`sourceRepository.blueprintMatchSource`) are reused, so a ready-handler apply never re-asks for a
+      confirmation the member already gave. - **Compose a spec that validates for every relation (GAP-02).** Before validation, adapt relation-dependent
+      blocks: when the relation is `link`, drop `upstreamSync` from the Blueprint's spec and force
+      `upstreamPullRequests.enabled: false`, because schema.md R13 makes `source.relation: link` with
+      `upstreamSync` an error (`upstream_sync_requires_upstream`). The dropped keys are listed in the pull
+      request body and in the Activity details — nothing is silently discarded, and the Blueprint repository's own
+      file is never edited. - **Report the outcome (APW-01 FR-29b/FR-29a).** After persisting `blueprintApplyRef`, call APW-02's
+      `APP_SOURCE_APPLY_REPORTER.recordSourceApplied(workId, result)` `@Optional()` with
+      `{kind:'commit', sha}`, `{kind:'pull_request', number, url}` or `{kind:'failed', reason}`; a missing port or
+      a throw is logged by code and never fatal. **The Blueprint's trademark display name (FR-63) is applied
+      here**: `WorkAppSpecState.displayName` from the entry's `displayName`, and `works.name` is set to it only
+      while the Work still carries the creation default (APW-01 T13's name), so a member who renamed the Work is
+      never overridden. Upgrade mode makes **no** reporter call and no rename.
       **Test**: `packages/agent/src/apps-catalog/__tests__/app-blueprint-apply.spec.ts` — a fresh Fork App Work gets
       exactly one commit holding spec + add-only overlays and a Link App Work gets a PR with no push (ACC-03-26); a
       `.github/workflows/x.yml` overlay refused and an existing file never overwritten (ACC-03-27); a missing pinned
       commit refuses and writes nothing (ACC-03-28); upgrade PR keeps a user field, lists a conflict and is updated by a
-      newer version (ACC-03-29); an explicit Blueprint applied to a generated repository (ACC-03-44).
+      newer version (ACC-03-29); an explicit Blueprint applied to a generated repository (ACC-03-44); **Link plus a
+      Blueprint whose spec carries `upstreamSync` composes a valid spec, drops that key and forces
+      `upstreamPullRequests.enabled: false`, and lists what it dropped** (ACC-03-53); **a fork App Work resolves
+      against its upstream and not against the fork, reusing the persisted match source, and `userId` omitted falls
+      back to the Work owner** (ACC-03-54); **the reporter receives `commit`, `pull_request` and `failed` in their
+      three cases and the upgrade mode makes no reporter call** (ACC-03-55); **the trademark display name lands on
+      `WorkAppSpecState.displayName` and on `works.name` while the name is still the creation default, and a renamed
+      Work keeps its name** (ACC-03-37).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-blueprint-apply` passes and the dispatcher symbol is in
       `DISPATCHER_SYMBOLS`.
 
@@ -453,17 +560,25 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       focus, icon rendered with `<img>` only, the `upstreamAgreementMissing` tooltip copy.
       **Done when**: APW-01 can mount it with no change to the component.
 
-- [ ] **T33. The `ever-works/apps` catalog repository** _(outside this monorepo)_.
-      **Create** in `ever-works/apps`: `manifest.json` (`schemaVersion: 1`, empty `apps`), `licenses.yml`
+- [ ] **T33. The `ever-works/templates` catalog repository** _(outside this monorepo)_.
+      **Create** in `ever-works/templates` — **the repository that exists (2026-09-17); the earlier drafts called it
+      `ever-works/apps`, and `EVER_WORKS_APPS_CATALOG_REPO` accepts either value, so the older name keeps working
+      and nothing is renamed away** — `manifest.json` (`schemaVersion: 1`, empty `apps`), `licenses.yml`
       (legal-review draft per [catalog.md §4](./catalog.md), classes fixed per R-3), `schema/manifest.schema.json`
       (incl. `managedHosting.upstreamAgreement`), `schema/licenses.schema.json`, `schema/app-spec.schema.json` (copy of
-      T8's output), `scripts/validate.mjs` (checks C1–C12, with C5 failing `red` and C6 the upstream-agreement rule),
-      `.github/workflows/validate.yml`, `.github/workflows/schema-sync.yml`, `.github/workflows/verify-expiry.yml`,
+      T8's output), `scripts/validate.mjs` (checks C1–C12, with C5 failing `red` and C6 the upstream-agreement rule;
+      its C4 leg runs **T57's published validator package** — `@ever-works/contracts` at the version pinned in this
+      repository's `package.json` — and its C12 leg compares the vendored schema against that same package's
+      committed schema, so nothing here re-implements the platform's rules),
+      `.github/workflows/validate.yml` (blueprint-draft mode for `.works/works.yml`, data-repository mode with a
+      stub `source` for `profiles/*.works.yml`), `.github/workflows/release.yml` (tag `vX.Y.Z` and print the commit
+      sha the catalog pull request pins into `sha:` — **never** stamp `blueprint:` into the file: blueprint mode
+      forbids it), `.github/workflows/verify-expiry.yml`,
       `.github/CODEOWNERS` (legal reviewers own `licenses.yml` and `managedHosting.upstreamAgreement` changes),
       `CONTRIBUTING.md`, `README.md`.
       **Test**: `scripts/__tests__/validate.test.mjs` in that repository (`node --test scripts/__tests__`) — one failing
       fixture per check C1–C12, including a `red` entry (C5) and an amber `allowed: true` entry without an agreement
-      (C6).
+      (C6), and the three APW-13 Blueprint drafts passing the C4 leg.
       **Done when**: the repository is public, `validate.yml` is required on `main`, and the platform reads an
       empty catalog as `available: true` with zero entries.
 
@@ -562,9 +677,12 @@ _Delivers spec FR-53…FR-65._
       **Test**: `packages/agent/src/app-license/__tests__/app-license.service.spec.ts` — an amber Work refused for Ever
       Works Apps by `getHostingEligibility` (ACC-03-33); manager refused, owner recorded with text hash and commit, a new
       text id clears it (ACC-03-34); MIT → BUSL-1.1 notifies, keeps running Deployments and requires attestation next
-      (ACC-03-35); private AGPL without `sourceOfferUrl` ⇒ `sourceOfferMissing` (ACC-03-36); trademark display name
-      `Cal.diy (community build)` (ACC-03-37); 8-day registry outage never managed-eligible (ACC-03-38); amber with an
-      agreement eligible, red on Your cluster only after attestation and never managed (ACC-03-47).
+      (ACC-03-35); private AGPL without `sourceOfferUrl` ⇒ `sourceOfferMissing` (ACC-03-36); 8-day registry outage never
+      managed-eligible (ACC-03-38); amber with an agreement eligible, red on Your cluster only after attestation and
+      never managed (ACC-03-47); the eligibility line for a Work whose Blueprint carries a trademark notice names the
+      notice the Blueprint set (`WorkAppSpecState.displayName`, written by T28 — **the license service never creates
+      or renames a Work**, so ACC-03-37's Work-name assertion lives in
+      `packages/agent/src/apps-catalog/__tests__/app-blueprint-apply.spec.ts` and in APW-01's create spec).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-license.service` passes and the dispatcher symbol is in
       `DISPATCHER_SYMBOLS`.
 
@@ -689,6 +807,88 @@ _Delivers spec FR-53…FR-65._
       **Done when**: `pnpm --filter @ever-works/agent test -- collectors redaction` is green — including the
       secret-shaped-column guard in `redaction.spec.ts` — and a backup of a workspace holding one App Work lists
       `data/works/app-spec-states.jsonl`.
+
+- [ ] **T55 (P2 seam, own PRs — the interface-first split; no whole-phase loop).** Three small PRs, in this order,
+      each complete on its own and each merged before APW-01 P1: 1. **`commitFiles?`** — the git-capability slice of T22: `GitRepository.commitFiles?` in
+      `packages/plugin/src/contracts/capabilities/git-provider.interface.ts`, its GitHub implementation in
+      `packages/plugins/github/src/github-api.service.ts`, the delegation in
+      `packages/plugins/github/src/github.plugin.ts` and the `null`/`unsupported` wrapper in
+      `packages/agent/src/facades/git.facade.ts`. T22 then adds only `topics?` and `getFileWebUrl?`. 2. **The catalog seam** — T24's read paths and T26's adapter, so `packages/agent/src/app-works/` gains its
+      binding: `AppSourceCatalogAdapter` implements APW-01 T11's `AppSourceCatalogPort` (including
+      `matchSource`, `displayName` and `prompts`) in `packages/agent/src/apps-catalog/apps-catalog.module.ts`. 3. **The apply seam** — T28 with T53 (the apply job and the `app.blueprint.matched` record), which
+      `AppSourceInitializerService` (APW-01 T15) calls.
+      **Create** nothing beyond those three PRs' own files; the point of this task is the ordering, recorded once.
+      **Test**: each PR runs its own task's spec (T22's, T24/T26's, T28/T53's) and `pnpm --filter @ever-works/agent
+test -- app-spec` stays green.
+      **Done when**: APW-01 P1 can be built against all three without any other APW-03 task having merged, and
+      `git grep -n "APW-01 P1" docs/specs/features/app-works/APW-03-app-spec-and-catalog/tasks.md` finds only this
+      sentence.
+
+- [ ] **T56 (P1 and P2, lands with T13, T28 and T42). Job wiring: Trigger.dev bindings, worker RPC and where each
+      event is emitted.** The three jobs this epic dispatches follow the existing `MEMORY_FACT_EMBED_DISPATCHER`
+      pattern end to end; symbol files and a trigger task alone are not enough.
+      **Create** (P1, with T13) `packages/tasks/src/dispatchers/app-spec-evaluate.dispatcher.ts`; **Create** (P2,
+      with T28) `packages/tasks/src/dispatchers/app-blueprint-apply.dispatcher.ts`; **Create** (P3, with T42)
+      `packages/tasks/src/dispatchers/app-license-evaluate.dispatcher.ts`.
+      **Modify** `packages/tasks/src/trigger/trigger.service.ts` (`dispatchAppSpecEvaluate`,
+      `dispatchAppBlueprintApply`, `dispatchAppLicenseEvaluate`, mirroring `dispatchMemoryFactEmbed`, with the
+      idempotency keys APW-03's payloads carry), `packages/tasks/src/trigger/trigger-tenant-client.factory.ts`
+      (the three ids), `packages/tasks/src/trigger/trigger.module.ts` (provider + export, beside the existing
+      dispatcher at `:164`), `packages/tasks/src/index.ts` (exports) and `packages/tasks/src/tasks/trigger/index.ts`.
+      **Modify** `apps/api/src/trigger/trigger-internal.controller.ts` — add `@Optional()`
+      `AppSpecService`, `AppBlueprintApplyService` and `AppLicenseService` parameters **appended last**, and their
+      `remoteMap` entries; **Modify** `apps/api/src/trigger/trigger-internal.module.ts` — import the agent
+      `AppSpecModule`, `AppsCatalogModule` and `AppLicenseModule`; **Modify**
+      `packages/tasks/src/trigger/worker/modules/trigger-internal.module.ts` —
+      `APP_SPEC_SERVICE`, `APP_BLUEPRINT_APPLY_SERVICE` and `APP_LICENSE_SERVICE` through `createRemoteProxy`,
+      exported, following `MemoryFactEmbedService` (`:431-433`).
+      **The worker never evaluates.** Every Trigger task calls its service through the RPC proxy, so the
+      evaluation, the database writes and the in-process events all run **in the API process** — which is what
+      makes `AppSpecAppliedEvent` and `AppLicenseChangedEvent` reach APW-05, APW-07 and APW-08, whose `@OnEvent`
+      listeners live in API-side agent modules. The worker has its own `EventEmitterModule`
+      (`trigger-plugins.module.ts:41`), so an event emitted inside the worker would reach nobody; plan §6.1 states
+      this and names the emitting process.
+      **Test**: **create** `packages/tasks/src/dispatchers/__tests__/app-spec-evaluate.dispatcher.spec.ts` (and the
+      sibling specs for the other two) — the id is forwarded, a `null` dispatch runs the handler in-process;
+      extend `packages/tasks/src/__tests__/trigger.service.spec.ts` — three dispatchers, unconfigured ⇒ `null`,
+      idempotency-key shape; extend `apps/api/src/trigger/trigger-internal.controller.spec.ts` — the three names in
+      `remoteMap` with their method allow-lists; extend
+      `packages/tasks/src/trigger/worker/modules/trigger-internal.module.spec.ts` — the worker compiles with no
+      database module and each of the three resolves to a remote proxy, and an event emitted by a service call
+      reaches an API-side `@OnEvent` listener in the integration case (ACC-03-50).
+      **Done when**: all four specs are green and `git grep -n "AppSpecAppliedEvent" packages/tasks/src` finds no
+      emit site.
+
+- [ ] **T57 (P2, lands with T33 and T8). The published validator artifact C4 and C12 run.**
+      **Create** `packages/contracts/src/apps/validator/` — a publishable entry point re-exporting the pure
+      validator (`validateAppSpecDocument`, `validateAppSpecObject`, `APP_SPEC_ISSUE_CODES`) from
+      `packages/agent/src/works-config/schema/`'s pure modules, plus the committed JSON Schema of T8. It lives in
+      `packages/contracts` because that package is **not** private, so Blueprint CI can install it; nothing is moved
+      out of `packages/agent` — the agent package re-exports the same modules it does today.
+      **Modify** `packages/contracts/package.json` — a `./apps/validator` subpath export and the `files` entry;
+      **Create** `.github/workflows/publish-app-spec-validator.yml` — publishes `@ever-works/contracts` on a tag,
+      with `EVER_WORKS_APP_SPEC_VALIDATOR_VERSION` recorded in the catalog repository's `package.json` pin.
+      **Test**: `packages/contracts/src/apps/__tests__/validator-entry.spec.ts` — the entry validates schema.md
+      §24.1–§24.4 and reports the same codes the agent package reports; a drift guard asserts the committed JSON
+      Schema equals T8's generator output (ACC-03-51).
+      **Done when**: a scratch install of the packed tarball validates a Blueprint draft and the catalog
+      repository's `package.json` names its exact version.
+
+- [ ] **T58 (P2, lands with T33). Validate every Blueprint draft in `blueprint` mode.**
+      **Create** `packages/agent/src/works-config/schema/__tests__/blueprint-drafts.spec.ts` — walks
+      `docs/specs/features/app-works/APW-13-golden-paths/blueprints/*/.works/works.yml` and validates each in
+      **`blueprint` mode**, which schema.md §3's corrected row defines as allowing and expecting `source` and
+      `blueprint` (the 2026-09-17 correction — the drafts declare both, and the apply job composes the real `source`
+      itself), asserting zero errors; warnings are reported but not fatal (ACC-03-52). This is the same mode and the
+      same rules catalog CI check C4 runs through T57's published artifact, so a draft that passes here cannot fail
+      there.
+      **Modify** `docs/specs/features/app-works/APW-03-app-spec-and-catalog/catalog.md` §5 — reference this spec as
+      the mechanism behind catalog check C4's blueprint-mode leg.
+      **Test**: `pnpm --filter @ever-works/agent test -- blueprint-drafts` — every draft directory present under
+      `blueprints/` is validated, and the spec fails loudly if the folder holds a draft it did not read.
+      **Done when**: the spec is green for all three drafts, and the same three files still fail for the reasons
+      that are real defects (a reserved `EVER_WORKS_*` env name, a look-around `validate.pattern`, a below-minimum
+      memory request) whenever those are reintroduced — a contrast case keeps that honest.
 
 ---
 

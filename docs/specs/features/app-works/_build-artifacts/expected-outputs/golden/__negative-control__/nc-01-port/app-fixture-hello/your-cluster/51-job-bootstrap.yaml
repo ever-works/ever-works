@@ -1,0 +1,82 @@
+# GOLDEN — app-fixture-hello · target your-cluster · Job `job-bootstrap-77777777` (when: first-deploy)
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.8 (`command` jobs: the component’s image, env, security context and
+# Spec      : resources; `backoffLimit: retries`, `activeDeadlineSeconds: timeoutSeconds`,
+# Spec      : `ttlSecondsAfterFinished: 86400`, `restartPolicy: Never`; the last 3 Jobs per name are kept)
+# Spec      : APW-06 spec.md FR-26 row 2 (pre-deploy jobs in declared order) and row 4 (first-deploy jobs
+# Spec      : run before the app is published), FR-51 (Run now reuses this definition)
+# Spec      : `retries` is pinned to 0 — the App spec schema declares no default (../../README.md).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: job-bootstrap-77777777
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+        ever-works.io/job: bootstrap
+        ever-works.io/component: web
+spec:
+    backoffLimit: 0
+    activeDeadlineSeconds: 120
+    ttlSecondsAfterFinished: 86400
+    template:
+        metadata:
+            labels:
+                ever-works.io/job: bootstrap
+                ever-works.io/component: web
+                app.kubernetes.io/managed-by: ever-works-k8s-plugin
+                app.kubernetes.io/part-of: app-fixture-hello
+                ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+                ever-works.io/kind: app
+        spec:
+            restartPolicy: Never
+            serviceAccountName: app
+            automountServiceAccountToken: false
+            enableServiceLinks: false
+            securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                    type: RuntimeDefault
+            imagePullSecrets:
+                - name: app-pull
+            containers:
+                - name: bootstrap
+                  image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00
+                  imagePullPolicy: IfNotPresent
+                  command:
+                      - node
+                      - src/bootstrap.mjs
+                  envFrom:
+                      - secretRef:
+                            name: app-env-c35b103be8
+                            optional: false
+                      - configMapRef:
+                            name: app-platform-c35b103be8
+                            optional: false
+                  resources:
+                      requests:
+                          cpu: 50m
+                          memory: 64Mi
+                      limits:
+                          memory: 128Mi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                          drop:
+                              - ALL
+                  volumeMounts:
+                      - name: tmp
+                        mountPath: /tmp
+            volumes:
+                - name: tmp
+                  emptyDir:
+                      sizeLimit: 256Mi

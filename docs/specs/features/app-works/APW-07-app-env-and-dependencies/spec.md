@@ -312,7 +312,25 @@ Every threshold below is a number on purpose.
   policy allowing only them, and exposes no dependency outside the cluster.
 - **FR-39.** The mail relay option exists only when the operator has configured a relay that issues a separate credential
   per App Work. It is never the operator's own credential, sends only from an address on the App Work's domain or the
-  relay's no-reply domain, and allows at most 200 messages per App Work per day by default.
+  relay's no-reply domain, and allows at most 200 messages per App Work per day by default. **Added 2026-09-17
+  (XC-21):** it is offered only to an account with a verified email, an account and an organization daily ceiling apply
+  on top of the per-App-Work limit (1 000 and 5 000 by default), a bounce or complaint rate above 5 % suspends further
+  credential issuance for that account and raises a mail signal for an operator, an operator can stop issuance without
+  stopping anything already issued, and relay messages are metered and appear in the daily receipt. Relay use never
+  requires the app to reach a mail port: the app talks to the relay endpoint over HTTPS.
+- **FR-61.** On **Ever Works Apps** every declared dependency has a provider, including **mail**: an app that declares
+  `smtp` gets a per-App-Work credential for the platform's mail relay, so an app that requires SMTP reaches **Ready** on
+  the managed tier. The tier's block on outbound mail ports (25, 465, 587) is **not** relaxed for it — the relay is
+  reached over its own HTTPS endpoint, and the app is handed that endpoint, its credential and its from-address as
+  ordinary dependency outputs. This applies to the same relay as FR-39, with the same per-App-Work daily limit.
+- **FR-62.** A dependency whose provider needs something only the owner can supply starts in **Needs your settings** and
+  is provisioned only after they save it; it never fails for a deadline the owner could not have met. When the App spec
+  marks `smtp` **not** required and no mail provider is configured, the entries that would read from it are left unset
+  with a warning instead of blocking a Build or Deploy; when it **is** required, they block, naming the missing entry.
+- **FR-63.** A dependency's size can be chosen per App Work before it is first provisioned, increased later when its
+  storage supports it, and never decreased — a smaller value is refused with **"A dependency's storage can't be shrunk.
+  Delete its data first if you need a smaller one."**, and a storage class that cannot grow is refused with a message
+  naming the class. Every size change is recorded in Activity by name and amount.
 - **FR-40.** Dependency outputs are exactly those the App spec may reference: **postgres** `url`, `directUrl` (only when
   declared), `host`, `port`, `database`, `user`, `password`; **redis** `url`, `host`, `port`, `password`;
   **objectStorage** `endpoint`, `region`, `accessKeyId`, `secretAccessKey`, `bucket.<name>`; **smtp** `host`, `port`,
@@ -351,7 +369,7 @@ Every threshold below is a number on purpose.
 
 - **FR-51.** Postgres and object storage live on tenant data servers inside the isolated hosting zone that hold no
   platform or production data; Redis is a dedicated instance per App Work there (a shared cache cannot isolate one app's
-  keys from another's).
+  keys from another's); **mail is served by the platform relay of FR-61, never by a tenant-reachable mail port.**
 - **FR-52.** Each App Work's database has its own owner role, is closed to every other role, accepts at most 20
   connections for that role, and applies a 60-second default statement timeout and a 60-second idle-in-transaction
   timeout the app may lower but not remove.
@@ -412,10 +430,11 @@ Every threshold below is a number on purpose.
                 ▲                              │ unset / reset (non-generated)
                 └──────────────────────────────┘          generated: rotate (typed) ──► set (version + 1)
 
- Dependency:  pending ──► provisioning ──► ready ◄──► degraded (reason)
-                               │  └──► failed (reason) ── Retry ──► provisioning
-              ready ── removed from App spec / app removed / target changed ──► kept (no longer managed)
-              kept or ready ── Delete data (typed slug) ──► deleting ──► deleted
+ Dependency:  awaiting_config ──owner saves settings──► pending ──► provisioning ──► ready ◄──► degraded (reason)
+                                                          │  └──► failed (reason) ── Retry ──► provisioning
+               ready ── removed from App spec / app removed / target changed ──► kept (no longer managed)
+               kept or ready ── Delete data (typed slug) ──► deleting ──► deleted
+               ready ── size increased (FR-63) ──► provisioning ──► ready (never smaller)
 ```
 
 ---
@@ -504,7 +523,7 @@ The 👁 control shows the typed characters only while held, and only before sav
 | Element         | Copy                                                                                                                                                                                                                                                                                                            |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Provider lines  | `In your cluster · single instance` · `Managed by the CloudNativePG operator in your cluster` · `Your own SMTP server` · `Your own S3 storage` · `Ever Works mail relay` · `Ever Works Apps`                                                                                                                    |
-| Status          | `Pending` · `Provisioning` · `Ready` · `Degraded` · `Failed` · `Kept — no longer managed` · `No longer used by the App spec — data kept` · `Deleting` · `Deleted`                                                                                                                                               |
+| Status          | `Needs your settings` · `Pending` · `Provisioning` · `Ready` · `Degraded` · `Failed` · `Kept — no longer managed` · `No longer used by the App spec — data kept` · `Deleting` · `Deleted`                                                                                                                |
 | Backup          | `No automatic backups. If this volume is lost, the data is gone.` · `Backups: not configured` · `Backups: last completed {time}` · `Backups: overdue — last completed {time}` · `Backups: last attempt failed` · `Backups: managed by your {kind} provider` · `Backups: couldn't check`                         |
 | Failure reasons | `Your cluster has no default storage class. Choose one in Dependency settings.` · `Couldn't reach your cluster.` · `Sign-in was refused by the server.` · `Bucket {bucket} doesn't exist or can't be read.` · `The volume didn't become ready within {minutes} minutes.` · `Extensions not available: {names}.` |
 
@@ -605,6 +624,16 @@ Deleting the App Work (APW-01's dialog, APW-06's Stored data section) shows the 
 - [ ] **ACC-07-31** — A verification's values are produced with zero writes to stored env values (a second verification
       gets different generated values), an unset required prompted value is reported by name, and its dependencies have no
       persistent volume claim and no stored outputs.
+- [ ] **ACC-07-32** — An App Work on **Ever Works Apps** whose App spec declares `smtp` reaches **Ready** with a
+      per-App-Work relay credential, and the tier's outbound ports 25, 465 and 587 remain refused; the app never needs a
+      mail port (FR-61, GAP-22).
+- [ ] **ACC-07-33** — A provider that needs owner-supplied settings starts **Needs your settings**, is not dispatched and
+      does not fail on a deadline; saving the settings provisions it. With `smtp.required: false` and no mail provider
+      configured, a Deploy proceeds with the SMTP-sourced entries unset and a warning; with `smtp.required: true` the
+      Deploy names the missing entry (FR-62, S20).
+- [ ] **ACC-07-34** — Increasing a dependency's size above its current size is refused with the stated message; a
+      storage class that cannot expand is refused naming the class; a successful increase is recorded in Activity with
+      the two amounts (FR-63).
 
 ---
 

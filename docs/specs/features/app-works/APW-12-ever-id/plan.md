@@ -53,7 +53,7 @@ spec under `apps/api/src/auth/`, §10.3).
 | Plugins   | [`packages/plugin/src/settings/json-schema.types.ts`](../../../../../packages/plugin/src/settings/json-schema.types.ts) · [`packages/plugins/cloudflare-dns/src/settings.schema.ts`](../../../../../packages/plugins/cloudflare-dns/src/settings.schema.ts)                                                                                                        | `x-secret`, `x-envVar`, `x-scope: 'global' \| 'tenant' \| 'user' \| 'work'` — the pattern for admin-only secrets with env fallbacks.                                                                                                                                                                                                                       |
 | Facades   | [`packages/agent/src/facades/oauth.facade.ts`](../../../../../packages/agent/src/facades/oauth.facade.ts) · [`facades.module.ts`](../../../../../packages/agent/src/facades/facades.module.ts)                                                                                                                                                                     | Capability resolution through `PluginRegistryService`; `FACADES` provider list.                                                                                                                                                                                                                                                                            |
 | Web       | [`apps/web/src/lib/auth/cookies.ts`](../../../../../apps/web/src/lib/auth/cookies.ts)                                                                                                                                                                                                                                                                              | `everworks_auth_token` (encrypted, HttpOnly, `secure` from the public URL scheme, SameSite=Lax, 7 days); `oauth_state` and `redirect_url` cookies (10 min).                                                                                                                                                                                                |
-| Web       | [`apps/web/src/app/api/auth/authorize/route.ts`](../../../../../apps/web/src/app/api/auth/authorize/route.ts) · [`lib/utils/url.ts`](../../../../../apps/web/src/lib/utils/url.ts)                                                                                                                                                                                 | The local-client hand-off: `addSessionTokenToUrl` appends `sessionToken` for `ALLOWED_REDIRECT_URLS` hosts. **Kept unchanged; must not be extended.**                                                                                                                                                                                                      |
+| Web       | [`apps/web/src/app/api/auth/authorize/route.ts`](../../../../../apps/web/src/app/api/auth/authorize/route.ts) · [`lib/utils/url.ts`](../../../../../apps/web/src/lib/utils/url.ts)                                                                                                                                                                                 | The existing local-client browser hand-off. **Kept unchanged; must not be extended**, and described only generically here (Resolution R-14: existing, unfixed weaknesses are not reproduced in this public repository — the mechanism and its allow-list constant are recorded in the private operations repository).                                      |
 | Web       | [`app/actions/auth.ts`](../../../../../apps/web/src/app/actions/auth.ts) `connectProvider` · [`app/api/oauth/oauth-callback-handler.ts`](../../../../../apps/web/src/app/api/oauth/oauth-callback-handler.ts) · [`callback-errors.ts`](../../../../../apps/web/src/app/api/oauth/callback-errors.ts)                                                               | Server action gets `{url, state}` from the API and mirrors `state` into a cookie; the callback compares, calls the API, sets the auth cookie and maps errors to `/auth/error?error=oauth_*`.                                                                                                                                                               |
 | Web       | [`lib/auth/providers.ts`](../../../../../apps/web/src/lib/auth/providers.ts) · [`lib/api/auth.ts`](../../../../../apps/web/src/lib/api/auth.ts) · [`lib/api/enums.ts`](../../../../../apps/web/src/lib/api/enums.ts)                                                                                                                                               | Reads `/auth/providers`; typed API client; `OAuthProvider` enum (four members, left untouched).                                                                                                                                                                                                                                                            |
 | Web       | [`components/auth/social-login.tsx`](../../../../../apps/web/src/components/auth/social-login.tsx) · [`(auth)/login/login-client.tsx`](<../../../../../apps/web/src/app/[locale]/(auth)/login/login-client.tsx>) · [`(auth)/register/register-form.tsx`](<../../../../../apps/web/src/app/[locale]/(auth)/register/register-form.tsx>)                             | `SocialLoginButtons` with a `disabled` consent gate used by registration.                                                                                                                                                                                                                                                                                  |
@@ -140,7 +140,7 @@ sequenceDiagram
     A->>P: buildAuthorizationRequest(redirectUri, scopes)
     P-->>A: {url, state, nonce, codeVerifier}
     A-->>W: {authorizationUrl, transaction = seal(txn, 600 s)}
-    W->>B: Set-Cookie ew_everid_txn (HttpOnly, Lax, Path=/api/auth/ever-id) + navigate
+    W->>B: Set-Cookie ew_everid_txn (HttpOnly, Lax, Path=/) + navigate
     B->>E: authorize (S256, state, nonce)
     E-->>B: 302 {redirect}?code&state&iss
     B->>W: GET /api/auth/ever-id/callback
@@ -221,8 +221,14 @@ never writes these columns; nulls are the default for every other sign-in method
 `EverIdReplayService.consumeOnce(kind, key, ttlSeconds)` inserts `{ id: uuid, identifier: 'ever-id:<kind>',
 value: sha256('<kind>|' + key), expiresAt }`. A unique violation on `value` means "already used". Kinds:
 `txn` (key `state`, 600 s), `pending` (key pending id, 600 s), `jti` (key `iss|jti`, 600 s). Each insert
-first deletes at most 100 expired `ever-id:%` rows via `DELETE … WHERE id IN (SELECT id … LIMIT 100)`
-(portable to Postgres and SQLite). No new table.
+first deletes at most 100 expired `ever-id:%` rows. **The cleanup is two statements, not one** — a `SELECT` of up
+to 100 expired ids (`id`, ordered by `expiresAt`) followed by
+`DELETE FROM verification WHERE id IN (:ids)` — because the platform wires **Postgres, SQLite, MySQL and
+MariaDB** (`packages/agent/src/database/database.config.ts`), and MySQL/MariaDB reject both `LIMIT` inside an `IN`
+subquery and a subquery over the table being deleted from; a single-statement form would work on two engines and
+fail on the other two (the same class of portability bug `b5a7d6857` fixed elsewhere). The repository spec covers
+all four engines, and a duplicate-key race between the select and the delete is harmless — the row is already
+expired and the next insert re-selects. No new table.
 
 ### 3.4 Sealed values (never persisted)
 
@@ -271,6 +277,9 @@ export const EVER_ID_LIMITS = {
 	allowedIssuersMax: 3,
 	localClientsMax: 5,
 	delegatedClientsMax: 10,
+	delegatedClientsWindowDays: 30,
+	availabilityCacheSeconds: 60,
+	delegatedClientNamesMax: 10,
 	devicePollMinIntervalSeconds: 5,
 	devicePollSlowDownStepSeconds: 5,
 	deviceCodeMaxLifetimeSeconds: 900
@@ -290,17 +299,21 @@ export type EverIdErrorCode =
 	| 'lastSignInMethod'
 	| 'notConnected'
 	| 'accountDisabled'
+	| 'everIdSignedOut'
 	| 'tokenInQuery'
 	| 'insufficientScope';
 export type EverIdCallbackOutcome =
 	| { outcome: 'signedIn'; access_token: string; user: { id: string; email: string | null; username: string } }
 	| { outcome: 'confirmSignUp'; pending: string; identity: { email: string; name: string | null } }
 	| { outcome: 'confirmConnect'; pending: string; identity: { email: string }; accountEmail: string }
-	| { outcome: 'emailInUse'; email: string };
+	| { outcome: 'emailInUse'; email: string; pending: string };
 ```
 
 `emailInUse` returns the address only because the person just proved control of it at Ever ID with
-`email_verified: true`.
+`email_verified: true` — and it returns it **inside the sealed `pending` value** as well, so the
+account-exists page reads the address from the pending cookie (never from the query string) with no second
+source of truth. `pending` is sealed by `EverIdSealService` under the `signUp` kind for 600 s and consumed
+once, exactly like `confirmSignUp`.
 
 ### 3.6 Migrations (Constitution V)
 
@@ -411,17 +424,24 @@ Every `verify*`/`exchange*` method throws `IdentityTokenRejectedError { code }` 
   Vitest (Constitution I).
 - `src/settings.schema.ts`, every property `x-scope: 'global'`:
 
-| Key                | Type / limits                                                                           | `x-envVar`              | Notes                                |
-| ------------------ | --------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------ |
-| `issuerUrl`        | string, `https://` (or `http://localhost`/`127.0.0.1` when `NODE_ENV !== 'production'`) | `EVER_ID_ISSUER_URL`    | required                             |
-| `clientId`         | string ≤ 255                                                                            | `EVER_ID_CLIENT_ID`     | required                             |
-| `clientSecret`     | string, `x-secret: true`                                                                | `EVER_ID_CLIENT_SECRET` | required; `client_secret_basic`      |
-| `allowedIssuers`   | string[] 1–3                                                                            | —                       | default `[issuerUrl]`                |
-| `apiAudience`      | string ≤ 255                                                                            | —                       | default `ever-works` (APW-11 §2.4)   |
-| `localClients`     | `{ kind: 'cli' \| 'node'; clientId }[]` ≤ 5                                             | —                       | public clients allowed at `/session` |
-| `signUpAllowed`    | boolean                                                                                 | —                       | default `true`                       |
-| `clockSkewSeconds` | integer 0–120                                                                           | —                       | default `60`                         |
-| `displayName`      | string ≤ 40                                                                             | —                       | default `Ever ID`                    |
+| Key                    | Type / limits                                                                           | `x-envVar`                   | Notes                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `issuerUrl`            | string, `https://` (or `http://localhost`/`127.0.0.1` when `NODE_ENV !== 'production'`) | `EVER_ID_ISSUER_URL`         | required                                                                                                                                                                                                                                                                                                                                                                                 |
+| `clientId`             | string ≤ 255                                                                            | `EVER_ID_CLIENT_ID`          | required                                                                                                                                                                                                                                                                                                                                                                                 |
+| `clientSecret`         | string, `x-secret: true`                                                                | `EVER_ID_CLIENT_SECRET`      | required; `client_secret_basic`                                                                                                                                                                                                                                                                                                                                                          |
+| `allowedIssuers`       | string[] 1–3                                                                            | `EVER_ID_ALLOWED_ISSUERS`    | default `[issuerUrl]`                                                                                                                                                                                                                                                                                                                                                                    |
+| `apiAudience`          | string ≤ 255                                                                            | `EVER_ID_API_AUDIENCE`       | default `ever-works` (APW-11 §2.4)                                                                                                                                                                                                                                                                                                                                                       |
+| `localClients`         | `{ kind: 'cli' \| 'node'; clientId }[]` ≤ 5                                             | —                            | public clients allowed at `/session`                                                                                                                                                                                                                                                                                                                                                     |
+| `delegatedClientNames` | `{ clientId: string ≤ 255; displayName: string ≤ 60 }[]` ≤ 10                           | —                            | the names the card shows (FR-48); an unnamed `clientId` falls back to the client id itself                                                                                                                                                                                                                                                                                               |
+| `accountManagementUrl` | string, `https://`                                                                      | —                            | the **Manage in Ever ID ↗** target (FR-48); unset hides the link                                                                                                                                                                                                                                                                                                                         |
+| `signUpAllowed`        | boolean                                                                                 | `EVER_ID_SIGN_UP_ALLOWED`    | default `true`                                                                                                                                                                                                                                                                                                                                                                           |
+| `clockSkewSeconds`     | integer 0–120                                                                           | `EVER_ID_CLOCK_SKEW_SECONDS` | default `60`                                                                                                                                                                                                                                                                                                                                                                             |
+| `displayName`          | string ≤ 40                                                                             | —                            | default `Ever ID`                                                                                                                                                                                                                                                                                                                                                                        |
+| `availability`         | object, **platform-written, not user-writable**                                         | —                            | `{ unavailableSince?: string; discoveryRefreshedAt?: string; jwksRefreshedAt?: string; lastLogoutNoticeAt?: string }` (§9.2). Stored, so every replica reads the same state and a re-test on one replica clears the flag on all of them; read through a cache of at most `EVER_ID_LIMITS.availabilityCacheSeconds` (60 s), which is what makes FR-5's disable bound hold across replicas |
+
+`delegatedClientsWindowDays: 30` in `EVER_ID_LIMITS` bounds the card's list: the API filters
+`external_identities.delegatedClients` to entries seen within that window when it builds `ExternalIdentityDto`,
+so the filter runs in the API and never in the web.
 
 - `src/oidc-identity.plugin.ts` implements §4.1 with `openid-client` (`discovery`, `buildAuthorizationUrl`
   with `code_challenge_method=S256`, `authorizationCodeGrant` with `pkceCodeVerifier`, `expectedNonce`,
@@ -466,7 +486,7 @@ failing) → API `404 everIdDisabled` or `503 providerUnavailable` (§5.2).
 | `GET /api/auth/providers` (existing) | public                                          | existing            | + `everId: { enabled: boolean; displayName: string }`                         | FR-6         |
 | `POST /authorize`                    | public                                          | 20 / 60 s / IP      | `{ returnTo? }` → `{ authorizationUrl, transaction }`                         | FR-8–10      |
 | `POST /callback`                     | public; bearer read when `txn.intent = connect` | 20 / 60 s / IP      | `{ code, state, iss?, transaction }` → `EverIdCallbackOutcome`                | FR-11–25     |
-| `POST /sign-up/confirm`              | public                                          | 10 / 60 s / IP      | `{ pending, acceptedTerms: string[] }` → `TokenResponse`                      | FR-23        |
+| `POST /sign-up/confirm`              | public                                          | 10 / 60 s / IP      | `{ pending, terms: TermsAcceptanceClaimDto[] }` → `TokenResponse`             | FR-23        |
 | `POST /connect/authorize`            | session only                                    | 10 / 60 s / user    | `{}` → `{ authorizationUrl, transaction }` · `403 reauthRequired`             | FR-25        |
 | `POST /connect/confirm`              | session only                                    | 10 / 60 s / user    | `{ pending }` → `ExternalIdentityDto` · `409 subjectLinked \| userHasIssuer`  | FR-25–27     |
 | `GET /identities`                    | session only                                    | default             | → `{ items: ExternalIdentityDto[], canDisconnect, disconnectBlockedReason? }` | FR-28, 48    |
@@ -481,12 +501,38 @@ failing) → API `404 everIdDisabled` or `503 providerUnavailable` (§5.2).
 `ExternalIdentityDto`: `{ id, displayName, email, linkedAt, linkedVia, lastLoginAt, delegatedClients }`. The
 issuer and subject are never returned to the browser. DTOs **new** in `apps/api/src/auth/dto/ever-id.dto.ts`
 (class-validator: `returnTo` ≤ 2,048 chars and must start with `/` but not `//`; `pending`/`transaction`
-≤ 4,096 chars; `acceptedTerms` ≤ 10 entries).
+≤ 4,096 chars).
+
+**Terms at sign-up use the existing contract, not a new one.** `terms` is `TermsAcceptanceClaimDto[]`
+(`{ documentId, version, sha256, locale }`, the shape `apps/api/src/auth/dto/auth.dto.ts` already uses for
+register), validated by the same `assertClaimsArePublished`, recorded through
+`TermsAcceptanceService.record(userId, claims, { method, ip, userAgent })` with a new, named
+`AcceptanceMethod` value for this path (`ever-id-signup`; the existing values are untouched). The
+create-account page gets the required documents from the same source the register page uses — the published
+terms the API exposes — and the web never invents a `documentId`.
+
+**Sign-up ordering (replaces "one transaction").** `TermsAcceptanceService.record` writes through Better Auth's
+adapter and `UserRepository.create` is a plain repository save, so the two cannot share a transaction. The
+order is therefore explicit and compensatable: (1) verify the pending value and its single-use replay row;
+(2) **pre-check** `(issuer, subject)` and take the link row first where the unique index allows, so a pair
+already linked elsewhere fails before any account exists; (3) create the user
+(`registrationProvider: EVER_ID_REGISTRATION_PROVIDER`, `emailVerified: true`, random bcrypt password as
+`validateSocialUser` does); (4) record terms **best-effort**, exactly as register does — a terms failure is
+logged and does not orphan the account; (5) `issueSession(..., origin)`. If step 2's insert fails after the
+pre-check (the S24 race), the just-created user is **compensated** by deleting it before the error is returned,
+and the spec asserts that no orphan user, `account` row or session survives the race.
 
 **Query-token refusal (FR-17):** **new** `apps/api/src/auth/guards/no-token-in-query.guard.ts`, applied
 controller-wide and to APW-11's delegated handler through `@DelegatedRead`, refuses any query key in
 `access_token`, `id_token`, `logout_token`, `token`, `sessionToken`, `code_verifier` with `400 tokenInQuery`
 before the handler runs and before any logging interceptor records the URL.
+**It must run before authentication, or FR-17's `400` never happens for an unauthenticated caller:**
+`AuthSessionGuard` is a global `APP_GUARD` registered first and answers `401` before any controller-level guard
+runs, so a request carrying a query token and no `Authorization` header would get `401` instead of the `400` the
+spec and APW-11 T25 assert. The check therefore lives in `AuthSessionGuard` itself — as the first thing it does
+for handlers carrying the `NO_TOKEN_IN_QUERY` metadata (`@DelegatedRead` sets it) and for every path under
+`/api/auth/ever-id/*` — and the standalone guard remains as the controller-level belt for handlers that opt in
+without the session guard. The predicate is shared by both, so the two cannot drift.
 
 ### 5.2 Error contract
 
@@ -504,6 +550,7 @@ before the handler runs and before any logging interceptor records the URL.
 | Disconnect would lock out                                 | 409    | `lastSignInMethod`                                         |
 | Exchange for an unconnected pair                          | 403    | `notConnected`                                             |
 | User inactive                                             | 403    | `accountDisabled`                                          |
+| A session ended by a sign-out notice, on the next request | 401    | `everIdSignedOut` (the S6 notice; §5.4's marker)           |
 | Token in query                                            | 400    | `tokenInQuery`                                             |
 | Delegated token lacks scope on a `@DelegatedRead` handler | 403    | `insufficientScope` (APW-11 §4.5)                          |
 
@@ -541,6 +588,16 @@ externalSid?: string | null })` — optional third argument; `AuthProviderServic
 - **New** `apps/api/src/auth/services/ever-id-session.service.ts`: `currentSession(headers)` (by hash),
   `endBySid(sid)`, `endByIdentity(identityId, exceptSessionId?)` — plain `DELETE` on `session`, returning the
   count for Activity. `signOutAll` already deletes every session of a user (spec FR-37 is a test, not code).
+- **The S6 notice needs a signal, because a deleted session looks exactly like an expired one.** Before a
+  back-channel notice deletes the rows for `sid` (or for `sub`), the service writes a short-lived marker keyed by
+  the row's `tokenHash` — one `verification` row per ended session, `identifier` `ever-id:signedOut`,
+  `value` `sha256('signedOut|' + tokenHash)`, TTL 300 s, reusing the existing table and its unique index rather
+  than adding one. `AuthSessionGuard`'s provider branch, when `authenticate` fails for a bearer whose hash has a
+  live marker, answers `401` with `code: 'everIdSignedOut'` (a new member of the closed error-code union) instead
+  of the generic unauthorized body; the web maps that code to `auth.everId.signedOutByProvider` and shows the
+  notice on the next page load. The marker is single-purpose, contains no token, and expires. Sessions ended by
+  a `sub`-only notice get the same marker; a session that simply expired does not, so the two stay
+  distinguishable.
 
 ### 5.5 Linking rules — **new** `apps/api/src/auth/services/ever-id-linking.service.ts`
 
@@ -558,16 +615,26 @@ Additive `ActivityActionType` members `IDENTITY_LINKED = 'identity_linked'`, `ID
 'identity_unlinked'`, `USER_LOGOUT = 'user_logout'`, `DELEGATED_ACCESS = 'delegated_access'`,
 `IDENTITY_PROVIDER_CONFIG_CHANGED = 'identity_provider_config_changed'` (each value ≤ 50 characters). Rows (spec FR-49), all through `ActivityLogService.log(...).catch(() => {})`:
 
-| `actionType`                       | `action`                          | `metadata` (never tokens, codes, subject)              |
-| ---------------------------------- | --------------------------------- | ------------------------------------------------------ |
-| `USER_LOGIN`                       | `user.login.ever-id`              | `{ provider: 'ever-id', identityId }`                  |
-| `USER_SIGNUP`                      | `user.signup.ever-id`             | `{ identityId }`                                       |
-| `USER_LOGIN`                       | `user.login.ever-id.device`       | `{ identityId, clientKind }`                           |
-| `IDENTITY_LINKED`                  | `auth.ever_id.linked`             | `{ identityId, emailsDiffer: boolean }`                |
-| `IDENTITY_UNLINKED`                | `auth.ever_id.unlinked`           | `{ identityId, sessionsEnded }`                        |
-| `USER_LOGOUT`                      | `auth.ever_id.backchannel_logout` | `{ identityId, sessionsEnded, by: 'sid' \| 'sub' }`    |
-| `DELEGATED_ACCESS`                 | `auth.ever_id.delegated_read`     | `{ identityId, clientId }` — first per client per 24 h |
-| `IDENTITY_PROVIDER_CONFIG_CHANGED` | `auth.ever_id.config_changed`     | `{ fields: string[] }`                                 |
+| `actionType`                       | `action`                          | `metadata` (never tokens, codes, subject)                          | `status`  | `summary` (English; the key is §8's)                              |
+| ---------------------------------- | --------------------------------- | ------------------------------------------------------------------ | --------- | ----------------------------------------------------------------- |
+| `USER_LOGIN`                       | `user.login.ever-id`              | `{ provider: 'ever-id', identityId, displayName }`                 | COMPLETED | `Signed in with Ever ID` / `signedInWithEverId`                   |
+| `USER_SIGNUP`                      | `user.signup.ever-id`             | `{ identityId, displayName }`                                      | COMPLETED | `Created an account with Ever ID` / `signedUpWithEverId`          |
+| `USER_LOGIN`                       | `user.login.ever-id.device`       | `{ identityId, clientKind, displayName }`                          | COMPLETED | `Signed in from a terminal with Ever ID` / `signedInFromTerminal` |
+| `IDENTITY_LINKED`                  | `auth.ever_id.linked`             | `{ identityId, emailsDiffer: boolean, displayName }`               | COMPLETED | `Connected Ever ID` / `everIdConnected`                           |
+| `IDENTITY_UNLINKED`                | `auth.ever_id.unlinked`           | `{ identityId, sessionsEnded, displayName }`                       | COMPLETED | `Disconnected Ever ID` / `everIdDisconnected`                     |
+| `USER_LOGOUT`                      | `auth.ever_id.backchannel_logout` | `{ identityId, sessionsEnded, by: 'sid' \| 'sub' }`                | COMPLETED | `Signed out of Ever ID elsewhere` / `signedOutElsewhere`          |
+| `DELEGATED_ACCESS`                 | `auth.ever_id.delegated_read`     | `{ identityId, clientId, clientName }` — first per client per 24 h | COMPLETED | `{clientName} read your App Works` / `delegatedRead`              |
+| `IDENTITY_PROVIDER_CONFIG_CHANGED` | `auth.ever_id.config_changed`     | `{ fields: string[] }`                                             | COMPLETED | `Ever ID configuration changed` / `configChanged`                 |
+
+**Every row carries `summary` and `status`** because `CreateActivityLogDto` requires both and the web renders the
+`summary` it receives rather than deriving one. `displayName` is the identity's display name where the row is about
+an identity (FR-49) — never the subject, the issuer or an e-mail the person did not link. Failures use the same
+action with `status: FAILED` and a `reason` in metadata: a refused upstream-style outcome
+(`auth.ever_id.sign_in_refused` → FAILED), an invalid or replayed notice (`…backchannel_logout` → FAILED), and a
+rejected delegated token (`…delegated_read` → FAILED). Per Resolution R-34 every member gets a Live Feed kind in
+`packages/agent/src/activity-log/feed-kind.ts` and a `NEVER_PUBLISH` entry in
+`packages/agent/src/shared-views/publishable-activity.ts` (App Works rows carry App Work identifiers, so they are
+never published to shared views), with the corresponding spec lines updated in T15.
 
 ---
 
@@ -575,22 +642,22 @@ Additive `ActivityActionType` members `IDENTITY_LINKED = 'identity_linked'`, `ID
 
 ### 6.1 Where it hangs
 
-| File                                                                                       | Change                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/lib/auth/providers.ts`                                                       | read `everId` from `/auth/providers`; default `{ enabled: false }` when absent                                                                                                          |
-| **new** `apps/web/src/lib/feature-flags/ever-id.ts`                                        | `isEverIdFlagOn(distinctId)` — §6.4                                                                                                                                                     |
-| **new** `apps/web/src/lib/feature-flags/posthog-client.ts`                                 | the singleton extracted from `work-kinds.ts` (behaviour of `work-kinds.ts` unchanged)                                                                                                   |
-| `apps/web/src/app/actions/auth.ts`                                                         | **new** `startEverIdSignIn(returnTo?)`, `startEverIdConnect()`, `confirmEverIdSignUp(acceptedTerms)`, `confirmEverIdConnect()`, `disconnectEverId(id)`, `getEverIdLogoutUrl()`          |
-| **new** `apps/web/src/lib/auth/ever-id-cookies.ts`                                         | `ew_everid_txn` (600 s) and `ew_everid_pending` (600 s): HttpOnly, SameSite=Lax, `secure` from the public URL scheme like `cookies.ts`, Path `/`, cleared on every callback and confirm |
-| **new** `apps/web/src/app/api/auth/ever-id/callback/route.ts`                              | the redirect URI; mirrors `handleOAuthCallback`, maps outcomes and codes (§6.3)                                                                                                         |
-| **new** `apps/web/src/components/auth/ever-id-button.tsx`                                  | full-width button above `SocialLoginButtons`, accepts the same `disabled`/`disabledReason` consent gate                                                                                 |
-| `(auth)/login/login-client.tsx`, `(auth)/register/register-form.tsx`, their `page.tsx`     | render the button when `everId.enabled && flag`                                                                                                                                         |
-| **new** `apps/web/src/app/[locale]/(auth)/auth/ever-id/create-account/page.tsx` + client   | spec §6.2                                                                                                                                                                               |
-| **new** `apps/web/src/app/[locale]/(auth)/auth/ever-id/account-exists/page.tsx`            | spec S3                                                                                                                                                                                 |
-| **new** `apps/web/src/app/[locale]/(dashboard)/settings/security/connect-ever-id/page.tsx` | spec §6.4 confirmation                                                                                                                                                                  |
-| **new** `apps/web/src/components/settings/ConnectedIdentitiesCard.tsx`                     | spec §6.3; rendered in `SecuritySettings.tsx` below change-password                                                                                                                     |
-| `(auth)/auth/error/auth-error-content.tsx`                                                 | add `ever_id_*` codes                                                                                                                                                                   |
-| `logout()` in `app/actions/auth.ts` and the dialog that calls it                           | "Also sign out of Ever ID" when the profile says the session came from Ever ID                                                                                                          |
+| File                                                                                       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/auth/providers.ts`                                                       | read `everId` from `/auth/providers`; default `{ enabled: false }` when absent                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **new** `apps/web/src/lib/feature-flags/ever-id.ts`                                        | `isEverIdFlagOn(distinctId)` — §6.4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **new** `apps/web/src/lib/feature-flags/posthog-client.ts`                                 | the singleton extracted from `work-kinds.ts` (behaviour of `work-kinds.ts` unchanged)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `apps/web/src/app/actions/auth.ts`                                                         | **new** `startEverIdSignIn(returnTo?)`, `startEverIdConnect()`, `confirmEverIdSignUp(acceptedTerms)`, `confirmEverIdConnect()`, `disconnectEverId(id)`, `getEverIdLogoutUrl()`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **new** `apps/web/src/lib/auth/ever-id-cookies.ts`                                         | `ew_everid_txn` (600 s) and `ew_everid_pending` (600 s): HttpOnly, SameSite=Lax, `secure` from the public URL scheme like `cookies.ts`, Path `/`, cleared on every callback and confirm                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **new** `apps/web/src/app/api/auth/ever-id/callback/route.ts`                              | the redirect URI; mirrors `handleOAuthCallback`, maps outcomes and codes (§6.3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **new** `apps/web/src/components/auth/ever-id-button.tsx`                                  | full-width button above `SocialLoginButtons`, accepts the same `disabled`/`disabledReason` consent gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `(auth)/login/login-client.tsx`, `(auth)/register/register-form.tsx`, their `page.tsx`     | render the button when `everId.enabled && flag`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **new** `apps/web/src/app/[locale]/(auth)/auth/ever-id/create-account/page.tsx` + client   | spec §6.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **new** `apps/web/src/app/[locale]/(auth)/auth/ever-id/account-exists/page.tsx`            | spec S3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **new** `apps/web/src/app/[locale]/(dashboard)/settings/security/connect-ever-id/page.tsx` | spec §6.4 confirmation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **new** `apps/web/src/components/settings/ConnectedIdentitiesCard.tsx`                     | spec §6.3; rendered in `SecuritySettings.tsx` below change-password                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `(auth)/auth/error/auth-error-content.tsx`                                                 | add `ever_id_*` codes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `logout()` in `app/actions/auth.ts` and the sign-out dialog that calls it                  | "Also sign out of Ever ID" — the **new** `apps/web/src/components/auth/EverIdSignOutDialog.tsx`, reached from `DashboardSidebar.tsx`'s `handleLogout` (line 127) and `CommandPalette.tsx` (line 192), which today call `logout()` directly. The checkbox appears only when `GET /logout-url` answers `200` for the current session (a `404` means the session was not opened with Ever ID); unticked, the dialog behaves exactly as the menu item does today. Ticked, it follows the URL from that route and stores its `state` in `ew_everid_logout_state`; the end-session call returns to `apps/web/src/app/api/auth/ever-id/logout-return/route.ts`, which validates the state, clears the cookies and shows the S7 copy. |
 
 ### 6.2 Redirect URI and return path
 
@@ -601,13 +668,13 @@ again by the API DTO; an absolute URL falls back to `ROUTES.DASHBOARD`. The loca
 
 ### 6.3 Callback outcomes
 
-| API result       | Web action                                                                                                 |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| `signedIn`       | `setAuthCookies(access_token)`; redirect via `getRedirectUrl`                                              |
-| `confirmSignUp`  | set `ew_everid_pending`; redirect `/auth/ever-id/create-account`                                           |
-| `confirmConnect` | set `ew_everid_pending`; redirect `/settings/security/connect-ever-id`                                     |
-| `emailInUse`     | redirect `/auth/ever-id/account-exists` (address read from the pending cookie, never from the query)       |
-| error `code`     | redirect `/auth/error?error=ever_id_<snake_code>`; connect-intent errors redirect to Settings with a toast |
+| API result       | Web action                                                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signedIn`       | `setAuthCookies(access_token)`; redirect via `getRedirectUrl`                                                                                                                 |
+| `confirmSignUp`  | set `ew_everid_pending`; redirect `/auth/ever-id/create-account`                                                                                                              |
+| `confirmConnect` | set `ew_everid_pending`; redirect `/settings/security/connect-ever-id`                                                                                                        |
+| `emailInUse`     | redirect `/auth/ever-id/account-exists` (set `ew_everid_pending` from the `pending` value of the outcome — the address is read from that sealed cookie, never from the query) |
+| error `code`     | redirect `/auth/error?error=ever_id_<snake_code>`; connect-intent errors redirect to Settings with a toast                                                                    |
 
 ### 6.4 The `ever-id` flag — fail-closed
 
@@ -617,6 +684,13 @@ errors, timeouts and `undefined` are off. Pages without a signed-in person (sign
 the constant distinct ID `anonymous`, so a staff-only rollout exposes Ever ID through **Settings → Connect**
 first and the sign-in button only once the flag is on for `anonymous`. The flag is a UI rollout control; the
 API kill switch is the plugin's enablement (§9.2).
+
+**Deliberate difference from APW-01's Work-kind flags (stated, not accidental).** APW-01 T20 makes the Work-kind
+flags fail **closed** — a missing PostHog key means off. Ever ID reads a missing `POSTHOG_API_KEY` as
+_configuration alone decides_ (on), because an authentication method must not be switched off by an absent
+analytics key (spec FR-1). The two helpers therefore stay separate — `ever-id.ts` does not import
+`work-kinds.ts`'s policy, only the extracted client singleton — and T21's spec pins both behaviours so a later
+"unification" cannot silently change either.
 
 ---
 
@@ -630,6 +704,23 @@ API kill switch is the plugin's enablement (§9.2).
   ≤ 900 s) → `POST /api/auth/ever-id/session` with the access token in `Authorization` → store the session
   exactly where `oauthLogin` stores it. The access token is dropped from memory after the exchange and is never
   printed; errors pass through the same control-character sanitiser `oauth.service.ts` uses.
+  **The device-authorization request, exactly** (the earlier "resource/audience per `idp-options.md`" named a
+  parameter that file does not define): `client_id` = the `cli`/`node` public client from `client-config`;
+  `scope` = `openid email ever-works:session`; and the audience is carried as the **`audience` parameter only
+  when the provider accepts it** — the request table below is the single source, and the `audience` row is
+  **conditional on D5**: with D5 answered as _token exchange_ (its recommended default) the device request sends
+  no `audience` and the CLI exchanges the resulting token for an `ever-works`-audience token; with D5 answered
+  as _multi-audience tokens_ it sends `audience=ever-works` directly. Until D5 is answered, the CLI sends
+  `scope` only and the API accepts the resulting token through the same §4.3 exchange rules, so neither answer
+  requires a code change in the client — only the presence of one parameter.
+
+    | Device-authorization request parameter | Value                                                    | Depends on |
+    | -------------------------------------- | -------------------------------------------------------- | ---------- |
+    | `client_id`                            | the `cli` (or `node`) public client id                   | —          |
+    | `scope`                                | `openid email ever-works:session`                        | —          |
+    | `audience`                             | `ever-works`, **sent only when the provider accepts it** | D5         |
+    | `resource`                             | not sent (no RFC 8707 resource indicator is assumed)     | —          |
+
 - **Node.** `PlatformAuthClient.signInWithEverId({ onPrompt })` in `apps/node/src/core/auth-client.ts` with
   the same algorithm, `logger.protect(accessToken)` before anything else, and a `runtime.ts` option beside the
   e-mail/password path.
@@ -690,6 +781,50 @@ dashboard.settings.security.connectedIdentities.connectedToast "Ever ID connecte
 dashboard.settings.security.connectedIdentities.disconnectedToast "Ever ID disconnected."
 ```
 
+**The list above is complete**, and the four groups below were missing from it (audit, 2026-09-17) — they are
+required by the spec copy and by tasks that test them, so they belong here rather than being invented in a
+component:
+
+```
+# Sign-out dialog (spec §6.5) — the dialog T26 creates
+dashboard.signOut.title                      "Sign out of Ever Works?"
+dashboard.signOut.alsoSignOutEverId          "Also sign out of Ever ID"
+dashboard.signOut.cancel                     "Cancel"
+dashboard.signOut.confirm                    "Sign out"
+# Registration consent (spec §6.2) — the checkbox on both the register page and the create-account screen
+auth.everId.termsCheckbox                    "I agree to the Terms of Service and Privacy Policy"
+# The pending-cookie expiry copy T25 tests
+auth.everId.pendingExpired                   "That took too long. Start again."
+# Account-exists / disabled states
+auth.error.everId.accountDisabled            "This account is disabled. Contact an administrator."
+auth.error.everId.everIdDisabled             "Signing in with Ever ID isn't available here."
+auth.error.everId.sessionRequired            "Sign in with your password to do that."
+auth.error.everId.notConnected               "Connect Ever ID in Settings → Security first."
+auth.error.everId.lastSignInMethod           "Add another way to sign in first — Ever ID is the only one this account has."
+auth.error.everId.tokenInQuery               "That link isn't valid. Start again from the app."
+auth.error.everId.insufficientScope          "That app doesn't have permission to see this."
+auth.error.everId.signedOutByProvider        "You were signed out of Ever ID."
+# S7 return route
+auth.everId.signedOutBoth                    "You're signed out of Ever Works and Ever ID."
+# Administrator surface (spec §6.7) — one label per FR-3 check id, plus Health
+dashboard.settings.admin.everId.title        "Ever ID"
+dashboard.settings.admin.everId.testConnection "Test connection"
+dashboard.settings.admin.everId.check.discovery          "Discovery document"
+dashboard.settings.admin.everId.check.issuerMatch        "Issuer matches"
+dashboard.settings.admin.everId.check.endpoints          "Endpoints reachable"
+dashboard.settings.admin.everId.check.pkceS256           "S256 code challenge supported"
+dashboard.settings.admin.everId.check.signingAlg         "Signing algorithm"
+dashboard.settings.admin.everId.check.backchannelLogout  "Back-channel logout"
+dashboard.settings.admin.everId.check.deviceAuthorization "Device authorization"
+dashboard.settings.admin.everId.checkOk                  "Works"
+dashboard.settings.admin.everId.checkFailed              "Not supported"
+dashboard.settings.admin.everId.health.title             "Health"
+dashboard.settings.admin.everId.health.discovery         "Last discovery refresh {ago}"
+dashboard.settings.admin.everId.health.jwks              "Last key refresh {ago}"
+dashboard.settings.admin.everId.health.logoutNotice      "Last sign-out notice {ago}"
+dashboard.settings.admin.everId.secretSet                "•••••• (set)"
+```
+
 The CLI and node strings live in their own sources (they are not web-localised today). A lint-style unit
 test asserts no new key's English value contains "SSO" or "single sign-on" (spec copy rule).
 
@@ -709,23 +844,25 @@ test asserts no new key's English value contains "SSO" or "single sign-on" (spec
 | `ever_id.device.exchanged`              | `{ clientKind, result }`                                                    |
 | `ever_id.delegated.read`                | `{ result: 'ok' \| 'insufficientScope' \| 'rejected' }` (sampled 1 in 10)   |
 | `ever_id.provider.unavailable`          | `{ stage: 'discovery' \| 'jwks' \| 'token' }`                               |
+| `ever_id.provider.recovered`            | `{ unavailableForSeconds, by: 'test-connection' \| 'scheduled' }`           |
 
 No event carries an e-mail, subject, issuer URL, client secret, token, code or `state`.
 
 ### 9.2 Failure modes and the chosen behaviour
 
-| Failure                                                    | Behaviour                                                                                                                    | Why                                                                                    |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Ever ID down at sign-in                                    | `503 providerUnavailable`, S16 copy, other methods untouched                                                                 | An external dependency must never block password or social sign-in.                    |
-| Ever ID down during a sign-out notice                      | Not applicable — the notice arrives _from_ Ever ID; keys come from cache (≤ 21,600 s)                                        | Honouring logouts must not depend on a fresh key fetch.                                |
-| JWKS stale beyond 21,600 s                                 | Every validation fails closed; delegated reads 401; sessions already open keep working                                       | Bounded trust in unrefreshable keys.                                                   |
-| Admin disables the plugin                                  | Sign-in family 404; `/identities`, `DELETE`, `/backchannel-logout` keep working                                              | People can always leave; logouts are always honoured (spec FR-5).                      |
-| Only Ever ID remains and the plugin is disabled            | The account e-mail is verified (sign-up requires it), so password reset still works                                          | FR-28 guarantees a path; documented in the admin help text.                            |
-| Flag bypassed by calling the API directly                  | Allowed: the API gates on configuration, the flag gates UI rollout                                                           | The flag is not a security boundary; the plugin toggle is the kill switch.             |
-| Two replicas validate the same `jti` concurrently          | The unique index on `verification.value` lets exactly one insert win                                                         | Cross-replica replay protection without a new store.                                   |
-| Unique violation on `(issuer, subject)` at sign-up/connect | `409 subjectLinked`; the pending value is consumed                                                                           | Decides the S24 race in the database.                                                  |
-| Sealed cookie over 4 KB                                    | Impossible by construction (payload capped at 3,072 bytes; `returnTo` ≤ 2,048)                                               | A silently dropped cookie would look like S17 forever.                                 |
-| Issuer changes at the provider                             | Discovery refresh marks the plugin unavailable until an admin re-tests; allow-list permits 2–3 issuers during a planned move | Mix-up and silent retargeting defence; supports a provider migration (idp-options §5). |
+| Failure                                                    | Behaviour                                                                                                                                                                                                                                                                                                                                                                          | Why                                                                                                                                                                              |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ever ID down at sign-in                                    | `503 providerUnavailable`, S16 copy, other methods untouched                                                                                                                                                                                                                                                                                                                       | An external dependency must never block password or social sign-in.                                                                                                              |
+| Ever ID down during a sign-out notice                      | Not applicable — the notice arrives _from_ Ever ID; keys come from cache (≤ 21,600 s)                                                                                                                                                                                                                                                                                              | Honouring logouts must not depend on a fresh key fetch.                                                                                                                          |
+| JWKS stale beyond 21,600 s                                 | Every validation fails closed; delegated reads 401; sessions already open keep working                                                                                                                                                                                                                                                                                             | Bounded trust in unrefreshable keys.                                                                                                                                             |
+| Admin disables the plugin                                  | Sign-in family 404; `/identities`, `DELETE`, `/backchannel-logout` keep working                                                                                                                                                                                                                                                                                                    | People can always leave; logouts are always honoured (spec FR-5).                                                                                                                |
+| Only Ever ID remains and the plugin is disabled            | The account e-mail is verified (sign-up requires it), so password reset still works                                                                                                                                                                                                                                                                                                | FR-28 guarantees a path; documented in the admin help text.                                                                                                                      |
+| Flag bypassed by calling the API directly                  | Allowed: the API gates on configuration, the flag gates UI rollout                                                                                                                                                                                                                                                                                                                 | The flag is not a security boundary; the plugin toggle is the kill switch.                                                                                                       |
+| Two replicas validate the same `jti` concurrently          | The unique index on `verification.value` lets exactly one insert win                                                                                                                                                                                                                                                                                                               | Cross-replica replay protection without a new store.                                                                                                                             |
+| Unique violation on `(issuer, subject)` at sign-up/connect | `409 subjectLinked`; the pending value is consumed                                                                                                                                                                                                                                                                                                                                 | Decides the S24 race in the database.                                                                                                                                            |
+| Sealed cookie over 4 KB                                    | Impossible by construction (payload capped at 3,072 bytes; `returnTo` ≤ 2,048)                                                                                                                                                                                                                                                                                                     | A silently dropped cookie would look like S17 forever.                                                                                                                           |
+| Issuer changes at the provider                             | Discovery refresh marks the plugin unavailable until an admin re-tests; allow-list permits 2–3 issuers during a planned move                                                                                                                                                                                                                                                       | Mix-up and silent retargeting defence; supports a provider migration (idp-options §5).                                                                                           |
+| Availability differs per replica                           | Impossible by construction: `unavailableSince` and the three health timestamps live in the plugin's **persisted settings** (`availability`, §4.2), read through a cache of at most `EVER_ID_LIMITS.availabilityCacheSeconds`, so a re-test on one replica clears the flag on every replica within 60 s (FR-5) and `GET /admin/health` returns the same three timestamps everywhere | Plugin availability today is per-process registry state (`packages/agent/src/facades/oauth.facade.ts`); sign-in must not behave differently depending on which replica answered. |
 
 ---
 
@@ -863,3 +1000,52 @@ Gauzy web sign-in, workspace picker, MCP authorization server login, production 
 - Delegated reads use the first-party consent default of spec §9 until the owner decides.
 - A provider migration changes `sub` values unless the new provider imports users with preserved IDs;
   [`idp-options.md`](./idp-options.md) §5 makes that a selection criterion.
+
+---
+
+## 13. Security and permissions (added 2026-09-17)
+
+Every route this epic adds, with who may call it, the guard that enforces it, and the validating DTO. The
+**human-only** column is [CONTRACTS](../CONTRACTS.md) §4's rule (Resolution R-32) — API keys, Fleet run tokens
+and Ever ID delegated tokens are refused with `403` and the unchanged non-human-actor body.
+
+| Route                                | Auth                                                  | Human-only | Throttle            | Validating DTO                          | Secret fields                          |
+| ------------------------------------ | ----------------------------------------------------- | ---------- | ------------------- | --------------------------------------- | -------------------------------------- |
+| `GET /api/auth/providers` (existing) | public                                                | no         | existing            | —                                       | none                                   |
+| `POST /authorize`                    | public                                                | no         | 20 / 60 s / IP      | `EverIdAuthorizeDto`                    | none                                   |
+| `POST /callback`                     | public (+ bearer read for connect)                    | no         | 20 / 60 s / IP      | `EverIdCallbackDto`                     | `transaction`, `pending` sealed        |
+| `POST /sign-up/confirm`              | public                                                | no         | 10 / 60 s / IP      | `EverIdSignUpConfirmDto` (terms claims) | `pending` sealed                       |
+| `POST /connect/authorize`            | session only (`SessionOnlyGuard`)                     | **yes**    | 10 / 60 s / user    | `EverIdAuthorizeDto`                    | none                                   |
+| `POST /connect/confirm`              | session only                                          | **yes**    | 10 / 60 s / user    | `EverIdConfirmDto`                      | `pending` sealed                       |
+| `GET /identities`                    | session only                                          | no         | default             | —                                       | none                                   |
+| `DELETE /identities/:id`             | session only                                          | **yes**    | 10 / 3,600 s / user | `EverIdDeleteIdentityDto`               | none                                   |
+| `GET /logout-url`                    | session                                               | no         | 10 / 60 s / user    | —                                       | none                                   |
+| `POST /backchannel-logout`           | public, form-encoded                                  | no         | 60 / 60 s / IP      | `LogoutTokenForm`                       | `logout_token` in the body only        |
+| `POST /session`                      | public, bearer Ever ID token                          | no         | 10 / 60 s / IP      | `EverIdSessionExchangeDto`              | token in the header only               |
+| `GET /client-config`                 | public                                                | no         | 30 / 60 s / IP      | —                                       | none (by contract)                     |
+| `POST /admin/test`                   | `IsPlatformAdminGuard`                                | **yes**    | 10 / 60 s / user    | —                                       | reads `clientSecret`, returns no value |
+| `GET /admin/health`                  | `IsPlatformAdminGuard`                                | no         | default             | —                                       | none                                   |
+| Plugin settings save (`ever-id`)     | platform admin via the existing plugin-settings route | **yes**    | existing            | `OidcIdentitySettingsSchema`            | `clientSecret` (`x-secret`)            |
+
+**New public endpoints and why**: `/authorize`, `/callback`, `/sign-up/confirm`, `/session`,
+`/client-config` and `/backchannel-logout` must work before any session exists (that is what sign-in and the
+provider's notice are). Each is throttled, validates a DTO, carries no scope, and returns no secret;
+`/client-config` is the only one a third party may read freely, and it exposes exactly the issuer, the public
+client ids and the scope names. **New scopes/roles**: no new platform role; the only new scope is the
+provider-side `apps:read` (delegated read, R-19) and `ever-works:session` (terminal exchange). **No new
+`@Public` route exists beyond the table above.** The delegated branch is admitted only on handlers carrying
+`@DelegatedRead(scope)` and is refused by the unchanged `HumanActorGuard` everywhere else.
+
+## 14. Risks and mitigations (added 2026-09-17)
+
+| Risk                                                                    | Likelihood | Impact | Mitigation                                                                                                                                                                                           | Threat row |
+| ----------------------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| The provider is a new single dependency for every platform's sign-in    | medium     | high   | It is an **addition**: every existing method keeps working, the plugin fails closed, and an unavailable provider answers `503` with copy rather than blocking password or social sign-in (spec §9.2) | T-24, B-7  |
+| Issuer mix-up or a silent retargeting of the provider                   | low        | high   | Exact issuer match against discovery, a 1–3 issuer allow-list, and issuer drift marking the plugin unavailable (FR-14)                                                                               | T-24       |
+| A delegated token is replayed or over-scoped                            | low        | high   | Single-use `jti` replay store, ≤ 3,600 s lifetime, audience and scope checks, `@DelegatedRead` only where declared (R-19)                                                                            | T-24, T-25 |
+| Sign-up creates an orphan account when the link insert loses the race   | medium     | medium | Explicit ordering with compensation, plus the unique index deciding the race (spec S24, T15)                                                                                                         | —          |
+| The provider's configuration drifts between replicas                    | medium     | medium | Availability and health timestamps are persisted and read through a ≤ 60 s cache (§4.2, §9.2)                                                                                                        | —          |
+| A secret or token leaks into a log, Activity row or telemetry payload   | medium     | high   | Field allow-lists, `x-secret`, no token in any URL, redaction covered by T20/T32/T45 tests (ACC-12-37)                                                                                               | T-32, T-33 |
+| The Keycloak relocation breaks a self-hoster's configuration            | low        | medium | Relocation only, behaviour unchanged, same exports and defaults, existing tests unchanged (R-28, `cross-platform.md` §5.1)                                                                           | —          |
+| Sign-out notices are missed while the platform is briefly unavailable   | low        | medium | The notice endpoint depends on cached keys (≤ 21,600 s), not on a fresh fetch, so it keeps working through an outage (spec §9.2)                                                                     | B-7        |
+| A member's GitHub or provider connection is used beyond their authority | low        | high   | Background work uses the owner's connection, member-initiated work the member's own, and a platform credential is never substituted (CONTRACTS §11)                                                  | T-35       |

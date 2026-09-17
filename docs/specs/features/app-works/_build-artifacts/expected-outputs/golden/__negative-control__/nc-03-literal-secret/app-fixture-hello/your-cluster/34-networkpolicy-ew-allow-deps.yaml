@@ -1,0 +1,29 @@
+# GOLDEN — app-fixture-hello · target your-cluster · NetworkPolicy `ew-allow-deps`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.10 — `extraEgress` only: this Blueprint declares `domains.needsHairpin: false`, so no ingress-address rule is rendered.
+# Spec      : APW-06 spec.md FR-20 (deny all; ingress controller to the primary web port; pods to each other;
+# Spec      : DNS; the internet except private ranges; the app’s own dependencies; its public address when
+# Spec      : `needsHairpin`), FR-21 (enforcement is probed after each rollout)
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    name: ew-allow-deps
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+spec:
+    podSelector: {}
+    policyTypes:
+        - Egress
+    egress:
+        - to:
+              - ipBlock:
+                    cidr: 198.51.100.0/24

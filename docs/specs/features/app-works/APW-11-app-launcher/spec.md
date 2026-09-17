@@ -158,6 +158,20 @@ anyone and the person's own apps once Ever ID lets that platform ask on their be
 - **S22 (P2) — An origin that was not allow-listed.** A page on an origin outside the configured list
   asks for the person's apps with a valid delegated token; the request is refused and the component shows
   the signed-out state.
+- **S23 — An App Work on a dedicated apps apex.** **Given** an installation whose apps apex is configured
+  separately from the platform's own domain, **when** a live App Work's only address is its managed subdomain,
+  **then** its tile opens `<label>.<apps-domain>` and never a host under the platform's own domain.
+- **S24 — The App Work stops running.** **Given** a listed App Work that its owner paused, or that an operator
+  quarantined, **when** a member opens the launcher, **then** the tile is gone from **Your apps**, the Work is
+  listed in **Manage apps** as **Not live — no address**, and its pin, hide and exposure choices are still
+  there when it runs again.
+- **S25 — An editor exposes a Work without settings access.** **Given** an editor who cannot open the Work's
+  settings page, **when** they turn **Show in App Launcher** on from the Work's Overview, **then** the change is
+  saved on the spot, the Work appears for every member who can view it, the Activity records who did it, and the
+  manager-only settings page shows the same state.
+- **S26 — The switch is turned off and on again.** **Given** a person with pinned tiles, a hidden tile and one
+  exposed Work, **when** an operator turns the launcher off and later back on, **then** every surface is absent
+  while it is off and, once it is back, the same tiles return with the same pins, hides and exposure choices.
 
 ---
 
@@ -184,6 +198,13 @@ Every threshold below is a number on purpose.
   the panel is open.
 - **FR-7.** The command palette gains one command, **Open App Launcher**, matching the words `launcher`,
   `apps` and `switch app`.
+- **FR-64.** The empty states of §6.2 act. **Create an App Work** opens the App Work create route with the
+  `app` kind already chosen; **Go to Works** opens the Works list. Which of the two renders is decided by
+  whether App Works are available to this person, and the component reports which action it offered and which
+  one the person chose, so a host page can react to either.
+- **FR-66.** The panel's cache belongs to one scope. Switching Organization closes the panel, and an item list
+  fetched for one Organization is never rendered after the switch; pins and hides on Ever apps stay personal
+  across Organizations, and nothing else crosses the boundary.
 
 ### 4.2 Ever apps — the platform catalog
 
@@ -216,6 +237,22 @@ Every threshold below is a number on purpose.
   scope) that the person can view **and** that are exposed (FR-19), ordered by FR-26.
 - **FR-18.** When the latest production deployment of a listed Work failed, its tile carries the chip
   **Last deploy failed**. When it is deploying, the tile carries **Deploying**. Neither removes the tile.
+- **FR-55.** For an App Work the launcher address is the address the platform publishes for it: its primary
+  address — the verified custom domain its owner marked primary, else its managed subdomain on the apps apex,
+  else nothing — and only when the platform publishes none does the FR-16 order apply. A host is never
+  synthesised for a Work from its managed label under a different apex: an App Work whose label was allocated
+  under the apps apex is never listed at `<label>.<the platform's own domain>`.
+- **FR-56.** An App Work that is paused, removed or quarantined is not live. It is not listed in **Your apps**,
+  it appears in **Manage apps** as **Not live — no address**, and its stored exposure and personal arrangement
+  are kept, so it returns unchanged when it runs again.
+- **FR-57.** A listed item's name is the App spec's display name when the Work declares one — including any
+  community-build suffix the platform appends — and otherwise the Work's own name. The name is capped at 100
+  characters and is never cut in the middle of that suffix.
+- **FR-58.** **Deploying** and **Last deploy failed** (FR-18) are decided from the latest production deployment
+  that has not been superseded, counting only that one row: a deployment that has not finished yet (queued,
+  initializing, building, deploying or being verified) shows **Deploying**; one that ended in error, timed out,
+  or was rolled back after a failed check shows **Last deploy failed**; a finished one and one a person
+  cancelled show neither chip. A cancelled deployment is never a failure and never removes a tile.
 
 ### 4.4 Show in App Launcher (exposure)
 
@@ -230,6 +267,18 @@ Every threshold below is a number on purpose.
   the Work, the site or its data, and it is not a publishing control — the settings copy says so.
 - **FR-23.** A Work that is not live shows the setting disabled with **"Available once this Work has a
   live address."**, and the stored choice is kept.
+- **FR-59.** The setting is reachable from two surfaces, and both stay: the Work's settings page, where
+  managers and owners already work, and a card on the Work's Overview that every member who can view the Work
+  can read — editors get the toggle there, viewers read **"Only editors can change this."** Both surfaces show
+  the same state, and a person who cannot open the settings page is never left without a way to see or (as an
+  editor) change it.
+- **FR-60.** Changing the setting saves that one field on the spot: it writes no other Work field, does not
+  rewrite the Work's README, and reports **Saved** or the failure copy in place. The setting has three values —
+  on, off and unset (the kind default) — and **Reset to default** is offered whenever an explicit choice is
+  stored, including after the Work's kind changed. Resetting never disables the setting.
+- **FR-61.** The Activity record for a change carries the actor, the direction, whether the new state is
+  explicit or the kind default, and the effective value it moved to. It is written once per real change — never
+  for a save that leaves the effective value and the explicit flag unchanged — and never contains the address.
 
 ### 4.5 Personal arrangement
 
@@ -246,6 +295,14 @@ Every threshold below is a number on purpose.
   preference rows; rows for Works that no longer exist or are no longer accessible are ignored on read.
 - **FR-29.** Saves are idempotent per item: re-sending the same values succeeds and changes nothing.
   Concurrent saves resolve last-write-wins per item, never per whole list.
+- **FR-62.** The 6-pin limit (FR-25) is evaluated over the merged view a person sees: the pins held on Ever
+  apps, which every Organization shares, plus the pins held in the active Organization. Pinning while a second
+  Organization already holds six never unpins anything: that Organization keeps all six and shows the first six
+  by pin time until one is released. A reorder writes an explicit order for every item of the section it moves
+  within.
+- **FR-63.** **Manage apps** lists every eligible item, including hidden and not-live ones (FR-27), 200 at a
+  time. Past 200 it renders the first 200 with a counted **Showing 200 of {count}** line and a filter, so no
+  eligible item is unreachable.
 
 ### 4.6 Opening an item safely
 
@@ -319,6 +376,10 @@ Every threshold below is a number on purpose.
   rolled out gradually to a share of people; where no gradual-rollout service is configured, switched on
   means on for everyone. An unknown rollout answer counts as off. P1 ships to production only after its
   acceptance criteria are green on stage.
+- **FR-65.** The installation switch (FR-54) is a switch, not a migration. Turning it off hides every surface
+  within one request and leaves every stored preference, exposure value and Activity record exactly as it was;
+  turning it back on restores that exact state — the same tiles, in the same order, with the same pins, hides
+  and exposure choices. Switching it off deletes no row and rewrites no Work.
 
 ---
 
@@ -431,6 +492,7 @@ All copy below is final English copy, ready to be keyed for translation.
 | Exposure off      | `Hidden by the Work · Turn on in the Work's settings`                 |
 | Pin counter       | `{count} of 6 pins used`                                              |
 | Pin limit tooltip | `Six pins is the limit. Unpin one first.`                             |
+| Manage apps cap   | `Showing 200 of {count}` · filter label `Filter apps`                 |
 | Move controls     | `Move up` · `Move down`                                               |
 | Save states       | `Saving…` · `Saved` · `Couldn't save. Try again.`                     |
 
@@ -441,9 +503,12 @@ All copy below is final English copy, ready to be keyed for translation.
 │  Show in App Launcher                                                [●]   │
 │  Lists this Work's live address in members' App Launcher. It doesn't       │
 │  publish the site or give anyone access to it.                             │
+│  Reset to default                                                          │
 └────────────────────────────────────────────────────────────────────────────┘
    disabled: "Available once this Work has a live address."
    viewer:   "Only editors can change this."
+   on Overview (every member): the same control; "Reset to default" only when an
+   explicit choice is stored.
 ```
 
 ### 6.5 P2 — inside another platform
@@ -576,22 +641,188 @@ A reviewer can run this list top to bottom against a running build with the flag
       days earlier does not.
 - [ ] **ACC-11-40** The item-activated event can be cancelled by the host, and then no tab opens.
 
+**Added in the audit round (2026-09-17) — each keeps every criterion above in force**
+
+- [ ] **ACC-11-41** An App Work whose managed label was allocated on a configured apps apex opens
+      `<label>.<apps-domain>`, and no tile address for any App Work is under the platform's own domain (S23,
+      FR-55).
+- [ ] **ACC-11-42** A paused App Work, and separately a quarantined one, is absent from **Your apps** and listed
+      in **Manage apps** as **Not live — no address**; its pin, hide and exposure choices survive the pause and
+      the resume (S24, FR-56).
+- [ ] **ACC-11-43** A Work whose App spec declares a display name — including one the platform suffixes
+      `(community build)` — is listed under that name, and a name at the 100-character cap is not cut in the
+      middle of that suffix (FR-57).
+- [ ] **ACC-11-44** A superseded latest production deployment, and one a person cancelled, show no chip and do
+      not fail a tile; a rolled-back one shows **Last deploy failed** (FR-58).
+- [ ] **ACC-11-45** An editor who cannot open the Work's settings page turns **Show in App Launcher** on from the
+      Work's Overview, a viewer reads **"Only editors can change this."** there, and both surfaces show the same
+      state as the manager-only settings page (S25, FR-59).
+- [ ] **ACC-11-46** A single toggle writes the exposure field only: no other Work field changes, the Work's
+      README is untouched, and **Reset to default** is offered once an explicit choice is stored and returns the
+      Work to its kind default (FR-60).
+- [ ] **ACC-11-47** A reorder writes an explicit order for the whole section; a second Organization already
+      holding six pins keeps all six and shows the first six by pin time; **Manage apps** past 200 items renders
+      **Showing 200 of {count}** and still reaches every eligible item (FR-62, FR-63).
+- [ ] **ACC-11-48** **Create an App Work** opens the App Work create route with the `app` kind already chosen,
+      **Go to Works** opens the Works list, and the component reports which action it offered and which was
+      chosen (FR-64).
+- [ ] **ACC-11-49** Switching Organization closes the panel, and no item fetched for the previous Organization
+      is rendered after the switch (FR-66).
+- [ ] **ACC-11-50** With the switch off every surface is gone and every stored preference, exposure value and
+      Activity record is unchanged; with it on again the same tiles return with the same pins, hides and exposure
+      values (S26, FR-65).
+- [ ] **ACC-11-51** The local catalog fixture is used only when the installation is not production and the
+      program's non-production fakes switch is on; with `NODE_ENV=production` the override is refused and the
+      versioned catalog is read (FR-8).
+- [ ] **ACC-11-52** The fixtures seeded through the non-production seed route render exactly the states the PR
+      lane asserts — a live App Work, a failed-after-success Work and a verified custom domain — and the route
+      answers not found in production.
+- [ ] **ACC-11-53** The `app_launcher` Activity row shows a translated badge and filter label in all 21 locale
+      files (FR-42).
+- [ ] **ACC-11-54** The contracts barrel's area check includes the new `apps` area and its expected-area count
+      is recounted from the array, so a name collision inside the launcher's shared types fails the check.
+
 ---
 
 ## 9. Open questions
+
+Each question below stays open until its row says otherwise. Every one is registered in the program
+clarifications register (`docs/specs/features/app-works/CLARIFICATIONS.md`, one row per marker, with the
+default the specs assume, the wave it blocks, who decides and its status); a question answered since this
+spec was drafted keeps its text and gains a **Resolved (…)** line underneath, and nothing is deleted.
 
 - **[NEEDS CLARIFICATION: where does the platform catalog live?]** ADR-014 puts catalogs in the
   `ever-works` organisation; the catalog describes the whole Ever family and P2 consumers live in
   `ever-co`. _Default: a public `ever-works/platforms` repository read by Ever Works, relocatable by
   configuration; revisit when P2 ships._
+  **Resolved (owner, 2026-09-17): the repository is [`ever-works/platforms`](https://github.com/ever-works/platforms)** —
+  created 2026-09-17 with `platforms.json`, `schema/platforms.schema.json`, `icons/` and a validation workflow
+  that is green, and it is what `EVER_WORKS_PLATFORM_CATALOG_REPO` defaults to
+  ([`BUILD-READINESS.md`](../BUILD-READINESS.md) §6 item 4; [`CONTRACTS.md`](../CONTRACTS.md) §7). The P2 half of
+  the question — whether a consumer outside `ever-works` wants a nearer copy — stays open, and relocation by
+  configuration is unchanged. Read access is part of the answer: the reader fetches the catalog over the raw
+  host as ADR-014's reader does, so the repository must be readable by the API process (public, as
+  `ever-works/templates` is, or read with a token, as the Apps catalog's optional
+  `EVER_WORKS_APPS_CATALOG_TOKEN` does); the drafts in [`catalog-draft/`](./catalog-draft/) become that
+  repository's first commit content (T18).
 - **[NEEDS CLARIFICATION: where is the web component published?]** Program README open question 7.
   _Default: developed in the Ever Works monorepo during P1, extracted with history to a public `ever-co`
   repository and published under the `@ever-co` scope at P2._
+  **Register:** APW-11 question 2, open; README §8 question 7, with the P1 answer already settled by this spec
+  (the package lives in the monorepo, `"private": true`, and is mounted in the header from P1 — FR-45, T10, T28).
+  The Wave 3 decision — the extraction repository, the npm scope and the names-only publish credential — is
+  still the owner's, and T28 cannot finish without it.
 - **[NEEDS CLARIFICATION: which platforms are in the first catalog?]** Ever Works, Ever Gauzy and Ever
   Teams are certain; Ever Rec and others need a named owner per entry.
+  **Resolved in part (owner, 2026-09-17): the catalog repository exists and every platform entry is data in it**,
+  so adding Rec or any other platform is a pull request against `ever-works/platforms` and never a release of
+  Ever Works (FR-8, ADR-014). Still open: one named owner per entry beyond the first three, and the
+  per-environment addresses, which live only in that repository and never in this public spec (T18).
 - **[NEEDS CLARIFICATION: should the launcher appear on public marketing sites?]** P2 supports a signed-out
   platform list, which would work on a marketing page. _Default: dashboards only._
+  **Register:** APW-11 question 4, open. Nothing in P1 changes if the answer is yes: FR-37's public platform list
+  is already readable without signing in, and adding a host page is additive work in P2.
 - **[NEEDS CLARIFICATION: exposure default for non-App Works.]** Off keeps the launcher about apps rather
   than every website. Owners with many sites may prefer on.
+  **Register:** APW-11 question 5, open; the default this spec assumes is **off** (FR-19), and an explicit
+  choice always wins in either direction, so answering "on" later is a default change and not a rewrite.
 - **[NEEDS CLARIFICATION: should App Works on a person's own cluster count as live?]** They do in this
   spec (a succeeded production deployment plus an address). The launcher does not probe reachability.
+  **Narrowed (audit round, 2026-09-17):** _live_ is unchanged — a succeeded production deployment plus an
+  address, never a reachability probe — but the address is now the platform's published primary address for an
+  App Work (FR-55) and a paused, removed or quarantined App Work is not live (FR-56). The question is
+  registered as APW-11 question 6 and stays open only for the "no probe" half.
+
+---
+
+## 10. Non-functional requirements
+
+Every number below is already a requirement in §4; this section collects them where a reviewer can measure
+them. None of them is new behaviour.
+
+- **NFR-1 — Panel latency.** A second open within 5 minutes renders in **≤ 100 ms**; a cold open paints
+  6 skeleton tiles immediately and its content within **800 ms p95** (FR-5). Tiles never reorder while the
+  panel is open (FR-6).
+- **NFR-2 — Registry latency.** `GET` of the person's items answers in **≤ 300 ms p95** for a person with 200
+  live Works, and a single response never holds more than **200 items** (FR-33, FR-34).
+- **NFR-3 — Registry limits.** **60 reads** and **30 writes** per person per minute; a call past either limit is
+  refused, never queued (FR-36). A save carries at most **200 changes**; a person holds at most **500** stored
+  preference rows (FR-28).
+- **NFR-4 — Catalog freshness and resilience.** At most one catalog read per hour after a success and one per
+  **30 seconds** after a failure; a failed refresh keeps serving the last good copy, and a first-ever failure
+  degrades to the single current-platform tile rather than an empty **Ever apps** section (FR-11, FR-12, S9,
+  S10).
+- **NFR-5 — Catalog read budget.** At most **24 entries** are read, icons are fetched in batches of 6 with an
+  **8 s** timeout each, an icon is inlined only up to **16 KB**, and entries past the cap or failing validation
+  are dropped individually and counted (FR-11, FR-44).
+- **NFR-6 — Component weight.** The web component, including its styles, is **≤ 30 KB compressed** and emits no
+  global style; the budget is checked in the package's own lane so it fails a build rather than a review
+  (FR-46).
+- **NFR-7 — Save latency.** An arrangement change is batched and reported **Saved** within **1 second**;
+  toggling exposure saves in place and reports its own state (FR-27, FR-60).
+- **NFR-8 — Degraded paths stay useful.** With the catalog unreadable **Your apps** still renders and the
+  current platform still shows; with the registry unreadable **Ever apps** still renders; both offer
+  **Try again** (§6.2).
+- **NFR-9 — Privacy.** Every read and write is scoped to the signed-in person; no address, host name, Work name,
+  identifier or credential appears in telemetry, Activity records or any URL (FR-31, FR-43, FR-53).
+- **NFR-10 — Compatibility.** The panel works in the browsers the e2e lane runs (Chromium, Firefox, WebKit), and
+  the same component renders in an Angular, a React, a Solid and a plain HTML page with no console error and no
+  style leaking into the host (FR-45, ACC-11-34).
+- **NFR-11 — Configuration, not code.** The catalog source, ref, environment, self id, the installation switch,
+  the rollout share and the P2 origin allow-list are configuration; no platform address or catalog entry is
+  compiled into the product (FR-8, FR-50, FR-54).
+- **NFR-12 — Accessibility and language.** The §6.6 keyboard table works end to end, focus never escapes the open
+  panel, chips and states are text rather than colour, and every string resolves through translation in all
+  locale files (FR-38…FR-42).
+
+---
+
+## 11. Constitution gates
+
+| Principle                                 | How this epic complies                                                                                                                                                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**                      | No external integration is added in P1. P2's token verification goes through APW-12's identity-provider facade, never an IdP SDK, and the catalog is data read over HTTP, not a plugin.                                               |
+| **II — Capability-driven**                | No plugin id is referenced anywhere in this epic. The public platform list and the person's items are platform routes.                                                                                                                |
+| **III — Source of truth**                 | Personal arrangement is platform metadata about a person; the catalog is data in its own repository (ADR-014). Nothing moves into or out of a Work Repository, and no catalog entry lives in code.                                    |
+| **IV — Job runtime**                      | No background work is added: the catalog refresh is request-driven with caching, so no dispatch, no `202` and no overlap guard is needed.                                                                                             |
+| **V — Forward-only migration**            | One migration: one nullable column and one table, with `down()` dropping only what it created and `NULL` meaning the kind default rather than a guessable value.                                                                      |
+| **VI — Tests first**                      | Every task names its test: agent unit specs for the pure rules and the service, controller specs for the three routes, a registry latency integration spec, component specs, web unit specs, and the Playwright specs this epic owns. |
+| **VII — Secret hygiene**                  | No secret is stored and no token reaches a URL; delegated tokens are header-only and never logged; the catalog is public data and carries no credential (FR-31, FR-37).                                                               |
+| **VIII — Single source for plugin lists** | No plugin count or list appears here.                                                                                                                                                                                                 |
+| **IX — Behaviour-first spec**             | This document names no class, file, route or column; the deployment-state words of FR-58 are user-visible chip decisions, and the state vocabulary they map from lives in [`plan.md`](./plan.md).                                     |
+| **X — Backwards compatibility**           | One optional field on the Work update DTO, one additive block on the Work payload, and two new settings surfaces; no existing route, header control, switcher or settings tab changes behaviour when the flag is off.                 |
+| **Program rule #10 — public hygiene**     | No platform address, internal host or finding appears here; addresses are data in the catalog repository, and the acceptance fixtures use RFC 2606 hosts.                                                                             |
+| **Program rule #11 — i18n**               | Every new string is a key in all 21 locale files in the same change (FR-42, ACC-11-31, ACC-11-53).                                                                                                                                    |
+| **G-09 — no sign-on claims**              | No string on any surface may claim single sign-on, one login or an existing session elsewhere; the copy guard in T21 enforces it (ACC-11-33).                                                                                         |
+| **Additive-only (R-26)**                  | Deliberately additive: FR-55…FR-66, S23…S26 and ACC-11-41…ACC-11-54 are new ids; every earlier FR, scenario, ACC id, default and option is kept in force, and the switch (FR-65) is reversible with no data loss.                     |
+
+The plan's own checklist is [`plan.md`](./plan.md) §12, kept in the same shape as this table.
+
+---
+
+## 12. References
+
+- [App Works program overview](../README.md) — **D10** (the three address shapes), **D14** (the launcher ships
+  before single sign-on), **D4** (the catalog-listing repository), §1 vocabulary and §8 open questions 1–8.
+- [Cross-epic contracts](../CONTRACTS.md) — **R-1** (shared types), **R-2** (Activity naming and the
+  `app_launcher` family), **R-16** (the apps apex and the address shapes), **R-19** (the delegated auth method),
+  **R-22** (test locations), **R-25** (workspace backup), **R-26**/**R-27** (additive-only, deploy-shape family);
+  §7 flags and environment variables, §8 catalog repositories.
+- [ADR-014 — no hard-coded catalogs](../../../decisions/014-no-hardcoded-catalogs.md) — the reader this epic
+  copies the shape of, and why the platform list is data.
+- [ADR-015 — job-runtime provider pluggability](../../../decisions/015-job-runtime-provider-pluggability.md) —
+  why the catalog refresh is request-driven and adds no job.
+- [APW-06 — App runtime](../APW-06-app-runtime/) — spec FR-38 and plan §8 (the published primary address and the
+  apps apex), [deploy-shapes.md](../APW-06-app-runtime/deploy-shapes.md) (the shape family this epic must not
+  narrow), and the runtime state (paused / removed) FR-56 reads.
+- [APW-03 — App spec and catalog](../APW-03-app-spec-and-catalog/) — the App spec's display name (FR-57) and the
+  `apps` contracts barrel this epic's shared types live in.
+- [APW-10 — Ever Works Apps](../APW-10-apps-hosting-tier/) — the operator quarantine FR-56 honours.
+- [APW-13 — Golden paths](../APW-13-golden-paths/) — the fake GitHub, the `EVER_WORKS_E2E_FAKES` switch and the
+  lanes the PR-lane fixtures run in.
+- [Build readiness](../BUILD-READINESS.md) — §6 item 4 (the catalog repository as created, and what it was seeded
+  with).
+- [Acceptance scenarios](../ACCEPTANCE.md) — E2E-12 and the APW-11 negative rows.
+- [Progress](../TRACKER.md) · [user documentation](../user-docs/app-works.md) — what a person reads.
+- [Constitution](../../../../../.specify/memory/constitution.md) — Principles I–X and the compliance checklist.
+- [`plan.md`](./plan.md) · [`tasks.md`](./tasks.md)

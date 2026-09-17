@@ -31,6 +31,11 @@
 
 ## 2. `ever-works/apps` layout
 
+> **Repository name (2026-09-17).** The listing repository exists as **`ever-works/templates`**; the drafts called
+> it `ever-works/apps`, and `EVER_WORKS_APPS_CATALOG_REPO` accepts either value, so an installation carrying the
+> older name keeps working. Every `ever-works/apps` below means "the repository `EVER_WORKS_APPS_CATALOG_REPO`
+> points at".
+
 ```
 ever-works/apps/
 ├── manifest.json                   # the App Blueprint index (§3)
@@ -262,7 +267,10 @@ are the union across every operand that decided the class.
 
 ```
 ever-works/cal-diy-template/
-├── .works/works.yml        # App spec in `blueprint` mode: no `source`, no `blueprint` block (schema.md §3)
+├── .works/works.yml        # App spec in `blueprint` mode. Since the 2026-09-17 correction to schema.md §3 that
+│                           # mode **allows and expects** `source` and `blueprint` — a draft may carry both, and the
+│                           # apply job composes the real `source` itself. What must hold: `blueprint.repo` names
+│                           # this repository (schema.md §3), and `license` is optional.
 ├── overlay/                # files copied into the Work Repository at the same relative path
 │   └── Dockerfile
 ├── overlay.yml             # one row per overlay file (below)
@@ -303,23 +311,45 @@ renamed env entry, a new required dependency, a changed `generate` rule). The pl
 `validate.yml` runs `scripts/validate.mjs` on every pull request and push to `main`. Every check fails the
 run; none is advisory.
 
-| #   | Check                                                                                                                                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1  | `manifest.json` and `licenses.yml` validate against their JSON Schemas; sizes and counts within §3–§4 limits.                                                                                                                                               |
-| C2  | `id` unique. An upstream `repo` or alias may appear in several entries only when exactly one of them is `default: true`.                                                                                                                                    |
-| C3  | For every non-placeholder entry: the Blueprint repository exists, is public, carries the topic, the tag `v<version>` resolves to `sha`.                                                                                                                     |
-| C4  | The Blueprint's `.works/works.yml` at `sha` validates in `blueprint` mode against `schema/app-spec.schema.json` **and** the platform's rules (C4 runs the published validator package at the version pinned in `package.json`). Zero errors.                |
-| C5  | `license.class` equals the class `licenses.yml` computes for `license.spdx`; a `red` class fails.                                                                                                                                                           |
-| C6  | `managedHosting.allowed` is `true` for an `amber` entry only when `managedHosting.upstreamAgreement` is present; `upstreamAgreement` appears on no other class; any pull request that adds, changes or removes it carries a legal-reviewer approval (R-3).  |
-| C7  | `dependencies` equals the set derived from the Blueprint's App spec; `minResources.cpu` / `memory` ≥ the sum of component requests.                                                                                                                         |
-| C8  | `verification.status` recomputed from `evidence/<id>/*.json` equals the committed value; `verified` equals `status ∈ {verified, at-risk}`; `blueprintSha` = `blueprint.sha`; `expiresAt` ≤ `lastPassedAt` + 180 days; every `runUrl` is a workflow run URL. |
-| C9  | Overlay rules (§5), and no overlay file is byte-identical to a file at the same path in the upstream at the newest ref allowed by `refs` (source-copy guard).                                                                                               |
-| C10 | `icon` exists, ≤ 32 KiB, parses as SVG, contains no `<script>`, no `on*=` attribute and no external `href`.                                                                                                                                                 |
-| C11 | Every `licenses[].attestation.textId` is unique; a changed `text` under an unchanged `textId` fails.                                                                                                                                                        |
-| C12 | `schema/app-spec.schema.json` is byte-identical to the schema the pinned validator package publishes.                                                                                                                                                       |
+| #   | Check                                                                                                                                                                                                                                                                                                                                                                  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | `manifest.json` and `licenses.yml` validate against their JSON Schemas; sizes and counts within §3–§4 limits.                                                                                                                                                                                                                                                          |
+| C2  | `id` unique. An upstream `repo` or alias may appear in several entries only when exactly one of them is `default: true`.                                                                                                                                                                                                                                               |
+| C3  | For every non-placeholder entry: the Blueprint repository exists, is public, carries the topic, the tag `v<version>` resolves to `sha`.                                                                                                                                                                                                                                |
+| C4  | The Blueprint's `.works/works.yml` at `sha` validates in `blueprint` mode against `schema/app-spec.schema.json` **and** the platform's rules — C4 runs the published validator artifact `@ever-works/contracts` (subpath `./apps/validator`, APW-03 T57) **at the version pinned in `package.json`**, so the catalog never re-implements a platform rule. Zero errors. |
+| C5  | `license.class` equals the class `licenses.yml` computes for `license.spdx`; a `red` class fails.                                                                                                                                                                                                                                                                      |
+| C6  | `managedHosting.allowed` is `true` for an `amber` entry only when `managedHosting.upstreamAgreement` is present; `upstreamAgreement` appears on no other class; any pull request that adds, changes or removes it carries a legal-reviewer approval (R-3).                                                                                                             |
+| C7  | `dependencies` equals the set derived from the Blueprint's App spec; `minResources.cpu` / `memory` ≥ the sum of component requests.                                                                                                                                                                                                                                    |
+| C8  | `verification.status` recomputed from `evidence/<id>/*.json` equals the committed value; `verified` equals `status ∈ {verified, at-risk}`; `blueprintSha` = `blueprint.sha`; `expiresAt` ≤ `lastPassedAt` + 180 days; every `runUrl` is a workflow run URL.                                                                                                            |
+| C9  | Overlay rules (§5), and no overlay file is byte-identical to a file at the same path in the upstream at the newest ref allowed by `refs` (source-copy guard).                                                                                                                                                                                                          |
+| C10 | `icon` exists, ≤ 32 KiB, parses as SVG, contains no `<script>`, no `on*=` attribute and no external `href`.                                                                                                                                                                                                                                                            |
+| C11 | Every `licenses[].attestation.textId` is unique; a changed `text` under an unchanged `textId` fails.                                                                                                                                                                                                                                                                   |
+| C12 | `schema/app-spec.schema.json` is byte-identical to the schema the pinned validator artifact publishes (`@ever-works/contracts`, subpath `./apps/validator` — the same artifact C4 runs).                                                                                                                                                                               |
+
+**The published validator artifact (C4, C12).** The rules C4 and C12 exercise live in the platform's own pure
+validator modules, which sit in a package that is private; the catalog therefore cannot install them from there.
+`@ever-works/contracts` — which is **not** private — gains a publishable entry point at `./apps/validator` that
+re-exports the pure validator (`validateAppSpecDocument`, `validateAppSpecObject`, `APP_SPEC_ISSUE_CODES`) and
+publishes the committed JSON Schema beside it (APW-03 T57, `.github/workflows/publish-app-spec-validator.yml`).
+Nothing moves out of the agent package: it keeps re-exporting the same modules. This repository pins the exact
+published version in its `package.json`, and C4/C12 fail when the pin and the vendored schema disagree — that is
+what makes "passes CI but fails the platform" impossible.
 
 `schema-sync.yml` runs weekly (Monday 04:00 UTC): it fetches `GET /api/schema/app-spec.schema.json` from
 production and opens a pull request when it differs from the vendored copy.
+
+### 6.1 Blueprint repository CI (`ever-works/<app>-template`)
+
+A Blueprint repository runs three workflows. They are part of the contract: a repository without them cannot be
+listed, because `verification.evidence` is produced by them.
+
+| Workflow       | Trigger                            | What it does                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `validate.yml` | `pull_request`, `push` to `main`   | Validates `.works/works.yml` in **`blueprint` mode** with the pinned validator artifact (the same one C4 runs) and the vendored schema; validates `profiles/*.works.yml` (APW-13 T59) in **`data-repository` mode over a stub `source` block**, because a profile is a fork's App spec and always carries one. Zero errors.                                                                                       |
+| `release.yml`  | tag `v*`                           | Prints the commit sha the tag points at, for the catalog pull request's `sha:` field. **It never writes `blueprint:` into `.works/works.yml`** — the file stays a pure App spec, and stamping it would make the mode it must satisfy inconsistent with the file the platform reads.                                                                                                                               |
+| `verify.yml`   | `workflow_dispatch` (a maintainer) | Runs the repository's `tests/e2e/**` against a throwaway deployment and writes `evidence/<id>/*.json` (the shape §3.2 fixes). Only this run sets `verification.status`; C8 recomputes the committed value from those files. Inputs: `environment` (the platform environment it targets), `account` (the throwaway owner), `cluster` (the target it may deploy to). Secrets: `EVER_WORKS_E2E_UPSTREAM_TOKEN` only. |
+
+`schema-sync.yml` is not a Blueprint workflow: it lives in the catalogue repository, where the vendored schema is.
 
 ## 7. Contribution rules
 

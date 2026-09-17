@@ -27,7 +27,17 @@
 - **Cross-epic prerequisites** (do not implement here): APW-03's effective App spec + `WorkAppSpecState` and
   `app.spec.applied`; APW-07's `AppEnvResolver.resolveForBuild`, `AppEnvService.buildRedactor` and the ephemeral recipe
   of `AppRuntimeEnvSource` (R-10); APW-02's `setActionsPermissions?`; APW-01's `WorkCapabilities.builds` (R-7);
-  APW-13's fixture branches (R-23). Until they land, T16–T22 and T43 run against the typed fakes named in each task.
+  APW-13's fixture branches (R-23). **Added 2026-09-17 (`APW05-G06`):** APW-03 T22's `IGitProviderPlugin.commitFiles?`
+  and its `GitFacadeService` wrapper (the only clone-free write — T9, T16, T19), and APW-06 T3's
+  `packages/agent/src/app-runtime/ports.ts` (`AppImagePullCredentialSource` /
+  `APP_IMAGE_PULL_CREDENTIAL_SOURCE` for T16; `AppRuntimeEnvSource` / `APP_RUNTIME_ENV_SOURCE` for T43). Both merge in
+  the Wave 1 foundations (TRACKER), ahead of this epic's T9/T16/T19. Unit tests use a fake `RepositoryWriter` and fake
+  port objects; production bindings in T16, T19 and T43 are not merged, and the port files are neither re-declared nor
+  copied, until APW-03 T22 and APW-06 T3 are on `develop`. This epic never modifies `git.facade.ts` or `ports.ts`.
+  Until they land, T16–T22 and T43 run against the typed fakes named in each task.
+- **Cross-epic prerequisite claimed by this epic** (added 2026-09-17, `APW05-G01`/`GAP-07`): APW-05 is the only caller of
+  APW-02's `createWebhook?` / `deleteWebhook?`. T19a installs the `workflow_run` hook and T19a's release path removes it;
+  no other epic calls either method.
 
 ---
 
@@ -80,38 +90,62 @@ selection, digests, deployability, diagnosis, receipts, pull tokens, runner veri
 
 - [ ] **T4. `WorkBuild` entity.**
       **Create** `packages/agent/src/entities/work-build.entity.ts` with every column of [plan §3.1](./plan.md) (incl.
-      `checksBillableMinutes` and `verifySecretNames`), `TimestampColumn` from `packages/agent/src/entities/_types.ts`
+      `checksBillableMinutes`, `verifySecretNames` and the `syncOrigin`/`syncFromSha`/`syncToSha` trio APW-04 and APW-06
+      read — `APW04-G06`), `TimestampColumn` from `packages/agent/src/entities/_types.ts`
       for timestamps, `ManyToOne(() => Work, { onDelete: 'CASCADE' })`, Tier A `tenantId`/`organizationId` without
       relations, and the five indexes.
-      **Modify** `packages/agent/src/entities/index.ts`, `packages/agent/src/database/_entity-names.ts` (`'WorkBuild'`),
+      **Create also** `packages/agent/src/entities/work-build-preparation.entity.ts` — every column of
+      [plan §3.1b](./plan.md), the unique `(workId)` index `uq_work_build_preparations_work`, the same
+      `TimestampColumn`/`ManyToOne(Work, CASCADE)`/Tier A treatment and **no** API route that writes it
+      (`APW05-G03`).
+      **Modify** `packages/agent/src/entities/index.ts`, `packages/agent/src/database/_entity-names.ts` (`'WorkBuild'`,
+      `'WorkBuildPreparation'`),
       `packages/agent/src/database/_entities-inventory.ts` (import + `ENTITIES`).
-      **Test**: `packages/agent/src/entities/__tests__/work-build.entity.spec.ts` — index names, uniqueness flags, the partial
-      `WHERE` on `uq_work_builds_provider_run`, both scope columns present.
-      **Done when**: `pnpm --filter @ever-works/agent test -- work-build.entity` is green and the drift specs
-      `packages/agent/src/database/database.module.spec.ts` and `packages/agent/src/database/database.config.spec.ts`
-      pass without editing a magic number.
+      **Test**: `packages/agent/src/entities/__tests__/work-build.entity.spec.ts` — index names, uniqueness flags, the
+      plain `UNIQUE` on `(buildPluginId, providerRunId, runAttempt)` with **no** partial `WHERE` (so the same DDL works on
+      Postgres, SQLite, MySQL and MariaDB — `APW05-G10`), both scope columns present; and
+      `packages/agent/src/entities/__tests__/work-build-preparation.entity.spec.ts` — the unique `workId` index, the
+      `webhookState`/`workflowState` defaults, both scope columns.
+      **Done when**: `pnpm --filter @ever-works/agent test -- work-build.entity work-build-preparation.entity` is green
+      and the drift specs `packages/agent/src/database/database.module.spec.ts` and
+      `packages/agent/src/database/database.config.spec.ts` pass without editing a magic number.
 
 - [ ] **T5. Migration.**
       **Create** `apps/api/src/migrations/1792050000000-CreateWorkBuilds.ts` (generate the skeleton with
       `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateWorkBuilds`, then re-stamp
-      the class name/timestamp to the APW-05 block). `down()` drops only `work_builds`.
-      **Test**: `apps/api/src/migrations/__tests__/CreateWorkBuilds.spec.ts` — `up()` creates the table, FK and five
-      indexes; `down()` removes only them; the file contains no `ALTER TABLE` on a pre-existing table.
-      **Done when**: `pnpm --filter ever-works-api test -- CreateWorkBuilds` is green, a fresh Postgres and a fresh SQLite
-      database both migrate up and down cleanly, and the timestamp is above the newest migration on `develop`.
+      the class name/timestamp to the APW-05 block). It creates **both** `work_builds` and `work_build_preparations`
+      ([plan §3.1b](./plan.md)) with their FKs and all six indexes, declared through TypeORM `TableIndex` — no raw
+      double-quoted SQL and no partial index anywhere (`APW05-G10`). `down()` drops only those two tables.
+      **Test**: `apps/api/src/migrations/__tests__/CreateWorkBuilds.spec.ts` — `up()` creates both tables, their FKs and
+      the six indexes; `down()` removes only them; the file contains no `ALTER TABLE` on a pre-existing table and no
+      driver branch.
+      **Done when**: `pnpm --filter ever-works-api test -- CreateWorkBuilds` is green, a fresh Postgres, a fresh SQLite
+      **and** a fresh MySQL/MariaDB database all migrate up and down cleanly, and the timestamp is above the newest
+      migration on `develop`.
 
 - [ ] **T6. `AppBuildRepository`.**
-      **Create** `packages/agent/src/database/repositories/app-build.repository.ts` with `insertWithNextNumber(workId, data)`
-      (transaction, `MAX(number)+1`, 3 retries on unique violation), `upsertByProviderRun`, `findPage(workId, filters,
-page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`, `claimWatchLease(id, ms)`,
-      `findSilentNonTerminal(now, silenceMs, limit)`, `findWithOrphanedVerifySecrets(now, limit)`, `markLost(ids)`.
-      **Modify** `packages/agent/src/database/index.ts` to export it.
+      **Create** `packages/agent/src/database/repositories/app-build.repository.ts` with `insertWithNextNumber(workId, data,
+      { stampFromPreparation })` (transaction; the Work-row pessimistic lock on postgres/mysql/mariadb with
+      `loadEagerRelations: false`, skipped on the SQLite family; `MAX(number)+1` through the query builder with no
+      `FOR UPDATE`; 3 retries on a unique violation, detected across drivers as `CreditLedgerRepository.isUniqueViolation`
+      does — plan §3.1, `APW05-G10`), `upsertByProviderRun`, `findPage(workId, filters,
+page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`, `claimWatchLease(id, ms)` through the
+      query builder with a parameterised `:now`/`:until`, `findSilentNonTerminal(now, silenceMs, limit)`,
+      `findWithOrphanedVerifySecrets(now, limit)`, `markLost(ids)`.
+      **Create also** `packages/agent/src/database/repositories/app-build-preparation.repository.ts` with `findByWork` and
+      `upsertAfterPrepare` (`APW05-G03`).
+      **Modify** `packages/agent/src/database/index.ts` to export both.
       **Test**: `packages/agent/src/database/repositories/__tests__/app-build.repository.spec.ts` — 20 concurrent
-      `insertWithNextNumber` calls yield numbers 1…20 with no gap or duplicate; lease claim returns 0 rows for a live lease;
+      `insertWithNextNumber` calls yield numbers 1…20 with no gap or duplicate; `stampFromPreparation` copies
+      `buildInputsHash`, `buildSecretNames` and `secretsSyncedAt` from the preparation row, and an absent row leaves all
+      three NULL; lease claim returns 0 rows for a live lease;
       silent-build query honours the 90 s silence and the 200 limit, oldest first; orphaned-verify-secret query selects only
       verification Builds older than 40 minutes with a non-empty `verifySecretNames`.
-      **Done when**: `pnpm --filter @ever-works/agent test -- app-build.repository` is green on SQLite and on the Postgres
-      test container.
+      `apps/api/src/migrations/__tests__/query-shape.spec.ts` (or the existing query-shape precedent) asserts no
+      double-quoted raw SQL and no `interval '` literal in either repository, so the MySQL/MariaDB rule of `b5a7d6857` is
+      enforced by a test rather than by review (`APW05-G10`).
+      **Done when**: `pnpm --filter @ever-works/agent test -- app-build.repository app-build-preparation.repository` is
+      green on SQLite and on the Postgres test container.
 
 ## P1.3 — The `github-actions-build` plugin
 
@@ -120,12 +154,19 @@ page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`
       `everworks.plugin` block from [plan §4.3](./plan.md), deps `octokit`, `libsodium-wrappers`, `fflate`; `tsup`,
       `vitest` scripts copied from `packages/plugins/k8s/package.json`), `tsconfig.json`, `tsup.config.ts`,
       `vitest.config.ts`, `src/index.ts`, `src/settings.schema.ts` ([plan §4.4](./plan.md), `pullToken` with
-      `x-secret: true`), `src/github-actions-build.plugin.ts` (id, category `build`, capability `build`,
+      `x-secret: true` and `x-platformManaged: true`, `pullTokenExpiresAt` `x-platformManaged: true`, and the two new
+      Work-scope booleans `allowBuildValuesOnPullRequests` (default `false`) and
+      `verificationPromptedValuesRequireApproval` (default `true`) — `XC-01`), `src/github-actions-build.plugin.ts`
+      (id, category `build`, capability `build`,
       `buildKind: 'github-actions'`, `supportedStrategies: ['dockerfile']` — `auto` is not supported, R-13 — method stubs
-      throwing `not implemented`).
+      throwing `not implemented`; **no `validateSettings` for `pullToken`** — the check is
+      `AppBuildPullTokenService`, plan §4.12, `APW05-G07`).
       **Test**: `packages/plugins/github-actions-build/src/__tests__/plugin.manifest.spec.ts` — manifest
-      id/category/capabilities; `pullToken` is `x-secret`; `attestations` defaults `false`; `reclaimDisk` defaults `true`;
-      `supportedStrategies` excludes `auto`.
+      id/category/capabilities; `pullToken` is `x-secret` and `x-platformManaged`; `attestations` defaults `false`;
+      `reclaimDisk` defaults `true`; `supportedStrategies` excludes `auto`; **the schema declares no preparation key**
+      (`workflowSha256`, `workflowPullRequestNumber`, `webhookId`, `runsEtag`, `repositoryBlock` are absent —
+      `APW05-G03`), and `validateSettingsScope` refuses `pullToken` and `pullTokenExpiresAt` at every scope
+      (`APW05-G07`).
       **Done when**: `pnpm --filter @ever-works/github-actions-build-plugin test` is green and plugin discovery lists
       `github-actions-build` at API boot in development.
 
@@ -142,29 +183,49 @@ page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`
       repo with larger runner; attestations on; branch `feature/x` slug); byte equality on two runs (ACC-05-03); LF
       endings; for each fixture every build value string supplied to the test is **absent** from the output and the build
       job reads `EW_` secrets only as `${{ secrets.EW_* }}` references (ACC-05-05); the build job's `if:` refuses pull
-      requests whose head repository differs and no job that references `secrets.` or pushes runs for them (ACC-05-06);
-      tags `sha-${{ env.EW_SHA }}` + `branch-<slug>` for push and `pr-<n>` for pull requests, never `latest` (ACC-05-07);
-      `cache-to` only on push; the concurrency block sets `cancel-in-progress` only for `pull_request` and groups the
-      tracked branch by ref (ACC-05-10); the services golden declares the `postgres` service and a build-arg resolving
-      to `127.0.0.1` (ACC-05-12).
+      requests whose head repository differs **and** excludes `inputs.ew_mode == 'verify'` (`APW05-G02`), and no job that
+      references `secrets.` or pushes runs for them (ACC-05-06); tags `sha-${{ env.EW_SHA }}` + `branch-<slug>` for push
+      and `pr-<n>` for pull requests, never `latest` (ACC-05-07); `cache-to` only on push; the concurrency block sets
+      `cancel-in-progress` only for `pull_request`, groups the tracked branch by ref, and gives a verification its own
+      `verify-<buildId>` group (`APW05-G02`); the services golden declares the `postgres` service **with the
+      `BUILD_SERVICE_DEFAULTS` env (`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`), the published `5432` port and
+      `pg_isready` health**, and a build-arg resolving to `127.0.0.1` (ACC-05-12, `APW05-G08`); the `build` job's
+      `timeout-minutes` equals `build.resources.timeoutMinutes` with no verification bonus, and only the `verify` job adds
+      30 (`APW05-G22`).
+      **Also add four goldens (`APW05-G02`, `G08`, `XC-01`):** `verify-bootstrap` (dispatch-only: no `build` job, no
+      `checks` job, no `secrets.EW_` except `EW_VERIFY__PROMPTED`, no `push` or `pull_request` trigger);
+      `verify-job` (`permissions` exactly `contents: read, packages: read`, no `docker push`, `--push` or `cache-to`, the
+      `ew_reuse_digest` input, the `verify-<buildId>` concurrency group); `services-postgres-defaults` (an undeclared
+      `env` still yields the three defaults and the published container port); and `restricted-values` (a same-repository
+      pull request's `fromEnv` argument is the throwaway marker with **no** `secrets.EW_` reference, while the same file's
+      push path keeps `${{ secrets.EW_<NAME> }}` — ACC-05-31).
       `packages/plugins/github-actions-build/src/__tests__/action-pins.spec.ts` — every pin matches `^[0-9a-f]{40}$`
       (ACC-05-05).
       **Done when**: `pnpm --filter @ever-works/github-actions-build-plugin test -- generator action-pins` is green and the
       golden workflow for the minimal fixture passes `actionlint` locally.
 
 - [ ] **T9. Branch protection and workflow writer.**
-      **Create** `packages/plugins/github-actions-build/src/repo/branch-protection.ts` (404 → unprotected; 200 with
-      reviews or status checks → protected; 403 → protected) and `src/repo/workflow-writer.ts` (through the
+      **Create** `packages/plugins/github-actions-build/src/repo/branch-protection.ts` (the classic endpoint: 404 →
+      unprotected; 200 with reviews or status checks → protected; 403 → protected; **plus** `GET
+/repos/{o}/{r}/rules/branches/{branch}`, where an active `pull_request` or `required_status_checks` rule also means
+      protected, so a ruleset-only branch is not mistaken for an open one — `APW05-G16`) and
+      `src/repo/workflow-writer.ts` (through the
       `RepositoryWriter` parameter only — APW-03's `commitFiles?` via the facade; pull-request path on
       `ever-works/build-workflow` with one reused pull request; read-back sha256 compare with one retry; hand-edit detection
-      against `lastWrittenWorkflowSha256`; `nonFastForward` retries ≤ 3; `createdByAppWork: false` (Link) always takes the
-      pull request path — Resolution R-4).
+      against `lastWrittenWorkflowSha256`; `nonFastForward` retries ≤ 3; **`refRejectedByRule` switches once to the pull
+      request path and never loops** — plan §4.6 step 2, `APW05-G16`; `createdByAppWork: false` (Link) always takes the
+      pull request path — Resolution R-4; **the bootstrap file of plan §4.6 step 0**, which is delivered by these same
+      rules and sets `workflowState` without ever looking like a hand edit — `APW05-G02`).
       **Test**: `packages/plugins/github-actions-build/src/__tests__/workflow-writer.spec.ts` with a fake
       `RepositoryWriter` — no clone call exists; direct commit on an unprotected fork changes exactly the one workflow path
-      (ACC-05-01); pull request on a protected branch and on `createdByAppWork: false`; a second and third preparation
+      (ACC-05-01); pull request on a protected branch and on `createdByAppWork: false`; **a ruleset-protected branch whose
+      legacy endpoint answers 404 takes the pull request path**, and a direct write refused with `refRejectedByRule`
+      falls back to the pull request path exactly once (`APW05-G16`); a second and third preparation
       update the same pull request so one stays open (ACC-05-02); read-back mismatch → retry → `workflowWriteFailed`;
       hand-edited file → `editedByHand` + pull request, never an overwrite on the tracked branch (ACC-05-04); unchanged
-      content → `unchanged` and zero write calls.
+      content → `unchanged` and zero write calls; **a branch with no workflow at all gets exactly one bootstrap commit
+      whose content carries only the `verify` job, and a Link-relation App Work gets `workflowPending` plus the pull
+      request URL and zero commits** (`APW05-G02`, ACC-05-02).
       **Done when**: `pnpm --filter @ever-works/github-actions-build-plugin test -- workflow-writer` is green and no code
       path calls a force update on the tracked branch.
 
@@ -198,17 +259,23 @@ page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`
       `BuildSnapshot`; minutes = Σ ceil per job; `checksBillableMinutes` = the subset whose job name starts with the check
       prefix; only the `build` job decides status; pull-request head sha; failing step name/number),
       `src/runs/result-artifact.ts` (artifact lookup by name, zip ≤ 64 KB refused above, `fflate.unzipSync`, JSON ≤ 8 KB,
-      strict schema, digest regex).
+      strict schema, digest regex), **and `src/runs/run-lister.ts`** implementing
+      `IBuildPlugin.listRecentRuns?` (`APW05-G01`): `GET /repos/{o}/{r}/actions/workflows/{file}/runs?per_page=20` with
+      `If-None-Match` from the stored ETag, newest first, mapping each run to `BuildRunRef`; 304 → `notModified: true`.
       **Modify** `packages/plugins/github-actions-build/src/github-actions-build.plugin.ts` — implement `startBuild`
-      (workflow dispatch with `ew_build_id`, `ew_sha`, `ew_mode`, `ew_verify_plan` ≤ 60,000 chars), `getBuild`,
-      `cancelBuild`, `getLogsUrl`.
+      (workflow dispatch **on the tracked branch** with `ew_build_id`, `ew_sha`, `ew_mode`, `ew_verify_plan` ≤ 60,000
+      chars and `ew_reuse_digest`, retrying a 404/422 for up to 60 s after a bootstrap commit so a just-added workflow
+      file is dispatchable — `APW05-G02`), `getBuild`,
+      `cancelBuild`, `getLogsUrl`, `listRecentRuns`.
       **Test**: `packages/plugins/github-actions-build/src/__tests__/run-correlator.spec.ts` (adoption by `display_title`
       inside the window, none outside it); `run-observer.spec.ts` (two jobs 61 s + 30 s → 3 minutes and a receipt payload
       carrying them — ACC-05-20; a failed `Ever Works check: lint` job with a succeeded `build` job → snapshot
       `succeeded`, `checksBillableMinutes` 1 — ACC-05-29; pull request run reports head sha not merge sha; a run that
       stays `in_progress` across two polls and then `completed` maps each status — ACC-05-11; `cancelBuild` calls the
       cancel endpoint and a `cancelled` conclusion maps to `cancelled` — ACC-05-09; tags reported without `latest` —
-      ACC-05-07); `result-artifact.spec.ts` (oversize zip, malformed digest, extra keys rejected).
+      ACC-05-07); `result-artifact.spec.ts` (oversize zip, malformed digest, extra keys rejected);
+      `run-lister.spec.ts` (`per_page` ≤ 20, a 304 maps to `notModified`, fields map to `BuildRunRef`, a fork pull
+      request's head repository is reported — `APW05-G01`).
       **Done when**: `pnpm --filter @ever-works/github-actions-build-plugin test -- run-correlator run-observer result-artifact`
       is green.
 
@@ -239,11 +306,14 @@ page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`
 
 - [ ] **T15. Secret-in-image check and runner verification scripts.**
       **Create** `packages/plugins/github-actions-build/src/workflow/secret-check.sh.ts` (the [plan §4.11](./plan.md) script
-      as a template literal) and `src/workflow/verify-runner.sh.ts` ([plan §4.10](./plan.md): plan schema check, 12 GiB
-      summed memory refusal, throwaway `postgres`/`redis`/`minio` containers pinned by digest with no volumes, recipe
+      as a template literal) and `src/workflow/verify-runner.sh.ts` ([plan §4.10](./plan.md): plan schema check **with
+      `version == 1` refused otherwise** (`APW05-G11`), 12 GiB summed memory refusal, throwaway `postgres`/`redis`/`minio`
+      containers pinned by digest with no volumes, recipe
       materialisation with `openssl rand` / `openssl genpkey` into a `0600` env file, prompted values from the per-run
       secret, jobs, readiness waits, smoke via `curl --max-time 30 --max-redirs 0`, per-job and per-smoke result rows, env
-      file shredded, `set +x`).
+      file shredded, `set +x`; **and the image it verifies**: `--load` from the plan's `build` section with
+      `--cache-from` the `buildcache` tag only, or `docker pull` of `ew_reuse_digest`, never a push and never `cache-to`
+      — `APW05-G02`).
       **Test**: `packages/plugins/github-actions-build/src/__tests__/secret-check.script.spec.ts` — runs the script under
       `bash` with a stub `docker` on `PATH`: match → exit 79 and `EW_SECRET_IN_IMAGE:<NAME>` on stdout without the value,
       and the push step is never reached (ACC-05-15); no match → 0; 7-char value skipped.
@@ -273,75 +343,180 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
       **Done when**: `pnpm --filter @ever-works/agent test -- build.facade` is green.
 
 - [ ] **T17. `AppBuildsService` and the deployable verdict.**
-      **Create** `packages/agent/src/app-builds/app-builds.service.ts` (`requestRebuild` with 10 s dedupe and 10/hour limit,
-      `cancel`, `startVerification(workId, { ref, sha, plan, reuseImageDigest? })`, `applySnapshot(buildId, snapshot)`,
-      `finalize(buildId)` — digest confirmation, verdict, receipt, Activity, events), `deployable-verdict.ts` ([plan
-      §5.1](./plan.md), first failing clause wins), `app-build-failure-copy.ts` (class → i18n key + params, reused for the
-      agent hand-off in T44), `packages/agent/src/app-builds/app-builds.module.ts`, `index.ts`.
+      **Create** `packages/agent/src/app-builds/app-builds.service.ts` (`requestPrepare` with the `prepareSeq` marker of
+      plan §7.2, `recordProviderRun(workId, run, source)` — the shared accept rules of plan §7.5, `requestRebuild` with
+      10 s dedupe and 10/hour limit,
+      `cancel`, `startVerification(workId, { ref, sha, reuseImageDigest? }) → { buildId }`, `getDetail(workId, buildId)`,
+      `applySnapshot(buildId, snapshot)`,
+      `finalize(buildId)` — digest confirmation, verdict, receipt, Activity, events — and `publish(build, event)`, the
+      single Activity + event writer of plan §7.8), `deployable-verdict.ts` ([plan
+      §5.1](./plan.md), first failing clause wins, `computeBuildInputsHash` from `@ever-works/contracts`), `app-build-failure-copy.ts` (class → i18n key + params, reused for the
+      agent hand-off in T44), `app-build-pull-token.service.ts` (`save(workId, userId, token)` — plan §4.12,
+      `APW05-G07`), `packages/agent/src/app-builds/app-builds.module.ts`, `index.ts`.
+      **Create also** `packages/agent/src/events/app-build.events.ts` (the five classes, `AppBuildEventPayload` and the
+      explicit status → event map of plan §7.8 — `APW05-G05`) and
+      **Modify** `packages/agent/src/events/index.ts` to export them.
       **Modify** `packages/agent/src/entities/plugin-usage-event.entity.ts` — add `BUILD = 'build'` to
       `PluginUsageCapability` (varchar; no migration).
       **Modify** `packages/agent/src/entities/activity-log.types.ts` — add `APP_BUILD = 'app_build'` to
       `ActivityActionType`; `action` strings `app.build.queued|started|succeeded|failed|cancelled` (Resolution R-2).
+      **Modify** `packages/contracts/src/apps/builds.ts` — export `APP_BUILD_SWEEP_CRON`, `AppVerificationPlan` and the
+      pure `computeBuildInputsHash` (`APW05-G03`, `G11`, `G20`).
       **Test**: `packages/agent/src/app-builds/__tests__/deployable-verdict.spec.ts` — one case per clause in order: a
       pull-request Build → `pullRequest`, a verification Build → `verification` (ACC-05-23), `specValidAtCommit: false` →
       `specInvalid`, a Build whose `buildInputsHash` differs from the current hash after a rotation → `staleInputs`
-      (ACC-05-16), secret check failed → `secretCheckFailed`, unconfirmed digest → `digestUnconfirmed`.
+      (ACC-05-16), **a NULL `buildInputsHash` or `secretsSyncedAt` → `staleInputs`**, **a preparation that synced zero
+      values (the hash of the empty list) → passes that clause**, secret check failed → `secretCheckFailed`, unconfirmed
+      digest → `digestUnconfirmed` (`APW05-G03`).
       `packages/agent/src/app-builds/__tests__/app-builds.service.spec.ts` — a Rebuild returns within 2 s with a slow
-      dispatcher mocked (dispatch not awaited past the insert); dedupe inside/outside 10 s returns the same/new Build;
+      dispatcher mocked (dispatch not awaited past the insert) **and, with a null-returning prepare dispatcher, the
+      prepare runner is still invoked in-process exactly once and the 2 s budget holds** (`APW05-G20`); dedupe
+      inside/outside 10 s returns the same/new Build;
       11th rebuild → `rebuildRateLimited` with minutes (ACC-05-08); `cancel` on a running Build calls `cancelBuild` and the
       next snapshot finalises `cancelled` (ACC-05-09); receipt recorded once with `units`, payer `workspace`, operation
       `build.run`, `costCents: 0` and no credit ledger call (ACC-05-20); Activity rows carry `actionType: 'app_build'`
-      and metadata with no value and no excerpt line.
-      **Done when**: `pnpm --filter @ever-works/agent test -- deployable-verdict app-builds.service` is green.
+      and metadata with no value and no excerpt line; **`requestRebuild` and `startVerification` publish exactly one
+      `app.build.queued` with the plan §7.8 payload, `applySnapshot` publishes `app.build.started` exactly once across
+      repeated `running` snapshots, a snapshot first seen as `completed` still publishes `started` before `succeeded`, and
+      a `blocked` Build publishes nothing** (`APW05-G05`); **the plan JSON is built from the fixture spec at `sha`,
+      validates against `verify-plan.schema.json`, is refused above 60,000 characters or 12 GiB before dispatch, contains
+      no value from the env-source fake, and a verification Build's every transition calls
+      `APP_PROVISION_EVENTS_PORT.buildUpdated` — 3 times for queued → running → succeeded, once for a pre-dispatch
+      `missingBuildValues` block, zero times for a push Build, and a throwing port never fails the job** (`APW05-G11`);
+      **`AppBuildPullTokenService.save` maps the three refusal codes, returns `pullTokenNoImageYet` with no Build, and
+      writes `pullTokenExpiresAt` through `writePlatformManagedWorkSettings`** (`APW05-G07`);
+      `packages/agent/src/events/__tests__/events.spec.ts` — the five names are unique and dotted (`APW05-G05`).
+      **Done when**: `pnpm --filter @ever-works/agent test -- deployable-verdict app-builds.service app-build-pull-token.service`
+      is green.
 
 - [ ] **T18. Dispatchers.**
       **Create** `packages/agent/src/tasks/app-build-prepare-dispatcher.ts`, `app-build-prepare.types.ts`,
-      `app-build-watch-dispatcher.ts`, `app-build-watch.types.ts` ([plan §7.1](./plan.md)).
+      `app-build-watch-dispatcher.ts`, `app-build-watch.types.ts` ([plan §7.1](./plan.md)); both interfaces return
+      `Promise<string | null>` and are modelled on `work-import-dispatcher.ts`, **not** on the throwing
+      `kb-reembed-work-dispatcher.ts` (`APW05-G20`).
       **Modify** `packages/agent/src/tasks/index.ts` (exports) and `packages/agent/src/tasks/_tasks-symbols.ts`
       (`APP_BUILD_PREPARE_DISPATCHER`, `APP_BUILD_WATCH_DISPATCHER`, alphabetical).
-      **Modify** `packages/agent/src/tasks/job-runtime.providers.ts` and `packages/tasks/src/trigger/trigger.module.ts` to
-      bind both through the job-runtime registry like the existing `KB_REEMBED_WORK_DISPATCHER`.
-      **Test**: `packages/agent/src/tasks/tasks.spec.ts` passes with the two new symbols counted automatically.
-      **Done when**: `pnpm --filter @ever-works/agent test -- tasks.spec` is green.
+      **Modify** `packages/agent/src/tasks/job-runtime.providers.ts` — add both symbols to `DISPATCHER_SYMBOLS` and update
+      its arity JSDoc, counted off the merged array. **Modify**
+      `packages/agent/src/tasks/__tests__/job-runtime.providers.spec.ts` — raise the `toHaveLength` pin by two (14 on
+      `develop` @ 873274c9f; recount at merge after APW-02/03/04) and add both symbols to the expected `Set`.
+      **Modify** `packages/tasks/src/trigger/trigger.service.ts` — `dispatchAppBuildPrepare(payload)` and
+      `dispatchAppBuildWatch(payload)`, both `Promise<string | null>`: return `null` when `ensureConfigured()` is false or
+      `trigger()` throws, the same shape as `dispatchWorkspaceBackup`; tags `work:<workId>` / `build:<buildId>`,
+      `concurrencyKey` `app-build-prepare:<workId>` / `app-build-watch:<buildId>`.
+      **`trigger.module.ts` needs no edit** — `buildJobRuntimeProviders()` binds every `DISPATCHER_SYMBOLS` entry.
+      **Test**: `packages/agent/src/tasks/tasks.spec.ts` passes with the two new symbols counted automatically;
+      `job-runtime.providers.spec.ts` (arity and `Set`);
+      `packages/tasks/src/__tests__/trigger.service.spec.ts` (unconfigured → `null`; a thrown `trigger` → `null`; a
+      configured call passes tags and `concurrencyKey`).
+      **Done when**: `pnpm --filter @ever-works/agent test -- tasks.spec job-runtime.providers` and
+      `pnpm --filter @ever-works/tasks test -- trigger.service` are green.
 
 - [ ] **T19. `app-build-prepare` job.**
       **Create** `packages/agent/src/app-builds/app-build-prepare.runner.ts` ([plan §7.2](./plan.md): strategy gate,
-      build values through APW-07, runner selection, `prepareRepository` (incl. checks), persistence, `startBuild` for
-      requested Builds, lock `app-build-prepare:<workId>` ≤ 5 minutes with one re-run) and
-      `packages/tasks/src/tasks/trigger/app-build-prepare.task.ts`; **Modify** `packages/tasks/src/tasks/trigger/index.ts`.
+      build values through APW-07, runner selection (an **absent** `build.resources.memory` means the runner's maximum and
+      never blocks — `APW05-G14`), `prepareRepository` (incl. checks), the single-transaction preparation-row upsert of
+      plan §3.1b (`APW05-G03`), the **verification bootstrap** of plan §4.6 step 0 (`APW05-G02`), the **blocked-Build
+      retry** of plan §7.2 step 7 with `actionsEnabled` handled after `setActionsPermissions?` (`APW05-G15`), and
+      `startBuild` for requested Builds), the **`prepareSeq` coalescing loop** of plan §7.2 (`APW05-G17`) and
+      `packages/tasks/src/tasks/trigger/app-build-prepare.task.ts`; **Modify**
+      `packages/tasks/src/tasks/trigger/index.ts`. When the prepare dispatcher returns `null`, run the runner in-process,
+      unawaited, under the same lock ([plan §7.1](./plan.md), `APW05-G20`).
       **Test**: `packages/agent/src/app-builds/__tests__/app-build-prepare.runner.spec.ts` — `image`/`none` without checks:
       no Build and no plugin call; `auto` blocks a requested Build with `strategyNotSupported` (R-13); a missing required
       build value blocks the requested Build naming it and nothing is dispatched (ACC-05-14); runner too small blocks with
-      both numbers (ACC-05-22); concurrent dispatch runs once and re-runs once.
+      both numbers (ACC-05-22) **and an absent memory does not block** (`APW05-G14`); concurrent dispatch runs the passes
+      the coalescing loop allows and re-runs while `prepareSeq` keeps moving, and a dispatch that cannot take the lock
+      exits as `skipped` without losing the request (`APW05-G17`); **a `specApplied` prepare with no Build upserts the
+      preparation row with the hash, `secretsSyncedAt`, the names and `workflowState: 'committed'`; a second prepare after
+      an env entry was removed passes that name in `previouslyWrittenSecretNames` and drops it from the row; a checks-only
+      prepare leaves the three secret fields untouched** (`APW05-G03`); **a verification request on an App Work with no
+      workflow and no applied spec delivers exactly one bootstrap commit and then dispatches on the tracked branch, and on
+      a Link App Work it blocks with `workflowPending` and dispatches nothing** (`APW05-G02`); **a `manual` Build blocked
+      for `missingBuildValues` becomes `queued` with a cleared `blockedReason` and publishes `app.build.queued` once the
+      value exists, while an older blocked manual Build is cancelled as `superseded`** (`APW05-G15`).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-build-prepare.runner` is green.
 
+- [ ] **T19a. Webhook installation — the optional latency path (`APW05-G01`, `GAP-07`).**
+      **Modify** `packages/agent/src/app-builds/app-build-prepare.runner.ts` — after `prepareRepository` succeeds and the
+      workflow exists on the tracked branch, install or update the `workflow_run` hook through APW-02's
+      `GitFacadeService.createWebhook?` with `{ url: <config.webAppUrl() + '/api/ingest/github/events'>, secret: <the
+owner's github-plugin webhookSecret>, events: ['workflow_run'] }`, and persist `webhookId` + `webhookState`
+      (`installed` | `skipped` | `permissionMissing`) on the preparation row (plan §7.7).
+      **Create also** `AppBuildsService.releaseRepository(workId)` — best-effort `deleteWebhook?`, warning-logged, never
+      fatal (`GAP-07`'s removal half).
+      **Test**: `packages/agent/src/app-builds/__tests__/app-build-webhook.spec.ts` — the call uses the owner's
+      `webhookSecret` and exactly `['workflow_run']`; it is **skipped** when the secret is unset, when the receiver URL
+      fails `isSafeWebhookUrl`, when the token is an App installation token, and for an upstream relation; a
+      `permission_missing` result never blocks a Build and never changes a status; the secret appears in no log, error,
+      Activity row or telemetry payload; `releaseRepository` swallows a `deleteWebhook?` failure.
+      **Done when**: `pnpm --filter @ever-works/agent test -- app-build-webhook` is green.
+
 - [ ] **T20. `app-build-watch` job.**
-      **Create** `packages/agent/src/app-builds/app-build-watch.runner.ts` ([plan §7.3](./plan.md)) and
-      `packages/tasks/src/tasks/trigger/app-build-watch.task.ts`.
+      **Create** `packages/agent/src/app-builds/app-build-watch.runner.ts` ([plan §7.3](./plan.md), including the
+      preparation-row re-stamp when `startedAt` is first set — `APW05-G03`) and
+      `packages/tasks/src/tasks/trigger/app-build-watch.task.ts`. When the watch dispatcher returns `null`, run the runner
+      in-process, unawaited, capped at 10 concurrent runs per API process ([plan §7.1](./plan.md), `APW05-G20`).
       **Test**: `packages/agent/src/app-builds/__tests__/app-build-watch.runner.spec.ts` — lease prevents a second
-      concurrent observation; terminal transition finalises exactly once across 3 deliveries; `app.build.succeeded` is
-      emitted only when deployable is computed (with the flag in the payload); a succeeded push Build with a confirmed
-      digest and `sha-<40>` / `branch-<slug>` tags is `deployable: true` (ACC-05-07); a verification Build's per-run secret
-      is deleted on its terminal transition.
+      concurrent observation; terminal transition finalises exactly once across 3 deliveries; the ordered sequence
+      `app.build.queued → app.build.started → app.build.succeeded` publishes exactly once each, a snapshot first seen as
+      `completed` still yields `started` before `succeeded`, and `app.build.succeeded` carries branch, trigger, `deployable`
+      and `imageDigest` (`APW05-G05`); `app.build.succeeded` is
+      emitted only when deployable is computed (with the flag in the payload); **a succeeded push Build with a confirmed
+      digest and the `sha-<40>` and `branch-<slug>` tags — and no `latest` — is `deployable: true` (ACC-05-07)**; **a push
+      Build created by the consumer after
+      a `specApplied` prepare, whose run started after `secretsSyncedAt`, is likewise `deployable: true`, and that same
+      Build is
+      `staleInputs` when a sync finished after `startedAt`** (`APW05-G03`); a verification Build's per-run secret
+      is deleted on its terminal transition; **a verification Build going queued → running → succeeded calls
+      `APP_PROVISION_EVENTS_PORT.buildUpdated` three times**, and a throwing port does not fail the watch (`APW05-G11`).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-build-watch.runner` is green.
 
 - [ ] **T21. `app-build-sweep` job.**
       **Create** `packages/agent/src/app-builds/app-build-sweep.service.ts` and
       `packages/tasks/src/tasks/trigger/app-build-sweep.task.ts` (`schedules.task({ id: 'app-build-sweep', cron:
-'*/2 * * * *' })`, same shape as `packages/tasks/src/tasks/trigger/deploy-ready-poller.task.ts`).
+APP_BUILD_SWEEP_CRON })` from `@ever-works/contracts`, same shape as
+      `packages/tasks/src/tasks/trigger/deploy-ready-poller.task.ts`), and **run discovery before the silent pass** by
+      calling T21a's `AppBuildRunDiscoveryService` ([plan §7.4a](./plan.md), `APW05-G01`).
+      **Create also** `apps/api/src/app-builds/app-build-sweep-cron.service.ts` — the same pass from the API process when
+      Trigger.dev is not the configured runtime, gated on `config.trigger.shouldUseTrigger()` and wrapped in
+      `DistributedTaskLockService.runExclusive('app-builds:sweep', …, { ttlMs: 90_000 })`, like
+      `SkillReadinessSweepCronService`; register it in `apps/api/src/app-builds/app-builds.module.ts`
+      ([plan §7.4](./plan.md), `APW05-G20`).
       **Test**: `packages/agent/src/app-builds/__tests__/app-build-sweep.service.spec.ts` — 250 silent Builds → 200
       dispatched, oldest first; a Build silent for 91 s is dispatched so a terminal status lands within the next 2-minute
       tick (≤ 3 min, ACC-05-11); lost thresholds for adopted and never-adopted Builds; `digestUnconfirmed` rechecked after
       a pull token is saved; an orphaned verification secret is deleted.
-      **Done when**: `pnpm --filter @ever-works/agent test -- app-build-sweep.service` is green.
+      `apps/api/src/app-builds/app-build-sweep-cron.service.spec.ts` — skipped when `shouldUseTrigger()` is true; runs
+      `sweep()` once under the lock when false; a held lock means skip; a sweep error is logged, not thrown; a watch
+      dispatch returning `null` runs the watch runner in-process with at most 10 concurrent (`APW05-G20`).
+      **Done when**: `pnpm --filter @ever-works/agent test -- app-build-sweep.service` and
+      `pnpm --filter ever-works-api test -- app-build-sweep-cron.service` are green.
+
+- [ ] **T21a. Run discovery — Builds without a delivery (`APW05-G01`, `GAP-07`).**
+      **Create** `packages/agent/src/app-builds/app-build-run-discovery.service.ts` ([plan §7.4a](./plan.md)): up to 100
+      App Works whose applied strategy is `dockerfile` and whose `workflowSha256` is set, stalest `runsCheckedAt` first;
+      `BuildFacadeService` → `IBuildPlugin.listRecentRuns?` with the stored `runsEtag`; `notModified` only stamps
+      `runsCheckedAt`; every run with `createdAt ≥ workflowWrittenAt` goes to
+      `AppBuildsService.recordProviderRun(workId, run, 'poll')`; the cursor (`runsEtag`, `runsCheckedAt`) is stored on the
+      preparation row (plan §3.1b), not in a plugin setting.
+      **Test**: `packages/agent/src/app-builds/__tests__/app-build-run-discovery.service.spec.ts` — with delivery
+      disabled, a push run is recorded as Build #n on the next tick and its later `completed` is visible within 3 minutes
+      (ACC-05-11); a delivery **plus** a poll of the same run yields one Build and one `app.build.queued`; a fork
+      pull-request run → no Build; `image`/`none`/`auto` → none; a run created before `workflowWrittenAt` → none; a 304 →
+      no row writes; 150 eligible App Works → 100 checked, stalest first; a plugin without the method → skipped; a
+      discovery failure does not stop the silent pass.
+      **Done when**: `pnpm --filter @ever-works/agent test -- app-build-run-discovery.service` is green.
 
 - [ ] **T22. Event listeners.**
       **Create** `packages/agent/src/app-builds/app-builds.listener.ts` — `app.spec.applied` with `changedBlocks` including
       `build` or `checks` → prepare; `app.env.changed` with a build-phase name → prepare, debounced 10 s per Work; pull
-      token saved → prepare (reason `pullTokenSaved`).
+      token saved → prepare (reason `pullTokenSaved`); **a save of the Work-scoped settings of the resolved build plugin →
+      prepare (reason `settingsChanged`), which is what clears `runnerTooSmall`** (`APW05-G15`).
       **Test**: `packages/agent/src/app-builds/__tests__/app-builds.listener.spec.ts` — runtime-only names do not dispatch;
       5 changes within 10 s dispatch once; dispatch happens within 60 s of the first change, so `EW_` secrets re-sync
-      inside the SLA (ACC-05-13); a `checks`-only change dispatches prepare.
+      inside the SLA (ACC-05-13); a `checks`-only change dispatches prepare; **a settings change dispatches prepare and the
+      newest blocked manual Build becomes `queued`** (`APW05-G15`).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-builds.listener` is green.
 
 ## P1.5 — API and webhook intake
@@ -349,9 +524,14 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
 - [ ] **T23. Builds controller.**
       **Create** `apps/api/src/app-builds/app-builds.controller.ts`, `apps/api/src/app-builds/dto/app-builds.dto.ts`
       (`ListAppBuildsQueryDto` with `page`, `pageSize` 1–100, `status`, `trigger`, `branch`, `pullRequest`;
-      `CreateAppBuildDto` with optional 40-hex `commitSha`), `apps/api/src/app-builds/app-builds.module.ts`.
+      `CreateAppBuildDto` with optional 40-hex `commitSha`; **`SaveAppBuildPullTokenDto` with a `token` string, for the
+      new `PUT /api/works/:id/builds/pull-token` route of plan §5 — `APW05-G07`**),
+      `apps/api/src/app-builds/app-builds.module.ts`.
       Routes and codes exactly as [plan §5](./plan.md); `ensureCanView` / `ensureCanEdit` from
-      `packages/agent/src/services/work-ownership.service.ts`; non-`app` kind → 404.
+      `packages/agent/src/services/work-ownership.service.ts`; non-`app` kind → 404. **The list response's
+      `workflow` field reads the preparation row** (`{ state: 'none', pullRequestUrl: null }` when there is none —
+      `APW05-G03`), and the pull-token route delegates to `AppBuildPullTokenService`, returning its stable codes and never
+      the token (`APW05-G07`).
       **Modify** `apps/api/src/api.module.ts` to import `AppBuildsModule`.
       **Test**: `apps/api/src/app-builds/app-builds.controller.spec.ts` — foreign id 404 on read, Rebuild and Cancel
       (ACC-05-24); viewer 403 on POST routes with code; 202 shape with `deduped` and a second POST inside 10 s returning the
@@ -363,13 +543,27 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
 
 - [ ] **T24. `workflow_run` consumer.**
       **Create** `apps/api/src/app-builds/app-build-workflow-run.consumer.ts` ([plan §7.5](./plan.md)), registered on
-      `GitHubWebhookDispatcherService` in `onModuleInit`; **Modify** `apps/api/src/app-builds/app-builds.module.ts` to
-      import the ingest module's exported dispatcher.
+      `GitHubWebhookDispatcherService` in `onModuleInit`. **The consumer maps the delivery to a `BuildRunRef` and calls
+      `AppBuildsService.recordProviderRun(workId, run, 'event')`** — the same entry point run discovery uses — so the
+      accept rules live in one place (`APW05-G01`). **Modify** `apps/api/src/app-builds/app-builds.module.ts` to
+      import the ingest module's dispatcher, **and** either
+      `apps/api/src/ingest/ingest.module.ts` to add `GitHubWebhookDispatcherService` to `exports` (with its spec extended)
+      **or** register this consumer as a provider inside `IngestModule` — the module exports only `[EventIngestModule]`
+      today (`apps/api/src/ingest/ingest.module.ts:131-149`), so the "import the exported dispatcher" instruction cannot
+      work as written (`APW05-G21`).
       **Test**: `apps/api/src/app-builds/app-build-workflow-run.consumer.spec.ts` — other workflow paths ignored; repository
       not an App Work ignored; runs of an App Work whose applied strategy is `image`, `none` or `auto` ignored (ACC-05-30);
       a `pull_request` run whose head repository differs creates no Build (ACC-05-06); `requested` creates Build #n
-      `queued`; duplicate delivery is a no-op; manual run adopted by `display_title`;
+      `queued` **and publishes `app.build.queued` once, while a duplicate delivery publishes nothing** (`APW05-G05`);
+      manual run adopted by `display_title`; **a push or pull-request insert stamps `buildInputsHash`,
+      `buildSecretNames` and `secretsSyncedAt` from the preparation row in the same transaction, and a push run while
+      `workflowState = 'pullRequestOpen'` dispatches `app-build-prepare { reason: 'workflowMerged' }`** (`APW05-G03`);
+      **a commit inside a completed upstream-sync range stamps `syncOrigin: 'upstreamSync'` with `syncFromSha`/
+      `syncToSha`, and any other commit stamps `none` with both NULL** (`APW04-G06`);
+      **a null watch dispatch runs the watch runner in-process without being awaited** (`APW05-G20`);
       `apps/api/src/ingest/github/github-check-intake.service.spec.ts` still passes unchanged.
+      **Done when**: `pnpm --filter ever-works-api test -- app-build-workflow-run.consumer github-check-intake` is green
+      and the consumer performs zero outbound HTTP calls (asserted).
       **Done when**: `pnpm --filter ever-works-api test -- app-build-workflow-run.consumer github-check-intake` is green
       and the consumer performs zero outbound HTTP calls (asserted).
 
@@ -396,8 +590,11 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
 
 - [ ] **T27. Detail drawer and failure panel.**
       **Create** `apps/web/src/components/works/detail/builds/BuildDetailDrawer.tsx` (`?build=<number>`, copy digest,
-      receipt with the checks-minutes line, verification results) and `BuildFailurePanel.tsx` (title + suggestion per class
-      with params; excerpt in `<pre>`; **Ask an agent to fix this** calling APW-08's action when present, hidden otherwise).
+      receipt with the checks-minutes line, verification results, and the verification approval notice of plan §4.7b when
+      prompted values were withheld) and `BuildFailurePanel.tsx` (title + suggestion per class
+      with params; excerpt in `<pre>`; **Ask an agent to fix this** opening APW-08's `RequestChangeDialog` with `buildId`
+      preset through `requestAppChangeAction({ workId, buildId, request? })` → `POST /api/works/:id/evolve`, hidden when
+      APW-08 is absent or the viewer lacks edit access — `APW05-G12`).
       **Test**: `apps/web/src/components/works/detail/builds/BuildFailurePanel.unit.spec.tsx` — all 14 classes render
       translated title and suggestion with params (ACC-05-17); `BuildDetailDrawer.unit.spec.tsx` — `Esc` returns focus to
       the row; `C` copies the image reference; the receipt reads payer "your GitHub account" and no credits (ACC-05-20);
@@ -426,24 +623,42 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
       **Done when**: both commands exit 0 in the PR.
 
 - [ ] **T30. E2E.**
-      **Create** `apps/web/e2e/app-builds-tab.spec.ts` (list, URL filters, drawer, copy digest, viewer disabled —
-      ACC-05-24), `apps/web/e2e/app-builds-failure.spec.ts` (each seeded failure class renders its §6.3 copy — ACC-05-17; a
-      blocked `missingBuildValues` row names the value — ACC-05-14; `runnerTooSmall` shows both numbers — ACC-05-22),
-      `apps/web/e2e/app-builds-pull-token.spec.ts` (too broad → error; valid → saved, never re-rendered; Deploy blocked copy
-      for a private image without a token — ACC-05-21), `apps/web/e2e/app-builds-a11y.spec.ts` (axe on tab, drawer and
-      dialog with no new violations; keyboard `↑↓`, `Enter`, `Esc`, `C`, `R` — ACC-05-25) ([plan §10.2](./plan.md)), seeding
-      through the API with `EVER_WORKS_E2E_FAKES`.
-      **Test**: `pnpm --filter ever-works-web test:e2e app-builds-` (the four specs above are the test).
-      **Done when**: all four pass locally and in the `e2e.yml` lane; rows use `getByTestId`.
+      **Seeding recipe (rewritten 2026-09-17, `APW05-G18`).** The PR lane runs with `EVER_WORKS_E2E_FAKES=1`, and no
+      route or environment variable is added to seed Builds — every Build in these specs is produced by the real
+      `app-build-prepare` path against APW-13's fake GitHub and stops **before** any build-provider call: 1. register the owner with `registerUserViaAPI` (APW-13 T6); 2. seed the fake GitHub through `/_control/seed` (APW-13 T2) with a repository whose `.works/works.yml` is either
+      APW-13's `missing-value.works.yml` profile (→ `missingBuildValues`) or a `dockerfile` spec with
+      `build.resources.memoryGiB: 12` on a private repository and no larger runner set (→ `runnerTooSmall`); 3. create the App Work with APW-13's `createAppWork` helper (T6); 4. `POST /api/works/:id/builds` without `commitSha`; 5. `expect.poll` on `GET /api/works/:id/builds/:buildId` until `status` is `blocked` and `blockedReason` is the
+      expected one.
+      These Builds stop in `app-build-prepare` steps 3–4 ([plan §7.2](./plan.md)), before `prepareRepository` or
+      `startBuild`, so the detail shows `providerRunId: null`. No `work_builds` row is inserted directly, and no seeding
+      route exists.
+      **Create** `apps/web/e2e/app-builds-tab.spec.ts` (list, URL-backed filters, drawer on a blocked Build, viewer sees
+      Rebuild and Cancel disabled, another account's Build id answers 404 on read, Rebuild and Cancel — ACC-05-24),
+      `apps/web/e2e/app-builds-failure.spec.ts` (the blocked `missingBuildValues` notice names the value — ACC-05-14;
+      `runnerTooSmall` shows both numbers — ACC-05-22), `apps/web/e2e/app-builds-a11y.spec.ts` (axe on the tab, on a
+      blocked Build's drawer, and on `BuildSettingsDialog` and `PullTokenDialog` opened without submitting; the keys `↑↓`,
+      `Enter`, `Esc` and `R` — ACC-05-25).
+      **Recorded move (APW-13 plan §8.3 — a path the fake switch cannot see leaves the PR lane).** The build plugin has its
+      own Octokit and GHCR clients, and T14 keeps them on `api.github.com` and `ghcr.io`, so provider-set failure classes
+      (ACC-05-17), copying the digest with `C`, pull-token validation and "Deploy blocked for a private image without a
+      token" (ACC-05-21) are **not** PR-lane e2e and no `app-builds-pull-token.spec.ts` is created. They are covered by
+      T13 and T27 (all 14 classes' copy; `C`), by T14, T16, T23 and T28 (pull token), and by APW-13 T59 live on dev
+      (failure classes against real Builds).
+      **Test**: `pnpm --filter ever-works-web test:e2e app-builds-` (the three specs above are the test).
+      **Done when**: all three pass locally and in the `e2e.yml` lane, every Build they create is `blocked` with
+      `providerRunId: null`, and rows use `getByTestId`.
 
 - [ ] **T31. Live acceptance wiring.**
       **Modify** `docs/specs/features/app-works/ACCEPTANCE.md` (the APW-05 table in §3 — coordinate with the file's owner) —
-      map `ACC-05-01…23`, `29` and `30` to the APW-13 harness scenario names and to **APW-13's** fixture branches of
-      `ever-works/app-fixture-hello` — the branches `variant/<name>`: `variant/build-oom`, `variant/services-postgres`,
-      `variant/missing-value`, `variant/secret-in-image`, `variant/dockerfile-error`, created by APW-13 T58 (the short
-      names used elsewhere in this epic map to `variant/<name>`; Resolution R-23: this epic references them and creates
-      none).
-      **Test**: `rg -n "ACC-05-(0[1-9]|1[0-9]|2[0-3]|29|30)" docs/specs/features/app-works/ACCEPTANCE.md` lists every id with
+      map `ACC-05-01…23`, `29`, `30`, **31** and **32** to the APW-13 harness scenario names and to **APW-13's** fixture
+      branches of `ever-works/app-fixture-hello` — the branches `variant/<name>`: `variant/build-oom`,
+      `variant/services-postgres`, `variant/missing-value`, `variant/secret-in-image`, `variant/dockerfile-error`,
+      **`variant/build-timeout` and `variant/disk-full`, which APW-13 T58 also creates for ACC-05-17's `timeout` and
+      `diskFull` cases** (short names used elsewhere in this epic map to `variant/<name>`; Resolution R-23: this epic
+      references them and creates none — `APW05-G23`). The failure class name in that mapping is `outOfMemory`, matching
+      spec §6.3 and ACC-05-17, never `out_of_memory`.
+      **Test**: `rg -n "ACC-05-(0[1-9]|1[0-9]|2[0-3]|29|30|31|32)" docs/specs/features/app-works/ACCEPTANCE.md` lists every
+      id with
       a scenario name, and `git ls-remote https://github.com/ever-works/app-fixture-hello` shows each referenced branch
       once APW-13 T58 has landed.
       **Done when**: every P1 ACC-05 id names a scenario and no APW-05 task creates a fixture branch.
@@ -555,6 +770,10 @@ false`, `max-parallel: 5`, checkout of the pull request head with `persist-crede
       step.
       **Modify** `packages/plugins/github-actions-build/src/workflow/generator.ts` and `src/workflow/inputs-hash.ts` — emit
       the job after `build` when `checks` is non-empty; add `checks` (with `commandSha256`) to the canonical inputs.
+      **Ownership (`APW05-G04`).** T41 and T42 are the **only** implementers of the `checks` job, and the single golden is
+      `src/__tests__/golden/checks.yml`; APW-08 T15 consumes the check runs and does not edit this generator, and no other
+      epic uses the name `app-checks-two.yml`. The trigger is same-repository pull requests into the tracked branch only —
+      no `push`, no `workflow_dispatch` (CONTRACTS §3's row is corrected to match FR-65 by this fix pass).
       **Test**: `packages/plugins/github-actions-build/src/__tests__/checks-job.spec.ts` — two checks (one advisory) → two
       matrix rows and the exact job name expression; the job's YAML contains `contents: read` and nothing else under
       `permissions`, no `secrets.` and no `EW_` token other than `EW_CHECK_COMMAND_B64`, no `cache-` key, no `needs:`; the
@@ -581,17 +800,29 @@ false`, `max-parallel: 5`, checkout of the pull request head with `persist-crede
       **Done when**: the three specs are green through their package commands.
 
 - [ ] **T43. Verification inputs from APW-07's ephemeral mode (Resolution R-10).**
-      **Modify** `packages/agent/src/app-builds/app-builds.service.ts` — `startVerification` asks
+      **Modify** `packages/agent/src/app-builds/app-builds.service.ts` — `startVerification(workId, { ref, sha,
+reuseImageDigest? }) → { buildId }` asks
       `APP_RUNTIME_ENV_SOURCE`'s ephemeral mode for the value-free runner recipe (APW-07 plan §4.6.1; typed fake until APW-07
-      lands), refuses with `missingBuildValues` when a required prompted name is unset, writes the per-run
-      `EW_VERIFY__PROMPTED` secret through the plugin, records `verifySecretNames`, passes `reuseImageDigest` when a
-      succeeded Build of the same commit has a confirmed digest, and dispatches `startBuild({ mode: 'verify', verification
-})`. **Modify** `packages/agent/src/app-builds/app-build-watch.runner.ts` and `app-build-sweep.service.ts` — delete the
+      lands), builds `components`, `dependencies`, `jobs` and `smoke` from `AppSpecService.getEffectiveSpec(workId, sha)`,
+      **validates the plan against [`verify-plan.schema.json`](./verify-plan.schema.json) with ajv before dispatch**
+      (`APW05-G11`), refuses with `missingBuildValues` when a required prompted name is unset, writes the per-run
+      `EW_VERIFY__PROMPTED` secret through the plugin **only when T46's approval gate passes** (`XC-01`), records
+      `verifySecretNames`, passes `reuseImageDigest` when a
+      succeeded Build of the same commit has a confirmed digest, **dispatches on the tracked branch after the bootstrap
+      file of plan §4.6 step 0 when the App Work has no workflow (`APW05-G02`)**, and
+      dispatches `startBuild({ mode: 'verify', verification, reuseImageDigest })`. **Modify**
+      `packages/agent/src/app-builds/app-build-watch.runner.ts` and `app-build-sweep.service.ts` — delete the
       per-run secret. **Modify** `packages/plugins/github-actions-build/src/github-actions-build.plugin.ts` — `getBuild`
       fills `BuildSnapshot.verification` `{ jobs[], componentsReady, smoke[] }` from the result artifact.
       **Test**: extend `packages/agent/src/app-builds/__tests__/app-builds.service.spec.ts` — the plan JSON contains the recipe
-      and no value from the env source fake (sentinel search); an unset required prompted name blocks before dispatch; a
-      reused digest skips the image build input; the verification Build is created with trigger `verification` and is never
+      and no value from the env source fake (sentinel search); **every generated plan validates against
+      `verify-plan.schema.json` and a plan over 60,000 characters or 12 GiB is refused before dispatch**; an unset required
+      prompted name blocks before dispatch; a reused digest sets `ew_reuse_digest` and leaves the plan with no `build`
+      section; **an App Work with no workflow and no applied spec delivers exactly one bootstrap commit and then dispatches
+      on the tracked branch with the proposal head sha, while a Link App Work blocks with `workflowPending` and the pull
+      request URL and dispatches nothing** (`APW05-G02`); **a verification Build's queued, running and terminal
+      transitions each call `APP_PROVISION_EVENTS_PORT.buildUpdated`, including a pre-dispatch `blocked` transition**
+      (`APW05-G11`); the verification Build is created with trigger `verification` and is never
       deployable (ACC-05-23). Extend `packages/plugins/github-actions-build/src/__tests__/run-observer.spec.ts` — the
       artifact's job and smoke rows become `verification` in the CONTRACTS §3 shape (ACC-05-23). Extend
       `app-build-watch.runner.spec.ts` and `app-build-sweep.service.spec.ts` — the per-run secret is deleted exactly once.
@@ -601,13 +832,21 @@ false`, `max-parallel: 5`, checkout of the pull request head with `persist-crede
 
 - [ ] **T44. Failure hand-off to agents in the user's words (FR-39, ACC-05-19).**
       **Create** `packages/contracts/src/apps/build-failure-copy.ts` — `APP_BUILD_FAILURE_COPY_EN` (14 classes, `{ title,
-suggestion }` templates with `{param}` placeholders equal to plan §8's `failure.<class>` leaves). **Modify**
-      `packages/contracts/src/apps/index.ts` (export) and `packages/agent/src/app-builds/app-build-failure-copy.ts` —
-      `forAgent(build)` → `{ class, title, suggestion, excerpt, logsUrl, untrusted: true }`, exported from
-      `packages/agent/src/app-builds/index.ts` for APW-08.
+suggestion }` templates with `{param}` placeholders equal to plan §8's `failure.<class>` leaves) **and the type
+      `AppBuildFailureHandoff { class; title; suggestion; excerpt: string[]; logsUrl: string | null; untrusted: true }`**
+      (`APW05-G12`). **Modify** `packages/contracts/src/apps/index.ts` (export) and
+      `packages/agent/src/app-builds/app-build-failure-copy.ts` —
+      `forAgent(build): AppBuildFailureHandoff` → `{ class, title, suggestion, excerpt, logsUrl, untrusted: true }`,
+      exported from
+      `packages/agent/src/app-builds/index.ts` for APW-08, with the rule that **no consumer re-fetches or re-redacts build
+      logs** (FR-38).
+      **Named consumer action (`APW05-G12`).** T27's "APW-08's action when present" is
+      `requestAppChangeAction({ workId, buildId, request? })` → `POST /api/works/:id/evolve` with the failed Build's
+      `buildId` preset in APW-08's `RequestChangeDialog`; hidden when APW-08 is absent or the viewer lacks edit access.
       **Test**: `packages/agent/src/app-builds/__tests__/app-build-failure-copy.spec.ts` — for a seeded `outOfMemory` Build
       with `{ memory: '7Gi', max: '14 GiB' }` the agent payload's title and suggestion equal the English UI copy of spec §6.3
-      with the same parameters, the excerpt equals the stored redacted excerpt, and `untrusted` is `true` (ACC-05-19).
+      with the same parameters, the excerpt equals the stored redacted excerpt, `untrusted` is `true` and the returned
+      object satisfies `AppBuildFailureHandoff` (ACC-05-19).
       `apps/web/src/lib/api/app-build-failure-copy.parity.unit.spec.ts` — for every class, the `en.json` leaves
       `dashboard.workDetail.builds.failure.<class>.title|suggestion` equal `APP_BUILD_FAILURE_COPY_EN` (ACC-05-19).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-build-failure-copy` and `pnpm --filter ever-works-web test --
@@ -615,20 +854,55 @@ suggestion }` templates with `{param}` placeholders equal to plan §8's `failure
 
 - [ ] **T45 (P1, lands with T4–T5; recheck with T34). Classify new tables for workspace backup (R-25).**
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain:
-      `{ file: 'builds.jsonl', entity: 'WorkBuild', scope: { by: 'parent', column: 'workId', from: 'workIds' } }`.
+      `{ file: 'builds.jsonl', entity: 'WorkBuild', scope: { by: 'parent', column: 'workId', from: 'workIds' } }` **and**
+      `{ file: 'build-preparations.jsonl', entity: 'WorkBuildPreparation', scope: { by: 'parent', column: 'workId', from:
+'workIds' } }` (`APW05-G03`).
       **Modify** `packages/agent/src/account-transfer/backup/redaction.ts` — `BACKUP_BENIGN_COLUMNS` gains `appSpecHash`
       (a digest of an App spec, which holds no secret values), `buildSecretNames` and `verifySecretNames` (secret names,
       never values), `secretsSyncedAt` (a timestamp) and `secretCheck` (a verdict); `ENTITY_DROPPED_COLUMNS` gains
       `WorkBuild: ['buildInputsHash']` (derived from the fingerprints of build values, meaningless outside this
-      workspace). Nothing joins `BACKUP_DROPPED_ENTITIES`; T34's `scanSummary`, `signatureState` and
+      workspace) and `WorkBuildPreparation: ['buildInputsHash']`. `WorkBuildPreparation.webhookId`, `runsEtag` and
+      `repositoryBlock` carry no secret value; nothing joins `BACKUP_DROPPED_ENTITIES`; T34's `scanSummary`,
+      `signatureState` and
       `blockedEgressHosts` need no entry.
-      **Test**: extend `packages/agent/src/account-transfer/backup/collectors/collectors.spec.ts` — `WorkBuild` is
-      referenced exactly once, in `works`, scoped `parent` on `workId` from `workIds`, not dropped; an
-      `EntityBackupCollector` over the `works` spec yields a fixture `WorkBuild` row with
-      `buildSecretNames: ['EW_DATABASE_URL']` intact and no `buildInputsHash` key.
+      **Test**: extend `packages/agent/src/account-transfer/backup/collectors/collectors.spec.ts` — `WorkBuild` and
+      `WorkBuildPreparation` are each referenced exactly once, in `works`, scoped `parent` on `workId` from `workIds`, not
+      dropped; an `EntityBackupCollector` over the `works` spec yields a fixture `WorkBuild` row with
+      `buildSecretNames: ['EW_DATABASE_URL']` intact and no `buildInputsHash` key, and a fixture `WorkBuildPreparation`
+      row with `webhookId`/`runsEtag` intact and no `buildInputsHash` key.
       **Done when**: `pnpm --filter @ever-works/agent test -- collectors redaction` is green — including the
       secret-shaped-column guard in `redaction.spec.ts` — and `data/works/builds.jsonl` in a backup with one Build has
       no `buildInputsHash` key.
+
+- [ ] **T46 (P1, lands with T8 and T10). Restricted build values on pull requests and verifications (`XC-01`, FR-71, FR-72).**
+      **Modify** `packages/plugins/github-actions-build/src/workflow/generator.ts` — with
+      `allowBuildValuesOnPullRequests` false (the default) a `fromEnv` build argument is emitted as
+      `<NAME>=${{ github.event_name == 'pull_request' && '<restricted literal>' || secrets.EW_<NAME> }}`, one fixed marker
+      per value name; the "Check build values" step's `EW_MISSING` check is emitted only for the non-pull-request path;
+      with the setting true, the previous unrestricted form is emitted unchanged (plan §4.7b).
+      **Modify** `packages/plugins/github-actions-build/src/settings.schema.ts` — the two new Work-scope booleans
+      `allowBuildValuesOnPullRequests` (default `false`) and `verificationPromptedValuesRequireApproval` (default `true`)
+      (T7 creates the file; this task adds the keys and their copy).
+      **Modify** `packages/agent/src/app-builds/app-builds.service.ts` — `startVerification` writes
+      `EW_VERIFY__PROMPTED` only when the verification-prompted-values gate of plan §4.7b passes (no build-affecting file
+      in the base→head diff, or the owner approved it), and records why it withheld the values on the Build so the detail
+      drawer can say **"Owner approval is needed before prompted values are used for this verification."** with **Review
+      the change**. The `verify` job references no stored `EW_<NAME>` at all — the value-free recipe is the only source.
+      **Modify** `apps/web/src/components/works/detail/builds/BuildSettingsDialog.tsx` and the new
+      `dashboard.workDetail.builds.settings.allowBuildValuesOnPullRequests`,
+      `…allowBuildValuesOnPullRequestsWarning` and `…verificationPromptedValuesRequireApproval` leaves in all 21
+      `apps/web/messages/*.json` files, plus a notice on the Build detail drawer.
+      **Test**: `packages/plugins/github-actions-build/src/__tests__/secret-mode.spec.ts` — the pull-request path renders
+      the restricted literal and contains **no** `secrets.EW_` reference while the push path keeps
+      `${{ secrets.EW_<NAME> }}` (ACC-05-31); `EW_MISSING` is absent from the pull-request path; the golden
+      `restricted-values` is byte-stable; `allowBuildValuesOnPullRequests: true` reproduces the unrestricted golden byte
+      for byte. Extend `packages/agent/src/app-builds/__tests__/app-builds.service.spec.ts` — a prompted name is withheld
+      when the diff touches a `Dockerfile`, and delivered when the owner approved the diff or the flag is false
+      (ACC-05-32); a sentinel search proves the stored value is absent from the plan, the dispatch inputs and every log
+      line.
+      **Done when**: `pnpm --filter @ever-works/github-actions-build-plugin test -- secret-mode generator` and
+      `pnpm --filter @ever-works/agent test -- app-builds.service` are green, and ACC-05-31's honeypot leaves the canary
+      sink empty on the injection fixture.
 
 ---
 

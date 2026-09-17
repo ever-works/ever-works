@@ -18,13 +18,21 @@
   (an observable, checkable condition).
 - "Done when" is stated explicitly for every task and is checkable without reading the diff.
 - Add new tasks at the bottom of their phase rather than renumbering — APW-01 references T1–T8 (P0), T9–T34 (P1),
-  T15, T27, T43 and T44. T43–T44 were added by the program audit.
+  T15, T27, T43 and T44. T43–T44 were added by the program audit; T46–T51 by the 2026-09-17 audit pass.
 - Phase boundaries are ship boundaries: `develop` must be green and deployable at the end of each phase.
 - **P0 is independently shippable** on branch `feat/apw-02-fork-lifecycle-p0` and touches no table, route, job or UI;
   P1 ships on `feat/apw-02-fork-lifecycle`.
 - **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
   applied here: R-1 (T11), R-2 (T15), R-4 (T43), R-8 (T30, T36), R-14 (T2 — generic fixtures only), R-21 (T23), R-22
   (no suite under `apps/api/test/`).
+- **Prerequisites.** **P0: none — it is Wave 0 and ships alone.** **P1: APW-03 P1** (T1's contracts barrel and
+  T12's `AppSpecService.getEffectiveSpec` / `AppSpecAppliedEvent`) **and APW-03 P2's seam** (T24 `AppsCatalogService`,
+  T26's adapter) for T26/T28's spec reads, **APW-06 T1–T3** (`packages/agent/src/app-runtime/ports.ts` and the
+  `IDeploymentPlugin` App additions) for T28's proxies, and **APW-03 P3's `AppLicenseService`** (its T42) for the
+  license leg. The license and tier services are injected `@Optional()`; where a `ports.ts` file does not exist yet,
+  the task that needs it **creates it from CONTRACTS §3 verbatim** and APW-06 T3 modifies it — nothing here removes
+  what APW-06 declared. This epic creates `packages/agent/src/app-works/`, which APW-01 T11 and every later epic
+  build on, so **T15 lands before APW-01 T11** in the program merge order.
 - Unit and controller tests never call GitHub. Live behaviour is pinned once by the contract probe (T42) against a
   throwaway repository in a test organization, and by APW-13's suite.
 - Test commands run from the monorepo root unless a task says otherwise: plugin
@@ -357,6 +365,15 @@ limit)`, `findUnavailableDueForRecheck(nowMs, limit)`, `claimSetupPullRequestChe
       effective spec, with the documented defaults when the block or the field is absent.
       **Create** `packages/agent/src/app-works/app-upstream-sync.service.ts` — `run(payload)` per [plan §6.3](./plan.md)
       with `DistributedTaskLockService`, a `ProviderCallBudget` wrapper, `AppLicenseService` (`@Optional()`, APW-03).
+      **The per-App-Work claim is taken API-side, not in the worker**: `run` does **not** call
+      `DistributedTaskLockService` itself — it calls `AppUpstreamStateService.beginSync(workId)`, a remote-proxied
+      atomic conditional update on the new `syncLeaseUntil` column that returns allowed/denied, and
+      `finishSync(workId)` releases it. `DistributedTaskLockService` needs `@InjectRepository(CacheEntry)` and a
+      callback cannot cross the SuperJSON remote proxy, and the worker imports no database module — so the lock
+      cannot live there. `AppLicenseService` is reached the same way: through a **remote proxy named in T28** (the
+      API-side `AppUpstreamStateService` also exposes `requestLicenseEvaluation(workId, reason)`), so a missing
+      binding can never silently skip FR-37. `AppLicenseService.request(workId, reason)` gains its reason union in
+      CONTRACTS §2A as part of this task's PR.
       **Create** `packages/agent/src/app-works/app-upstream-conflict.copy.ts` — the spec §6.3 templates.
       **Test**: **create** `packages/agent/src/app-works/__tests__/upstream-schedule.spec.ts` and
       `packages/agent/src/app-works/__tests__/app-upstream-sync.service.spec.ts` — lock not acquired; archived/unavailable/
@@ -463,10 +480,15 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
 
 - [ ] **T33. `app-upstream-sync` task.**
       **Create** `packages/tasks/src/tasks/trigger/app-upstream-sync.task.ts` — `maxDuration: 1_800`.
-      **Modify** `packages/tasks/src/tasks/trigger/index.ts` and
-      `packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts` — export / provide `AppUpstreamSyncService`.
+      **Modify** `packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts` — export / provide
+      `AppUpstreamSyncService`. **It builds because it needs no database and no callback**: the per-Work claim is
+      `AppUpstreamStateService.beginSync/finishSync` through the T28 remote proxy, and the license leg is
+      `requestLicenseEvaluation` on the same proxy. Do not import a database module and do not inject
+      `DistributedTaskLockService` here.
       **Test**: **create** (new directory) `packages/tasks/src/tasks/trigger/__tests__/app-upstream-sync.task.spec.ts` —
-      payload forwarded to `AppUpstreamSyncService.run`; drained credentials skip.
+      payload forwarded to `AppUpstreamSyncService.run`; drained credentials skip; the worker module spec asserts the
+      module compiles with no database module, that `beginSync` is reached through the remote proxy, and that a
+      denied claim makes no provider call.
       **Done when**: `cd packages/tasks && npx vitest run src/tasks/trigger/__tests__/app-upstream-sync.task.spec.ts` is green.
 
 - [ ] **T34. `app-upstream-sync-dispatcher` cron.**
@@ -608,6 +630,154 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       and a backup of a workspace holding one App Work lists `data/works/upstream-states.jsonl` with one record in
       `manifest.json`.
 
+## P1.10 — Audit-pass additions (2026-09-17): automation, completion and closed sets
+
+- [ ] **T46. The workflow-change hold on the sync path (FR-60, FR-61 — ACC-02-24).**
+      **Create** `packages/agent/src/app-works/upstream-workflow-diff.ts` — a pure
+      `workflowChanges(compareFiles): { paths: string[]; truncated: boolean }` over the compare result, matching
+      `.github/workflows/**` at any depth (case-insensitive) and capping the reported paths at 100.
+      **Modify** `packages/agent/src/app-works/app-upstream-sync.service.ts` — in plan §6.3, **before** the
+      fast-forward decision and **before** the push to `ever-works/upstream-sync`: when `workflowChanges` is
+      non-empty, do not fast-forward and do not push; persist `syncState = 'held_for_workflow_review'` with the
+      changed paths, emit **no** `app.upstream.synced`, and return. The manual path, the scheduled path and any retry
+      all take the same branch — there is no flag that skips it. When the member confirms (T47's route), the sync
+      runs with the confirmation recorded; the Activity entry carries paths and counts only, never file content.
+      **Modify** `apps/api/src/app-works/app-upstream.controller.ts` and
+      `apps/api/src/works/dto/app-upstream.dto.ts` (created by T27) — `POST /api/works/:id/upstream/sync` accepts an
+      optional `confirmWorkflowChanges: true`, refused with `409 workflow_confirmation_required` when the hold is
+      active and the flag is absent; the refusal body names the changed paths.
+      **Modify** `apps/web/src/components/works/app/AppUpstreamCard.tsx` (T30) — the hold row with **Review the
+      changes** and **Sync anyway**, wired to the same action with the flag set.
+      **Test**: **create** `packages/agent/src/app-works/__tests__/upstream-workflow-diff.spec.ts` (nested paths,
+      case, the 100-path cap) and extend
+      `packages/agent/src/app-works/__tests__/app-upstream-sync.service.spec.ts` — an incoming range that touches a
+      workflow file performs **zero** fast-forward calls and **zero** pushes to `ever-works/upstream-sync`, while a
+      range that does not touch one behaves exactly as before; confirming then performs the push once; a
+      provider double proving no workflow-creating push happened before confirmation (ACC-02-24). Extend
+      `apps/api/src/app-works/app-upstream.controller.spec.ts` — the missing flag is `409` with the paths, the flag
+      proceeds. Extend `apps/web/src/components/works/app/AppUpstreamCard.unit.spec.tsx` — the hold row renders and
+      **Sync anyway** sends the flag (ACC-02-24).
+      **Done when**: the four specs are green and no test path can push a workflow-carrying range without the
+      confirmation.
+
+- [ ] **T47. Merged sync pull request finishes the sync (FR-62 — ACC-02-26).**
+      **Modify** `packages/agent/src/entities/work-upstream-state.entity.ts` (T12), the migration (T13) and
+      `packages/agent/src/database/repositories/work-upstream-state.repository.ts` (T14) — one new nullable
+      `syncPullRequestCheckedAt: Date` column and `claimSyncPullRequestChecks(nowMs, minIntervalMs, limit)`
+      mirroring `claimSetupPullRequestChecks`.
+      **Create** `packages/agent/src/app-works/app-upstream-sync-pr.service.ts` — `checkSyncPullRequest(workId)`:
+      `getPullRequestStatus` for `syncPullRequestNumber`, stamp `syncPullRequestCheckedAt`; **merged** ⇒ dispatch
+      `app-upstream-sync` with `{ trigger: 'merged', mergedSha }`; **closed unmerged** ⇒ clear the pull-request
+      fields and record `syncState = 'pull_request_closed'` without touching the tracked branch.
+      **Modify** `packages/agent/src/app-works/app-upstream-sync.service.ts` — `trigger: 'merged'` runs the finish
+      path and **not** the compare-and-open path: set `lastSyncedUpstreamSha` from the pull request's head and
+      `lastSyncCommitCount` from the compare, clear `syncPullRequestNumber/Url/branch`, run
+      `AppActionsHygieneService.apply` for the range only when the range changed a workflow file, and
+      `AppLicenseService.request(workId, 'upstream_merged')`, each exactly once — guarded by a state compare so a
+      re-dispatch is a no-op.
+      **Modify** `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts` (T28) — call
+      `claimSyncPullRequestChecks(now, 600_000, 50)` per tick beside the setup-pull-request checks.
+      **Test**: extend `packages/agent/src/app-works/__tests__/app-upstream-sync.service.spec.ts` (merged ⇒ sha,
+      count, cleared fields, hygiene and license once; a second dispatch changes nothing; closed-unmerged ⇒ fields
+      cleared and no hygiene) and
+      `packages/agent/src/app-works/__tests__/app-upstream-sync-dispatcher.service.spec.ts` (≤ 50 checks per tick,
+      the interval honoured), and extend `apps/api/src/app-works/app-upstream.controller.spec.ts` (`GET` fires the
+      check in the background when a sync pull request is open and the stamp is older than 60 000 ms) — ACC-02-26.
+      **Done when**: the three specs are green and the Upstream card no longer shows "Not synced yet" after a merged
+      sync pull request.
+
+- [ ] **T48. Private-copy divergence and sync through a plugin capability (FR-63 — ACC-02-27).**
+      **Modify** `packages/plugin/src/contracts/capabilities/git-provider.app-forks.ts` (T9) and
+      `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` (T10) — add the optional
+      `getRepositoryCopyDivergence?`: it takes the source and target coordinates plus `maxCommits`, and returns
+      `aheadBy`, `behindBy`, `upstreamHeadSha` and a `capped` flag, with JSDoc stating the caller must materialise
+      it first.
+      **Modify** `packages/plugins/github/src/github-api.service.ts` and
+      `packages/plugins/github/src/github.plugin.ts` — implement it with `GitOperations` (`fetch` into an isolated
+      `cloneBranch` working copy, `findMergeBase`, capped `log`); **Create** the facade wrapper in
+      `packages/agent/src/facades/git.facade.ts` (T22) that throws `GitOperationNotSupportedError` when the plugin
+      lacks it.
+      **Modify** `packages/agent/src/app-works/app-upstream-sync.service.ts` — the private-copy branch of plan §6.3
+      calls the facade method for the counts and reuses
+      `createRepositoryCopy({ branchName: 'ever-works/upstream-sync' })` for the push; **no agent-package code
+      invokes git directly** (Constitution I).
+      A provider without the capability ends in `syncState = 'provider_unsupported'` with its copy, not a crash.
+      **Test**: extend `packages/plugins/github/src/__tests__/github-api.service.fork-sync.spec.ts` with a
+      `GitOperations` double (ahead/behind direction, the `10000+` cap, `capped: true`) and
+      `packages/agent/src/facades/__tests__/git.facade.app-forks.spec.ts` (absent ⇒ throws); extend
+      `packages/agent/src/app-works/__tests__/app-upstream-sync.service.spec.ts` — a private copy syncs through the
+      capability with the counts from it, and a provider without it pauses with `provider_unsupported`
+      (ACC-02-27).
+      **Done when**: `git grep -n "isomorphic-git" packages/agent/src/app-works` returns nothing and the three
+      specs are green.
+
+- [ ] **T49. Sync settings come from the App spec (FR-64 — ACC-02-28).**
+      **Modify** `packages/agent/src/app-works/upstream-schedule.ts` (T26) — read every field from APW-03's
+      effective spec through `AppSpecService.getEffectiveSpec(workId, branch)`; `enabled: false` ⇒ `nextSyncAt`
+      stays `null` and the dispatcher never selects the row (manual **Sync now** still works), with
+      `lastSyncReason = 'disabled_by_spec'` recorded; `branch` names the branch compared and merged, and FR-43's
+      rename rule applies **only** when the branch was defaulted; the tracked branch is `spec.source.branch`.
+      **Create** `apps/api/src/app-works/app-spec-applied.listener.ts` — an `@OnEvent('app.spec.applied')` handler
+      **in the API process** that recomputes `syncSchedule` and `nextSyncAt` when `changedBlocks` includes
+      `upstreamSync` or `source`, and re-dispatches nothing else.
+      **Modify** `apps/api/src/app-works/app-works.module.ts` (T27) — register the listener; the agent
+      `AppWorksModule` exports what it needs.
+      **Test**: extend `packages/agent/src/app-works/__tests__/upstream-schedule.spec.ts` — the four field cases,
+      including `enabled: false` ⇒ `null` and a configured `branch`; **create**
+      `apps/api/src/app-works/__tests__/app-spec-applied.listener.spec.ts` — the schedule is recomputed for an
+      `upstreamSync` or `source` change and left alone for any other block; extend
+      `packages/agent/src/app-works/__tests__/app-upstream-sync.service.spec.ts` — a configured sync branch is the
+      branch compared and merged (ACC-02-28).
+      **Done when**: the three specs are green and `git grep -n "EVER_WORKS_APP_UPSTREAM" packages/agent/src` finds
+      no environment fallback for these settings.
+
+- [ ] **T50. Closed sets for readiness failure reasons, sync results and warning codes (FR-65 — ACC-02-29).**
+      **Modify** `packages/contracts/src/apps/app-upstream.ts` (T11) — add `APP_READINESS_FAILURE_REASONS`,
+      `APP_SYNC_REASONS` and `APP_UPSTREAM_WARNING_CODES` as `as const` tuples with their union types, one member
+      per state: readiness `access_revoked` · `dispatch_unavailable` · `copy_refused` · `too_large` ·
+      `provider_unsupported` · `timed_out` · `setup_pull_request_closed` · `handler_failed` · `blueprint_apply_failed`
+      · `data_repository_missing`; sync results `up_to_date` · `fast_forwarded` · `pull_request_opened` ·
+      `pull_request_updated` · `pull_request_merged` · `pull_request_closed` · `conflict` · `held_for_workflow_review`
+      · `skipped_rate_limited` · `skipped_budget` · `license_worse` · `disabled_by_spec` · `paused` ·
+      `provider_unsupported` · `failed`; warnings the ten spec §6.2 rows, camelCased. `AppUpstreamStateResponse`
+      gains `readinessHandlerReason?: { code: string; permission?: string }` and every `warnings[]` entry carries
+      `code: AppUpstreamWarningCode`. A provider failure is reported through the typed provider reason, never as
+      `handler_failed:<code>`.
+      **Modify** `packages/agent/src/app-works/app-upstream-state.service.ts` (T23) and
+      `app-upstream-sync.service.ts` (T26) — write only members of those unions, and map every `GitProviderErrorReason`
+      onto the matching member.
+      **Modify** `apps/web/src/lib/work-kinds/app-upstream.ts` **(new)** — one camelCase i18n leaf per member of each
+      union, and `AppUpstreamCard`/`AppUpstreamWarnings` read through it, so `app-upstream-warning-<code>` test ids
+      and the leaf names derive from the same value.
+      **Test**: extend `packages/contracts/src/apps/__tests__/app-upstream.spec.ts` — the three tuples pinned
+      (append-only snapshot) and every member maps to an i18n leaf; extend
+      `apps/web/src/components/works/app/app-upstream-messages.unit.spec.ts` (T35) — one leaf per member exists in
+      all 21 locales and no leaf contains `.`; extend the sync and state service specs — every failure path writes a
+      member and none writes a composed string (ACC-02-29).
+      **Done when**: the four specs are green and the union sizes are asserted, not described.
+
+- [ ] **T51. A gated fork gets exactly the build workflow enabled (FR-66 — ACC-02-30).**
+      **Modify** `packages/agent/src/app-works/app-actions-hygiene.service.ts` (T25) — after the disabling pass,
+      read the workflow list for the platform's own path (`ever-works-build.yml`, `.github/workflows/`) and its
+      `state`; when the provider reports the fork's workflows as gated and that workflow is not `active`, call
+      `setActionsPermissions` with `enableWorkflows: ['<the build workflow path>']` — **exactly that one path, never
+      an inherited workflow, never a second one** — and record `buildWorkflowEnabled: true` on the state row.
+      `FR-25`/`FR-26` are unchanged: every inherited workflow is still disabled and nothing else is enabled.
+      **Modify** `packages/agent/src/entities/work-upstream-state.entity.ts` (T12) and the migration (T13) — one
+      nullable boolean `buildWorkflowEnabled`.
+      **Modify** the live contract probe `packages/plugins/github/src/__tests__/contract/app-forks.contract.ts`
+      (T42) — **create a small repository that ships workflows, fork it, push a new push-triggered workflow through
+      the API, and record whether it runs and whether an explicit enable call was required**; the recorded
+      responses land as fixtures under `packages/plugins/github/src/__tests__/fixtures/app-forks/`, and the finding
+      is written into APW-05's spec (a proposed change, since APW-05 is another epic's file) as the answer to
+      "does the first Build on a fresh fork start?".
+      **Test**: extend `packages/agent/src/app-works/__tests__/app-actions-hygiene.service.spec.ts` — a gated fork
+      enables exactly one path, an ungated fork makes no enable call, and the manifest of the `enableWorkflows`
+      argument equals exactly one entry in every case (ACC-02-30); the probe spec is skipped unless its two
+      environment variables are set, exactly as today.
+      **Done when**: the hygiene spec is green with the one-path assertion and the probe's recorded result is
+      committed as a fixture with its verdict written down.
+
 ---
 
 ## Definition of Done
@@ -620,6 +790,8 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
   resolves a merge conflict (asserted by the sync service and state service specs' provider doubles recording every write).
 - `work_upstream_states` migrates forward and back cleanly; the dispatcher arity is 16 (14 on `e5f43f44d` plus two).
 - Exactly one Upstream tab and route exist; APW-09 adds a section to it, never a second tab.
-- ACC-02-01 … ACC-02-23 are each covered by an automated test here or listed as a live scenario in
+- ACC-02-01 … ACC-02-30 are each covered by an automated test here or listed as a live scenario in
   [ACCEPTANCE.md](../ACCEPTANCE.md) for APW-13.
+- A workflow-carrying upstream range can never fast-forward and can never reach the sync branch without the
+  member's confirmation (asserted by the sync spec's provider double recording every write).
 - Every gate in [plan §12](./plan.md) is confirmed, and its carried-forward gaps are still recorded there.

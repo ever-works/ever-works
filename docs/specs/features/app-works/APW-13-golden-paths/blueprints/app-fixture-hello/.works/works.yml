@@ -71,7 +71,7 @@ spec:
 
   env:
     - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
-    - { name: SMTP_HOST, from: deps.smtp.host } # TODO(verify, APW-07): smtp output names
+    - { name: SMTP_HOST, from: deps.smtp.host } # verified: APW-07 plan §4.6.2 (`APP_DEPENDENCY_OUTPUTS`) names host, port, user, password, from and secure
     - { name: SMTP_PORT, from: deps.smtp.port }
     - { name: SMTP_USER, secret: true, from: deps.smtp.user }
     - { name: SMTP_PASSWORD, secret: true, from: deps.smtp.password }
@@ -104,6 +104,10 @@ spec:
       command: ['node', 'src/bootstrap.mjs']
       timeoutSeconds: 120
 
+  # `*/2` is what ACC-E2E-05 needs: a tick that an acceptance lane can observe without waiting five minutes.
+  # It is NOT eligible for managed hosting — `ever-works-apps` refuses a schedule that fires more often than
+  # every 5 minutes (`cron_too_frequent`, APW-06 plan §4.9) and the zone CRD requires ≥ 5 minutes (APW-10 plan) —
+  # so the managed-tier variant is a profile in `profiles/`, generated from this base spec (see ../README.md).
   cron:
     - {
         name: tick,

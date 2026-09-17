@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="App Provisioner">
+  <title>App Provisioner</title>
+  <!-- DRAFT — ever-works/agents -> templates/app-provisioner/icon.svg (catalog avatar, matches avatarIcon: package-check). -->
+  <path d="M12 2.5 20 7v10l-8 4.5L4 17V7z" />
+  <path d="M4 7l8 4.5L20 7" />
+  <path d="M12 11.5V21.5" />
+  <path d="M8.5 12.6l2.5 2.6 4.5-5" />
+</svg>

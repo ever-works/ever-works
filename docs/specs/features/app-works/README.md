@@ -3,14 +3,24 @@
 **Program ID:** `app-works` (epic prefix `APW`)
 **Status:** `Draft`
 **Created:** 2026-09-17
-**Authored against:** `origin/develop` @ `a655b53ca` · **Verified against:** `develop` @ `e5f43f44d` (2026-09-17)
+**Authored against:** `origin/develop` @ `a655b53ca` · **Verified against:** `develop` @ `873274c9f` (2026-09-17; previously `e5f43f44d`, and `ee45946e5` for the first re-verification — see [EXISTING-SUBSTRATE](./EXISTING-SUBSTRATE.md) for what each pass re-checked)
 **Audience:** Product, Engineering (backend, frontend, platform/infra), Design
 **Governance:** [Spec Kit](../../README.md) · [Constitution](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)
 **Companion documents:** [BUILD-READINESS.md](./BUILD-READINESS.md) (**start here to build it** — what is
 decided, fixed, built and still missing) · [EXISTING-SUBSTRATE.md](./EXISTING-SUBSTRATE.md) (what already ships,
 with file evidence) · [TRACKER.md](./TRACKER.md) (status) · [ACCEPTANCE.md](./ACCEPTANCE.md) (the end-to-end
-acceptance suite for the whole program) · [`_build-artifacts/`](./_build-artifacts/) (the artifacts the program
-described but never produced)
+acceptance suite for the whole program) · [CONTRACTS.md](./CONTRACTS.md) (the normative cross-epic contracts,
+including resolutions R-1…R-39 and the flag, quota, notification, threat and signal registers) ·
+[CLARIFICATIONS.md](./CLARIFICATIONS.md) (one row per open `[NEEDS CLARIFICATION]` marker, who decides and which
+wave it blocks) · [CONFIGURATION.md](./CONFIGURATION.md) (every environment variable, flag and catalog pin, per
+environment) · [data-model.md](./data-model.md) (one place for the tables the epics add) ·
+[GITHUB-PERMISSIONS.md](./GITHUB-PERMISSIONS.md) (the permission and event matrix every live GitHub call needs) ·
+[THREAT-MODEL.md](./THREAT-MODEL.md) (trust boundaries, threats and their controls) ·
+[quickstart.md](./quickstart.md) (run the suites locally) · [checklists/requirements.md](./checklists/requirements.md)
+(what `Reviewed` and `Approved` mean for a spec) · [DOCS-PLAN.md](./DOCS-PLAN.md) (where the user docs publish) ·
+[JIRA-DRAFT.md](./JIRA-DRAFT.md) (the epic and story drafts) · [`contracts/`](./contracts/) (OpenAPI and
+agent-surface contracts) · [`_build-artifacts/`](./_build-artifacts/) (the artifacts the program described but
+never produced)
 
 ---
 
@@ -52,42 +62,42 @@ deploy, never write" guarantee (EW-766). Where a new noun is genuinely required,
 
 ## 1. Vocabulary — no new synonyms
 
-| Concept                                                                           | Canonical noun                                                                                                  | Do **not** introduce                                           |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| A Work whose code is a repository that Ever Works builds, runs and evolves        | **App Work** — a Work of kind **`app`** (chip label **App**) — **NEW kind**, justified in APW-01                | "project", "application instance", "service", "deployment"     |
-| A Work that only wraps an existing repository (no fork, no build, no deploy)      | **Repository Work** (`repo`, existing, unchanged)                                                               | —                                                              |
-| The repository the user pointed at, when it belongs to someone else               | **Upstream** (repository)                                                                                       | "source", "origin", "parent" in UI copy                        |
-| The user's copy on GitHub                                                         | **Fork** (a GitHub fork) or **Private copy** (a non-fork duplicate) — both are the App Work's **Work Repository** (see the repository-role note below) | "clone" as a UI noun, "mirror"                                 |
-| How to build and run the software                                                 | **App spec** — the `spec` block of `.works/works.yml` for kind `app` (existing file, existing "kind spec" idea) | "recipe", "preset", "manifest", "compose file" as the noun     |
-| A curated, ready-made App spec for a known open-source project                    | **App Blueprint** — a [Work Blueprint](../../../features/work-blueprints.md) whose kind is `app`                | "preset", "template" (Templates are Website/Work Templates)    |
-| The catalog listing App Blueprints                                                | **Apps catalog** — the listing in **`ever-works/templates`** (a runtime-loaded listing, ADR-014; renamed from `ever-works/apps` on 2026-09-17 — the noun "Apps catalog" is unchanged) | "marketplace" (reserved for EW-299), "store"                   |
-| The repository holding one App Blueprint                                          | **Blueprint repository** — `ever-works/<app>-template`                                                          | —                                                              |
-| The agent that studies a repository and writes its App spec                       | an **Agent** created from the **App Provisioner** agent template, using the **`provision-app` Skill**           | "provisioning bot", "deployer agent" as entities               |
-| Producing a container image from a commit                                         | **Build** (`WorkBuild`) — **NEW entity**, justified in APW-05                                                   | "pipeline run", "CI job" as the noun                           |
-| Putting a built image live                                                        | **Deployment** (existing `WorkDeployment`)                                                                      | "release", "rollout" as the noun                               |
-| Where an App Work runs                                                            | **Deploy target**: **None**, **Your cluster** (custom kubeconfig), **Ever Works Apps** (managed, gated)         | "hosting plan", "environment" (Environments = agent sandboxes) |
+| Concept                                                                           | Canonical noun                                                                                                                                                                                                                          | Do **not** introduce                                                   |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| A Work whose code is a repository that Ever Works builds, runs and evolves        | **App Work** — a Work of kind **`app`** (chip label **App**) — **NEW kind**, justified in APW-01                                                                                                                                        | "project", "application instance", "service", "deployment"             |
+| A Work that only wraps an existing repository (no fork, no build, no deploy)      | **Repository Work** (`repo`, existing, unchanged)                                                                                                                                                                                       | —                                                                      |
+| The repository the user pointed at, when it belongs to someone else               | **Upstream** (repository)                                                                                                                                                                                                               | "source", "origin", "parent" in UI copy                                |
+| The user's copy on GitHub                                                         | **Fork** (a GitHub fork) or **Private copy** (a non-fork duplicate) — both are the App Work's **Work Repository** (see the repository-role note below)                                                                                  | "clone" as a UI noun, "mirror"                                         |
+| How to build and run the software                                                 | **App spec** — the `spec` block of `.works/works.yml` for kind `app` (existing file, existing "kind spec" idea)                                                                                                                         | "recipe", "preset", "manifest", "compose file" as the noun             |
+| A curated, ready-made App spec for a known open-source project                    | **App Blueprint** — a [Work Blueprint](../../../features/work-blueprints.md) whose kind is `app`                                                                                                                                        | "preset", "template" (Templates are Website/Work Templates)            |
+| The catalog listing App Blueprints                                                | **Apps catalog** — the listing in **`ever-works/templates`** (a runtime-loaded listing, ADR-014; renamed from `ever-works/apps` on 2026-09-17 — the noun "Apps catalog" is unchanged)                                                   | "marketplace" (reserved for EW-299), "store"                           |
+| The repository holding one App Blueprint                                          | **Blueprint repository** — `ever-works/<app>-template`                                                                                                                                                                                  | —                                                                      |
+| The agent that studies a repository and writes its App spec                       | an **Agent** created from the **App Provisioner** agent template, using the **`provision-app` Skill**                                                                                                                                   | "provisioning bot", "deployer agent" as entities                       |
+| Producing a container image from a commit                                         | **Build** (`WorkBuild`) — **NEW entity**, justified in APW-05                                                                                                                                                                           | "pipeline run", "CI job" as the noun                                   |
+| Putting a built image live                                                        | **Deployment** (existing `WorkDeployment`)                                                                                                                                                                                              | "release", "rollout" as the noun                                       |
+| Where an App Work runs                                                            | **Deploy target**: **None**, **Your cluster** (custom kubeconfig), **Ever Works Apps** (managed, gated)                                                                                                                                 | "hosting plan", "environment" (Environments = agent sandboxes)         |
 | The infrastructure a deploy target actually resolves to                           | **Deploy shape** — shared cluster · internal cluster · customer kubeconfig · connected Ever Works machine · SSH host · provider plugin. **A family, additive only** (R-27, [`deploy-shapes.md`](./APW-06-app-runtime/deploy-shapes.md)) | "the cluster" as if there were one, and any wording that drops a shape |
-| A database, cache or bucket the app needs                                         | **App dependency** (declared in the App spec, provisioned per App Work)                                         | "addon", "resource", "sidecar"                                 |
-| Bringing upstream changes into the fork                                           | **Upstream sync**                                                                                               | "rebase job", "update"                                         |
-| A pull request opened against the upstream repository                             | **Upstream pull request**                                                                                       | "contribution" as an entity                                    |
-| The cross-platform switcher (Ever Works, Gauzy, Teams, Rec, the user's App Works) | **App Launcher**                                                                                                | "switcher" (Organization/Work switchers exist), "selector"     |
-| One identity across Ever platforms                                                | **Ever ID** (single sign-on)                                                                                    | "Ever account", "global login"                                 |
-| An Ever ID sign-in linked to an Ever Works account                                | **Connected identity** (`ExternalIdentity`) — **NEW entity**, justified in APW-12                               | "linked account", "federated user"                             |
-| One App Provisioner attempt on an App Work (steps, attempts, evidence)            | **App provisioning** (`WorkAppProvisioning`) — **NEW entity**, justified in APW-04                              | "provisioning job", "setup run" as nouns                       |
-| The checklist that must be green before Ever Works Apps accepts user code         | **Launch gate** (items `LG-01`…`LG-25`, APW-10)                                                                 | "go-live checklist", "readiness review"                        |
-| Stopping one App Work's workloads and network on Ever Works Apps                  | **Quarantine** (APW-10; distinct from the platform stop flag and Agent/workspace pauses — Resolution R-20)      | "kill switch" for a single App Work, "suspend"                 |
-| A unit of delegated work / an initiative / an execution / a capability            | **Task** / **Mission** / **Run** / **Skill** (existing — see the Agent Workspace vocabulary)                    | —                                                              |
+| A database, cache or bucket the app needs                                         | **App dependency** (declared in the App spec, provisioned per App Work)                                                                                                                                                                 | "addon", "resource", "sidecar"                                         |
+| Bringing upstream changes into the fork                                           | **Upstream sync**                                                                                                                                                                                                                       | "rebase job", "update"                                                 |
+| A pull request opened against the upstream repository                             | **Upstream pull request**                                                                                                                                                                                                               | "contribution" as an entity                                            |
+| The cross-platform switcher (Ever Works, Gauzy, Teams, Rec, the user's App Works) | **App Launcher**                                                                                                                                                                                                                        | "switcher" (Organization/Work switchers exist), "selector"             |
+| One identity across Ever platforms                                                | **Ever ID** (single sign-on)                                                                                                                                                                                                            | "Ever account", "global login"                                         |
+| An Ever ID sign-in linked to an Ever Works account                                | **Connected identity** (`ExternalIdentity`) — **NEW entity**, justified in APW-12                                                                                                                                                       | "linked account", "federated user"                                     |
+| One App Provisioner attempt on an App Work (steps, attempts, evidence)            | **App provisioning** (`WorkAppProvisioning`) — **NEW entity**, justified in APW-04                                                                                                                                                      | "provisioning job", "setup run" as nouns                               |
+| The checklist that must be green before Ever Works Apps accepts user code         | **Launch gate** (items `LG-01`…`LG-25`, APW-10)                                                                                                                                                                                         | "go-live checklist", "readiness review"                                |
+| Stopping one App Work's workloads and network on Ever Works Apps                  | **Quarantine** (APW-10; distinct from the platform stop flag and Agent/workspace pauses — Resolution R-20)                                                                                                                              | "kill switch" for a single App Work, "suspend"                         |
+| A unit of delegated work / an initiative / an execution / a capability            | **Task** / **Mission** / **Run** / **Skill** (existing — see the Agent Workspace vocabulary)                                                                                                                                            | —                                                                      |
 
 > **Repository roles — read before using the words "data repository" (added 2026-09-17).** A Work has up to three
 > repositories, and their roles are **already persisted** as `RepositoryRole = 'data' | 'work' | 'website'`
 > (`packages/contracts/src/api/work/import-source.dto.ts:12`). The mapping is documented in the platform itself
 > (`packages/contracts/src/domain/work-capabilities.ts:40-49`) and is easy to get wrong:
 >
-> | Role (persisted, do not rename) | Default name | UI label | What it holds |
-> | ------------------------------- | ------------ | -------- | ------------- |
-> | `data`                          | `<slug>-data`     | **"Work Repository"**        | The Work's **data** (content items, SEO/meta-data, setup parameters) |
-> | `website`                       | `<slug>-website`  | **"Work Repository"**        | The **app code / template output** — "not always a website". The owner's decision (2026-09-17) allows an **optional `-app` suffix alongside `-website`**, chosen by template type; the role itself is unchanged — **suffix only, no new persisted value** |
-> | `work`                          | `<slug>`          | **"{provider} Repository"**  | The GitHub-facing repository: the **generated output** (the "awesome" repo people star), **never deployed** |
+> | Role (persisted, do not rename) | Default name     | UI label                    | What it holds                                                                                                                                                                                                                                             |
+> | ------------------------------- | ---------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | `data`                          | `<slug>-data`    | **"Work Repository"**       | The Work's **data** (content items, SEO/meta-data, setup parameters)                                                                                                                                                                                      |
+> | `website`                       | `<slug>-website` | **"Work Repository"**       | The **app code / template output** — "not always a website". The owner's decision (2026-09-17) allows an **optional `-app` suffix alongside `-website`**, chosen by template type; the role itself is unchanged — **suffix only, no new persisted value** |
+> | `work`                          | `<slug>`         | **"{provider} Repository"** | The GitHub-facing repository: the **generated output** (the "awesome" repo people star), **never deployed**                                                                                                                                               |
 >
 > **An App Work's app-code fork — the repository Tasks, builds and deploys target — is the Work Repository
 > (`website` role), never the Work Repository.** Wherever an epic writes "the Work Repository" to mean the app
@@ -127,13 +137,13 @@ ticks that box explicitly.
 
 **D3 — The App spec lives in the Work Repository.** `.works/works.yml` gains a `spec` schema for kind `app`
 (Constitution III) and lives in the repository holding the app code — the **Work Repository** (`website` role),
-*not* the `data` role (see the repository-role note in §1). The database stores derived state only (last applied
+_not_ the `data` role (see the repository-role note in §1). The database stores derived state only (last applied
 spec hash, build and deployment records). A human can edit the spec by hand; agents change it by pull request like
 any other file.
 
-**D4 — Templates live in their own repositories; the listing is curation (ADR-014).** *(Rewritten 2026-09-17 on the
+**D4 — Templates live in their own repositories; the listing is curation (ADR-014).** _(Rewritten 2026-09-17 on the
 owner's template-repo decision; the previous text made the catalog a metadata-only manifest and excluded
-code-bearing templates.)*
+code-bearing templates.)_
 Every template is its own repository in the catalog organization, named with the **`-template`** postfix —
 Website/Work Templates and App Blueprints alike. The platform **discovers them by scanning the catalog
 organization and keeping repositories whose name ends in `template`**, which is the rule the Website Template
@@ -197,8 +207,8 @@ and never rotated implicitly. This is a new store; the existing Stripe-shaped ru
 untouched.
 
 **D10 — Three address shapes, all supported; the apex is an operator choice and nothing was removed.**
-*(Made explicit 2026-09-17 on the owner's answer. This decision is **purely additive** — every address shape the
-earlier plan allowed still works; the platform-domain shape is added to them, not swapped in for them.)*
+_(Made explicit 2026-09-17 on the owner's answer. This decision is **purely additive** — every address shape the
+earlier plan allowed still works; the platform-domain shape is added to them, not swapped in for them.)_
 
 An App Work is reachable by all three of these, in the order a Work usually acquires them:
 
@@ -254,6 +264,17 @@ Phase 1 is a framework-neutral web component fed by a static platform catalog pl
 App Works that expose a URL (`GET /api/me/apps`). **Ever ID** (a dedicated OpenID Connect identity
 provider) follows; platforms adopt it additively and keep their current sign-in methods. Ever Works is
 **not** the identity root for production platforms. Session tokens are never placed in URLs.
+**Provider and domain decided (owner, 2026-09-17): ZITADEL, self-hosted as-is, one instance for every
+platform, at `auth.ever.co`** (Resolution R-28; decision record
+[`APW-12/idp-options.md`](./APW-12-ever-id/idp-options.md) §6–§7). "Additively" is binding: each platform keeps
+its own authentication and its own user database, duplicated profiles are accepted, and nothing that signs a
+person in today is removed or routed away.
+**The user's own App Works are explicitly outside Ever ID's first wave** (owner step 7's "SSO" applies to the
+platforms and to the launcher, not to a deployed App Work): a deployed Cal.diy or Umami keeps whatever sign-in it
+ships with. Bringing Ever ID to a deployed App Work is a **recorded later wave**, not a silent omission — it
+needs an optional `identity` block in the App spec (derived OpenID Connect client values injected as env) plus
+Blueprint support, and it is listed in §8 as question 9. **No page and no string may claim SSO for an App Work
+until that ships** (launch-parity G-09).
 
 **D15 — Running user-controlled code on shared infrastructure is gated.**
 Before **Ever Works Apps** accepts any App Work, APW-10's launch gate must pass: an isolated tier, sandboxed
@@ -299,15 +320,29 @@ the private operations repository, not in this public spec.
 
 ## 4. Waves — the fastest safe path to the owner's end-to-end example
 
-| Wave  | Ships                                                                                                                                                                                                                                                                                                                                 | Epics (phase)                                                       | Deploy targets enabled                      |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
-| **0** | Prerequisite fixes found by research: agent `commitToRepo` / `openPullRequest` tool bindings, checkout-directory collisions, fork readiness. Small, independently shippable.                                                                                                                                                          | APW-08 P0, APW-02 P0                                                | —                                           |
-| **1** | Create an App Work from any GitHub URL (link/fork/private copy); App spec + Apps catalog + license gate; App Provisioner; Builds on GitHub-hosted runners; App renderer; env + dependencies on **Your cluster**; evolve loop; Upstream sync; App Launcher phase 1. **The owner's Cal.diy example runs end to end on a user cluster.** | APW-01…08 P1, **APW-09 P1**, APW-11 P1, APW-13 P1                                  | **None**, **Your cluster**                  |
-| **2** | The isolated Apps tier passes its launch gate (incl. a sandboxed container runtime for tenant workloads, R-24); managed subdomains on the user-apps domain; **verified App Blueprints only** on **Ever Works Apps**; Upstream pull requests; Ever ID for Ever Works.                                                                  | APW-10 P1–P2, APW-06 P2, APW-07 P2, APW-09 P2, APW-12 P1, APW-13 P2 | + **Ever Works Apps** (verified Blueprints) |
-| **3** | Any provisioned repository on **Ever Works Apps**, built by sandboxed in-zone rootless builds (R-24); preview Deployments per PR; Ever ID adopted by other platforms; App Launcher reads Apps across platforms.                                                                                                                       | APW-05 P3, APW-06 P3, APW-10 P3, APW-11 P2, APW-12 P2–P3            | + **Ever Works Apps** (any App Work)        |
+| Wave  | Ships                                                                                                                                                                                                                                                                                                                                                                        | Epics (phase)                                                       | Deploy targets enabled                      |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| **0** | Prerequisite fixes found by research: agent `commitToRepo` / `openPullRequest` tool bindings, checkout-directory collisions, fork readiness, **and the APW-13 test harness** (fake GitHub, the `EVER_WORKS_E2E_FAKES` non-production switch, helpers, `playwright.app-works.config.ts`) that other epics' PR-lane specs are written against. Small, independently shippable. | APW-08 P0, APW-02 P0, **APW-13 P0**                                 | —                                           |
+| **1** | Create an App Work from any GitHub URL (link/fork/private copy); App spec + Apps catalog + license gate; App Provisioner; Builds on GitHub-hosted runners; App renderer; env + dependencies on **Your cluster**; evolve loop; Upstream sync; App Launcher phase 1. **The owner's Cal.diy example runs end to end on a user cluster.**                                        | APW-01…08 P1, **APW-09 P1**, APW-11 P1, APW-13 P1                   | **None**, **Your cluster**                  |
+| **2** | The isolated Apps tier passes its launch gate (incl. a sandboxed container runtime for tenant workloads, R-24); managed subdomains on the user-apps domain; **verified App Blueprints only** on **Ever Works Apps**; Upstream pull requests; Ever ID for Ever Works.                                                                                                         | APW-10 P1–P2, APW-06 P2, APW-07 P2, APW-09 P2, APW-12 P1, APW-13 P2 | + **Ever Works Apps** (verified Blueprints) |
+| **3** | Any provisioned repository on **Ever Works Apps**, built by sandboxed in-zone rootless builds (R-24); preview Deployments per PR; Ever ID adopted by other platforms; App Launcher reads Apps across platforms.                                                                                                                                                              | APW-05 P3, APW-06 P3, APW-10 P3, APW-11 P2, APW-12 P2–P3            | + **Ever Works Apps** (any App Work)        |
 
 Wave 1 deliberately runs user code only where the **user** owns the blast radius (their cluster, their
 GitHub Actions minutes). That is what makes it shippable ASAP.
+
+**Cohort rollout and rollback, per wave** (added 2026-09-17 — resolution R-30; every family has an operator kill
+switch in [CONTRACTS](./CONTRACTS.md) §7, read by its job dispatcher and failing closed):
+
+| Wave | Cohort order                                                              | Exit criteria                                                                                                               | Rollback                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | staff (the harness is not user-facing)                                    | Wave 0 PRs merged; the APW-13 harness green on `develop`                                                                    | revert the PRs; no user-visible state exists yet                                                                                            |
+| 1    | staff → invited tenants → all tenants, one cohort per week                | the owner's Cal.diy example green on a user cluster; Wave 1 acceptance suite green; no P1 regression in the existing suites | `EVER_WORKS_APP_WORKS_ENABLED=false` (stops create/inspect) plus the family switches below; existing App Works keep running read-only       |
+| 2    | staff tenant → design partners → paying tenants, one step per gate re-run | APW-10's launch gate green **and** its per-shape attestations recorded (D15); Ever ID Test connection green (R-28)          | the same switches, plus `EVER_WORKS_APPS_MANAGED_ENABLED=false` (stops new managed deploys) and `EVER_WORKS_APP_UPSTREAM_PRS_ENABLED=false` |
+| 3    | all tenants, in zone order                                                | Wave 3 acceptance green; sandboxed in-zone builds (LG-24) attested                                                          | per-family switches; `works-app-previews` flag off                                                                                          |
+
+**"App Works off" is defined**: with the switches off, App Works stop _changing anything_ — jobs pause, the UI is
+read-only with a banner, existing Deployments keep running, and reads and sign-in keep working. Migrations are
+forward-only, so a rollback is a flag flip, never a schema revert.
 
 ---
 
@@ -316,31 +351,44 @@ GitHub Actions minutes). That is what makes it shippable ASAP.
 Each epic is a Spec Kit feature folder (`spec.md` + `plan.md` + `tasks.md`). `S` = size, `Dep` = blocking
 dependencies.
 
-| ID                                           | Epic                                                                                       | Extends (existing Ever Works)                                             | S   | Dep                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --- | ------------------ |
-| [APW-01](./APW-01-app-work-kind/)            | App Work kind & create from any repository URL (link · fork · private copy)                | `repo` kind create path, work kinds, create-Work UI                       | L   | APW-02 P0          |
-| [APW-02](./APW-02-fork-lifecycle/)           | Fork lifecycle: readiness, Actions hygiene, upstream sync, divergence, checkout keys       | GitHub plugin `forkRepository`, git facade, `GitOperations`               | L   | —                  |
-| [APW-03](./APW-03-app-spec-and-catalog/)     | App spec (`.works/works.yml` kind `app`), Apps catalog, Blueprint resolution, license gate | `works-config` kind specs, Work Blueprints catalog service                | L   | —                  |
-| [APW-04](./APW-04-app-provisioner/)          | App Provisioner: repository analysis → App spec PR → verification loop                     | Agents catalog, Skills catalog, Tasks, quality gates, ask-human           | XL  | APW-01, 03, 05, 06, 07 |
-| [APW-05](./APW-05-builds/)                   | Builds: `build` capability, GitHub Actions build plugin, in-cluster builder later          | plugin system, GitHub event intake, deploy service                        | L   | APW-02, 03, 07     |
-| [APW-06](./APW-06-app-runtime/)              | App runtime on Kubernetes: App renderer, deploy targets, domains, smoke tests, health      | `k8s` plugin, cluster-source matrix, subdomains, custom domains, verifier | XL  | APW-03, 05, 07, 10 |
-| ↳ [deploy-shapes.md](./APW-06-app-runtime/deploy-shapes.md) | **The deploy-shape family (R-27)** — shared cluster, internal cluster, custom kubeconfig, connected node, SSH host, provider plugins: what ships, what is an extension point, and why nothing here may be narrowed | cluster-source matrix, `deployment` plugin capability, Fleet node enrollment | — | — |
-| [APW-07](./APW-07-app-env-and-dependencies/) | App env & secrets store; App dependencies (Postgres, Redis, object storage)                | per-Work DB provisioner, plugin secret encryption                         | L   | APW-03, 06         |
-| [APW-08](./APW-08-evolve-loop/)              | Evolve loop: chat → Task → PR → merge → Build → Deployment; Goals & Missions on App Works  | Tasks, task isolation, quality gates, merge policy, Fleet, chat tools     | L   | APW-01, 03, 05, 06 |
-| [APW-09](./APW-09-upstream-pull-requests/)   | Upstream pull requests                                                                     | task isolation, GitHub PR API, approvals                                  | M   | APW-02, 08         |
-| [APW-10](./APW-10-apps-hosting-tier/)        | Ever Works Apps: isolated hosting tier for user-controlled code (launch gate)              | managed hosting, cluster-source matrix, deployer                          | XL  | —                  |
-| [APW-11](./APW-11-app-launcher/)             | App Launcher & Apps registry API                                                           | Work deployments, custom domains, dashboard shell                         | M   | — (P1); APW-06, 12 (P2) |
-| [APW-12](./APW-12-ever-id/)                  | Ever ID — single sign-on across Ever platforms                                             | auth provider abstraction                                                 | XL  | —                  |
-| [APW-13](./APW-13-golden-paths/)             | Golden paths & end-to-end acceptance: fixture app, Umami, **Cal.diy** Blueprints           | e2e suites, Apps catalog                                                  | L   | APW-01…08          |
+| ID                                                          | Epic                                                                                                                                                                                                               | Extends (existing Ever Works)                                                | S   | Dep                                                                                                                         |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------- |
+| [APW-01](./APW-01-app-work-kind/)                           | App Work kind & create from any repository URL (link · fork · private copy)                                                                                                                                        | `repo` kind create path, work kinds, create-Work UI                          | L   | APW-02 P0; **APW-03 P2** (T22, T26, T28, T32), **APW-06 T2–T3** (`app-runtime/ports.ts`, `APPS_TIER_POLICY`), **APW-13 P0** |
+| [APW-02](./APW-02-fork-lifecycle/)                          | Fork lifecycle: readiness, Actions hygiene, upstream sync, divergence, checkout keys                                                                                                                               | GitHub plugin `forkRepository`, git facade, `GitOperations`                  | L   | —                                                                                                                           |
+| [APW-03](./APW-03-app-spec-and-catalog/)                    | App spec (`.works/works.yml` kind `app`), Apps catalog, Blueprint resolution, license gate                                                                                                                         | `works-config` kind specs, Work Blueprints catalog service                   | L   | —                                                                                                                           |
+| [APW-04](./APW-04-app-provisioner/)                         | App Provisioner: repository analysis → App spec PR → verification loop                                                                                                                                             | Agents catalog, Skills catalog, Tasks, quality gates, ask-human              | XL  | APW-01, 03, 05, 06, 07                                                                                                      |
+| [APW-05](./APW-05-builds/)                                  | Builds: `build` capability, GitHub Actions build plugin, in-cluster builder later                                                                                                                                  | plugin system, GitHub event intake, deploy service                           | L   | APW-02, 03, 07; **APW-13 P0** (the fake-GitHub lane its tasks run in)                                                       |
+| [APW-06](./APW-06-app-runtime/)                             | App runtime on Kubernetes: App renderer, deploy targets, domains, smoke tests, health                                                                                                                              | `k8s` plugin, cluster-source matrix, subdomains, custom domains, verifier    | XL  | APW-03, 05, 07, 10                                                                                                          |
+| ↳ [deploy-shapes.md](./APW-06-app-runtime/deploy-shapes.md) | **The deploy-shape family (R-27)** — shared cluster, internal cluster, custom kubeconfig, connected node, SSH host, provider plugins: what ships, what is an extension point, and why nothing here may be narrowed | cluster-source matrix, `deployment` plugin capability, Fleet node enrollment | —   | —                                                                                                                           |
+| [APW-07](./APW-07-app-env-and-dependencies/)                | App env & secrets store; App dependencies (Postgres, Redis, object storage)                                                                                                                                        | per-Work DB provisioner, plugin secret encryption                            | L   | APW-03, 06 (P1b only — **P1a** lands in the Wave 1 foundations without APW-06)                                              |
+| [APW-08](./APW-08-evolve-loop/)                             | Evolve loop: chat → Task → PR → merge → Build → Deployment; Goals & Missions on App Works                                                                                                                          | Tasks, task isolation, quality gates, merge policy, Fleet, chat tools        | L   | APW-01, 03, 05, 06                                                                                                          |
+| [APW-09](./APW-09-upstream-pull-requests/)                  | Upstream pull requests                                                                                                                                                                                             | task isolation, GitHub PR API, approvals                                     | M   | APW-02, 08                                                                                                                  |
+| [APW-10](./APW-10-apps-hosting-tier/)                       | Ever Works Apps: isolated hosting tier for user-controlled code (launch gate)                                                                                                                                      | managed hosting, cluster-source matrix, deployer                             | XL  | —                                                                                                                           |
+| [APW-11](./APW-11-app-launcher/)                            | App Launcher & Apps registry API                                                                                                                                                                                   | Work deployments, custom domains, dashboard shell                            | M   | — (P1); APW-06, 12 (P2)                                                                                                     |
+| [APW-12](./APW-12-ever-id/)                                 | Ever ID — single sign-on across Ever platforms                                                                                                                                                                     | auth provider abstraction                                                    | XL  | — (P1); APW-11 P2 reads delegated tokens                                                                                    |
+| [APW-13](./APW-13-golden-paths/)                            | Golden paths & end-to-end acceptance: fixture app, Umami, **Cal.diy** Blueprints                                                                                                                                   | e2e suites, Apps catalog                                                     | L   | APW-01…08 (P1/P2); **P0 has no dependency and lands in Wave 0**                                                             |
+
+The `Dep` column and every epic's own `Depends on` line must agree; when they disagree the epic's own spec wins and
+the table is corrected in the same PR (resolution R-38, and [TRACKER](./TRACKER.md) carries the merge order).
 
 ---
 
 ## 6. Where progress is tracked
 
-- **[TRACKER.md](./TRACKER.md)** — spec and implementation status per epic, the merge order, and the Jira
-  mapping once tickets exist (placeholders `EW-TBD` until then).
+- **[TRACKER.md](./TRACKER.md)** — spec and implementation status per epic, the merge order, what `Reviewed`
+  and `Approved` mean, the owner/operator actions no epic can take, and the Jira mapping once tickets exist
+  (placeholders `EW-TBD` until then).
 - **[ACCEPTANCE.md](./ACCEPTANCE.md)** — the owner's eight-step example as executable acceptance
   scenarios, with the test file each scenario lives in.
+- **[CONTRACTS.md](./CONTRACTS.md)** — the normative names and rules: resolutions R-1…R-39, entities, routes,
+  jobs, Activity events, flags, the quota table (§7A), the notification catalogue (§6A), the threat register
+  (§10), the operational signals (§11) and the error-code catalogue (§12).
+- **[CLARIFICATIONS.md](./CLARIFICATIONS.md)** — the register of open `[NEEDS CLARIFICATION]` markers: who
+  decides each one, the default the specs assume, and the wave it blocks.
+- **[CONFIGURATION.md](./CONFIGURATION.md)** — every environment variable, flag and catalog pin, per
+  environment, with the epic that owns it and whether it is a secret.
+- **[data-model.md](./data-model.md)** — the consolidated tables the epics add, their owners, migrations and
+  retention.
 
 ---
 
@@ -360,8 +408,10 @@ dependencies.
 6. **Forward-only migrations in the same PR** (Constitution V, NN #16). Migration timestamps come from the
    epic's reserved block `1792` + two-digit epic number + two-digit slot + `00000` (APW-01 slot 00 =
    `1792010000000`), above the newest migration on `develop` — `1791240000000-AddSafetyRailsCore.ts` at
-   `ee45946e5` (re-verified 2026-09-17; `1791200100000-CreateOnboardingChecklists.ts` when the program was
-   authored); re-stamp before merge if `develop` moved past it.
+   `ee45946e5` (re-verified 2026-09-17 against `873274c9f`; `1791200100000-CreateOnboardingChecklists.ts` when
+   the program was authored); re-stamp before merge if `develop` moved past it. Within the block, migrations are
+   stamped in **merge order within the epic's slot**, and the `1792` prefix is reserved for App Works filenames
+   by a contract-test entry (Resolution R-39).
 7. **Tests first** (Constitution VI): unit for logic, controller spec for endpoints, Playwright for every
    new user-visible flow, and the epic's scenarios wired into [ACCEPTANCE.md](./ACCEPTANCE.md).
 8. **Secrets** (Constitution VII): App env values, kubeconfigs, registry and Git tokens are `x-secret`,
@@ -378,6 +428,31 @@ dependencies.
     literal `.`), added to all locale files in the same PR.
 12. **Every action that spends money says so**: Builds (runner minutes), agent Runs (tokens) and managed
     hosting (compute) each produce a receipt linked from Activity.
+13. **Every background family has an operator kill switch** (Resolution R-30). The switches are listed in
+    [CONTRACTS](./CONTRACTS.md) §7, read by the job dispatcher that owns the family, and fail closed. A switch
+    pauses a family — it never deletes, and "App Works off" means _stop changing things_, not _stop serving_.
+14. **Every unbounded action has a cap** (Resolution R-31). The per-member and per-organization caps live in
+    [CONTRACTS](./CONTRACTS.md) §7A with an environment override, a refusal code and user copy, and a cap is
+    raised by an operator, never widened silently.
+15. **Human-only actions are bound to a person, not to a credential** (Resolution R-32): spending money,
+    deleting data, publishing outside the platform, changing a security posture and accepting a legal obligation
+    go through `@HumanOnly()` and are excluded from MCP and chat; a typed confirmation is an extra field, never
+    the guard.
+16. **Every new Activity actionType is classified and summarised** (Resolution R-34): a Live Feed kind, a
+    shared-view publishability decision (App Works events are `NEVER_PUBLISH`), a `status` and a human-readable
+    `summary`. A completeness spec fails the build when one is missing.
+17. **Every new user-visible surface is keyboard-operable and checked** (added 2026-09-17): focus order follows
+    visual order, focus returns to its opener when a dialog closes, state is never carried by colour alone, live
+    regions announce asynchronously-arriving status politely, and the layout survives right-to-left locales
+    (`ar`, `he` are shipped). Each epic adds its own acceptance row and an automated axe check over each of its
+    new surfaces, next to the epics that already have one (APW-03, 05, 06, 07, 11, 12).
+18. **Constitutional gaps are flagged, not absorbed** (added 2026-09-17). `.specify/memory/constitution.md`
+    Principle VI still points new API behaviour at `apps/api/test/`, which is not a runnable lane
+    (Resolution R-22 corrects the _plan_; the constitution itself needs a patch), and Principle V names a
+    migrations path that differs from the one every epic actually uses. Until a proposed **PATCH 1.0.1** merges
+    (it updates Principle VI's implication, Principle V's path, the tasks template's test location and the spec
+    template's provider-neutral wording), a plan's Constitution VI checklist line says
+    "Constitutional gap flagged (R-22); amendment PR: <link>" rather than ticking silently.
 
 ---
 
@@ -405,8 +480,24 @@ Each has a recommended default that the epic specs assume until answered.
 6. **Ever ID identity provider** — which product and domain? _Answered (owner, 2026-09-17): **ZITADEL**,
    self-hosted as-is, integrated only through standard OpenID Connect, as a **pure addition** — every platform
    keeps its own authentication and its own user database, and duplicated profiles are accepted. See
-   [APW-12 `idp-options.md`](./APW-12-ever-id/idp-options.md) §6–§7. The **domain** for it is still open._
+   [APW-12 `idp-options.md`](./APW-12-ever-id/idp-options.md) §6–§7. The domain is also answered:
+   **`auth.ever.co`**, verified free in the live `ever.co` zone, one instance serving every platform
+   (Resolution R-28). The open sub-questions are D3–D9 in that file's §6 (hosting tier, brokering, audience
+   strategy, registration, consent, MFA policy, federation), tracked in
+   [CLARIFICATIONS.md](./CLARIFICATIONS.md)._
 7. **Where the App Launcher web component is published** — Ever Works monorepo package vs a cross-product
-   repository in `ever-co`. _Default: a cross-product package in `ever-co`, since Gauzy and Teams consume it._
+   repository in `ever-co`. _Default: a cross-product package in `ever-co`, since Gauzy and Teams consume it.
+   Still open (CL-xx in [CLARIFICATIONS.md](./CLARIFICATIONS.md)); the platform catalog it reads is already
+   settled — `ever-works/platforms` exists (Resolution R-29)._
 8. **First golden path** — validate the pipeline on a small app before the flagship? _Default: a fixture
    app and Umami first, **Cal.diy** as the flagship demo (APW-13)._
+9. **Single sign-on into a user's own App Works** — should a deployed App Work accept Ever ID as a sign-in
+   option, and in which wave? _Default: **not in Waves 1–2** (recorded in D14 above). If the owner wants it,
+   APW-12 gains a phase with an optional `identity` block in the App spec, derived client values injected as env,
+   and Blueprint support; until then no page or string may claim it (G-09)._
+10. **Does the managed-tier Cal.diy run belong to Wave 2's exit criteria?** — APW-13's golden-path lane runs
+    Cal.diy on **Your cluster** through Link; the traceability matrix previously marked the Ever Works Apps half
+    "GAP (optional)". _Default: keep it out of Wave 2's exit criteria and say so explicitly in
+    [ACCEPTANCE](./ACCEPTANCE.md) §4, because Cal.diy needs SMTP and a root-capable runtime that the Wave 2 tier
+    does not yet offer (see the capability rows in [TRACKER](./TRACKER.md)); it becomes a Wave 3 criterion once
+    the tier's dependency set covers those. The owner may promote it to Wave 2 — that is the open decision._

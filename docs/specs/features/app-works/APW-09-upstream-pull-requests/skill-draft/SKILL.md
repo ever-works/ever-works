@@ -76,9 +76,35 @@ report it — do not retry or work around it.
    **Motivation**, **Changes**, **Testing**. Keep it under 8,000 characters. Reference an issue only if one exists and
    the guide asks for it. End with the platform's disclosure line exactly as provided in your brief; if the project
    asks for its own AI disclosure wording, include that too.
-8. **Report** a structured result: `status` (`ready` | `aiNotAccepted` | `dcoRequired` | `doesNotPort` | `tooLarge`),
-   `claRequired` with link, `projectLimit` if stated, `title`, `body`, and for each check
-   `{ command, exitCode, alreadyRedOnBase, lastLines (≤ 50) }`.
+8. **Report** by writing the structured result to **`.ever-works/upstream-pr-report.json`** in your workspace — the
+   only report vehicle the platform reads. Nothing is inferred from prose in your final message: a missing, oversized
+   (over 32 KB) or malformed file fails the preparation, and the file is removed before the branch is committed, so it
+   never reaches the project. Its shape (every field capped; `checks` holds at most 10 entries and the platform
+   refuses a report whose commands or timings break the limits in step 5):
+    ```json
+    {
+    	"status": "ready | aiNotAccepted | dcoRequired | doesNotPort | tooLarge | needsSignature",
+    	"claUrl": "https://… (the agreement link, when the guide names one)",
+    	"projectLimitLines": 1000,
+    	"title": "≤ 72 characters, in the project's convention",
+    	"body": "≤ 8,000 characters, template filled, disclosure line last",
+    	"aiPolicyQuote": "≤ 300 characters, quoted exactly from the guide",
+    	"aiPolicyFile": "CONTRIBUTING.md",
+    	"doesNotPort": ["≤ 10 short pieces that did not port"],
+    	"checks": [
+    		{
+    			"command": "yarn lint",
+    			"exitCode": 0,
+    			"startedAt": "2026-09-17T10:00:00Z",
+    			"endedAt": "2026-09-17T10:04:11Z",
+    			"alreadyRedOnBase": false,
+    			"lastLines": ["≤ 50 lines"]
+    		}
+    	]
+    }
+    ```
+    Report every check you ran with its real exit code and real times — never a command you did not run. The person
+    sees this evidence labelled **as reported by you**, not as something the platform verified.
 
 ## Addressing a review
 

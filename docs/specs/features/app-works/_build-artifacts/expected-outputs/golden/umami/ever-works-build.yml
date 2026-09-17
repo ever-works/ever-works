@@ -1,0 +1,22 @@
+# GOLDEN — umami · `.github/workflows/ever-works-build.yml` — THE FILE IS NOT WRITTEN.
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+#
+# `build.strategy: image` with an empty `checks` list. APW-05 plan.md §4.6 step 8:
+#   "Strategy `image` or `none` with a non-empty `checks` list: the same delivery writes a
+#    checks-only workflow (§4.14); with no checks, nothing is written and an existing checks-only
+#    file the platform wrote is replaced by a pull request removing the jobs — never deleted directly".
+#
+# So the golden output for this Blueprint is the ABSENCE of the file: no workflow is created, and if
+# an earlier generation left one the platform proposes a pull request that removes its jobs (APW-05
+# spec.md FR-70). This marker exists so the file set has one entry per Blueprint and so a lane can
+# assert the absence rather than silently finding no file.
+#
+# WHY IT MATTERS: the upstream image is deployed as published
+# (`ghcr.io/umami-software/umami@sha256:85909afc…`, works.yml build block), so there is no image to
+# build and no build workflow to write; `checks: []` means there is no checks-only workflow either.
+# Switching `build.strategy` to `dockerfile` (the upstream ships a Dockerfile) is a one-line change
+# and this Blueprint would then get the full workflow — see the Blueprint README.
+#
+# Machine-readable marker (asserted by check.mjs):
+# ever-works-golden: absent-file
+# ever-works-golden: strategy=image checks=0

@@ -1,0 +1,19 @@
+{
+	"$comment": "DRAFT — the templates[] row for ever-works/agents manifest.json (APW-04 T30). Paths are relative to the template directory. Every path below exists in this draft folder and must exist in the catalog repository.",
+	"slug": "app-provisioner",
+	"path": "templates/app-provisioner",
+	"name": "App Provisioner",
+	"title": "App Provisioner",
+	"summary": "Studies a repository in an isolated sandbox and proposes the App spec that builds and runs it — verified by a real build, boot and smoke tests before you merge.",
+	"scope": "TENANT",
+	"avatarIcon": "package-check",
+	"tags": ["app-works", "provisioning", "containers", "kubernetes"],
+	"manifestPath": "templates/app-provisioner/.works/agent.yml",
+	"soulPath": "templates/app-provisioner/SOUL.md",
+	"readmePath": "templates/app-provisioner/README.md",
+	"systemPromptPath": "templates/app-provisioner/prompts/system.md",
+	"skillsPath": "templates/app-provisioner/skills.yml",
+	"kbPath": "templates/app-provisioner/kb/playbooks",
+	"iconPath": "templates/app-provisioner/icon.svg",
+	"evalPath": "eval/app-provisioner.yml"
+}

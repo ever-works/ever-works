@@ -1,0 +1,12 @@
+{
+	"$comment": "DRAFT — the manifest.json row for ever-works/skills (APW-04 T31). version/license/sourceUrl are required by that repository's schema/skill-manifest.schema.json.",
+	"slug": "provision-app",
+	"path": "skills/provision-app",
+	"name": "Provision an app",
+	"summary": "Work out how to build and run an arbitrary repository as an Ever Works App Work, and write its App spec (.works/works.yml, kind app) plus an overlay Dockerfile only when unavoidable.",
+	"skillPath": "skills/provision-app/SKILL.md",
+	"tags": ["app-works", "provisioning", "containers", "kubernetes", "deployment"],
+	"version": "0.1.0",
+	"license": "MIT",
+	"sourceUrl": "https://github.com/ever-works/skills/tree/main/skills/provision-app"
+}

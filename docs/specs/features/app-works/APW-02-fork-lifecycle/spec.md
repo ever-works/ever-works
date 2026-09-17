@@ -217,6 +217,27 @@ each end in a named state with a next step — never a silent stop.
   started again, at most 3 times, before the App Work is marked timed out.
 - **S28 — Someone else's App Work.** Every read and action on another account's App Work answers not found.
 
+- **S29 — Upstream adds automation.** **Given** an App Work whose tracked branch is up to date and whose upstream
+  commits a change that adds or edits a file under `.github/workflows/`, **when** the next sync runs, **then** the
+  sync does **not** fast-forward the tracked branch, and it does not push that range onto `ever-works/upstream-sync`
+  until the member has confirmed it: the card reads **"Upstream changed its workflows. Review and confirm before
+  syncing."** with **Review the changes** and an explicit **Sync anyway** action; until the member confirms, no
+  workflow from that range can run in the App Work's repository, and the member's GitHub Actions minutes are
+  untouched. Confirming records one Activity entry naming the changed workflow paths (paths only, never file
+  contents).
+
+- **S30 — A sync pull request is merged.** **Given** a sync pull request opened by S5, **when** the member merges
+  it, **then** the App Work notices within one dispatcher tick (and within 60 seconds of being viewed): "Last
+  synced" and the divergence badge update to the commit the pull request carried, one "upstream synced" Activity
+  entry records the count, the inherited-workflow list refreshes, and the license gate is asked again — exactly
+  once, however many times the check runs.
+
+- **S31 — A fresh fork cannot run workflows yet.** **Given** a fork of an upstream that ships its own workflows,
+  **when** the App Work becomes ready and the platform's build workflow is present in the fork, **then** the build
+  workflow runs on the first push the platform makes; if the provider reports that a fresh fork's workflows are
+  gated, the readiness job enables **exactly that one workflow** and nothing else, records it, and the first Build
+  starts. Inherited workflows stay off (S3).
+
 ## 4. Functional requirements
 
 Every threshold below is a number on purpose.
@@ -311,7 +332,11 @@ Every threshold below is a number on purpose.
 - **FR-33.** **Sync now** MUST return within 2 seconds without waiting, and MUST be limited to 6 per App Work per
   hour.
 - **FR-34.** At most one sync MUST run per App Work at a time.
-- **FR-35.** A fork with no commits of its own MUST be fast-forwarded to upstream's default branch head.
+- **FR-35.** A fork with no commits of its own MUST be fast-forwarded to upstream's default branch head. Because
+  Resolution R-4 gives every App Work fork a commit of the platform's own (the source file, or the merged setup pull
+  request), in practice an App Work is never behind-only: the reading after readiness is at least one commit ahead,
+  so the pull-request path of FR-36 is the normal path and fast-forward stays the exception it is written for. The
+  divergence reading MUST report that ahead count truthfully rather than rounding it to zero.
 - **FR-36.** A fork with commits of its own, and every private copy that is behind, MUST get the branch
   `ever-works/upstream-sync` pointing at upstream's head and one open pull request into the tracked branch, reused
   and updated on later syncs.
@@ -371,6 +396,41 @@ Every threshold below is a number on purpose.
   divergence, and the inherited-workflow state (Resolution R-8). Linked App Works and every other kind MUST NOT show
   it. The tab MUST leave room below its card for upstream pull requests (APW-09), which adds that section to the same
   tab rather than a second one.
+
+### 4.12 Upstream automation, sync completion and the build workflow (added by the 2026-09-17 audit pass)
+
+- **FR-60.** Before fast-forwarding a fork, and before creating or updating a sync pull request, the system MUST
+  compare the incoming upstream range with the tracked branch and detect whether it touches `.github/workflows/**`.
+  When it does, the system MUST NOT fast-forward, MUST NOT push that range onto `ever-works/upstream-sync` before the
+  member confirms, and MUST show the hold with the changed workflow paths; confirming records one Activity entry
+  with paths and counts only. This is what keeps a workflow nobody reviewed from running — and reading the App
+  Work's own build values — inside the member's repository before the next hygiene pass could ever see it.
+- **FR-61.** The values the platform writes for a Build MUST NOT be readable by any workflow other than the one the
+  platform itself maintains on the tracked branch. Until that holds, FR-60's hold is the only thing standing between
+  an upstream-added workflow and those values, so the hold MUST NOT be bypassed by the scheduled path, the manual
+  path or a retry. (The scoping itself is APW-05's; this epic owns the hold and MUST record in the Upstream card
+  when a sync was held for this reason.)
+- **FR-62.** The system MUST detect that a sync pull request was merged and finish that sync: update the last-synced
+  commit and the divergence counts, clear the pull request fields, re-run hygiene for the range and ask the license
+  gate again — each exactly once per merged pull request, whether the detection comes from polling the open pull
+  request or from the repository's pull-request delivery. A merged sync pull request counts as the sync having
+  happened even though the branch never moved through a fast-forward.
+- **FR-63.** A private copy's sync MUST be expressible with the platform's own capabilities: comparing a private
+  copy against its upstream and moving the sync branch MUST NOT require the platform layer to shell out to git
+  itself (Constitution I). The comparison MUST report the upstream head, how far ahead and behind the copy is, and
+  whether the count was capped.
+- **FR-64.** Sync MUST honour the App spec's own settings rather than its defaults: a schedule turned off in the
+  spec MUST leave the next run unset (`disabled_by_spec`) while **Sync now** still works, and a configured sync
+  branch MUST be the branch compared and merged. A spec change that touches those blocks MUST be picked up without
+  waiting for the next scheduled run.
+- **FR-65.** The readiness reasons, sync results and warning codes this epic reports MUST each be a closed set with
+  one stable value per user-visible state, so a card, a test id and a translation key can be derived from the value
+  itself; a provider-specific failure MUST be reported through the typed provider reason rather than a composed
+  string.
+- **FR-66.** When the provider reports that a fork's workflows are gated — the state a fresh fork of a repository
+  that ships workflows starts in — the readiness job MUST enable **exactly** the Ever Works build workflow and no
+  other, record that it did, and leave every other workflow disabled (FR-25, FR-26). Enabling is permitted for that
+  one path only, because it is the platform's own workflow and the Build chain does not start without it.
 
 ## 5. Key entities
 
@@ -454,22 +514,24 @@ request.
 | Workflows disabled          | `{count, plural, =1 {1 inherited workflow disabled} other {# inherited workflows disabled}}`                                                    |
 | Workflows list toggle       | `Show` · `Hide`                                                                                                                                 |
 | Workflows note              | `Workflows added later — by an upstream sync or a pull request — are switched off after each sync. Turn one on in GitHub only if you trust it.` |
+| Workflows changed (hold)    | `Upstream changed its workflows. Review and confirm before syncing.` · `Review the changes` · `Sync anyway`                                     |
 
 ### 6.2 Warnings (shown in the card and as a Work health warning)
 
-| State                    | Copy                                                                          | Action                     |
-| ------------------------ | ----------------------------------------------------------------------------- | -------------------------- |
-| Upstream archived        | `Upstream is archived — sync is paused.`                                      | —                          |
-| Upstream unavailable     | `Upstream {repo} is no longer reachable. Sync is paused.`                     | `Check again`              |
-| Fork missing             | `Your fork {repo} no longer exists on GitHub.`                                | `Open on GitHub`           |
-| Private copy missing     | `Your private copy {repo} no longer exists on GitHub.`                        | `Open on GitHub`           |
-| Rate limited             | `GitHub rate limit reached — sync will retry at {time}.`                      | —                          |
-| Default branch renamed   | `Upstream's default branch changed from {old} to {new}.`                      | —                          |
-| Too large (private copy) | `Upstream is now too large to sync into a private copy ({size}).`             | —                          |
-| History rewritten        | `Upstream rewrote its history. Close the sync pull request, then sync again.` | `Open pull request`        |
-| Needs admin              | `You need admin access to {repo} to switch off its workflows.`                | `Open on GitHub`           |
-| App permission missing   | `The Ever Works GitHub App needs the {permission} permission on {repo}.`      | `Review GitHub App access` |
-| Not ready (clone)        | `The repository isn't ready yet.`                                             | —                          |
+| State                    | Copy                                                                          | Action                      |
+| ------------------------ | ----------------------------------------------------------------------------- | --------------------------- |
+| Upstream archived        | `Upstream is archived — sync is paused.`                                      | —                           |
+| Upstream unavailable     | `Upstream {repo} is no longer reachable. Sync is paused.`                     | `Check again`               |
+| Fork missing             | `Your fork {repo} no longer exists on GitHub.`                                | `Open on GitHub`            |
+| Private copy missing     | `Your private copy {repo} no longer exists on GitHub.`                        | `Open on GitHub`            |
+| Rate limited             | `GitHub rate limit reached — sync will retry at {time}.`                      | —                           |
+| Default branch renamed   | `Upstream's default branch changed from {old} to {new}.`                      | —                           |
+| Too large (private copy) | `Upstream is now too large to sync into a private copy ({size}).`             | —                           |
+| History rewritten        | `Upstream rewrote its history. Close the sync pull request, then sync again.` | `Open pull request`         |
+| Needs admin              | `You need admin access to {repo} to switch off its workflows.`                | `Open on GitHub`            |
+| App permission missing   | `The Ever Works GitHub App needs the {permission} permission on {repo}.`      | `Review GitHub App access`  |
+| Not ready (clone)        | `The repository isn't ready yet.`                                             | —                           |
+| Workflows gated          | `GitHub hasn't run workflows in this fork yet.`                               | `Enable the build workflow` |
 
 Permission names rendered in `{permission}`: `Contents`, `Pull requests`, `Administration`, `Actions`, `Webhooks`.
 
@@ -541,6 +603,24 @@ Each item is an acceptance scenario collected into [ACCEPTANCE.md](../ACCEPTANCE
 - [ ] **ACC-02-23** — A fork or private copy App Work has one Upstream tab showing relation, readiness (Try again when
       timed out or failed), sync status and inherited workflows; a linked App Work and other kinds have none (S10b,
       FR-59).
+- [ ] **ACC-02-24** — An upstream range that adds or edits a workflow file is never fast-forwarded and never pushed
+      onto the sync branch before the member confirms; the card shows the hold with the changed paths; confirming
+      records one entry with paths and counts only (S29, FR-60, FR-61).
+- [ ] **ACC-02-25** — A fork carrying the platform's own `source` commit is never fast-forwarded; the divergence
+      reading after readiness is `aheadBy ≥ 1` and the sync takes the pull-request path (S4, S5, FR-35, FR-36).
+- [ ] **ACC-02-26** — A merged sync pull request is detected within one dispatcher tick, updates the last-synced
+      commit and the divergence counts exactly once, clears the pull-request fields, re-runs hygiene and asks the
+      license gate again (S30, FR-62).
+- [ ] **ACC-02-27** — A private copy's divergence and sync branch are produced through the plugin capability, with no
+      direct git invocation in the platform layer; the comparison reports the upstream head, ahead/behind and whether
+      the count was capped (S9, FR-63).
+- [ ] **ACC-02-28** — A spec whose sync schedule is off leaves the next run unset while **Sync now** still works; a
+      configured sync branch is the branch compared and merged; a spec change to either block is picked up without
+      waiting for the next scheduled run (FR-64).
+- [ ] **ACC-02-29** — Every readiness reason, sync result and warning code is one member of its closed set, and a
+      provider failure carries the typed provider reason rather than a composed string (FR-65).
+- [ ] **ACC-02-30** — On a fork whose workflows are gated, readiness enables exactly the Ever Works build workflow,
+      records it, leaves every inherited workflow disabled, and the first Build starts (S31, FR-66).
 
 ## 9. Open questions
 
@@ -552,3 +632,12 @@ Each item is an acceptance scenario collected into [ACCEPTANCE.md](../ACCEPTANCE
 - **[NEEDS CLARIFICATION: minimum schedule.]** Hourly is the floor to protect the member's API budget. Lower for
   paying accounts?
 - **[NEEDS CLARIFICATION: hygiene on linked repositories.]** Off by default (the member's own workflows). Offer it?
+- **[NEEDS CLARIFICATION: must an upstream update be reviewed before it goes live?]** The 2026-09-17 audit raised
+  this: a fast-forward lands upstream's commits on the tracked branch, APW-05 builds that push and APW-06 deploys
+  it, so a compromised upstream release can be live within one sync tick with no human in the loop — against
+  **agents open pull requests, humans merge** (README D11). FR-60/FR-61 now hold automatic syncs whenever the
+  incoming range touches workflows, but the general question is the owner's: should every upstream update reach a
+  running app only after the member approves it, with per-App-Work **Upstream updates: open a pull request
+  (default) | fast-forward automatically** as the setting, or should a Build whose commits came from an upstream
+  sync stay undeployed until the owner approves it? Until the owner answers, the default stays as specified here
+  and nothing in this epic auto-deploys an unreviewed upstream change that touches automation.

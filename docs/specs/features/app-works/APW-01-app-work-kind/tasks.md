@@ -17,11 +17,35 @@
 - Every task carries **Test** (the spec file and what it asserts, or the command that runs it) and **Done when**
   (an observable, checkable condition).
 - "Done when" is stated explicitly for every task and is checkable without reading the diff.
-- Add new tasks at the bottom of their phase rather than renumbering (T39–T40 were added by the program audit).
+- Add new tasks at the bottom of their phase rather than renumbering (T39–T40 were added by the program audit;
+  T41–T43 by the 2026-09-17 ordering pass).
 - Phase boundaries are ship boundaries: `develop` must be green and deployable at the end of each phase.
-- **Prerequisites:** APW-02 P0 (its T1–T8) and APW-02 P1 (its T9–T34, T43, T44), and APW-03 P1 (resolver, App spec
-  service, apply job, `commitFiles?`, `AppsCatalogBrowser`) are merged. Tasks below name the APW-02/03/04/06/10
-  symbols they consume; they never re-declare them.
+- A task marked **(own PR)** merges by itself, ahead of its phase, because another epic binds or compiles against
+  what it creates; the PR description names the ordering. The program merge order lives in `TRACKER.md`.
+- **Prerequisites (exact tasks — every one of them is merged before this epic's P1; the program merge order in
+  `TRACKER.md` places them there).** The earlier line named only "APW-03 P1", but the symbols this epic compiles
+  against are not all in APW-03 P1:
+    - **APW-02** P0 (its T1–T8) and P1 (its T9–T34, T43, T44) — checkout keys and `waitForReady` (T2–T5),
+      `findExistingFork` (T17), the `getRepository` extensions (T16), `WorkUpstreamState` and its repository
+      (T12–T14), the readiness job and the `APP_FORK_READY_HANDLER` token (T23–T24), the dispatcher symbols and
+      runtime bindings (T31), the setup-pull-request follow-through (T43), `createBranchFromSha` (T18) and the
+      non-production readiness deadline (T44).
+    - **APW-03 P1** — T1 (the contracts barrel) and T12 (`AppSpecService`).
+    - **APW-03 P2 — the "Wave 1 catalog seam", which lands before this epic's P1**: T22 (`commitFiles?` and the
+      facade wrapper), T24 (`AppsCatalogService`), T26 (the Blueprint resolver and `AppSourceCatalogAdapter`,
+      which **binds this epic's T11 port**), T28 with T53 (the apply job and the `app.blueprint.matched`
+      record) and T32 (`AppsCatalogBrowser`).
+    - **APW-06 T1–T3 only** — `packages/contracts/src/apps/app-runtime.ts`, `supportsApps` /
+      `isAppDeploymentPlugin` on `IDeploymentPlugin`, and `packages/agent/src/app-runtime/ports.ts` with
+      `APPS_TIER_POLICY` and `DisabledAppsTierPolicy`. Types, symbols and closed defaults only; no runtime
+      behaviour, so they carry no dependency on APW-01.
+    - **APW-13 P0** — its T1–T5: the fake GitHub, its contract test, the harness runner and the
+      `EVER_WORKS_E2E_FAKES` switch. T40 and the T30 ship gate need them.
+      **T11 lands first, on its own**, immediately after APW-02 T15, because APW-03 T26 binds the port T11 creates.
+      APW-03 P3's `AppLicenseService` (its T42) and APW-04's `AppProvisioningService` merge **after** this epic: both
+      are injected `@Optional()`, and until they land the calls are skipped and their tests use a typed fake. Only
+      those two bindings are optional — the symbols exist before this epic merges. Tasks below name the
+      APW-02/03/04/06/10/13 symbols they consume; they never re-declare them.
 - **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
   applied here: R-1 (T2), R-2 (T6), R-3 (T12, T22), R-4 (T13, T15, T24), R-5 (T12, T13, T14), R-6 (T12, T13, T17),
   R-7 (T3), R-12 (T2, T22, T28), R-15 (T39), R-22 (no suite under `apps/api/test/`).
@@ -54,8 +78,12 @@ _Delivers spec FR-1…FR-53 (incl. FR-29a, FR-40a, FR-46a) and ACC-01-01…ACC-0
       **Create** `packages/contracts/src/apps/app-source.ts` with `APP_SOURCE_REPOSITORY_TYPES`,
       `AppSourceRepositoryType`, `AppUpstreamRef`, `APP_DEPLOY_TARGET_CHOICES` (`none`, `your-cluster`,
       `ever-works-apps` — R-12), `AppDeployTargetChoice`, `APP_REPOSITORY_MODES`, `AppRepositoryMode`,
-      `APP_SOURCE_REASON_CODES` (24 codes), `AppSourceReasonCode`, `AppModeAvailability`, `AppTargetOwner`,
-      `AppSourceInspectRequest`, `AppSourceInspectResponse` (incl. `deployTargets`) and the nine numeric constants
+      `APP_SOURCE_REASON_CODES` (24 codes), `AppSourceReasonCode`, `AppModeAvailability`, `AppTargetOwner`
+      (incl. `existingForkChecked: boolean`), `AppDeployTargetAvailability` (`extends AppModeAvailability` with
+      `providerId?: string`, set only when the target is available and is not `none` — FR-33/FR-34),
+      `AppSourceInspectRequest`, `AppSourceInspectResponse` (incl. `deployTargets` and the P1
+      `scanIncomplete: boolean`) and the Blueprint prompt shape (`{ name, description?, required }`, never a
+      value — FR-55), plus the nine numeric constants
       exactly as in [plan §3.2](./plan.md).
       **Modify** `packages/contracts/src/apps/index.ts` — `export * from './app-source.js';` (**Create** it, and add
       `export * from './apps/index.js';` to `packages/contracts/src/index.ts`, if APW-03 T1 has not landed).
@@ -65,10 +93,14 @@ AppUpstreamRef } from '../../apps/app-source.js'`; widen `SourceRepository.type`
       `createdByThisWork?: boolean`. **Do not touch `IMPORT_SOURCE_TYPES`.**
       **Test**: **create** `packages/contracts/src/apps/__tests__/app-source.spec.ts` — pins the mode list, the 24
       reason codes, the three deploy target choices, every constant (`15`, `60_000`, `8_000`, `30`, `512_000`, `5`,
-      `120_000`, `600_000`, `10_000`), and that `IMPORT_SOURCE_TYPES` still has exactly four members.
+      `120_000`, `600_000`, `10_000`), that `scanIncomplete` is a required boolean, that `existingForkChecked` is a
+      required boolean and that `AppDeployTargetAvailability.providerId` is optional, and that `IMPORT_SOURCE_TYPES`
+      still has exactly four members.
       **Done when**: `import { AppSourceInspectResponse } from '@ever-works/contracts'` type-checks in `apps/api` and
       `apps/web` (`pnpm --filter ever-works-api type-check`, `pnpm --filter ever-works-web type-check`), and
       `git grep -n "app-source.dto" packages/contracts` returns nothing.
+      **Note**: `APP_REPOSITORY_MODES`, `AppDeployTargetChoice` and the reason codes keep their existing members —
+      this task adds fields and types, it renames and removes nothing.
 
 - [ ] **T3. Capabilities for `app`, the two new flags, and the replaced invariants (Resolution R-7).**
       **Modify** `packages/contracts/src/domain/work-capabilities.ts` — add `readonly builds: boolean` and
@@ -185,11 +217,15 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
       commit, no push) — together ACC-01-11.
       **Done when**: every row of plan §4.4 has a green `app` assertion and every `repo` assertion is unchanged.
 
-- [ ] **T11. Catalog port and module wiring.**
+- [ ] **T11. Catalog port and module wiring. (Own PR, before APW-03 P2 — TRACKER merge order.)**
       **Create** `packages/agent/src/app-works/app-source-catalog.port.ts` — `AppSourceCatalogPort`
-      (`matchBlueprint({ owner, repo, blueprintId? })`, `classifyLicense(spdx)`) and
+      (`matchBlueprint({ owner, repo, blueprintId? })`, `classifyLicense(spdx)`, plus the optional `matchSource`,
+      `prompts` and `displayName` fields of [plan §7](./plan.md)) and
       `APP_SOURCE_CATALOG_PORT = Symbol('APP_SOURCE_CATALOG_PORT')` exactly as [plan §7](./plan.md).
-      **Modify** `packages/agent/src/app-works/index.ts` (created by APW-02 T15) — export the port.
+      **Create** `packages/agent/src/app-works/app-prompted-values.port.ts` — `AppPromptedValuesPort`
+      (`storePrompted(workId, values)`), `APP_PROMPTED_VALUES_PORT = Symbol('APP_PROMPTED_VALUES_PORT')` and its
+      no-op default (plan §7).
+      **Modify** `packages/agent/src/app-works/index.ts` (created by APW-02 T15) — export both ports.
       **Modify** `packages/agent/src/app-works/app-works.module.ts` (created by APW-02 T15) — import the
       modules exporting APW-03's `AppSpecService`, `AppBlueprintApplyService`, `AppLicenseService` and APW-04's
       `AppProvisioningService` when present (each consumer injects them `@Optional()`), and provide + export this
@@ -199,7 +235,8 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
       provider of `WorkModule` (slug checks go through `WorkRepository`), so no module cycle is introduced.
       **Test**: extend `packages/agent/src/services/work.module.spec.ts` — the module graph compiles with and without
       APW-03/04 providers registered.
-      **Done when**: `@ever-works/agent/app-works` resolves from `apps/api` and `packages/tasks`.
+      **Done when**: `@ever-works/agent/app-works` resolves from `apps/api` and `packages/tasks`, and the port file
+      matches the shape APW-03 T26 binds without any change to this task's PR.
 
 - [ ] **T12. `AppSourceInspectorService`.**
       **Create** `packages/agent/src/app-works/app-source-inspector.service.ts` — `inspect(url, user, opts)`
@@ -209,12 +246,19 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
       case-insensitive match; `findExistingFork` per owner; `.gitattributes` `filter=lfs` probe through
       `getFileContent`; conflict lookups (T8) that expose another account's usage as a boolean only;
       `APP_SOURCE_CATALOG_PORT.matchBlueprint` with the optional `blueprintId` and `classifyLicense` (`@Optional()`,
-      try/catch ⇒ `unavailable`/`unknown`) per the license preview rule of [plan §7](./plan.md); `deployTargets`
+      try/catch ⇒ `unavailable`/`unknown`) per the license preview rule of [plan §7](./plan.md), returning the
+      match's `matchSource`, `displayName` and `prompts` (FR-55, FR-56); `deployTargets`
       (`none` always available; `your-cluster` when an installed deploy plugin reports `supportsApps`, else
       `cluster_target_unavailable`; `ever-works-apps` only when `AppsTierPolicy.isOpen()` — injected
-      `@Optional()`, absent ⇒ `managed_hosting_unavailable`; R-5, R-12); default-mode rules FR-17/FR-18; a
-      provider-call counter that stops at 15 and marks the rest `unavailable` without a `rate_limited` reason; a 60 s
-      in-memory cache keyed by `userId + lower(owner/repo)` (bypassed when `opts.fresh`).
+      `@Optional()`, absent ⇒ `managed_hosting_unavailable`; R-5, R-12), **each available non-`none` target
+      carrying the `providerId` the create request will persist**; default-mode rules FR-17/FR-18; a
+      provider-call counter charged per actual call — the fixed checks first (repository read 1, default-branch
+      read ≤ 1, caller read 1, organizations read 1, `.gitattributes` read 1 = ≤ 5), then `findExistingFork` in
+      owner order (the caller first, then organizations A–Z, ≤ 30 in P1), starting a new owner only while **at
+      least 3 calls remain** of the 15-call budget. Owners the budget did not reach keep their computed
+      `available`, get `existingForkChecked: false` and **no** reason code, and the response sets
+      `scanIncomplete: true` — never `rate_limited` or `unavailable` (FR-7, FR-9); a 60 s in-memory cache keyed by
+      `userId + lower(owner/repo)` (bypassed when `opts.fresh`).
       **Modify** `packages/agent/src/app-works/index.ts` — export it.
       **Test**: **create** `packages/agent/src/app-works/__tests__/app-source-inspector.service.spec.ts` —
       setting off ⇒ `app_works_disabled` before any provider call; every reason code; the default-mode matrix; the
@@ -222,18 +266,32 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
       (ACC-01-04); organization owners listed from the member's connection only (ACC-01-03); private-copy
       availability (ACC-01-05); renamed repository (`movedFrom`); empty repository; archived; 512 000 KB boundary
       (512 000 allowed, 512 001 refused); another account's link ⇒ Link unavailable, Fork available (ACC-01-09);
-      facade spies record zero write calls (ACC-01-06); `deployTargets` with the policy unbound, closed and open.
-      **Done when**: no test path can produce a mode or deploy target `available: true` alongside a reason code.
+      facade spies record zero write calls (ACC-01-06); `deployTargets` with the policy unbound, closed and open,
+      and **never `available: true` without a `providerId` for a non-`none` target**; the Blueprint match carrying
+      its `matchSource`, `displayName` and prompt descriptors, and a source-only preview carrying none
+      (ACC-01-21, ACC-01-22); three scan cases — a **30-organization fixture with no forks** gives ≤ 15 recorded
+      provider calls, the caller checked, every organization still `available: true`, the organizations the scan
+      did not reach flagged `existingForkChecked: false` and the response `scanIncomplete: true`; a
+      **2-organization fixture** gives `scanIncomplete: false`; and **no unreached owner carries a reason code**
+      (ACC-01-26).
+      **Done when**: no test path can produce a mode or deploy target `available: true` alongside a reason code, and
+      no unscanned owner is reported as having no fork.
 
 - [ ] **T13. `AppWorkCreateService`.**
       **Create** `packages/agent/src/app-works/app-work-create.service.ts` — `create(dto, user)` implementing
-      the twelve steps of [plan §4.2](./plan.md), injecting `AppSourceInspectorService`,
+      the steps of [plan §4.2](./plan.md) (including step 6a), injecting `AppSourceInspectorService`,
       `DistributedTaskLockService`, `GitFacadeService`, `DeployFacadeService`, `WorkRepository`,
       `WorkUpstreamStateRepository` (APW-02), `APP_FORK_READINESS_DISPATCHER` (APW-02), `EventEmitter2`,
-      `APP_SOURCE_CATALOG_PORT` (`@Optional()`, for the `blueprint_mismatch` check) and `APPS_TIER_POLICY`
-      (`@Optional()`, R-5). Error bodies `{ status: 'error', code, message, details? }`. Persist
-      `sourceRepository.blueprintId` when sent, and `sourceRepository.createdByThisWork` = `true` only when this
-      request issued the fork request or created the private-copy repository (R-4).
+      `APP_SOURCE_CATALOG_PORT` (for the Blueprint resolution of step 6a and the `blueprint_mismatch` refusal),
+      `APPS_TIER_POLICY` — the token imported from `packages/agent/src/app-runtime/ports.ts` (APW-06 T3, merged
+      ahead of this epic) and injected `@Optional()`, an unbound token meaning closed (R-5) — and
+      `APP_PROMPTED_VALUES_PORT` (`@Optional()`; unbound ⇒ the values are logged as dropped, never a refusal).
+      Error bodies `{ status: 'error', code, message, details? }`. Persist `sourceRepository.blueprintId` and
+      `sourceRepository.blueprintMatchSource` from step 6a (never from the request alone), and
+      `sourceRepository.createdByThisWork` = `true` only when this request issued the fork request or created the
+      private-copy repository (R-4). The deploy target of step 4 is persisted as the resolved plugin id — the
+      managed choice as the `apps-tier` plugin's id, **never** the literal `'ever-works'` — and its `providerId` is
+      echoed in `appSource.deployTarget`.
       **Modify** `packages/agent/src/services/work-lifecycle.service.ts` — in `createWork`, branch to
       `AppWorkCreateService.create` when `isAppWorkKind(normalizedKind)`; append the service to the
       constructor **last** and `@Optional()` (the positional-spec arity rule the class documents); skip
@@ -249,13 +307,23 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
       connection (ACC-01-03); copy name ladder stops at `-copy-5` and the shell is private (ACC-01-05); transaction
       failure after the fork leaves no row and a retry adopts the fork; `null` dispatch records
       `dispatch_unavailable`; `deployProvider: 'ever-works'` refused while `AppsTierPolicy` is unbound or closed
-      (ACC-01-12); onboarding deploy default never applied.
+      (ACC-01-12); the managed choice persisted as the `apps-tier` plugin id and **never** as the literal
+      `'ever-works'`; onboarding deploy default never applied; the Blueprint step-6a matrix — no id sent plus a
+      catalog match ⇒ that id and `matchSource: 'manifest'` persisted, no id sent plus `none`, `unavailable` or an
+      unbound port ⇒ no `blueprintId` and create still succeeds, id sent and equal to the match ⇒ the match's own
+      source kept, id sent for an unlisted repository ⇒ `explicit`, unknown id ⇒ `400 blueprint_mismatch` with zero
+      provider and zero repository writes (ACC-01-21); a renamed fork in an organization the scan did not reach is
+      still adopted at create with no fork request (ACC-01-26); a request carrying `appEnv` succeeds with the port
+      unbound and calls `storePrompted` once per name when it is bound, while no read response contains a value
+      (ACC-01-22).
       **Done when**: `createWork` for every non-`app` kind passes its existing specs unchanged.
 
 - [ ] **T14. Update and delete semantics.**
       **Modify** `packages/agent/src/services/work-lifecycle.service.ts` —
       `updateWork`: freeze `owner` for `app` (same shape as `repo`), restrict `deployProvider` to `null` or an
-      apps-capable plugin, refuse `'ever-works'` unless `AppsTierPolicy.isOpen()` (R-5);
+      apps-capable plugin, map it exactly as T13's step 4 (`'ever-works'` accepted only as an input alias for the
+      managed target and rewritten to the apps-tier plugin id; the literal is never persisted), refuse the managed
+      target unless `AppsTierPolicy.isOpen()` (R-5);
       `deleteWork`: the App branch of [plan §4.3](./plan.md) — `=== true` only, link refused, upstream
       full-name guard, admin check through `getRepository(...).permissions.admin`, partial-failure message,
       per-Work checkout removal (`checkoutKey: 'work:<id>:data'`, APW-02). (The workload removal of R-15 is T39.)
@@ -269,38 +337,74 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
 - [ ] **T15. `AppSourceInitializerService` (the ready handler, Resolution R-4).**
       **Create** `packages/agent/src/app-works/app-source-initializer.service.ts` implementing APW-02's
       `AppForkReadyHandler.onDataRepositoryReady({ workId })` per [plan §6](./plan.md): `AppSpecService.initialize`;
-      **Blueprint path** (`sourceRepository.blueprintId`) ⇒ `AppBlueprintApplyService.request` and no file write
-      here; **minimal path** ⇒ never clones: `getLatestCommit` + `getFileContent('.works/works.yml')`, parse with the
-      works-config loader, prototype-pollution strip, set `version`/`kind`/`spec.source`, content compare; when
-      `createdByThisWork` (fork or private copy) ⇒ one `GitFacadeService.commitFiles` on the default branch
-      (`nonFastForward` ⇒ re-read head, ≤ 3 retries); otherwise (link, pasted or adopted fork) ⇒ setup pull request
-      from `ever-works/app-setup` (reusing an open one) and outcome `waiting_for_setup_pr` with URL and number;
-      refusal on unparseable or other-kind files; follow-ups only when the source is on the default branch
-      (`initialized` or `unchanged`): `AppLicenseService.request` and — when no valid App spec exists —
-      `AppProvisioningService.start({ workId, trigger: 'auto-create' })`; one Activity row per outcome via
-      `ActivityLogService.log` with `{ blueprint: boolean, setupPullRequest: boolean }`.
+      **Blueprint path** (`sourceRepository.blueprintId` **and the default-branch file does not already record that
+      same Blueprint with `spec.source`**) ⇒ `AppBlueprintApplyService.request(workId, blueprintId, { userId,
+matchSource: sourceRepository.blueprintMatchSource ?? 'explicit', confirmForkMatch: false })`, no file write
+      here, and outcome **`blueprint_requested`** — which means readiness **stays `preparing`** with
+      `readinessReason: 'blueprint_applying'` (no `readyAt`, no `app.fork.ready`, no APW-04 `forkReady`, no
+      `nextSyncAt`), APW-03's apply job reporting back through APW-02's `APP_SOURCE_APPLY_REPORTER`; when the file
+      already records the Blueprint, fall through to the minimal path so the `setup_merged` re-invocation returns
+      `unchanged` and runs its follow-ups exactly once. APW-03's `applyInProgress` refusal also returns
+      `blueprint_requested`; any other apply refusal is `failed/blueprint_<code>`. **Minimal path** ⇒ never clones:
+      `getLatestCommit` + `getFileContent('.works/works.yml')`, parse with the works-config loader,
+      prototype-pollution strip, set `version`/`kind`/`spec.source`, content compare; when `createdByThisWork` (fork
+      or private copy) ⇒ one `GitFacadeService.commitFiles` on the default branch (`nonFastForward` ⇒ re-read head,
+      ≤ 3 retries); otherwise (link, pasted or adopted fork) ⇒ setup pull request from `ever-works/app-setup`,
+      created with **`GitFacadeService.createBranchFromSha(owner, repo, 'ever-works/app-setup', head.sha)`** —
+      **never `createBranch` with a sha**: the existing `createBranch` resolves `heads/<fromRef>` and so takes a
+      branch name only, and a sha passed to it 404s (`git.facade.ts:692-697`,
+      `github-api.service.ts:576-580`) — reusing an open pull request when there is one, reusing an existing branch
+      with the branch's own head as `baseSha` when there is not, and returning `waiting_for_setup_pr` with URL and
+      number; `GitOperationNotSupportedError` from either capability ⇒ `failed/provider_unsupported`; refusal on
+      unparseable or other-kind files; follow-ups only when the source is on the default branch (`initialized` or
+      `unchanged`): `AppLicenseService.request` and — when **`AppSpecService.hasValidAppSpec(workId, sha)`** is
+      false, which a `source`-only file always is — `AppProvisioningService.start({ workId, trigger: 'auto-create'
+})`; one Activity row per outcome via `ActivityLogService.log` with `{ blueprint: boolean, setupPullRequest:
+boolean }`.
+      **Modify** `packages/agent/src/app-works/app-works.module.ts` — provide **and export**
+      `AppSourceInitializerService`.
       **Modify** `apps/api/src/app-works/app-works.module.ts` (created by APW-02 T27) — bind
-      `APP_FORK_READY_HANDLER` with `useExisting: AppSourceInitializerService`.
-      **Modify** `packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts` — provide the same
-      binding in the worker.
+      `APP_FORK_READY_HANDLER` with `useExisting: AppSourceInitializerService`. **The handler runs in the API
+      process**: every dependency it needs (the database, `ActivityLogService`, APW-03's and APW-04's services, the
+      dispatchers) lives in API-side injection, and it clones nothing.
+      **Modify** `apps/api/src/trigger/trigger-internal.controller.ts` — add
+      `@Optional() private readonly appSourceInitializerService?: AppSourceInitializerService` **appended last**
+      (the controller's arity rule) and `AppSourceInitializerService: this.appSourceInitializerService` to
+      `remoteMap`; `onDataRepositoryReady` is **not** added to `RETRY_SAFE_REMOTE_METHODS`.
+      **Modify** `packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts` — bind
+      `APP_FORK_READY_HANDLER` to `createRemoteProxy(apiClient, 'AppSourceInitializerService')`. **Do not provide
+      the class or import `AppWorksModule` in the worker**: it has no database module and no `ActivityLogService`.
       **Test**: **create** `packages/agent/src/app-works/__tests__/app-source-initializer.service.spec.ts` —
-      Blueprint path requests apply and writes nothing (ACC-01-19); created fork ⇒ exactly one `commitFiles` on the
-      default branch and zero `cloneOrPull` calls (ACC-01-02); link ⇒ zero default-branch writes, one setup pull
-      request, source relation `link`, Activity `app.source.linked` (ACC-01-01); adopted fork ⇒ setup pull request,
-      never `commitFiles` on the default branch (ACC-01-04); retry reuses the open pull request (ACC-01-17); keys
-      preserved; unchanged ⇒ no commit; unparseable ⇒ untouched + failed; other kind ⇒ untouched + failed;
-      provisioning started only when the source is on the default branch, without a valid spec, and at most once
-      (ACC-01-19); Activity payloads contain no body text.
+      Blueprint path requests apply and writes nothing, returns `blueprint_requested` and emits no readiness
+      (ACC-01-19); a re-invocation on a file that already records the Blueprint returns `unchanged` with zero
+      `request` calls and its follow-ups once, and an `applyInProgress` refusal still returns `blueprint_requested`;
+      created fork ⇒ exactly one `commitFiles` on the default branch and zero `cloneOrPull` calls (ACC-01-02);
+      link ⇒ zero default-branch writes, one `createBranchFromSha` call **whose 4th argument equals the mocked
+      `getLatestCommit` sha** followed by `commitFiles` with that same `baseSha`, **zero `createBranch` calls**, one
+      setup pull request, source relation `link`, Activity `app.source.linked` (ACC-01-01); missing
+      `createBranchFromSha` ⇒ `failed/provider_unsupported` and no pull request; an existing branch is reused with
+      the branch's own head as `baseSha`; adopted fork ⇒ setup pull request, never `commitFiles` on the default
+      branch (ACC-01-04); retry reuses the open pull request (ACC-01-17); keys preserved; unchanged ⇒ no commit;
+      unparseable ⇒ untouched + failed; other kind ⇒ untouched + failed; **provisioning**: created fork on the
+      minimal path ⇒ `start` exactly once while `validationStatus` is still `missing`, post-merge re-invocation on
+      a source-only file ⇒ `start` once, `unchanged` on a file that already holds a valid full spec ⇒ `start` not
+      called, a full spec with errors ⇒ `start` called (ACC-01-19); Activity payloads contain no body text.
       **Done when**: running the handler twice on the same Work produces exactly one commit (created fork) or exactly
-      one open setup pull request (link), and the spec's facade spy records zero `cloneOrPull` calls.
+      one open setup pull request (link), the spec's facade spy records zero `cloneOrPull` calls, and
+      `apps/api/src/trigger/trigger-internal.controller.spec.ts` lists `AppSourceInitializerService` in `remoteMap`
+      with `onDataRepositoryReady` in its method allow-list.
 
 - [ ] **T16. Deploy refusal until the App runtime.**
       **Modify** `apps/api/src/plugins-capabilities/deploy/deploy.service.ts` — beside the `repo` refusal
       (~198), refuse `isAppWorkKind` with `409 { code: 'app_runtime_unavailable', message: 'Deploying App
-Works arrives with the App runtime.' }` unless APW-06's app route is registered (an `@Optional()` token
-      APW-06 declares; absent ⇒ refuse).
+Works arrives with the App runtime.' }` unless APW-06's App path is registered. The probe is the
+      **`APP_WORK_DEPLOY_ROUTE` token APW-06 T4 declares in `packages/agent/src/app-runtime/ports.ts`** (the file
+      APW-06 T3 creates ahead of this epic per the Prerequisites, the token APW-06 T4 adds), injected `@Optional()`
+      and appended last; this task declares nothing of its own, and an unbound token means "APW-06 has not merged",
+      so the refusal stands.
       **Test**: extend `apps/api/src/plugins-capabilities/deploy/deploy.service.spec.ts` — `app` refused before
-      `getPluginAndTokenAndSettings` is called, with the facade mocked to throw as production does (ACC-01-12).
+      `getPluginAndTokenAndSettings` is called, with the facade mocked to throw as production does (ACC-01-12), and
+      the same spec re-run with the token bound ⇒ the refusal is replaced by the App path.
       **Done when**: no `app` Work can reach the website workflow dispatch (the spec's dispatch spy records zero calls).
 
 ## P1.4 — API
@@ -340,9 +444,18 @@ Works arrives with the App runtime.' }` unless APW-06's app route is registered 
 - [ ] **T20. Flag semantics for `app`.**
       **Modify** `apps/web/src/lib/feature-flags/work-kinds.ts` — `FAIL_CLOSED_WORK_KINDS = ['app']`; for those
       values, missing key, missing flag, `undefined`, error and timeout all add the value to the disabled set.
+      **Modify** the same file (and the server-side caller that reads it) — when **no PostHog client is configured
+      at all** (no `POSTHOG_API_KEY`), the fail-closed set is decided by the runtime instance setting read
+      **server-side at request time** (`EVER_WORKS_APP_WORKS_ENABLED`, the API twin — never a build-time
+      `NEXT_PUBLIC_*` variable), so chip and API always agree. This is what makes the chip visible in the PR e2e
+      lane, in local development and on a self-hosted install without PostHog, and every other `works-<kind>` flag
+      keeps its fail-open behaviour untouched (FR-47).
       **Test**: **create** `apps/web/src/lib/feature-flags/work-kinds.unit.spec.ts` — `app` disabled without
-      PostHog, enabled only on explicit `true`; `blog` still fail-open (ACC-01-13).
-      **Done when**: an instance with no PostHog key shows no **App** chip.
+      PostHog **and** the runtime setting unset; **enabled** without PostHog and the runtime setting `true`;
+      disabled with a PostHog client and a missing flag, an `undefined` value or an error; enabled only on an
+      explicit `true` with a client; `blog` still fail-open in all of those cases (ACC-01-13, ACC-01-25).
+      **Done when**: an instance with no PostHog key and the setting off shows no **App** chip, an instance with no
+      PostHog key and the setting on shows it, and no other kind's flag semantics changed.
 
 - [ ] **T21. Client plumbing.**
       **Modify** `apps/web/src/lib/api/work.ts` — `CreateWorkDto` + `repositoryMode?`, `targetOwner?`,
@@ -361,19 +474,35 @@ Works arrives with the App runtime.' }` unless APW-06's app route is registered 
       **Create** `apps/web/src/components/works/app/AppWorkForm.tsx`,
       `apps/web/src/components/works/app/AppSourcePreviewCard.tsx`, `apps/web/src/components/works/app/AppModeCards.tsx`,
       `apps/web/src/components/works/app/AppTargetOwnerPicker.tsx` and
-      `apps/web/src/components/works/app/AppDeployTargetPicker.tsx` per [plan §5.2–5.3](./plan.md) and spec §6.1–6.3,
+      `apps/web/src/components/works/app/AppDeployTargetPicker.tsx` and
+      `apps/web/src/components/works/app/AppBlueprintPrompts.tsx` per [plan §5.2–5.3](./plan.md) and spec §6.1–6.3,
       including the **Paste a URL** / **Browse the Apps catalog** tabs that mount APW-03's `AppsCatalogBrowser` (a pick
       fills the URL, carries `blueprintId` and runs inspect once), the R-3 license chip copy, and the deploy target
-      picker defaulting to **None — don't deploy yet** (R-12) with availability from inspect's `deployTargets`, with
+      picker defaulting to **None — don't deploy yet** (R-12) with availability from inspect's `deployTargets`,
+      with
       `data-testid`s `app-work-url`, `app-work-check`, `app-work-mode-<mode>`, `app-work-owner`,
       `app-work-deploy-none`, `app-work-deploy-your-cluster`, `app-work-deploy-ever-works-apps`, `app-work-submit`.
+      **Submit carries the Blueprint and the target, never a guess.** On the **Paste a URL** tab, when the current
+      preview has `blueprint.status === 'matched'` the submit payload sends `blueprintId = preview.blueprint.id`;
+      clearing the URL or the preview clears it. For a non-`none` deploy target the payload sends the target's
+      **`providerId`** from `preview.deployTargets[choice]` — the picker never invents an id (FR-34).
+      **`AppBlueprintPrompts`** renders the preview's prompt descriptors (name, description, `Required`) for a
+      matched Blueprint, one input per prompt, never pre-filled from a stored value; its answers are collected into
+      the write-only `appEnv` field of the submit payload, and while a `Required` prompt is empty the submit button
+      is disabled with `Fill in the values the app needs first.` (FR-55).
       **Test**: **create** `apps/web/src/components/works/app/AppWorkForm.unit.spec.tsx`,
-      `apps/web/src/components/works/app/AppModeCards.unit.spec.tsx` and
+      `apps/web/src/components/works/app/AppModeCards.unit.spec.tsx`,
+      `apps/web/src/components/works/app/AppBlueprintPrompts.unit.spec.tsx` and
       `apps/web/src/components/works/app/AppTargetOwnerPicker.unit.spec.tsx` — inspect only on click/Enter; URL change
       clears the preview; disabled cards announce reasons (every ACC-01-07 code); `↑`/`↓` skip disabled; owner switch
       re-derives without a request; private-copy trade-off copy shown before submit (ACC-01-05); submit label per mode;
       single-flight submit (ACC-01-08); **None** selected by default and Ever Works Apps disabled with its reason
-      (ACC-01-12); a catalog pick fills the URL, keeps `blueprintId` and inspects exactly once (ACC-01-19).
+      (ACC-01-12); a catalog pick fills the URL, keeps `blueprintId` and inspects exactly once (ACC-01-19);
+      run a provider check proving that an owner the preview did not check (`existingForkChecked: false`) is still
+      selectable and shows no existing-fork line (ACC-01-26); paste with a matched preview ⇒ the submit payload
+      carries that `blueprintId`, no match ⇒ it omits it, URL change ⇒ it is cleared (ACC-01-21); prompts render with
+      their required markers, a `Required` prompt left empty disables submit with its copy, and the submitted
+      `appEnv` holds the typed values (ACC-01-22); a non-`none` target submits its `providerId` (ACC-01-27).
       **Done when**: the form renders every spec §6.3 reason string from a fixture.
 
 - [ ] **T23. Chips and routing.**
@@ -440,13 +569,19 @@ Works arrives with the App runtime.' }` unless APW-06's app route is registered 
 ## P1.7 — i18n, tests, docs
 
 - [ ] **T27. i18n keys.**
-      **Modify** `apps/web/messages/en.json` — every key in [plan §8](./plan.md) with spec §6 copy verbatim.
+      **Modify** `apps/web/messages/en.json` — every key in [plan §8](./plan.md) with spec §6 copy verbatim,
+      including the keys added by the program audit: `dashboard.workCreation.app.promptsTitle`,
+      `promptsHint`, `promptRequired`, `promptsIncomplete`, the Blueprint setup-note variants
+      (`linkSetupNoteBlueprint`, `existingForkSetupNoteBlueprint`), the Blueprint-delete note
+      `deleteAppStoredDataTypeToConfirm`, the skipped-import note `dashboard.settings.import.appSkipped`, and the
+      `preparingBlueprintTitle` / `preparingBlueprintBody` pair for `blueprint_applying`.
       **Modify** the 20 sibling locale files in `apps/web/messages/` (localised where a translator is available,
       English otherwise; `apps/web/scripts/sync-locale-parity.mjs` seeds missing leaves). No leaf key contains `.`.
       **Test**: **create** `apps/web/src/components/works/app/app-works-messages.unit.spec.ts` (pattern of
       `apps/web/src/components/tasks/tasks-kanban-messages.unit.spec.ts`) — loads all 21 files in
       `apps/web/messages/`, asserts every leaf under `dashboard.workCreation.app`, `dashboard.workDetail.appSource`,
-      the `dashboard.workDetail.settings.deleteApp*` leaves, the four chip/kind `app` keys and
+      the `dashboard.workDetail.settings.deleteApp*` leaves, the four chip/kind `app` keys,
+      `dashboard.settings.import.appSkipped` and
       `dashboard.activity.filters.types.appSource` exists in every file, and that no leaf key under those trees
       contains `.` (ACC-01-18); run `cd apps/web && npx vitest run src/components/works/app/app-works-messages.unit.spec.ts`.
       **Done when**: the spec is green over the 21 files.
@@ -483,9 +618,13 @@ Works arrives with the App runtime.' }` unless APW-06's app route is registered 
       **Modify** `packages/agent/src/app-works/index.ts` — export the port.
       **Modify** `packages/agent/src/items-generator/dto/delete-items-generator.dto.ts` — `DeleteWorkDto` gains
       `delete_stored_data?: boolean = false` (`@IsOptional`, `@IsBoolean`, `@ApiPropertyOptional` stating it applies
-      to kind `app` only).
+      to kind `app` only) **and** `confirm_slug?: string` (`@IsOptional`, `@IsString`, `@MaxLength(200)`), the
+      server-side half of the typed confirmation (FR-40b).
       **Modify** `packages/agent/src/services/work-lifecycle.service.ts` — inject `APP_WORK_DELETION_PORT`
-      `@Optional()` (appended last); in `deleteWork` for kind `app`, refuse the linked-repository request first, then
+      `@Optional()` (appended last); in `deleteWork` for kind `app`, refuse the linked-repository request first,
+      then — when `delete_stored_data === true` — require `confirm_slug === work.slug`, else
+      `422 { code: 'confirmation_mismatch' }` **before the port is called or any repository step runs** (FR-40b);
+      then
       call `requestDeletion` before any repository step with `deleteStoredData: delete_stored_data === true`; unbound or
       a throw ⇒ taken as `done` (a throw appends the target and reason code to `message`); `done` ⇒ the row is deleted
       in the request; `pending` ⇒ `200 { deleting: true, message }` and the row stays. **Add**
@@ -493,19 +632,30 @@ Works arrives with the App runtime.' }` unless APW-06's app route is registered 
       the local checkout, idempotent, never touches a repository. **Modify**
       `packages/agent/src/items-generator/dto/delete-items-generator.dto.ts` response — `DeleteWorkResponseDto` gains
       `deleting?: boolean`.
-      **Modify** `apps/web/src/lib/api/work.ts` — `DeleteWorkDto` gains `delete_stored_data?: boolean`.
+      **Modify** `apps/mcp/src/openapi-tools/whitelist.ts` — the `delete_work` entry gains
+      `omitArgs: ['delete_stored_data', 'confirm_slug']`, so neither the stored-data flag nor its confirmation is
+      advertised as a tool argument and no agent can destroy stored data through MCP (FR-40b).
+      **Modify** `apps/web/src/lib/api/work.ts` — `DeleteWorkDto` gains `delete_stored_data?: boolean` and
+      `confirm_slug?: string`.
       **Modify** `apps/web/src/components/works/detail/settings/DeleteComponent.tsx` — for `app`: the workloads note;
       **Also delete stored data** checkbox + typed App Work slug, shown when the deploy target is not `none`, sending
-      `delete_stored_data: true` only when both are satisfied; kept independent of the fork checkbox.
+      `delete_stored_data: true` **and** `confirm_slug: <typed slug>` only when both are satisfied; kept independent
+      of the fork checkbox. The target it reads is **APW-06's `GET /api/works/:id/app-target`**, and a `404`
+      (APW-06 not merged, or no runtime row yet) is treated as `none`, which hides the checkbox (FR-34).
       **Test**: extend `packages/agent/src/services/__tests__/work-lifecycle.app-kind.spec.ts` — a linked-repository
-      delete request is refused before the port is called; port called once, before any repository deletion call, with
+      delete request is refused before the port is called; `delete_stored_data: true` without `confirm_slug`, and
+      with a non-matching one, is refused with `422 confirmation_mismatch` **and the port is never called**; the
+      matching pair proceeds; port called once, before any repository deletion call, with
       `deleteStoredData: false` when the flag is omitted and `true` only when it is `true`; the fork decision is identical
       with either value; `done` ⇒ row deleted; `pending` ⇒ row kept, response `deleting: true`, and a later
       `completeAppWorkDeletion(workId)` deletes it (a second call is a no-op); port unbound ⇒ deletion proceeds; port
       throws ⇒ row deleted and the message names the target; non-`app` kinds never call the port. Extend
+      `apps/mcp/test/whitelist-app-works.spec.ts` — `delete_work` lists both names in `omitArgs` and the generated
+      tool schema carries neither. Extend
       `apps/web/src/components/works/detail/settings/DeleteComponent.unit.spec.tsx` — stored-data checkbox hidden for
-      target `none`; payload carries `delete_stored_data: true` only after the typed App Work slug matches; ticking it never
-      sets `delete_data_repository` (ACC-01-20).
+      target `none` **and when `GET app-target` answers 404**; payload carries `delete_stored_data: true` and the
+      typed `confirm_slug` only after the typed App Work slug matches; ticking it never
+      sets `delete_data_repository` (ACC-01-20, ACC-01-24).
       **Done when**: both specs are green and `packages/agent/src/services/__tests__/work-lifecycle.delete.spec.ts`
       passes unchanged.
 
@@ -525,6 +675,54 @@ Works arrives with the App runtime.' }` unless APW-06's app route is registered 
       request) and ACC-01-16 (the 15-minute copy; Try again never requests a second fork).
       **Done when**: both pass in the fake-GitHub e2e shard; a run with `EVER_WORKS_E2E_FAKES` unset (where the spec
       self-skips, as every `flow-app-work-*` spec does) is not accepted as evidence.
+
+- [ ] **T41. Account import and restore never create or convert an App Work (FR-54).**
+      **Modify** `packages/agent/src/account-transfer/account-import.service.ts` — `normalizeImportedWorkKind`
+      (lines 62-69) must return `undefined` for `'app'` instead of accepting it, and the overwrite branch
+      (`updateData.kind = importedKind`, lines 732-738) must skip the assignment when either the imported kind or
+      the existing Work's kind is `app`, so an import can neither create an App Work nor turn a Repository Work into
+      one (nor an App Work back). The entry is reported as skipped with the kind it kept; no error is raised and no
+      other entry's import changes.
+      **Modify** `packages/agent/src/account-transfer/account-import.service.ts` — the import report gains the
+      skip reason code `app_kind_not_importable` beside the existing per-entry outcomes.
+      **Test**: extend `packages/agent/src/account-transfer/account-import.service.spec.ts` — an export whose entry
+      claims kind `app` creates nothing and is listed as skipped; an overwrite whose exported kind is `app` leaves
+      the existing Work's kind untouched; an overwrite of an existing App Work by a `repo` entry leaves it `app`;
+      every other kind imports exactly as before (ACC-01-23).
+      **Done when**: the spec is green, `WORK_KINDS` is unchanged, and a grep over the import path shows `'app'` is
+      never assigned to `kind`.
+
+- [ ] **T42. Blueprint parity across every client (FR-56).**
+      **Modify** `apps/web/src/lib/ai/tools/work.tools.ts` — for `kind === 'app'` the confirmation calls the
+      read-only `inspectAppSource` first and appends "with the {name} App Blueprint" when a Blueprint matched, so a
+      Blueprint is never applied unseen; the tool passes neither a guessed nor a stale `blueprintId`.
+      **Modify** `apps/mcp/src/openapi-tools/whitelist.ts` — the count comment beside the Works block, so the new
+      read-only inspect tool and the `appEnv` field are accounted for.
+      **Modify** `docs/features/app-works.md` (created by T29) — one paragraph: the Blueprint is chosen by the
+      server from the resolution order, whichever client creates the App Work, and a client that names a different
+      one is refused.
+      **Test**: extend `apps/web/src/lib/ai/tools/work.tools.app.unit.spec.ts` — a matched Blueprint is named in
+      the confirmation; the created call carries no `blueprintId` of its own; extend
+      `apps/mcp/test/whitelist-app-works.spec.ts` — `create_work` exposes `appEnv` and no blueprint override; run
+      the APW-01 T13 create spec against a fake catalog to assert the same Blueprint id is persisted for a web
+      payload and a chat payload with no id (ACC-01-21).
+      **Done when**: the three specs are green and the same resolution order is asserted for the web, chat and MCP
+      paths.
+
+- [ ] **T43. Prompted values, end to end (FR-55).**
+      **Modify** `packages/agent/src/dto/create-work.dto.ts` — `appEnv?: Record<string, string>` (`@IsOptional`,
+      `@IsObject`, each value `@IsString`, `@MaxLength(8192)`, `@ApiPropertyOptional` stating **write-only**), and
+      mark it so the generated OpenAPI never lists it as a response property.
+      **Modify** `packages/agent/src/app-works/app-work-create.service.ts` — after the transaction of T13 step 10
+      commits, hand the values to `APP_PROMPTED_VALUES_PORT.storePrompted(workId, values)` `@Optional()`, once, and
+      never log them; unbound ⇒ log the count only and continue.
+      **Modify** `apps/api/src/works/dto/create-work.dto.ts` (or the Swagger decorators on the agent DTO) — no
+      response DTO ever echoes `appEnv`.
+      **Test**: extend `packages/agent/src/app-works/__tests__/app-work-create.service.spec.ts` — the port receives
+      exactly the typed names once per create; unbound ⇒ the create still succeeds; a value is never written to the
+      Activity row, the telemetry payload or the response; the schema rejects a non-string value and a value over
+      8 192 characters (ACC-01-22).
+      **Done when**: the spec is green and `git grep -n "appEnv" apps/api/src` shows no read path.
 
 ## P1.9 — Ship gate
 
@@ -629,6 +827,8 @@ _Refines spec FR-9 (all organizations) and adds the P2 items in [plan §11](./pl
   an App Work.
 - Inspect produces no GitHub write in any test (asserted by facade spies); no code path in this epic clones a data
   repository to record its source, or pushes to a default branch it did not create.
-- ACC-01-01 … ACC-01-20 are each covered by an automated test here or listed as a live scenario in
+- ACC-01-01 … ACC-01-27 are each covered by an automated test here or listed as a live scenario in
   [ACCEPTANCE.md](../ACCEPTANCE.md) for APW-13.
+- Every task named in the Prerequisites is merged before this epic's P1, in the program merge order; no task here
+  adds, renames or removes a symbol another epic owns.
 - Every gate in [plan §12](./plan.md) is confirmed, and its carried-forward gaps are still recorded there.

@@ -1,0 +1,232 @@
+# GOLDEN — cal-diy · target ever-works-apps · the `Work` resource handed to the tier
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml (sha256 538a1389bc4dfc0f8fab31821d6e78aca2a0622d1f0e55fec1794433b646c16a)
+# Producer  : packages/plugins/ever-works-apps/src/desired-state.mapper.ts (APW-10 plan.md §5.2),
+#             writing CRD group hosting.ever.works/v1alpha1 (APW-10 plan.md §3.1).
+# This is DESIRED STATE handed to the tier (Resolution R-5, APW-06 spec.md FR-7) — the platform
+# applies no Deployment, Service, Ingress, Secret or namespace of its own for this target.
+# The zone controller renders it with APW-06’s renderer and applies its own non-overridable
+# overlays (APW-10 plan.md §2.1 D-C, §3.4). `status` is written by the tier, never here.
+# Pinned inputs and the placeholder convention: ../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — `env.sealed` is a sealed payload, never plaintext.
+#
+# GAPS this file cannot express (reported, not fixed — see ../README.md §"Blueprint ✗ spec"):
+#   · `authScheme` (APW-13 addition, CONTRACTS §1) has no field in the Work cron shape:
+#     APW-10 plan.md:245 lists `http: { method, path, authEnv }` only.
+#   · `dependencies[].kind` is `postgres|redis|objectStorage` — an `smtp` dependency cannot appear.
+#   · `components[].volumes[].backup` is not in the Work volume shape (name, path, size).
+apiVersion: hosting.ever.works/v1alpha1
+kind: Work
+metadata:
+    name: w-11111111-1111-4111-8111-111111111111
+    namespace: ever-works-apps-control
+    labels:
+        hosting.ever.works/owner: 55555555-5555-4555-8555-555555555555
+        hosting.ever.works/canary: 'false'
+spec:
+    workId: 11111111-1111-4111-8111-111111111111
+    ownerUserId: 55555555-5555-4555-8555-555555555555
+    organizationId: null
+    generation: 1
+    quotaProfile: starter
+    desiredState: running
+    pausedReplicas: null
+    dataDeletion: null
+    quarantine: null
+    egressThrottle: false
+    images:
+        - component: web
+          source: ghcr.io/example-owner/cal.diy/ever-works-app@sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0
+          pullCredential:
+              sealed: '<sealed pull credential — APW-05 FR-19, sealed to the controller key>'
+    components:
+        - name: web
+          role: web
+          command:
+              - /calcom/scripts/start.sh
+          port: 3000
+          replicas: 1
+          resources:
+              cpu: 500m
+              memory: 1536Mi
+              memoryLimit: 3Gi
+          probes:
+              startup:
+                  http: /api/version
+                  periodSeconds: 10
+                  failureThreshold: 60
+              readiness:
+                  http: /auth/login
+              liveness:
+                  http: /api/version
+                  periodSeconds: 30
+          writableRootFilesystem: true
+    jobs:
+        - name: migrate
+          when: pre-deploy
+          component: web
+          command:
+              - npx
+              - prisma
+              - migrate
+              - deploy
+              - '--schema'
+              - /calcom/packages/prisma/schema.prisma
+          timeoutSeconds: 1800
+        - name: bootstrap-admin
+          when: first-deploy
+          component: web
+          command:
+              - node
+              - '--input-type=module'
+              - '-e'
+              - |
+                  const res = await fetch(`${process.env.APP_WEB_INTERNAL_URL}/api/auth/setup`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                      username: 'admin',
+                      full_name: 'Administrator',
+                      email_address: process.env.APP_BOOTSTRAP_ADMIN_EMAIL,
+                      password: process.env.APP_BOOTSTRAP_ADMIN_PASSWORD,
+                    }),
+                  });
+                  const text = await res.text();
+                  if (res.ok) { console.log('bootstrap-admin: created'); process.exit(0); }
+                  if (res.status === 400 && text.includes('No setup needed')) { console.log('bootstrap-admin: already done'); process.exit(0); }
+                  console.error(`bootstrap-admin: unexpected HTTP ${res.status}`); // never print the body: it may echo input
+                  process.exit(1);
+          timeoutSeconds: 300
+        - name: close-signup
+          when: first-deploy
+          component: web
+          command:
+              - sh
+              - '-c'
+              - |
+                  npx prisma db execute --schema /calcom/packages/prisma/schema.prisma --stdin <<'SQL'
+                  UPDATE "Feature" SET enabled = true WHERE slug = 'disable-signup';
+                  SQL
+          timeoutSeconds: 300
+    cron:
+        - name: tasker
+          schedule: '* * * * *'
+          http:
+              method: GET
+              path: /api/tasks/cron
+              authEnv: CRON_SECRET
+              authScheme: bearer
+        - name: tasker-cleanup
+          schedule: 0 0 * * *
+          http:
+              method: GET
+              path: /api/tasks/cleanup
+              authEnv: CRON_SECRET
+              authScheme: bearer
+        - name: calendar-subscriptions
+          schedule: '*/5 * * * *'
+          http:
+              method: GET
+              path: /api/cron/calendar-subscriptions
+              authEnv: CRON_SECRET
+              authScheme: bearer
+        - name: calendar-subscriptions-cleanup
+          schedule: 0 3 * * *
+          http:
+              method: GET
+              path: /api/cron/calendar-subscriptions-cleanup
+              authEnv: CRON_SECRET
+              authScheme: bearer
+        - name: booking-reminder
+          schedule: '*/15 * * * *'
+          http:
+              method: POST
+              path: /api/cron/bookingReminder
+              authEnv: CRON_API_KEY
+              authScheme: raw
+        - name: change-time-zone
+          schedule: 0 * * * *
+          http:
+              method: POST
+              path: /api/cron/changeTimeZone
+              authEnv: CRON_API_KEY
+              authScheme: raw
+        - name: webhook-triggers
+          schedule: '* * * * *'
+          http:
+              method: POST
+              path: /api/cron/webhookTriggers
+              authEnv: CRON_API_KEY
+              authScheme: raw
+    smoke:
+        - name: version
+          component: web
+          path: /api/version
+          method: GET
+          expect:
+              status:
+                  - 200
+          firstDeployOnly: false
+        - name: login
+          component: web
+          path: /auth/login
+          method: GET
+          expect:
+              status:
+                  - 200
+              bodyNotContains:
+                  - localhost:3000
+                  - NEXT_PUBLIC_WEBAPP_URL_PLACEHOLDER
+          firstDeployOnly: false
+        - name: setup-closed
+          component: web
+          path: /api/auth/setup
+          method: POST
+          expect:
+              status:
+                  - 400
+          firstDeployOnly: false
+        - name: cron-refuses-anonymous
+          component: web
+          path: /api/tasks/cron
+          method: GET
+          expect:
+              status:
+                  - 401
+          firstDeployOnly: false
+    hosts:
+        - host: cal-diy.ever.works
+          kind: managed
+          customHostnameRef: null
+    env:
+        sealed: <sealed env payload — hybrid RSA-OAEP-256 + AES-256-GCM to the controller public key>
+        names:
+            - NEXTAUTH_SECRET
+            - CALENDSO_ENCRYPTION_KEY
+            - CRON_API_KEY
+            - CRON_SECRET
+            - DATABASE_URL
+            - DATABASE_DIRECT_URL
+            - DATABASE_HOST
+            - NEXT_PUBLIC_WEBAPP_URL
+            - NEXTAUTH_URL
+            - NEXTAUTH_URL_INTERNAL
+            - APP_WEB_INTERNAL_URL
+            - EMAIL_SERVER_HOST
+            - EMAIL_SERVER_PORT
+            - EMAIL_SERVER_USER
+            - EMAIL_SERVER_PASSWORD
+            - EMAIL_FROM
+            - EMAIL_FROM_NAME
+            - CALCOM_TELEMETRY_DISABLED
+            - TURBO_TELEMETRY_DISABLED
+            - TZ
+            - GOOGLE_LOGIN_ENABLED
+            - APP_BOOTSTRAP_ADMIN_EMAIL
+            - APP_BOOTSTRAP_ADMIN_PASSWORD
+            - GOOGLE_API_CREDENTIALS
+            - GOOGLE_WEBHOOK_TOKEN
+    dependencies:
+        - kind: postgres
+          ref: <apw-07 dependency ref for postgres>
+        - kind: smtp
+          ref: <apw-07 dependency ref for smtp>

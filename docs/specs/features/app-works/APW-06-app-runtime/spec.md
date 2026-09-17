@@ -227,6 +227,20 @@ Work itself is deleted.
   Your cluster, **when** a verification runs, **then** a temporary namespace separate from the live app is created with
   no public host, no custom domain and no DNS record, dependencies without persistent volumes, and smoke checks run from
   inside it; it is removed entirely when the verification ends or its time limit passes, and no Deployment is recorded.
+- **S35 — An app whose image is published, not built.** **Given** an App Work whose App spec names an existing image
+  rather than a Dockerfile or an automatic build, **when** the owner presses **Deploy**, **then** the Deployment starts
+  with no Build and no Build entry appears in the history, the image is fetched once and pinned by digest, the Deploy tab
+  shows the short digest in place of a Build link, and **Roll back** returns to a previous Deployment's recorded digest
+  without fetching the tag again. **Given** the named image cannot be read without credentials, **then** the Deployment
+  fails with **"This image can't be downloaded without credentials. Ever Works deploys published images only when they
+  are public."**; **given** it is named only by a movable tag, **then** the Deployment proceeds on Your cluster with
+  **"This image is referenced by tag. Pin it by digest so every Deployment runs the same image."** while Ever Works Apps
+  refuses it before anything is applied.
+- **S36 — Dependencies before the first Deployment.** **Given** an App Work on Your cluster whose App spec declares a
+  database, **when** the owner saves the target, **then** the app's namespace and its baseline network policies are
+  created before the database is provisioned — nothing waits for a Deployment — the database becomes ready within its
+  deadline, and only then does the first Deployment run. **Given** the owner has switched network isolation off,
+  **then** other pods still cannot reach the database.
 
 ---
 
@@ -286,10 +300,13 @@ Every threshold below is a number on purpose.
 
 ### 4.2 What runs on the cluster
 
-- **FR-10.** Each App Work gets its own namespace per cluster, named once at first Deployment and never renamed
+- **FR-10.** Each App Work gets its own namespace per cluster, named once when the App Work is first **prepared** on
+  that cluster — dependency provisioning or the first Deployment, whichever comes first — and never renamed
   (a slug rename does not move it). A namespace that belongs to another Work, or that holds objects Ever
   Works did not create, is refused unless the owner explicitly chose it. Platform-reserved namespaces are
-  always refused.
+  always refused. Preparing a namespace also installs the baseline network policies of FR-20 before any
+  dependency is provisioned, so requiring a dependency to be ready before the first Deployment (FR-24) never
+  waits on a Deployment to create them.
 - **FR-11.** Each component runs as its own workload with its declared replicas (0–10). Web components get an
   in-cluster service; only the primary web component is published on domains.
 - **FR-12.** Security defaults for every container: no privilege escalation, every Linux capability dropped,
@@ -311,7 +328,9 @@ Every threshold below is a number on purpose.
 - **FR-17.** Runtime env values (APW-07) are delivered as a secret whose contents change the pods' identity, so
   a changed value always restarts pods on the next Deployment and an unchanged value never does. Each
   Deployment keeps its own immutable copy so a rollback restores the matching values; the current and 2
-  previous copies are kept.
+  previous copies are kept. A Deployment of the same Build with unchanged env values and unchanged platform
+  variables therefore leaves running pods in place — pre-deploy jobs and smoke checks still run — and no
+  per-Deployment fact (its id, its short id, a timestamp, a counter) is ever placed in a pod template.
 - **FR-18.** The platform adds read-only variables prefixed `EVER_WORKS_` (public URL, deployed commit, Source
   URL when FR-44 applies). The App spec's settings may also refer to the deployed commit and to each web
   component's in-cluster address, which works before and after the app is published. Env changes made after a Deployment reach the app on the next Deployment; the
@@ -337,14 +356,17 @@ Every threshold below is a number on purpose.
 
 - **FR-23.** A Deployment starts from: a manual **Deploy**, saving a cluster target with **Deploy now** ticked
   (the default) when a green Build exists, a Build succeeding on the deploy branch (default on, switchable per
-  App Work), a primary-domain change (FR-38), or a rollback (FR-33). The request answers
+  App Work), an App spec applied on the deploy branch that changes what runs when the App spec's build strategy is
+  **image** (FR-64), a primary-domain change (FR-38), or a rollback (FR-33). The request answers
   within 2 seconds and never waits for the cluster.
 - **FR-24.** Preconditions, checked on request and again when work starts, each reported by name: App spec at
   the Build's commit is valid; the license allows the target (FR-9); every required env value is set; every
   dependency is ready; a green Build exists for the chosen commit (default: head of the deploy branch) and its
-  image still exists; the target is configured and its last connection check passed; the App Work is not
-  paused; no other Deployment is running; cron and job authentication values are set and non-empty; quota.
-- **FR-25.** The image and the App spec always come from the **same commit**.
+  image still exists — **required only for the App spec's build strategies that produce a Build (FR-64)**; the
+  target is configured and its last connection check passed; the App Work is not paused; no other Deployment is
+  running; cron and job authentication values are set and non-empty; quota.
+- **FR-25.** The image and the App spec always come from the **same commit**. When the App spec's build strategy
+  publishes an image rather than building one (FR-64), that image is the App spec's own reference at that commit.
 - **FR-26.** Order, with the rule for each failure:
 
 | #   | Phase                                                     | Deadline                                                                               | On failure                                    |
@@ -379,7 +401,8 @@ Every threshold below is a number on purpose.
 - **FR-34.** Manual **Roll back** is offered on any **Live** Deployment among the last 20 to the same target
   whose image still exists. It deploys that Deployment's Build with the App spec from that Build's commit,
   skips pre-deploy jobs by default, and states: **"Database changes made by later Deployments are not
-  undone."**
+  undone."** For an App Work whose image is published rather than built (FR-64) it redeploys the recorded
+  image digest and spec commit, and never re-resolves a tag.
 - **FR-35.** A rollback that does not reach readiness within the component deadlines ends **Failed — rollback
   did not complete** and sends an urgent notification.
 
@@ -442,11 +465,13 @@ Every threshold below is a number on purpose.
 
 ### 4.8 Status and health
 
-- **FR-46.** App status shows: target, state (**Not deployed**, **Deploying**, **Live**, **Live with
-  warnings**, **Degraded**, **Down**, **Can't reach your cluster**, **Paused**), URL, per component ready /
+- **FR-46.** App status shows: target, state, URL, per component ready /
   desired replicas, restarts of current pods, last out-of-memory kill in the last 24 hours, each job's last
   result, each scheduled call's last run and result, the latest smoke results, network-isolation
-  enforcement, Source (FR-44) and the time it was observed. A snapshot older than 180 seconds says
+  enforcement, Source (FR-44), the outcomes of any action still in flight, and the time it was observed. The
+  state is one of **Not deployed**, **Live**, **Degraded**, **Down**, **Can't reach your cluster**, **Paused** or
+  **Deleting**; when a Deployment is running, its own state (**Deploying**, **Checking**, **Live with warnings**)
+  is shown beside it rather than replacing it. A snapshot older than 180 seconds says
   **"Last checked <n> minutes ago"**; **Refresh** is allowed once per 15 seconds.
 - **FR-47.** Live App Works are polled every 60 seconds: component readiness, restarts, out-of-memory kills, and
   the first `GET` smoke check over the public address. **Degraded**: a web component below desired replicas,
@@ -463,7 +488,9 @@ Every threshold below is a number on purpose.
 
 - **FR-49.** **Pause app** scales every component to 0 and suspends scheduled calls within 120 seconds; published
   addresses stay (visitors see the controller's unavailable page). **Resume** restores declared replicas and
-  runs phases 3 and 5 with their deadlines. Deploying a paused App Work is refused.
+  runs phases 3 and 5 with their deadlines. Deploying a paused App Work is refused. If a resume's own checks fail,
+  the app stays resumed — there is no earlier version to restore — the Deploy tab shows the failure, and health
+  notifications follow FR-47.
 - **FR-50.** **Remove from cluster** deletes workloads, jobs, scheduled calls, services, published hosts, secrets,
   the app's network policies and the managed DNS record within 300 seconds, and keeps volumes, dependencies and the
   namespace holding them; the namespace's deny-all policy stays while any kept dependency or volume remains, so kept
@@ -516,7 +543,27 @@ Every threshold below is a number on purpose.
   separate from the live app's namespace, labelled with its expiry: no public host, custom domain or DNS record; volumes
   and dependencies without persistent storage; smoke checks run from inside the namespace. It never counts as a
   Deployment, never changes the live app, and is removed entirely when the verification ends or its time limit passes.
-  All of its cluster work runs on the isolated worker (FR-5).
+  All of its cluster work runs on the isolated worker (FR-5). Its namespace name is derived by this epic from the live
+  namespace plus the provisioning attempt, so a re-provision never collides with a leftover namespace from an earlier
+  attempt, and a verifier never has to derive or guess a name of its own; its progress and outcome reach the verifier
+  through a result channel rather than being read from a Deployment row.
+
+### 4.14 App Works whose image is published, not built
+
+- **FR-64.** An App spec may publish an image instead of building one (the build strategy that names an existing
+  image) or declare that there is nothing to run at all. For the **published-image** strategy: no Build is
+  produced, so a Deployment requires none and **no Build event is emitted**; the image reference comes from the
+  App spec at the Deployment's own spec commit and is resolved **once**, in the isolated worker, to an immutable
+  digest, with the reference's registry treated exactly like a cluster address (FR-4) before it is contacted; a
+  reference given only by a movable tag is deployed once and the Deployment records it, and on **Ever Works Apps**
+  such a reference is refused before any work starts; a reference that cannot be read without credentials is
+  refused with **"This image can't be downloaded without credentials. Ever Works deploys published images only
+  when they are public."**, a tag-only reference is reported as **"This image is referenced by tag. Pin it by
+  digest so every Deployment runs the same image."**, and a reference that does not exist or cannot be reached
+  fails the Deployment by name. No pull credential is used for a public image. Deployments of this strategy
+  start from the App spec being applied on the deploy branch when it changes anything that runs (FR-23), and a
+  rollback reuses that Deployment's recorded digest and spec commit (FR-34). For the **nothing-to-run** strategy,
+  Builds still happen and a Deployment is refused with a named reason.
 
 ---
 
@@ -656,7 +703,9 @@ dialog (S30, S31), next to APW-01's separate fork checkbox:
 | Element                  | Copy                                                                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | Deployment states        | `Queued` · `Deploying` · `Checking` · `Live` · `Live with warnings` · `Failed` · `Rolled back` · `Cancelled` · `Cancelled — quarantined` · `Skipped` |
-| App states               | `Not deployed` · `Live` · `Degraded` · `Down` · `Can't reach your cluster` · `Paused`                                         |
+| App states               | `Not deployed` · `Live` · `Degraded` · `Down` · `Can't reach your cluster` · `Paused` · `Deleting…`                          |
+| Deployment states shown beside the app state | `Deploying` · `Checking` · `Live with warnings`                                                                  |
+| Published image          | `This image can't be downloaded without credentials. Ever Works deploys published images only when they are public.` · `This image is referenced by tag. Pin it by digest so every Deployment runs the same image.` |
 | Precondition list header | `Fix these before deploying:`                                                                                                 |
 | Kubeconfig refused       | `This kubeconfig {reason}. Use a service account token instead.`                                                              |
 | Not public               | `Ever Works can only reach clusters at a public address.`                                                                     |
@@ -739,6 +788,13 @@ states are text plus icon, never colour alone.
 - [ ] **ACC-06-49** On Ever Works Apps the Deployment reaches the tier's plugin as desired state; no workload object is applied by the platform and the `k8s` plugin never receives the tier's credential.
 - [ ] **ACC-06-50** The deploy-target picker offers **None**, **Your cluster** and **Ever Works Apps**, each with a stated reason when it is unavailable; a shape the installation cannot serve is never offered, and **no shape that ships today is removed from the matrix**: an app-kind change leaves `allowedClusterSourcesFor` returning `k8s-works` (admin), `k8s-works-shared` and `custom-kubeconfig` exactly as before (R-27).
 - [ ] **ACC-06-51** The same fixture App Work deploys successfully through **both** shipped cluster sources — `custom-kubeconfig` and `k8s-works-shared` — proving the target is a configuration of one runtime rather than a fork of it (R-27, `deploy-shapes.md` §4).
+- [ ] **ACC-06-52** A published-image App Work deploys with no Build, emits no `app.build.*` event and shows a short digest where the history normally links a Build; a movable tag is resolved once and a rollback reuses the recorded digest without re-resolving it; a registry answer of 404, 401/403 or timeout fails the Deployment with its own named reason (S35, FR-64).
+- [ ] **ACC-06-53** Ever Works Apps refuses a tag-only image reference before anything is applied (precondition `image_not_pinned`); a public image reference is deployed with no pull credential; the `nothing-to-run` strategy refuses the Deployment by name while Builds still run (S35, FR-64).
+- [ ] **ACC-06-54** On Your cluster with no Deployment yet, saving the target creates the namespace, the `LimitRange` and the three baseline network policies before the first dependency is provisioned, and the dependency reaches ready without any Deployment having run; a second call is a no-op; a namespace labelled for another Work is refused; with isolation off the baseline policies are absent while a `dep-<kind>` policy still admits only the app's own pods (S36, FR-10, FR-20, FR-24).
+- [ ] **ACC-06-55** Every action route's outcome is visible: a completed refresh, a log fetch, a pause, a resume, a removal, a cancel, a job run, a connection check and an ingress reconcile each leave their documented result (runtime state or the 5-minute cache) and a failed one leaves a named code; a log `requestId` from another App Work answers not found; a cancel is honoured only for the Deployment that requested it (FR-46, FR-48, FR-49, FR-51).
+- [ ] **ACC-06-56** No App Work kubeconfig is loaded, parsed or dialled by the API: saving settings through the generic Work plugin-settings route for kind `app` records zero `validateConnection` calls and zero `KubeConfig.loadFromString` calls, while the same route for a non-App Work is byte-identical to today (FR-3, FR-5, ACC-06-43).
+- [ ] **ACC-06-57** Another workspace's App Work answers not found with a body identical to an unknown id on every route, before the kind check, while a viewer member still gets 403 on actions (S25, FR-54).
+- [ ] **ACC-06-58** A Deployment of the same Build with unchanged env values leaves every component's pod identities and ReplicaSet count unchanged, and the per-Deployment id appears only on the Deployment object's metadata (FR-17).
 
 ## 9. Open questions
 

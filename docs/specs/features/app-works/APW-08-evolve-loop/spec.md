@@ -190,6 +190,32 @@ on `develop` today (§2.3).
 - **S30 — Viewer** → **Close anyway** and **Deploy now** hidden; the chain fully readable.
 - **S31 — Someone else's Task** → chain, cost and close all answer **not found**.
 
+### 3.4 Additions (2026-09-17 — containment, tool policy, the operator switch)
+
+- **S32 — A new App Work with no Agent to run it.** **Given** Maya created Bookings from a Blueprint, so it has no
+  prior Task and no Agent was ever assigned to it, and she owns no Agent that may commit, **when** she asks in chat
+  for an SMS reminder, **then** the confirmation card says **"No agent can commit yet. Create one for Bookings?"**
+  and names one template; on **Create and start** an Agent is created from that template with `evolve-app` bound,
+  assigned to Bookings, and the Task is created and started as in S1 — one card, one confirmation, no empty picker.
+- **S33 — My machine declined to isolate.** **Given** Maya's desktop has declined the isolated home for model steps,
+  **when** an App Work Task is routed to it, **then** the run does not start, the Task shows **"This machine runs app
+  changes without an isolated home. Allow it once, or run this Task in an isolated sandbox."** with **Allow on this
+  machine**, and after she allows it the Task's Cost view lists, beside the run receipt, the containment the run got
+  and the downgrade she accepted.
+- **S34 — The operator stops App Works changes.** **Given** the operator has switched the evolve loop off,
+  **when** Maya asks for a change, **then** no run starts and the card says **"Changes to apps are paused by the
+  operator."**; Tasks already running and existing App Works keep their boards, delivery chains and history
+  readable, and the Jobs pause exactly as the switch declares.
+- **S35 — The repository is bigger than a stage allows.** **Given** Bookings' repository is 4 GiB and the shared
+  limits table refuses a checkout above a named size for the stage the run uses, **when** the Task finalizes its
+  workspace, **then** no run starts, the Task shows **"This app's repository is too big to check out here (4.0 GB;
+  this stage allows 3.0 GB)."** and the App Work's Inspect view already said which stage would refuse first.
+- **S36 — A check needs a tool this machine lacks.** **Given** a required App check runs `cargo test` on a Fleet
+  node with no `cargo`, **when** the check exits `127` (POSIX) or `9009` (Windows), **then** the gate row reads
+  **"Error — a tool this check needs is missing on this machine"**, that node is not offered this Task again, the
+  gate is not red-green (it is an error), and the Task can still run on another enrolled node or in the isolated
+  sandbox.
+
 ---
 
 ## 4. Functional requirements
@@ -235,11 +261,19 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
 
 - **FR-12.** An agent run on an App Work Task executes only (a) on a Fleet node the owner enrolled, or (b) in an
   isolated run environment that receives no platform secret and restricts network access to the repository
-  host and package registries. With neither available the run does not start (S15).
+  host and package registries. With neither available the run does not start (S15). A Fleet placement (a) is
+  admitted only while **the containment the node actually gave the run** reports the model step's isolated
+  home as applied; a node that reports a downgrade — its own decision, not a failure — is not admissible for a
+  new App Work run until the owner accepts that downgrade once for that node, and the acceptance is shown on
+  the Task together with the containment the run got (S33). Containment controls environment variables only:
+  it is **not** a filesystem boundary and carries no egress control, so an accepted downgrade never widens the
+  Agent's tools, protected paths, merge policy or target branch.
 - **FR-13.** The App spec's checks execute only in places where the owner holds the blast radius: on the Fleet
   node running the Task, or in the App Work's own repository CI, with a read-only repository token and no
   secrets. They never run on shared platform machines outside such isolation. A non-required check that fails
-  never fails the repository's CI run; a required one does.
+  never fails the repository's CI run; a required one does. Setup steps and checks on a Fleet node deliberately
+  run with the machine's **real** home directory and toolchain — the containment record of FR-12 covers the model
+  step and never these — so FR-14's per-check admission by the owner is the control that protects them.
 - **FR-14.** On a Fleet node a check runs only when the owner has admitted that exact command for their machines.
   A check the owner has not admitted is reported **Not admitted** and the gate is never green because of it
   (S16). When an App spec is first applied, and whenever its checks change, the owner is asked once to review
@@ -254,7 +288,12 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
 - **FR-17.** A red required check sends the Agent back with the check's name, exit status and the last 200 lines
   of its output, up to the Work's gate-attempt budget (1–5, default 2). When the budget is spent the Task is
   _Blocked_ and an escalation is raised.
-- **FR-18.** A check exceeding its timeout (1–3,600 seconds, default 600) is **Timed out**, distinct from red.
+- **FR-18.** A check exceeding its timeout is **Timed out**, distinct from red. The bounds are the App spec's own,
+  which APW-03's schema owns: `timeoutSeconds` **60–7,200**, default **1,800** (APW-03 `schema.md` §17). This epic
+  declares **no** bound of its own and never shortens a check the schema accepts; its earlier narrower text
+  (`1–3,600`, default `600`) is superseded by the schema, which widens the ceiling and the default and is the only
+  place these numbers live. The repository's CI leg gets `ceil(timeoutSeconds / 60)` minutes, so a 7,200-second
+  check is a 120-minute job and a 60-second check is 1 minute.
 - **FR-19.** At most 20 checks per App spec are honoured; the 21st and later are reported **Ignored — over the
   limit of 20** and never run.
 
@@ -267,13 +306,18 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
   {n} more"**) and the rule that protects each (S4). The rules are always read from the Task's base commit, so a
   branch cannot relax the rules it is judged by. The App Provisioner's own Task (APW-04) is exempt from the App
   spec field rule only.
-- **FR-21.** When the changed-file list cannot be read in full (more than 300 files, or the provider truncates),
-  the pull request is refused: **"This change touches too many files to verify protected paths (over 300)."**
+- **FR-21.** When the changed-file list cannot be read in full — **300 or more files**, which is the provider's own
+  list limit, so a larger change and a change of exactly 300 are indistinguishable — the pull request is refused:
+  **"This change touches too many files to verify protected paths (over 300)."** A change of fewer than 300 files
+  is never refused for this reason, however large its patch text is: only paths and counts are needed here, so
+  patch-text truncation is not a refusal (FR-25).
 - **FR-22.** Every run brief for an App Work lists the protected paths before the Task description.
-- **FR-23.** The App spec's instruction files (at most 5; each at most 32 KB; together at most 64 KB) are read
-  from the Task's base commit — not from the branch the Agent is editing — and given to the Agent inside a clearly
-  marked block of untrusted repository content. A missing file is skipped and noted; a file outside the
-  repository or reached through a link is refused.
+- **FR-23.** The App spec's instruction files are read from the Task's base commit — not from the branch the Agent
+  is editing — and given to the Agent inside a clearly marked block of untrusted repository content. This epic reads
+  at most **5** files, each at most **32 KB**, together at most **64 KB**; APW-03's schema allows **10**, so a spec
+  carrying 6–10 files is valid and every file past the fifth is reported **Ignored — over the limit of 5** in the run
+  record rather than silently dropped. A missing file is skipped and noted; a file outside the repository or reached
+  through a link is refused.
 - **FR-24.** Nothing in an instruction file changes the Agent's tools, permissions, protected paths, merge policy,
   target branch, budget or checks (S17).
 
@@ -311,11 +355,25 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
     | `live`                  | **Live ✓** / **Live ✓ (with warnings)** | A Deployment containing it is live and its in-cluster smoke checks passed. |
     | `closed_without_deploy` | **Closed without deploying**            | A person accepted the change as not live (S9).                             |
 
+    `{outcome}` is the Deployment's own terminal outcome as APW-06 records it — a deployment that failed, one
+    that was rolled back, and one whose rollback itself failed are three different chips, and a rolled-back
+    Deployment is never reported as a plain failure. Every input that can decide a state — each APW-05 Build
+    status with its deployable verdict and trigger, each APW-06 Deployment state with its warnings and its
+    smoke result, the deploy target, the auto-deploy switch and the App spec's build strategy — has exactly one
+    row in the normative table of plan §2.4, and a state is never inferred from an input that table does not
+    name.
+
 - **FR-31.** "Contains" means the merge commit is the Build's or Deployment's commit or an ancestor of it on the
   source branch. Newer Builds and Deployments therefore carry older merged changes along (S23, S24).
 - **FR-32.** The Task moves to _Done_ when its delivery state becomes `live`; when the Deploy target is **None**
   and a containing Build succeeds (S21); when the App spec's build strategy is `none`, at merge; or on **Close
   anyway** (S9). A Task that closes this way passes the same approver and blocker gates as any Task completing.
+  Two further strategies are named here rather than left to inference: with `build.strategy: image` the App Work
+  runs **no Build**, so the chain goes `merged` → `deploying` → `live` with no `building` or `built` step, and the
+  Task closes on `live` exactly as any other; with `build.strategy: auto` and a builder that cannot serve it, the
+  Build is reported `blocked` by APW-05 and the Task takes `build_failed` — a blocked strategy is a failure to
+  build, never a silent wait. A Build or Deployment that is `cancelled`, `SUPERSEDED` or superseded by a newer
+  queued row is decided by FR-34 and never by the table's `failed` rows.
 - **FR-33.** A merge into any branch other than the source branch completes the Task exactly as today (S19).
 - **FR-34.** A Deployment that is replaced by a newer queued one does not change the state; the newer Deployment
   decides. A cancelled Deployment returns the state to `built`.
@@ -349,7 +407,12 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
   recent Task on that Work that reached _In review_ or _Done_; else the only Agent pinned to that Work; else the only
   Agent assigned to that Work. An Agent that is archived or cannot commit never matches. With no match the
   assistant asks (S25). The same rule picks the Agent of the Tasks named in FR-9. The `evolve-app` Skill is attached
-  to that Agent for this Work on first use, once.
+  to that Agent for this Work on first use, once. When the rule finds nothing **and the person owns no Agent that
+  may commit at all** — the ordinary state of an App Work created from a Blueprint, which has no prior Task and no
+  provisioner-created Agent — the confirmation card does not dead-end on an empty picker: it offers to create one,
+  naming a single Agents-catalog template that is created with `evolve-app` bound, commit permission and an
+  admissible runtime, and assigns it to the Work, in one step (S32). Where the person owns Agents that may commit,
+  S25's picker is unchanged and no Agent is ever created silently.
 - **FR-43.** Progress is posted into the Task's own thread, at most once per state change: run started, pull
   request opened, gate result, merged, Build started/finished, Deployment started/finished, live, follow-up.
 - **FR-44.** The chat chain card refreshes every 10 seconds while visible, stops after 30 minutes without change.
@@ -400,7 +463,13 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
   not re-offered to the same node.
 - **FR-62.** A Task's **Cost** section lists every Run receipt of the Task and every Build receipt of a Build of
   its branch or of a commit containing its merge commit up to the one that went live, with a total; unknown
-  amounts are shown as unknown (S14).
+  amounts are shown as unknown (S14). Every amount an App Work causes — provisioning, evolve runs, follow-up
+  runs, Mission-filed runs, upstream-preparation runs and managed builds or hosting — is booked against **that
+  App Work's own budget**, the same `WorkBudget` every other Work already has, through the platform's budget
+  guard; the App Work's overview shows the same rollup as a **Cost** summary with the month's cap and the
+  remaining amount, and links to the Task-level Cost section rather than competing with it. An App Work with no
+  budget set shows its spend and no cap, exactly as any other Work does; a run that the budget guard refuses is
+  **waiting**, on FR-66's terms, and is never a delivery failure.
 - **FR-63.** Reads need view access to the Work; **Close anyway**, **Deploy now**, **Try once more**, starting a
   change and editing Goal or Mission output need edit access. Another account's ids answer **not found** (S31).
 - **FR-64.** Every user-visible string is translatable and never assembled from fragments.
@@ -420,6 +489,54 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
   by the Agent's commit and pull-request tools, so an owner's autonomy setting for publishing does not hold them;
   merging stays governed by the merge policy (FR-28). The Wave 0 repair of those tools (FR-1…FR-8) still ships for
   Agents that call them outside the evolve loop.
+
+### 4.15 Additions (2026-09-17 — tool grants, containment, limits, cost, the operator switch)
+
+- **FR-69.** An App Work Task's run is a run over **third-party code** and is granted the **App Work Task tool
+  policy**: no outbound messaging of any kind (email, chat, channel notifications, agent-to-agent messages), no web
+  fetch or search, no MCP tool, no sub-agent or delegation, and no tool that mutates the platform's own App Works —
+  creating or deleting a Work, provisioning, deploying, editing the environment or the target, or opening an upstream
+  pull request. `ask_human` and the read-only repository tools stay. The policy is a published constant, is
+  re-checked when the run is dispatched exactly as the Provisioner's grants are, and applies to every App Work run
+  whichever surface started it (chat, board, Goal, Mission, follow-up). FR-24 already says no instruction file may
+  widen it; FR-69 says the platform does not widen it either (S17, S34).
+- **FR-70.** FR-12's containment is **recorded, shown and enforced at admission**. The platform stores what the run
+  got — the node's execution path, whether the isolated home applied, and any downgrade the node declared — shows it
+  on the Task's Cost view with the run receipt, and refuses admission without it (S33). A recorded downgrade is
+  accepted only by an explicit owner action for that node, kept until the owner withdraws it, and never silently.
+- **FR-71.** **Keyboard and accessibility.** Every surface this epic adds — the delivery chips and Delivery section,
+  the Cost section, **Close anyway** and **Deploy now** confirmations, the Request-a-change dialog, the chat chain
+  card, the Goal Work field and the Mission Output card and template form — meets the program's accessibility bar:
+  axe reports no new violations on each; every state is exposed as text and never by colour alone; every action is
+  reachable and operable by keyboard with a visible focus ring; a dialog closes on `Esc` and returns focus to the
+  control that opened it; progress and completion are announced in a polite live region; and each layout renders in
+  a right-to-left locale (`ar`, `he`) without mirroring errors or clipped chips.
+- **FR-72.** **Repository size limits are one table.** Which stage refuses a repository, and at what size, comes from
+  the shared App Works limits table (CONTRACTS §2A) and never from a number local to this epic. The evolve loop's
+  checkout — Fleet or isolated sandbox — refuses before the run starts when the repository exceeds the limit for the
+  stage it would use, names the size and the limit (S35), and the Inspect view reports the first stage that would
+  refuse. This epic adds no limit of its own and raises none.
+- **FR-73.** **One budget per App Work.** Every Run and every managed Build or hosting charge an App Work causes is
+  booked against that App Work's own budget through the platform's budget guard, with an alert at the Work's alert
+  threshold and the month's cap and remaining amount on the App Work's overview (FR-62). A refused run is waiting
+  (FR-66). No separate App Works spend account is introduced.
+- **FR-74.** **The operator can stop the loop.** The evolve loop and auto-delivery honour the operator kill switches
+  of CONTRACTS §7 / Resolution R-30 — `EVER_WORKS_APP_CHANGES_ENABLED` for **new** change runs (from chat, the board,
+  a Goal or a Mission) and `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED` for auto-delivery, follow-up creation and the
+  auto-deploy a merge of an App Work's change triggers — and each switch **fails closed**: with it off, no new change
+  run is dispatched, no auto-deploy is triggered by a merge and no follow-up Task is opened; the switch is read by
+  the job dispatchers themselves, not only by the pages that create work (S34). R-30's definition of "App Works off"
+  holds here in full: jobs pause (no new dispatches; a running job finishes its current step and parks), the UI is
+  read-only with a banner, existing Deployments keep running and reads keep working — the switch stops new work, it
+  never deletes, hides or invalidates anything, and turning it back on resumes.
+- **FR-75.** **The push credential is checked before the first run, not at the push.** Before an App Work Task's
+  first Run starts on a Fleet node, the platform verifies that it can mint a push credential for the Work Repository
+  — the Ever Works GitHub App installed on the repository's owner — and refuses with the S28 copy and the exact
+  owner name when it cannot. The check is per App Work and re-run when the Work Repository's owner changes.
+- **FR-76.** **Both check triggers are kept.** `Ever Works check: {name}` legs are reported on a same-repository
+  pull request **and** on the tracked branch, so a change that lands by merge commits without an intervening pull
+  request is still checked; FR-16's gate reads the pull request's head commit, and the tracked-branch leg is
+  reported only. Spec checks never fail a Build's status (FR-15).
 
 ---
 
@@ -612,19 +729,157 @@ and returns focus to the button that opened it.
 - [ ] **ACC-08-32** — A system-opened upstream sync conflict Task gets the Agent FR-42's rule resolves; with no
       resolvable Agent it is unassigned, not started, and the owner is notified exactly once.
 
+**Additions (2026-09-17) — tool grants, containment, limits, cost, the operator switch**
+
+- [ ] **ACC-08-33** — An App Work run's tool list contains none of FR-69's denied groups; an instruction file that
+      asks for one changes nothing; a dispatch that would grant one is refused.
+- [ ] **ACC-08-34** — A Fleet node reporting a containment downgrade does not receive a new App Work run until the
+      owner allows it once; the record the run got is visible on the Task's Cost view.
+- [ ] **ACC-08-35** — axe reports no new violations on the chips, Delivery section, Cost section, Request-a-change
+      dialog and chain card; `Esc` closes a dialog and returns focus; every chip state reads as text; both dialogs
+      render in `ar` and `he`.
+- [ ] **ACC-08-36** — A repository over the shared limit for the run's stage refuses before the run starts, names the
+      size and the limit, and Inspect named the same stage first.
+- [ ] **ACC-08-37** — Every Run and managed Build of an App Work books against that Work's own budget; the overview
+      shows cap and remaining; a budget-refused run is waiting and opens no follow-up.
+- [ ] **ACC-08-38** — With the operator switch off, no change run is dispatched, no auto-deploy is triggered by a
+      merge and no follow-up opens; existing chains stay readable and no Task is destroyed.
+- [ ] **ACC-08-39** — With no push credential for the App Work's repository owner, the first run does not start and
+      the S28 copy names that owner; after the installation is granted the same Task starts.
+- [ ] **ACC-08-40** — With no resolvable Agent and no committable Agent owned, the card offers the template, and one
+      **Create and start** produces an Agent with `evolve-app` bound, commit permission and an admissible runtime,
+      assigned to the Work, plus the Task.
+- [ ] **ACC-08-41** — On an App Work whose spec declares a required check, the Work's checks policy and repository-
+      declared-command mode are switched on by the spec listener, so the gate reports **Not admitted** (or red)
+      rather than grading green with nothing run.
+- [ ] **ACC-08-42** — Each row of plan §2.4's delivery table is a case: `blocked` and `auto` map to `build_failed`,
+      `image` skips `building`/`built`, `cancelled` and `SUPERSEDED` follow FR-34, and `{outcome}` distinguishes
+      failed, rolled back and rollback-failed.
+- [ ] **ACC-08-43** — An App Work created before this epic, whose spec omits `source.branch`, ends with its tracked
+      branch in `taskIsolationBaseBranch` after the backfill, and its next merge is tracked.
+- [ ] **ACC-08-44** — Changing an App spec's checks notifies the owner once per spec hash; a check exiting `127` or
+      `9009` reads **Error — a tool this check needs is missing on this machine** and that node is not re-offered
+      the Task.
+- [ ] **ACC-08-45** — The delivery reconciler's compare-and-set and its uniqueness rule behave identically on
+      Postgres, SQLite, MySQL and MariaDB.
+- [ ] **ACC-08-46** — `request_app_change` is reachable on a change-request turn ("add an SMS reminder to my app")
+      and absent on an unrelated one — a registry row with no keyword slot is never shipped.
+- [ ] **ACC-08-47** — Two identical failures open one follow-up; a user-created Task labelled `app-provision` gets no
+      exemption while a real provisioning Task does, on every APW-04 finalize path; editing or clearing labels changes
+      no follow-up.
+
 ---
 
 ## 9. Open questions
 
+> **Register (added 2026-09-17).** Each marker below is one row of the program clarification register
+> ([`CLARIFICATIONS.md`](../CLARIFICATIONS.md)) — the five APW-08 rows are `CL-08-1`…`CL-08-5`, in this order.
+> A row records the question, the default this spec assumes, the wave it blocks, who decides and its status
+> (`open` · `resolved-by R-n` · `default accepted`). A marker is never deleted: when a binding resolution settles
+> it, the resolution line is added underneath the question and the question stays. **No APW-08 marker blocks
+> Wave 0 or P1**: every default below is already the behaviour P1 builds, and each is revisited before P2.
+
 - **[NEEDS CLARIFICATION: "Live with warnings" closes the Task?]** Closed here (the app runs; APW-06 did not roll
   back) with a manual fix Task offered. The alternative treats a failed public smoke check as a failed delivery.
-- **[NEEDS CLARIFICATION: `.github/workflows/**` protected by default?]\*\* It blocks CI changes an owner might want
-  an Agent to make. An App spec opt-out could follow.
+  _Register `CL-08-1` — status: default accepted for P1 (FR-40); owner decides before P3._
+- **[NEEDS CLARIFICATION: `.github/workflows/**`protected by default?]\*\* It blocks CI changes an owner might want
+an Agent to make. An App spec opt-out could follow.
+_Register`CL-08-2` — status: open · owner. The default is blanket protection (FR-20, plan §11). An App spec
+  opt-out, if the owner asks for one, is an **addition**: the blanket default stays and the opt-out is new.\_
 - **[NEEDS CLARIFICATION: CI checks and "a red check opens no pull request".]** CI checks need a pull request to
   exist, so cloud runs open one and the gate governs merge-readiness and the fix loop; Fleet runs keep "red opens
   nothing". Or open drafts until green?
+  _Register `CL-08-3` — status: default accepted for P1._ **Resolved (R-9, CONTRACTS §0):** R-9 makes the CI side a
+  per-check matrix job whose legs are named `Ever Works check: {name}` and whose `continue-on-error` carries
+  advisory semantics (FR-15, FR-76), so a red required leg is red on the pull request and the CI fix loop — not
+  "no pull request" — governs a cloud run. Opening drafts until green stays an open alternative; nothing here
+  removes the Fleet behaviour.
 - **[NEEDS CLARIFICATION: default change Agent.]** FR-42 uses the last Agent that worked on the Work, then the only
   pinned or assigned Agent; the fork lifecycle's conflict Tasks use the same rule (R-21). An explicit per-App-Work
   "Agent for changes" setting is the alternative.
+  _Register `CL-08-4` — status: resolved._ **Resolved (R-21, CONTRACTS §0):** the bootstrapping half is settled by
+  FR-42's new third branch — when nothing resolves and the person owns no Agent that may commit, the card offers to
+  create one from a named template and assign it (S32, ACC-08-40). The per-App-Work "Agent for changes" setting
+  remains an open alternative and is **not** removed by this: the resolution rule stays the default.
 - **[NEEDS CLARIFICATION: follow-up budget.]** 2 per change / 3 open per Work bound spend (each is at least one
   run); tie them to a monthly budget instead?
+  _Register `CL-08-5` — status: default accepted for P1 (FR-37, FR-38); owner decides before P3._ FR-73 adds the
+  monthly Work budget **alongside** the two counters — it does not replace them, so both bounds hold.
+
+---
+
+## 10. Non-functional requirements
+
+Added 2026-09-17 (SK-15). Every number below is one already stated in a requirement or a plan section; this section
+lifts them into measurable lines rather than inventing new ones.
+
+- **NFR-1** Merge detection: a merge is recorded within **2 minutes** of it happening (FR-29); the PR-status sweep
+  runs every 2 minutes and the delivery reconciler every 2 minutes, offset by one (plan §6).
+- **NFR-2** Delivery reconciliation: **≤ 200 Tasks per tick**, stalest `deliveryUpdatedAt` first, one Task's failure
+  never aborting the tick (plan §6, §8.2).
+- **NFR-3** Chat reply: the `evolve` reply returns within **5 seconds** and the chain card refreshes every
+  **10 seconds** while visible, stopping after **30 minutes** without a change (FR-41, FR-44).
+- **NFR-4** Follow-up creation: within **2 minutes** of a terminal failure, at most **2** per merged change and
+  **3** open per App Work (FR-36…FR-38).
+- **NFR-5** Commit serialization: a second commit to one Work waits at most **120 seconds**, then fails with FR-6's
+  copy and writes nothing (FR-6).
+- **NFR-6** Guard cost: the change guard reads one compare-diff per finalize, asks for at most **300** files, counts
+  only non-lockfile lines, and never reads patch text it does not need (FR-21, FR-25, plan §2.5).
+- **NFR-7** Check execution: at most **20** checks per App spec, each with a timeout of at most **7,200 seconds**
+  (default **1,800**, plan §2.3's clamp keeping the epic's original floor); instruction files at most **5**, each
+  **32 KB**, together **64 KB** (FR-19, FR-23, plan §2.3).
+- **NFR-8** Degraded paths stay available: without APW-05's and APW-06's tables the epic behaves exactly as today
+  (`completeOnMerge`), and an untracked or other-branch merge is never stranded (FR-33, plan §8.2).
+- **NFR-9** Every read in this epic is Work-scoped and answers **not found** for a foreign identifier; every mutation
+  needs edit access (FR-63).
+- **NFR-10** Every user-visible string is translatable, never assembled from fragments, and every surface added here
+  passes FR-71's accessibility bar (FR-64, FR-71).
+- **NFR-11** Telemetry carries counts, states and ids only — never a prompt, diff, path or log line — and the typed
+  event module refuses a forbidden property key before capture (FR-65, plan §8.1).
+- **NFR-12** The operator switch is read by the dispatchers themselves and fails closed, so its effect is bounded by
+  the job cadence — one tick (FR-74).
+
+---
+
+## 11. Constitution gates
+
+| Principle                              | How this epic complies                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**                   | No integration is added. Git, AI and workspace access go through the existing facades; the two provider additions (`mergeCommitSha`, an optional ancestry check) are optional methods on the existing git capability, and a provider without them degrades to exact-sha matching (plan §7).                                               |
+| **II — No hard-coded plugin ids**      | Wave 0 removes the two `'github'` literals; the isolated-run predicate reads the pipeline plugin's `enforcesRuntimeNetworking` flag, and no plugin id is written into core (plan §2.2, §2.3).                                                                                                                                             |
+| **III — Source-of-truth repositories** | App rules — checks, protected paths, human-merge paths, instruction files, size guidance — are read from `.works/works.yml` in the Work Repository **at the Task's base commit**; the database stores derived delivery state only; the template proposes App spec changes by pull request (FR-20, FR-59).                                 |
+| **IV — Job runtime**                   | The reconciler is a scheduled task, Mission ticks and Goal iterations keep their existing dispatchers, and `evolve` dispatches through `dispatchAgentRun` and returns `202`; nothing calls a queue directly (plan §4, §6).                                                                                                                |
+| **V — Forward-only migrations**        | Three additive migrations in the reserved block `179208…`, each guarded so a re-run is a no-op, each `down()` dropping only what its `up()` added; one **additional** guarded backfill migrates data, never schema (plan §3.5, task T50).                                                                                                 |
+| **VI — Tests first**                   | Wave 0 starts from seven failing cases whose red output is pasted into the P0 PR; every service has a named spec, and the golden-table specs for non-app Works must pass unchanged (plan §9, T1).                                                                                                                                         |
+| **VII — Secret hygiene**               | Failure logs are redacted and fenced, checks in the repository's CI receive no secret at all, instruction files are fenced as untrusted repository content, and telemetry has no content (FR-23, FR-36, FR-65).                                                                                                                           |
+| **VIII — Plugin counts**               | No plugin is added or removed; `built-in-plugins.md` is untouched (plan §11).                                                                                                                                                                                                                                                             |
+| **IX — Behaviour-first spec**          | This document names no class, no file and no endpoint; every path and constant lives in `plan.md`.                                                                                                                                                                                                                                        |
+| **X — Backwards compatibility**        | Every new field is optional, non-app Works are byte-identical (golden-table tests), `completeOnMerge` is unchanged for untracked Tasks, and every existing id — FR, scenario, ACC, task, resolution — is kept; new behaviour is added alongside (program Resolutions R-26, R-27).                                                         |
+| **Program rules 9 and 10**             | Repository content is fenced as untrusted and the tools that could act on it are restricted by FR-69; no infrastructure or competitor name appears anywhere in this epic's copy.                                                                                                                                                          |
+| **Program resolutions (CONTRACTS §0)** | R-1 shared types in `packages/contracts/src/apps/`; R-2 one Activity family `app_change`; R-9 the per-check CI matrix; R-17 holds are waits and rail refusals are `needs_input`; R-21 the agent-resolution rule shared with APW-02; R-22 no `apps/api/test/` suites; R-26 additive-only; R-27 the deploy-shape family is kept (plan §11). |
+
+---
+
+## 12. References
+
+- [App Works program overview](../README.md) — decisions D1, D3, D6, D11, D13 and §7 rule 9.
+- [Cross-epic contracts](../CONTRACTS.md) — §0 resolutions R-1…R-27, §1 the App spec, §2 entities, §2A shared types,
+  §3 capability interfaces, §4 HTTP API, §6 Activity events, §7 flags and environment variables, §8 catalogs, §9
+  names written into a Work Repository.
+- [Acceptance](../ACCEPTANCE.md) — the E2E scenarios this epic's ACC-08 ids are walked inside.
+- [Existing substrate](../EXISTING-SUBSTRATE.md) — task isolation, the PR sweep, the CI fix loop, the merge gate,
+  the Fleet push credential and `postSystemMessage`.
+- [APW-01 — App Work kind](../APW-01-app-work-kind/) — the Work Repository role and the kind switch.
+- [APW-02 — Fork lifecycle](../APW-02-fork-lifecycle/) — checkout keys, the upstream sync conflict Task and R-21.
+- [APW-03 — App spec and catalog](../APW-03-app-spec-and-catalog/) — `getEffectiveSpec`, `diffGuardedSpecBlocks`,
+  `isProtectedPath`, `AppSpecAppliedEvent`, `schema.md` §17/§18.
+- [APW-04 — App provisioner](../APW-04-app-provisioner/) — the Provisioner's tool policy FR-69 mirrors, and
+  `IPipelinePlugin.enforcesRuntimeNetworking`.
+- [APW-05 — Builds](../APW-05-builds/) — Build statuses, the `checks` matrix job (R-9, plan §4.14) and receipts.
+- [APW-06 — App runtime](../APW-06-app-runtime/) — Deployment states, `smokeResult`, auto-deploy and the deploy
+  shapes family (R-27, `deploy-shapes.md`).
+- [APW-09 — Upstream pull requests](../APW-09-upstream-pull-requests/) — the consumer of FR-69's tool policy.
+- [APW-13 — Golden paths](../APW-13-golden-paths/) — the acceptance scenarios and fixture branches (R-23).
+- [Constitution](../../../../../.specify/memory/constitution.md) — Principles I–X; [ADR-014, ADR-015,
+  ADR-017](../../../../../docs/adr/) — plugin-first, capability interfaces and the job runtime.
+- [`plan.md`](./plan.md) · [`tasks.md`](./tasks.md) · [`ACCEPTANCE.md`](../ACCEPTANCE.md)

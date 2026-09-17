@@ -1,0 +1,59 @@
+# GOLDEN — cal-diy · target your-cluster · NetworkPolicy `ew-allow-egress`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml (sha256 538a1389bc4dfc0f8fab31821d6e78aca2a0622d1f0e55fec1794433b646c16a)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.10 — DNS to kube-system, then the internet except every private, loopback, link-local, shared, multicast and reserved range (IPv4 and IPv6).
+# Spec      : APW-06 spec.md FR-20 (deny all; ingress controller to the primary web port; pods to each other;
+# Spec      : DNS; the internet except private ranges; the app’s own dependencies; its public address when
+# Spec      : `needsHairpin`), FR-21 (enforcement is probed after each rollout)
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    name: ew-allow-egress
+    namespace: ew-cal-diy-11111111
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: cal-diy
+        ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+        ever-works.io/kind: app
+spec:
+    podSelector: {}
+    policyTypes:
+        - Egress
+    egress:
+        - to:
+              - namespaceSelector:
+                    matchLabels:
+                        kubernetes.io/metadata.name: kube-system
+                podSelector:
+                    matchLabels:
+                        k8s-app: kube-dns
+          ports:
+              - port: 53
+                protocol: UDP
+              - port: 53
+                protocol: TCP
+        - to:
+              - ipBlock:
+                    cidr: 0.0.0.0/0
+                    except:
+                        - 10.0.0.0/8
+                        - 172.16.0.0/12
+                        - 192.168.0.0/16
+                        - 100.64.0.0/10
+                        - 169.254.0.0/16
+                        - 127.0.0.0/8
+                        - 0.0.0.0/8
+                        - 224.0.0.0/4
+                        - 240.0.0.0/4
+        - to:
+              - ipBlock:
+                    cidr: '::/0'
+                    except:
+                        - fc00::/7
+                        - fe80::/10
+                        - '::1/128'
+                        - ff00::/8

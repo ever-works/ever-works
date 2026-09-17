@@ -96,8 +96,8 @@ const REGISTRY = [
         layer: 'data-repository',
         schema: 'pass',
         codes: [],
-        warnings: ['advisory_check'],
-        note: 'clean at this revision: the reserved env names AND the look-around validate.pattern were both repaired by uncommitted worktree changes (20:09 and 20:17 on 2026-09-17); the head-revision fixture below still catches both',
+        warnings: ['advisory_check', 'secret_build_arg'],
+        note: 'the reserved env names AND the look-around validate.pattern were both repaired by uncommitted worktree changes (20:09 and 20:17 on 2026-09-17); the head-revision fixture below still catches both. `secret_build_arg` (R11) is the ACCEPTED outcome for this draft: its DATABASE_URL build arg is now `fromEnv` rather than a literal, and schema.md §24.1 records why — the previous literal named a user/database the build service never provisions',
     },
     // ── the same three at HEAD, where R23 was still violated ────────────────────────────────────
     {

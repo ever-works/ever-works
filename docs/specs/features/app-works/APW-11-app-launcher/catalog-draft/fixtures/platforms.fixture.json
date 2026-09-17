@@ -1,0 +1,198 @@
+{
+	"$comment": "Test fixtures for APW-11 T8 (apps/api/src/app-launcher/platform-catalog.service.spec.ts). Each case is self-contained so the spec can feed one at a time and assert its outcome; the file is deliberately NOT a valid catalog — several cases must fail validation, which is the point. The two paths that need real bytes (`icons/oversize.svg`, `icons/script.svg`) are written by the spec at test time (see `generatedIcons`), so no 16 KB blob is committed.",
+	"generatedIcons": {
+		"icons/oversize.svg": "Buffer.alloc(16385, 'x') wrapped in a minimal <svg> element — one byte over APP_LAUNCHER_ICON_MAX_BYTES (16,384).",
+		"icons/script.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg> — refused by the SVG deny patterns.",
+		"icons/foreign-object.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><foreignObject/></svg> — refused by the SVG deny patterns."
+	},
+	"cases": [
+		{
+			"name": "valid",
+			"expect": "listed",
+			"entry": {
+				"id": "ever-example",
+				"name": "Ever Example",
+				"description": "A well-formed catalog entry.",
+				"icon": "icons/ever-example.svg",
+				"order": 40,
+				"status": "available",
+				"urls": {
+					"production": "https://example.com",
+					"stage": "https://stage.example.com",
+					"develop": "https://dev.example.com"
+				}
+			}
+		},
+		{
+			"name": "missingDevelopUrl",
+			"expect": "listed for production and stage, absent for develop",
+			"entry": {
+				"id": "ever-no-develop",
+				"name": "Ever No Develop",
+				"description": "Has no develop address, so develop never shows it (FR-10).",
+				"icon": "icons/ever-no-develop.svg",
+				"order": 41,
+				"status": "available",
+				"urls": {
+					"production": "https://no-develop.example.com",
+					"stage": "https://no-develop.stage.example.com"
+				}
+			}
+		},
+		{
+			"name": "javascriptUrl",
+			"expect": "dropped with reason unsafeUrl — produces no tile (ACC-11-08)",
+			"entry": {
+				"id": "ever-javascript",
+				"name": "Ever Javascript",
+				"description": "Address is a javascript: URL.",
+				"icon": "icons/ever-javascript.svg",
+				"order": 42,
+				"status": "available",
+				"urls": {
+					"production": "javascript:alert(1)"
+				}
+			}
+		},
+		{
+			"name": "httpUrl",
+			"expect": "dropped with reason unsafeUrl — produces no tile (ACC-11-08)",
+			"entry": {
+				"id": "ever-http",
+				"name": "Ever Http",
+				"description": "Address is plain http, which is never opened outside a local installation.",
+				"icon": "icons/ever-http.svg",
+				"order": 43,
+				"status": "available",
+				"urls": {
+					"production": "http://insecure.example.com"
+				}
+			}
+		},
+		{
+			"name": "userinfoUrl",
+			"expect": "dropped — an address carrying userinfo is refused by toSafeLauncherUrl (plan §4.6)",
+			"entry": {
+				"id": "ever-userinfo",
+				"name": "Ever Userinfo",
+				"description": "Address carries credentials in the authority.",
+				"icon": "icons/ever-userinfo.svg",
+				"order": 44,
+				"status": "available",
+				"urls": {
+					"production": "https://user:secret@example.com"
+				}
+			}
+		},
+		{
+			"name": "oversizeIcon",
+			"expect": "entry KEPT without an icon (initials tile) — a bad icon never removes a platform (plan §9.2)",
+			"entry": {
+				"id": "ever-oversize-icon",
+				"name": "Ever Oversize Icon",
+				"description": "Its icon is one byte over the cap.",
+				"icon": "icons/oversize.svg",
+				"order": 45,
+				"status": "available",
+				"urls": {
+					"production": "https://oversize.example.com"
+				}
+			}
+		},
+		{
+			"name": "scriptIcon",
+			"expect": "entry KEPT without an icon — the SVG deny pattern rejects the file, not the platform",
+			"entry": {
+				"id": "ever-script-icon",
+				"name": "Ever Script Icon",
+				"description": "Its icon contains a script element.",
+				"icon": "icons/script.svg",
+				"order": 46,
+				"status": "available",
+				"urls": {
+					"production": "https://script-icon.example.com"
+				}
+			}
+		},
+		{
+			"name": "foreignObjectIcon",
+			"expect": "entry KEPT without an icon",
+			"entry": {
+				"id": "ever-foreign-object-icon",
+				"name": "Ever Foreign Object Icon",
+				"description": "Its icon embeds foreignObject.",
+				"icon": "icons/foreign-object.svg",
+				"order": 47,
+				"status": "available",
+				"urls": {
+					"production": "https://foreign-object.example.com"
+				}
+			}
+		},
+		{
+			"name": "badIconPath",
+			"expect": "dropped — the icon path must match ^icons/[a-z0-9-]+\\.(svg|png)$",
+			"entry": {
+				"id": "ever-bad-icon-path",
+				"name": "Ever Bad Icon Path",
+				"description": "Its icon path points outside icons/.",
+				"icon": "../secrets/icon.svg",
+				"order": 48,
+				"status": "available",
+				"urls": {
+					"production": "https://bad-icon.example.com"
+				}
+			}
+		},
+		{
+			"name": "unknownStatus",
+			"expect": "dropped (FR-11 drops entries with an unknown status)",
+			"entry": {
+				"id": "ever-unknown-status",
+				"name": "Ever Unknown Status",
+				"description": "Status is not in the enum.",
+				"icon": "icons/ever-unknown-status.svg",
+				"order": 49,
+				"status": "preview",
+				"urls": {
+					"production": "https://unknown-status.example.com"
+				}
+			}
+		},
+		{
+			"name": "descriptionTooLong",
+			"expect": "dropped — the description is capped at 80 characters",
+			"entry": {
+				"id": "ever-long-description",
+				"name": "Ever Long Description",
+				"description": "This description is deliberately longer than the eighty character cap that APW-11 FR-9 and plan section five point two both set for a catalog entry, so validation drops it.",
+				"icon": "icons/ever-long-description.svg",
+				"order": 50,
+				"status": "available",
+				"urls": {
+					"production": "https://long-description.example.com"
+				}
+			}
+		},
+		{
+			"name": "duplicateId",
+			"expect": "the second entry is dropped, and CI refuses the file (unique ids are a workflow check, not a schema one) — pins are keyed by `platform:<id>`, so a duplicate would merge two platforms into one preference row",
+			"entry": {
+				"id": "ever-example",
+				"name": "Ever Example Duplicate",
+				"description": "Repeats the id of the first case.",
+				"icon": "icons/ever-example-duplicate.svg",
+				"order": 51,
+				"status": "available",
+				"urls": {
+					"production": "https://duplicate.example.com"
+				}
+			}
+		},
+		{
+			"name": "twentyFifthEntry",
+			"expect": "dropped — the catalog is capped at 24 entries (FR-11, ACC-11-08). The spec builds it by repeating the first valid entry under 25 distinct ids rather than committing 25 objects here.",
+			"entry": null
+		}
+	]
+}

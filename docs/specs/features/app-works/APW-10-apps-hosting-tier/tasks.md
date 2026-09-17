@@ -129,6 +129,14 @@ _Delivers spec FR-1…FR-29, FR-41…FR-46, FR-52, FR-53. The tier stays **Close
       `packages/plugins/k8s/src/app/` as APW-06 exports it — the platform never sends workload objects, Resolution
       R-5), overlays, server-side apply by the controller with field manager `ever-works-apps-controller`. Removal
       without data deletion (FR-28) delegates to T39's `removal.reconciler.ts`.
+      **Added by the 2026-09-17 fix pass.** The reconciler uses **only** APW-06's workload builders (component
+      `Deployment`s, `Service`s, `Ingress`, command/runner `Job`s, `CronJob`s, `PVC`s, env `Secret`) and **discards**
+      the renderer's `Namespace`, `ServiceAccount`, `LimitRange`, `ResourceQuota` and `NetworkPolicy` objects — tenancy
+      objects come only from T4's `tenant-template.ts` (APW10-G03). **Create** `src/render/work-to-render-input.ts`
+      _(new)_ for the reverse mapping (`Work.spec` → APW-06 `AppRenderInput`, including `env.values` after T44's
+      substitution, `policy`, `ingress`, `hosts.previous`, `deploymentShort`) with a golden round-trip test against
+      T26's forward mapper. It runs T43's dependency reconciler before reporting a phase, and it performs T52's P1
+      image promotion at startup (APW10-G08).
       **Test**: `apps/apps-tier-controller/src/reconcile/__tests__/work.reconciler.spec.ts` (**new**) with a fake API —
       ordering (template before workloads); refusal leaves zero workload objects; two `Work`s get two namespaces
       (ACC-10-26); a removed `Work` still has its PVCs and its dependency references after a simulated 30 days
@@ -423,13 +431,21 @@ _Delivers spec FR-30…FR-40, FR-47…FR-51. Coordinated with APW-06 P2 (T44–T
 - [ ] **T26. Desired-state mapper and App additions.**
       **Create** `packages/plugins/ever-works-apps/src/desired-state.mapper.ts` (**new**); **modify**
       `packages/plugins/ever-works-apps/src/apps-tier.provider.ts` to implement `applyWork`, `getWork`,
-      `setEgressThrottle` and APW-06's `IDeploymentPlugin` App additions (`supportsApps`, `deployApp`,
-      `getAppStatus`, `runAppJob`, `destroyApp` → `removeWork({ deleteData: deleteVolumes })`). The plugin writes the
-      `Work` desired-state object only (Resolution R-5).
+      `setEgressThrottle`, **`setDependencies` / `releaseDependencies` / `getDependencies` (T45)** and APW-06's
+      `IDeploymentPlugin` App additions (`supportsApps`, `deployApp`, `getAppStatus`, `runAppJob`,
+      `scaleApp` → `desiredState: paused` with `pausedReplicas`, `getAppLogs` → `pods/log` through the platform Role,
+      `checkAppCluster` → `zoneInfo()`, `prepareAppNamespace` / `publishAppHosts` → no-ops returning the zone's observed
+      values, `destroyApp` → `removeWork({ deleteData: deleteVolumes })`). The plugin writes the
+      `Work` desired-state object only (Resolution R-5). The managed behaviour of every member is the table in plan
+      §5.2; leaving one out makes the tier a second-class target (added, APW10-G04).
       **Test**: `packages/plugins/ever-works-apps/src/__tests__/desired-state.mapper.spec.ts` (**new**) — every §3.1
       limit (ACC-10-27), non-digest image refused before any network call, unknown render-input fields dropped,
-      generation monotonic; `src/__tests__/apps-tier.provider.status.spec.ts` (**new**) — a `Quarantined` phase with
-      `observedGeneration < generation` maps to a cancelled result with reason `quarantined` (ACC-10-35 plugin half);
+      generation monotonic, **smoke checks and `cron[].http.authScheme` and job `when` carried through (ACC-10-53)**;
+      `src/__tests__/apps-tier.provider.status.spec.ts` (**new**) — a `Quarantined` phase with
+      `observedGeneration < generation` maps to a cancelled result with reason `quarantined` (ACC-10-35 plugin half),
+      **each refusal code of plan §3.1 maps to the APW-06 outcome in the plan's mapping table**, `scaleApp('pause')`
+      writes `desiredState: paused` with the recorded counts and `scaleApp('resume')` reverses it, `getAppLogs` reads
+      `pods/log` and answers `logs_unavailable_on_tier` on a temporary refusal, and
       `destroyApp` passes `deleteVolumes` through unchanged; the fake API sees no write outside `works`.
       **Done when**: both specs pass and APW-06's deploy job, run against the plugin with a fake zone, records a
       Deployment whose state reads **Cancelled — quarantined** (cross-epic check with APW-06).
@@ -597,7 +613,10 @@ _Sandboxed in-zone builds (LG-24) and build limits (LG-25) — Resolution R-24._
       `Removed`; only with `spec.dataDeletion` **and** every `status.dependencies[]` `released`, delete PVCs then the
       namespace and set `status.removal.dataDeletedAt`.
       **Modify** `packages/plugins/ever-works-apps/src/apps-tier.provider.ts` — `removeWork(workId, { deleteData })`
-      sets `desiredState: removed` and, only when `deleteData`, `dataDeletion`.
+      sets `desiredState: removed` and, only when `deleteData`, `dataDeletion`; **and, added by APW10-G01, calls
+      `releaseDependencies(workId, { deleteData })` and waits for every `status.dependencies[]` entry to report
+      `released` before `dataDeletion` is written** — otherwise nothing ever sets the phase this reconciler waits for
+      and ACC-10-47 can never pass.
       **Test**: `apps/apps-tier-controller/src/reconcile/__tests__/removal.reconciler.spec.ts` (**new**) — after removal
       the fake API holds no Deployment, Service, Ingress, Job, CronJob or env Secret for the Work and still holds its
       PVCs (ACC-10-29, ACC-10-47); with `dataDeletion` but one dependency not `released`, zero PVC deletes; once all are
@@ -646,6 +665,168 @@ _Sandboxed in-zone builds (LG-24) and build limits (LG-25) — Resolution R-24._
       with a tier App Work lists `data/runs/apps-tier-usage-windows.jsonl` and no `apps_tier_*` operator row.
 
 ---
+
+## Fix-pass additions (added 2026-09-17)
+
+_Closes APW10-G01 and GAP-22 (blockers), APW10-G02…G08 and GAP-25. T43–T46 are **P2** and pair with APW-07's T36/T37;
+T47, T48 and T52 land with the P1 tasks they modify; T49–T51 are P2._
+
+- [ ] **T43 (P2). In-zone dependency reconciler (APW10-G01, GAP-22).**
+      **Create** `apps/apps-tier-controller/src/dependencies/dependency.reconciler.ts` (**new**) — reads
+      `Work.spec.dependencies[]`, and for each kind: creates the tenant database with
+      `buildTenantPostgresDdl(input)` from `packages/contracts/src/apps/tenant-postgres-ddl.ts` on the data server named
+      in the new zone Secret (plan §3.6), creates the App Work's own Redis instance, creates its prefixed buckets with a
+      user limited to `aw-<hex12>-*` and the 10 GiB quota, and obtains the mail credential from the relay's credential
+      API (T46). Writes `status.dependencies[]` with `phase` ∈ `pending|ready|failed|released`, `lastBackupAt` and a
+      `detail` that names a reason and never a value, and schedules a backup at most every 24 hours.
+      **Modify** `src/reconcile/work.reconciler.ts` (T6) to run it before reporting a tenant phase, and
+      `src/reconcile/removal.reconciler.ts` (T39) to release rather than delete unless `spec.dataDeletion` is set.
+      **Test**: `apps/apps-tier-controller/src/dependencies/__tests__/dependency.reconciler.spec.ts` (**new**) — each
+      kind reaches `ready` with a fresh `lastBackupAt`; an unreachable data server yields `failed` with a reason and no
+      value; an unknown kind is refused; a release sets `released` without deleting data and a delete happens only
+      afterwards (ACC-10-49, ACC-10-51). The live properties (another App Work's role refused, 21st connection refused,
+      70-second statement cancelled at 60 s, bucket prefix, quota) are LG-14's, extended by T45.
+      **Done when**: the spec passes, APW-07's T36 reads a real `Work.status.dependencies[]`, and ACC-E2E-10 (b)'s
+      dependency cards are green.
+
+- [ ] **T44 (P2). Dependency token substitution (APW10-G01).**
+      **Create** `apps/apps-tier-controller/src/seal/dep-token-substitution.ts` (**new**) — after unsealing and before
+      the tenant env Secret is written, replaces every `ew-dep://<kind>/<output>` token with the value T43 resolved, and
+      refuses an unknown token or an unresolved kind with the new refusal code `DEPENDENCY_TOKEN_UNKNOWN`.
+      **Modify** `src/seal/unseal.ts` (call it) and `src/crds/work.ts` (the code).
+      **Test**: `apps/apps-tier-controller/src/seal/__tests__/dep-token-substitution.spec.ts` (**new**) — a known token
+      is replaced in a plain value and inside a template; an unknown token, an unknown kind and a missing output each
+      refuse the `Work` with `DEPENDENCY_TOKEN_UNKNOWN`; **no placeholder ever reaches the rendered env Secret** — the
+      assertion is on the applied Secret's bytes, not on the intermediate string (ACC-10-49, FR-55).
+      **Done when**: the spec passes and a repository-wide search finds no code path that writes the env Secret before
+      substitution.
+
+- [ ] **T45 (P2). `IAppsTierProvider` dependency methods and the extended LG-14 probe (APW10-G01).**
+      **Modify** `packages/plugin/src/contracts/capabilities/apps-tier.interface.ts` — add `setDependencies`,
+      `releaseDependencies` and `getDependencies` exactly as plan §5.1; **modify**
+      `packages/plugins/ever-works-apps/src/apps-tier.provider.ts` (T26) to implement them by patching only
+      `spec.dependencies` on the `Work` (never the whole object — that would restart the app's workloads for a
+      dependency change).
+      **Modify** `apps/apps-tier-controller/src/reconcile/selfcheck.reconciler.ts` and the LG-14 row of plan §3.7 — the
+      probe additionally asserts, on the canary's own database, that a 21st connection is refused
+      (`CONNECTION_LIMIT_NOT_ENFORCED`) and that a 70-second statement is cancelled at 60 s
+      (`STATEMENT_TIMEOUT_NOT_ENFORCED`), because APW-07 relies on this probe for ACC-07-26.
+      **Test**: `packages/plugins/ever-works-apps/src/__tests__/apps-tier.provider.dependencies.spec.ts` (**new**) — the
+      fake API sees exactly one patch to `spec.dependencies`, the `Work`'s `spec.generation` and every other field are
+      untouched, and `releaseDependencies` waits for `released`; extend
+      `apps/apps-tier-controller/src/reconcile/__tests__/selfcheck.reconciler.spec.ts` with both new LG-14 reasons.
+      **Done when**: both specs pass and the live LG-14 run on stage records the two new outcomes.
+
+- [ ] **T46 (P2). Managed mail on the tier (GAP-22).**
+      **Modify** `apps/apps-tier-controller/src/dependencies/dependency.reconciler.ts` (T43) and `src/crds/work.ts` —
+      `smtp` joins `Work.spec.dependencies`, and its credential comes from the relay's credential API named in the zone
+      Secret (`smtpRelay.credentialApiUrl`, `adminSecretRef`), never from a tenant-reachable mail port.
+      **Modify** `packages/plugins/apps-tier-dependencies/src/managed-smtp.provider.ts` (APW-07 T36) — the platform side
+      writes `{ kind: 'smtp', ref: 'dep-smtp' }` and reports readiness from `status.dependencies[]`. **LG-08 is
+      unchanged**: ports 25, 465 and 587 remain blocked, and the relay is reached over its own HTTPS endpoint.
+      **Test**: extend `dependency.reconciler.spec.ts` — declaring `smtp` yields a `ready` dependency whose outputs carry
+      the relay endpoint, credential and from-address, and a credential-API refusal yields `failed` with a reason;
+      extend `packages/plugins/apps-tier-controller/src/template/__tests__/tenant-template.spec.ts` — the egress policy
+      still omits 25/465/587 while the relay endpoint is reachable on 443 (ACC-10-50, and ACC-07-32 on APW-07's side).
+      **Done when**: the specs pass and `app-fixture-hello`'s `smtp: { required: true }` reaches `ready` on a stage
+      tier, so ACC-E2E-10 (b) can pass.
+
+- [ ] **T47 (P1, lands with T4/T6). Deployment phase order, smoke checks and status (GAP-25).**
+      **Modify** `apps/apps-tier-controller/src/crds/work.ts` — `spec.smoke[]`, `spec.cron[].http.authScheme`,
+      `status.jobs[]`, `status.smoke[]` and `status.deployPhase` exactly as plan §3.1; **modify**
+      `src/reconcile/work.reconciler.ts` — the phases are **normative and ordered**: pre-deploy jobs → rollout →
+      first-deploy jobs → in-cluster smoke → publish hosts at the edge → post-deploy jobs → CronJobs, each written to
+      `status.deployPhase`, with `status.smoke[]` populated by the in-cluster runs and a first-deploy job never running
+      after the first Deployment; **modify** `src/render/work-to-render-input.ts` and
+      `packages/plugins/ever-works-apps/src/desired-state.mapper.ts` (T26) to carry all three.
+      **Test**: extend `work.reconciler.spec.ts` — the phase order is asserted from the fake API call log, an
+      in-cluster smoke failure stops before hosts are published, and no first-deploy job exists on a second
+      Deployment; extend `packages/plugins/ever-works-apps/src/__tests__/apps-tier.provider.status.spec.ts` — APW-06's
+      `hooks.onPhase` sees each `status.deployPhase` in order and `status.smoke[]` reaches its smoke result
+      (ACC-10-53).
+      **Done when**: both specs pass and APW-06's Deployment on the managed target shows job and smoke results.
+
+- [ ] **T48 (P1, lands with T4/T7/T9). Quarantine isolation that blocks (APW10-G02).**
+      **Modify** `src/template/tenant-template.ts` — every `allow-*` policy carries
+      `podSelector.matchExpressions: [{ key: hosting.ever.works/quarantined, operator: NotIn, values: ['true'] }]`, and
+      `default-deny` / `quarantine` keep selecting all pods; **modify**
+      `src/reconcile/quarantine.sequencer.ts` — step (1) labels every pod template, applies `quarantine`, records
+      `status.quarantine.policiesSuspended[]`, and release re-applies the template's policies and clears the label;
+      **modify** `src/probe/net.ts` and the LG-18 row of plan §3.7 — the drill's canary pod, kept alive through the
+      window, must observe the public control and the edge path **refused** within 15 s (`QUARANTINE_NOT_ISOLATING`).
+      **Test**: extend `tenant-template.spec.ts` and `pod-overlays.spec.ts` — golden files carry the selector on every
+      `allow-*` policy; extend `quarantine.sequencer.spec.ts` — the label, the policy and `policiesSuspended[]` are set
+      in step (1) and cleared in reverse; extend `probe/__tests__/net.spec.ts` — a reachable public control during
+      quarantine yields `QUARANTINE_NOT_ISOLATING` even when `networkIsolatedAt` is fresh (ACC-10-52). **Modify**
+      T11's kind job to install a CNI that enforces NetworkPolicy and to assert egress is refused there.
+      **Done when**: the specs pass and the LG-18 drill on a real zone fails when the label or the selector is removed.
+
+- [ ] **T49 (P2). Custom hostnames on the tier (APW10-G06).**
+      **Create** `packages/agent/src/entities/apps-tier-custom-hostname.entity.ts`,
+      `packages/agent/src/apps-tier/apps-tier-custom-hostname.service.ts` and
+      `apps/api/src/migrations/1792100300000-CreateAppsTierCustomHostnames.ts` (**new**) per plan §4; routes
+      `POST /api/works/:workId/custom-hostnames`, `GET` (with the validation record and the CNAME target) and `DELETE`
+      on the user controller; a `apps-tier-gate-watch` step that polls pending hostnames until both statuses are
+      `active`. **Modify** `packages/plugins/ever-works-apps/src/desired-state.mapper.ts` — `customHostnameRef` reaches
+      `Work.spec.hosts[]` only when the statuses are `active`.
+      **Test**: `packages/agent/src/apps-tier/__tests__/apps-tier-custom-hostname.service.spec.ts` (**new**) — creation
+      stores id, status and validation; a pending hostname never reaches `Work.spec.hosts[]`; the owner view carries the
+      TXT record and the fallback target and **no credential**; removal deletes the edge hostname and the row.
+      Extend `apps-tier-user.controller.spec.ts` (another account's Work → 404, ACC-10-31).
+      **Done when**: the specs pass, the new table is classified under R-25 with the other operator tables (T42), and
+      ACC-10-56 is walked.
+
+- [ ] **T50 (P2, lands with T28). Hosting prices in the pricebook and a real debit (APW10-G07).**
+      **Modify** `packages/agent/src/subscriptions/billing/credit-pricebook.ts` — a new **`VERSION_2`** with an
+      `effectiveFrom` date (VERSION_1 stays frozen), carrying `hosting.*` and `relay.messages` keys in whole billing
+      units; **modify** `packages/contracts/src/billing/meter.types.ts` — `hosting` joins `CREDIT_PRICE_GROUPS`;
+      **modify** `packages/agent/src/apps-tier/apps-tier-metering.service.ts` — the integer conversions (core-seconds ÷
+      3600, MiB-hours ÷ 1024, MiB ÷ 1024, GiB-hours ÷ 720) with the remainder carried on
+      `AppsTierUsageWindow.carriedRemainder`, `PluginUsageService.record` called with `operation` **and**
+      `payer: 'platform'`, and the daily receipt debiting the credit ledger once with idempotency key
+      `apps-tier:<workId>:<YYYY-MM-DD>`. **Modify** `packages/tasks/.../apps-tier-daily-receipts.task.ts` accordingly.
+      **Test**: `packages/agent/src/subscriptions/billing/__tests__/credit-pricebook.spec.ts` — VERSION_2 is additive,
+      VERSION_1 is byte-identical, `hosting` is a valid group, and each key resolves; extend
+      `apps-tier-metering.service.spec.ts` — the conversions and the carried remainder are exact, a re-run of the same
+      day debits once, and a price list without hosting keys still records quantities with 0 credits
+      (ACC-10-55).
+      **Done when**: the specs pass and a day's receipt reconciles against the ledger's single debit.
+
+- [ ] **T51 (P2). Credits, caps and the billing quarantine (XC-12).**
+      **Modify** `packages/agent/src/apps-tier/apps-tier-eligibility.service.ts` and
+      `apps-tier-metering.service.ts` — notify the owner at 80 % and 100 % of available credits, enforce an optional
+      per-App-Work monthly cap, and on zero credits or a lapsed subscription quarantine the App Work with category
+      **Billing** after a 7-day grace period, releasing it automatically when payment resumes; **modify**
+      `apps/api/src/apps-tier/apps-tier-user.controller.ts` — the monthly cost estimate from the quota profile.
+      **Test**: extend `apps-tier-metering.service.spec.ts` and `apps-tier-quarantine.service.spec.ts` — both
+      notifications fire once per month, the cap refuses a scale that would exceed it, the grace period is exact, a
+      Billing quarantine is released automatically and never by an owner (ACC-10-54).
+      **Done when**: the specs pass and the owner banner shows the billing variant of plan §6.3.
+
+- [ ] **T52 (P1, lands with T6/T10). P1 promotion of the canary and controller images (APW10-G08).**
+      **Create** `apps/apps-tier-controller/canary/` (**new**) — the canary application image (HTTPS client for LG-16, a
+      Postgres client for LG-14, a marker writer/reader for LG-18) built by T10's workflow — and
+      `src/promote/canary-promotion.ts` (**new**) performing the copy/scan/sign of the controller's own image and the
+      canary image into each canary's `t-<id>` registry space at startup. **Modify** `src/main.ts` to run it before the
+      first canary reconcile, and `src/reconcile/selfcheck.reconciler.ts` to report P2-only items
+      (`LG-13`'s promotion half, LG-16, LG-17, LG-20) as **`inconclusive`** with reason **`PHASE_NOT_ENABLED`** in a P1
+      run.
+      **Test**: `apps/apps-tier-controller/src/promote/__tests__/canary-promotion.spec.ts` (**new**) — both images land
+      signed in each canary's space, admission then admits the canary pods, and a P1 run reports the P2-only items
+      `inconclusive` rather than `passed` or skipped (ACC-10-57).
+      **Done when**: a P1 self-check run and quarantine drill complete on a real zone (T22) with the probe Jobs
+      admitted.
+
+- [ ] **T53 (P2). Hosting terms and abuse policy (EXT-18).**
+      **Create** `docs/specs/features/app-works/policies-draft/` (**new**) — a hosting terms addendum, an
+      acceptable-use policy, an abuse and copyright takedown process (intake, response targets, mapping to FR-41's
+      quarantine categories), a trademark display policy and a names-only subprocessor delta, each marked for counsel
+      review. **Modify** `packages/agent/src/apps-tier/apps-tier-eligibility.service.ts` (T27) — the hosting terms join
+      the platform's existing required-documents set (migration `1785000000000-CreateTermsAcceptance`) and must be
+      accepted before an owner's first deployment to the tier, with `termsNotAccepted` added to FR-35's reason codes.
+      **Test**: extend `apps-tier-eligibility.service.spec.ts` — an owner who has not accepted the hosting terms is
+      refused with `termsNotAccepted`, and accepting them clears it (ACC-10-38).
+      **Done when**: the drafts exist, the documents are registered, and the reason code has owner copy.
 
 ## Definition of Done
 

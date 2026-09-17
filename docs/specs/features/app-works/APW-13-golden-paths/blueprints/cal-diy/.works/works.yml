@@ -57,16 +57,23 @@ spec:
       # verified: the Dockerfile declares these ARGs.
       - { name: MAX_OLD_SPACE_SIZE, value: '6144' }
       - { name: CALCOM_TELEMETRY_DISABLED, value: '1' }
-      # The build talks only to the ephemeral database below; this URL is not a credential.
-      # TODO(verify, APW-05): the host name at which the build plugin exposes build services.
-      - { name: DATABASE_URL, value: 'postgresql://postgres@localhost:5432/calendso' }
+      # Resolved through the `DATABASE_URL` env entry below, whose `phase: both` makes it the ephemeral build
+      # service during the build and the App dependency at run time (APW-05 spec FR-20; APW-07 plan §4.6.2).
+      # A literal cannot work: APW-05 passes a literal `value` argument through unchanged (plan §4.6), while the
+      # build service is reached on 127.0.0.1 with its own throwaway user, password and database. This is rule
+      # R11's warning — the value is baked into image layers — which schema.md §24.1 accepts for this case.
+      - { name: DATABASE_URL, fromEnv: DATABASE_URL }
       # Deliberately NOT passed: NEXTAUTH_SECRET and CALENDSO_ENCRYPTION_KEY. The Dockerfile gives both a
       # build-only placeholder that satisfies the framework's presence check; the real values exist only at
       # run time (env below). A real secret in a build argument can end up in build logs or image metadata.
     services:
-      # README of the upstream says a database must be reachable during the build; whether a database-less build
-      # now works is unverified, so the Blueprint provides one. It is discarded with the build.
-      # TODO(verify, APW-05): the plugin configures trust authentication for this throwaway service.
+      # The build never migrates: the Dockerfile's RUN steps are `turbo prune`, `yarn install`, the tRPC, embed
+      # and web builds and a cache delete (L44-L51), and upstream's own image test builds against an empty,
+      # reachable database (`.github/actions/docker-build-and-test/action.yml` L79-L117). The service below is
+      # discarded with the build; a build with no database at all is untested, so the upstream-sync canary tries
+      # it once (see ../README.md).
+      # verified: APW-07 resolves this service to user `ever-works-build`, password `ever-works-build`, database
+      # `app` on 127.0.0.1:5432, with `url` = `directUrl` (plan §4.6.2); port 5432 is the postgres image default.
       - { name: postgres, image: 'postgres:16' }
     resources: { cpu: 4, memory: 12Gi, timeoutMinutes: 60 }
 
@@ -76,8 +83,10 @@ spec:
       command: ['/calcom/scripts/start.sh'] # verified: the image CMD
       port: 3000 # verified: EXPOSE 3000
       replicas: 1 # one replica: the start script migrates and seeds on boot
-      # verified: the start script rewrites the built public URL placeholder inside the build output at boot,
-      # so one image serves any domain — and the root filesystem must be writable.
+      # verified: the image carries `http://localhost:3000` (the Dockerfile's `ARG NEXT_PUBLIC_WEBAPP_URL`
+      # default, L56/L84) and the start script rewrites it to the run-time `NEXT_PUBLIC_WEBAPP_URL` in place,
+      # with `sed -i` over `apps/web/.next` and `apps/web/public` — so a domain change needs new pods (the
+      # `onChange: restart` below), not a rebuild, and the root filesystem must be writable.
       writableRootFilesystem: true
       probes:
         # /api/version answers without the database (verified). 60 × 10 s = a 10-minute boot budget.
@@ -89,7 +98,7 @@ spec:
       resources: { cpu: 500m, memory: 1536Mi, memoryLimit: 3Gi } # TODO(verify): measure on the verification lane
 
   dependencies:
-    postgres: { version: '16', directUrl: true } # verified: the app reads both a pooled and a direct URL
+    postgres: { version: '16', directUrl: true } # verified: the running app reads DATABASE_URL (packages/prisma/index.ts); migrations read DATABASE_DIRECT_URL (packages/prisma/schema.prisma `directUrl`)
     smtp: { required: true } # booking confirmations and password resets are email
 
   env:
@@ -109,18 +118,26 @@ spec:
       generate: { kind: hex, bytes: 32, rotate: never }
 
     # ── Derived from dependencies and domains ─────────────────────────────────────────────────────────────
-    - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+    # `phase: both`: at build time this resolves to the throwaway `build.services` postgres (APW-05 plan §4.7),
+    # at run time to the App dependency. Both are needed — the `build.args` entry above reads this name.
+    - { name: DATABASE_URL, secret: true, phase: both, from: deps.postgres.url }
     - { name: DATABASE_DIRECT_URL, secret: true, from: deps.postgres.directUrl }
-    # verified: the start script waits for "$DATABASE_HOST" (host:port) before migrating.
-    # TODO(verify, APW-07): output names `host` and `port` of the postgres dependency.
+    # verified: the start script waits for "$DATABASE_HOST" (host:port) before migrating — a wait, not a
+    # requirement (`wait-for-it.sh` runs without `set -e`). APW-07 plan §4.6.2 names these two outputs.
     - { name: DATABASE_HOST, template: '{{deps.postgres.host}}:{{deps.postgres.port}}' }
-    - { name: NEXT_PUBLIC_WEBAPP_URL, from: domains.primary.url } # runtime value replaces the built placeholder
+    - { name: NEXT_PUBLIC_WEBAPP_URL, from: domains.primary.url } # runtime value replaces the built one at boot
     - { name: NEXTAUTH_URL, template: '{{domains.primary.url}}/api/auth' } # verified: the framework's own default
+    # The sign-in page's server props ask next-auth for a CSRF token server-side, and next-auth 4.24.13 takes
+    # both the origin and the path from NEXTAUTH_URL_INTERNAL when set (packages/next-auth/src/react/index.tsx:
+    # `baseUrlServer`/`basePathServer`). Without this the pod calls its own PUBLIC url, which is not published
+    # yet when the first-deploy jobs and the smoke tests run (APW-06 plan §5.5).
+    - { name: NEXTAUTH_URL_INTERNAL, template: '{{components.web.internalUrl}}/api/auth' }
     # NOT named EVER_WORKS_*: that prefix is reserved for platform-injected values, and an `env` entry may not
     # use it (CONTRACTS §1 / schema.md rule R23 → `reserved_env_name`). These three are the Blueprint's own
     # bootstrap inputs, so they carry an APP_ prefix and the bootstrap-admin job below reads them by that name.
     - { name: APP_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
-    # TODO(verify, APW-07): output names of the smtp dependency.
+    # verified: APW-07 plan §4.6.2 (`APP_DEPENDENCY_OUTPUTS`) names `host`, `port`, `user`, `password`, `from`
+    # and `secure` for smtp.
     - { name: EMAIL_SERVER_HOST, from: deps.smtp.host }
     - { name: EMAIL_SERVER_PORT, from: deps.smtp.port }
     - { name: EMAIL_SERVER_USER, secret: true, from: deps.smtp.user }
@@ -129,7 +146,13 @@ spec:
     - { name: EMAIL_FROM_NAME, value: 'Cal.diy (community build)' }
 
     # ── Fixed values ──────────────────────────────────────────────────────────────────────────────────────
+    # verified: three separate telemetry sources. `CALCOM_TELEMETRY_DISABLED` (build arg at L9 and run-time
+    # variable) gates the app's own page-view collector (packages/lib/telemetry.ts); `TURBO_TELEMETRY_DISABLED`
+    # gates the Turbo binary that `yarn start` runs (root package.json `start` = `turbo run start`); and the
+    # build-time framework telemetry cannot be reached at all, because the upstream Dockerfile declares no ARG
+    # for `NEXT_TELEMETRY_DISABLED` — so the build keeps Next.js's default, not a value we choose.
     - { name: CALCOM_TELEMETRY_DISABLED, value: '1', phase: both } # telemetry is on unless this is set
+    - { name: TURBO_TELEMETRY_DISABLED, value: '1' }
     - { name: TZ, value: 'UTC' } # the upstream example environment forces UTC
     - { name: GOOGLE_LOGIN_ENABLED, value: 'false' }
 
@@ -141,14 +164,19 @@ spec:
       secret: true
       prompt:
         {
-          description: 'Password of the first administrator — at least 15 characters with upper-case, lower-case and a digit',
+          description: 'Password of the first administrator — 15 characters or more, with upper-case, lower-case and a digit, and no leading or trailing spaces',
           required: true
         }
-      # NOT a `pattern`: schema.md §12 allows RE2 syntax only, which has no look-around, and the composition
-      # rule this is after ("upper-case, lower-case and a digit") cannot be expressed without it
-      # (`pattern_unsupported`). The platform checks the length; Cal.diy's own setup route enforces the full
-      # rule, and the prompt above states it to the person typing it.
-      validate: { minLength: 15 }
+      # verified: apps/web/app/api/auth/setup/route.ts L22-25 validates `isPasswordValid(val.trim(), false, true)`,
+      # and packages/lib/auth/isPasswordValid.ts in strict mode requires length > 14 plus a digit, a lower-case
+      # and an upper-case letter — on the TRIMMED value, hence "no leading or trailing spaces" above.
+      # The pattern is RE2-safe: schema.md §12 allows no look-around, so the three class orderings are spelled
+      # out as an alternation instead of `(?=…)` (`pattern_unsupported`).
+      validate:
+        {
+          minLength: 15,
+          pattern: '^(?:.*[a-z].*[A-Z].*[0-9].*|.*[a-z].*[0-9].*[A-Z].*|.*[A-Z].*[a-z].*[0-9].*|.*[A-Z].*[0-9].*[a-z].*|.*[0-9].*[a-z].*[A-Z].*|.*[0-9].*[A-Z].*[a-z].*)$'
+        }
 
     # ── Optional integrations (prompted, may be left empty) ───────────────────────────────────────────────
     - name: GOOGLE_API_CREDENTIALS
@@ -158,8 +186,14 @@ spec:
       secret: true
       generate: { kind: hex, bytes: 32, rotate: never }
 
-    # TODO(verify): signup can only be closed with a build-time variable the upstream Dockerfile does not accept
-    # as an argument. Decide between an overlay Dockerfile and a runtime check before enabling:
+    # TODO(verify): signup is closed at RUN time, without a rebuild, through the `disable-signup` feature flag:
+    # apps/web/app/api/auth/signup/route.ts (L29-L33) refuses with 403 when the flag is enabled or when
+    # NEXT_PUBLIC_DISABLE_SIGNUP is "true", and keeps accepting requests that carry an invite token (L25). The
+    # row is inserted by packages/prisma/migrations/20230601181657_disable_signup_feature_flag/migration.sql
+    # (table "Feature", model at packages/prisma/schema.prisma L1369, `enabled` default false), and the
+    # `close-signup` job below sets it. An administrator can reopen signup under Settings → Admin → Flags, and a
+    # running pod picks the change up within the flag repository's 5-minute cache. The old build-time route is
+    # kept below for reference — the upstream Dockerfile declares no ARG for it.
     # - { name: NEXT_PUBLIC_DISABLE_SIGNUP, value: "true", phase: build }
 
   jobs:
@@ -199,8 +233,32 @@ spec:
           console.error(`bootstrap-admin: unexpected HTTP ${res.status}`); // never print the body: it may echo input
           process.exit(1);
 
+    # Closes public signup after the administrator exists, without a rebuild (see the `disable-signup` note in
+    # `env` above). Idempotent: the row already exists, and the update is a no-op on the second run.
+    # TODO(verify): `prisma db execute --stdin` against Prisma 6.16.1 — confirm the flags on the verification lane.
+    - name: close-signup
+      when: first-deploy
+      component: web
+      timeoutSeconds: 300
+      command:
+        - sh
+        - -c
+        - |
+          npx prisma db execute --schema /calcom/packages/prisma/schema.prisma --stdin <<'SQL'
+          UPDATE "Feature" SET enabled = true WHERE slug = 'disable-signup';
+          SQL
+
   # Every entry below: the route file exists at the pin, its handler method and credential check were read, and
   # the schedule comes from the upstream's own schedule files (apps/web/vercel.json, .github/workflows/cron-*.yml).
+  # `tasker` (`/api/tasks/cron`) answers GET only — the route exports `GET` and `revalidate = 0`; the POST form
+  # exists in packages/features/tasker/api/cron.ts but has no route. Anonymous calls split by family: the
+  # `tasks/*` routes and the raw-key routes answer 401, while the `calendar-subscriptions*` and
+  # `selected-calendars` routes accept the raw `CRON_API_KEY` or `Bearer CRON_SECRET` and answer 403 — which is
+  # why the `cron-refuses-anonymous` smoke below stays on `/api/tasks/cron`.
+  # None of these is eligible for managed hosting as written: `ever-works-apps` refuses a schedule that fires
+  # more often than every 5 minutes (`cron_too_frequent`, APW-06 plan §4.9), and `tasker` and `webhook-triggers`
+  # fire every minute. Decision: Cal.diy's managed tier needs a ≥ 5-minute task queue (or a tier exception) before
+  # this Blueprint can be hosted there; on a Your cluster target it runs exactly as written (APW-13 plan §7.2).
   cron:
     - {
         name: tasker,
@@ -263,7 +321,9 @@ spec:
     - { name: setup-closed, http: { method: POST, path: /api/auth/setup }, expect: { status: [400] } }
     - { name: cron-refuses-anonymous, http: { method: GET, path: /api/tasks/cron }, expect: { status: [401] } }
 
-  # From the upstream's AGENTS.md: "Run `yarn type-check:ci --force` before concluding CI failures are unrelated".
+  # From the upstream's AGENTS.md L83-L85: `yarn type-check:ci --force`, `yarn biome check --write .` and
+  # `TZ=UTC yarn test`; L32 and L41 add "< 500 lines, < 10 files" per pull request. "Run `yarn type-check:ci
+  # --force` before concluding CI failures are unrelated".
   # Checks run exactly the declared command in a fresh checkout — nothing is installed first (APW-08 plan §2.3), so
   # every command installs its own dependencies. Each check runs as its own CI job (program Resolution R-9).
   checks:
@@ -273,18 +333,23 @@ spec:
         required: true,
         timeoutSeconds: 3600
       }
-    - { name: biome, command: 'yarn install --immutable && yarn biome check .', required: false, timeoutSeconds: 1800 } # TODO(verify): read-only form of the documented `--write` command
+    - { name: biome, command: 'yarn install --immutable && yarn biome check .', required: false, timeoutSeconds: 1800 } # verified: read-only form of AGENTS.md L84; `--write` would mutate the checkout
     - {
         name: unit-tests,
         command: 'yarn install --immutable && TZ=UTC yarn test',
         required: false,
         timeoutSeconds: 3600
-      }
+      } # verified: `TZ=UTC` is repeated deliberately — the root `test` script already sets it (package.json L77)
 
   agents:
     instructionFiles: [AGENTS.md] # upstream guidance: draft PRs, conventional commits, ask before schema changes
     maxPullRequestChangedLines: 500 # upstream guidance; it also says fewer than 10 code files per PR
 
+  # TODO(verify, APW-03): applying this Blueprint with `source.relation: link` makes rule R13
+  # (`upstream_sync_requires_upstream`) an error and aborts apply, so apply must drop `upstreamSync` — and
+  # `upstreamPullRequests.enabled` — for that relation. For `fork` and `private-copy` it stays, and it is what the
+  # weekly upstream-sync canary (APW-13 spec §4.5) runs on. APW-13 plan §6 and T27/T28 record the relation each
+  # golden path uses (ACCEPTANCE.md E2E-14 accepts Link for Cal.diy).
   upstreamSync:
     schedule: '0 6 * * 1'
     mode: merge

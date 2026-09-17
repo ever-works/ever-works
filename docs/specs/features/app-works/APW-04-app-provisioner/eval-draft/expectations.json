@@ -1,0 +1,164 @@
+{
+	"$comment": "DRAFT — structured expectations for the eight APW-04 eval fixtures (plan §11.4). Read by packages/agent/src/app-provisioning/__tests__/app-provisioner.eval.spec.ts (T32) against the trees in ./fixtures/<case>/tree.md. Every dependency names the file that justifies it; every env entry names its class and source.",
+	"version": 1,
+	"cases": {
+		"app-spec": {
+			"fixture": "app-spec",
+			"detectionSource": "app-spec",
+			"detectionEvidence": [".works/works.yml"],
+			"overlayDockerfile": false,
+			"dependencies": [],
+			"env": {},
+			"jobs": [],
+			"cron": [],
+			"probes": { "readiness": "/healthz", "liveness": "/livez" },
+			"notes": "An existing valid App spec wins; the proposal preserves it and changes only what the evidence requires."
+		},
+		"compose": {
+			"fixture": "compose",
+			"detectionSource": "compose",
+			"detectionEvidence": ["compose.yaml"],
+			"overlayDockerfile": false,
+			"dependencies": [
+				{ "kind": "postgres", "evidence": "compose.yaml" },
+				{ "kind": "redis", "evidence": "compose.yaml" }
+			],
+			"env": {
+				"DATABASE_URL": { "secret": true, "phase": "run-time", "source": "from" },
+				"REDIS_URL": { "secret": true, "phase": "run-time", "source": "from" },
+				"PORT": { "secret": false, "phase": "run-time", "source": "default" }
+			},
+			"jobs": [{ "kind": "pre-deploy", "evidence": "compose.yaml" }],
+			"cron": [],
+			"probes": { "readiness": "/readyz", "liveness": "/livez" }
+		},
+		"dockerfile": {
+			"fixture": "dockerfile",
+			"detectionSource": "dockerfile",
+			"detectionEvidence": ["Dockerfile"],
+			"overlayDockerfile": false,
+			"dependencies": [{ "kind": "postgres", "evidence": "package.json" }],
+			"env": {
+				"DATABASE_URL": { "secret": true, "phase": "run-time", "source": "from" },
+				"NEXT_PUBLIC_APP_URL": { "secret": false, "phase": "build-time", "source": "from" },
+				"SESSION_SECRET": { "secret": true, "phase": "run-time", "source": "generate" }
+			},
+			"jobs": [{ "kind": "pre-deploy", "evidence": "scripts/migrate.js" }],
+			"cron": [],
+			"probes": { "readiness": "/api/health", "liveness": "/api/health/live" }
+		},
+		"helm": {
+			"fixture": "helm",
+			"detectionSource": "helm",
+			"detectionEvidence": ["chart/Chart.yaml", "chart/values.yaml"],
+			"overlayDockerfile": false,
+			"dependencies": [{ "kind": "postgres", "evidence": "chart/values.yaml" }],
+			"env": {
+				"POSTGRES_HOST": { "secret": false, "phase": "run-time", "source": "from" },
+				"POSTGRES_PASSWORD": { "secret": true, "phase": "run-time", "source": "from" },
+				"TZ": { "secret": false, "phase": "run-time", "source": "default" }
+			},
+			"jobs": [],
+			"cron": [],
+			"probes": { "readiness": "/healthz", "liveness": "/healthz/live" }
+		},
+		"descriptor-hint": {
+			"fixture": "descriptor-hint",
+			"detectionSource": "descriptor-hint",
+			"detectionEvidence": ["Procfile"],
+			"overlayDockerfile": false,
+			"dependencies": [{ "kind": "redis", "evidence": "src/queue.js" }],
+			"env": {
+				"REDIS_URL": { "secret": true, "phase": "run-time", "source": "from" },
+				"PORT": { "secret": false, "phase": "run-time", "source": "default" }
+			},
+			"jobs": [],
+			"cron": [],
+			"probes": { "readiness": "/healthz", "liveness": "/livez" },
+			"notes": "The Procfile is a hint: the start command and the port come from the code and the Dockerfile, not the descriptor."
+		},
+		"zero-config-with-auto": {
+			"fixture": "zero-config",
+			"detectionSource": "auto",
+			"detectionEvidence": ["package.json"],
+			"overlayDockerfile": false,
+			"buildStrategy": "auto",
+			"dependencies": [],
+			"env": { "PORT": { "secret": false, "phase": "run-time", "source": "default" } },
+			"jobs": [],
+			"cron": [],
+			"probes": {}
+		},
+		"zero-config-without-auto": {
+			"fixture": "zero-config",
+			"detectionSource": "auto",
+			"detectionEvidence": ["package.json"],
+			"overlayDockerfile": true,
+			"overlayPath": ".works/overlay/Dockerfile",
+			"buildStrategy": "dockerfile",
+			"dependencies": [],
+			"env": { "PORT": { "secret": false, "phase": "run-time", "source": "default" } },
+			"jobs": [],
+			"cron": [],
+			"probes": {}
+		},
+		"bootstrap-risk": {
+			"fixture": "bootstrap-risk",
+			"detectionSource": "compose",
+			"detectionEvidence": ["compose.yaml"],
+			"overlayDockerfile": false,
+			"dependencies": [{ "kind": "postgres", "evidence": "compose.yaml" }],
+			"env": {
+				"DATABASE_URL": { "secret": true, "phase": "run-time", "source": "from" },
+				"ADMIN_EMAIL": { "secret": false, "phase": "run-time", "source": "prompt" },
+				"ADMIN_PASSWORD": { "secret": true, "phase": "run-time", "source": "generate" }
+			},
+			"jobs": [
+				{ "kind": "pre-deploy", "evidence": "docker-entrypoint.sh" },
+				{ "kind": "first-deploy", "evidence": "src/routes/setup.js" }
+			],
+			"cron": [],
+			"probes": { "readiness": "/healthz", "liveness": "/livez" },
+			"risks": [
+				{ "kind": "bootstrap-endpoint", "file": "src/routes/setup.js" },
+				{ "kind": "swallowed-migration", "file": "docker-entrypoint.sh" }
+			],
+			"negativeSmoke": ["the setup endpoint refuses a second attempt"]
+		},
+		"cron-key": {
+			"fixture": "cron-key",
+			"detectionSource": "dockerfile",
+			"detectionEvidence": ["Dockerfile"],
+			"overlayDockerfile": false,
+			"dependencies": [{ "kind": "postgres", "evidence": "requirements.txt" }],
+			"env": {
+				"DATABASE_URL": { "secret": true, "phase": "run-time", "source": "from" },
+				"CRON_SECRET": { "secret": true, "phase": "run-time", "source": "generate" },
+				"CIPHER_KEY": {
+					"secret": true,
+					"phase": "run-time",
+					"source": "generate",
+					"shape": { "length": 32, "charset": "base64-url", "validation": true }
+				},
+				"DESCRIPTOR_ONLY_ROUTE": {
+					"secret": false,
+					"phase": "run-time",
+					"source": "default",
+					"declared": false
+				}
+			},
+			"jobs": [],
+			"cron": [
+				{
+					"schedule": "*/15 * * * *",
+					"route": "/internal/reindex",
+					"authEnv": "CRON_SECRET",
+					"evidence": "app/cron.py",
+					"negativeSmoke": true
+				}
+			],
+			"cronForbidden": ["/internal/listed-only-in-descriptor"],
+			"probes": { "readiness": "/healthz", "liveness": "/livez-db-free" }
+		}
+	}
+}

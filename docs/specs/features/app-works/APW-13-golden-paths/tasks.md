@@ -58,10 +58,21 @@ regression gaps of ACCEPTANCE §5 that need no App Works code._
       `git http-backend`), `control.mjs` (`/_control/seed`, `/_control/fault`, `/_control/calls`), `state.mjs` (in-memory
       repositories, forks with readiness delay, permissions per token) — all new. `clone_url` in every repository
       response points at the fake.
+      **Add the consumer-derived routes** (added 2026-09-17, [plan §8.3](./plan.md)): the route table there is derived
+      from every consuming epic, not only from APW-13 — `GET /repos/:o/:r/forks` (APW-02), the Git Data API
+      (`git/refs`, `git/trees`, `git/blobs`, `git/commits`, APW-02/APW-03), topics and hooks, workflow
+      disable/enable per id, Actions secrets public-key/PUT, runs/jobs/artifacts, branch protection, and issue comments
+      — with the fault vocabulary (`delay`, `never-ready`, `rate-limit`, `server-error`, `auth-refused` **per token
+      identity**, `conflict`) and the `/_control/seed` shape of the same section. Seed the PR-lane catalog (the test
+      `ever-works/templates` manifest, `licenses.yml`, the three Blueprint repositories, the amber and red licence
+      upstreams) from a checked-in JSON fixture per spec rather than per-test code.
       **Test**: `apps/web/e2e/fakes/github-fake/__tests__/server.unit.spec.ts` (new) — fork readiness delay and "never
       ready"; a clone and push round-trip through `git-backend`; `/_control/calls` records method, path and token
-      identity. Run (after T4): `pnpm --filter ever-works-web test:e2e-harness server`.
-      **Done when**: the spec passes and the server starts in under 1 s.
+      identity; a per-token `auth-refused` fault returns `401` for that token and is restored afterwards; a seeded
+      catalog fixture serves the routes APW-02, APW-03 and APW-05 consume. Run (after T4):
+      `pnpm --filter ever-works-web test:e2e-harness server`.
+      **Done when**: the spec passes, the server starts in under 1 s, and every route in the plan §8.3 table has a
+      handler and a recorded fixture.
 
 - [ ] **T3 (parallel with T2). Contract test.**
       **Create** `apps/web/e2e/fakes/github-fake/__tests__/contract.unit.spec.ts` (new) — for every served route, the
@@ -84,13 +95,19 @@ regression gaps of ACCEPTANCE §5 that need no App Works code._
 - [ ] **T5. `EVER_WORKS_E2E_FAKES` in the GitHub plugin.**
       **Modify** `packages/plugins/github/src/github.plugin.ts` — when `process.env.NODE_ENV !== 'production'` and
       `EVER_WORKS_E2E_FAKES === '1'` and `APW_E2E_GITHUB_FAKE_URL` is set, use it as the API base URL for every call; the
-      admin `apiBaseUrl` setting and its SSRF guard are untouched.
+      admin `apiBaseUrl` setting and its SSRF guard are untouched. **Also switch every URL builder, not just the API base
+      (added 2026-09-17, plan §8.3):** `getCloneUrl` (`:155-157`, injected at `:663-667` and `:763`) and `getWebUrl`
+      (`:159-161`) return the fake's origin, and the `https://github.com/<full_name>.git` fallback and the
+      `raw.githubusercontent.com` content URL in `github-api.service.ts` (`:1364`) honour the same switch. Without the
+      `getCloneUrl` case an isomorphic-git clone/push still reaches real GitHub while this task's unit test passes.
       **Modify** `packages/plugins/github/src/github-api.service.ts` — the `https://github.com/<full_name>.git` fallback
       honours the same switch.
       **Test**: `packages/plugins/github/src/__tests__/e2e-fakes-switch.spec.ts` (new) — honoured in
       `test`/`development`; ignored with `NODE_ENV=production`; a loopback `apiBaseUrl` setting is still refused with the
-      switch on. Run: `pnpm --filter @ever-works/github-plugin test e2e-fakes-switch`.
-      **Done when**: the three cases pass and CONTRACTS §7's `EVER_WORKS_E2E_FAKES` row matches the behaviour.
+      switch on; **`getCloneUrl` and `getWebUrl` return the fake origin under the switch and `github.com` without it**;
+      a clone through `GitOperations` uses the fake's `clone_url`. Run:
+      `pnpm --filter @ever-works/github-plugin test e2e-fakes-switch`.
+      **Done when**: all cases pass and CONTRACTS §7's `EVER_WORKS_E2E_FAKES` row matches the behaviour.
 
 ## P0.3 — Helpers
 
@@ -121,12 +138,16 @@ regression gaps of ACCEPTANCE §5 that need no App Works code._
       **Done when**: all cases pass.
 
 - [ ] **T9. GitHub estate helper — without delete.**
-      **Create** `apps/web/e2e/helpers/github-estate.ts` (new) — `generateFromTemplate`, `pushCommit`, `archiveAndLabel`
+      **Create** `apps/web/e2e/helpers/github-estate.ts` (new) — `generateFromTemplate({ repo, newName, includeAllBranches })`
+      (`include_all_branches: true`, so the `variant/*` branches travel with the copy — T68),
+      `pushCommit({ repo, branch, files, message, token })` (the token is the customer's own for a variant push — T67 — and
+      never the estate token in a platform-facing call), `archiveAndLabel`
       (topic `apw-e2e-expired`, run id in description), `closePullRequest`, `getRepo`, `getActionsPermissions`,
       `listWorkflowRuns`, `listPulls`, `getUserPermission`.
       **Test**: `apps/web/e2e/helpers/__tests__/github-estate.unit.spec.ts` (new) — the module exports no function whose
       name matches `/delete|remove|destroy/i`; a source scan of `apps/web/e2e/**` finds no `DELETE` request to `/repos/`
-      and no `deleteRepository` reference (ACC-13-17, static half). Run:
+      and no `deleteRepository` reference (ACC-13-17, static half); `generateFromTemplate` always sends
+      `include_all_branches: true`. Run:
       `pnpm --filter ever-works-web test:e2e-harness github-estate`.
       **Done when**: the spec is green and adding a `deleteRepo` export makes it fail.
 
@@ -140,34 +161,49 @@ regression gaps of ACCEPTANCE §5 that need no App Works code._
       **Done when**: both refusals are tested and green.
 
 - [ ] **T11 (parallel with T10). Canary sink reader and evidence builder.**
-      **Create** `apps/web/e2e/helpers/canary-sink.ts` (new; `listRequests`, `assertNoLeak(values)`) and
-      `apps/web/e2e/helpers/app-works-evidence.ts` (new; evidence JSON of [plan §3.1](./plan.md) at
-      `evidence/<blueprint-id>/<runId>.json`, lane summary of spec §6.2, artefact secret scan before upload).
-      **Test**: `apps/web/e2e/helpers/__tests__/app-works-evidence.unit.spec.ts` (new) — evidence validates against a copy
-      of APW-03's `catalog.md` §3.2 evidence shape; the summary shows spend against budget; an attachment containing a
-      known secret fails the run (ACC-13-16, cross-cutting artefact scan). Run:
-      `pnpm --filter ever-works-web test:e2e-harness app-works-evidence`.
+      **Create** `apps/web/e2e/helpers/canary-sink.ts` (new; `listRequests(since)`, `assertNoLeak(values)`) — reads the
+      sink's read API of [plan §5.3](./plan.md) (`GET /requests?since=&limit=` with the bearer read token, paged by
+      `receivedAt`, `authorization` stripped by the sink) and `apps/web/e2e/helpers/app-works-evidence.ts` (new; evidence
+      JSON of [plan §3.1](./plan.md) at `evidence/<blueprint-id>/<runId>.json` — validated against the schema T61 drafts —
+      lane summary of spec §6.2, artefact secret scan before upload).
+      **Test**: `apps/web/e2e/helpers/__tests__/app-works-evidence.unit.spec.ts` (new) — evidence validates against
+      `ever-works/templates/schema/evidence.schema.json` (T61) and a file missing `license.class`, `passCount` or
+      `upstream.kind` fails; the summary shows spend against budget; an attachment containing a known secret fails the
+      run (ACC-13-16, 23); a `truncated` sink page is followed and a wrong read token is refused (ACC-13-24 fixture).
+      Run: `pnpm --filter ever-works-web test:e2e-harness app-works-evidence`.
       **Done when**: the spec is green.
 
 ## P0.4 — Configs and the suite workflow
 
 - [ ] **T12. Live config.**
       **Create** `apps/web/playwright.app-works.config.ts` (new, [plan §8.1](./plan.md)) and
-      `apps/web/e2e/app-works-live.setup.ts` (new; runs interlocks, registers throwaway accounts, attaches the user token
-      through `patchPluginSettingsViaAPI`, writes the estate file).
+      `apps/web/e2e/app-works-live.setup.ts` (new; runs interlocks, registers throwaway accounts, connects the account's
+      GitHub through the surface T63 lands, creates the account's Agent with limited networking and its model credential
+      (spec FR-65) and records the Agent id in the estate file, writes the estate file).
       **Modify** `apps/web/playwright.config.ts` — add `flow-app-works-(live|kind)-` to the ignore patterns of both the
       `chromium` and `chromium-no-auth` projects. No other change.
       **Test**: `cd apps/web && pnpm exec playwright test --list` lists no `flow-app-works-live-` or `-kind-` spec, and
       `pnpm exec playwright test -c playwright.app-works.config.ts --list` lists them.
-      **Done when**: both listings are as stated.
+      **Done when**: both listings are as stated, and the setup fails with the surface's name (S10) when the connection
+      surface is absent rather than letting a scenario fail at its first fork call.
 
-- [ ] **T13. `e2e.yml` starts the fake.**
+- [ ] **T13. `e2e.yml` starts the fake and the job runtime.**
       **Modify** `.github/workflows/e2e.yml` — in the Playwright step, start `node e2e/fakes/github-fake/server.mjs` in
       the background before the API and wait for it; add `EVER_WORKS_E2E_FAKES=1` and
       `APW_E2E_GITHUB_FAKE_URL=http://127.0.0.1:3900` to the API and Playwright environments and
       `EVER_WORKS_APP_WORKS_ENABLED=true` to the API environment (Resolution R-6); dump the fake's log in the existing
       failure trap. Triggers, shards and concurrency unchanged.
-      **Test**: `gh workflow run e2e.yml --ref <branch>` — the run's logs show the fake starting in every shard.
+      **Also start the App runtime worker** (added 2026-09-17, spec FR-55; the exact step and readiness probe are in
+      [plan §9.1](./plan.md)): `EVER_WORKS_APPS_LOCAL_WORKER=true nohup pnpm --filter @ever-works/trigger-tasks app-runtime:local-worker`
+      in the background with its log in the failure trap. Without it fork readiness reports `dispatch_unavailable` and
+      every App cluster call is refused, so ACC-E2E-02's PR twin, ACC-NEG-09 and T30/T31 can never pass. Production
+      refuses to boot with that variable, so the step is non-production by construction.
+      **Add the lane switches** (spec FR-65) to the API and Playwright environments:
+      `EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS` (ACC-NEG-09's shortened readiness window) and the non-production
+      override that forces the web `works-app` chip on in the lane (the web runs `NODE_ENV=production` here, so the
+      override is an explicit environment value, never `NODE_ENV`; APW-01 T7b owns the fail-closed helper it overrides).
+      **Test**: `gh workflow run e2e.yml --ref <branch>` — the run's logs show the fake and the worker starting in every
+      shard, and a run with the worker step removed fails the new specs with the named dispatch reason (ACC-13-22).
       **Done when**: that run is green and no existing spec changes result (cross-cutting: existing workflows keep
       passing).
 
@@ -178,19 +214,24 @@ regression gaps of ACCEPTANCE §5 that need no App Works code._
       connection; `409` for a second account; the generate, deploy and write refusals over HTTP; with `works-app` on,
       unchanged. Covers ACC-REG-01, ACC-NEG-15.
       **Test**: `cd apps/web && EVER_WORKS_E2E_FAKES=1 pnpm exec playwright test flow-repo-work-kind-regression`.
-      **Done when**: it passes locally and in a dispatched `e2e.yml` run.
+      **Done when**: it passes locally and in a dispatched `e2e.yml` run. **Until T63 lands** the "seeded fake connection"
+      this task needs has no supported surface, so the spec ships as
+      `test.fixme('APW-13 T63: no supported GitHub connection surface')` and is un-fixme'd in T63's PR — the same marker
+      T15, T16, T30 and T31 carry.
 
 - [ ] **T15. Template fork succeeds.**
       **Create** `apps/web/e2e/flow-template-fork-success.spec.ts` (new) — fork into the user and into an organization;
       the fake records the user's token. Covers ACC-REG-02.
       **Test**: `cd apps/web && EVER_WORKS_E2E_FAKES=1 pnpm exec playwright test flow-template-fork-success`.
-      **Done when**: it passes and `/_control/calls` shows the user's token on the fork call.
+      **Done when**: it passes and `/_control/calls` shows the user's token on the fork call. **Until T63 lands** it carries
+      `test.fixme('APW-13 T63: no supported GitHub connection surface')` (T14's marker).
 
 - [ ] **T16. Activity for deploy and PR events.**
       **Create** `apps/web/e2e/flow-activity-deploy-and-pr-events.spec.ts` (new) — template fork and PR events appear
       with names only. Covers ACC-REG-07.
       **Test**: `cd apps/web && EVER_WORKS_E2E_FAKES=1 pnpm exec playwright test flow-activity-deploy-and-pr-events`.
-      **Done when**: it passes.
+      **Done when**: it passes (**until T63 lands** with `test.fixme('APW-13 T63: no supported GitHub connection surface')`,
+      T14's marker).
 
 - [ ] **T17. Signed GitHub delivery.**
       **Create** `apps/web/e2e/flow-github-intake-signed-delivery.spec.ts` (new) — a delivery signed with the CI webhook
@@ -221,17 +262,22 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 ## P1.1 — Test estate (owner actions)
 
 - [ ] **T20. Estate.** `(owner action)`
-      **Create** (outside the monorepo) `<e2e-upstream-org>`, `<e2e-fork-org>` and the `<e2e-user>` machine user
-      (read-only on the upstream organization); a dedicated test budget for model spend; the canary sink; the test DNS
+      **Create** (outside the monorepo) the **Ever Works test tenant** for dev and one for stage (owner decision J-08,
+      ACCEPTANCE §0.3 — the tenancy comes from Ever Works itself, not a purpose-built GitHub test organization), the
+      GitHub account that tenant connects, and the `<e2e-user>` machine user (read-only on the upstream organization);
+      a dedicated test budget for model spend and the lane's model/pipeline credential; the canary sink; the test DNS
       zone; the test cluster(s) and their operations-change claim procedure. **Modify** the monorepo's GitHub
-      environments `app-works-dev` and `app-works-stage` with the secrets and variables of ACCEPTANCE §0.4. Record
-      addresses and ownership in the private operations repository only.
+      environments `app-works-dev` and `app-works-stage` with the secrets and variables of ACCEPTANCE §0.4, including
+      `APW_E2E_JOB_RUNTIME_PROJECT_REF` / `TRIGGER_SECRET_KEY` for any lane that does not use the credential-free local
+      worker. Record addresses and ownership in the private operations repository only.
       **Test**: `gh workflow run app-works-nightly.yml -f lane=dry-run` (the `lane` input sets `APW_E2E_LANE`; a dry run runs the interlocks and exits).
-      **Done when**: `app-works-live.setup.ts` passes its interlocks in that dry run.
+      **Done when**: `app-works-live.setup.ts` passes its interlocks in that dry run, the test tenant is recorded in the
+      private operations repository, and `<e2e-upstream-org>` resolves to `ever-works` while `<e2e-fork-org>` resolves to
+      the tenant account's fork space.
 
 - [ ] **T21. Long-lived repositories.** `(owner action)`
-      **Create** `<e2e-fork-org>/umami` and `<e2e-fork-org>/cal-diy` once (fork or private copy — record the choice
-      privately). Automation only links them.
+      **Create** `<e2e-fork-org>/umami` and `<e2e-fork-org>/cal-diy` once **in the test tenant's connected account's fork
+      space** (fork or private copy — record the choice privately). Automation only links them.
       **Test**: `getRepo` from `apps/web/e2e/helpers/github-estate.ts` returns both, not archived; `getUserPermission`
       shows `<e2e-user>` can push to both and cannot push to `<e2e-upstream-org>`.
       **Done when**: both reads return as stated in a dry-run dispatch.
@@ -240,13 +286,19 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 
 - [ ] **T22. `ever-works/app-fixture-hello`.**
       **Create** in that repository every file of [plan §4.1](./plan.md) with the HTTP surface of plan §4.2; mark it a
-      template repository; MIT licence.
+      template repository; MIT licence; topics `ever-works-app-fixture` (so the repository is discoverable and the
+      template generation of T9 works).
+      **Modify** `ever-works/app-fixture-hello:Dockerfile` — the `runtime` stage ends with a **numeric** `USER 1000`, never
+      `USER node` (plan §4.1): kubelet refuses a non-numeric image user under the platform's `runAsNonRoot` default with
+      `image has non-numeric user`, which APW-06 classifies `image_user_unverifiable` and refuses before apply on
+      `ever-works/apps`. The shipped repository currently says `USER node`; the App's own README records the numeric uid.
       **Create** `ever-works/app-fixture-hello:.github/workflows/image.yml` — builds and publishes
       `ghcr.io/ever-works/app-fixture-hello:<sha>` and fails when `docker build` exceeds 120 s.
       **Test**: `ever-works/app-fixture-hello:test/routes.test.mjs`, `test/migrate.test.mjs`, `test/bootstrap.test.mjs`
       (`sawPublicApp` is false on 404 and on a different marker) run by `npm ci && npm test` (ACC-13-01 build-time half,
-      ACC-13-03 unit half).
-      **Done when**: image CI is green under the time limit; `docker run` + a local Postgres answers every route.
+      ACC-13-03 unit half); a `docker image inspect` assertion that the image's `Config.User` is numeric.
+      **Done when**: image CI is green under the time limit; `docker run` + a local Postgres answers every route; the
+      image's configured user is numeric and non-root.
 
 - [ ] **T23. Variant branches and images.**
       **Create** branches `variant/build-oom`, `variant/baked-localhost`, `variant/bad-migration`, `variant/slow-boot`
@@ -257,6 +309,10 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       **Test**: dispatch `variants.yml` — the out-of-memory build exits 137, the baked build's `/marker` contains
       `localhost`, the bad migration exits non-zero, the slow boot listens after 120 s (preconditions of ACC-NEG-10,
       ACC-NEG-11, ACC-13-08).
+      **Modify** `ever-works/app-fixture-hello:VARIANTS.md` and `.github/workflows/variants.yml` (added 2026-09-17) —
+      `VARIANTS.md` is the branch contract (`variant/<name>`, its single commit, its mechanism, its scenario) and is
+      already published; this task keeps it in step with the branches it creates, and T67 adds the rebase rule for when
+      `main` moves.
       **Done when**: each branch is one commit on `main` and its `variants.yml` job is green.
 
 - [ ] **T24. `ever-works/app-fixture-hello-template`.**
@@ -288,26 +344,40 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 - [ ] **T27. `ever-works/umami-template`.**
       **Create** from `docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/`; topic; `validate.yml`. After
       the first nightly run, resolve each item of its README's "Unverified" list in the same repository and update the
-      draft here.
-      **Test**: `validate.yml` green; `apps/web/e2e/flow-app-works-live-umami.spec.ts` (T43) on dev.
+      draft here. The Blueprint's `web` component declares `runAsUser: 1001` once APW-03's `components[].runAsUser`
+      exists (T61's field request) — the image sets its user by name.
+      **Record the relation** (added 2026-09-17): the Blueprint declares `source.relation: fork` and the golden-path lane
+      states which relation each run uses; applying the Blueprint to a **Link** App Work strips
+      `upstreamSync`/`upstreamPullRequests.enabled` per APW-03's apply rule, and that rule is APW-03's to write
+      (plan §13).
+      **Test**: `validate.yml` green; `apps/web/e2e/flow-app-works-live-umami.spec.ts` (T43) on dev; the enabled
+      `default-admin-refused` smoke (`POST /api/auth/login`, expecting `401`) passes in the same run.
       **Done when**: ACC-13-05 and ACC-13-06 are green once.
 
 - [ ] **T28. `ever-works/cal-diy-template`.**
       **Create** from `docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/`; topic; `validate.yml`.
       Re-read the facts table at the then-current pin before creating (refresh procedure in its README). Resolve the
       open coordination items of [plan §13](./plan.md) with APW-05, APW-06 and APW-07 in their PRs, not here.
+      **Record the relation** (added 2026-09-17): the Cal.diy golden path accepts **Link** (ACC-E2E-14), so the Blueprint's
+      `upstreamSync` block must survive Link apply — either APW-03's apply rule strips it for a link (recorded in
+      CONTRACTS) or the Blueprint's fork-only fields move to a documented `examples/` spec. T27's relation note applies
+      identically; the choice is recorded in the Blueprint's README facts table.
       **Test**: `validate.yml` green; `apps/web/e2e/flow-app-works-live-cal-diy-golden-path.spec.ts` (T46) build step on
       stage.
       **Done when**: ACC-13-07 is green once.
 
 - [ ] **T29. Catalog content.**
-      **Create** in `ever-works/apps`: branch `e2e` whose `manifest.json` adds the test upstreams of ACCEPTANCE §0.3;
-      `candidate` entries for the three Blueprints on `main`; an `evidence/` directory with a README (the path APW-03
-      `catalog.md` §3.2 defines).
+      **Create** in `ever-works/templates` (CONTRACTS §7: the listing repository, renamed from `ever-works/apps`, and the
+      name ACCEPTANCE §0.3's test-catalog row uses): branch `e2e` whose `manifest.json` adds the test upstreams of
+      ACCEPTANCE §0.3; `candidate` entries for the three Blueprints on `main`; an `evidence/` directory with a README (the
+      path APW-03 `catalog.md` §3.2 defines). The `e2e` branch also lists the generated upstream prefix
+      `<e2e-upstream-org>/app-fixture-gen-*` (added 2026-09-17, spec FR-9) so a per-run upstream still resolves from a
+      verified Blueprint (ACC-13-21).
       **Modify** dev and stage deployment configuration (APW-03's documented place) so `EVER_WORKS_APPS_CATALOG_REF` pins
       a commit of `e2e`.
       **Test**: `GET /api/apps-catalog` on dev and on production.
-      **Done when**: dev lists the fixture Blueprint and production's response does not.
+      **Done when**: dev lists the fixture Blueprint and production's response does not, and the generated upstream
+      prefix resolves to the fixture Blueprint in the `e2e` branch's manifest.
 
 ## P1.5 — PR-lane specs
 
@@ -315,7 +385,9 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       **Create** `apps/web/e2e/flow-app-work-create-from-url.spec.ts` (new) — ACC-E2E-01, ACC-NEG-08.
       **Test**: `cd apps/web && EVER_WORKS_E2E_FAKES=1 pnpm exec playwright test flow-app-work-create-from-url`.
       **Done when**: it passes with the fake (or is `fixme('APW-01')`), uses no `waitForTimeout`, and asserts every
-      GitHub write through `/_control/calls`.
+      GitHub write through `/_control/calls`. **Until T63 lands** it also carries
+      `test.fixme('APW-13 T63: no supported GitHub connection surface')`, because the create call needs the account's Git
+      connection to exist (T14's marker).
 
 - [ ] **T31. Fork lifecycle.**
       **Create** `apps/web/e2e/flow-app-work-fork-lifecycle.spec.ts` (new) — ACC-E2E-02 twin, ACC-NEG-09.
@@ -350,12 +422,22 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       unset so the shared default applies** (`EVER_WORKS_DOMAIN`) and the lane asserts the default managed address, and
       `EVER_WORKS_APPS_DNS_ZONE_ID` / `EVER_WORKS_APPS_DNS_API_TOKEN` unset so no real zone is written; the lane also
       reads the host the platform assigned and passes on a custom domain (plan §8.4).
-      **Test**: `gh workflow run app-works-kind.yml --ref <branch>`.
-      **Done when**: the run bootstraps kind and reaches the Playwright step (specs may be `fixme`).
+      **Also** (added 2026-09-17, plan §8.4): start the App runtime worker with the step of T13; set
+      `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST` to the kind API's private CIDRs (`127.0.0.1/32`, the kind Docker network
+      CIDR read live from `docker network inspect kind`, and the ingress network when it differs) — without it every
+      Deployment is refused by APW-06's cluster-address guard; and paste a **service-account** kubeconfig carrying
+      `certificate-authority-data` and no client certificate/key, which is what APW-06 plan §6.1 requires.
+      **Test**: `gh workflow run app-works-kind.yml --ref <branch>`; a run with the allowlist removed fails the first
+      Deployment with the guard's reason rather than timing out (ACC-13-22).
+      **Done when**: the run bootstraps kind and reaches the Playwright step (specs may be `fixme`) and no Deployment is
+      refused by the address guard.
 
 - [ ] **T35. Runtime on kind.**
       **Create** `apps/web/e2e/flow-app-works-kind-runtime.spec.ts` (new) — ACC-E2E-05 cluster half, ACC-NEG-11, ACC-13-02,
-      ACC-13-03, ACC-13-08 (bad migration and slow boot variants keep the previous Deployment serving).
+      ACC-13-03, ACC-13-08 (bad migration and slow boot variants keep the previous Deployment serving). The spec **adds and
+      verifies the custom domain in `<e2e-dns-zone>` before the App Work's first Deployment** (added 2026-09-17, plan §8.4),
+      because the fixture's `FIXTURE_PUBLIC_URL` references `domains.primary.url` and APW-05/APW-06 refuse an unresolved
+      referenced entry.
       **Create** `apps/web/e2e/flow-work-deploy-custom-kubeconfig.spec.ts` (ACC-REG-04) and
       `apps/web/e2e/flow-custom-domain-verify.spec.ts` (ACC-REG-06) — new.
       **Create** `packages/agent/src/ever-works-providers/__tests__/ever-works-db-provision.integration.spec.ts` (new;
@@ -368,9 +450,15 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 
 - [ ] **T36. `app-works-nightly.yml`.**
       **Create** `.github/workflows/app-works-nightly.yml` (new) per [plan §9.3](./plan.md), environment `app-works-dev`,
-      jobs `interlocks → fixture → umami → safety → cleanup → evidence`, summary step.
-      **Test**: `gh workflow run app-works-nightly.yml -f lane=dry-run`, then a full dispatch.
-      **Done when**: the dry run passes interlocks and the summary step writes the spec §6.2 table.
+      jobs `interlocks → fixture → model → umami → safety → cleanup → evidence` **in sequence** (one worker, spec FR-44),
+      each with its own `timeout-minutes` from the per-job budget table of [plan §9.6](./plan.md), the whole lane at
+      `timeout-minutes: 240`; the job-runtime worker step of T13; the lane switches of spec FR-65
+      (`EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS`, the web chip override, `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`);
+      the throwaway account's Agent and model credential created before `fixture`; summary step.
+      **Test**: `gh workflow run app-works-nightly.yml -f lane=dry-run`, then a full dispatch; the run's job list, each
+      job's duration and its `timeout-minutes` are compared with the plan §9.6 table.
+      **Done when**: the dry run passes interlocks, the summary step writes the spec §6.2 table, no job exceeds its own
+      budget, and the summary prints Build minutes and check minutes separately from runner minutes.
 
 - [ ] **T37. Fork, link, private copy.**
       **Create** `apps/web/e2e/flow-app-works-live-fork.spec.ts` (E2E-02, 03) and
@@ -409,20 +497,28 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       `apps/web/e2e/flow-app-works-live-prompt-injection.spec.ts` (NEG-05, ACC-13-04),
       `apps/web/e2e/flow-app-works-live-build-failures.spec.ts` (NEG-10; T59 extends it),
       `apps/web/e2e/flow-app-works-live-delete-retains.spec.ts` (NEG-07) — new.
-      **Test**: live run of the four specs on dev (ACC-13-04; ACC-NEG-04, 05, 07, 10).
+      **Add** (added 2026-09-17, ACC-NEG-11): the `variant/baked-localhost` case belongs in
+      `flow-app-works-live-build-failures.spec.ts` — the lane pins the variant branch through the Blueprint's
+      `source.branch`, deploys it, and asserts the `marker` smoke fails on `bodyNotContains: ['localhost']` while the
+      previous Deployment keeps serving. ACCEPTANCE `:664` records that the nightly run on `variant/baked-localhost` has
+      no live spec named in APW-13's tasks; this is that spec.
+      **Test**: live run of the four specs on dev (ACC-13-04; ACC-NEG-04, 05, 07, 10, 11).
       **Done when**: all pass and the injection run meets every FR-13 condition.
 
 - [ ] **T43. Umami.**
       **Create** `apps/web/e2e/flow-app-works-live-umami.spec.ts` (new; ACC-13-05, 06) — asserts the default credential is
-      refused directly until smoke calls take bodies.
+      refused directly **and** reads the Blueprint's `default-admin-refused` smoke result, which the enabled smoke now
+      proves too (added 2026-09-17: APW-03 `schema.md` §16 defines `smoke[].http.body`, so the Blueprint's call carries
+      the body and the direct assertion is an addition, not the only path).
       **Test**: live run of the spec on dev (ACC-13-05, 06).
-      **Done when**: it passes within 15 minutes of create.
+      **Done when**: it passes within 15 minutes of create and both the direct assertion and the smoke row pass.
 
 - [ ] **T44. Task isolation PR, live.**
       **Create** `apps/web/e2e/flow-task-isolation-pr-live.spec.ts` (new; ACC-REG-03) on a generated fixture repository.
       **Test**: live run of the spec on dev; then one full dispatched nightly run.
-      **Done when** (T36–T44): one dispatched nightly run on dev is green end to end within 90 minutes and within budget,
-      its cleanup left no namespace behind, and every repository it touched is archived and labelled.
+      **Done when** (T36–T44): one dispatched nightly run on dev is green end to end, **every job stays inside its own
+      budget of the plan §9.6 table** (the `fixture` job inside its 90 minutes) and the lane inside 225, its cleanup left
+      no namespace behind, and every repository it touched is archived and labelled.
 
 ## P1.8 — Golden-path lane
 
@@ -438,29 +534,44 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       ingress; smoke; CronJobs and first `tasker` success; sign in; event type; booking and confirmation email; evolve
       change with the `M3` control; Goal scoped to the App Work; launcher entry; protected branding request; domain
       change without rebuild. Covers ACC-E2E-14, ACC-13-07, 09, 10, 11, 12, 13, 14.
+      **Add** (added 2026-09-17): the lane's deploy target carries `allowRoot: true` before the Cal.diy App Work is created
+      (the pinned image has no `USER` and runs as root — spec FR-26), and the run asserts it rather than assuming it; the
+      sign-in and one encrypted round trip (two-factor setup) are performed with run-time `NEXTAUTH_SECRET` /
+      `CALENDSO_ENCRYPTION_KEY` values that **differ** from the build placeholders, which is what settles the upstream
+      README's "must match build variable" note against the source's run-time reads (plan §7.1); and the evidence records
+      the measured peak memory, disk, wall time and image size for ACC-13-07.
       **Test**: a dispatched golden-path run on stage (ACC-13-07, 09, 10, 11, 12, 13, 14; ACC-E2E-14).
-      **Done when**: one dispatched run on stage is green within 4 hours and within budget.
+      **Done when**: one dispatched run on stage is green within 4 hours and within budget, the root precondition was
+      stated by the lane, the mismatched-secret round trip passed, and the measured numbers are in the evidence.
 
 ## P1.9 — Verification and smoke rows
 
 - [ ] **T47. Evidence and status.**
       **Create** `apps/web/e2e/flow-app-works-live-blueprint-verification.spec.ts` (new; ACC-13-15) — drives a candidate
       Blueprint through the streak using recorded evidence files.
-      **Create** in `ever-works/apps`: `scripts/verification-status.mjs`, `scripts/__tests__/verification-status.test.mjs`
-      (state machine of spec §5.3), and the CI step that writes the computed status into the manifest in the evidence PR.
+      **Create** in `ever-works/templates`: `scripts/verification-status.mjs`, `scripts/__tests__/verification-status.test.mjs`
+      (state machine of spec §5.3, including `not-verified → verified` at the same pin after N fresh passes), and the CI
+      step that writes the computed status into the manifest in the evidence PR. The script is the **single**
+      implementation: APW-03's C8 imports it instead of recomputing the status (added 2026-09-17, spec FR-57) — T61
+      drafts its input schema.
       **Modify** `.github/workflows/app-works-nightly.yml` and `.github/workflows/app-works-golden-path.yml` — their
       `evidence` jobs open one catalog PR per run.
-      **Test**: `node --test scripts/__tests__/verification-status.test.mjs` in `ever-works/apps`; live run of the
-      verification spec on dev.
+      **Test**: `node --test scripts/__tests__/verification-status.test.mjs` in `ever-works/templates`; live run of the
+      verification spec on dev; a check that APW-03's catalog CI **imports** this module (a second implementation fails
+      the review, and the test asserts the import path).
       **Done when**: five recorded passes produce `verified`; two failures produce `not-verified`; a canary failure only
-      sets `canaryBehind`.
+      sets `canaryBehind`; a `not-verified` entry with N fresh passes returns to `verified`.
 
 - [ ] **T48. Deployed smoke rows.**
       **Modify** `apps/web/e2e-smoke/deployed-api-contract.spec.ts` — add each App Works row of [plan §9.5](./plan.md)
       **in the PR that ships its route** (tracked here, landed by the owning epic).
+      **Request the three rows explicitly** (added 2026-09-17, ACC-13-18): APW-03's route PR adds `/api/apps-catalog`
+      (public → `200`), APW-06's adds `/api/works/<zero-uuid>/app-status` (`401`) and APW-11's adds `/api/me/apps` (`401`).
+      A grep of every `APW-*/tasks.md` finds `deployed-api-contract` only in this file, so without these three one-line
+      requests ACC-13-18 has no implementing task anywhere in the program. T55's script diff covers the ids.
       **Test**: `cd apps/web && SMOKE_BASE_URL=<env origin> pnpm exec playwright test -c playwright.smoke.config.ts deployed-api-contract`
       against dev, stage and production (ACC-13-18).
-      **Done when**: ACC-13-18 is green on dev, stage and production.
+      **Done when**: ACC-13-18 is green on dev, stage and production and each of the three rows landed in its route's PR.
 
 - [ ] **T49. P1 ship gate.**
       **Modify** `docs/specs/features/app-works/TRACKER.md` — epics whose listed scenarios are all green → `Verified`.
@@ -575,6 +686,176 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       (shared default apex) and a live nightly run on dev (ACC-13-20).
       **Done when**: the kind run passes the managed-address case, the nightly run passes whichever case dev is in, and a
       host under another Ever product's domain makes the assertion fail in a unit case.
+
+---
+
+# Additions from the 2026-09-17 fact re-check (FR-55…FR-65)
+
+_Every task below is additive: each one adds a schema field, a job, a step or a variable, and none removes an existing
+one._
+
+- [ ] **T61. Evidence schema and the numeric component user (spec FR-57, FR-65).**
+      **Create** in `ever-works/templates`: `schema/evidence.schema.json` — object, required
+      `blueprint`/`upstream`/`license`/`platform`/`lane`/`passCount`/`runId`/`startedAt`/`steps`/`spend` — with
+      `upstream.kind ∈ {pin, canary}`, `license.class ∈ {green, amber, red, unknown}` and `passCount` an integer ≥ 1, plus
+      `scripts/__tests__/evidence-schema.test.mjs` (a file missing any field the status rules read fails validation).
+      **Modify** APW-03's `schema.md` §10 and CONTRACTS §1 — add the optional numeric `components[].runAsUser`
+      (integer ≥ 1) requested in [plan §14](./plan.md), and record the RE2 constraint on `env[].validate.pattern` that
+      Cal.diy's administrator password depends on.
+      **Test**: `node --test scripts/__tests__/evidence-schema.test.mjs` in `ever-works/templates`; the schema rejects a
+      file without `license.class`; APW-03's `validate.mjs` accepts a spec with `components[].runAsUser: 1001` and rejects
+      `runAsUser: 0`.
+      **Done when**: T11's evidence builder validates against the published schema, and the two contract additions are
+      recorded in their owners' files.
+
+- [ ] **T62. Canary sink draft and its read API (spec FR-61, ACC-13-04).**
+      **Create** in the private operations repository the sink's source (a tiny HTTPS service) and its deployment note,
+      implementing the read API of [plan §5.3](./plan.md): `GET /requests?since=&limit=`, `GET /healthz`, bearer read
+      token, `authorization` stripped before storage, `truncated` flag, `receivedAt` paging.
+      **Modify** `<e2e-upstream-org>/app-fixture-injection` (T26) — every payload address is the **placeholder** base
+      address `https://canary.invalid` until the harness rewrites it in the per-run generated copy; the repository's
+      `git grep -nE 'https?://'` lists only placeholders and public documentation links.
+      **Test**: `apps/web/e2e/helpers/__tests__/canary-sink.unit.spec.ts` (T11) against a local instance; the T26 review
+      confirms no real address is committed.
+      **Done when**: the sink answers a recorded request and the fixture repository contains no real sink address.
+
+- [ ] **T63. The GitHub connection surface (spec FR-56; unblocks T14, T15, T16, T30, T31).**
+      **Decide and land one** of the two surfaces of [plan §8.8](./plan.md), exactly as written there. Either
+      **Modify** `packages/plugins/github/src/github.plugin.ts` (mode `hybrid` + a user-scope `x-secret` `accessToken`
+      setting) and `packages/agent/src/plugins/services/plugin-operations.service.ts` (allow that one field at user scope,
+      by name), with the security review recorded in the PR; or **Create** the non-production connection-seeding route for
+      the PR lanes plus the operator-run OAuth connect for the live lanes, recorded in T20's estate file.
+      **Create** `apps/web/e2e/helpers/github-connection.ts` (new, [plan §8.2](./plan.md)) — `connectCustomerGitHub` plus
+      its state assertion.
+      **Modify** APW-13's five marked specs — remove the
+      `test.fixme('APW-13 T63: no supported GitHub connection surface')` marker in the same PR — and record the chosen
+      surface in CONTRACTS (a §1 row, or §7 rows) and ACCEPTANCE §0.5.
+      **Test**: `apps/web/e2e/helpers/__tests__/github-connection.unit.spec.ts` (new) — each surface asserts the state it
+      claims, a refused surface fails with its name and no raw `400`, and (surface a) every other admin-only setting is
+      still refused at user and work scope.
+      **Done when**: T14, T15, T16, T30 and T31 run un-fixme'd against the fake and pass, and the contract row is merged.
+
+- [ ] **T64. Lane switches, dev/stage enablement and the Agent credential (spec FR-65, S10).**
+      **Modify** `.github/workflows/app-works-nightly.yml` (T36) and `.github/workflows/app-works-golden-path.yml` (T45) —
+      set every switch the specs need (the web chip's non-production override, `EVER_WORKS_APP_WORKS_ENABLED`,
+      `EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS`, `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`) and create the throwaway
+      account's Agent with limited networking plus its model credential before the first Run, recording the Agent id in
+      the estate file.
+      **Create** `docs/runbooks/app-works-acceptance-lanes.md` rows (T56) or the private operations repository's runbook —
+      `(owner action)` the dev and stage enablement: `works-app` on, `EVER_WORKS_APP_WORKS_ENABLED=true`,
+      `EVER_WORKS_APP_LAUNCHER_ENABLED=true`, and the worker attestation
+      (`EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`) so APW-06 does not refuse App cluster jobs in production-shaped
+      environments — with a read-back verification of each.
+      **Test**: a dry-run dispatch lists every switch it set and reads each back from the platform; a lane started with one
+      switch missing fails before any platform call and names it (S10, ACC-13-22).
+      **Done when**: the nightly dry run passes with no switch assumed, and the dev/stage read-back is recorded in the
+      private operations repository.
+
+- [ ] **T65. Maintenance issues and their credential (spec FR-58).**
+      **Create** `apps/web/e2e/helpers/blueprint-issues.ts` (new) — `openOrUpdateMaintenanceIssue`, whose input is
+      `{ blueprintId, runs, firstFailingUpstreamCommit }`: deduplicated by label `verification-failure` plus the
+      Blueprint id, updating the open issue when one exists and commenting otherwise.
+      **Modify** the `evidence` job of `.github/workflows/app-works-nightly.yml` and
+      `.github/workflows/app-works-golden-path.yml` — call it on a failure and on a canary failure, linking both runs.
+      **Test**: `apps/web/e2e/helpers/__tests__/blueprint-issues.unit.spec.ts` (new) — two failures open exactly one
+      issue; a third failure adds one comment and no new issue; a canary failure names the first failing upstream commit.
+      **Done when**: the unit spec passes and the credential below is recorded — a least-privilege **GitHub App
+      installation** for `ever-works/templates` and the three Blueprint repositories (issues and pull requests only, no
+      contents write), named in ACCEPTANCE §0.4 in the same PR (the ready-to-paste row is in the change report).
+
+- [ ] **T66. Per-Run token counts for the spend total (spec FR-59, ACC-13-16).**
+      **Modify** `apps/web/e2e/helpers/app-works-live.ts` — `accountSpend(receipts: RunReceipt[])` reads
+      `{ actionsMinutes, tokens }` from the Run and Build receipts of CONTRACTS §4 and the summary prints the total.
+      **Modify** whichever owner ships it first: CONTRACTS §4's Run DTO (APW-05) or APW-08's `TaskCostView` — a per-Run
+      token count, requested in [plan §13](./plan.md) and [plan §14](./plan.md).
+      **Test**: `apps/web/e2e/helpers/__tests__/app-works-live.unit.spec.ts` (T8) gains a case with two receipts of known
+      token counts and asserts the total; a receipt without a token count fails the accounting instead of being counted as
+      zero.
+      **Done when**: the summary's token figure comes from a real field, and no lane estimates it.
+
+- [ ] **T67. Variant commits reach the fork (spec FR-60; T58's push half).**
+      **Modify** `ever-works/app-fixture-hello` — a `variants.yml` job (T23/T58) that **rebases every `variant/*` branch
+      onto `main`** whenever `main` moves, so a variant never drifts behind the base app.
+      **Modify** `apps/web/e2e/flow-app-works-live-build-failures.spec.ts` (T42/T59) — push the variant commit to the
+      fork's tracked branch with the **customer account's own token** (never the estate token) and, where the run starts
+      from a generated upstream, assert the branch travelled with `include_all_branches: true` (T9) before falling back to
+      a cherry-pick onto the fork head.
+      **Test**: a case where the generated upstream carries `variant/*` and the fork's tracked branch is set from it; a
+      case where the branch is absent and the cherry-pick path produces the same tree; the rebase job is red when a variant
+      branch is behind `main`.
+      **Done when**: a variant commit is verifiably present on the fork's tracked branch before the Build starts, and the
+      `/_control/calls` record shows the customer's token identity on that push.
+
+- [ ] **T68. Make the image pullable (spec FR-62, S20, ACC-13-24).**
+      **Modify** `.github/workflows/app-works-kind.yml` (T34), `app-works-nightly.yml` (T36) and
+      `app-works-golden-path.yml` (T45) — before the first Deployment, assert the image the lane will deploy is pullable:
+      either the GHCR package is public, or the App Work holds the read-only pull token variable named in ACCEPTANCE §0.4.
+      Record which path the lane used in the evidence file.
+      **Create** `apps/web/e2e/helpers/image-pull.ts` (new) — `assertPullable({ packageRef, token? })`.
+      **Test**: a lane pointed at a private package with no token fails with the platform's
+      `pull_credential_unavailable` reason and names the package and the variable, never a rollout timeout; a public
+      package passes with no token.
+      **Done when**: ACC-13-24 is green on the kind lane and both paths are exercised once. **Probe first:** whether a
+      package first pushed by `GITHUB_TOKEN` from a public fork defaults to public — the probe decides which path the
+      fixture lanes take, and its result is recorded in the fixture README.
+
+- [ ] **T69. Managed-constraint lint and the managed-compatible fixture profile (spec FR-63, ACC-13-25).**
+      **Create** `ever-works/templates/scripts/managed-constraints.mjs` and its test — lint a Blueprint's static App spec
+      for `cron` schedules that can fire more often than every 5 minutes, a root-running image, and a private-address
+      dependency, and write the result into the evidence file's managed-hosting field.
+      **Create** `ever-works/app-fixture-hello-template:profiles/managed-cron.works.yml` and the matching file in
+      `ever-works/app-fixture-hello` — the every-5-minute `tick` profile of [plan §4.4](./plan.md); the every-2-minute
+      profile stays exactly as it is.
+      **Test**: `node --test scripts/__tests__/managed-constraints.test.mjs` in `ever-works/templates`; the lint marks
+      Cal.diy's minute-level `tasker` and `webhook-triggers` crons as managed-hosting ineligible **and still reports the
+      Blueprint as verified**, and marks the fixture's `managed-cron` profile eligible.
+      **Done when**: every Blueprint's evidence carries a managed-hosting result, and ACC-E2E-10 (b) has a fixture
+      Blueprint the tier admits.
+
+- [ ] **T70. Test-catalog entry for generated upstreams (spec FR-9, ACC-13-21).**
+      **Modify** `ever-works/templates`' `e2e` branch `manifest.json` (T29) — add an owner-scoped entry for
+      `<e2e-upstream-org>/app-fixture-gen-*` pointing at Blueprint `app-fixture-hello`, so an App Work created from a
+      per-run upstream is resolved from a verified Blueprint.
+      **Modify** APW-03's `catalog.md` — a test-only rule that an owner-scoped repository pattern in the test catalog's
+      `e2e` branch keeps verified status for an explicit match (requested in [plan §13](./plan.md)).
+      **Test**: `GET /api/apps-catalog` on dev resolves `app-fixture-gen-<runId>` to the fixture Blueprint; the explicit
+      choice for a repository outside the pattern is still refused managed hosting (APW-03 FR-81 unchanged).
+      **Done when**: ACC-E2E-10 (b) can be set up from a per-run upstream without weakening APW-03 FR-81.
+
+- [ ] **T71. Verification lane walls, per-job budgets and check minutes (spec FR-64, ACC-13-16).**
+      **Modify** `.github/workflows/app-works-nightly.yml` (T36) and `app-works-golden-path.yml` (T45) — per-job
+      `timeout-minutes` from the [plan §9.6](./plan.md) table, the lane's `timeout-minutes` above the sum, and a summary
+      that prints Build minutes **and** `checksBillableMinutes` separately from runner minutes.
+      **Test**: a full nightly dispatch — no job exceeds its budget, the summary's two minutes figures add up to
+      `spend.actionsMinutes` in the evidence file, and a scenario that overruns its job fails that job with reason
+      `budget`.
+      **Done when**: ACC-13-16 is green with the per-job table in force and the numbers in the evidence match the summary.
+
+- [ ] **T72. Cal.diy non-root variant and the root precondition (spec FR-26, R-27).**
+      **Create** `ever-works/cal-diy-template:variants/nonroot.Dockerfile` and its README row — a fork-side Dockerfile
+      that adds a numeric non-root `USER` owning `apps/web/.next` and `apps/web/public`, so the managed tier stays open to
+      Cal.diy. Marked unverified until a lane run passes.
+      **Modify** `apps/web/e2e/flow-app-works-live-cal-diy-golden-path.spec.ts` (T46) — assert the App Work's deploy target
+      carries `allowRoot: true` before the first Deployment, and record that assertion in the evidence.
+      **Test**: the golden-path run on stage asserts the target setting before creating the App Work; the variant is built
+      once in the Blueprint repository's CI without being deployed, and its result is recorded as unverified or verified
+      on its own evidence.
+      **Done when**: the golden path runs on a target whose `allowRoot` the lane asserted, and the non-root variant has a
+      recorded status of its own — with no existing deploy shape removed (R-27).
+
+- [ ] **T73. Fixture repository facts the apps rely on (added 2026-09-17).**
+      **Modify** `ever-works/app-fixture-hello` — `package.json` keeps `dependencies` and `devDependencies` **empty**
+      (`format:check` runs the repository's own `tools/format-check.mjs`, and `src/pg.mjs` speaks the wire protocol, so no
+      package is needed) and the `runtime` stage installs with `npm ci --omit=dev`; add topics to `app-fixture-hello`
+      itself (`ever-works-app-fixture`, `ever-works-test-fixture`) and mark it a **template repository**, which T9's
+      `generateFromTemplate` requires.
+      **Modify** `ever-works/app-fixture-hello-template:README.md` and the draft's blueprint README — the fixture builds
+      in under three minutes **as measured by its own CI**, and the recorded figure replaces the estimate of
+      [plan §4.5](./plan.md); the disk-reclaim step is part of the budget.
+      **Test**: `gh api repos/ever-works/app-fixture-hello --jq '.is_template, .topics'` shows `true` and both topics;
+      `npm ci && npm run format:check` passes with an empty dependency set; the image CI's recorded wall time is quoted in
+      the README.
+      **Done when**: the repository is a template with the topics, and no estimate remains quoted as a measurement.
 
 ---
 

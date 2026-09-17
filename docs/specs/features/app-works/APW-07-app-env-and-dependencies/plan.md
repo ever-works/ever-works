@@ -93,8 +93,8 @@ ranges are fixed by [APW-03 `schema.md` §11, §12, §21, §22](../APW-03-app-sp
                │                              ▼
                │                  IAppDependencyProvider
                │                   ├─ k8s plugin: k8s-inline-postgres | -redis | -minio      (P1)
-               │                   ├─ app-dependencies-external: smtp-external | s3-external | platform-smtp-relay (P1)
-               │                   └─ apps-tier-dependencies: managed-postgres | -redis | -object-storage (P2)
+               │                   ├─ app-dependencies-external: smtp-external | s3-external | platform-smtp-relay (P1; the relay also serves Ever Works Apps, GAP-22)
+               │                   └─ apps-tier-dependencies: managed-postgres | -redis | -object-storage | -smtp (P2)
                │                              │ outputs (encrypted) · status · backup state
                ▼                              ▼
      work_app_env_values            work_app_dependencies
@@ -128,6 +128,26 @@ Every `ResolvedEnvValue` is `{ name, value, secret, fingerprint }` where `finger
 `d<outputsVersion>` for dependency outputs and `sha256(value)` only for non-secret or build-service values (APW-05 uses it
 for `buildInputsHash`; no hash of a stored secret is ever persisted). Unresolved items carry `{ name, reason, ref }` and
 never a value. APW-05 and APW-06 must refuse to proceed while `unresolved` is non-empty for a required or referenced entry.
+
+**One fingerprint rule (added 2026-09-17, APW07-G03).** The per-entry `changedSinceBuild` / `changedSinceDeploy` flags
+(FR-24) cannot be derived from a single combined hash, so every fingerprint is defined per name and recorded on the row
+that already exists for it:
+
+| Entry                                                                                              | Fingerprint                                                                                                                    |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| stored override / generated / prompted                                                             | `v<version>`                                                                                                                   |
+| a `from` entry that is a direct dependency output                                                  | `d<outputsVersion>`                                                                                                            |
+| a `template` entry, or a `from` entry that is not a direct dependency output, **when the resolved value is secret** | `t<sha256 over the template or reference text plus the sorted (placeholder, fingerprint) pairs it resolved>`                     |
+| a non-secret value, or a build-service value                                                       | `sha256(value)`                                                                                                                |
+
+A hash of a secret value is **never** computed or persisted. `AppRuntimeEnvSource.resolve` and `resolveForBuild`
+therefore also return `fingerprints: Record<string, string>` with exactly the same keys as `values`; APW-05 persists
+that map as `WorkBuild.buildValueFingerprints` for the latest Build with `deployable = true` on the tracked branch, and
+APW-06 persists it inside `appRender.envFingerprints` for the current Deployment (CONTRACTS §2 rows requested from their
+owners). `list` compares each entry's current fingerprint with those maps and marks `changedSinceBuild` /
+`changedSinceDeploy`. Comparison rule: a name present on only one side counts as changed; no Build or Deployment, or a
+null map on a row written before the column existed, gives `false`; an unresolved entry gives `false`, because the
+"Needed before…" state already covers it. Neither flag ever reads or decrypts a value.
 
 ### 2.3 Dependency provisioning
 
@@ -172,8 +192,12 @@ uq_work_app_env_values_work_name  UNIQUE (workId, name)
 idx_work_app_env_values_work      (workId)
 ```
 
-Race-safe generation: `INSERT … ON CONFLICT ("workId", name) DO NOTHING` then read back (SQLite: `INSERT OR IGNORE`),
-the same "first writer wins, losers re-read" contract as `WorkRuntimeEnvService.getOrGenerate`.
+Race-safe generation: `INSERT … ON CONFLICT ("workId", name) DO NOTHING` then read back, with per-driver branches —
+SQLite `INSERT OR IGNORE`, MySQL/MariaDB `INSERT IGNORE` (both drivers are supported by
+`packages/agent/src/database/database.config.ts:33-34,208`, so a Postgres-only form would break them; added
+2026-09-17, APW07-G12) — the same "first writer wins, losers re-read" contract as
+`WorkRuntimeEnvService.getOrGenerate`. Where a driver offers no such clause, the service does the compare-and-set
+itself inside the same transaction.
 
 ### 3.2 `work_app_dependencies`
 
@@ -307,7 +331,11 @@ strings; `port` is decimal, `secure` is `"true"`/`"false"`.
 ### 3.4 Migration (Constitution V)
 
 `apps/api/src/migrations/1792070000000-CreateAppEnvAndDependencies.ts` — creates both tables, FKs and indexes (the partial
-unique index uses `WHERE status NOT IN ('kept','deleted')`, supported by Postgres and SQLite). `down()` drops only these two
+unique index `WHERE status NOT IN ('kept','deleted')` is emitted as a **Postgres-guarded raw** statement, the repo's
+existing convention for partial unique indexes — see
+`apps/api/src/migrations/1791220000000-CreateWorkspaceBackups.ts:26-34` — while SQLite gets the equivalent unique
+expression index and MySQL/MariaDB gets a generated-column unique key; the service-level compare-and-set of §3.1 covers
+every driver, so correctness never depends on the index form — added 2026-09-17, APW07-G12). `down()` drops only these two
 tables. No existing table is altered; `works.deployRuntimeEnvEncrypted` and friends are not touched. Re-stamp above the
 newest `develop` migration before merge.
 
@@ -334,7 +362,7 @@ refuses anything without the `enc::v1::` prefix (no legacy plaintext rows can ex
 
 | Method                                                                                          | Behaviour                                                                                                                                                                                                                                                                                      |
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list(workId, viewer)`                                                                          | Joins the effective App spec (APW-03) with stored rows into `AppEnvEntryView[]`; computes `changedSinceBuild` from the latest deployable Build's fingerprints (APW-05) and `changedSinceDeploy` from APW-06's current Deployment fingerprint set; never decrypts except keypair public halves. |
+| `list(workId, viewer)`                                                                          | Joins the effective App spec (APW-03) with stored rows into `AppEnvEntryView[]`; computes `changedSinceBuild` by comparing each build/both entry's current `resolveForBuild` fingerprint with `WorkBuild.buildValueFingerprints` of the latest Build with `deployable = true` on the tracked branch, and `changedSinceDeploy` by comparing each runtime/both entry's current runtime fingerprint with `appRender.envFingerprints` of `WorkAppRuntimeState.currentDeploymentId` (the §2.2 comparison rule; added 2026-09-17, APW07-G03); never decrypts except keypair public halves. |
 | `ensureGenerated(workId)`                                                                       | For every `generate` entry without a row: generate (§4.3), validate against `validate`, insert-or-ignore, re-read. Called from `app.spec.applied` and at the start of every resolve. Also flags `generatorChanged` when fingerprints differ.                                                   |
 | `apply(workId, actor, { set, unset, reset, import, acknowledgeNeverRotate, replaceGenerated })` | One transaction per call: validate every item (§4.4), refuse all on a storage error, per-item results otherwise; enforces 300 rows and 1 MiB; version + 1 per changed name; emits one `app.env.changed` with names and actions.                                                                |
 | `rotate(workId, actor, name, { confirmName })`                                                  | Generated entries only; `confirmName === name` required; regenerates (keypair: both halves in one transaction); version + 1; `app.env.rotated`.                                                                                                                                                |
@@ -397,12 +425,16 @@ Limits 64 KiB / 500 lines checked before parsing. The parser never logs; its uni
 
 `AppEnvRuntimeSource` (`packages/agent/src/app-env/app-env-runtime.source.ts`) implements the port in
 `packages/agent/src/app-runtime/ports.ts` (CONTRACTS §3) and is bound to `APP_RUNTIME_ENV_SOURCE`:
-`resolve(workId, specCommitSha, { primaryUrl, primaryHost, buildCommitSha, internalUrls, preview? })` →
-`{ values, secretNames, unsetRequired, notReadyDependencies, egress }` — `values` for `runtime`/`both` entries per the
-§2.2 table (plus keypair `<NAME>_PUBLIC`), `secretNames` the secret subset, `unsetRequired` the required prompted names,
-`notReadyDependencies` the referenced kinds not `ready`, and `egress` the `{ host, ports }` of external providers
-(`smtp-external`, `s3-external`, relay) so APW-06 can open exactly those destinations. For target `ever-works-apps`,
-dependency references become placeholders substituted in the zone (§4.11).
+`resolve(workId, specCommitSha, { target, primaryUrl, primaryHost, buildCommitSha, internalUrls, preview? })` →
+`{ values, fingerprints, secretNames, unsetRequired, notReadyDependencies, egress }` — `values` for `runtime`/`both` entries per the
+§2.2 table (plus keypair `<NAME>_PUBLIC`), `fingerprints` the per-name map of the §2.2 fingerprint rule,
+`secretNames` the secret subset, `unsetRequired` the required prompted names,
+`notReadyDependencies` the referenced kinds not `ready` (derived from
+`AppDependenciesService.ensureReadyForDeploy(workId)`, which also dispatches provisioning for `pending` kinds —
+GAP-05), and `egress` the `{ host, ports }` of external providers
+(`smtp-external`, `s3-external`, relay) so APW-06 can open exactly those destinations. `target` decides whether a
+dependency reference becomes a real output or a placeholder: `ever-works-apps` is the only target that emits
+`ew-dep://` placeholders (§4.11). This epic never reads the target from the stored row.
 
 **Ephemeral mode** (Resolution R-10, CONTRACTS §3; for APW-04 verification through APW-05 and APW-06):
 `resolveEphemeral(workId, specCommitSha, ctx)` never writes `work_app_env_values` or `work_app_dependencies`, never reads a
@@ -411,8 +443,8 @@ stored **generated** value, reads a stored **prompted/user** value only when it 
 
 | `ctx.target` | Caller                                                  | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cluster`    | APW-06 verification namespace (worker, §4.12 of APW-06) | `values`: generated entries freshly generated in memory (§4.3), `value` literals, prompted values already set, derived references against the verification's ephemeral dependencies (§4.9 `ephemeral: true` outputs, held in memory) and `ctx.internalUrls`; keypair `<NAME>_PUBLIC` included.                                                                                                                                                                                                                                                               |
-| `runner`     | APW-05 runner verification (API process)                | `recipe` — **no value at all**: per entry `{ name, secret, source: 'generate', spec: { kind, bytes, length, alphabet, keypair } }`, `{ source: 'literal', spec: { value } }` (never secret), `{ source: 'template', spec: '<text with {{gen:NAME}}, {{prompted:NAME}} and runner-local host names>' }` for `from`/`template` references (dependency outputs map to APW-05's runner container names and throwaway credentials `{{gen:DEP_<KIND>_PASSWORD}}`), or `{ source: 'prompted', spec: { required } }`. APW-05 fetches the set prompted values itself. |
+| `cluster`    | APW-06 verification namespace (worker, §4.12 of APW-06) | `values`: generated entries freshly generated in memory (§4.3), `value` literals, prompted values already set, derived references against the verification's ephemeral dependencies — read from **`ctx.dependencyOutputs`**, the map APW-06 passes after calling `AppDependenciesService.provisionEphemeral(workId, { namespace, kinds, signal })` — and `ctx.internalUrls`; keypair `<NAME>_PUBLIC` included. Nothing is stored. (Added 2026-09-17, APW07-G04: without this field the resolver cannot see the outputs `provisionEphemeral` returned, so ACC-07-31 and ACC-06-48 could not pass.) |
+| `runner`     | APW-05 runner verification (API process)                | `recipe`: **no value at all** — a `AppEnvRecipeEntry[]` (the normative discriminated union defined in `packages/contracts/src/apps/app-env.ts`, added by APW07-G18) with per entry `{ name, secret, source: 'generate', spec: { kind, bytes, length, alphabet, keypair: { type, format, passwordEnv? } } }`, `{ source: 'literal', spec: { value } }` (never secret), `{ source: 'template', spec: { text, tokens: AppEnvRecipeToken[] } }` where a token is `{ kind: 'gen' \| 'prompted' \| 'dep', name, placeholder }`, or `{ source: 'prompted', spec: { required } }`. The container-host grammar is fixed here so the two epics cannot drift: kinds map to `postgres` → host `postgres`, port `5432`, user/db `ever-works-build`/`app`; `redis` → host `redis`, port `6379`, password `""`; `objectStorage` → host `object-storage`, port `9000`, access key `ever-works-build` (APW-05's throwaway container names, `minio` is the image and never the host) and the dependency password token is `{{gen:DEP_<KIND>_PASSWORD}}` uppercased from the kind. APW-05 fetches the set prompted values itself. |
 
 Templates: tokenise `{{ … }}`, resolve, substitute; depth 10 re-checked, failing closed with `templateUnresolvable`.
 
@@ -512,12 +544,26 @@ several providers one plugin declares (the `WorkAppDependency` "provider plugin 
   `preference`; the owner's explicit choice (via `PUT …/:kind`) wins if supported. Preferences: `k8s-inline-postgres` 10,
   `k8s-inline-redis` 10, `k8s-inline-minio` 10, `s3-external` 20, `smtp-external` 10, `platform-smtp-relay` 20,
   `managed-*` 10 (only target `ever-works-apps`).
-- **Cluster access** comes from APW-06's runtime target resolver (kubeconfig, context, namespace, the app's pod labels);
-  this epic never parses kubeconfigs itself. Until APW-06 lands, a typed fake.
+- **Cluster access** comes from APW-06's runtime target resolver — **named explicitly (added, APW07-G01 /
+  APW07-G02): `AppRuntimeTargetPort.prepareDependencyTarget(workId)`** in
+  `packages/agent/src/app-runtime/ports.ts` (CONTRACTS §3), resolving
+  `{ ref: AppTargetRef; podLabels } | { unavailable: 'target_none' | 'target_not_checked' | 'namespace_owned_elsewhere' | 'cluster_unreachable' }`.
+  The `app-dependency-provision` job calls it **before** `provider.provision` and builds
+  `AppDependencyContext.cluster` from it. Preparation is what makes the namespace, the `LimitRange` and the three
+  baseline network policies exist first (APW-06 plan §4.2), so **a provider never waits for and never dispatches a
+  Deployment** — the ordering cycle GAP-06 / APW07-G01 described is broken here. `unavailable: 'cluster_unreachable'`
+  is **transient** (FR-43 retries); every other `unavailable` reason is a definite failure carrying that reason
+  (`target_none`, `target_not_checked`, `namespace_owned_elsewhere`). This epic never parses kubeconfigs itself.
+  Until APW-06 lands, a typed fake.
 - **`reconcile(workId)`** implements the §2.3 diagram. **`ensureReadyForDeploy(workId)`** returns
   `{ ready: boolean, notReady: [{ kind, status, reason }] }` for APW-06's preflight and triggers provisioning if pending.
-- **Leases**: `UPDATE work_app_dependencies SET "provisionLeaseUntil" = now() + interval '15 minutes' WHERE id = :id AND
-("provisionLeaseUntil" IS NULL OR "provisionLeaseUntil" < now())`.
+  APW-06 calls both (its preconditions and its `PUT app-target`); the six entry points APW-06 may use are
+  `reconcile`, `ensureReadyForDeploy`, `onAppRemoved`, `onAppWorkDeleting`, `list` and `provisionEphemeral`
+  (CONTRACTS §3 row requested).
+- **Leases** (made driver-portable, APW07-G12): a parameterised timestamp compare-and-set —
+  `UPDATE work_app_dependencies SET "provisionLeaseUntil" = :until WHERE id = :id AND ("provisionLeaseUntil" IS NULL OR "provisionLeaseUntil" < :now)`
+  with `:until` / `:now` bound as timestamps — never `now() + interval '15 minutes'`, which is Postgres-only and has
+  no MySQL/MariaDB branch although `database.config.ts` supports those drivers.
 
 ### 4.9 Your-cluster providers — `packages/plugins/k8s/src/app-dependencies/` (new)
 
@@ -530,10 +576,39 @@ live in the App Work's namespace chosen by APW-06 (`ew-<slug ≤ 30>-<8 hex>`) a
 `app.kubernetes.io/part-of: <slug>`, `ever-works.io/work-id`, `ever-works.io/kind: app`) plus
 `ever-works.io/dependency: <kind>` — the label APW-06's `destroyApp` never deletes without `deleteVolumes` — and
 `ever-works.io/retain: "true"` on PVCs; pod `securityContext` `runAsNonRoot: true`, `seccompProfile: RuntimeDefault`,
-container `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`. Reachability relies on APW-06's per-namespace
-`ew-default-deny` + `ew-allow-deps` policies (only the App Work's pods share the namespace); the provider verifies both
-exist before provisioning and otherwise fails `namespacePoliciesMissing`. Images pinned by digest in
+container `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`. Images pinned by digest in
 `app-dependencies/images.ts`, overridable by admin settings; never a LoadBalancer or NodePort Service.
+
+**Reachability is owned by this epic, not by APW-06's isolation switch (rewritten 2026-09-17, APW07-G01).** Every
+provider applies its own ingress policy **before** its StatefulSet / `Cluster`, and it is drawn whatever the App Work's
+isolation setting is — which is what makes FR-38 hold even when the owner has switched isolation off:
+
+- Name `dep-<kind>`; labels the common set plus `ever-works.io/dependency: <kind>`; `podSelector:
+  { ever-works.io/dependency: <kind> }`; `policyTypes: [Ingress]`.
+- Ingress **only** from `podSelector: {}` in the same namespace, on the service ports (5432, 6379, 9000). Nothing
+  outside the namespace is admitted.
+- Operator path (`k8s-inline-postgres` with the CNPG CRD usable): additionally admit the operator's namespace,
+  detected from its Deployment; when detection fails, warning `operatorNamespaceUnknown` with the fallback
+  `namespaceSelector: {}` limited to the operator status port and 5432.
+- With isolation off the card shows the note **"Your app is not network-isolated; this dependency still only accepts
+  connections from its namespace."**
+- `stopWorkloads` keeps `dep-<kind>`; `deleteData: true` already deletes NetworkPolicies by the
+  `ever-works.io/dependency` label.
+- The check the provider used to do against APW-06's `ew-default-deny` / `ew-allow-deps` is **gone** — `ew-allow-deps`
+  allows *egress to addresses outside the namespace*, so it never kept other pods away from a dependency pod, and
+  under `isolation: false` APW-06 draws no `ew-*` policy at all, which would have failed every provider. Its
+  replacement is the definite failure reason **`namespaceNotOwned`** (APW-06's namespace ownership check failed) and,
+  for a genuinely missing namespace baseline, the defensive `namespace_baseline_missing`. APW-06 now draws the
+  baseline in `prepare-namespace` *before* provisioning, so neither is a steady state.
+
+**Cluster permissions this needs (added, APW07-G10).** The providers create `statefulsets` (plain Postgres,
+Redis-with-persistence, object storage), read `customresourcedefinitions` (cluster-scoped, `crdServed`), and — on the
+operator path — read `clusters.postgresql.cnpg.io`, `backups.postgresql.cnpg.io` and
+`scheduledbackups.postgresql.cnpg.io` for FR-49's backup state. APW-06's `checkAppCluster` list and the
+`docs/features/app-runtime.md` service-account recipe are extended by its owner: `statefulsets` **required**, the CRD
+read and the operator resources **optional** (a denied CRD read silently chooses the plain path with
+`statusDetail.operatorSkipped = 'noPermission'`). A 403 on StatefulSet create fails the card with the definite reason
+**`clusterPermissionMissing`**.
 
 | Provider                              | Objects                                                                                                                                                                                                                                                                                                                                                                                                                                                | Ready when                                                                                                                       | Outputs                                                                                                                          | Backup state                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -553,7 +628,27 @@ Cluster or StatefulSet/Deployment, Services, Secrets, Jobs, NetworkPolicy, then 
 remain (≤ 5 minutes) or reports `remaining`.
 
 Provider settings (k8s plugin, Work and user scope): `appDependencyStorageClass` (string), `appDependencySizes`
-(`{ postgres, objectStorage, redis }` GiB, ≥ defaults), admin: image overrides per kind/version.
+(`{ postgres, objectStorage, redis }` GiB — a **default** seeding the configure dialog, not a floor: FR-37 lets the
+owner pick any size at or above the provider minimum before first provisioning), admin: image overrides per
+kind/version, and a pinned default S3-compatible server image (see the recorded owner decision in §12's known gaps).
+
+### 4.9a Waiting for the owner's settings, and what "optional SMTP" means (added 2026-09-17, APW07-G16)
+
+A provider whose configuration only the owner can supply (`smtp-external`, `s3-external`, `platform-smtp-relay` when
+admin settings are incomplete) used to be dispatched immediately, so its card reached `failed deadlineExceeded` inside
+the SMTP deadline of 30 seconds before the owner could type anything.
+
+- New status **`awaiting_config`**, copy **"Needs your settings"**, with the action **Configure**. `reconcile` inserts
+  the row in `awaiting_config` for such a provider (`awaitingConfig: true` on its descriptor) and dispatches
+  **nothing**; no deadline runs. `PUT …/:kind` with valid `config` moves it to `pending` and dispatches `provision`.
+  A provider whose prompt schema is satisfied by admin settings (the relay) skips this state.
+- `AppDependencyView` carries `awaitingConfig: boolean` and the provider's `promptFields`, so the card can render the
+  dialog without a round trip.
+- **Optional SMTP does not block.** When `smtp.required` is `false` (the APW-03 schema default) and no SMTP provider is
+  configured or ready, an entry sourced from `deps.smtp.*` is **left out of the resolved set** with the warning
+  `smtpNotConfigured` rather than becoming `dependencyNotReady`, so a Deploy is not blocked by a dependency the App
+  spec itself calls optional; a `from: deps.smtp.*` entry that the App spec marks `required` on the **env** side still
+  blocks, naming the missing entry. `smtp.required: true` on the dependency always blocks until it is ready.
 
 ### 4.10 External providers — `packages/plugins/app-dependencies-external/` (new)
 
@@ -567,7 +662,25 @@ Package id `app-dependencies-external`, category `app-dependency`, capability `a
 | `platform-smtp-relay` | none (operator-configured)                                                                                                                                         | Offered only when admin settings `relay.apiUrl`, `relay.apiToken`†, `relay.host`, `relay.port`, `relay.fromDomain` are all set. `provision` → `POST {apiUrl}/credentials { id: "work-<uuid>", dailyLimit: 200 }` → `{ username, password }`; `deprovision` → `DELETE {apiUrl}/credentials/work-<uuid>`. | `from` = `no-reply@<fromDomain>` unless the App Work's verified domain is used; backup `external` |
 
 External endpoints are validated as public hostnames (no private, loopback or link-local addresses after DNS resolution)
-before any connection, matching the platform's existing SSRF posture for user-supplied URLs.
+before any connection, matching the platform's existing SSRF posture for user-supplied URLs. **An operator allow-list
+is honoured (added, APW07-G09):** `public-endpoint.ts` accepts a CIDR from
+`EVER_WORKS_APP_DEPENDENCY_PRIVATE_ALLOWLIST` (owner APW-07, default empty, comma-separated CIDRs — the same shape as
+APW-06's `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`, which stays untouched). Without it the kind lane's local mail
+sink and S3 test server are refused and a self-hosted installation can never use its own internal SMTP relay; the
+allow-list is the documented escape hatch, and every entry is logged once at boot (CIDR only, never the endpoint).
+
+**`platform-smtp-relay` is target-aware (added 2026-09-17, GAP-22 / XC-21).** Its descriptor declares
+`targets: ['your-cluster', 'ever-works-apps']`, so the **same** provider serves an App Work on the managed tier: the
+tier's mail-port block (APW-10's LG-08) stays exactly as it is, because the relay is reached over 443 to the relay's
+own API and the tenant app talks to the relay endpoint the provider hands it through `from: deps.smtp.*`. The relay is
+never a tenant's own SMTP client, never an operator's credential, and never an app's direct connection to port 25,
+465 or 587. Eligibility and abuse controls added with it: the descriptor is offered only to a **verified** account
+(`User.emailVerified`), it carries a per-**account** and per-**organization** daily cap
+(`EVER_WORKS_APP_RELAY_DAILY_LIMIT_PER_ACCOUNT`, default 1 000, and `…_PER_ORGANIZATION`, default 5 000) on top of the
+existing per-App-Work 200, a bounce or complaint rate above `EVER_WORKS_APP_RELAY_SUSPEND_BOUNCE_RATE` (default 5 %)
+suspends issuance and raises a `Mail` signal through APW-10's signals service where the tier is in use, and the
+provider refuses to issue a credential while the platform stop flag for mail issuance is set. Relay usage is metered as
+`relay.messages` on the credit list (XC-20, XC-21) and appears in the daily receipt.
 
 ### 4.11 Wave 2 — `packages/plugins/apps-tier-dependencies/` (new, P2)
 
@@ -605,7 +718,31 @@ holds no tenant data-server endpoint or admin credential, and never sees a manag
 - **Redis** — one Redis-compatible instance per App Work in the zone (`maxmemory 256mb`, declared policy, password auth).
 - **Object storage** — buckets `aw-<hex12>-<name>`, one user limited to `aw-<hex12>-*`, quota 10 GiB, public-read only on
   declared `publicBuckets`.
-- **Backups** — `backupStatus` reads `Work.status.dependencies[].lastBackupAt`; older than 24 hours → `overdue`.
+- **Backups** — `backupStatus` reads `Work.status.dependencies[].lastBackupAt`; the threshold is FR-48's 26 hours for
+  every card, and `APP_DEPENDENCY_MANAGED.backupMaxAgeMs` (24 h) is the **zone's own** schedule target, not the card's
+  overdue line: the zone must write `lastBackupAt` at least once every 24 hours, so a 25-hour-old timestamp reads
+  `overdue` only after the zone has actually missed its schedule (rewritten with APW07-G25 to remove the FR-48
+  contradiction; the 27-hour case is the one that must read `overdue` under the 26-hour rule).
+- **Metering (added, XC-20)** — the zone's `UsageReport` gains `dependencyStorageGiBHours` and
+  `dependencyBackupGiBHours` per App Work (APW-10 plan §3.2), imported idempotently per `(workId, windowStart, unit)`
+  like every other unit, priced on the credit list as `hosting.dependency_storage_gib_hour` and
+  `hosting.dependency_backup_gib_hour`, and shown in the daily receipt. Managed dependency storage is otherwise
+  invisible: it lives on a shared tenant data server, outside any namespace meter.
+- **In-zone provisioning is APW-10's, and it is contracted (added, APW10-G01 / APW07-G19)** — this epic writes
+  `{ kind, ref: dep-<kind> }` through `IAppsTierProvider.setDependencies(workId, deps)` and reads readiness and
+  `lastBackupAt` from `Work.status.dependencies[]`; it never sends whole-desired-state `applyWork` for a dependency
+  change (which would replace the app's running desired state) and never sees a connection string. The zone controller
+  owns: creating the namespace-scoped tenant database with `buildTenantPostgresDdl`, one Redis instance per App Work,
+  prefixed buckets with their user and quota, substituting every `ew-dep://<kind>/<output>` token inside the sealed env
+  before the tenant Secret is written and **refusing an unknown token** (`DEPENDENCY_TOKEN_UNKNOWN`), a backup schedule
+  of at most 24 hours writing `lastBackupAt`, and releasing a dependency on removal so
+  `status.dependencies[].phase = released` gates data deletion. The matching APW-10 tasks are its T43–T46.
+- **Managed SMTP (added, GAP-22)** — the fourth managed kind is `smtp`, served by the relay of §4.10 with
+  `targets: ['ever-works-apps']`: the tier blocks outbound 25/465/587 (LG-08) and that block is **not** relaxed, because
+  the relay is reached over its own HTTPS API and the tenant app is handed a relay endpoint plus a per-App-Work
+  credential. `smtp` therefore joins `Work.spec.dependencies` (`postgres|redis|objectStorage|smtp`) and the zone token
+  map. Without it, Cal.diy and the `app-fixture-hello` fixture — both `smtp: { required: true }` — could never reach
+  `ready` on the tier and ACC-E2E-10 (b) could not pass.
 
 ### 4.12 Deleting an App Work (Resolution R-15)
 
@@ -629,9 +766,18 @@ FR-57 warning. The call is idempotent (a re-dispatched op finds `kept`/`deleted`
 ## 5. API
 
 Controller `apps/api/src/app-env/app-env.controller.ts` and `apps/api/src/app-dependencies/app-dependencies.controller.ts`
-**(new)**; `AuthSessionGuard`; `ParseUUIDPipe`; `WorkOwnershipService.ensureCanView` for GET, `ensureCanEdit` for writes;
-non-`app` kind → 404 `notAppWork`; request bodies of these routes are excluded from request logging (the controller spec
-captures logger output during every write and asserts no submitted value appears).
+**(new)**; `AuthSessionGuard`; `ParseUUIDPipe`; **access through `AppWorkAccessService.resolve(workId, userId, 'view' | 'edit')`**
+(`view` for GET, `edit` for writes, called before the kind check — added 2026-09-17, APW07-G13: `ensureCanView` /
+`ensureCanEdit` return **403** for an existing Work where the caller has no membership and only 404 when the row is
+missing, while spec FR-32/S23 and T24/T25 require "foreign id 404 on every route"; 403 stays for a viewer attempting a
+write). Non-`app` kind → 404 `notAppWork`; request bodies of these routes are excluded from request logging — the
+mechanism is `@SensitiveRequestBody()` on `PUT /app-env`, `PUT /app-dependencies/:kind`,
+`POST /app-env/:name/rotate` and `DELETE /app-dependencies/:kind`, a decorator read by the monitoring interceptors so
+they record `{ redacted: true }` instead of the body for `packages/monitoring/src/interceptors/sentry.interceptor.ts`,
+which otherwise attaches the body to the request context and to every captured exception and drops only keys exactly
+matching a short list (`password`, `token`, `secret`, `apikey`, …) — so `set.SMTP_PASSWORD`, `import.dotenv` and
+`config.secretAccessKey` would reach the error reporter (added, APW07-G05). The controller spec captures
+error-reporting context calls during every write and asserts no submitted value appears.
 
 | Method | Route                                                                | Body / query                                                                                                                                                    | Response                                                                                                                                               | Throttle        |
 | ------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
@@ -652,16 +798,41 @@ is older than 15 minutes and returns `refreshing: true`.
 Error codes: `notAppWork`, `secureStorageUnavailable` (503), `tooManyValues` / `valuesTooLarge` (422),
 `generatedValueUseRotate`, `neverRotateNotAcknowledged`, `rotateConfirmationMismatch` (422), `notGenerated` (422),
 `rotateRateLimited` (429), `providerNotSupported` (422), `dependencyNotDeclared` (404), `confirmationMismatch` (422),
-`deleteInProgress` (409).
+`deleteInProgress` (409), **`sizeShrinkRefused`** (422 — a `sizeGiB` below the provisioned size, FR-37) and
+**`volumeExpansionUnsupported`** (422 — the storage class cannot expand, added APW07-G22). Every one of these codes is
+exported from `packages/contracts/src/apps/app-env.ts` / `app-dependencies.ts` and carries exactly one message key
+under `dashboard.workDetail.appEnv.errors.*` / `…appDependencies.reasons.*` (G23); a test in T2 asserts every code
+constant has an `en.json` key.
+
+**Volume size (added, APW07-G22).** `PUT /app-dependencies/:kind` with `sizeGiB`: below the provider's minimum → 422
+`sizeShrinkRefused`; equal to or above the provisioned size on a storage class that allows expansion → the `resize`
+provision mode patches the volume claim and updates `sizeGiB`; a class that cannot expand → 422
+`volumeExpansionUnsupported` with the class named. The admin setting `appDependencySizes` remains a **default**, not a
+floor: FR-37 lets the owner choose any size at or above the provider minimum before first provisioning, and the
+setting only seeds the dialog.
+
+**Additions this epic asks of other epics (recorded, not edited here).** APW-06's `checkAppCluster` permission list and
+the `docs/features/app-runtime.md` service-account recipe gain `statefulsets` (required) and the CRD/operator reads
+(optional) — APW07-G10. `WorkBuild.buildValueFingerprints` (APW-05) and `WorkDeployment.appRender.envFingerprints`
+(APW-06) are added to CONTRACTS §2 — APW07-G03. APW-06's `AppRuntimeEnvSource.resolve` returns `fingerprints` and
+carries `target`; `resolveEphemeral`'s `cluster` ctx gains `dependencyOutputs` — APW07-G03 / APW07-G04. APW-06's Deploy
+tab renders this epic's `DeployBlockedByEnvNotice` for the `env_required_unset` precondition, and the precondition
+carries `names[]` **with descriptions** (APW07-G15).
 
 **Consumer interfaces** (exported from `packages/agent/src/app-env/index.ts` and `app-dependencies/index.ts`):
-`AppEnvRuntimeSource` (the `APP_RUNTIME_ENV_SOURCE` binding, incl. `resolveEphemeral` with targets `cluster` and `runner`),
+`AppEnvRuntimeSource` (the `APP_RUNTIME_ENV_SOURCE` binding, incl. `resolveEphemeral` with targets `cluster` and
+`runner`),
 `AppEnvResolver.resolveForBuild` (APW-05), `AppEnvService.missingRequired/buildRedactor/ensureGenerated`,
 `AppDependenciesService.ensureReadyForDeploy/onAppRemoved(workId, { deleteData })` — APW-06 calls `onAppRemoved` with
 `deleteData: true` **before** `destroyApp(…, { deleteVolumes: true })`, as its plan requires —
+`AppDependenciesService.reconcile` (APW-06's target/cluster change) and
 `AppDependenciesService.onAppWorkDeleting(workId, { deleteStoredData })` (§4.12, R-15), `list(workId)` (names, kinds and
-sizes for APW-06's deletion preview), and `provisionEphemeral(workId, namespace, kinds)` /
-`AppDependencyFacadeService` with `ephemeral: true` for APW-06's verification namespace (R-10).
+sizes for APW-06's deletion preview), and
+`provisionEphemeral(workId, { namespace, kinds, signal })` →
+`{ outputs: Record<AppDependencyKind, Record<string, string>>, failed: Array<{ kind, reason }> }` (outputs in memory
+only) / `AppDependencyFacadeService` with `ephemeral: true` for APW-06's verification namespace (R-10). APW-06 passes
+those `outputs` straight back into `AppRuntimeEnvSource.resolveEphemeral({ target: 'cluster', dependencyOutputs })`,
+which is the order the two epics must use: provision ephemeral dependencies → resolve ephemeral values → render.
 
 ---
 
@@ -704,10 +875,13 @@ requestedByUserId? }`), symbol listed in `_tasks-symbols.ts`; task file
   persist → events. `pending` outcomes re-dispatch after `retryAfterMs` (≤ 30 s) until the deadline; transient failures
   re-dispatch after 5 minutes up to 3 attempts; `refresh` calls `getOutputs` (outputs changed → `outputsVersion + 1`) and
   `backupStatus`; `deprovision` calls `deprovision` and records `app.dependency.released` or `app.dependency.data_deleted`.
-- **Triggers**: `app.spec.applied` → `reconcile`; APW-06 deploy-target change and app removal → `reconcile` /
-  `onAppRemoved`; APW-06's `delete-app-work` op → `onAppWorkDeleting` (R-15); APW-06's `verification-deploy` op →
-  `provisionEphemeral` (R-10); Deploy preflight → `ensureReadyForDeploy`; `GET` older than 15 minutes → `refresh`; user
-  Retry/Configure/Delete data.
+- **Triggers**: `app.spec.applied` → `reconcile`; APW-06 deploy-target or cluster change (its `PUT app-target`, APW-06
+  plan §9.1) → `reconcile`; APW-06's Remove op → `onAppRemoved` (keep or data path, APW-06 plan §9.2); APW-06's
+  `delete-app-work` op → `onAppWorkDeleting` (R-15); APW-06's `verification-deploy` op → `provisionEphemeral`, whose
+  outputs APW-06 hands to `resolveEphemeral` (R-10); APW-06's Deploy preflight → `ensureReadyForDeploy`; `GET` older
+  than 15 minutes → `refresh`; user Retry/Configure → `provision`; `PUT …/:kind` with a larger `sizeGiB` → `resize`;
+  user Delete data → `deprovision`. Each trigger names its APW-06 call site (T66/T67/T69/T70, T58, T60) so neither epic
+  has to guess which side calls what.
 - **Events** (EventEmitter2 + Activity, names only): `app.env.changed`, `app.env.rotated`, `app.dependency.provisioned`,
   `app.dependency.failed`, `app.dependency.released`, `app.dependency.data_deleted` (the last two added to CONTRACTS §6).
   `ActivityActionType` gains `APP_ENV = 'app_env'` and `APP_DEPENDENCY = 'app_dependency'`; every row stores the dotted
@@ -732,13 +906,18 @@ dashboard.workDetail.appEnv.rotateDialog.{title,warning,typeToConfirm,appliesNex
 dashboard.workDetail.appEnv.importDialog.{title,placeholder,replaceGenerated,import,resultSummary,line,undeclaredWarning}
 dashboard.workDetail.appEnv.errors.{invalidName,reservedName,valueTooLarge,controlCharacter,lengthMismatch,tooShort,tooLong,patternMismatch,generatedValueUseRotate,neverRotateNotAcknowledged,rotateConfirmationMismatch,secureStorageUnavailable,tooManyValues,valuesTooLarge,malformedLine,rotateRateLimited}
 dashboard.workDetail.appEnv.deployBlocked.{message,action}
-dashboard.workDetail.appDependencies.{title,empty,targetNone,refreshing,loadError}
+dashboard.workDetail.appDependencies.{title,empty,targetNone,refreshing,loadError,notIsolatedNote}
 dashboard.workDetail.appDependencies.kind.{postgres,redis,objectStorage,smtp} · .provider.{inlineSingle,operator,smtpExternal,s3External,relay,managed}
-dashboard.workDetail.appDependencies.status.{pending,provisioning,ready,degraded,failed,kept,notInSpec,deleting,deleted}
+dashboard.workDetail.appDependencies.status.{pending,awaitingConfig,provisioning,ready,degraded,failed,kept,notInSpec,deleting,deleted}
 dashboard.workDetail.appDependencies.backup.{none,notConfigured,healthy,overdue,failing,external,unknown}
-dashboard.workDetail.appDependencies.reasons.{noDefaultStorageClass,clusterUnreachable,smtpConnectFailed,smtpTlsFailed,smtpAuthRefused,bucketUnreadable,volumeNotReady,extensionUnavailable,platformServerRefused,deadlineExceeded}
+dashboard.workDetail.appDependencies.reasons.{noDefaultStorageClass,clusterUnreachable,smtpConnectFailed,smtpTlsFailed,smtpAuthRefused,bucketUnreadable,volumeNotReady,extensionUnavailable,platformServerRefused,deadlineExceeded,namespaceNotOwned,namespaceBaselineMissing,clusterPermissionMissing,operatorNamespaceUnknown,volumeExpansionUnsupported,sizeShrinkRefused,relayIneligible,relaySuspended,providerNotSupported,dependencyNotDeclared,confirmationMismatch,deleteInProgress,notGenerated,notAppWork}
 dashboard.workDetail.appDependencies.actions.{configure,retry,deleteData} · .configureDialog.{title,save} · .deleteDialog.{title,destroys,noUndo,typeToConfirm,delete}
+dashboard.activity.filters.types.{appEnv,appDependency}
 ```
+
+Every status, reason and error code above is exported as a constant from `packages/contracts/src/apps/app-env.ts` /
+`app-dependencies.ts`, so a code added without copy fails T2's key test (added, APW07-G23). `awaitingConfig` is the
+new pre-provisioning state of §4.9a.
 
 ---
 
@@ -746,11 +925,22 @@ dashboard.workDetail.appDependencies.actions.{configure,retry,deleteData} · .co
 
 ### 9.1 Events (counters and identifiers only)
 
+**Scope (added, APW07-G14).** The rule below governs **this epic's own telemetry events**. Activity rows are a separate
+sink and they do carry names on purpose — FR-8 and S3 require "Environment value SMTP_PASSWORD set", and FR-56 requires
+the kept dependency resources by name — and `ActivityLogService.log` forwards every row to the analytics sink
+(`packages/agent/src/activity-log/activity-log.service.ts:113` → `apps/api/src/activity-log/jitsu.service.ts:39-49`,
+which sends `summary`, `details` and all `metadata`). Names, kinds and counts therefore reach analytics through
+Activity; **values, prompts, hosts, bucket names, connection strings and namespaces never do**, and the telemetry events
+below never carry a name. The new task T46 pins both halves: the telemetry spec for the events, and an
+`ActivityLogService`/`JitsuService` spec asserting an `app_env` / `app_dependency` row's dispatched payload contains no
+value and no `valueEncrypted`/`configEncrypted`/`outputsEncrypted` field.
+
 `app_env_values_changed` (`count`, `actions`), `app_env_rotated`, `app_env_import` (`set`, `created`, `skipped`,
 `refused`), `app_env_validation_refused` (`code`), `app_env_deploy_blocked` (`missingCount`), `app_dependency_provisioned`
 (`kind`, `providerId`, `durationBucket`), `app_dependency_failed` (`kind`, `providerId`, `reason`),
-`app_dependency_backup_state` (`kind`, `state`), `app_dependency_data_deleted` (`kind`). Never names of env entries, hosts,
-bucket names or namespaces.
+`app_dependency_backup_state` (`kind`, `state`), `app_dependency_data_deleted` (`kind`), plus
+`app_dependency_awaiting_config` (`kind`) and `app_dependency_resize` (`kind`, `fromGiB`, `toGiB`) added with §4.9a and
+APW07-G22. Never names of env entries, hosts, bucket names or namespaces.
 
 ### 9.2 Failure modes and the chosen behaviour
 
@@ -822,10 +1012,12 @@ ephemeral mode (R-10), env API and UI, capability, facade, k8s inline providers 
 providers, relay provider, provision job, dependencies API and UI, App Work deletion (R-15), i18n, tests, docs.
 **Ships value alone**: an App Work runs on Your cluster with every value and dependency it declares.
 
-### P2 — Ever Works Apps dependencies (Wave 2; FR-51…FR-55)
+### P2 — Ever Works Apps dependencies (Wave 2; FR-51…FR-55, FR-61…FR-63)
 
-`apps-tier-dependencies` plugin, tenant DDL builder, platform-server refusal, managed Redis instances, bucket policies,
-managed backup reporting, ACC-07-26…28. **Depends on** APW-10's launch gate and tenant data servers.
+`apps-tier-dependencies` plugin (managed Postgres, Redis, object storage **and SMTP through the relay**, GAP-22),
+tenant DDL builder, platform-server refusal, managed Redis instances, bucket policies,
+managed backup reporting, managed-dependency metering (XC-20), ACC-07-26…28 plus the new ACC-07-32…34. **Depends on**
+APW-10's launch gate, tenant data servers and its in-zone dependency tasks T43–T46.
 
 ---
 
@@ -866,6 +1058,15 @@ managed backup reporting, ACC-07-26…28. **Depends on** APW-10's launch gate an
   targets (the runner target returns a value-free recipe); §3 `IAppDependencyProvider` details gain
   `AppDependencyContext.ephemeral` and `deprovision` option `stopWorkloads`.
 - **In-cluster object storage is internal-only**; browser-facing uploads require Your own S3 storage in Wave 1.
+- **Default in-cluster S3-compatible server — recorded, not resolved (APW07-G17).** T19/T21 fix a digest-pinned image
+  and the init Job in `app-dependencies/images.ts`; the provider id stays `k8s-inline-minio` for continuity and the
+  server is chosen by admin setting with a tested default, so swapping the product changes `images.ts`, the init Job and
+  its spec **only** — never a capability, an output name or an App spec field. Owner confirmation of the shipped default
+  remains open (spec §9) and is additive either way.
+- **`APP_DEPENDENCY_OUTPUTS` has one owner (APW07-G20).** APW-03's reference resolver and JSON Schema must import it (and
+  `APP_ENV_KEYPAIR_FORMATS`) from `@ever-works/contracts` rather than re-declaring the tables, and T40's parity spec
+  lives in `packages/agent/src/works-config/schema/__tests__/` because `@ever-works/contracts` has zero dependencies and
+  must not import the agent package. Until APW-03 lands, T1's values are the reference and the parity spec is skipped.
 - **Dependency credential rotation and data migration between providers** are out of scope; kept rows record what remains.
 - **CONTRACTS additions by this epic**: routes `PUT` / `POST …/provision` / `DELETE /api/works/:id/app-dependencies/:kind`
   (§4); events `app.dependency.released`, `app.dependency.data_deleted` (§6); category `app-dependency`, the

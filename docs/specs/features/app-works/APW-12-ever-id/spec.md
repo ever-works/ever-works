@@ -580,6 +580,7 @@ A reviewer can run this list top to bottom against a running build with a test O
 - [ ] **ACC-12-38** Every new string resolves in all locales; no page contains "SSO" or "single sign-on".
 - [ ] **ACC-12-39** The button, both confirmation screens, the card and the dialogs pass an automated accessibility check with no new violations.
 - [ ] **ACC-12-40** Ever Teams and Ever Gauzy adoption criteria in [`cross-platform.md`](./cross-platform.md) §7 are met before each platform's production flag is turned on.
+- [ ] **ACC-12-41** Deleting an account or an organization deletes every `external_identities` row it owned, so no Ever ID link outlives the account (Resolution R-35's APW-12 half), and the cascade is idempotent when the deletion event is replayed.
 
 ---
 
@@ -593,11 +594,85 @@ A reviewer can run this list top to bottom against a running build with a test O
 - **[NEEDS CLARIFICATION: does Ever ID itself offer Google and GitHub sign-in?]** If yes, a person may reach
   Ever Works through Ever ID's Google button; Ever Works still sees only the Ever ID pair. Default: yes, with
   linking at Ever ID also explicit.
+  → **Resolved (D4, [`idp-options.md`](./idp-options.md) §6, recommended default):** yes, with the §6.1 explicit
+  re-authentication linking rule. Register row: `CLARIFICATIONS.md` (row for this marker).
 - **[NEEDS CLARIFICATION: sign-up through Ever ID on Ever Works.]** Default on (FR-2). Should a private
   installation default it off?
+  → **Answered as a configuration default, not a defect:** `signUpAllowed` is `true` everywhere and an
+  installation sets `EVER_ID_SIGN_UP_ALLOWED=false` to turn it off (plan §4.2, CONTRACTS §7).
 - **[NEEDS CLARIFICATION: delegated token lifetime.]** Ever Works accepts up to 3,600 seconds; the
   recommendation to Ever ID is 900 seconds. Confirm.
+  → **Resolved ([`idp-options.md`](./idp-options.md) §6.1):** access 900 s, ID token 300 s, and Ever Works keeps
+  accepting up to 3,600 s so a slower provider does not break the contract (FR-45).
 - **[NEEDS CLARIFICATION: consent for `apps:read`.]** Consent screen at first use, or pre-approved for
   first-party Ever apps? Default: pre-approved for first-party clients only, listed and revocable on the card.
+  → **Resolved (D7, [`idp-options.md`](./idp-options.md) §6):** pre-approved for first-party Ever clients only;
+  the card lists every client that read and offers revoke (FR-48).
 - **[NEEDS CLARIFICATION: other product lines.]** Whether another product line's identity provider ever
   federates with Ever ID. Default: no; the Ever instance stays separate. No nudge to connect in P1.
+  → **Resolved (D9, [`idp-options.md`](./idp-options.md) §6; R-28):** no. Each product line keeps its own
+  identity infrastructure and the Ever instance stays separate.
+
+---
+
+## 10. Non-functional requirements
+
+Numbers are binding; each is measurable and each names where it is proven. They are lifted from the plan rather
+than invented here (Constitution IX keeps implementation detail in `plan.md`).
+
+| Id     | Requirement                                                                                                                                                                                                                                                     | Proven by                               |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| NFR-1  | Sign-in completes within **5 seconds** of the provider's redirect for a healthy provider; every outbound call the sign-in path makes has a **5,000 ms** timeout, with one retry after 1 s for discovery and the key set and **no retry** for the token endpoint | T6, T7, T20; ACC-12-28                  |
+| NFR-2  | A sign-out notice ends its sessions within **5 seconds** of arriving, and the person's next page load shows the notice                                                                                                                                          | T14, T30; ACC-12-23                     |
+| NFR-3  | A token in a query parameter is refused with `400 tokenInQuery` **before** authentication runs and before any logging interceptor records the URL                                                                                                               | T16; ACC-12-10                          |
+| NFR-4  | Turning the plugin off, or the provider becoming unavailable, takes effect within **60 seconds** on **every** API replica, with no restart                                                                                                                      | T32; ACC-12-01, ACC-12-04               |
+| NFR-5  | The key set is cached for 600 s, an unknown key triggers one refetch with a 30 s cooldown, and stale use beyond 21,600 s fails closed                                                                                                                           | T6; ACC-12-08                           |
+| NFR-6  | A sealed cookie never exceeds 3,072 bytes (so it fits under 4 KB) with `returnTo` up to 2,048 characters                                                                                                                                                        | T13; ACC-12-09                          |
+| NFR-7  | Replay protection is single-use and cross-replica: two concurrent consumers of one `state`, `pending` value or `jti` leave exactly one winner                                                                                                                   | T13, T15; ACC-12-09, ACC-12-19          |
+| NFR-8  | No secret, token, code, `state` or subject appears in a log line, an Activity row, a telemetry event or an error body                                                                                                                                           | T20, T32, T45; ACC-12-37                |
+| NFR-9  | No token is ever carried in a URL, on any path, in any environment                                                                                                                                                                                              | T16, T18, T30; ACC-12-10, ACC-12-26     |
+| NFR-10 | Every new string resolves in all 21 locales and no English value contains "SSO" or "single sign-on"                                                                                                                                                             | T27; ACC-12-38                          |
+| NFR-11 | The new surfaces pass an automated accessibility check with no new violations, are keyboard-operable, and survive right-to-left locales                                                                                                                         | T30; ACC-12-39 (README §7 rule 17)      |
+| NFR-12 | Nothing that signs a person in today changes behaviour: every pre-existing sign-in test in all three repositories passes **unchanged**, with the feature off and on                                                                                             | T30, T34, T35–T42; ACC-12-32, ACC-12-40 |
+
+## 11. Constitution gates
+
+One behaviour-level line per gate; the implementation checklist with its citations is
+[`plan.md`](./plan.md) §12.
+
+- [x] **I — Plugin-first.** The identity integration is a plugin with its own settings schema, and the OpenID Connect libraries are dependencies of that package only.
+- [x] **II — Capability-driven.** Callers ask the facade; no plugin id appears in core. Declared deviation: the settings cascade collapses to the platform tier, because sign-in precedes any user or Work.
+- [x] **III — Source-of-truth repositories.** Identity metadata is platform metadata, never Work content.
+- [x] **IV — Job runtime.** No new background job is needed: notices are synchronous, keys refresh lazily, replay cleanup is opportunistic.
+- [x] **V — Forward-only migrations.** Two additive migrations, `down()` drops only what `up()` created, no backfill (Resolution R-39's block).
+- [x] **VI — Tests first.** Unit, controller, integration, Playwright, client and other-repository specs are named in `plan.md` §10; no suite under `apps/api/test/` (Resolution R-22).
+- [x] **VII — Secrets.** The client secret is `x-secret`; no Ever ID token is stored; query tokens are refused before logging.
+- [x] **VIII — Plugin counts.** The plugin is registered in the built-in plugins documentation in the same PR.
+- [x] **IX — Behaviour-first spec.** Every identifier lives in the plan, not in this file.
+- [x] **X — Backwards compatibility.** One optional provider field, one optional session argument, one added value on the existing credential union and two nullable columns; every existing route and response is unchanged.
+- [x] **Program rule 1 — additive only** (Resolution R-26), restated as the owner's binding constraints in [`idp-options.md`](./idp-options.md) §7.
+- [x] **Constitutional gaps flagged, not absorbed** (README §7 rule 18): Principle VI's test location is corrected here per R-22 pending a constitution patch.
+
+## 12. References
+
+- **Program**: [README](../README.md) (D14, §8 questions 6, 9 and 10; §7 rules 1–18) ·
+  [CONTRACTS](../CONTRACTS.md) (R-1, R-2, R-19, R-22, **R-28** Ever ID provider/domain, R-30 switches, R-32
+  human-only, R-34 Activity completeness, R-35 deletion, R-37 registers, R-38 merge order, R-39 migrations; §4
+  routes, §7 flags, §7A caps, §11 signals, §12 error codes) ·
+  [ACCEPTANCE](../ACCEPTANCE.md) (ACC-E2E-13, the APW-12 section, ACC-NEG-17/18/19/20) ·
+  [TRACKER](../TRACKER.md) (the APW-12 P0 operator action) ·
+  [GITHUB-PERMISSIONS](../GITHUB-PERMISSIONS.md) · [THREAT-MODEL](../THREAT-MODEL.md) (B-7, B-11, B-12) ·
+  [CLARIFICATIONS](../CLARIFICATIONS.md) (the D-rows and this epic's markers).
+- **This epic**: [`plan.md`](./plan.md) · [`tasks.md`](./tasks.md) · [`idp-options.md`](./idp-options.md) (the
+  decision record and the owner's binding constraints) · [`cross-platform.md`](./cross-platform.md) (Teams and
+  Gauzy adoption, XP ids) · [`cross-repo-issues/`](./cross-repo-issues/) (the issue drafts for those repositories).
+- **Existing substrate**: [EXISTING-SUBSTRATE](../EXISTING-SUBSTRATE.md) §6 (identity and cross-platform
+  navigation) · `apps/api/src/auth/` (Better Auth abstraction, session provider) ·
+  `apps/api/src/terms/terms-acceptance.service.ts` (the terms contract sign-up reuses) ·
+  `apps/api/src/safety/guards/human-actor.guard.ts` (the human-only guard) ·
+  `packages/plugin/src/contracts/` (capability contracts) · `packages/agent/src/facades/oauth.facade.ts` (the
+  facade precedent) · `docs/specs/security/THREAT-MODEL.md` (the platform threat model this epic extends).
+- **Decisions**: ADR-014 (no hardcoded catalogs), ADR-015 (job-runtime provider pluggability), ADR-017 — the
+  program decisions in README §2 that this epic depends on.
+- **User documentation**: `docs/features/ever-id.md` (created by T33) and
+  [`../user-docs/app-works.md`](../user-docs/app-works.md).

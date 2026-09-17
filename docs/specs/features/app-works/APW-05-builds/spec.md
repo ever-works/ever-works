@@ -11,7 +11,7 @@
 **Last updated**: 2026-09-17
 **Owner**: Product
 **Size**: L · **Depends on**: APW-03 (App spec `build` block, validation), APW-02 (Actions hygiene, webhook
-installation), APW-07 (build-phase values) · **Depended on by**: APW-04 (verification builds), APW-06
+capability), APW-07 (build-phase values) · **Depended on by**: APW-04 (verification builds), APW-06
 (deploys a Build), APW-08 (merge → rebuild), APW-13 (golden paths)
 
 > **Additive-only (program rule #1).** Nothing here changes how platform-template Works build or deploy
@@ -135,6 +135,14 @@ verifies before it runs anything.
 - **S31 — Checks without a build.** **Given** `build.strategy: image` and one declared check, **when** the App spec is
   applied, **then** the build workflow is written with only the checks, pull requests show **Ever Works check:
   {name}**, and no Build is recorded.
+- **S32 — A value no human has reviewed stays out of the run.** **Given** an App Work with one build value and a pull
+  request opened by an agent from a branch of the same repository whose `Dockerfile` prints every build argument, **when**
+  that pull request's Build runs, **then** the build receives the throwaway marker and never the stored value (the value
+  appears in no log, no build argument and no published layer), the canary sink receives nothing, and the Build is
+  **Not deployable — built from a pull request** exactly as before. **Given** the same App Work's verification of that
+  proposal, **then** a prompted value is delivered only when the change touches no build-affecting file or the owner
+  approved it, and otherwise the Build detail says **"Owner approval is needed before prompted values are used for this
+  verification."** with **Review the change**.
 
 ### 3.2 Unhappy paths
 
@@ -155,9 +163,15 @@ verifies before it runs anything.
   spec."**
 - **S17 — The runner is too small.** **Given** a private copy asking for `build.resources.memory: 12Gi` and no larger
   runner configured, **then** Builds are **Blocked — This build needs 12 GiB but the runner for private repositories
-  allows 5 GiB** with **Use a larger runner**.
+  allows 5 GiB** with **Use a larger runner**. **Given instead** a private copy whose App spec leaves
+  `build.resources` out, **then** the Build runs on the standard private runner with no block, and if it runs out of
+  memory the panel reads **"Raise build.resources.memory (now 5Gi) or lower the build's heap size. On this runner a
+  build can use at most 5 GiB."** with **Use a larger runner**.
 - **S18 — Events never arrive.** **Given** a Build whose event deliveries are lost, **then** the platform asks GitHub
-  directly and the tab reflects each status change within 3 minutes.
+  directly and the tab reflects each status change within 3 minutes. **Given** a platform that never received a single
+  delivery for a workflow — no webhook is installed, or it was refused — **when** a push reaches the tracked branch,
+  **then** the push is still recorded as a Build within 3 minutes and its terminal status is visible within 3 minutes of
+  it ending: discovery does not depend on any event arriving.
 - **S19 — A secret inside the image.** **Given** a Dockerfile that copies a secret build value into the final
   image's metadata, **then** nothing is pushed, the Build shows **Failed — A secret would have been published inside
   the image: `SIGNING_KEY`** with advice to use it only in an earlier stage, and the value is never printed.
@@ -261,7 +275,9 @@ Every threshold below is a number on purpose.
   time of writing); private repositories use the standard private runner (2 vCPU, 7 GB) unless a **larger runner
   label** is set in the App Work's build settings (with its memory declared there).
 - **FR-23.** `build.resources.memory` above the runner's memory minus 2 GiB blocks the Build, stating both numbers
-  (S17). `build.resources.cpu` above the runner's vCPU count is a warning only.
+  (S17). `build.resources.cpu` above the runner's vCPU count is a warning only. An App spec that leaves
+  `build.resources.memory` out uses the runner's maximum (runner memory − 2 GiB) and is **never** blocked by this rule:
+  the field asks for a specific amount, it does not set a ceiling.
 - **FR-24.** The job timeout equals `build.resources.timeoutMinutes` (5–180, default 60).
 - **FR-25.** Checkout fetches a single commit. The runner frees preinstalled tool directories before building unless
   **Reclaim runner disk** is off (default on).
@@ -334,7 +350,11 @@ Every threshold below is a number on purpose.
 - **FR-52.** A **Verification** Build carries a verification plan (components to start, throwaway dependency kinds,
   jobs, smoke tests). After a successful image build — in the same run, or reusing the confirmed image of an earlier
   succeeded Build of the same commit, so nothing is built twice — the runner starts the image and dependency
-  containers on its private network, runs the jobs and smoke tests, and reports each smoke result on the Build.
+  containers on its private network, runs the jobs and smoke tests, and reports each smoke result on the Build. **When
+  the App Work has no build workflow yet**, a dispatch-only version of the file is committed or proposed first, exactly
+  as FR-7 delivers it; a verification therefore never needs a file that only an applied App spec could produce, and it
+  dispatches on the tracked branch with the proposal's commit. A pending proposal blocks the Verification Build as
+  **Waiting for the build workflow to be merged**, and a verification pushes no image and no tag (FR-54).
 - **FR-53.** Verification is limited to 30 minutes and 12 GiB of summed memory. Generated values are freshly
   generated inside the runner, derived values point at the runner's throwaway containers, and both are discarded with
   the runner; a prompted value is used only when the owner has already set it, is delivered for that run alone and is
@@ -347,7 +367,9 @@ Every threshold below is a number on purpose.
   with a sandboxed runtime and user namespaces — and is removed at most 10 minutes after it ends.
 - **FR-56.** Network access during a managed build is denied except to the source repository host and the base-image
   and package registries on the operator's allowlist; blocked hosts are reported (S29).
-- **FR-57.** Default caps: 4 vCPU, 12 GiB memory, 30 GiB ephemeral disk, 60 minutes; operator plan maximums never exceed
+- **FR-57.** Default caps: 4 vCPU, 12 GiB memory, 30 GiB ephemeral disk, 60 minutes — these defaults apply when the App
+  spec leaves the corresponding `build.resources` value out, so an App spec with no `build.resources` at all still
+  builds on the managed tier rather than being blocked; operator plan maximums never exceed
   16 vCPU, 64 GiB and 180 minutes. At most 1 running managed Build per App Work and 3 per account. Source is fetched
   with a read-only token for one repository valid ≤ 1 hour; the push token covers one repository in a per-tenant
   registry namespace and is valid ≤ timeout + 60 minutes. No platform or production pull credential can read a tenant
@@ -384,6 +406,25 @@ Every threshold below is a number on purpose.
   receipt as a separate line.
 - **FR-70.** Checks are written for every build strategy, including `image` and `none`, where the workflow holds only the
   checks (S31). Removing every check from the App spec removes the checks from the workflow on its next preparation.
+
+### 4.14 Restricted build values on pull requests and verifications
+
+- **FR-71.** A Build started by a pull request from the App Work's own repository receives **no stored build value**:
+  every `fromEnv` build argument is passed a fixed throwaway marker instead of the value, a value that belongs to a
+  build service still resolves to that run's own throwaway service, prompted values are not synchronised for a pull
+  request at all, and the workflow's missing-value check does not run, because a pull request legitimately has no stored
+  value. Nothing else about the pull-request Build changes: it still builds the pull-request head, is still **Not
+  deployable — built from a pull request**, and still writes no cache and pushes no image. Builds on the tracked branch
+  (push and Rebuild) keep using the stored values exactly as FR-16 describes. An owner who needs a stored value on a
+  pull request may switch this off per App Work, and the Builds tab then states plainly that a value is handed to
+  whatever code the pull request contains.
+- **FR-72.** A **Verification** Build never receives a stored build value either: its `fromEnv` arguments come from the
+  value-free verification recipe (FR-53), and the owner-set prompted values are delivered only when the change under
+  verification touches no build-affecting file — the Dockerfile, `.dockerignore`, `package.json`, lockfiles, `Makefile`,
+  or anything under `build/`, `scripts/` or `.github/workflows/` — or the owner approved that change. Otherwise the
+  verification runs on generated and derived values alone and says so, with a **Review the change** action. The
+  honeypot assertion is FR-71's: a build value whose Dockerfile reads it on an agent-authored pull request must leave
+  the canary sink empty (ACC-05-31).
 
 ---
 
@@ -476,24 +517,29 @@ All copy below is final English copy, ready to be keyed for translation.
 
 ### 6.3 Failure panel — every class, exact copy
 
-| Class                    | Title                                                         | Suggestion                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| outOfMemory              | `Ran out of memory`                                           | `Raise build.resources.memory (now {memory}) or lower the build's heap size. On this runner a build can use at most {max}.`      |
-| diskFull                 | `Ran out of disk space`                                       | `Turn on "Reclaim runner disk" in build settings, or shrink the build context with a .dockerignore file.`                        |
-| dockerfileError          | `The Dockerfile failed at step {step} of {total}`             | `The failing step was: {command}. Fix it in {dockerfile} and push, or ask an agent to fix it.`                                   |
-| dependencyDownloadFailed | `Couldn't download dependencies`                              | `A package or base image registry didn't answer. Rebuild in a few minutes; if it keeps failing, pin the versions you depend on.` |
-| registryPushDenied       | `Couldn't push the image`                                     | `Allow workflows in this repository to write packages (Settings ▸ Actions ▸ General ▸ Workflow permissions), then rebuild.`      |
-| missingBuildValue        | `A build value is missing: {names}`                           | `Set it in Settings ▸ Environment, then rebuild.`                                                                                |
-| secretInImage            | `A secret would have been published inside the image: {name}` | `Use this value only in an earlier build stage, or pass it as a build secret mount. Nothing was pushed.`                         |
-| timeout                  | `Took longer than {minutes} minutes`                          | `Raise build.resources.timeoutMinutes (maximum 180) or speed the build up with caching.`                                         |
-| workflowInvalid          | `The workflow file is invalid`                                | `GitHub can't run the build workflow. Review the open pull request from Ever Works to restore it.`                               |
-| digestMismatch           | `The pushed image could not be confirmed`                     | `The registry reported a different image than the build did. Rebuild; nothing unconfirmed will be deployed.`                     |
-| verificationFailed       | `The app didn't pass its smoke tests`                         | `{failed} of {total} smoke tests failed. See the results below.`                                                                 |
-| lost                     | `Lost track of this build`                                    | `GitHub stopped answering about this build. Check it on GitHub.`                                                                 |
-| unknown                  | `Something else went wrong`                                   | `Open the logs on GitHub, or ask an agent to look.`                                                                              |
+| Class                    | Title                                                         | Suggestion                                                                                                                                                          |
+| ------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| outOfMemory              | `Ran out of memory`                                           | `Raise build.resources.memory (now {memory}) or lower the build's heap size. On this runner a build can use at most {max}.`                                         |
+| diskFull                 | `Ran out of disk space`                                       | `Turn on "Reclaim runner disk" in build settings, or shrink the build context with a .dockerignore file.`                                                           |
+| dockerfileError          | `The Dockerfile failed at step {step} of {total}`             | `The failing step was: {command}. Fix it in {dockerfile} and push, or ask an agent to fix it.`                                                                      |
+| dependencyDownloadFailed | `Couldn't download dependencies`                              | `A package or base image registry didn't answer. Rebuild in a few minutes; if it keeps failing, pin the versions you depend on.`                                    |
+| registryPushDenied       | `Couldn't push the image`                                     | `Allow workflows in this repository to write packages (Settings ▸ Actions ▸ General ▸ Workflow permissions), then rebuild.`                                         |
+| missingBuildValue        | `A build value is missing: {names}`                           | `Set it in Settings ▸ Environment, then rebuild.`                                                                                                                   |
+| secretInImage            | `A secret would have been published inside the image: {name}` | `Use this value only in an earlier build stage, or pass it as a build secret mount. Nothing was pushed.`                                                            |
+| timeout                  | `Took longer than {minutes} minutes`                          | `Raise build.resources.timeoutMinutes (maximum 180) or speed the build up with caching.`                                                                            |
+| workflowInvalid          | `The workflow file is invalid`                                | `GitHub can't run the build workflow. Review the open pull request from Ever Works to restore it.`                                                                  |
+| digestMismatch           | `The pushed image could not be confirmed`                     | `The registry reported a different image than the build did. Rebuild; nothing unconfirmed will be deployed.`                                                        |
+| verificationFailed       | `The app didn't pass its smoke tests`                         | `{failed} of {total} smoke tests failed. See the results below.`                                                                                                    |
+| egressBlocked            | `Network access was blocked`                                  | `The build tried to reach {hosts}, which aren't on the builder's allowed list. Get what you need from your source repository or an allowed registry, then rebuild.` |
+| lost                     | `Lost track of this build`                                    | `GitHub stopped answering about this build. Check it on GitHub.`                                                                                                    |
+| unknown                  | `Something else went wrong`                                   | `Open the logs on GitHub, or ask an agent to look.`                                                                                                                 |
+
+`egressBlocked` is a Wave 3 class — it never occurs on GitHub-hosted runners — but its copy ships in P1 with the other 13
+because the class list is P1, so no pass over the 14 leaves a hole. `{hosts}` is at most 10 names.
 
 Every failure panel offers **Ask an agent to fix this**, handing class, suggestion, excerpt and logs link to the
-evolve loop (APW-08).
+evolve loop (APW-08) through `POST /api/works/:id/evolve` with the failed Build's `buildId`; the action is hidden when
+APW-08 is absent or the viewer lacks edit access.
 
 ### 6.4 Blocked states, Overview card, empty, loading, error
 
@@ -511,6 +557,21 @@ evolve loop (APW-08).
   LOADING: 5 skeleton rows, no layout shift.   LOAD ERROR: "Builds could not be loaded. Try refreshing the page."
 ```
 
+Every blocked reason has its own copy and its own action — the seven above plus:
+
+| Reason                              | Copy                                                                                                                       | Action             |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `workflowWriteFailed`               | `Ever Works couldn't write the build workflow to the repository.` · `A rule on this repository refuses the change.`        | `Rebuild`          |
+| `tooManyBuildValues`                | `This build uses {count} build values; at most 50 are allowed.`                                                            | `Open Environment` |
+| `buildValueTooLarge`                | `{name} is too large to pass to a build (48 KB maximum).`                                                                  | `Open Environment` |
+| `buildServicePortRequired`          | `The build service {service} needs a port: Ever Works doesn't know which port "{image}" listens on.`                       | `Open Environment` |
+| `verificationDependencyUnsupported` | `A verification can't start {kind} yet. The check runs on the cluster instead.`                                            | —                  |
+| `strategyNotSupported`              | `GitHub-hosted runners can't build with the "{strategy}" strategy. Add a Dockerfile and set build.strategy to dockerfile.` | —                  |
+| `specInvalid`                       | `The App spec at this commit has errors.`                                                                                  | —                  |
+| `repositoryUnavailable`             | `{repository} is archived, deleted or no longer available to your GitHub connection.`                                      | —                  |
+| `managedConcurrencyLimit`           | `Waiting for other builds: at most {perWork} per app and {perAccount} per account run at once.`                            | —                  |
+| `buildValueNameReserved`            | `{name} is reserved by Ever Works and can't be passed to a build. Rename the environment entry.`                           | `Open Environment` |
+
 ### 6.5 Pull token dialog
 
 ```
@@ -524,9 +585,17 @@ evolve loop (APW-08).
 ║                                        [ Cancel ]  [ Check and save ]║
 ╚══════════════════════════════════════════════════════════════════════╝
   Errors: "This token can do more than read packages. Create one with only read:packages."
+          "This is a fine-grained token. Create a classic token with only read:packages checked."
           "This token can't read {imageRepository}."
+          "This image is already public — no token is needed."
   Saved:  "Pull token saved. It expires on {date}." · "Pull token saved. It doesn't expire."
+  Waiting:"There is no finished build yet. Add a pull token after the first successful build."
+  Public: "This image is private. Make the package public in GitHub, then check again."   [ Check again ]
+  Viewer: "You need edit access to do this."
 ```
+
+The **Check again** action re-reads the registry and, when the package has become public, clears the token state without
+ever displaying a stored token.
 
 ### 6.6 Keyboard affordances
 
@@ -573,7 +642,8 @@ Status is text plus an icon, never colour alone; live status changes are announc
 - [ ] **ACC-05-09** — Cancel on a running Build reaches `cancelled` within 60 seconds.
 - [ ] **ACC-05-10** — Two quick commits on a pull request cancel the older build; three quick commits on the tracked
       branch never cancel the running build and build only the newest waiting commit.
-- [ ] **ACC-05-11** — With event delivery disabled, a Build's terminal status appears within 3 minutes.
+- [ ] **ACC-05-11** — With event delivery disabled **and with no repository webhook installed**, a push to the tracked
+      branch is still recorded as a Build and its terminal status appears within 3 minutes.
 - [ ] **ACC-05-12** — The fixture app's build migrates an ephemeral Postgres and succeeds; no connection reaches the App
       Work's real database.
 - [ ] **ACC-05-13** — `EW_` secrets exist before a platform-started Build dispatches and are re-synced within 60 seconds
@@ -609,6 +679,13 @@ Status is text plus an icon, never colour alone; live status changes are announc
       by either result; a pull request from another repository runs no check.
 - [ ] **ACC-05-30** — With `build.strategy: image` and one check, the written workflow contains only the checks and no
       Build is recorded; removing the check removes it from the workflow on the next preparation.
+- [ ] **ACC-05-31** — A build value whose `Dockerfile` reads it is passed to a pull request from the App Work's own
+      repository as a throwaway marker only: the stored value appears in no build argument, no log line, no published
+      image layer and no Activity row, the workflow still references `secrets.EW_<NAME>` for the tracked-branch path
+      only, and the canary sink receives nothing.
+- [ ] **ACC-05-32** — A Verification Build delivers an owner-set prompted value only when the verified change touches no
+      build-affecting file or the owner approved it; otherwise the Build detail shows the approval notice with **Review
+      the change**, and the verification still completes on generated and derived values.
 
 ---
 
@@ -619,7 +696,11 @@ Status is text plus an icon, never colour alone; live status changes are announc
   uses is that provider's internal choice — Resolution R-13)._
 - **[NEEDS CLARIFICATION: default package visibility.]** Whether a first push from a public repository's workflow
   creates a public or private package must be verified against GitHub before P1 ships; the pull-token flow covers
-  both, but the default Builds-tab copy depends on it.
+  both, but the default Builds-tab copy depends on it. **Either outcome is now handled without touching a scenario:**
+  if the first push yields a private package, a public fork's Build cannot be confirmed anonymously, so it is
+  `digestUnconfirmed` and not deployable until a token exists — the acceptance harness therefore carries an optional
+  `APW_E2E_GHCR_PULL_TOKEN` secret and a **Make the package public** step for the fixture repository, either of which
+  satisfies ACC-E2E-05/07/14, and the live probe records the observed default here once it is run.
 - **[NEEDS CLARIFICATION: larger runners for private copies.]** They need an organization and are billed per minute.
   _Default: a label the owner configures, with its memory; no guided setup in P1._
 - **[NEEDS CLARIFICATION: always propose the workflow as a pull request?]** Direct commits on repositories the App Work

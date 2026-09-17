@@ -48,8 +48,18 @@ spec:
       # No command: the image CMD runs the database check (which migrates) and then the server. That script
       # stops on the first error, so a failed migration fails the container — no separate migrate job needed.
       port: 3000 # verified: EXPOSE 3000, PORT=3000
+      # verified: the image's user is the NAME `nextjs` (`adduser --system --uid 1001 nextjs`, Dockerfile L59-L61,
+      # then `USER nextjs`, L97) — a name, not the numeric uid. kubelet refuses a non-numeric image user under
+      # `runAsNonRoot` unless `runAsUser` is set ("container has runAsNonRoot and image has non-numeric user (%s),
+      # cannot verify user is non-root", kubernetes/pkg/kubelet/kuberuntime/security_context_others.go), and
+      # APW-06 plan §4.4 renders `runAsNonRoot: true` with no `runAsUser` (targetSettings `allowRoot: false`).
+      # TODO(contract, APW-03): an optional numeric `components[].runAsUser` (schema.md §10 has no user field
+      # today) is what this Blueprint needs; it will then declare `runAsUser: 1001` for the `web` component.
       replicas: 1
-      # TODO(verify): the boot script also updates the tracker script; try `false` on the verification lane.
+      # verified: `scripts/start-docker.sh` runs `check-db.js`, `update-tracker.js` and then `node server.js`, and
+      # `scripts/update-tracker.js` writes `public/script.js` ONLY when `COLLECT_API_ENDPOINT` is set — which this
+      # Blueprint does not set. So a read-only root filesystem may hold: `false` is what the verification lane
+      # should try (the Prisma CLI's writes and the server's cache writes are the unverified part).
       writableRootFilesystem: true
       probes:
         startup: { http: /api/heartbeat, periodSeconds: 5, failureThreshold: 60 } # verified: returns {"ok":true}
@@ -58,7 +68,9 @@ spec:
       resources: { cpu: 250m, memory: 512Mi, memoryLimit: 1Gi } # TODO(verify): measure
 
   dependencies:
-    # The upstream compose file uses Postgres 15. TODO(verify): the minimum supported major version.
+    # The upstream compose file uses Postgres 15. Upstream documents "A PostgreSQL database version v12.14+"
+    # (README L31) and `scripts/check-db.js` L8-L9 / L63-L66 refuses to start below `9.4.0`. The Blueprint asks
+    # for 16; the two are compatible, 16 being far above both floors.
     postgres: { version: '16', directUrl: true } # verified: migrations prefer DIRECT_DATABASE_URL when set
 
   env:
@@ -125,16 +137,32 @@ spec:
         expect: { status: [200], bodyNotContains: ['localhost:3000'] }
       }
     # The default credential must be refused once bootstrap-admin has run.
-    # TODO(verify, APW-06): smoke `http` gains a request body; until then the verification lane asserts this.
-    # - { name: default-admin-refused, http: { method: POST, path: /api/auth/login, body: { username: admin, password: umami } }, expect: { status: [401] } }
+    # verified: smoke `http` takes a JSON body, POST only (schema.md §16, ≤ 16 KiB). `src/app/api/auth/login/route.ts`
+    # L26 answers `unauthorized()` for a wrong credential, and `src/lib/response.ts` L20-L30 makes that 401.
+    - {
+        name: default-admin-refused,
+        http: { method: POST, path: /api/auth/login, body: { username: admin, password: umami } },
+        expect: { status: [401] }
+      }
 
-  # Only meaningful after switching to `strategy: dockerfile`. TODO(verify): the upstream's own check commands.
+  # Only meaningful after switching to `strategy: dockerfile`: with `strategy: image` there is no Build to check.
+  # verified from the upstream's own CI (`.github/workflows/ci.yml` at v3.4.0 — Node 22, pnpm 12.3.4,
+  # `DATABASE_URL` = a dummy and `SKIP_DB_CHECK: 1`) and from `package.json` (`test` = `vitest run`, with a
+  # `pretest` codegen step; `lint` = `biome lint .`; `engines.pnpm` = 12.3.4). The upstream Dockerfile builds with
+  # a dummy `DATABASE_URL` (L40), so the dockerfile variant needs NO build service. Enable both when the strategy
+  # changes:
+  # - { name: test, command: 'pnpm install --frozen-lockfile && pnpm test', required: true, timeoutSeconds: 1800 }
+  # - { name: lint, command: 'pnpm install --frozen-lockfile && pnpm lint', required: false, timeoutSeconds: 900 }
   checks: []
 
   agents:
     instructionFiles: []
     maxPullRequestChangedLines: 400
 
+  # TODO(verify, APW-03): applying this Blueprint with `source.relation: link` makes rule R13
+  # (`upstream_sync_requires_upstream`) an error and aborts apply, so apply must drop `upstreamSync` — and
+  # `upstreamPullRequests.enabled` — for that relation. ACCEPTANCE.md E2E-03 links the long-lived Umami repository,
+  # so that is the path the nightly lane takes; a fork keeps the weekly sync below.
   upstreamSync:
     schedule: '0 6 * * 2'
     mode: merge

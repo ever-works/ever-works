@@ -1,0 +1,35 @@
+# GOLDEN — cal-diy · target your-cluster · NetworkPolicy `ew-allow-ingress`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml (sha256 538a1389bc4dfc0f8fab31821d6e78aca2a0622d1f0e55fec1794433b646c16a)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.10 — the primary web component (web) on its declared port, from the ingress controller namespace.
+# Spec      : APW-06 spec.md FR-20 (deny all; ingress controller to the primary web port; pods to each other;
+# Spec      : DNS; the internet except private ranges; the app’s own dependencies; its public address when
+# Spec      : `needsHairpin`), FR-21 (enforcement is probed after each rollout)
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    name: ew-allow-ingress
+    namespace: ew-cal-diy-11111111
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: cal-diy
+        ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+        ever-works.io/kind: app
+spec:
+    podSelector:
+        matchLabels:
+            ever-works.io/component: web
+    policyTypes:
+        - Ingress
+    ingress:
+        - from:
+              - namespaceSelector:
+                    matchLabels:
+                        kubernetes.io/metadata.name: ingress-nginx
+          ports:
+              - port: 3000
+                protocol: TCP

@@ -1,0 +1,95 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://raw.githubusercontent.com/ever-works/platforms/main/schema/platforms.schema.json",
+	"title": "Ever platform catalog",
+	"description": "The catalog the App Launcher reads at runtime (APW-11 FR-8…FR-14). Mirrors the zod rules of APW-11 plan §5.2 one for one; `.github/workflows/validate.yml` enforces the two rules JSON Schema cannot express on its own — unique ids and the icon byte cap.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schemaVersion", "catalogVersion", "platforms"],
+	"properties": {
+		"$comment": {
+			"type": "string",
+			"description": "Free-form note for humans. Ignored by every reader."
+		},
+		"schemaVersion": {
+			"const": 1,
+			"description": "Bumped only for a breaking change to this file's shape."
+		},
+		"catalogVersion": {
+			"type": "string",
+			"pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+			"description": "Surfaced to the client verbatim (AppLauncherListResponse.meta.catalogVersion) and tagged in the repository."
+		},
+		"platforms": {
+			"type": "array",
+			"minItems": 1,
+			"maxItems": 24,
+			"description": "At most 24 entries: APW-11 FR-11 drops anything past the 24th, so CI refuses the 25th instead of letting it disappear silently.",
+			"items": {
+				"$ref": "#/$defs/platform"
+			}
+		}
+	},
+	"$defs": {
+		"platform": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "description", "icon", "order", "status", "urls"],
+			"properties": {
+				"id": {
+					"type": "string",
+					"pattern": "^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$",
+					"description": "Stable id. Becomes the item key `platform:<id>` and the preference row's itemKey, so it is never renamed — a rename loses every pin on that platform."
+				},
+				"name": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 40
+				},
+				"description": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 80
+				},
+				"icon": {
+					"type": "string",
+					"pattern": "^icons/[a-z0-9-]+\\.(svg|png)$",
+					"description": "Path inside this repository. The reader inlines the bytes as a data URI (≤ 16 KB), and an SVG is rejected when it contains `<script`, `on…=`, `javascript:` or `<foreignObject` (APW-11 FR-14)."
+				},
+				"order": {
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 9999,
+					"description": "Sort key; ties break by name (APW-11 FR-11)."
+				},
+				"status": {
+					"enum": ["available", "beta"]
+				},
+				"urls": {
+					"type": "object",
+					"additionalProperties": false,
+					"minProperties": 1,
+					"description": "One address per environment. All three keys are supported and each is optional: an entry without an address for the environment the installation is running in is simply not shown (APW-11 FR-10, ACC-11-05).",
+					"properties": {
+						"production": {
+							"$ref": "#/$defs/httpsUrl"
+						},
+						"stage": {
+							"$ref": "#/$defs/httpsUrl"
+						},
+						"develop": {
+							"$ref": "#/$defs/httpsUrl"
+						}
+					}
+				}
+			}
+		},
+		"httpsUrl": {
+			"type": "string",
+			"format": "uri",
+			"pattern": "^https://",
+			"maxLength": 253,
+			"description": "https only — `http:`, `javascript:`, `data:` and every other scheme are refused at validation time and again at render time (APW-11 FR-32, S16)."
+		}
+	}
+}

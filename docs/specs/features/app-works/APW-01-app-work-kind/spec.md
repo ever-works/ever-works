@@ -10,7 +10,8 @@
 **Created**: 2026-09-17
 **Last updated**: 2026-09-17
 **Owner**: Product
-**Size**: L · **Depends on**: APW-02 (P0, P1), APW-03 (P1) · **Depended on by**: APW-04…06, 08, 09, 11, 13
+**Size**: L · **Depends on**: APW-02 (P0, P1), APW-03 (P1 **and its Wave 1 catalog seam in P2**), APW-06 (T1–T3),
+APW-13 (P0) · **Depended on by**: APW-04…06, 08, 09, 11, 13
 
 > **Additive-only (program rule 1).** Nothing here removes, renames or loosens an existing surface. The
 > **Repository Work** keeps every refusal it has today, its create form, its chip and its 409 rule. Every
@@ -22,6 +23,11 @@
 > R-3 (license classes at creation), R-4 (the first write into the Work Repository), R-6 (the kind switch refuses
 > every client), R-7 (Builds and App environment capabilities), R-12 (deploy target **None**) and R-15 (deleting an
 > App Work). Where older text in this epic disagreed, the resolution wins and the text below was aligned.
+
+> **Merge-order correction (2026-09-17).** This epic compiles against symbols APW-03 ships in **P2**, APW-06 ships
+> in **T1–T3** and APW-13 ships in **P0**. Those are named task by task in [`tasks.md`](./tasks.md) and ordered
+> ahead of this epic's P1 in the program merge order; nothing was removed from this epic's own phases. The
+> per-phase list is in [plan §11](./plan.md).
 
 ---
 
@@ -234,6 +240,24 @@ copy only when the member ticks that separate box and types its name.
   opens a new one.
 - **S33 — Someone else's App Work.** No message reveals another account's App Work; conflicts name only the repository.
 
+- **S34 — A Blueprint the member never named.** **Given** the App form is open on **Paste a URL** and the member
+  pastes `acme/tasks-app`, which the Apps catalog lists, **when** the preview renders, **then** the Blueprint badge
+  reads **Verified Blueprint** and creating the App Work records that Blueprint on it — the member never picks it,
+  and a later reader sees which Blueprint applies and how it was matched. Clearing the URL clears the match.
+
+- **S35 — Values I already know, typed before the app exists.** **Given** a Blueprint whose App spec prompts for a
+  mail server and an admin password, **when** the preview renders, **then** the form shows those prompts with their
+  descriptions and which of them are required; **then** the member types them and presses **Fork and create App
+  Work**, and the values are stored encrypted on the App Work once its App spec exists, so the first deploy uses
+  them without the member typing them again. Leaving a required prompt empty keeps the submit button disabled with
+  **"Fill in the values the app needs first."**; no prompt is ever rendered with a value already in it.
+
+- **S36 — Reconnecting a workspace does not create App Works.** **Given** a workspace export whose Works include a
+  crafted entry claiming kind `app`, **when** the member imports it, **then** no App Work is created or converted:
+  the entry keeps the kind it has today (or is skipped when it has none), the import report lists it as skipped with
+  **"App Works aren't restored by import — create them from the repository URL."**, and no cluster workload, build or
+  repository write happens.
+
 ## 4. Functional requirements
 
 Every threshold below is a number on purpose.
@@ -263,15 +287,23 @@ Every threshold below is a number on purpose.
   preview.
 - **FR-6.** URL parsing MUST reuse the Repository Work rules exactly: GitHub only, `owner/repo` only, no
   credentials, query or fragment, at most 400 characters.
-- **FR-7.** Inspect MUST make at most 15 provider API calls, complete within 8 seconds at p95, cache its
-  answer per member and repository for 60 seconds, and be rate-limited to 30 requests per minute per member.
+- **FR-7.** Inspect MUST make at most 15 provider API calls — the existing-fork scan of FR-9 counting toward that
+  same budget — complete within 8 seconds at p95, cache its answer per member and repository for 60 seconds, and be
+  rate-limited to 30 requests per minute per member.
 - **FR-8.** When the Blueprint or license lookup is unavailable, inspect MUST still answer, with the
   Blueprint marked unavailable and the license class **unknown** — never a guessed class. The license chip
   states what the class allows (Resolution R-3): **green** — hosting allowed on every target; **amber** and
   **red** — Your cluster after the owner's attestation (amber reaches Ever Works Apps only with a recorded
   upstream agreement, red never does); **unknown** — treated as needing attestation.
-- **FR-9.** Existing-fork detection MUST cover the caller's account and every organization offered in
-  **Fork into** (up to 30 in P1, all in P2), and MUST recognise a fork by its upstream network, not by name.
+- **FR-9.** Existing-fork detection MUST recognise a fork by its upstream network, not by name. Within the FR-7
+  call budget it MUST check the caller's own account first, then the organizations offered in **Fork into** in A–Z
+  order (up to 30 offered in P1, up to 200 in P2). The fixed checks that precede the scan are bounded so the scan
+  always has room: repository read 1, default-branch read at most 1 (only when the repository reports size 0),
+  caller read 1, organizations read 1, `.gitattributes` read 1 — at most 5. Each owner is charged the calls it
+  actually made and a new owner is started only while at least 3 calls remain. An owner the budget did not reach
+  MUST stay selectable with its availability unchanged, MUST be reported as **not checked** — never as having no
+  fork, and never with a reason code — and the response MUST say the scan was incomplete. Creating into that owner
+  still adopts an existing fork (FR-19, APW-02 FR-10).
 - **FR-10.** A 403 from GitHub MUST be classified — not found, SAML authorization required, third-party
   access restricted, rate limited — and never reported as a generic "no access".
 
@@ -348,9 +380,17 @@ Every threshold below is a number on purpose.
   a default branch it did not create. When a Blueprint was matched or picked, the source block and the
   Blueprint's App spec MUST land together, in that one commit or that one pull request (the Blueprint
   application itself belongs to APW-03); the Blueprint applied MUST be the one the member saw in the preview.
+- **FR-29b.** The Blueprint an App Work carries MUST be settled at create time by the server, from the resolution
+  order the program fixed (manifest match, then alias, then fork network, then probe, then an explicit id) — no
+  client has to send one. When the member did send an id and it is not the one the server resolved, creation MUST
+  be refused with `blueprint_mismatch` and nothing is written. Which Blueprint applies, and how it was matched,
+  MUST be persisted on the App Work's source record and returned to every caller, so chat, MCP and command-line
+  callers see the same Blueprint as the form.
 - **FR-29a.** When no Blueprint applies and the repository carries no valid App spec, the system MUST start
   the App Provisioner (APW-04) once the source is on the default branch (after the commit, or after the setup
-  pull request is merged), and MUST NOT start it twice for one App Work.
+  pull request is merged), and MUST NOT start it twice for one App Work. A file holding only the source block is
+  **not** an App spec, so the minimal path always starts provisioning; the question is asked of the commit the
+  source was recorded on, synchronously, and never of the asynchronous evaluation state.
 - **FR-30.** While a setup pull request is open the App Work MUST show as waiting for that merge; once it is
   merged the App Work MUST become ready; closed without merging, the App Work MUST show that and offer **Try
   again**, which opens a new setup pull request.
@@ -367,7 +407,13 @@ Every threshold below is a number on purpose.
   the managed tier is open). Inspect MUST report each target's availability and reason so the form never
   guesses.
 - **FR-34.** An App Work MUST NOT inherit a deploy provider from onboarding defaults. The deploy target
-  chosen at creation MUST be the target the App runtime (APW-06) shows and uses until the member changes it.
+  chosen at creation MUST be the target the App runtime (APW-06) shows and uses until the member changes it: the
+  runtime's target is **derived once**, when its state row is first created, from the plugin id the create request
+  persisted, and a row that already exists is never re-derived. **Ever Works Apps** is persisted as the
+  `ever-works-apps` plugin chosen by capability — never as the platform's older managed-hosting id, which belongs
+  to website hosting and is counted by its own quota. An id that is unknown, disabled or not apps-capable derives
+  to **None**. Until the App runtime merges, the Deploy surface reads the target from its route and treats a missing
+  route as **None** (FR-40a).
 - **FR-35.** A request naming **Ever Works Apps** while the managed tier is disabled MUST be refused.
 - **FR-36.** Until the App runtime (APW-06) handles App Works, a deploy request for an App Work MUST be
   refused with **"Deploying App Works arrives with the App runtime."** rather than reaching the website
@@ -390,6 +436,11 @@ Every threshold below is a number on purpose.
   mean "keep stored data" for every caller. The removal MUST run before the App Work itself is deleted; while it
   runs the App Work reads **Deleting…** (APW-06). If the workloads cannot be removed, the App Work MUST still be
   deleted and the member MUST be told what may remain on which target.
+- **FR-40b.** The typed-slug confirmation of FR-40a MUST be enforced by the server, not only by the web dialog:
+  a request that asks to delete stored data without a confirmation equal to the App Work's slug MUST be refused
+  with `422 confirmation_mismatch` **before** the App runtime is asked to remove anything, for every caller — web,
+  chat, MCP server and command-line client alike. The MCP server MUST NOT expose the stored-data flag or its
+  confirmation as tool arguments at all, so no agent can destroy stored data through it.
 
 ### 4.9 Writers that refuse an App Work
 
@@ -412,10 +463,16 @@ Every threshold below is a number on purpose.
 - **FR-46a.** The App form MUST offer two ways in — **Paste a URL** and **Browse the Apps catalog** (the
   catalog browser belongs to APW-03) — and a catalog pick MUST carry its Blueprint into inspect and create.
 - **FR-47.** The **App** chip MUST appear on `/new` and `/works/new` when `works-app` resolves true. Unlike
-  other kinds, the flag MUST fail closed for `app`: a missing flag hides the chip.
+  other kinds, the flag MUST fail closed for `app`: a missing flag hides the chip — but **only when the web app
+  actually has a flag provider configured**. With no PostHog client at all (the PR e2e lane, local development and
+  every self-hosted install), the web server MUST read the same runtime instance setting the API uses
+  (`EVER_WORKS_APP_WORKS_ENABLED`, read server-side at request time, never a build-time public variable), so the
+  chip and the API always agree: the switch on ⇒ the chip shows, the switch unset or `false` ⇒ the chip is hidden.
+  A configured provider keeps the other kinds' fail-open behaviour untouched.
 - **FR-48.** The API MUST refuse creating an App Work and inspecting a repository for one unless the
   instance setting enables App Works (default off), for every client — web app, chat, MCP server and
-  command-line client alike (Resolution R-6).
+  command-line client alike (Resolution R-6). **Workspace import and restore are clients too**: a restored or
+  imported Work MUST NEVER be created as, or converted into, kind `app` (FR-54).
 - **FR-49.** The chat create tool MUST accept the mode and target owner and MUST ask for confirmation
   before any App Work is created, naming the repository that will be created or written.
 - **FR-50.** The MCP server MUST expose inspect as a read-only tool and accept the new create fields.
@@ -424,6 +481,21 @@ Every threshold below is a number on purpose.
 - **FR-52.** Every user-visible string MUST be translatable, with keys present in all locale files.
 - **FR-53.** The product MUST record, without repository names or tokens: inspect run (mode offered,
   reasons), create started (mode, deploy target), create outcome (reason code), preparing duration.
+- **FR-54.** Workspace import and workspace restore MUST NEVER create a Work with kind `app`, and MUST NEVER
+  change an existing Work's kind to or from `app`. An imported entry that claims kind `app`, or that would change
+  another Work into one, MUST be treated as if it carried no new kind — the Work keeps the kind it has — and the
+  import report MUST list it as skipped with **"App Works aren't restored by import — create them from the
+  repository URL."** No import path may bypass the instance setting (FR-48), the create-time re-validation (FR-12)
+  or the source record this epic writes.
+- **FR-55.** When a Blueprint's App spec declares prompted values, the preview MUST show them — name,
+  description and whether each is required — and the create request MUST be able to carry the member's answers,
+  write-only, so that they are never echoed back by any read. Captured answers MUST be stored encrypted on the App
+  Work as soon as its App spec exists, as prompted-origin values, and the first deploy MUST use them; a value the
+  member leaves empty for a required prompt MUST NOT block creation, and the app's own readiness MUST report the
+  missing value instead. A prompt is never pre-filled with a stored value.
+- **FR-56.** A pasted URL, a chat call, an MCP call and a command-line call MUST all end with the same Blueprint
+  decision: the server resolves the Blueprint itself (FR-29b) and no client is required to send an id. A caller
+  that names a Blueprint the server did not resolve MUST be refused with `blueprint_mismatch` and nothing written.
 
 ## 5. Key entities
 
@@ -495,35 +567,41 @@ All copy below is final English copy, keyed for translation.
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Element                      | Copy                                                                                                                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stars                        | `{count, plural, =1 {1 star} other {# stars}}`                                                                                                                           |
-| Default branch               | `Default branch: {branch}`                                                                                                                                               |
-| Size (shown when > 100 MB)   | `Large repository ({size})`                                                                                                                                              |
-| Moved                        | `Moved to {fullName}`                                                                                                                                                    |
-| Is a fork                    | `This repository is a fork of {parent}.`                                                                                                                                 |
-| Own fork                     | `This is your fork of {parent}. Ever Works will follow {parent} as upstream.`                                                                                            |
-| Public fork note             | `Forks of public repositories are public.`                                                                                                                               |
-| Archived                     | `This repository is archived. Upstream sync stays off.`                                                                                                                  |
-| License chip                 | `License: {spdx}` · `License: not detected`                                                                                                                              |
-| License class (R-3)          | `Hosting allowed` (green) · `Your cluster, after you attest the license` (amber, red) · `License unknown — you'll attest it before deploying` (unknown)                  |
-| Blueprint badge              | `Verified Blueprint` · `Blueprint available` · `No Blueprint — an agent will work out how to run it` · `Blueprint check unavailable`                                     |
-| Link                         | `Link` — `Use this repository as it is. You can push to it, so changes land here directly.`                                                                              |
-| Link (on own fork)           | `Link — don't follow upstream`                                                                                                                                           |
-| Fork                         | `Fork` — `Make your own fork. You can sync it with upstream and propose changes back.`                                                                                   |
-| Fork into                    | `Fork into`                                                                                                                                                              |
-| Existing fork                | `You already have a fork: {fullName}. Ever Works will use it.`                                                                                                           |
-| Private copy                 | `Private copy` — `Make a private repository with the same code.`                                                                                                         |
-| Private copy trade-off       | `A private copy is not linked to the original on GitHub, so it can't open pull requests to the original project. Upstream changes arrive as pull requests in your copy.` |
-| Link setup note              | `Ever Works opens a pull request that adds one file, .works/works.yml. Merge it to finish.`                                                                              |
-| Existing fork setup note     | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml.`                                                                             |
-| Deploy target title          | `Where should it run?`                                                                                                                                                   |
-| None (R-12)                  | `None — don't deploy yet` — `You can pick a target later.`                                                                                                               |
-| Your cluster                 | `Your cluster` — `Run it on your own Kubernetes cluster. You'll add the connection on the Deploy tab.`                                                                   |
-| Ever Works Apps              | `Ever Works Apps` — disabled: `Coming soon — managed hosting for apps isn't open yet.`                                                                                   |
-| Submit (per mode)            | `Link and create App Work` · `Fork and create App Work` · `Copy and create App Work`                                                                                     |
-| Submit pending               | `Creating…`                                                                                                                                                              |
-| Success (link / fork / copy) | `App Work created.` · `Fork requested — we'll tell you when it's ready.` · `Copy started — we'll tell you when it's ready.`                                              |
+| Element                        | Copy                                                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Stars                          | `{count, plural, =1 {1 star} other {# stars}}`                                                                                                                           |
+| Default branch                 | `Default branch: {branch}`                                                                                                                                               |
+| Size (shown when > 100 MB)     | `Large repository ({size})`                                                                                                                                              |
+| Moved                          | `Moved to {fullName}`                                                                                                                                                    |
+| Is a fork                      | `This repository is a fork of {parent}.`                                                                                                                                 |
+| Own fork                       | `This is your fork of {parent}. Ever Works will follow {parent} as upstream.`                                                                                            |
+| Public fork note               | `Forks of public repositories are public.`                                                                                                                               |
+| Archived                       | `This repository is archived. Upstream sync stays off.`                                                                                                                  |
+| License chip                   | `License: {spdx}` · `License: not detected`                                                                                                                              |
+| License class (R-3)            | `Hosting allowed` (green) · `Your cluster, after you attest the license` (amber, red) · `License unknown — you'll attest it before deploying` (unknown)                  |
+| Blueprint badge                | `Verified Blueprint` · `Blueprint available` · `No Blueprint — an agent will work out how to run it` · `Blueprint check unavailable`                                     |
+| Link                           | `Link` — `Use this repository as it is. You can push to it, so changes land here directly.`                                                                              |
+| Link (on own fork)             | `Link — don't follow upstream`                                                                                                                                           |
+| Fork                           | `Fork` — `Make your own fork. You can sync it with upstream and propose changes back.`                                                                                   |
+| Fork into                      | `Fork into`                                                                                                                                                              |
+| Existing fork                  | `You already have a fork: {fullName}. Ever Works will use it.`                                                                                                           |
+| Private copy                   | `Private copy` — `Make a private repository with the same code.`                                                                                                         |
+| Private copy trade-off         | `A private copy is not linked to the original on GitHub, so it can't open pull requests to the original project. Upstream changes arrive as pull requests in your copy.` |
+| Link setup note                | `Ever Works opens a pull request that adds one file, .works/works.yml. Merge it to finish.`                                                                              |
+| Existing fork setup note       | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml.`                                                                             |
+| Link setup note (Blueprint)    | `Ever Works opens a pull request that adds .works/works.yml and the Blueprint's files. Merge it to finish.`                                                              |
+| Existing fork note (Blueprint) | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml and the Blueprint's files.`                                                   |
+| Prompts title                  | `Values this app needs`                                                                                                                                                  |
+| Prompt hint                    | `The {name} Blueprint asks for these. You can change them later in Settings.`                                                                                            |
+| Prompt required marker         | `Required`                                                                                                                                                               |
+| Prompts incomplete             | `Fill in the values the app needs first.`                                                                                                                                |
+| Deploy target title            | `Where should it run?`                                                                                                                                                   |
+| None (R-12)                    | `None — don't deploy yet` — `You can pick a target later.`                                                                                                               |
+| Your cluster                   | `Your cluster` — `Run it on your own Kubernetes cluster. You'll add the connection on the Deploy tab.`                                                                   |
+| Ever Works Apps                | `Ever Works Apps` — disabled: `Coming soon — managed hosting for apps isn't open yet.`                                                                                   |
+| Submit (per mode)              | `Link and create App Work` · `Fork and create App Work` · `Copy and create App Work`                                                                                     |
+| Submit pending                 | `Creating…`                                                                                                                                                              |
+| Success (link / fork / copy)   | `App Work created.` · `Fork requested — we'll tell you when it's ready.` · `Copy started — we'll tell you when it's ready.`                                              |
 
 ### 6.3 Unavailable reasons (exact copy per reason code)
 
@@ -559,17 +637,18 @@ All copy below is final English copy, keyed for translation.
 The relation line sits in the header meta row right after the **App** chip; the status card sits above the
 Overview tiles and disappears when the App Work is ready.
 
-| Element              | Copy                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Header relation      | `Upstream: {fullName}` · `Fork: {fullName}` · `Private copy: {fullName}` · `Linked: {fullName}`                                 |
-| Preparing (fork)     | `Preparing your fork` — `GitHub is creating {fullName}. This usually takes under a minute; large repositories can take longer.` |
-| Preparing (copy)     | `Preparing your private copy` — `Copying {upstream} into {fullName}. Larger repositories take longer.`                          |
-| Preparing (link)     | `Finishing setup` — `Opening a pull request that adds .works/works.yml to {fullName}.`                                          |
-| Setup PR closed      | `The setup pull request was closed without merging.` · `Try again`                                                              |
-| Timed out            | `Your fork is taking longer than 15 minutes.` · `Try again` · `Open on GitHub`                                                  |
-| Failed (access)      | `Ever Works lost access to GitHub while preparing this App Work.` · `Reconnect GitHub` · `Try again`                            |
-| Failed (other)       | `Preparing this App Work failed: {reason}` · `Try again`                                                                        |
-| Waiting for setup PR | `Merge the setup pull request to finish.` · `Open pull request`                                                                 |
+| Element                        | Copy                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Header relation                | `Upstream: {fullName}` · `Fork: {fullName}` · `Private copy: {fullName}` · `Linked: {fullName}`                                       |
+| Preparing (fork)               | `Preparing your fork` — `GitHub is creating {fullName}. This usually takes under a minute; large repositories can take longer.`       |
+| Preparing (copy)               | `Preparing your private copy` — `Copying {upstream} into {fullName}. Larger repositories take longer.`                                |
+| Preparing (link)               | `Finishing setup` — `Opening a pull request that adds .works/works.yml to {fullName}.`                                                |
+| Preparing (Blueprint applying) | `Applying the {name} Blueprint` — `Ever Works is preparing your App Work and will write .works/works.yml with the Blueprint's files.` |
+| Setup PR closed                | `The setup pull request was closed without merging.` · `Try again`                                                                    |
+| Timed out                      | `Your fork is taking longer than 15 minutes.` · `Try again` · `Open on GitHub`                                                        |
+| Failed (access)                | `Ever Works lost access to GitHub while preparing this App Work.` · `Reconnect GitHub` · `Try again`                                  |
+| Failed (other)                 | `Preparing this App Work failed: {reason}` · `Try again`                                                                              |
+| Waiting for setup PR           | `Merge the setup pull request to finish.` · `Open pull request`                                                                       |
 
 ### 6.5 Delete dialog
 
@@ -652,6 +731,28 @@ Each item is an acceptance scenario collected into [ACCEPTANCE.md](../ACCEPTANCE
       by default; stored data is deleted only when **Also delete stored data** is ticked and the App Work's slug typed;
       that choice never changes the fork decision, and a failed removal still deletes the App Work and names what
       remains (FR-40a, Resolution R-15).
+- [ ] **ACC-01-21** — A pasted URL the Apps catalog lists is created with that Blueprint recorded and applied
+      even though no client sent an id; a caller that names a different Blueprint gets `blueprint_mismatch` with
+      nothing written; the response tells every client which Blueprint applies and how it was matched (S34, FR-29b,
+      FR-56).
+- [ ] **ACC-01-22** — A Blueprint's prompted values render on the preview with their descriptions and required
+      markers, are carried write-only by the create request, are stored encrypted once the App spec exists, and
+      never appear in any read response (S35, FR-55).
+- [ ] **ACC-01-23** — A workspace import whose entry claims kind `app`, or would convert another Work into one,
+      creates or converts nothing, keeps the kind the Work has, lists the entry as skipped with its copy, and
+      bypasses neither the instance setting nor create-time re-validation (S36, FR-48, FR-54).
+- [ ] **ACC-01-24** — Asking to delete stored data without a server-side confirmation equal to the App Work's slug
+      is refused with `422 confirmation_mismatch` before the App runtime is asked for anything, and the MCP delete
+      tool exposes neither the stored-data flag nor its confirmation (FR-40b).
+- [ ] **ACC-01-25** — With no PostHog provider configured the **App** chip follows the runtime instance setting
+      read server-side (switch on ⇒ chip shown, unset ⇒ hidden) while every other `works-<kind>` flag keeps its
+      fail-open behaviour; with a provider configured, a missing flag hides the chip (FR-47).
+- [ ] **ACC-01-26** — Inspect never exceeds its 15-call budget, checks the caller's account first, reports an owner
+      it could not reach as **not checked** with the scan marked incomplete and no reason code, and creating into
+      that owner still adopts a fork that exists there (FR-7, FR-9).
+- [ ] **ACC-01-27** — The deploy target chosen at creation survives as the App runtime's target, derived once from
+      the persisted plugin id: **None** for nothing, **Your cluster** for an apps-capable plugin, **Ever Works
+      Apps** for the apps-tier plugin — and never through the platform's website managed-hosting id (FR-34).
 
 ## 9. Open questions
 

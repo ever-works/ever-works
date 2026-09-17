@@ -181,11 +181,13 @@ sequenceDiagram
 `POST api/admin/apps-tier/works/:workId/quarantine` → `AppsTierQuarantineService.request()` writes an
 `apps_tier_quarantines` row (`requested`) and **synchronously** patches `Work.spec.desiredState =
 quarantined` with `quarantine.requestId` (one API call, ≤ 2 s) → `202`. The controller sequences:
-(1) apply namespace `quarantine` NetworkPolicy denying all ingress and egress and record
-`status.quarantine.networkIsolatedAt`; (2) record replica counts, scale Deployments/StatefulSets to 0,
+(1) label every pod template `hosting.ever.works/quarantined: "true"` so the `allow-*` policies of §3.4 stop selecting
+the pods, apply `quarantine` (deny-all) and record `status.quarantine.networkIsolatedAt` and `policiesSuspended[]`;
+(2) record replica counts, scale Deployments/StatefulSets to 0,
 suspend CronJobs and running Jobs, record `scaledToZeroAt`; (3) switch the App Work's hosts to the
 unavailable backend, record `ingressDisabledAt`. `apps-tier-gate-watch` (or the admin page's poll) copies
-the timestamps into the row. Release reverses (3)→(2)→(1) from the recorded counts. A detector
+the timestamps into the row. Release reverses (3)→(2)→(1) from the recorded counts, re-applying the tenant template's
+policies and clearing the quarantine label. A detector
 quarantine (FR-39) is applied by the controller itself with `status.quarantine.source = detector`; the
 platform mirrors it on the next watch. Nothing in `packages/agent/src/agents/run-kill-switch.ts`,
 `packages/agent/src/agents/agent-brake.service.ts` or `packages/agent/src/safety/workspace-pause.service.ts` calls
@@ -203,7 +205,8 @@ The controller: (1) applies the `quarantine` NetworkPolicy; (2) deletes Deployme
 every NetworkPolicy except `default-deny` and `quarantine`, and the env Secret; (3) removes the hosts from
 `allowed-hosts`; (4) labels the namespace `hosting.ever.works/retained-until=<+30 d>` and sets `status.phase` to
 `Removed`. Only when `spec.dataDeletion` is set **and** every `status.dependencies[]` entry reports `released`
-(APW-07's managed providers deprovision first) does it delete the PVCs and then the namespace, recording
+(APW-07's managed providers deprovision first, through `IAppsTierProvider.releaseDependencies` — added, APW10-G01) does
+it delete the PVCs and then the namespace, recording
 `status.removal.dataDeletedAt`. The
 platform deletes the `Work` object only after `dataDeletedAt` is set or the 30-day retention was cleared by the
 operator action outside this epic.
@@ -230,7 +233,8 @@ spec:
   organizationId: <uuid|null>
   generation: 42                     # platform deploy generation; monotonically increasing
   quotaProfile: starter              # must exist in zone config
-  desiredState: running | quarantined | removed          # removed: §2.6 (Resolution R-15)
+  desiredState: running | paused | quarantined | removed   # removed: §2.6 (R-15); paused: owner Pause (APW06-G04)
+  pausedReplicas: { web: 2, worker: 1 } | null   # recorded by the platform, restored by the controller on resume
   dataDeletion: { requestedAt, requestedByUserId } | null  # set only after the owner confirmed "Also delete stored data"
   quarantine: { requestId, category: abuse|security|billing|legal|pause-all|drill, requestedAt }
   egressThrottle: false              # FR-36 100 % state
@@ -242,20 +246,24 @@ spec:
                   resources: { cpu, memory, memoryLimit }, probes: { startup, readiness, liveness },
                   volumes: [ { name, path, size } ] ≤ 4, writableRootFilesystem } ]   # ≤ 8
   jobs:  [ { name, when: pre-deploy|first-deploy|post-deploy, component, command[] | http, timeoutSeconds ≤ 3600 } ]  # ≤ 10
-  cron:  [ { name, schedule (≥ 5 min), http: { method, path, authEnv } } ]            # ≤ 10
+  cron:  [ { name, schedule (≥ 5 min), http: { method, path, authEnv, authScheme: bearer|raw } } ]   # ≤ 10; authScheme per CONTRACTS C2
+  smoke: [ { name, component, path, method, expect: { status, bodyContains[], bodyNotContains[] }, latencyMs, firstDeployOnly } ]  # ≤ 20
   hosts: [ { host, kind: managed|custom, customHostnameRef } ]                          # ≤ 20
   env:   { sealed: <base64 ≤ 256 KiB>, names: [ ≤ 200 ] }
-  dependencies: [ { kind: postgres|redis|objectStorage, ref } ]                         # resolved in zone (APW-07)
+  dependencies: [ { kind: postgres|redis|objectStorage|smtp, ref } ]                    # resolved in zone (APW-07; `smtp` = the relay, GAP-22)
 status:
-  phase: Pending|Promoting|Provisioning|Ready|Degraded|Quarantined|Refused|Failed|Removed
+  phase: Pending|Promoting|Provisioning|Ready|Degraded|Paused|Quarantined|Refused|Failed|Removed
   observedGeneration: 42
   removal: { removedAt, retainedUntil, dataDeletedAt }   # §2.6
-  dependencies: [ { kind, ref, phase, lastBackupAt } ]    # APW-07 row in CONTRACTS §3; phase `released` gates data deletion
+  dependencies: [ { kind, ref, phase: pending|ready|failed|released, lastBackupAt, detail? } ]   # APW-07 row in CONTRACTS §3; phase `released` gates data deletion
   namespace: ewa-<first 20 hex of workId>
   refusal: { code, field }
   components: [ { name, readyReplicas, replicas, imageDigest } ]
+  jobs:  [ { name, when, runName, status: succeeded|failed|timeout|running, startedAt, completedAt, exitCode } ]   # GAP-25
+  smoke: [ { name, scope: in-cluster|public, status: passed|failed|skipped, httpStatus, latencyMs, failedExpectation?, found? ≤ 200 } ]   # GAP-25
+  deployPhase: prepare|pre-deploy-jobs|rollout|first-deploy-jobs|in-cluster-smoke|publish|public-smoke|post-deploy-jobs|cron|done   # GAP-25
   quarantine: { requestId, source: operator|detector, networkIsolatedAt, scaledToZeroAt,
-                ingressDisabledAt, replicasBefore: { web: 1 }, releasedAt }
+                ingressDisabledAt, replicasBefore: { web: 1 }, releasedAt, policiesSuspended: [ … ] }
   promotion: [ { component, digest, scan: { critical, criticalFixable, high }, signed, allowanceRef } ]
   policyRevision: <git sha>; controllerVersion: <semver>
   conditions: [ … standard ]
@@ -265,10 +273,25 @@ Whole object ≤ 512 KiB (validated by the controller **and** a CRD `x-kubernete
 Refusal codes: `SPEC_LIMIT_EXCEEDED`, `NAMESPACE_FIELD_FORBIDDEN`, `QUOTA_PROFILE_UNKNOWN`,
 `PLATFORM_CREDENTIAL_IN_ENV`, `IMAGE_NOT_DIGEST_PINNED`, `IMAGE_SCAN_BLOCKED`, `IMAGE_UNSIGNED`,
 `IMAGE_OUTSIDE_TENANT_REGISTRY`, `HOST_NOT_VERIFIED`, `HOST_CLAIMED`, `SEALED_PAYLOAD_INVALID`,
-`CRON_TOO_FREQUENT`, **`ISOLATION_NOT_ENFORCED`** — refused when the zone cannot prove the isolation the Work
+`CRON_TOO_FREQUENT`, `DEPENDENCY_TOKEN_UNKNOWN` (added, APW10-G01: a sealed env referencing an `ew-dep://` token the
+zone cannot resolve is refused rather than shipped with the placeholder in it), **`ISOLATION_NOT_ENFORCED`** — refused
+when the zone cannot prove the isolation the Work
 requires (sandbox runtime class, default-deny network policy, quota profile applied); APW-06 renders it as the
 Deployment ending `failed (isolation_not_enforced)`, so the two epics must spell it the same way. Degraded
 reasons include `IMAGE_RUNS_AS_ROOT`, `QUOTA_EXCEEDED`.
+
+**Refusal code → APW-06 outcome (added, APW10-G04).** The plugin maps every refusal to a result APW-06 already
+understands, so an owner never sees a bare code:
+
+| Zone refusal                                 | APW-06 result                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| `ISOLATION_NOT_ENFORCED`                      | `failed` with `AppFailureCode.isolation_not_enforced`                          |
+| `IMAGE_RUNS_AS_ROOT`                          | `failed` with `managed_root_forbidden`                                         |
+| `IMAGE_NOT_DIGEST_PINNED`, `IMAGE_SCAN_BLOCKED`, `IMAGE_UNSIGNED`, `IMAGE_OUTSIDE_TENANT_REGISTRY` | `failed` with `image_scan_blocked` (the reason text names which) |
+| `HOST_NOT_VERIFIED`, `HOST_CLAIMED`           | `failed` with `publish_failed`                                                 |
+| `DEPENDENCY_TOKEN_UNKNOWN`                    | `failed` with `env_source_unavailable`, naming the token's kind (never the token's value) |
+| `SPEC_LIMIT_EXCEEDED`, `NAMESPACE_FIELD_FORBIDDEN`, `QUOTA_PROFILE_UNKNOWN`, `CRON_TOO_FREQUENT`, `SEALED_PAYLOAD_INVALID`, `PLATFORM_CREDENTIAL_IN_ENV` | `failed` with `worker_failed` and the code in `failure.code` |
+| `status.phase: Quarantined` observed while `observedGeneration < spec.generation` | outcome `cancelled` with `cancelReason: 'quarantined'` → APW-06 stores `CANCELED` and shows **Cancelled — quarantined** (ACC-10-35) |
 
 ### 3.2 `SelfCheck`, `UsageReport`, `AbuseSignal`, `AppBuild`
 
@@ -308,6 +331,9 @@ rules:
       resources: [configmaps]
       resourceNames: [ever-works-apps-controller-public-key, ever-works-apps-zone-info]
       verbs: [get]
+    - apiGroups: ['']
+      resources: [pods, pods/log]          # added (APW10-G04): owner logs on the tier are impossible without it
+      verbs: [get, list]
     - apiGroups: [coordination.k8s.io]
       resources: [leases]
       resourceNames: [ever-works-apps-controller]
@@ -331,7 +357,39 @@ change `spec.workId` or add unknown fields.
 | NetworkPolicy `allow-edge-ingress`     | Ingress from the edge controller namespace to declared component ports only.                                                                                                                                                                                                                                                                                                                                |
 | NetworkPolicy `allow-internet-egress`  | `ipBlock 0.0.0.0/0 except [0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.168.0.0/16, 198.18.0.0/15, 224.0.0.0/4, 240.0.0.0/4]` plus the zone-config extra excepts; ports as `port`/`endPort` ranges that omit 25, 465, 587 and the zone-config mining ports. IPv6 egress: none unless the zone config enables `2000::/3` with the equivalent excepts. |
 | NetworkPolicy `allow-tenant-data`      | Egress to this Work's dependency endpoints (address:port pairs resolved in zone).                                                                                                                                                                                                                                                                                                                           |
-| NetworkPolicy `quarantine` (on demand) | Selects all pods; ingress `[]`, egress `[]`.                                                                                                                                                                                                                                                                                                                                                                |
+| NetworkPolicy `quarantine` (on demand) | Selects all pods; ingress `[]`, egress `[]`. **It is a second layer, not the mechanism** — see the rule below.                                                                                                                                                                                                                                                                                               |
+
+**Quarantine isolation that actually blocks (rewritten 2026-09-17, APW10-G02).** A NetworkPolicy only *adds* allowed
+traffic: an empty `quarantine` policy cannot take away what `allow-internet-egress` or `allow-edge-ingress` already
+grants, so the earlier design left quarantined pods with internet egress and edge ingress until they scaled to zero —
+and LG-18 proved isolation only by a timestamp the controller wrote itself. Every `allow-*` policy therefore carries a
+pod selector that excludes a quarantined pod:
+
+```yaml
+podSelector:
+    matchExpressions:
+        - { key: hosting.ever.works/quarantined, operator: NotIn, values: ['true'] }
+```
+
+The sequencer adds `hosting.ever.works/quarantined: "true"` to every pod template in step (2) and removes it on release;
+release re-applies the tenant template's policies from the template, so nothing is hand-restored. `status.quarantine`
+records `policiesSuspended[]` (the policy names whose selector excluded the pods) so the state is auditable rather than
+implied. `default-deny` and `quarantine` both keep selecting all pods, so the combination is genuinely deny-all.
+LG-18 gains a **real** probe (plan §3.7): a canary pod kept alive through the isolation window must see the public
+control and the edge path refused within 15 s, or the item fails with `QUARANTINE_NOT_ISOLATING` — a timestamp is no
+longer sufficient evidence. T4's golden files and T7's assertions change with it, and T11's kind job installs a CNI
+that enforces NetworkPolicy (the default kind CNI does not) so the refusal is observed, not assumed.
+
+**Renderer scope (added, APW10-G03).** The controller uses **only APW-06's workload builders** — component
+`Deployment`s, `Service`s, `Ingress`, command/runner `Job`s, `CronJob`s, `PVC`s and the env `Secret` — and
+**discards** the renderer's `Namespace`, `ServiceAccount`, `LimitRange`, `ResourceQuota` and `NetworkPolicy` objects.
+Tenancy objects come only from `tenant-template.ts` above. Without this rule the tenant namespace would receive two
+quotas, two default limits and an extra `ew-allow-egress` that widens the egress deny list — i.e. a dependency
+provisioned against one quota and a workload against another, and less isolation than either epic intended.
+Because APW-06 sends desired state and not a render input, the controller rebuilds one from `Work.spec` in
+`src/render/work-to-render-input.ts` (new) — including `env.values` (after unsealing and token substitution),
+`policy`, `ingress`, `hosts.previous` and `deploymentShort` — with a golden round-trip test against the plugin's
+`desired-state.mapper` so the two directions cannot drift.
 | ResourceQuota `profile`                | From the quota profile (spec FR-47), incl. `services.loadbalancers: 0`, `services.nodeports: 0`, `count/jobs.batch`, `count/cronjobs.batch`.                                                                                                                                                                                                                                                                |
 | LimitRange `defaults`                  | Default request 100m/128Mi, default limit 500m/512Mi, max per container from profile.                                                                                                                                                                                                                                                                                                                       |
 | Pull Secret `registry`                 | Read-only credential for `t-<id>` in the zone registry.                                                                                                                                                                                                                                                                                                                                                     |
@@ -370,6 +428,7 @@ of its canonical JSON; the controller recomputes live hashes for LG-22.
 | ConfigMap `ever-works-apps-controller-public-key` | PEM public key + key id                                                                                                                                                                                                                                                |
 | Secret `ever-works-apps-probe-targets`            | `{ privateRangeSentinels: {10/8: [...], 172.16/12: [...], 192.168/16: [...], 100.64/10: [...]}, platformEndpoints: [...] (≥ 3), publicControls: [...] (≥ 2), egressDenyAddresses: [...], miningPorts: [...], metadataAddresses: [...], controlPlaneEndpoints: [...] }` |
 | Secret `ever-works-apps-credential-fingerprints`  | HMAC-SHA256 key + list of fingerprints of platform/org credentials (FR-23)                                                                                                                                                                                             |
+| Secret `ever-works-apps-tenant-data-servers`      | **Added (APW10-G01, APW10-G19).** The tenant data servers the zone's dependency reconciler provisions on, plus the bucket-space and Redis endpoints: `{ postgres: { host, port, adminSecretRef, caRef? }, redis: { endpointTemplate, adminSecretRef }, objectStorage: { endpoint, region, adminSecretRef, bucketPrefixPattern, quotaGiB }, smtpRelay: { endpoint, credentialApiUrl, adminSecretRef } }`. Values are zone-only and never leave it; the platform holds none of them. |
 | ConfigMap `ever-works-apps-quota-profiles`        | Profiles pushed from the platform's profile table by the operator runbook (P2)                                                                                                                                                                                         |
 | Secret `ever-works-apps-sensor-test`              | The benign trigger the runtime sensor rule matches (LG-19)                                                                                                                                                                                                             |
 
@@ -389,20 +448,29 @@ of its canonical JSON; the controller recomputes live hashes for LG-22.
 | LG-11 | canary pod + controller | No file at the service-account token path; a canary env containing a planted fingerprint is `Refused`                      | `SA_TOKEN_PRESENT`, `PLANTED_CREDENTIAL_ADMITTED`                                                           |
 | LG-12 | platform                | §3.3 access reviews                                                                                                        | `CREDENTIAL_TOO_BROAD`                                                                                      |
 | LG-13 | dry-run + controller    | Unsigned digest refused; foreign registry image refused; zone-config vulnerable fixture digest refused at promotion        | `UNSIGNED_IMAGE_ADMITTED`, `FOREIGN_IMAGE_ADMITTED`, `VULNERABLE_IMAGE_PROMOTED`                            |
-| LG-14 | canary pod              | canary-a connects to canary-b's database endpoint with canary-a's credential → refused                                     | `CROSS_TENANT_DB_REACHABLE`                                                                                 |
+| LG-14 | canary pod              | canary-a connects to canary-b's database endpoint with canary-a's credential → refused; **plus, on canary-a's own database, a 21st connection is refused (`CONNECTION_LIMIT_NOT_ENFORCED`) and a 70-second statement is cancelled at 60 s (`STATEMENT_TIMEOUT_NOT_ENFORCED`)** — extended, APW10-G01, because APW-07 relies on this probe for ACC-07-26 | `CROSS_TENANT_DB_REACHABLE`, `CONNECTION_LIMIT_NOT_ENFORCED`, `STATEMENT_TIMEOUT_NOT_ENFORCED`             |
 | LG-15 | platform                | `appsDomain` not equal to or under any platform domain; PSL fetched (8 s timeout) contains the apex                        | `APEX_UNDER_PLATFORM_DOMAIN`, `APEX_NOT_ON_PSL`, `PSL_UNREACHABLE` (inconclusive)                           |
 | LG-16 | platform                | HTTPS GET `canary-a.<appsDomain>` → 200, chain valid, SAN has `*.<appsDomain>`                                             | `CANARY_TLS_INVALID`, `CANARY_UNREACHABLE`                                                                  |
-| LG-17 | platform + dry-run      | Edge-hostname capability reports the canary custom hostname `active`; Ingress with an unregistered host refused            | `CUSTOM_HOSTNAME_NOT_ACTIVE`, `UNREGISTERED_HOST_ADMITTED`                                                  |
-| LG-18 | platform + controller   | Write marker → quarantine canary-a via the admin service path → timings from status and public GET → release → read marker | `QUARANTINE_ISOLATION_SLOW`, `QUARANTINE_SCALE_SLOW`, `QUARANTINE_EDGE_SLOW`, `RELEASE_SLOW`, `MARKER_LOST` |
-| LG-19 | controller + platform   | Pods carry bandwidth annotations; run the sensor test trigger; `AbuseSignal{test:true}` ≤ 120 s                            | `BANDWIDTH_LIMIT_MISSING`, `SENSOR_SILENT`                                                                  |
+| LG-17 | platform + dry-run      | Edge-hostname capability reports the canary custom hostname `active`; Ingress with an unregistered host refused. **Assigned (APW10-G05): the platform half runs in T16 (`EdgeHostnamesFacade` creates or reuses a canary hostname), the dry-run half in T9.** | `CUSTOM_HOSTNAME_NOT_ACTIVE`, `UNREGISTERED_HOST_ADMITTED`                                                  |
+| LG-18 | platform + controller   | **Drill handshake (defined, APW10-G05), driven by `SelfCheck.status` sub-phases: `markerWritten` → the platform quarantines canary-a through the T17 service path → `quarantineObserved` → the platform releases → `markerVerified`.** The platform polls for each sub-phase, so the drill depends on T17 (not on a timestamp the controller writes for itself). Timings come from `status.quarantine.*` **and** from a live public GET, and a canary pod kept alive through the window must see the public control and the edge path refused ≤ 15 s | `QUARANTINE_ISOLATION_SLOW`, `QUARANTINE_SCALE_SLOW`, `QUARANTINE_EDGE_SLOW`, `QUARANTINE_NOT_ISOLATING`, `RELEASE_SLOW`, `MARKER_LOST` |
+| LG-19 | controller + platform   | Pods carry bandwidth annotations; run the sensor test trigger; **the platform half asserts the resulting `AbuseSignal{test:true}` is imported within 120 s** (assigned to T16, APW10-G05)     | `BANDWIDTH_LIMIT_MISSING`, `SENSOR_SILENT`, `SIGNAL_NOT_IMPORTED`                                          |
 | LG-20 | platform                | Newest `UsageReport` ≤ 2 h; newest successful import ≤ 2 h                                                                 | `USAGE_REPORT_STALE`, `USAGE_IMPORT_STALE`                                                                  |
-| LG-21 | platform                | Quarantine + release rows for the drill exist in `apps_tier_quarantines` with actor `system:self-check`                    | `AUDIT_ROWS_MISSING`                                                                                        |
+| LG-21 | platform                | Quarantine + release rows for the drill exist in `apps_tier_quarantines` with **`source = 'self-check'`** (the table has no actor column — corrected, APW10-G05)        | `AUDIT_ROWS_MISSING`                                                                                        |
 | LG-22 | controller              | Live policy hashes = manifest hashes                                                                                       | `POLICY_DRIFT`, `POLICY_MANIFEST_MISSING`                                                                   |
 | LG-23 | platform                | Lease `renewTime` ≤ 120 s; `controllerVersion` ≥ `EVER_WORKS_APPS_CONTROLLER_MIN_VERSION`                                  | `HEARTBEAT_STALE`, `CONTROLLER_TOO_OLD`                                                                     |
 | LG-24 | controller (P3)         | Canary `AppBuild` pod has sandbox class, egress to a non-allow-listed host refused, push to another tenant's space refused | `BUILD_UNSANDBOXED`, `BUILD_EGRESS_OPEN`, `BUILD_PUSH_CROSS_TENANT`                                         |
 | LG-25 | controller (P3)         | Canary build with a 60 s cap sleeping 120 s is terminated and recorded                                                     | `BUILD_CAP_NOT_ENFORCED`                                                                                    |
 
 Every probe emits `misconfigured` → **Error** when its FR-7 minimum targets are absent.
+
+**P1 runs and P2-only items (added, APW10-G08).** Zone admission refuses any tenant image outside
+`<zone registry>/t-<namespace id>/…@sha256` signed by the zone promotion key (LG-13), and canaries use the same
+tenant template with no exemption (ACC-10-06) — so a P1 self-check or quarantine drill on a real zone would have its
+probe Jobs refused. P1 therefore carries a **minimal copy-and-sign promotion**: the controller promotes its own image
+and one named canary image into each canary's `t-<id>` space at startup (T6), and T10 builds that canary image from
+`apps/apps-tier-controller/canary/` (an HTTPS client for LG-16, a Postgres client for LG-14 and a marker writer for
+LG-18). In a P1 run the P2-only items report **`inconclusive`** with reason **`PHASE_NOT_ENABLED`** — never `passed`
+and never skipped — so ACC-10-02 can be observed at T22 while the gate correctly stays not-green for P2.
 
 ### 3.8 Controller code layout (**new** `apps/apps-tier-controller/`)
 
@@ -414,16 +482,21 @@ src/reconcile/selfcheck.reconciler.ts   canaries, probe jobs, dry-runs, drift, d
 src/reconcile/quarantine.sequencer.ts   ordered isolate → scale → edge; reverse on release
 src/reconcile/removal.reconciler.ts     §2.6: isolate → remove workloads → retain or (confirmed) delete data
 src/reconcile/appbuild.reconciler.ts    P3: sandboxed in-zone builds (LG-24, LG-25)
+src/dependencies/dependency.reconciler.ts  managed dependencies from Work.spec.dependencies (APW10-G01, GAP-22)
+src/render/work-to-render-input.ts      Work.spec → APW-06 AppRenderInput, for the renderer library (APW10-G03)
 src/template/tenant-template.ts         §3.4 objects (pure)
 src/template/pod-overlays.ts            §3.4 overlays (pure)
 src/validate/work-spec.validator.ts     FR-26 limits, refusal codes
 src/validate/credential-fingerprints.ts HMAC matcher
 src/promote/promotion-job.ts            copy · scan · sign Job spec (tools named in zone config)
+src/promote/canary-promotion.ts         P1: promotes the controller's own image and the canary image (APW10-G08)
 src/usage/usage-reporter.ts             hourly aggregation → UsageReport
 src/signals/signal-rules.ts             FR-38 heuristics → AbuseSignal (+ detector quarantine)
 src/policy/drift.ts                     canonical JSON hashing
 src/probe/*.ts                          `probe` entrypoint: net, kernel, token, dns, marker
 src/seal/unseal.ts                      RSA-OAEP-256 + AES-256-GCM
+src/seal/dep-token-substitution.ts      ew-dep://<kind>/<output> → real value, after unsealing (APW10-G01)
+canary/                                 the canary app image built by T10 (HTTPS, Postgres client, marker) — APW10-G08
 deploy/                                 CRDs + controller RBAC + Deployment (consumed by the zone's GitOps)
 Dockerfile                              distroless Node 22, non-root, read-only root filesystem
 ```
@@ -448,7 +521,8 @@ no `@ManyToOne` across families (EW-654 rule as in `fleet-kill-switch.entity.ts`
 | `AppsTierAbuseSignal` / `apps_tier_abuse_signals`       | `id`, `workId`, `zoneName` unique, `kind`, `severity`, `observedAt`, `summary` varchar(500), `ruleId`, `test` bool, `status` (`open`/`dismissed`/`actioned`), `handledByUserId?`, `handledReason?`, `autoQuarantined` bool, `createdAt`. Index `(status, severity)`.                                                                                                                                                                                                  |
 | `AppsTierQuotaProfile` / `apps_tier_quota_profiles`     | `name` PK varchar(32), `limits` simple-json (FR-47 fields), `monthlyEgressGiB`, `buildMinutesMonthly`, `updatedByUserId?`, `updatedAt`. Seeded `starter`, `standard`.                                                                                                                                                                                                                                                                                                 |
 | `AppsTierImageAllowance` / `apps_tier_image_allowances` | `id`, `workId`, `digest` char(71), `reason`, `createdByUserId`, `expiresAt` (≤ 30 days), `createdAt`. Unique `(workId, digest)`.                                                                                                                                                                                                                                                                                                                                      |
-| `AppsTierUsageWindow` / `apps_tier_usage_windows`       | `id`, `workId`, `windowStart`, `unit` (`cpu_core_seconds`/`memory_mib_hours`/`egress_mib`/`storage_gib_hours`/`build_minutes`), `quantity` bigint, `pluginUsageEventId`, `createdAt`. **Unique `(workId, windowStart, unit)`** (FR-50).                                                                                                                                                                                                                               |
+| `AppsTierUsageWindow` / `apps_tier_usage_windows`       | `id`, `workId`, `windowStart`, `unit` (`cpu_core_seconds`/`memory_mib_hours`/`egress_mib`/`storage_gib_hours`/`build_minutes`/`dependency_storage_gib_hours`/`dependency_backup_gib_hours`), `quantity` bigint, `carriedRemainder` int (the sub-unit remainder the whole-number billing conversion carries forward — APW10-G07), `pluginUsageEventId`, `createdAt`. **Unique `(workId, windowStart, unit)`** (FR-50).                                                                                                                                                                                                                               |
+| `AppsTierCustomHostname` / `apps_tier_custom_hostnames` | **Added (APW10-G06).** `id`, `workId`, `host` varchar(253) unique, `edgeHostnameId` varchar(64), `status` (`pending`/`active`/`failed`/`deleted`), `certificateStatus` (`pending`/`active`/`failed`), `validation` simple-json (the ownership record shown to the owner), `fallbackTarget` varchar(253), `createdAt`, `updatedAt`. Index `(workId, status)`. It is what makes ACC-10-31's live half buildable: without it nothing stores the edge hostname id, nothing shows the owner the TXT record or the CNAME to set, and nothing deletes the hostname when the domain or the App Work goes. |
 | `Work` column                                           | `appsTierQuotaProfile` varchar(32) NULL (NULL = `starter`).                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Migrations — APW-10 block (README §7 rule 6), re-stamp before merge if `develop` moved:
@@ -460,6 +534,8 @@ Migrations — APW-10 block (README §7 rule 6), re-stamp before merge if `devel
    partial unique index; SQLite branch uses a unique expression index), abuse signals, image allowances.
 3. `apps/api/src/migrations/1792100200000-CreateAppsTierQuotaAndMetering.ts` — quota profiles (seeded),
    usage windows, `works.appsTierQuotaProfile`.
+4. `apps/api/src/migrations/1792100300000-CreateAppsTierCustomHostnames.ts` _(added, APW10-G06)_ — the custom-hostname
+   table only. `down()` drops it.
 
 `down()` of each drops only what its `up()` created.
 
@@ -477,6 +553,15 @@ export interface IAppsTierProvider extends IPlugin {
 	setDesiredState(workId: string, state: 'running' | 'quarantined', q?: AppsTierQuarantineRequest): Promise<void>;
 	setEgressThrottle(workId: string, throttled: boolean): Promise<void>;
 	removeWork(workId: string, opts: { deleteData: boolean }): Promise<void>; // FR-28, §2.6: data only when deleteData
+	/**
+	 * Managed dependencies (added, APW10-G01 / GAP-22). APW-07 writes only the dependency list, **not** the whole
+	 * desired state — `applyWork` would replace everything including `generation`, restarting the app's workloads for a
+	 * dependency change. `releaseDependencies` runs before data deletion so `status.dependencies[].phase = released`
+	 * gates it (§2.6).
+	 */
+	setDependencies(workId: string, deps: Array<{ kind: 'postgres' | 'redis' | 'objectStorage' | 'smtp'; ref: string }>): Promise<void>;
+	releaseDependencies(workId: string, opts: { deleteData: boolean }): Promise<{ remaining: Array<{ kind: string; ref: string }> }>;
+	getDependencies(workId: string): Promise<Array<{ kind: string; ref: string; phase: 'pending' | 'ready' | 'failed' | 'released'; lastBackupAt: string | null }>>;
 	startSelfCheck(runId: string, items: string[]): Promise<void>;
 	getSelfCheck(runId: string): Promise<AppsTierSelfCheckStatus | null>;
 	reviewCredentialScope(): Promise<AppsTierAccessReview>; // LG-12
@@ -510,6 +595,24 @@ in `packages/contracts/src/apps/apps-tier.ts` (Resolution R-1).
   **Cancelled — quarantined**), `runAppJob` → spec job trigger annotation, `destroyApp` with option
   `deleteVolumes` → `removeWork(workId, { deleteData })` with the same boolean). APW-06's
   `AppRuntimeFacadeService` selects it for target **Ever Works Apps** by capability, not by id (Constitution II).
+
+**Every APW-06 App member on this plugin (added, APW10-G04).** Leaving any of these out makes the managed target a
+second-class target for the owner:
+
+| `IDeploymentPlugin` member | Behaviour for target `ever-works-apps`                                                                                                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deployApp`                | Seal env + pull credential, map to `Work.spec`, bump `spec.generation`, write the `Work`. `hooks.onPhase` is driven by the polled `status.deployPhase`; `hooks.verifyPublic` reads `status.smoke[]` (the zone runs in-cluster smoke; the platform runs the public half from the worker as on Your cluster); `hooks.isCancelled` reads `status.phase === 'Quarantined'` as well as the platform's cancel flag. |
+| `getAppStatus`             | `status.components[]`, `status.jobs[]`, `status.smoke[]`, `status.deployPhase`, `status.quarantine.*`, `status.dependencies[]` — the fields GAP-25 added to §3.1.                                                                        |
+| `runAppJob`                | A job trigger annotation on the `Work` (`hosting.ever.works/run-job`); the controller starts that job once and reports it in `status.jobs[]`.                                                                                          |
+| `scaleApp('pause' \| 'resume')` | `desiredState: paused` with `pausedReplicas` recorded (§3.1) and back to `running` on resume; the controller scales and restores exactly those counts.                                                                            |
+| `getAppLogs`               | Reads `pods/log` in the tenant namespace through the platform Role (now granted, §3.3) and returns the same redacted `AppLogTail` APW-06 defines; a temporary zone refusal answers `logs_unavailable_on_tier` rather than failing the route. |
+| `checkAppCluster`          | Not applicable on the tier (no owner credential): resolves `{ ok: true, fingerprint: <zone id>, … }` from `zoneInfo()` and never dials. APW-06's target card uses the tier's own eligibility instead.                                    |
+| `prepareAppNamespace`, `publishAppHosts` | The zone owns the namespace and the edge; both are no-ops that return the zone's observed values, so APW-06's `prepare-namespace` and `ingress-reconcile` ops succeed without applying anything.                            |
+| `destroyApp`               | `removeWork(workId, { deleteData: deleteVolumes })`, preceded by APW-07's `releaseDependencies` when data is deleted (§2.6).                                                                                                          |
+
+The owner banner is part of the same contract: APW-10 T30 mounts `AppsTierQuarantineBanner` in APW-06's App deploy
+page and APW-06's page reads `GET /api/me/apps-tier` (§6.2) for the eligibility copy — a CONTRACTS §4 consumer row
+(APW-06), added by APW10-G04.
 - `src/desired-state.mapper.ts` — APW-06 render input → `Work.spec` (drops anything outside §3.1; rejects
   non-digest images before any network call).
 - `src/seal.ts` — hybrid sealing (§2.1 D-D) against the key id in the public-key ConfigMap; refuses when the
@@ -531,16 +634,27 @@ in `packages/contracts/src/apps/apps-tier.ts` (Resolution R-1).
 | `apps-tier-policy.impl.ts`              | Owns and binds `AppsTierPolicy` for `APPS_TIER_POLICY` (§5.5, Resolution R-5).                                                                               |
 | `gate/apps-tier-gate-watch.service.ts`  | The body of `apps-tier-gate-watch`: transitions, attestation notices, stuck quarantine re-patch, stale runs, signal import; each step isolated.              |
 | `apps-tier-image-allowance.service.ts`  | Create (≤ 30 days) and list image allowances; projected onto `Work` by the plugin (FR-31).                                                                   |
+| `apps-tier-custom-hostname.service.ts`  | **Added (APW10-G06).** Owns the edge-hostname lifecycle for custom domains on the tier: creates through `EdgeHostnamesFacade`, stores `{ workId, host, edgeHostnameId, status, certificateStatus, validation, fallbackTarget }`, polls until both statuses are `active`, passes `customHostnameRef` into `Work.spec.hosts[]`, exposes the ownership record and the CNAME target to the owner, and calls `deleteCustomHostname` on domain removal or App Work removal. **Persistence: a new table `apps_tier_custom_hostnames`** (`id`, `workId`, `host` varchar(253) unique, `edgeHostnameId` varchar(64), `status`, `certificateStatus`, `validation` simple-json, `createdAt`, `updatedAt`) in migration slot 03, classified under R-25 with the other operator tables. |
 | `apps-tier-metering.service.ts`         | Import windows idempotently → `PluginUsageService.record({ capability: 'hosting', pluginId: 'ever-works-apps' … })`; egress thresholds; daily receipts.      |
 | `apps-tier-signals.service.ts`          | Import signals, dedupe by `zoneName`, auto-quarantine mirror, dismiss/action.                                                                                |
 | `apps-tier-quota-profile.service.ts`    | CRUD within ceilings (16 CPU, 32 GiB, 100 pods, 500 GiB); assignment.                                                                                        |
 | `apps-tier.facade.ts` (in `facades/`)   | `AppsTierFacadeService` — resolves the enabled `apps-tier` plugin; throws `AppsTierUnavailableError` when none.                                              |
 
 `packages/agent/src/entities/plugin-usage-event.entity.ts` gains `PluginUsageCapability.HOSTING = 'hosting'`
-(varchar; no migration). `packages/agent/src/usage/credit-price-list.ts` gains price keys
-`hosting.cpu_core_hour`, `hosting.memory_gib_hour`, `hosting.egress_gib`, `hosting.storage_gib_month`,
-`hosting.build_minute` — values are an owner decision (spec §9); until set they price at 0 and the receipt
-still records quantities.
+(varchar; no migration). **Prices live in `packages/agent/src/subscriptions/billing/credit-pricebook.ts`, not in
+`credit-price-list.ts` (which only declares the interface) — corrected by APW10-G07.** `VERSION_1` is frozen, so
+hosting prices arrive as **`VERSION_2` with an `effectiveFrom` date**, and `hosting` joins
+`CREDIT_PRICE_GROUPS` in `packages/contracts/src/billing/meter.types.ts` (research|data|tools|models|**hosting**).
+Billing units are whole numbers, so each price key names its integer unit and the conversion is explicit:
+`hosting.cpu_core_hour` (core-seconds ÷ 3600, remainder carried on `AppsTierUsageWindow`),
+`hosting.memory_gib_hour` (MiB-hours ÷ 1024), `hosting.egress_gib` (MiB ÷ 1024 — **not** the metered `egress_mib`),
+`hosting.storage_gib_month` (GiB-hours ÷ 720), `hosting.build_minute`, plus `hosting.dependency_storage_gib_hour`
+and `hosting.dependency_backup_gib_hour` (XC-20) and `relay.messages`. `PluginUsageService.record` is called with
+`operation` (the unit) **and** `payer: 'platform'`, because `usage-meter-classifier.ts` builds the price key from
+capability + operation and records a missing payer as `unconfirmed`. The daily-receipt job debits the credit ledger
+with idempotency key `apps-tier:<workId>:<YYYY-MM-DD>`, so the "credits charged" line is a real debit rather than a
+number no balance ever reflects. Until the owner sets values the keys price at 0 and the receipt still records
+quantities with 0 credits.
 
 ### 5.4 Tier state evaluation
 
@@ -912,6 +1026,99 @@ on stage, APW-03's verified-only constant derived from `managedScope()`. **Gate*
   `isOpen()`. The tenant data servers' per-role connection limits and source restrictions are verified by LG-14.
 
 ## 14. Known gaps carried forward
+
+### Resolutions of the remaining 2026-09-17 audit findings
+
+Additive; the section each belongs to is named so no competing statement is created.
+
+- **Quarantine/release handshake (APW10-G10).** §3.1 gains `spec.release: { requestId, requestedAt }`. A detector
+  quarantine that the zone applied is mirrored by the platform setting `spec.desiredState: quarantined` with
+  `quarantine.requestId` equal to the status-side request id, and the mapper **never** touches `desiredState` or
+  `quarantine` on an ordinary deployment (T26 test). `observedGeneration` always refers to `spec.generation`. A release
+  arriving while a quarantine is still applying answers `409 APPS_TIER_QUARANTINE_APPLYING` until
+  `status.quarantine.ingressDisabledAt` is set, or is queued behind it (§6.3, spec S19). T7, T17 and T26 test it.
+- **Pull credential (APW10-G11, GAP-28).** FR-32 and §3.1 are restated as what APW-05 actually provides: **a read-only
+  registry credential sealed to the controller, used only by the promotion Job, never written into a tenant namespace
+  and discarded when the copy finishes** — with a test that the discard happens. When a credential expires before the
+  copy, the controller reports `PULL_CREDENTIAL_EXPIRED` and APW-06 re-dispatches `deployApp` with a freshly sealed
+  envelope; no short-lived token is required from APW-05, and nothing in FR-32 is dropped (the 15-minute bound stays as
+  the envelope's validity).
+- **Organization-credential fingerprints (APW10-G12).** Population path chosen: the platform computes an HMAC
+  fingerprint on every platform and organization credential create or rotate and publishes them as a namespaced
+  **`CredentialFingerprintSet`** custom resource in the control namespace (added to the platform Role and to §3.2). The
+  controller reads that list for FR-23 and refuses a match with `PLATFORM_CREDENTIAL_IN_ENV`. The HMAC key is a new
+  operator env in CONTRACTS §7; an organization credential that is never published is excluded by construction, and the
+  spec says so.
+- **Sealed-payload format (APW10-G13).** Defined in `packages/contracts/src/apps/apps-tier-seal.ts`:
+  `{ v: 1, kid, alg: 'RSA-OAEP-256+A256GCM', ek, iv (12 bytes), tag (16 bytes), ct }` as base64url JSON, with
+  additional authenticated data `hosting.ever.works/v1alpha1|<workId>|<field>` — so a payload is bound to one Work and
+  one field. A mismatch is refused `SEALED_PAYLOAD_INVALID`. A committed golden vector fixture is shared by T5 and T12.
+- **Capability types and missing members (APW10-G14).** §5.1's types are written out field by field from §3.1–§3.2, and
+  `IAppsTierProvider` gains `listWorks({ phase?, limit, continueToken })` and
+  `setImageAllowances(workId, allowances)`. `controllerVersion` comes from the controller Lease's
+  `hosting.ever.works/controller-version` annotation (zone-info carries the same value as a fallback). Outside a user
+  context the facade resolves the plugin by **installation-level enablement** (operator env or admin settings), never by
+  `userId`.
+- **Removal completion and retained objects (APW10-G15).** T39's `destroyApp` returns
+  `{ kept: [{ kind: 'PersistentVolumeClaim' | 'Dependency', name }] }` read from `getWork` status, and a new
+  `apps-tier-removal-gc` scheduled task deletes `Work` objects whose `dataDeletedAt` is set, or whose `retainedUntil`
+  has passed and the operator has cleared the retention, with a test. The ordering against APW-06's step 1 is stated in
+  CONTRACTS §3's removal row.
+- **Task-list completeness (APW10-G16).** The tasks that change shared files list every edit they need — including the
+  dispatcher-arity edit and the barrel `AREAS` update — and a new config task creates the `everWorks.appsTier` config
+  section with CONTRACTS' defaults and the env examples. `work.entity.ts` joins T25's Modify list. T31 and T35 become
+  verification-only steps that cite APW-03's T24 and APW-05's T35 instead of duplicating their edits.
+- **Quota profiles reaching the zone (APW10-G17).** `AppsTierQuotaLimits` is defined in contracts
+  (`cpuRequest`, `cpuLimit`, `memoryRequestMiB`, `memoryLimitMiB`, `pods`, `volumes`, `storageGiB`,
+  `bandwidthOutMbit`, `bandwidthInMbit`, `monthlyEgressGiB`, `buildMinutesMonthly` — 0 build minutes until P3) with the
+  Starter and Standard seeds, and the plugin carries the **resolved limits inside `Work.spec.quotaProfile`** on every
+  `applyWork` and re-applies assigned Works after an edit, so FR-48's 5 minutes holds without granting the platform
+  write access to the zone's profile ConfigMap. The ceilings bound what a profile may contain.
+- **Response shapes and cursors (APW10-G18).** §6 gains a response table with types in
+  `packages/contracts/src/apps/apps-tier.ts` — `AppsTierStatusResponse`, `AppsTierGateItemView { id, titleKey, kind,
+  phase, outcome, reasonCode, durationMs, attestation? }`, `AppsTierRunSummary`, `AppsTierWorkRow { workId, workName,
+  ownerMasked, profile, phase, cpuHours24h, egressGiB30d, openSignals }`, `AppsTierSignalView`, `WorkAppsTierView` — an
+  opaque base64 `(finishedAt, id)` cursor, `RUN_NOT_GREEN` carrying `items: string[]`, and
+  `apps/api/src/apps-tier/dto/apps-tier-user.dto.ts` added to T30.
+- **Eligibility (APW10-G19).** `isPaidSubscription` is defined as an active subscription, `plan.hosting === 'cloud'`
+  and a non-zero monthly or annual price, with the behaviour stated when subscriptions are disabled altogether.
+  `capReached` is **not** a second cap: this epic reads it through `EverWorksAppsQuotaService` /
+  `EVER_WORKS_APPS_MAX_PER_USER` and maps it to APW-06's `quota_exceeded`, exactly as §5.5 already says. T27's cases
+  follow.
+- **Controller inputs (APW10-G20).** Controller ports are defined with fakes: `UsageMetricsSource.window(workId, start,
+  end)` → `{ cpuCoreSeconds, memoryMiBHours, egressMiB, storageGiBHours }`, `FlowEventSource.refusedConnections(
+  namespace, window)` → `Array<{ port, count }>`, and `RuntimeSensorEvent { namespace, ruleId, severity, observedAt,
+  summary }`, each selected by zone config; `sandboxKernelSignature` (a regex) joins zone-info; and T28 gains a monthly
+  unthrottle step.
+- **CRD tests (APW10-G21).** T3's test validates sample objects against the generated `openAPIV3Schema` with `ajv`
+  (`additionalProperties: false` on `spec`, the `@sha256:` pattern) instead of asserting refusals a CRD cannot perform;
+  the 512 KiB and namespace-field refusals move to T5's `work-spec.validator.spec.ts` and the zone admission policy;
+  §3.1 replaces the "CRD size rule" claim with per-field `maxLength`/`maxItems` bounds.
+- **Admin e2e (APW10-G22).** T20's specs get a named setup: an `e2e-admin-*` platform admin is registered and a fake
+  apps-tier provider is bound in the e2e API behind a non-production env flag (CONTRACTS §7); alternatively the board
+  fetches on the client through `apps/web/src/lib/api/admin-apps-tier.ts` so `page.route` works. `GET status` with no
+  enabled plugin is the state **Closed** with reason **`ZONE_NOT_CONFIGURED`**.
+- **Gate-run guard, retention and column types (APW10-G24).** A partial unique index on
+  `apps_tier_gate_runs(status) WHERE status = 'running'` with a concurrency test (and the engine fallback defined for
+  drivers without partial indexes); a retention step in `apps-tier-gate-watch` keeping 180 days or the latest 500 runs,
+  with a test; and every column given a type, length and nullability (varchar enums, `zoneName` varchar(253) unique,
+  uuid ids). The two entities are justified in spec §5.2 and their nouns reach README §1 in the same PRs as T13/T25.
+- **Quota numbers have one source (GAP-26).** Spec FR-47 is the single source; APW-06's FR-22 **references the assigned
+  profile** through `AppsTierPolicy.podPolicy()` rather than restating 2/4 CPU and 4/6 GiB, and APW-06 gains the
+  render-time precondition **`quota_insufficient`** summing peak usage (components + surge + pre-deploy jobs) against
+  the profile, so Cal.diy's shape is refused with a named reason instead of failing admission. Blueprints gain an
+  optional job `resources` override so a migrate job can ask for less memory.
+- **Pricing (EXT-27, APW10-G07).** The pricebook citation is corrected, the operation keys are camelCase, and the owner
+  still sets the values; until then keys price at 0 and the receipt records quantities, exactly as §5.3 says.
+- **i18n rule (APW10-G25).** §8 gains a key table mapping every spec §6 string to a leaf key and the conversion rule
+  `admin.appsTier.reasons.<camelCase(code)>` (`METADATA_REACHABLE` → `metadataReachable`); the new top-level `admin`
+  namespace is kept deliberately and noted, rather than renamed to `dashboard.adminAppsTier`, so no shipped key moves.
+- **Owner decisions still open (APW10-G09, EXT-16, EXT-20).** Where the tier runs, the apex domain and its PSL
+  submission, the credit prices, sandbox incompatibility, the abuse rota and retention-against-terms remain
+  **[NEEDS CLARIFICATION]** in spec §9, and the staging zone is the private operations plan's deliverable. They gate
+  T22/T32, not the specification work: LG-15's dedicated-apex path is kept with its probes intact, the default apex is
+  the platform's own domain (R-16), and every item the tier cannot satisfy on a shape is recorded **`Failed` with the
+  reason** rather than skipped (`deploy-shapes.md` §3).
 
 - Sandbox incompatibility (spec §9) surfaces as **Degraded** at runtime; there is no pre-flight
   compatibility check.

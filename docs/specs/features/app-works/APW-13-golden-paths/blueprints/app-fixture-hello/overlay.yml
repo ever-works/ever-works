@@ -1,0 +1,12 @@
+# Overlay manifest — APW-03 catalog.md §5. One row per file under `overlay/`, and one file per row.
+#
+# EMPTY ON PURPOSE: the fixture application (`ever-works/app-fixture-hello`) is built by APW-13 and its Dockerfile
+# lives in that repository, not here — the Blueprint builds it with `build.strategy: dockerfile`. Nothing is copied
+# into the Work Repository's tree, so there is no overlay file and no `overlay/` directory.
+#
+# Row shape for future entries:
+#   files:
+#       - path: Dockerfile # destination in the Work Repository, relative
+#         mode: add-only # add-only (skip when the file exists) · replace (only through a pull request)
+
+files: []

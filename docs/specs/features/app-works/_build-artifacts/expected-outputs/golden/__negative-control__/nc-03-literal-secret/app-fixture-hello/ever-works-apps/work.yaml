@@ -1,0 +1,161 @@
+# GOLDEN — app-fixture-hello · target ever-works-apps · the `Work` resource handed to the tier
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Producer  : packages/plugins/ever-works-apps/src/desired-state.mapper.ts (APW-10 plan.md §5.2),
+#             writing CRD group hosting.ever.works/v1alpha1 (APW-10 plan.md §3.1).
+# This is DESIRED STATE handed to the tier (Resolution R-5, APW-06 spec.md FR-7) — the platform
+# applies no Deployment, Service, Ingress, Secret or namespace of its own for this target.
+# The zone controller renders it with APW-06’s renderer and applies its own non-overridable
+# overlays (APW-10 plan.md §2.1 D-C, §3.4). `status` is written by the tier, never here.
+# Pinned inputs and the placeholder convention: ../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — `env.sealed` is a sealed payload, never plaintext.
+#
+# GAPS this file cannot express (reported, not fixed — see ../README.md §"Blueprint ✗ spec"):
+#   · `authScheme` (APW-13 addition, CONTRACTS §1) has no field in the Work cron shape:
+#     APW-10 plan.md:245 lists `http: { method, path, authEnv }` only.
+#   · `dependencies[].kind` is `postgres|redis|objectStorage` — an `smtp` dependency cannot appear.
+#   · `components[].volumes[].backup` is not in the Work volume shape (name, path, size).
+apiVersion: hosting.ever.works/v1alpha1
+kind: Work
+metadata:
+    name: w-22222222-2222-4222-8222-222222222222
+    namespace: ever-works-apps-control
+    labels:
+        hosting.ever.works/owner: 44444444-4444-4444-8444-444444444444
+        hosting.ever.works/canary: 'false'
+spec:
+    workId: 22222222-2222-4222-8222-222222222222
+    ownerUserId: 44444444-4444-4444-8444-444444444444
+    organizationId: null
+    generation: 1
+    quotaProfile: starter
+    desiredState: running
+    pausedReplicas: null
+    dataDeletion: null
+    quarantine: null
+    egressThrottle: false
+    images:
+        - component: web
+          source: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00
+          pullCredential:
+              sealed: '<sealed pull credential — APW-05 FR-19, sealed to the controller key>'
+    components:
+        - name: web
+          role: web
+          command:
+              - node
+              - src/server.mjs
+          port: 8080
+          replicas: 1
+          resources:
+              cpu: 50m
+              memory: 64Mi
+              memoryLimit: 128Mi
+          probes:
+              startup:
+                  http: /healthz
+                  periodSeconds: 2
+                  failureThreshold: 30
+              readiness:
+                  http: /readyz
+              liveness:
+                  http: /healthz
+                  periodSeconds: 20
+          volumes:
+              - name: uploads
+                path: /data
+                size: 1Gi
+          writableRootFilesystem: false
+        - name: worker
+          role: worker
+          command:
+              - node
+              - src/worker.mjs
+          replicas: 1
+          resources:
+              cpu: 25m
+              memory: 64Mi
+              memoryLimit: 128Mi
+          writableRootFilesystem: false
+    jobs:
+        - name: migrate
+          when: pre-deploy
+          component: web
+          command:
+              - node
+              - src/migrate.mjs
+          timeoutSeconds: 120
+        - name: bootstrap
+          when: first-deploy
+          component: web
+          command:
+              - node
+              - src/bootstrap.mjs
+          timeoutSeconds: 120
+    cron:
+        - name: tick
+          schedule: '*/2 * * * *'
+          http:
+              method: POST
+              path: /cron/tick
+              authEnv: FIXTURE_CRON_TOKEN
+              authScheme: bearer
+    smoke:
+        - name: healthz
+          component: web
+          path: /healthz
+          method: GET
+          expect:
+              status:
+                  - 200
+          firstDeployOnly: false
+        - name: readyz
+          component: web
+          path: /readyz
+          method: GET
+          expect:
+              status:
+                  - 200
+          firstDeployOnly: false
+        - name: marker
+          component: web
+          path: /marker
+          method: GET
+          expect:
+              status:
+                  - 200
+              bodyNotContains:
+                  - localhost
+          firstDeployOnly: false
+        - name: cron-refuses-anonymous
+          component: web
+          path: /cron/tick
+          method: POST
+          expect:
+              status:
+                  - 401
+          firstDeployOnly: false
+    hosts:
+        - host: app-fixture-hello.ever.works
+          kind: managed
+          customHostnameRef: null
+    env:
+        sealed: <sealed env payload — hybrid RSA-OAEP-256 + AES-256-GCM to the controller public key>
+        names:
+            - DATABASE_URL
+            - SMTP_HOST
+            - SMTP_PORT
+            - SMTP_USER
+            - SMTP_PASSWORD
+            - SMTP_FROM
+            - FIXTURE_PUBLIC_URL
+            - FIXTURE_INTERNAL_URL
+            - FIXTURE_GIT_SHA
+            - FIXTURE_MARKER
+            - FIXTURE_MAIL_TO
+            - FIXTURE_SESSION_SECRET
+            - FIXTURE_CRON_TOKEN
+    dependencies:
+        - kind: postgres
+          ref: <apw-07 dependency ref for postgres>
+        - kind: smtp
+          ref: <apw-07 dependency ref for smtp>

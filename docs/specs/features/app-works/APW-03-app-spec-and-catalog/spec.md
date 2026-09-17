@@ -420,6 +420,42 @@ Licenses that require offering source to network users produce a visible source 
   — before **Blueprint applied** or **Blueprint apply failed**, with the Blueprint id, version and match source only.
   Inspecting a repository before creation MUST record nothing.
 
+### 4.10 Validation completeness, wiring and the Blueprint's own repository (added by the 2026-09-17 ordering pass)
+
+- **FR-83.** The rule set MUST run whenever the document parses: only an unparseable document, one over the size
+  limit, one over the alias limit and one over the depth limit may suppress R1–R26. Every other structural problem is
+  reported **together with** the rules, so one `unknown_field` never hides the five other problems the same
+  document has. A problem that makes one subtree unreadable MAY suppress only the rules that read that subtree, and
+  the response MUST say which.
+- **FR-84.** The inputs the server-only rules read MUST be defined as one context — the recorded source relation,
+  catalog membership, the enabled build strategies, the dependency providers available for the Work's target and
+  whether the tracked branch exists — and a field the platform cannot answer yet MUST be treated as **unknown**, so
+  its rule is skipped rather than reported. A deploy-strategy rule MUST apply only to strategies that need a
+  builder.
+- **FR-85.** A Blueprint repository's own `.works/works.yml` MUST be validatable with the same rules the platform
+  runs, so a draft can be proof-read before it is listed: blueprint mode allows and expects `source` and
+  `blueprint` (schema.md §3, corrected 2026-09-17), and catalog CI MUST exercise exactly that mode through one
+  published artifact rather than a re-implementation, so a Blueprint cannot pass CI and fail the platform.
+- **FR-86.** A push delivery MUST find every App Work whose Work Repository it concerns — including one whose
+  repository has no platform GitHub App installed, which is the normal case for a member's own fork — and MUST be
+  scoped to the account the delivery is bound to, so no delivery ever requests work for another account's App Work.
+- **FR-87.** When a Blueprint is applied to a **linked** repository, its relation-dependent blocks MUST be adapted
+  before the composed spec is validated: `upstreamSync` is dropped and external upstream pull requests are turned
+  off, because a linked repository has no upstream. What was dropped MUST be listed for the member; nothing is
+  discarded silently and the Blueprint repository's own file is never edited.
+- **FR-88.** A Blueprint that carries a trademark notice MUST give the App Work its display name, and that name
+  MUST be used on the Work's surfaces while the Work still carries its creation default. A Work the member renamed
+  MUST keep the member's name, and the display name MUST be recorded on the App spec state whether or not the Work
+  was renamed.
+- **FR-89.** The platform MUST be able to answer, for one commit, whether that commit already carries a usable App
+  spec — meaning a spec with at least one key beyond the source block — without waiting for the asynchronous
+  evaluation, so "there is no App spec yet, start the App Provisioner" is decided from the commit itself and a
+  source-only file never counts as an App spec.
+- **FR-90.** Every background job this epic dispatches MUST be wired end to end — a dispatcher, the runtime task, the
+  worker's remote proxy and the service's registration for remote calls — and the evaluation, its database writes
+  and its in-process events MUST happen in the API process, so the events other epics listen for are actually
+  delivered.
+
 ---
 
 ## 5. Key entities
@@ -687,6 +723,16 @@ action, focus returns to the opener.
 - [ ] **ACC-03-47** An amber entry without a recorded upstream agreement reports `upstreamAgreementMissing`; with one (and the other conditions met) it reports `available`; a red or unknown classification reports `licenseNotGreen`.
 - [ ] **ACC-03-48** With the instance setting that enables the managed tier switched on and the managed tier itself closed, availability reports `managedTierDisabled`; with the tier open and admitting verified Blueprints only, an unverified entry reports `blueprintNotVerified`.
 - [ ] **ACC-03-49** Each of the key pair formats `pem`, `base64url-raw` and `pkcs12` validates with its examples; `rsa-4096` with `base64url-raw` reports `keypair_format_unsupported`; `pkcs12` without a generated password entry reports `keypair_password_invalid`; `build.strategy: auto` validates and reports `build_strategy_unavailable` when no enabled build plugin supports it.
+- [ ] **ACC-03-50** Each of the three jobs runs through a runtime dispatcher and a worker remote proxy, the worker compiles with no database module, and an event one of them emits reaches an API-side listener for it (FR-90).
+- [ ] **ACC-03-51** The published validator artifact validates the schema.md examples and reports the same codes the platform reports, its committed schema equals the generator's output, and the catalog repository pins its exact version (FR-85).
+- [ ] **ACC-03-52** A Blueprint repository draft carrying `source` and `blueprint` validates in blueprint mode with zero errors, and catalog CI runs that same mode through the published artifact (FR-85).
+- [ ] **ACC-03-53** Applying a Blueprint that declares `upstreamSync` to a linked repository composes a valid spec, drops that block, turns external upstream pull requests off and lists what it dropped (FR-87).
+- [ ] **ACC-03-54** A Blueprint apply on a fork resolves against its upstream and never against the fork itself, reuses the match source recorded at creation, and falls back to the Work owner when no caller is present (FR-87).
+- [ ] **ACC-03-55** An apply reports `commit`, `pull_request` or `failed` back to the App Work's readiness exactly once, and an upgrade reports nothing (FR-81, FR-90).
+- [ ] **ACC-03-56** A push delivery finds an App Work whose repository has no platform GitHub App installed and matches nothing for another account's binding (FR-86).
+- [ ] **ACC-03-57** The "does this commit already carry a usable App spec?" predicate answers false for an absent file, a source-only file and a source-plus-extension-key file; true for a valid spec with a build and components; false for the same spec with an error — all while the evaluation state still reads missing (FR-89).
+- [ ] **ACC-03-58** Every input of the server-only rules left unknown skips its rule, and only strategies that need a builder report `build_strategy_unavailable` (FR-84).
+- [ ] **ACC-03-59** A document with one structural error still reports the rule problems it also has, and only an unparseable, oversized, alias-heavy or too-deep document suppresses the rule set (FR-83).
 
 ---
 
