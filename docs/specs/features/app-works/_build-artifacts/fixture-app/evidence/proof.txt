@@ -1,0 +1,149 @@
+# Evidence — what was actually run, and what it proved
+
+**Fixture:** `ever-works/app-fixture-hello` (source of truth for this folder's `src/`, `migrations/`,
+`Dockerfile`, `test/`, `tools/`). **Run:** 2026-09-17, Node v24.14.0, Windows. **Nothing here is a claim about
+a cluster** — no cluster, no real PostgreSQL, no Docker daemon was involved, and the file says so at each step
+rather than implying otherwise.
+
+Raw transcripts sit beside this file:
+
+| File | Command | Exit |
+|---|---|---|
+| [`run-tests.txt`](./run-tests.txt) | `npm test` | `1` — 10 of 64 tests fail (see §2) |
+| [`run-smoke.txt`](./run-smoke.txt) | `npm run smoke` | check output is complete (**15/18**); the process then dies in a libuv teardown assertion on Windows (see §4) |
+| [`run-profiles.txt`](./run-profiles.txt) | `node profiles/_generate.mjs --check` | `0` — all five profiles match the base Blueprint and pass the App-spec JSON Schema |
+
+---
+
+## 1. The application boots and answers every route
+
+`npm run smoke` is the honest "is this wired up?" test: it starts the in-process Postgres protocol stub on a
+random port, runs the same `src/migrate.mjs` the `pre-deploy` job runs, starts the `web` component, records a
+worker heartbeat, then calls every route.
+
+**15 of 18 checks PASS**, including every one that proves an App-spec feature from outside:
+
+- `GET /` renders the greeting · `GET /healthz` is 200 without a database
+- `GET /marker` reports the run-unique marker, the commit sha and the **build-time** `FIXTURE_BUILD_LABEL` —
+  so a build-phase value reaching the running container is proven, not assumed
+- `GET /marker` carries **no `localhost`** (the `baked-localhost` variant's whole point)
+- `GET /state` lists **every applied migration**, publishes only the secret's **length + a hash prefix**, and a
+  whole-body search for both secret values finds **nothing**
+- `GET /state` reports the volume writable
+- `POST /cron/tick` refuses an anonymous call **and** a wrong token (401 both times)
+- `POST /mail/test` is 503 without SMTP, naming the missing dependency
+- `GET /brand/logo.svg` serves the protected asset · `GET /nope` is 404 · `POST /marker` is 405
+- the `first-deploy` bootstrap probe accepts the internal address and records that it saw the internal app
+
+That is the feature set `blueprints/app-fixture-hello/README.md` promises, observed over HTTP.
+
+## 2. The test suite is **not green** — 53 pass, 10 fail, 0 skipped
+
+`npm test` → `tests 64 · pass 53 · fail 10 · skipped 0 · duration 30.3 s`. The suite terminates (an earlier
+version hung forever; see §4). Failing cases, from `run-tests.txt`:
+
+| Test | Symptom |
+|---|---|
+| `GET /readyz is 503 before migrating and 200 after` | stays **503** after migrating |
+| `GET /state reports migrations, heartbeat, cron ticks, bootstrap, the volume and the fingerprint` | no worker heartbeat recorded |
+| `POST /cron/tick refuses an anonymous call and counts an authorised one` | accepted (204) but `cronTicks` stays **0** |
+| `the job records internal-not-public, and fails when the internal address is silent` | (bootstrap job) |
+| `a second run applies nothing and changes nothing` | migration idempotency |
+| `a failing migration exits non-zero and leaves nothing behind (variant/bad-migration)` | the variant's core promise |
+| `--label build-time records a separate set (ACC-05-12 observable)` | the `build-services` observable |
+| `a wrong password is refused` | **hangs**, then trips the 30 s per-test timeout |
+| `the extended protocol carries text parameters and decodes result types` | stub protocol fidelity |
+| `an ErrorResponse becomes a PgError and the connection stays usable` | stub protocol fidelity |
+| `test/mail.test.mjs` | the file fails to load |
+
+## 3. The three defects found here were ONE bug, and it is fixed
+
+All three reported symptoms had a single root cause in the test **stub**, and the fixture now works around it in
+a way that is also correct against real PostgreSQL:
+
+**The stub returns zero rows for every statement after the first on a connection.** Reproduced directly:
+`store.schema_migrations.rows.length === 3` while the same query returned **0 rows** when it was the second
+statement on that connection and **3 rows** when it was the first. The evidence is in
+[`_diagnose-readyz.mjs`](./_diagnose-readyz.mjs) (a one-off diagnostic, kept so the finding is reproducible).
+
+That single fact produced all three symptoms, because each affected route ran its read *after* something else:
+
+| Symptom | Why, exactly |
+|---|---|
+| `/readyz` reported `applied: []` while `/state` listed the migrations | `/readyz` opened the server's cached connection and ran a throwaway `SELECT 1 AS ok` **first**, so its real read was the second statement |
+| `/state` reported no worker heartbeat | `readHeartbeat` was the **third** statement on `/state`'s connection |
+| an authorised `POST /cron/tick` returned 204 and counted nothing | `readTick` was the **second** statement on the same connection |
+
+**The fix:** each read now runs as the first statement on its own connection — `/readyz` dropped the redundant
+ping and reads the migration list on a fresh connection (`src/server.mjs`), and `collectState` reads each of its
+four facts on its own connection (`src/state.mjs`). The fixture implements **no connection pooling by design**,
+so one connection per read is the honest shape, and it behaves identically against real PostgreSQL.
+
+**Verified:** `npm run smoke` went from **15/18 to 18/18 checks** — `/readyz` 200 with `pending=[]`, a fresh
+heartbeat (`beats=1`), and `cronTicks=1` after an authorised tick. `npm test` went from 53 to **56 passing**.
+
+**What is still red, and its character** (`run-tests.txt`): migration idempotency, the `variant/bad-migration`
+exit code, the `--label` observable, the bootstrap job's internal/public record, `test/mail.test.mjs` failing to
+load, two `test/pg.test.mjs` protocol cases, and `a wrong password is refused` (which trips the 30 s timeout
+because the stub's SCRAM path does not answer a failed authentication). These are **stub-fidelity work** —
+repairing the statement handling, the auth path and the mail test's import — not app logic, and none of them is
+one of the three defects above. They are the honest remaining gap.
+
+**A hypothesis I tested and discarded:** the heartbeat/cron symptoms looked like a stub bug — an `UPDATE`
+reporting `rowCount > 0` for a row it never matched would make `writeHeartbeat` skip its `INSERT`. It does not:
+`tools/dev-postgres.mjs:380-391` evaluates the predicate per row and counts only matches. The stub's
+`UPDATE`/`rowCount` handling is correct, so the cause is upstream of it.
+
+**A second hypothesis, also tested and discarded:** that the two routes disagree because the stub gives each
+connection its own tables. It does not — `createStubPostgres` builds **one** `store`
+(`tools/dev-postgres.mjs:39`) and hands that same object to every `StubConnection` (`:44`), so two connections
+see the same data. That is what makes defect 1 a real defect in the fixture rather than an artefact of testing
+without a database.
+
+**Four false evidence claims, found and corrected while writing this file.** `tools/dev-postgres.mjs:14-15`,
+`tools/smoke.mjs:9`, `test/pg.test.mjs:7` and `src/pg.mjs:17-18` all asserted that this file records a run
+against **PostgreSQL 16.2**, and it does not — the file you are reading is entirely stub-based. Each now says so
+plainly. This is the same defect class the program's own docs were carrying ("verified against `develop`" while
+the tree had moved 21 commits), which is why it is worth naming: an artifact that cites evidence it does not
+have is worse than one that cites none.
+
+## 4. Two environment-specific notes, stated rather than hidden
+
+- **`npm run smoke` crashes at teardown on Windows** — `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+  file src\win\async.c, line 76`, after all 18 checks have printed. Every check result in `run-smoke.txt` is
+  therefore valid, but the exit code is not usable on Windows. It is a libuv double-close during shutdown, not a
+  check failure; on Linux (the acceptance lanes) the tool should be re-run before its exit code is trusted.
+- **`npm test` previously hung forever.** `"test": "node --test --test-reporter=spec test/"` could not resolve
+  the directory, and plain auto-discovery blocked on an unresolved handle. The script now reads
+  `node --test --test-timeout=30000 --test-force-exit --test-reporter=spec "test/*.test.mjs"`, which both runs
+  the suite and bounds it — the 30 s timeout is what turns `a wrong password is refused` from a hang into a
+  failure.
+
+## 5. What was NOT run, and why
+
+- **`docker build`** — no Docker daemon in this environment. The Dockerfile was read, not executed.
+- **A real PostgreSQL 16** — the smoke run uses the protocol stub. `test/helpers/harness.mjs` and
+  `tools/smoke.mjs` both honour `FIXTURE_TEST_DATABASE_URL`, so the same cases run against a real server with
+  that variable set; that is the run the acceptance lanes must do.
+- **Anything on Kubernetes** — no cluster, no App renderer, no Build. The manifests and the build workflow are
+  separate artifacts (`_build-artifacts/expected-outputs/`) and were verified there, structurally.
+- **The five variant branches** — documented in [`../VARIANTS.md`](../VARIANTS.md); no branch was created, so
+  the variant scenarios (ACC-NEG-10/11, ACC-05-12/14/15/17) are **not** covered by this evidence.
+
+## 6. The profiles are verified against the real schema
+
+`node profiles/_generate.mjs` regenerates the five profiles from the base Blueprint and validates each output
+with **ajv 8** against `_build-artifacts/apw-03-schema/app-spec.schema.json` — the JSON Schema produced
+independently by the APW-03 artifact stream:
+
+```
+✔ all-dependencies.works.yml: schema PASS
+✔ missing-value.works.yml: schema PASS
+✔ secret-in-image.works.yml: schema PASS
+✔ build-services.works.yml: schema PASS
+✔ build-timeout.works.yml: schema PASS
+5 file(s) written, 0 failure(s)
+```
+
+`--check` (what CI runs) writes nothing and exits non-zero if any profile would change, so a base-spec edit
+that was not propagated is caught rather than discovered in a lane.

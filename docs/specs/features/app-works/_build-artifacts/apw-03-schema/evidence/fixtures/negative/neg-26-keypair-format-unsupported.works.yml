@@ -1,0 +1,18 @@
+# NEGATIVE FIXTURE neg-26 — error class: a keypair format the key type cannot produce.
+# Expected: JSON Schema FAIL (`if`/`then`: /spec/env/0/generate/keypair/type) · rule layer `keypair_format_unsupported`
+#           (R25; schema-carried, so the rule layer does not repeat it).
+# schema.md §12 / R-11: "`base64url-raw` only with `ed25519` or `ec-p256` (error `keypair_format_unsupported`)".
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - name: BAD_RAW
+          secret: true
+          generate: { kind: keypair, keypair: { type: rsa-4096, format: base64url-raw } }

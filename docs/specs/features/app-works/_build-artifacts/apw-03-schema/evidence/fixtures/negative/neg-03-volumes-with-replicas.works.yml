@@ -1,0 +1,17 @@
+# NEGATIVE FIXTURE neg-03 — error class: `volumes` with `replicas > 1`.
+# Expected: JSON Schema FAIL (`if`/`then`: /spec/components/0/replicas maximum 1) · rule layer `volume_replicas`.
+# schema.md R18 / CONTRACTS.md C2: a volume cannot attach to two pods, so the pair is an error.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - name: web
+          role: web
+          port: 3000
+          replicas: 2
+          volumes: [{ name: data, path: /data, size: 2Gi, backup: true }]

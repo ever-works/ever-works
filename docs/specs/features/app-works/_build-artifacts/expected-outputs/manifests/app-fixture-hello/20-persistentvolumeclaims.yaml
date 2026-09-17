@@ -1,0 +1,37 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. PersistentVolumeClaim `web-uploads` (APW-06 plan §4.6, §4.1).
+#
+# `components[0].volumes: [{ name: uploads, path: /data, size: 1Gi, backup: false }]` (works.yml:57)
+#   PVC name              = `<component>-<volume>` = `web-uploads`   (plan §4.1 names table)
+#   accessModes           = [ReadWriteOnce]
+#   resources.requests.storage = `size` = 1Gi
+#   storageClassName      = the target setting, else the cluster default (omitted here → cluster default)
+#   annotation ever-works.io/backup = "true|false" from `volumes[].backup` → "false"
+#   label ever-works.io/retain = "true"  (plan §4.1)
+#
+# Rules this object carries:
+#   * SSA only ever RAISES `storage`; a lower value is refused before apply (`volume_shrink`, plan §4.6)
+#   * `replicas > 1` with volumes is refused (`volume_replicas`; APW-03 schema.md:459 R18) — hence `replicas: 1`
+#     and `strategy: Recreate` on the web Deployment
+#   * redeploy, pause, rollback and remove-without-data never delete it (spec FR-16, FR-50; ACC-06-18)
+#   * the App Work deletion path keeps it unless "Also delete stored data" was ticked (R-15; ACC-E2E-05
+#     asserts the PVC still exists after the Work is deleted)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-uploads
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/component: web
+    ever-works.io/retain: "true"
+  annotations:
+    ever-works.io/backup: "false"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

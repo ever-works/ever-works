@@ -1,0 +1,146 @@
+# CONTRACTS.md §1 outline, MATERIALISED.
+#
+# Evidence fixture for the APW-03 schema build artifact. This file is NOT in the repository under test
+# and is not a spec anyone has to follow; it exists so the schema can be run against the §1 outline with
+# the outline's PLACEHOLDER syntax resolved. `contracts-1-annotated.works.yml` in this directory is the
+# same block extracted VERBATIM from CONTRACTS.md §1 (lines 81-193) and is expected to FAIL, because §1
+# writes enum alternatives as prose (`fork | private-copy | link`) and placeholder text (`<40-char
+# commit>`, `<ENV NAME>`, `sha256:...`).
+#
+# Every substitution below is mechanical and listed so a reviewer can check it. The ONLY judgement calls
+# are #6 and #7, which resolve a self-contradictory line in the outline (CONTRACTS.md C2 says so
+# explicitly: "The outline's `generate`/`validate` line lists option names, not a consistent pair (a
+# `base64` generator of 32 bytes yields 44 characters; `generate` and `validate` must agree)").
+#
+#  #  outline line                                     materialised as                          why
+#  1  relation: fork | private-copy | link             relation: fork                           first alternative
+#  2  sha: <40-char commit>                            sha: 0123456789abcdef...01234567         schema.md §24.1 uses this value
+#  3  class: green | amber | red | unknown             class: green                             first alternative
+#  4  source: detected | blueprint | user              source: blueprint                        first alternative
+#  5  strategy: dockerfile | image | auto | none       strategy: dockerfile                     first alternative
+#  6  generate: { kind: base64 | hex | chars | ... }   generate: { kind: chars, length: 32,      chars is the only kind whose
+#     + bytes: 32, length: 32, rotate: never,             rotate: never }                        generated length can equal the
+#     keypair: { type: ed25519, format: pem | ...,                                               outline's validate.length: 32
+#                passwordEnv: <ENV NAME> }                                                       (C2); `bytes`/`keypair` are
+#                                                                                                chars-invalid, so both are dropped
+#  7  validate: { length: 32, pattern: '^[A-Za-z0-9+/=]+$' }   kept                          R9: chars(32) has length 32, and the
+#                                                                                             default `alnum` alphabet matches
+#  8  role: web | worker                               role: web                                first alternative
+#  9  when: pre-deploy | first-deploy | post-deploy    when: pre-deploy                         first alternative
+# 10  phase: runtime | build | both                    phase: runtime                           first alternative
+# 11  image: ghcr.io/owner/app@sha256:...              (kept, digest materialised)               schema.md does not forbid `build.image`
+#                                                                                                when strategy is not `image` - see
+#                                                                                                gaps-and-contradictions.md Q7
+#
+# Header comment above the extracted block, carried over verbatim except for the substitutions.
+version: 2
+kind: app
+spec:
+    source: # required — written by APW-01 at creation
+        relation: fork # was: fork | private-copy | link (substitution 1)
+        upstream: { repo: calcom/cal.diy, defaultBranch: main } # absent when relation = link
+        branch: main # the Work Repository branch that is built and deployed
+    blueprint: # present when resolved from the Apps catalog (APW-03)
+        id: cal-diy
+        version: 1.0.0
+        repo: ever-works/cal-diy-template
+        sha: 0123456789abcdef0123456789abcdef01234567 # was: <40-char commit> (substitution 2)
+    license: # APW-03 license gate
+        spdx: MIT # or LicenseRef-* for custom licenses
+        class: green # was: green | amber | red | unknown (substitution 3)
+        source: blueprint # was: detected | blueprint | user (substitution 4)
+        notice: 'Cal.diy® is a trademark of Cal.com, Inc.'
+    display:
+        name: 'Cal.diy (community build)'
+        protectedPaths: ['apps/web/public/brand/**'] # agents may not modify (D13)
+    build: # APW-05
+        strategy: dockerfile # was: dockerfile | image | auto | none (substitution 5)
+        dockerfile: Dockerfile
+        context: .
+        target: runner
+        image: ghcr.io/owner/app@sha256:9f2c1e0b7a4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0f9e8d7c6b5a49 # was: ghcr.io/owner/app@sha256:... (substitution 11)
+        args: # build-time values; reference env names, never literal secrets
+            - { name: NEXT_PUBLIC_WEBAPP_URL, value: 'http://localhost:3000' }
+            - { name: CALENDSO_ENCRYPTION_KEY, fromEnv: CALENDSO_ENCRYPTION_KEY }
+        services: # ephemeral services reachable only during the build
+            - { name: postgres, image: 'postgres:16' }
+        resources: { cpu: 4, memory: 12Gi, timeoutMinutes: 60 }
+    components: # APW-06 — at least one when build.strategy != none
+        - name: web # required, DNS-label
+          role: web # was: web | worker (substitution 8)
+          command: ['/calcom/scripts/start.sh']
+          port: 3000
+          replicas: 1
+          writableRootFilesystem: true
+          probes:
+              startup: { http: /api/version, periodSeconds: 10, failureThreshold: 60 }
+              readiness: { http: /auth/login }
+              liveness: { http: /api/version, periodSeconds: 30 }
+          resources: { cpu: 500m, memory: 1Gi, memoryLimit: 3Gi }
+          volumes: [{ name: data, path: /data, size: 2Gi, backup: true }]
+    dependencies: # APW-07
+        postgres: { version: '16', directUrl: true }
+        redis: { version: '7', maxmemoryPolicy: noeviction }
+        objectStorage: { buckets: [uploads] }
+        smtp: { required: true }
+    env: # APW-07 — every variable the app reads
+        - name: NEXTAUTH_SECRET # required
+          secret: true
+          phase: runtime # was: runtime | build | both (substitution 10)
+          generate: # was: { kind: base64 | hex | chars | uuid | keypair, bytes: 32, length: 32, rotate: never, keypair: {...} } (substitution 6)
+              {
+                  kind: chars,
+                  length: 32,
+                  rotate: never
+              }
+          validate: { length: 32, pattern: '^[A-Za-z0-9+/=]+$' } # substitution 7: unchanged
+        - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+        - { name: DATABASE_DIRECT_URL, secret: true, from: deps.postgres.directUrl }
+        - { name: NEXT_PUBLIC_WEBAPP_URL, from: domains.primary.url }
+        - { name: NEXTAUTH_URL, template: '{{domains.primary.url}}/api/auth' }
+        - { name: EMAIL_SERVER_HOST, from: deps.smtp.host }
+        - {
+              name: GOOGLE_API_CREDENTIALS,
+              secret: true,
+              prompt: { description: 'Google Calendar OAuth JSON', required: false }
+          }
+        - { name: CALCOM_TELEMETRY_DISABLED, value: '1' }
+    jobs: # APW-06 — run as Kubernetes Jobs
+        - name: migrate
+          when: pre-deploy # was: pre-deploy | first-deploy | post-deploy (substitution 9)
+          component: web # image + env of this component
+          command: ['npx', 'prisma', 'migrate', 'deploy']
+          timeoutSeconds: 900
+        - name: bootstrap-admin # first-deploy jobs run BEFORE the ingress is published
+          when: first-deploy
+          http: { method: POST, path: /api/auth/setup, body: { generatedCredential: admin } }
+    cron: # APW-06 — the app's own recurring calls (Kubernetes CronJobs); not a platform Schedule
+        # authScheme (added by APW-13): bearer (default) sends "Authorization: Bearer <authEnv value>"; raw sends "Authorization: <authEnv value>"
+        - {
+              name: booking-reminder,
+              schedule: '*/15 * * * *',
+              http: { method: POST, path: /api/cron/bookingReminder, authEnv: CRON_API_KEY, authScheme: raw }
+          }
+    domains: # APW-06
+        primaryComponent: web
+        publicUrlEnv: [NEXT_PUBLIC_WEBAPP_URL, NEXTAUTH_URL]
+        onChange: restart # what a domain change requires
+        needsHairpin: true # the app calls its own public URL server-side
+    smoke: # APW-06 — run after every Deployment; APW-04 uses them as the gate
+        - { name: version, http: { method: GET, path: /api/version }, expect: { status: [200] } }
+        - {
+              name: login,
+              http: { method: GET, path: /auth/login },
+              expect: { status: [200], bodyNotContains: ['localhost:3000'] }
+          }
+    checks: # APW-08 — quality gates for Tasks on this App Work; run sandboxed
+        - { name: type-check, command: 'yarn type-check:ci --force', required: true, timeoutSeconds: 1800 }
+    agents: # APW-08
+        instructionFiles: [AGENTS.md]
+        maxPullRequestChangedLines: 500
+    upstreamSync: # APW-02
+        schedule: '0 6 * * 1'
+        mode: merge # merge-upstream for forks; fetch-and-merge for private copies
+    upstreamPullRequests: # APW-09
+        enabled: false
+        requireApproval: true # cannot be set false

@@ -1,0 +1,113 @@
+version: 2
+kind: app
+spec:
+    source: # required — written by APW-01 at creation
+        relation: fork | private-copy | link # required
+        upstream: { repo: calcom/cal.diy, defaultBranch: main } # absent when relation = link
+        branch: main # the Work Repository branch that is built and deployed
+    blueprint: # present when resolved from the Apps catalog (APW-03)
+        id: cal-diy
+        version: 1.0.0
+        repo: ever-works/cal-diy-template
+        sha: <40-char commit>
+    license: # APW-03 license gate
+        spdx: MIT # or LicenseRef-* for custom licenses
+        class: green | amber | red | unknown
+        source: detected | blueprint | user
+        notice: 'Cal.diy® is a trademark of Cal.com, Inc.'
+    display:
+        name: 'Cal.diy (community build)'
+        protectedPaths: ['apps/web/public/brand/**'] # agents may not modify (D13)
+    build: # APW-05
+        strategy: dockerfile | image | auto | none # required when components exist (auto = zero-config, R-13)
+        dockerfile: Dockerfile
+        context: .
+        target: runner
+        image: ghcr.io/owner/app@sha256:... # strategy = image
+        args: # build-time values; reference env names, never literal secrets
+            - { name: NEXT_PUBLIC_WEBAPP_URL, value: 'http://localhost:3000' }
+            - { name: CALENDSO_ENCRYPTION_KEY, fromEnv: CALENDSO_ENCRYPTION_KEY }
+        services: # ephemeral services reachable only during the build
+            - { name: postgres, image: 'postgres:16' }
+        resources: { cpu: 4, memory: 12Gi, timeoutMinutes: 60 }
+    components: # APW-06 — at least one when build.strategy != none
+        - name: web # required, DNS-label
+          role: web | worker # web components get Service + Ingress
+          command: ['/calcom/scripts/start.sh']
+          port: 3000
+          replicas: 1
+          writableRootFilesystem: true
+          probes:
+              startup: { http: /api/version, periodSeconds: 10, failureThreshold: 60 }
+              readiness: { http: /auth/login }
+              liveness: { http: /api/version, periodSeconds: 30 }
+          resources: { cpu: 500m, memory: 1Gi, memoryLimit: 3Gi }
+          volumes: [{ name: data, path: /data, size: 2Gi, backup: true }]
+    dependencies: # APW-07
+        postgres: { version: '16', directUrl: true }
+        redis: { version: '7', maxmemoryPolicy: noeviction }
+        objectStorage: { buckets: [uploads] }
+        smtp: { required: true }
+    env: # APW-07 — every variable the app reads
+        - name: NEXTAUTH_SECRET # required
+          secret: true
+          phase: runtime | build | both # default runtime
+          generate:
+              {
+                  kind: base64 | hex | chars | uuid | keypair,
+                  bytes: 32,
+                  length: 32,
+                  rotate: never,
+                  keypair: { type: ed25519, format: pem | base64url-raw | pkcs12, passwordEnv: <ENV NAME> }
+              }
+          validate: { length: 32, pattern: '^[A-Za-z0-9+/=]+$' }
+        - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+        - { name: DATABASE_DIRECT_URL, secret: true, from: deps.postgres.directUrl }
+        - { name: NEXT_PUBLIC_WEBAPP_URL, from: domains.primary.url }
+        - { name: NEXTAUTH_URL, template: '{{domains.primary.url}}/api/auth' }
+        - { name: EMAIL_SERVER_HOST, from: deps.smtp.host }
+        - {
+              name: GOOGLE_API_CREDENTIALS,
+              secret: true,
+              prompt: { description: 'Google Calendar OAuth JSON', required: false }
+          }
+        - { name: CALCOM_TELEMETRY_DISABLED, value: '1' }
+    jobs: # APW-06 — run as Kubernetes Jobs
+        - name: migrate
+          when: pre-deploy | first-deploy | post-deploy
+          component: web # image + env of this component
+          command: ['npx', 'prisma', 'migrate', 'deploy']
+          timeoutSeconds: 900
+        - name: bootstrap-admin # first-deploy jobs run BEFORE the ingress is published
+          when: first-deploy
+          http: { method: POST, path: /api/auth/setup, body: { generatedCredential: admin } }
+    cron: # APW-06 — the app's own recurring calls (Kubernetes CronJobs); not a platform Schedule
+        # authScheme (added by APW-13): bearer (default) sends "Authorization: Bearer <authEnv value>"; raw sends "Authorization: <authEnv value>"
+        - {
+              name: booking-reminder,
+              schedule: '*/15 * * * *',
+              http: { method: POST, path: /api/cron/bookingReminder, authEnv: CRON_API_KEY, authScheme: raw }
+          }
+    domains: # APW-06
+        primaryComponent: web
+        publicUrlEnv: [NEXT_PUBLIC_WEBAPP_URL, NEXTAUTH_URL]
+        onChange: restart | rebuild # what a domain change requires
+        needsHairpin: true # the app calls its own public URL server-side
+    smoke: # APW-06 — run after every Deployment; APW-04 uses them as the gate
+        - { name: version, http: { method: GET, path: /api/version }, expect: { status: [200] } }
+        - {
+              name: login,
+              http: { method: GET, path: /auth/login },
+              expect: { status: [200], bodyNotContains: ['localhost:3000'] }
+          }
+    checks: # APW-08 — quality gates for Tasks on this App Work; run sandboxed
+        - { name: type-check, command: 'yarn type-check:ci --force', required: true, timeoutSeconds: 1800 }
+    agents: # APW-08
+        instructionFiles: [AGENTS.md]
+        maxPullRequestChangedLines: 500
+    upstreamSync: # APW-02
+        schedule: '0 6 * * 1'
+        mode: merge # merge-upstream for forks; fetch-and-merge for private copies
+    upstreamPullRequests: # APW-09
+        enabled: false
+        requireApproval: true # cannot be set false

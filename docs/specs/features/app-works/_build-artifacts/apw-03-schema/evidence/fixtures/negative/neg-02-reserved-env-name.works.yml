@@ -1,0 +1,16 @@
+# NEGATIVE FIXTURE neg-02 — error class: reserved env name.
+# Expected: JSON Schema FAIL (`not`/`pattern` on /spec/env/0/name) · rule layer `reserved_env_name`.
+# schema.md R23 / CONTRACTS.md C2: `EVER_WORKS_` is reserved for platform-injected values, so an `env`
+# entry may not use it. This is the class the HL Cal.diy and Umami Blueprints were in at HEAD.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - { name: EVER_WORKS_WEB_INTERNAL_URL, from: components.web.internalUrl }

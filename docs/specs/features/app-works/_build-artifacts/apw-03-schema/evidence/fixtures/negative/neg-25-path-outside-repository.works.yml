@@ -1,0 +1,17 @@
+# NEGATIVE FIXTURE neg-25 — error class: a path that leaves the repository.
+# Expected: JSON Schema FAIL (`not`/`pattern` on /spec/build/dockerfile and on /spec/display/protectedPaths/0) ·
+#           rule layer `path_outside_repository` (R22; not implemented in the reference rule layer, see
+#           validator-rules.md §8 — the schema is the layer that carries it).
+# schema.md R22 / §0 `RelPath`: no leading `/`, no `..` segment, not under `.git/`.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    display:
+        protectedPaths: ['../secrets/**']
+    build: { strategy: dockerfile, dockerfile: /abs/Dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }

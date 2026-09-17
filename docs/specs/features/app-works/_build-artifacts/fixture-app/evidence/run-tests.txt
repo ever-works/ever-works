@@ -1,0 +1,250 @@
+npm warn Unknown user config "msvs_version". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> app-fixture-hello@0.1.0 test
+> node --test --test-timeout=30000 --test-force-exit --test-reporter=spec "test/*.test.mjs"
+
+✔ an internal 200 with this marker is "saw the app" (2.5382ms)
+✔ a 404 from the ingress is not this app (0.6985ms)
+✔ a different marker answering on the public address is not this app (0.4006ms)
+✔ a 200 that is not this app's JSON is not this app (0.503ms)
+✔ a network failure is an observation, not an exception (0.6372ms)
+✔ an unconfigured address is reported, not fetched (0.3208ms)
+✖ the job records internal-not-public, and fails when the internal address is silent (98.3654ms)
+✔ the job fails (exit 1) when the app does not answer internally (37.9942ms)
+✔ a public address equal to the internal one is not a public observation (31.1405ms)
+✔ a missing FIXTURE_INTERNAL_URL is a configuration error (2.2772ms)
+✔ a missing marker is a configuration error (1.1882ms)
+✔ --dry-run observes without recording (28.7355ms)
+✔ greeting is a non-empty plain string (2.4422ms)
+✔ the home page renders the greeting inside the tested element (0.4408ms)
+✔ a run-unique marker in the greeting reaches the page unchanged (0.2167ms)
+✔ the page shows the public URL when it is known and nothing when it is not (0.1966ms)
+✔ values interpolated into the page are escaped (0.2401ms)
+✔ the greeting lives in exactly one source file (7.4361ms)
+✔ smtpConfig reads the names the App spec binds, and is null without SMTP_HOST (2.5927ms)
+✔ buildMessage produces CRLF headers and dot-stuffs the body (2.1693ms)
+✔ sendMail delivers one message through a real SMTP conversation (46.8728ms)
+✔ sendMail refuses a server that rejects the credentials (10.9528ms)
+✔ sendMail fails fast when nothing is listening (2.9353ms)
+{"t":"2026-09-17T19:34:43.922Z","method":"POST","path":"/mail/test","status":202,"ms":8}
+✔ POST /mail/test sends to the prompted address and answers 202 (45.4107ms)
+{"t":"2026-09-17T19:34:43.958Z","method":"POST","path":"/mail/test","status":202,"ms":5}
+{"t":"2026-09-17T19:34:43.962Z","method":"POST","path":"/mail/test","status":429,"ms":0}
+✔ POST /mail/test is rate limited to one message a minute (27.4898ms)
+Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 76
+✖ test\mail.test.mjs (506.6754ms)
+✔ the application's own migrations apply in order and are recorded (87.7515ms)
+✖ a second run applies nothing and changes nothing (50.5788ms)
+✔ a migration that changed after it was applied is refused, not re-run (38.0879ms)
+✖ a failing migration exits non-zero and leaves nothing behind (variant/bad-migration) (22.2226ms)
+✖ --label build-time records a separate set (ACC-05-12 observable) (35.4052ms)
+✔ a missing DATABASE_URL is a configuration error, not a crash (1.0949ms)
+✔ an empty migrations directory is a configuration error (6.7859ms)
+✔ parseDatabaseUrl reads a URL and falls back to the PG* variables (4.9564ms)
+✔ redactUrl hides the password (0.3829ms)
+✔ the client authenticates with SCRAM-SHA-256 and reports the server version (54.106ms)
+✖ a wrong password is refused (30013.7788ms)
+✖ the extended protocol carries text parameters and decodes result types (13.2419ms)
+✔ the simple protocol runs several statements and returns each result (14.1164ms)
+✖ an ErrorResponse becomes a PgError and the connection stays usable (8.4705ms)
+✔ a query against a client that is not connected fails instead of hanging (0.6253ms)
+✔ connecting to a port with nothing on it fails within the connect timeout (2.395ms)
+✔ end() is safe to call twice (5.3985ms)
+{"t":"2026-09-17T19:34:43.940Z","method":"GET","path":"/healthz","status":200,"ms":6}
+✔ GET /healthz answers 200 with no database at all (70.8157ms)
+{"t":"2026-09-17T19:34:43.992Z","method":"GET","path":"/readyz","status":503,"ms":19}
+{"t":"2026-09-17T19:34:44.036Z","method":"GET","path":"/readyz","status":200,"ms":6}
+✔ GET /readyz is 503 before migrating and 200 after (82.3107ms)
+{"t":"2026-09-17T19:34:44.050Z","method":"GET","path":"/readyz","status":503,"ms":3}
+✔ GET /readyz reports a database that is not there (12.1254ms)
+{"t":"2026-09-17T19:34:44.061Z","method":"GET","path":"/marker","status":200,"ms":1}
+✔ GET /marker reports the prompted marker, the build commit and the build label (11.9311ms)
+{"t":"2026-09-17T19:34:44.074Z","method":"GET","path":"/marker","status":200,"ms":1}
+✔ GET /marker falls back to the request host and never invents localhost (12.9117ms)
+{"t":"2026-09-17T19:34:44.142Z","method":"GET","path":"/state","status":200,"ms":25}
+✔ GET /state reports migrations, heartbeat, cron ticks, bootstrap, the volume and the fingerprint (68.2764ms)
+{"t":"2026-09-17T19:34:44.170Z","method":"GET","path":"/state","status":200,"ms":19}
+{"t":"2026-09-17T19:34:44.195Z","method":"GET","path":"/state","status":200,"ms":17}
+{"t":"2026-09-17T19:34:44.218Z","method":"GET","path":"/state","status":200,"ms":18}
+✔ the secret fingerprint is stable across restarts and changes only with the value (75.3701ms)
+{"t":"2026-09-17T19:34:44.244Z","method":"GET","path":"/state","status":200,"ms":17}
+✔ GET /state reports a volume it cannot write to as false (24.7466ms)
+{"t":"2026-09-17T19:34:44.267Z","method":"POST","path":"/cron/tick","status":401,"ms":1}
+{"t":"2026-09-17T19:34:44.271Z","method":"POST","path":"/cron/tick","status":401,"ms":0}
+{"t":"2026-09-17T19:34:44.273Z","method":"POST","path":"/cron/tick","status":401,"ms":1}
+{"t":"2026-09-17T19:34:44.278Z","method":"POST","path":"/cron/tick","status":204,"ms":4}
+{"t":"2026-09-17T19:34:44.297Z","method":"GET","path":"/state","status":200,"ms":17}
+{"t":"2026-09-17T19:34:44.299Z","method":"POST","path":"/cron/tick","status":204,"ms":1}
+{"t":"2026-09-17T19:34:44.320Z","method":"GET","path":"/state","status":200,"ms":19}
+✔ POST /cron/tick refuses an anonymous call and counts an authorised one (77.7516ms)
+{"t":"2026-09-17T19:34:44.330Z","method":"POST","path":"/cron/tick","status":401,"ms":0}
+✔ POST /cron/tick refuses every call when no token is configured (8.2672ms)
+{"t":"2026-09-17T19:34:44.337Z","method":"POST","path":"/mail/test","status":503,"ms":0}
+✔ POST /mail/test answers 503 when the smtp dependency is missing (7.2561ms)
+{"t":"2026-09-17T19:34:44.346Z","method":"GET","path":"/brand/logo.svg","status":200,"ms":2}
+✔ GET /brand/logo.svg serves the protected branding asset (8.5834ms)
+{"t":"2026-09-17T19:34:44.353Z","method":"GET","path":"/nope","status":404,"ms":0}
+{"t":"2026-09-17T19:34:44.356Z","method":"GET","path":"/package.json","status":404,"ms":0}
+{"t":"2026-09-17T19:34:44.358Z","method":"POST","path":"/marker","status":405,"ms":0}
+✔ unknown paths are 404 and wrong methods are 405 (11.7173ms)
+{"t":"2026-09-17T19:34:44.367Z","method":"GET","path":"/","status":200,"ms":1}
+{"t":"2026-09-17T19:34:44.370Z","method":"GET","path":"/marker","status":200,"ms":0}
+{"t":"2026-09-17T19:34:44.374Z","method":"GET","path":"/state","status":200,"ms":3}
+✔ the fixture answers at all with no database configured (15.4333ms)
+✔ the fingerprint publishes a length and a hash prefix, never the value (3.857ms)
+✔ safeEqual compares without leaking a length (0.5226ms)
+✔ ageSeconds reports the age of an ISO timestamp and survives rubbish (0.3656ms)
+✔ checkUploadsWritable writes and removes its probe (8.0641ms)
+✔ the worker writes a heartbeat that gets fresher with every beat (108.9107ms)
+✔ the worker exits with a configuration error when it has no database (2.2269ms)
+✔ the worker keeps beating while the database is unreachable, then gives up on abort (708.0556ms)
+ℹ tests 64
+ℹ suites 0
+ℹ pass 56
+ℹ fail 7
+ℹ cancelled 1
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30332.9541
+
+✖ failing tests:
+
+test at test\bootstrap.test.mjs:78:1
+✖ the job records internal-not-public, and fails when the internal address is silent (98.3654ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/bootstrap.test.mjs:102:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\mail.test.mjs:1:1
+✖ test\mail.test.mjs (506.6754ms)
+  'test failed'
+
+test at test\migrate.test.mjs:43:1
+✖ a second run applies nothing and changes nothing (50.5788ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   '0002_ticks.sql',
+  +   '0003_bootstrap.sql'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/migrate.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '0002_ticks.sql', '0003_bootstrap.sql' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\migrate.test.mjs:62:1
+✖ a failing migration exits non-zero and leaves nothing behind (variant/bad-migration) (22.2226ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/migrate.test.mjs:72:2)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test\migrate.test.mjs:89:1
+✖ --label build-time records a separate set (ACC-05-12 observable) (35.4052ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   '0001_init.sql',
+  -   '0002_ticks.sql'
+  - ]
+  
+      at TestContext.<anonymous> (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/migrate.test.mjs:104:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ '0001_init.sql', '0002_ticks.sql' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\pg.test.mjs:56:1
+✖ a wrong password is refused (30013.7788ms)
+  'test timed out after 30000ms'
+
+test at test\pg.test.mjs:64:1
+✖ the extended protocol carries text parameters and decodes result types (13.2419ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      {
+  +     n: null,
+  +     name: null
+  -     n: 42,
+  -     name: 'hello'
+      }
+    ]
+  
+      at file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/pg.test.mjs:70:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async withStub (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/pg.test.mjs:21:10)
+      at async TestContext.<anonymous> (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/pg.test.mjs:65:2)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { name: null, n: null } ],
+    expected: [ { name: 'hello', n: 42 } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\pg.test.mjs:100:1
+✖ an ErrorResponse becomes a PgError and the connection stays usable (8.4705ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      {
+  +     still_alive: null
+  -     still_alive: 'yes'
+      }
+    ]
+  
+      at file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/pg.test.mjs:116:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async withStub (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/pg.test.mjs:21:10)
+      at async TestContext.<anonymous> (file:///E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/_build-artifacts/fixture-app/test/pg.test.mjs:101:2)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { still_alive: null } ],
+    expected: [ { still_alive: 'yes' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

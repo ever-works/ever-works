@@ -1,0 +1,17 @@
+# NEGATIVE FIXTURE neg-28 — error class: a `template` cycle.
+# Expected: JSON Schema PASS · rule layer FAIL `template_cycle`.
+# schema.md §21: "**Cycles** among `template` entries are error `template_cycle` naming every entry in the
+# cycle." Every string here is a legal template; only the graph makes it wrong.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - { name: PUBLIC_URL, template: '{{env.APP_URL}}' }
+        - { name: APP_URL, template: 'https://{{env.PUBLIC_URL}}' }

@@ -1,0 +1,660 @@
+================================================================================
+RAW RUN TRANSCRIPT — APW-03 App spec schema evidence
+================================================================================
+Produced by: node validate.mjs   (working directory: this evidence/ folder)
+Repository : E:\Coding\Worktrees\ever-works-platform-any-repo-works
+Branch     : plan/any-repo-as-work
+Artifact   : docs/specs/features/app-works/_build-artifacts/apw-03-schema/
+
+$ node --version
+v24.14.0
+
+$ git -C <repo> rev-parse HEAD
+e47866dc7636aa0fa5916bc656175a18401db6e8
+
+$ git -C <repo> status --porcelain -- docs/specs/features/app-works   (fixture sources + concurrency check)
+ M docs/specs/features/app-works/ACCEPTANCE.md
+ M docs/specs/features/app-works/APW-01-app-work-kind/plan.md
+ M docs/specs/features/app-works/APW-01-app-work-kind/tasks.md
+ M docs/specs/features/app-works/APW-02-fork-lifecycle/plan.md
+ M docs/specs/features/app-works/APW-02-fork-lifecycle/tasks.md
+ M docs/specs/features/app-works/APW-03-app-spec-and-catalog/schema.md
+ M docs/specs/features/app-works/APW-04-app-provisioner/tasks.md
+ M docs/specs/features/app-works/APW-06-app-runtime/plan.md
+ M docs/specs/features/app-works/APW-06-app-runtime/spec.md
+ M docs/specs/features/app-works/APW-06-app-runtime/tasks.md
+ M docs/specs/features/app-works/APW-08-evolve-loop/tasks.md
+ M docs/specs/features/app-works/APW-09-upstream-pull-requests/plan.md
+ M docs/specs/features/app-works/APW-09-upstream-pull-requests/spec.md
+ M docs/specs/features/app-works/APW-10-apps-hosting-tier/plan.md
+ M docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md
+ M docs/specs/features/app-works/APW-12-ever-id/cross-platform.md
+ M docs/specs/features/app-works/APW-12-ever-id/idp-options.md
+ M docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml
+ M docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml
+ M docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml
+ M docs/specs/features/app-works/CONTRACTS.md
+ M docs/specs/features/app-works/EXISTING-SUBSTRATE.md
+ M docs/specs/features/app-works/README.md
+ M docs/specs/features/app-works/TRACKER.md
+?? docs/specs/features/app-works/BUILD-READINESS.md
+?? docs/specs/features/app-works/_build-artifacts/
+
+$ sha256 of the fixture sources this run read (pin, so the result stays checkable)
+d32c7934c23d2dfbbd06ceb4fb018e6c51664e105c218f46f317d64d3c907c56  docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml
+a1230269a34905fba2adf4951d2256045007ae3b770961385891a2d691bc0703  docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml
+6977cfdf9b4ae12e83e6c0710ebef2b27d36f46e1fc875dd376bd0d1bcb0ecea  docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml
+
+$ node validate.mjs   (stdout+stderr, then the exit code)
+================================================================================
+APW-03 App spec schema — evidence run
+================================================================================
+run at        : 2026-09-17T18:23:37.937Z
+node          : v24.14.0
+repo root     : E:\Coding\Worktrees\ever-works-platform-any-repo-works
+schema        : docs/specs/features/app-works/_build-artifacts/apw-03-schema/app-spec.schema.json
+schema sha256 : 459fb280214f133a7f6bf512412f6b112ea7ac0e7047835b0c3187d925ae0f7a
+$schema       : https://json-schema.org/draft/2020-12/schema
+$id           : https://api.ever.works/api/schema/app-spec.schema.json
+$defs         : 42 definitions
+ajv           : E:\Coding\Worktrees\ever-works-platform-any-repo-works\node_modules\.pnpm\ajv@8.18.0\node_modules\ajv\dist\2020.js
+ajv options   : { strict: false, allErrors: true, allowUnionTypes: true }  (packages/agent-plugins/src/schema-validator.ts:53)
+yaml          : E:\Coding\Worktrees\ever-works-platform-any-repo-works\node_modules\.pnpm\yaml@2.8.3\node_modules\yaml\dist\index.js
+fixtures      : 42
+
+--------------------------------------------------------------------------------
+FIXTURE   blueprint/app-fixture-hello (worktree)
+file      docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml
+mode      data-repository
+note      the fixture Blueprint; its `format` check is required:false, hence one warning
+sha256    d32c7934c23d2dfbbd06ceb4fb018e6c51664e105c218f46f317d64d3c907c56
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+  warning  advisory_check                  spec.checks[1].required                `format` is advisory, so it verifies nothing
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   blueprint/umami (worktree)
+file      docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml
+mode      data-repository
+note      worktree revision: the EVER_WORKS_* env names were renamed to APP_* by an uncommitted change
+sha256    a1230269a34905fba2adf4951d2256045007ae3b770961385891a2d691bc0703
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   blueprint/cal-diy (worktree)
+file      docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml
+mode      data-repository
+note      clean at this revision: the reserved env names AND the look-around validate.pattern were both repaired by uncommitted worktree changes (20:09 and 20:17 on 2026-09-17); the head-revision fixture below still catches both
+sha256    6977cfdf9b4ae12e83e6c0710ebef2b27d36f46e1fc875dd376bd0d1bcb0ecea
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+  warning  advisory_check                  spec.checks[1].required                `biome` is advisory, so it verifies nothing
+  warning  advisory_check                  spec.checks[2].required                `unit-tests` is advisory, so it verifies nothing
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   head-revision/app-fixture-hello (control)
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/head-revision/app-fixture-hello.works.yml
+mode      data-repository
+note      CONTROL: never declared a reserved env name, so it must pass under both revisions
+sha256    03e5beffd43515a5311041cd5eb7bfeca7bd47fc6fcb2f1b695a99ed0fe4da72
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+  warning  advisory_check                  spec.checks[1].required                `format` is advisory, so it verifies nothing
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   head-revision/umami (HEAD e47866dc7)
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/head-revision/umami.works.yml
+mode      data-repository
+note      EVER_WORKS_WEB_INTERNAL_URL, EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD
+sha256    e970b3b31f4f924dd451ff53f7cc223bea9f31760124782e810a12b25d98cdcd
+SCHEMA    FAIL  (expected FAIL)
+  reserved_env_name              /spec/env/6/name                       not                    /spec/env/6/name must NOT match the forbidden shape
+  reserved_env_name              /spec/env/7/name                       not                    /spec/env/7/name must NOT match the forbidden shape
+RULES     FAIL
+  error    reserved_env_name               spec.env[6].name                       `EVER_WORKS_WEB_INTERNAL_URL` uses the reserved EVER_WORKS_ prefix
+  error    reserved_env_name               spec.env[7].name                       `EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD` uses the reserved EVER_WORKS_ prefix
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   head-revision/cal-diy (HEAD e47866dc7)
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/head-revision/cal-diy.works.yml
+mode      data-repository
+note      three reserved names; the look-around pattern is a second, independent defect
+sha256    b086c07a52eed566718f5ed3e034b1e2c5366271aeb4d3a65c3c67cce018fd38
+SCHEMA    FAIL  (expected FAIL)
+  reserved_env_name              /spec/env/9/name                       not                    /spec/env/9/name must NOT match the forbidden shape
+  reserved_env_name              /spec/env/19/name                      not                    /spec/env/19/name must NOT match the forbidden shape
+  reserved_env_name              /spec/env/20/name                      not                    /spec/env/20/name must NOT match the forbidden shape
+RULES     FAIL
+  error    reserved_env_name               spec.env[9].name                       `EVER_WORKS_WEB_INTERNAL_URL` uses the reserved EVER_WORKS_ prefix
+  error    reserved_env_name               spec.env[19].name                      `EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL` uses the reserved EVER_WORKS_ prefix
+  error    reserved_env_name               spec.env[20].name                      `EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD` uses the reserved EVER_WORKS_ prefix
+  error    pattern_unsupported             spec.env[20].validate.pattern          RE2 has no look-around and no back-references
+  warning  advisory_check                  spec.checks[1].required                `biome` is advisory, so it verifies nothing
+  warning  advisory_check                  spec.checks[2].required                `unit-tests` is advisory, so it verifies nothing
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   contracts-1/annotated (verbatim CONTRACTS.md §1)
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/contracts-1-annotated.works.yml
+mode      data-repository
+note      the outline writes enums and placeholders as prose; every path listed is a documented placeholder. Layer 2 is NOT asserted on this file: with no valid component the resolver cascades, and the cascade is reported for information only (see the issues below).
+sha256    42f4cecfb3251442977d943bee881f448a9b18d21f90dcc3c4d65f8fbeeac612
+SCHEMA    FAIL  (expected FAIL)
+  invalid_enum                   /spec/source/relation                  enum                   /spec/source/relation must be one of fork, private-copy, link
+  pattern                        /spec/blueprint/sha                    pattern                /spec/blueprint/sha does not match ^[0-9a-f]{40}$
+  invalid_enum                   /spec/license/class                    enum                   /spec/license/class must be one of green, amber, red, unknown
+  invalid_enum                   /spec/license/source                   enum                   /spec/license/source must be one of detected, blueprint, user
+  unknown_field                  /spec/build                            not                    /spec/build must NOT match the forbidden shape
+  invalid_type                   /spec/build                            if                     /spec/build must match "then" schema
+  unknown_field                  /spec/build                            not                    /spec/build must NOT match the forbidden shape
+  invalid_type                   /spec/build                            if                     /spec/build must match "then" schema
+  invalid_enum                   /spec/build/strategy                   enum                   /spec/build/strategy must be one of dockerfile, image, auto, none
+  pattern                        /spec/build/image                      pattern                /spec/build/image does not match ^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::[0-9]{1,5})?/)?[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]{0,127})?(?:@sha256:[0-9a-f]{64})?$
+  invalid_enum                   /spec/components/0/role                enum                   /spec/components/0/role must be one of web, worker
+  invalid_enum                   /spec/env/0/phase                      enum                   /spec/env/0/phase must be one of runtime, build, both
+  invalid_type                   /spec/env/0/generate                   not                    /spec/env/0/generate must NOT match the forbidden shape
+  invalid_type                   /spec/env/0/generate                   if                     /spec/env/0/generate must match "then" schema
+  invalid_type                   /spec/env/0/generate                   not                    /spec/env/0/generate must NOT match the forbidden shape
+  invalid_type                   /spec/env/0/generate                   if                     /spec/env/0/generate must match "then" schema
+  invalid_type                   /spec/env/0/generate                   not                    /spec/env/0/generate must NOT match the forbidden shape
+  invalid_type                   /spec/env/0/generate                   if                     /spec/env/0/generate must match "then" schema
+  invalid_enum                   /spec/env/0/generate/kind              enum                   /spec/env/0/generate/kind must be one of base64, hex, chars, uuid, keypair
+  keypair_password_invalid       /spec/env/0/generate/keypair           not                    /spec/env/0/generate/keypair must NOT match the forbidden shape
+  invalid_type                   /spec/env/0/generate/keypair           if                     /spec/env/0/generate/keypair must match "else" schema
+  invalid_enum                   /spec/env/0/generate/keypair/format    enum                   /spec/env/0/generate/keypair/format must be one of pem, base64url-raw, pkcs12
+  pattern                        /spec/env/0/generate/keypair/passwordEnv pattern                /spec/env/0/generate/keypair/passwordEnv does not match ^[A-Z_][A-Z0-9_]{0,127}$
+  invalid_enum                   /spec/jobs/0/when                      enum                   /spec/jobs/0/when must be one of pre-deploy, first-deploy, post-deploy
+  invalid_enum                   /spec/domains/onChange                 enum                   /spec/domains/onChange must be one of restart, rebuild
+RULES     FAIL
+  error    keypair_password_invalid        spec.env[0].generate.keypair.passwordEnv `<ENV NAME>` must be a secret entry generated with base64, hex or chars
+  error    reference_unresolved            spec.env[3].from                       `domains.primary.url`: no `web` component exists
+  error    reference_unresolved            spec.env[4].template                   `domains.primary.url`: no `web` component exists
+  error    reference_unresolved            spec.build.args[1].fromEnv             no env entry named `CALENDSO_ENCRYPTION_KEY`
+  error    component_ref_unknown           spec.smoke[0].component                smoke targets `web`, which is not a web component
+  error    component_ref_unknown           spec.smoke[1].component                smoke targets `web`, which is not a web component
+  error    primary_component_invalid       spec.domains.primaryComponent          `domains.primaryComponent` must name a web component
+  error    http_job_requires_web_component spec.jobs[1].component                 an http job requires a web component
+  error    http_job_requires_web_component spec.cron[0].component                 an http job requires a web component
+  error    auth_env_not_secret             spec.cron[0].http.authEnv              `CRON_API_KEY` must name a secret: true entry
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   contracts-1/materialised
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/contracts-1-materialised.works.yml
+mode      data-repository
+note      §1's own outline names three env entries it never declares: build.args[1].fromEnv CALENDSO_ENCRYPTION_KEY, cron[0].http.authEnv CRON_API_KEY, and (before R15) the same key again
+sha256    479ca79a9644a4b02b69315513a20eb6b1ebe56b06170a2a7e650081e40b2046
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    reference_unresolved            spec.build.args[1].fromEnv             no env entry named `CALENDSO_ENCRYPTION_KEY`
+  error    auth_env_not_secret             spec.cron[0].http.authEnv              `CRON_API_KEY` must name a secret: true entry
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   pos-00 minimal valid spec
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/positive/pos-00-minimal.works.yml
+mode      data-repository
+note      only `source` and `source.relation` are required — CONTRACTS.md §1 "every field is optional unless marked required"
+sha256    4acf5819df2e9ef49dbd892a59412e904a894fc4728c0a30116e4dc307c72979
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   pos-01 x- extension keys at three depths
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/positive/pos-01-extension-keys.works.yml
+mode      data-repository
+note      schema.md §2.3 / C1: `patternProperties: { "^x-": {} }` next to every `additionalProperties: false`
+sha256    3c660126ae38d1064a8ab78004b50475a5c90a5b3511c6b65ee5fb235f435439
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   pos-02 appSpecVersion newer than the build
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/positive/pos-02-app-spec-version.works.yml
+mode      data-repository
+note      the error→warning downgrade for a newer appSpecVersion is deliberately NOT a schema failure
+sha256    ba4da0acfe9b0f650a70b9621d168cbb41a38d2b77bd653fecf150e7deb5ac83
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   pos-03 spec.kind: app with no root kind
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/positive/pos-03-spec-kind-only.works.yml
+mode      data-repository
+note      schema.md §1: "When absent, `spec.kind: app` selects this schema"
+sha256    acba0751ba9cbe1fdb34374718453e78a7476327bb17cf3715a63ff775b1d871
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-01 unknown field (typo)
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-01-unknown-field.works.yml
+mode      data-repository
+note      `replica` → `replicas`; the suggestion is Layer-2 work (CONTRACTS.md C1), printed in the schema error table
+sha256    66f4bf4a6a3d2a62f18e25063ecf010c3c5a5afa6082bb1000faa833fac16a09
+SCHEMA    FAIL  (expected FAIL)
+  unknown_field                  /spec/components/0                     additionalProperties   /spec/components/0 has an unpermitted field "replica"
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-02 reserved env name
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-02-reserved-env-name.works.yml
+mode      data-repository
+sha256    93200cb8af9144632c36d951a4fa4f15486adac0ee57ba5528ac84dce12890ef
+SCHEMA    FAIL  (expected FAIL)
+  reserved_env_name              /spec/env/0/name                       not                    /spec/env/0/name must NOT match the forbidden shape
+RULES     FAIL
+  error    reserved_env_name               spec.env[0].name                       `EVER_WORKS_WEB_INTERNAL_URL` uses the reserved EVER_WORKS_ prefix
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-03 volumes with replicas > 1
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-03-volumes-with-replicas.works.yml
+mode      data-repository
+note      R18 is one of the cross-field rules the SCHEMA carries (if/then) — Layer 2 deliberately does not repeat it
+sha256    22a46d47b66e4055e8a85fc5a0d296348d77870f0c230997957fc176b3eb4c8b
+SCHEMA    FAIL  (expected FAIL)
+  volume_replicas                /spec/components/0/replicas            maximum                /spec/components/0/replicas must be <= 1
+  invalid_type                   /spec/components/0                     if                     /spec/components/0 must match "then" schema
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-04 secret: true with a literal value
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-04-secret-with-literal-value.works.yml
+mode      data-repository
+sha256    30cbdd937b28f02abf08e56fcf751caefd00e74339eca1547fb970f3d27a7898
+SCHEMA    FAIL  (expected FAIL)
+  literal_secret_value           /spec/env/0                            not                    /spec/env/0 must NOT match the forbidden shape
+  invalid_type                   /spec/env/0                            if                     /spec/env/0 must match "then" schema
+RULES     FAIL
+  error    literal_secret_value            spec.env[0].value                      a secret entry may not carry a literal value
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-05 from: outside the reference grammar
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-05-bad-from-reference.works.yml
+mode      data-repository
+sha256    8dcc6e619e90c61d256937e22aa990ca8bc915a0108a56a090d5a8f54dc82be9
+SCHEMA    FAIL  (expected FAIL)
+  reference_syntax               /spec/env/0/from                       pattern                /spec/env/0/from does not match ^(?:domains\.primary\.(?:url|host)|build\.commitSha|components\.[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?\.internalUrl|deps\.(?:postgres|redis|smtp)\.[A-Za-z0-9_]+|deps\.objectStorage\.(?:[A-Za-z0-9_]+|bucket\.[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?)|platform\.smtp\.(?:host|port|user|password|from|secure))$
+RULES     FAIL
+  error    reference_syntax                spec.env[0].from                       `deps.mysql.url`: not a Reference in the §21 grammar
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-06 missing source.relation
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-06-missing-source-relation.works.yml
+mode      data-repository
+sha256    a9965f6286298ed7d020da9e9ddee560ed7f534e2a444b5c1b0b3973de5c0e87
+SCHEMA    FAIL  (expected FAIL)
+  required                       /spec/source                           required               /spec/source is missing the required field "relation"
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-07 well-formed but unresolved from:
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-07-unresolved-reference.works.yml
+mode      data-repository
+note      THE LAYER SPLIT: the schema cannot see that `dependencies.redis` was never declared
+sha256    40880d460b11f6d0d439e0ca8313d611bcc54c18463586d1d6740a96b6a01684
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    reference_unresolved            spec.env[0].from                       `deps.redis.url`: dependencies.redis is not declared
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-08 secrecy does not propagate
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-08-secret-not-propagated.works.yml
+mode      data-repository
+sha256    1e9277514a1c5439b9d9b14318e17332e7116a2f31f9f9f1313894e62dcce052
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    secret_reference_not_secret     spec.env[0].secret                     `DATABASE_URL` reads a secret output, so it must be secret: true
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-09 env entry with two value sources
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-09-env-two-value-sources.works.yml
+mode      data-repository
+sha256    b5e5f4d2302bc21f0f6f9d52b0eab49a7ddfab9402232111d07cddc01ab85fc3
+SCHEMA    FAIL  (expected FAIL)
+  env_source_count               /spec/env/0                            oneOf                  /spec/env/0 must match exactly one of the allowed shapes
+RULES     FAIL
+  error    env_source_count                spec.env[0]                            entry has 2 value sources (value, from); exactly one is required
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-10 pkcs12 keypair without passwordEnv
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-10-pkcs12-without-password-env.works.yml
+mode      data-repository
+note      "passwordEnv present exactly when pkcs12" is schema-carried; Layer 2 only validates the named entry
+sha256    c8f0fee768f056f9c117cbab2732e9f655063bccac0db7232cd5e106e4976b7a
+SCHEMA    FAIL  (expected FAIL)
+  keypair_password_invalid       /spec/env/0/generate/keypair           required               /spec/env/0/generate/keypair is missing the required field "passwordEnv"
+  invalid_type                   /spec/env/0/generate/keypair           if                     /spec/env/0/generate/keypair must match "then" schema
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-11 worker component with a port
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-11-worker-with-port.works.yml
+mode      data-repository
+sha256    120b8270698f4e973d874a395292b8905c9165377e165b02423eb47943617f8b
+SCHEMA    FAIL  (expected FAIL)
+  worker_port_forbidden          /spec/components/1                     not                    /spec/components/1 must NOT match the forbidden shape
+  invalid_type                   /spec/components/1                     if                     /spec/components/1 must match "then" schema
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-12 web component without a port
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-12-web-without-port.works.yml
+mode      data-repository
+sha256    71028b21be9df7db17f2e15340d796ee809539c4fb1e4c412eacb01cbf90b5e8
+SCHEMA    FAIL  (expected FAIL)
+  web_component_needs_port       /spec/components/0                     required               /spec/components/0 is missing the required field "port"
+  invalid_type                   /spec/components/0                     if                     /spec/components/0 must match "then" schema
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-13 validate.pattern with look-around
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-13-lookaround-validate-pattern.works.yml
+mode      data-repository
+note      ECMA-262 accepts it; RE2 (schema.md §12) does not — the schema must NOT encode RE2
+sha256    5b170dc07b82d15c6dea26616a915e4aaffffa9326b9bf189da229a6c71a0624
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    pattern_unsupported             spec.env[0].validate.pattern           RE2 has no look-around and no back-references
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-14 duplicate env name
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-14-duplicate-env-name.works.yml
+mode      data-repository
+sha256    2a1dd696d232a8f8e1be15f73388b4238cbb8b2370ba91362061ddbcc4042f3d
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    duplicate_name                  spec.env[1].name                       duplicate env name "DATABASE_URL"
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-15 generate/validate disagree
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-15-generate-validate-conflict.works.yml
+mode      data-repository
+note      CONTRACTS.md C2's own example: base64 of 32 bytes is 44 characters, not 32
+sha256    7de802efcffff59cb1dc25230a86165ccec3aae993c2d4256610c23a2ce97c6c
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    generate_validate_conflict      spec.env[0].validate.length            the generator produces 44 characters, validate.length is 32
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-16 job component that does not exist
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-16-unknown-component-reference.works.yml
+mode      data-repository
+sha256    37c565036274fed5e0eedccd21f92e8a0701589b73c7ae557db56ff94264f05a
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    component_ref_unknown           spec.jobs[0].component                 no component named `api`
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-17 warnings only
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-17-warnings-only.works.yml
+mode      data-repository
+note      a legal document that is still wrong three ways — severity is not a schema concept
+sha256    5e6cd624e4e6a4d0fd52b13fc924c6a6d0a8c6d9cfcd3b9244226aff10d2f956
+SCHEMA    PASS  (expected PASS)
+RULES     PASS
+  warning  secret_build_arg                spec.build.args[0].fromEnv             `NPM_TOKEN` is a secret baked into image layers
+  warning  image_not_pinned                spec.build.image                       `image` is a moving tag; pin by digest
+  warning  advisory_check                  spec.checks[0].required                `format` is advisory, so it verifies nothing
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-18 literal secret in build.args
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-18-literal-secret-in-build-args.works.yml
+mode      data-repository
+note      schema.md §24.4 leading example (R10)
+sha256    7aa0e8ece183a40f2c52bbaa1d42174d005e66110f2a5c87982ed10aa8599a72
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    literal_secret_in_build_args    spec.build.args[0].value               build arguments are stored in image layers
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-19 upstreamPullRequests.requireApproval: false
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-19-upstream-pr-approval-false.works.yml
+mode      data-repository
+sha256    68029890602e97c66533406d8f17b027e8db3448af7ffe45dacc07886d90ab08
+SCHEMA    FAIL  (expected FAIL)
+  upstream_pr_approval_required  /spec/upstreamPullRequests/requireApproval const                  /spec/upstreamPullRequests/requireApproval must be true
+RULES     FAIL
+  error    upstream_pr_approval_required   spec.upstreamPullRequests.requireApproval upstream pull requests always need a person’s approval
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-20 publicBuckets not a subset of buckets
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-20-public-bucket-undeclared.works.yml
+mode      data-repository
+sha256    66bdec822685b60aaaa5e1eb68a03d2f973505a77ac44d487822bf2d1bb5ada0
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    public_bucket_undeclared        spec.dependencies.objectStorage.publicBuckets `avatars` is not in `buckets`
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-21 fork-only blocks on relation: link
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-21-upstream-blocks-on-link.works.yml
+mode      data-repository
+sha256    038021c95200494c0f2e406485357aae185e8ef6b52abf28b19ac212924d25f1
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    upstream_sync_requires_upstream spec.upstreamSync                      a link App Work cannot sync an upstream
+  error    upstream_prs_require_fork       spec.upstreamPullRequests.enabled      upstream pull requests need a fork
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-22 upstreamSync schedule too frequent
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-22-schedule-too-frequent.works.yml
+mode      data-repository
+sha256    148bf69c066383f09cde9eaee07fdd021a5ee16b00185e2f08a82bde71223fe7
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    schedule_too_frequent           spec.upstreamSync.schedule             consecutive upstream syncs must be at least 60 minutes apart
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-23 cron with the wrong field count
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-23-cron-wrong-field-count.works.yml
+mode      data-repository
+sha256    a59790e56641d9e39ea9e847b1b109f2eacf1540d3488edb7faa1b1239aacc7f
+SCHEMA    FAIL  (expected FAIL)
+  cron_invalid                   /spec/cron/0/schedule                  pattern                /spec/cron/0/schedule does not match ^\S+(\s+\S+){4}$
+RULES     FAIL
+  error    cron_invalid                    spec.cron[0].schedule                  cannot parse `every night`
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-24 memoryLimit below memory
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-24-memory-limit-below-request.works.yml
+mode      data-repository
+sha256    63318daad6a3013639c938b739aa07b731c9a988ce89942a1a46a9c3c9d40aa4
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    limit_below_request             spec.components[0].resources.memoryLimit 512Mi is below 1Gi
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-25 path outside the repository
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-25-path-outside-repository.works.yml
+mode      data-repository
+note      R22 is schema-carried (`#/$defs/relPath`, `#/$defs/glob`); Layer 2 does not repeat it
+sha256    dc9f481bac2188f69f753f371fdea32cff0c6fb9abc3ebf3607a5202c272f882
+SCHEMA    FAIL  (expected FAIL)
+  invalid_type                   /spec/display/protectedPaths/0         not                    /spec/display/protectedPaths/0 must NOT match the forbidden shape
+  invalid_type                   /spec/build/dockerfile                 not                    /spec/build/dockerfile must NOT match the forbidden shape
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-26 keypair format the type cannot produce
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-26-keypair-format-unsupported.works.yml
+mode      data-repository
+note      R25 is schema-carried; the JSON Schema failure carries no code of its own, which is why §5 of validator-rules.md maps keyword+path → code
+sha256    d8b3aaad9d391f8169acab5b656dcf9746247ac32fb911982373d11465029e69
+SCHEMA    FAIL  (expected FAIL)
+  invalid_enum                   /spec/env/0/generate/keypair/type      enum                   /spec/env/0/generate/keypair/type must be one of ed25519, ec-p256
+  invalid_type                   /spec/env/0/generate/keypair           if                     /spec/env/0/generate/keypair must match "then" schema
+RULES     PASS
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-27 spec.kind disagrees with root kind
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-27-kind-mismatch.works.yml
+mode      data-repository
+sha256    723961ed0978d6d751ff3ba8b1859ca6e7c546473de911ed8817a5eba8e8f868
+SCHEMA    FAIL  (expected FAIL)
+  kind_mismatch                  /spec/kind                             const                  /spec/kind must be "app"
+RULES     FAIL
+  error    kind_mismatch                   spec.kind                              root kind is "app" but spec.kind is "blog"
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-28 template cycle
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-28-template-cycle.works.yml
+mode      data-repository
+sha256    35044521ba6024528a54417292db5ab25e1503fc7467a2c3d55483f012ed9553
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    template_cycle                  spec.env.PUBLIC_URL.template           template cycle: PUBLIC_URL → APP_URL → PUBLIC_URL
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   neg-29 template chain deeper than 10
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/negative/neg-29-template-too-deep.works.yml
+mode      data-repository
+sha256    b5e600a4d98ace12404f5477ca614c174e72f7ab4797915a7fe6afe08c706a5f
+SCHEMA    PASS  (expected PASS)
+RULES     FAIL
+  error    template_too_deep               spec.env.C11.template                  resolution depth exceeds 10
+VERDICT   expectation met
+
+--------------------------------------------------------------------------------
+FIXTURE   blueprint-mode/cal-diy (mode: blueprint)
+file      docs/specs/features/app-works/_build-artifacts/apw-03-schema/evidence/fixtures/head-revision/cal-diy.works.yml
+mode      blueprint
+note      schema.md §3 forbids `source` and `blueprint` in blueprint mode — every Blueprint declares both
+sha256    b086c07a52eed566718f5ed3e034b1e2c5366271aeb4d3a65c3c67cce018fd38
+SCHEMA    FAIL  (expected FAIL)
+  reserved_env_name              /spec/env/9/name                       not                    /spec/env/9/name must NOT match the forbidden shape
+  reserved_env_name              /spec/env/19/name                      not                    /spec/env/19/name must NOT match the forbidden shape
+  reserved_env_name              /spec/env/20/name                      not                    /spec/env/20/name must NOT match the forbidden shape
+RULES     FAIL
+  error    blueprint_mode_forbidden_key    spec.source                            `source` is forbidden in blueprint mode
+  error    blueprint_mode_forbidden_key    spec.blueprint                         `blueprint` is forbidden in blueprint mode
+  error    reserved_env_name               spec.env[9].name                       `EVER_WORKS_WEB_INTERNAL_URL` uses the reserved EVER_WORKS_ prefix
+  error    reserved_env_name               spec.env[19].name                      `EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL` uses the reserved EVER_WORKS_ prefix
+  error    reserved_env_name               spec.env[20].name                      `EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD` uses the reserved EVER_WORKS_ prefix
+  error    pattern_unsupported             spec.env[20].validate.pattern          RE2 has no look-around and no back-references
+  warning  advisory_check                  spec.checks[1].required                `biome` is advisory, so it verifies nothing
+  warning  advisory_check                  spec.checks[2].required                `unit-tests` is advisory, so it verifies nothing
+VERDICT   expectation met
+
+================================================================================
+SUMMARY
+================================================================================
+fixture                                              schema   rules   verdict
+blueprint/app-fixture-hello (worktree)               pass     pass    met
+blueprint/umami (worktree)                           pass     pass    met
+blueprint/cal-diy (worktree)                         pass     pass    met
+head-revision/app-fixture-hello (control)            pass     pass    met
+head-revision/umami (HEAD e47866dc7)                 fail     fail    met
+head-revision/cal-diy (HEAD e47866dc7)               fail     fail    met
+contracts-1/annotated (verbatim CONTRACTS.md §1)     fail     fail    met
+contracts-1/materialised                             pass     fail    met
+pos-00 minimal valid spec                            pass     pass    met
+pos-01 x- extension keys at three depths             pass     pass    met
+pos-02 appSpecVersion newer than the build           pass     pass    met
+pos-03 spec.kind: app with no root kind              pass     pass    met
+neg-01 unknown field (typo)                          fail     pass    met
+neg-02 reserved env name                             fail     fail    met
+neg-03 volumes with replicas > 1                     fail     pass    met
+neg-04 secret: true with a literal value             fail     fail    met
+neg-05 from: outside the reference grammar           fail     fail    met
+neg-06 missing source.relation                       fail     pass    met
+neg-07 well-formed but unresolved from:              pass     fail    met
+neg-08 secrecy does not propagate                    pass     fail    met
+neg-09 env entry with two value sources              fail     fail    met
+neg-10 pkcs12 keypair without passwordEnv            fail     pass    met
+neg-11 worker component with a port                  fail     pass    met
+neg-12 web component without a port                  fail     pass    met
+neg-13 validate.pattern with look-around             pass     fail    met
+neg-14 duplicate env name                            pass     fail    met
+neg-15 generate/validate disagree                    pass     fail    met
+neg-16 job component that does not exist             pass     fail    met
+neg-17 warnings only                                 pass     pass    met
+neg-18 literal secret in build.args                  pass     fail    met
+neg-19 upstreamPullRequests.requireApproval: false   fail     fail    met
+neg-20 publicBuckets not a subset of buckets         pass     fail    met
+neg-21 fork-only blocks on relation: link            pass     fail    met
+neg-22 upstreamSync schedule too frequent            pass     fail    met
+neg-23 cron with the wrong field count               fail     fail    met
+neg-24 memoryLimit below memory                      pass     fail    met
+neg-25 path outside the repository                   fail     pass    met
+neg-26 keypair format the type cannot produce        fail     pass    met
+neg-27 spec.kind disagrees with root kind            fail     fail    met
+neg-28 template cycle                                pass     fail    met
+neg-29 template chain deeper than 10                 pass     fail    met
+blueprint-mode/cal-diy (mode: blueprint)             fail     fail    met
+
+fixtures run          : 42
+schema PASS / FAIL    : 23 / 19
+expectations met      : 42 / 42
+
+FINDINGS (computed from this run, not written in advance)
+  1. The three real Blueprint specs, at their repository revisions, score:
+       app-fixture-hello (worktree)       schema PASS rules PASS
+       umami (worktree)                   schema PASS rules PASS
+       cal-diy (worktree)                 schema PASS rules PASS
+     A schema that rejected a real Blueprint would be the most serious possible finding. None does.
+  2. The same Blueprints snapshotted at HEAD (e47866dc7) score:
+       app-fixture-hello (control)        schema PASS rules PASS
+       umami (HEAD e47866dc7)             schema FAIL rules FAIL
+       cal-diy (HEAD e47866dc7)           schema FAIL rules FAIL
+     The HEAD revision of cal-diy and umami declares env entries named EVER_WORKS_*, which
+     CONTRACTS.md:27 and schema.md R23 forbid; both are rejected with reserved_env_name, and
+     app-fixture-hello is the control that passes in both revisions. The working tree no longer
+     reproduces it — an uncommitted change renamed those entries (see fixtures/head-revision/SOURCE.txt).
+  3. 14 of 42 fixtures PASS the JSON Schema and FAIL the rule layer:
+       contracts-1/materialised, neg-07, neg-08, neg-13, neg-14, neg-15, neg-16, neg-18, neg-20, neg-21, neg-22, neg-24, neg-28, neg-29
+     That list IS the schema/rule boundary the program keeps asserting, enumerated.
+  4. CONTRACTS.md §1 extracted verbatim is not a valid document (its enums are prose); materialising
+     it exposes a second defect — its build args and its cron entry name env entries the outline
+     never declares (two reference_unresolved + one auth_env_not_secret).
+  5. Each fixture's sha256 is printed above, so this transcript stays checkable even though other
+     agents are editing the same worktree concurrently.
+
+
+All 42 fixtures matched their recorded expectation.
+
+$ echo $LASTEXITCODE
+0
+
+Note: 'exit code 0' means all 42 fixture entries matched the expectation recorded for them in
+validate.mjs. Nineteen entries are EXPECTED to fail the JSON Schema and fourteen more are
+expected to pass it and fail the rule layer; a non-zero exit would mean reality moved away
+from what the registry records.

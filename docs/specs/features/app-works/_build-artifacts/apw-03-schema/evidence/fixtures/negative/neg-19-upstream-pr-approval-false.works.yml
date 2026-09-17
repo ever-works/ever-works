@@ -1,0 +1,16 @@
+# NEGATIVE FIXTURE neg-19 — error class: `upstreamPullRequests.requireApproval: false`.
+# Expected: JSON Schema FAIL (`const: true` on /spec/upstreamPullRequests/requireApproval) ·
+#           rule layer `upstream_pr_approval_required`.
+# schema.md §20 / R12: "**Only `true` is valid**". This is one of the few CROSS-FIELD rules a 2020-12
+# `const` can carry on its own, and §24.4 lists it as an expected report.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    upstreamPullRequests: { enabled: false, requireApproval: false }

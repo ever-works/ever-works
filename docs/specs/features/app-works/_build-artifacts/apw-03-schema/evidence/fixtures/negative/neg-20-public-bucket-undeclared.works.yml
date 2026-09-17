@@ -1,0 +1,18 @@
+# NEGATIVE FIXTURE neg-20 — error class: `publicBuckets` is not a subset of `buckets`.
+# Expected: JSON Schema PASS · rule layer FAIL `public_bucket_undeclared`.
+# schema.md §11: "`objectStorage.publicBuckets` … Subset of `buckets` (`public_bucket_undeclared`)".
+# A subset check against a list declared elsewhere in the same document is not expressible in JSON Schema.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    dependencies:
+        objectStorage:
+            buckets: [uploads]
+            publicBuckets: [avatars]

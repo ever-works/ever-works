@@ -1,0 +1,13 @@
+✔ all-dependencies.works.yml: schema PASS
+✔ missing-value.works.yml: schema PASS
+✔ secret-in-image.works.yml: schema PASS
+✔ build-services.works.yml: schema PASS
+✔ build-timeout.works.yml: schema PASS
+
+  all-dependencies.works.yml: unchanged
+  missing-value.works.yml: unchanged
+  secret-in-image.works.yml: unchanged
+  build-services.works.yml: unchanged
+  build-timeout.works.yml: unchanged
+
+0 file(s) written, 0 failure(s) (check mode: nothing written)

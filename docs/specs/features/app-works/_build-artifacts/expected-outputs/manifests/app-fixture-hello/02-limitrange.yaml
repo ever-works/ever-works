@@ -1,0 +1,29 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. LimitRange `ew-defaults` (APW-06 plan §4.2, §4.1).
+# Target "Your cluster" → max per container 8 CPU / 64Gi (the managed flavour is in managed-overlay.yaml).
+#
+# This LimitRange matters more for the fixture than for cal-diy: the fixture's worker asks for 48Mi and the
+# renderer emits no cpu limit for either component, so the namespace defaults are what an unset field falls
+# back to at admission time.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ew-defaults
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: "1"
+        memory: 512Mi
+        ephemeral-storage: 1Gi
+      max:
+        cpu: "8"
+        memory: 64Gi

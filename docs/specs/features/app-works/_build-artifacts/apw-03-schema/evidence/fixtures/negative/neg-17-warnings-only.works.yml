@@ -1,0 +1,23 @@
+# NEGATIVE FIXTURE neg-17 — error class: none. WARNINGS only.
+# Expected: JSON Schema PASS · rule layer PASS with three warnings:
+#           `advisory_check` (R20), `image_not_pinned` (R19), `secret_build_arg` (R11).
+# A rule set that cannot report a warning is as broken as one that cannot report an error, and severity is
+# exactly what JSON Schema has no vocabulary for — every one of these is a legal document.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build:
+        strategy: image
+        image: 'postgres:16'
+        args:
+            - { name: NPM_TOKEN, fromEnv: NPM_TOKEN }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - { name: NPM_TOKEN, secret: true, phase: build, generate: { kind: hex, bytes: 32 } }
+    checks:
+        - { name: format, command: 'npm run format:check', required: false }

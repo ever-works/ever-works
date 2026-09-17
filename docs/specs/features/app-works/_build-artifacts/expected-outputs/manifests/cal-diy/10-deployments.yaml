@@ -1,0 +1,127 @@
+# GOLDEN RENDERED OUTPUT — cal-diy. Deployment `web` (APW-06 plan §4.1 names table, §4.3, §4.4, §4.5).
+# One Deployment per component. `role: web` also gets a Service (11-services.yaml) and, as
+# `domains.primaryComponent`, the Ingress (12-ingress.yaml).
+#
+# spec-field → rendered field (full table in _index.md):
+#   components[0].command                  → spec.template.spec.containers[0].command
+#   components[0].port: 3000               → ports[0].containerPort (named `http` — probe port)
+#   components[0].replicas: 1              → spec.replicas
+#   components[0].probes.*                 → startup/readiness/livenessProbe, spec values + schema defaults
+#                                            (`APW-03 schema.md:198-201`: period 10, timeout 5, delay 0,
+#                                            failureThreshold 3 / startup 30)
+#   components[0].writableRootFilesystem   → readOnlyRootFilesystem  (true → readOnly false, no /tmp emptyDir)
+#   components[0].resources                → requests.cpu/memory, limits.memory (no cpuLimit declared)
+#   (no volumes)                           → strategy RollingUpdate (Recreate is only for components with volumes)
+#   deadline formula (APW-06 plan §5.3)    → progressDeadlineSeconds: clamp(10*60 + 10*3 + 120, 300, 2400) = 750
+#
+# Placeholders: `example-owner` and the `sha256:0123…` digest are documentation placeholders. The image
+# reference is digest-pinned and never a tag (APW-05 spec FR-32, APW-06 plan §1.2 #3).
+#
+# Labels deliberately EXCLUDE `ever-works.io/managed` and `app.kubernetes.io/name`: reusing them would make
+# App components appear in `listProjects` / `listManagedDeployments` (APW-06 plan §1.2 #6, §4.1).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+    ever-works.io/component: web
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 750
+  minReadySeconds: 0
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      ever-works.io/component: web
+  template:
+    metadata:
+      labels:
+        ever-works.io/component: web
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: cal-diy
+        ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+        ever-works.io/kind: app
+      annotations:
+        ever-works.io/env-checksum: 3b2eee9155911d5d
+        ever-works.io/build-commit: a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
+        ever-works.io/deployment-id: 33333333-3333-4333-8333-333333333333
+    spec:
+      serviceAccountName: app
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      imagePullSecrets:
+        - name: app-pull
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              ever-works.io/component: web
+      containers:
+        - name: web
+          image: ghcr.io/example-owner/cal.diy/ever-works-app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          imagePullPolicy: IfNotPresent
+          command:
+            - /calcom/scripts/start.sh
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: app-env-3b2eee9155
+                optional: false
+            - configMapRef:
+                name: app-platform-3b2eee9155
+                optional: false
+          startupProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            initialDelaySeconds: 0
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /auth/login
+              port: http
+            initialDelaySeconds: 0
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/version
+              port: http
+            initialDelaySeconds: 0
+            timeoutSeconds: 5
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1536Mi
+            limits:
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL

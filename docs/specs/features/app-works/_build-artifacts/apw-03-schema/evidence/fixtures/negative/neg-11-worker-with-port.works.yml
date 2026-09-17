@@ -1,0 +1,14 @@
+# NEGATIVE FIXTURE neg-11 — error class: a `worker` component declares `port`.
+# Expected: JSON Schema FAIL (`if`/`then`: /spec/components/0 must NOT have `port`) · rule layer `worker_port_forbidden`.
+# schema.md §10: "`port` … 1–65535. Forbidden for `worker` (`worker_port_forbidden`)."
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+        - { name: worker, role: worker, port: 3000, command: ['node', 'dist/worker.js'] }

@@ -1,0 +1,129 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. Runner ConfigMap `ew-runner-918eaf204a`
+# (APW-06 plan §4.1, §4.8, §4.9). Script + request list, both as DATA — never as a command line.
+#
+# `ew-runner-918eaf204a` = first 10 hex of sha256("22222222-2222-4222-8222-222222222222|ever-works-runner|v1")
+# = sha256(…) → 918eaf204adeb17fcfb71215acee5456c43e06287d37696ecd31ca778a386b67. See _index.md and
+# ../open-questions.md Q-4.
+#
+# Requests here: the one `http` cron plus the four smoke checks (works.yml:106-122). `spec.cron[].http`
+# inherits the `expect` default from jobs (`[200, 201, 204]`), which is what covers the fixture's
+# `POST /cron/tick → 204` (APW-13 plan.md:200).
+#
+# Smoke requests never follow redirects. `expect.status` judges the FIRST response — which is what makes
+# `smoke/setup-closed` (expect 400) and `smoke/cron-refuses-anonymous` (expect 401) meaningful rather than
+# chasing a redirect.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ew-runner-918eaf204a
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+immutable: true
+data:
+  runner.mjs: |
+    import { readFileSync } from 'node:fs';
+
+    const requestId = process.argv[2];
+    const requests = JSON.parse(readFileSync('/ew/requests.json', 'utf8'));
+    const request = requests[requestId];
+    if (!request) {
+    	console.log(JSON.stringify({ name: requestId, status: 0, latencyMs: 0, failedExpectation: 'unknown request' }));
+    	process.exit(2);
+    }
+
+    const resolve = (value) =>
+    	String(value).replace(/\{\{env\.([A-Z_][A-Z0-9_]*)\}\}/g, (_match, name) => process.env[name] ?? '');
+
+    const scrub = (text) => {
+    	let out = String(text);
+    	for (const value of Object.values(process.env)) {
+    		if (value && value.length >= 8) out = out.split(value).join('***');
+    	}
+    	return out;
+    };
+
+    const headers = {};
+    if (request.authEnv && process.env[request.authEnv]) {
+    	headers.authorization =
+    		request.authScheme === 'raw' ? process.env[request.authEnv] : `Bearer ${process.env[request.authEnv]}`;
+    }
+    if (request.body !== undefined) headers['content-type'] = 'application/json';
+
+    const started = Date.now();
+    let status = 0;
+    let body = '';
+    try {
+    	const response = await fetch(request.url, {
+    		method: request.method ?? 'GET',
+    		headers,
+    		body: request.body === undefined ? undefined : resolve(JSON.stringify(request.body)),
+    		redirect: 'manual'
+    	});
+    	status = response.status;
+    	body = Buffer.from(await response.arrayBuffer()).subarray(0, 1048576).toString('utf8');
+    } catch {
+    	status = 0;
+    }
+
+    const expect = request.expect ?? {};
+    const statuses = expect.status ?? [200];
+    let failedExpectation;
+    let found;
+    if (!statuses.includes(status)) failedExpectation = `status ${status}`;
+    for (const needle of expect.bodyContains ?? []) {
+    	if (!body.includes(needle)) failedExpectation = failedExpectation ?? 'missing expected text';
+    }
+    for (const needle of expect.bodyNotContains ?? []) {
+    	if (body.includes(needle)) {
+    		failedExpectation = failedExpectation ?? 'unexpected text present';
+    		found = scrub(needle).slice(0, 200);
+    	}
+    }
+
+    console.log(
+    	JSON.stringify({
+    		name: requestId,
+    		status,
+    		latencyMs: Date.now() - started,
+    		...(failedExpectation ? { failedExpectation } : {}),
+    		...(found ? { found } : {})
+    	})
+    );
+    process.exit(failedExpectation ? 1 : 0);
+  requests.json: |
+    {
+      "cron/tick": {
+        "authEnv": "FIXTURE_CRON_TOKEN",
+        "authScheme": "bearer",
+        "expect": { "status": [200, 201, 204] },
+        "method": "POST",
+        "url": "http://web.ew-app-fixture-hello-22222222.svc:80/cron/tick"
+      },
+      "smoke/cron-refuses-anonymous": {
+        "expect": { "status": [401] },
+        "method": "POST",
+        "url": "http://web.ew-app-fixture-hello-22222222.svc:80/cron/tick"
+      },
+      "smoke/healthz": {
+        "expect": { "status": [200] },
+        "method": "GET",
+        "url": "http://web.ew-app-fixture-hello-22222222.svc:80/healthz"
+      },
+      "smoke/marker": {
+        "expect": {
+          "status": [200],
+          "bodyNotContains": ["localhost"]
+        },
+        "method": "GET",
+        "url": "http://web.ew-app-fixture-hello-22222222.svc:80/marker"
+      },
+      "smoke/readyz": {
+        "expect": { "status": [200] },
+        "method": "GET",
+        "url": "http://web.ew-app-fixture-hello-22222222.svc:80/readyz"
+      }
+    }

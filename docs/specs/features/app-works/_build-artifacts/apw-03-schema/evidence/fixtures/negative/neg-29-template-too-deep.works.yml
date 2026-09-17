@@ -1,0 +1,27 @@
+# NEGATIVE FIXTURE neg-29 — error class: a `template` chain deeper than the resolution limit.
+# Expected: JSON Schema PASS · rule layer FAIL `template_too_deep`.
+# schema.md §21: "Resolution depth ≤ 10 (`template_too_deep`)." Twelve entries chain c1 → c2 → … → c12;
+# each value is a legal template and each name is unique, so nothing but a graph walk can see it.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - { name: C1, template: '{{env.C2}}' }
+        - { name: C2, template: '{{env.C3}}' }
+        - { name: C3, template: '{{env.C4}}' }
+        - { name: C4, template: '{{env.C5}}' }
+        - { name: C5, template: '{{env.C6}}' }
+        - { name: C6, template: '{{env.C7}}' }
+        - { name: C7, template: '{{env.C8}}' }
+        - { name: C8, template: '{{env.C9}}' }
+        - { name: C9, template: '{{env.C10}}' }
+        - { name: C10, template: '{{env.C11}}' }
+        - { name: C11, template: '{{env.C12}}' }
+        - { name: C12, template: 'https://example.test/' }
