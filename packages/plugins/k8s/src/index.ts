@@ -39,3 +39,7 @@ export {
 	type DnsResolver
 } from './domain.handler.js';
 export * from './types.js';
+// App renderer (APW-06 plan §4.1 names/labels and §4.4 security context) — pure functions with no
+// cluster access, exported for APW-10's in-zone controller and for the rest of `src/app/`.
+export * from './app/app-names.js';
+export * from './app/app-security.js';

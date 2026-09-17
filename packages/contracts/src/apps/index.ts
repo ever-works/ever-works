@@ -31,6 +31,7 @@
  */
 export * from './app-dependencies.js';
 export * from './app-env.js';
+export * from './app-runtime.js';
 export * from './app-source.js';
 export * from './app-upstream.js';
 export * from './apps-limits.js';
