@@ -501,3 +501,11 @@ Each has a recommended default that the epic specs assume until answered.
     [ACCEPTANCE](./ACCEPTANCE.md) §4, because Cal.diy needs SMTP and a root-capable runtime that the Wave 2 tier
     does not yet offer (see the capability rows in [TRACKER](./TRACKER.md)); it becomes a Wave 3 criterion once
     the tier's dependency set covers those. The owner may promote it to Wave 2 — that is the open decision._
+
+**How these ten relate to the epic markers.** Questions 1 and 7 are restated as epic markers and are rows
+`CL-42` and `CL-48` in [CLARIFICATIONS.md](./CLARIFICATIONS.md); question 10 covers the same subject as `CL-08`.
+Questions 3, 4, 5, 6 and 9 have **no** epic §9 marker and are tracked only here — they block no epic's approval.
+Every epic marker, the default its spec assumes, the wave it blocks and who decides it are in that register; a
+spec is `Approved` for a wave only when no blocking marker for that wave is open (the status criteria are in
+[TRACKER](./TRACKER.md), and the repeatable checklist is
+[`checklists/requirements.md`](./checklists/requirements.md)).

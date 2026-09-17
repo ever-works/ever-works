@@ -132,13 +132,19 @@ this phase._
       `[ActivityActionType.APP_UPSTREAM_PR]: 'deliveryWhenCompleted'` to `FEED_KIND_RULES` (APW09-G03: the table-driven
       spec at `feed-kind.spec.ts:14-19` fails until every member has an explicit entry, and the comment at
       `feed-kind.ts:48-52` says so). No existing rule is changed or reordered.
+      **Modify** nothing in `packages/contracts/src/api/shared-view/publishable-activity.ts`: resolution R-34 classifies
+      every new family, and App Works events default to **`NEVER_PUBLISH`** — `app_upstream_pr` must stay off
+      `PUBLISHABLE_ACTIVITY_ACTIONS` (its Live Feed narration names a repository and a pull-request number).
       **Test**: `packages/contracts/src/apps/__tests__/upstream-pull-request.types.spec.ts` (new) — pins every union,
       every number and every copy-bearing code (30 refusals + `activeProposal`); extend
       `packages/agent/src/entities/__tests__/activity-log.types.spec.ts` with `['APP_UPSTREAM_PR', 'app_upstream_pr']`;
       extend `packages/agent/src/activity-log/feed-kind.spec.ts` — the new member is mapped, and with
       `ActivityStatus.FAILED` for `app.upstream_pr.refused` / `.failed` / `.expired` it resolves to the problem kind
-      while `COMPLETED` `app.upstream_pr.opened` resolves to delivery (plan §3.4). Run:
-      `pnpm --filter @ever-works/contracts test` and `pnpm --filter @ever-works/agent test activity-log.types feed-kind`.
+      while `COMPLETED` `app.upstream_pr.opened` resolves to delivery (plan §3.4); extend
+      `packages/agent/src/shared-views/__tests__/publishable-activity.spec.ts` — `app_upstream_pr` is on
+      `NEVER_PUBLISH_ACTIVITY_ACTIONS` and not on the publishable allowlist (R-34; that spec already fails until every
+      kind is classified). Run:
+      `pnpm --filter @ever-works/contracts test` and `pnpm --filter @ever-works/agent test activity-log.types feed-kind publishable-activity`.
       **Done when**: all three specs are green and `pnpm --filter @ever-works/contracts build` emits the declarations.
 
 - [ ] **T7. Entity + migrations.**
@@ -699,8 +705,9 @@ WorkUpstreamPrSetting, UpstreamPrSuggestion])` and provides `UpstreamPullRequest
 
 - [ ] **T39 (P2). The operator kill switch and the operator deny list (added 2026-09-17, XC-10/XC-22, FR-41/FR-46).**
       **Create** `packages/agent/src/upstream-pull-requests/upstream-operator-policy.ts` (new) — reads
-      `EVER_WORKS_UPSTREAM_PRS_ENABLED` (default **`false`** in production, `true` elsewhere only when explicitly set;
-      CONTRACTS §7 carries the row) and the deny list, and exposes `isPaused()` / `isDenied(owner, repo)`.
+      **`EVER_WORKS_APP_UPSTREAM_PRS_ENABLED`** (resolution R-30's binding name; the binding default is **`true`** —
+      the family runs unless an operator turns it off, CONTRACTS §7) and the deny list, and exposes `isPaused()` /
+      `isDenied(owner, repo)`.
       **Modify** `upstream-preparation.service.ts`, `upstream-open.service.ts`, `upstream-status.service.ts`,
       `upstream-suggestion.service.ts`, the two dispatchers and `packages/tasks/src/tasks/trigger/upstream-pr-status.task.ts`
       — each reads the switch **itself** before doing any work and fails closed (no preparation row, no open, no push,

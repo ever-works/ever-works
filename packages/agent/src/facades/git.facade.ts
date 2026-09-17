@@ -60,6 +60,18 @@ export interface FacadeCloneOptions {
     readonly committer?: GitCommitter;
     readonly branch?: string;
     readonly autoSwitchToMainBranch?: boolean;
+    /**
+     * Per-caller working copy key (`work:<workId>:<role>`). Two calls for one repository with
+     * different keys get different directories and are never coalesced onto one git operation;
+     * omitted keeps the shared per-repository directory every existing caller uses.
+     */
+    readonly checkoutKey?: string;
+    /**
+     * Declares that the remote repository MUST exist, so a missing/empty remote fails loudly
+     * instead of being replaced by an empty local repository. Opt-in; absent keeps the lenient
+     * default.
+     */
+    readonly expectExisting?: boolean;
 }
 
 /**
@@ -1383,12 +1395,17 @@ export class GitFacadeService implements IGitFacade {
         // coordinate, and two callers with different tokens still resolve to
         // the same on-disk directory — sharing the in-flight operation is
         // exactly what we want, and it keeps secrets out of map keys.
+        //
+        // `checkoutKey` IS part of the key: a key asks for a working copy of
+        // its own, so coalescing two different keys would hand both callers
+        // the same directory again — the very sharing the key prevents.
         const key = [
             plugin.id,
             cloneOptions.owner,
             cloneOptions.repo,
             cloneOptions.branch ?? '',
             cloneOptions.autoSwitchToMainBranch === false ? 'no-switch' : 'switch',
+            cloneOptions.checkoutKey ?? '',
         ].join('\0');
 
         const inFlight = this.cloneOrPullRequests.get(key);
@@ -1572,9 +1589,9 @@ export class GitFacadeService implements IGitFacade {
         return plugin.getWebUrl(owner, repo);
     }
 
-    getLocalDir(providerId: string, owner: string, repo: string): string {
+    getLocalDir(providerId: string, owner: string, repo: string, checkoutKey?: string): string {
         const plugin = this.getPluginSync(providerId);
-        return plugin.getLocalDir(owner, repo);
+        return plugin.getLocalDir(owner, repo, checkoutKey);
     }
 
     private getPluginSync(providerId: string): IGitProviderPlugin {
@@ -1604,9 +1621,14 @@ export class GitFacadeService implements IGitFacade {
         return plugin.replaceRemote(dir, remote, url);
     }
 
-    async removeLocalDir(providerId: string, owner: string, repo: string): Promise<void> {
+    async removeLocalDir(
+        providerId: string,
+        owner: string,
+        repo: string,
+        checkoutKey?: string,
+    ): Promise<void> {
         const plugin = this.getPluginSync(providerId);
-        return plugin.removeLocalDir(owner, repo);
+        return plugin.removeLocalDir(owner, repo, checkoutKey);
     }
 
     async renameBranch(

@@ -92,6 +92,14 @@ export interface ForkTemplateResult {
         url: string;
     };
     created: boolean;
+    /**
+     * APW-02 P0 — readiness of the fork this call asked for. `pending` means the provider accepted
+     * the request but the repository is not readable yet: a background readiness poller finishes
+     * that job, and the caller must not clone or push into the repository until it reports ready.
+     * `ready` means an existing fork was resolved and is usable now. Absent when the provider
+     * reported no readiness (pre-existing providers).
+     */
+    forkReadiness?: 'ready' | 'pending';
 }
 
 @Injectable()
@@ -514,6 +522,13 @@ export class TemplateCatalogService implements OnModuleInit {
             template.repositoryName,
             {
                 organization: targetOrganizationLogin,
+                // `waitForReady` is deliberately NOT set here. The provider can now fork
+                // non-blockingly (`waitForReady: false` → `forkReadiness: 'pending'`), but P0 ships
+                // no readiness poller: `WorkUpstreamState` and the `app-fork-readiness` job are
+                // APW-02 P1 (T12/T24), and this epic's P0 gate allows no migration, job or route.
+                // Asking for a pending fork here would leave it pending forever, so this caller
+                // keeps the provider's blocking default until that poller exists. The provider
+                // resolves an existing fork first either way, so a repeat fork is already cheap.
             },
             { userId, providerId },
         );
@@ -577,6 +592,7 @@ export class TemplateCatalogService implements OnModuleInit {
                     ),
             },
             created: true,
+            forkReadiness: forkedRepository.forkReadiness,
         };
     }
 

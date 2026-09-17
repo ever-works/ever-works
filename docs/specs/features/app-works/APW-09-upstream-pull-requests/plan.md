@@ -387,6 +387,10 @@ export const UPSTREAM_REFUSAL_CODES = [
 export const UPSTREAM_ERROR_CODES = ['activeProposal'] as const; // 409 bodies, not refusals (spec §6.5).
 
 export const UPSTREAM_LIMITS = {
+	// Every value below is the DEFAULT an operator may raise for the installation without a redeploy
+	// (resolution R-31, CONTRACTS §7A: `EVER_WORKS_APP_UPSTREAM_PR_MAX_PER_DAY` covers
+	// `openedOverallPer24h`, member 3 / organization 20). Raising one never removes the platform ceiling
+	// below, and no product setting raises a value at will (FR-26).
 	openedPerUpstreamPer24h: 1,
 	// Ceiling only. The effective per-upstream open cap is the App Work's own setting,
 	// `spec.upstreamPullRequests.maxOpen` (schema.md §20, default 3, valid 1–10, read through
@@ -606,8 +610,9 @@ send Ever Works none, which is exactly why FR-29 polls (row 23's event cell says
 ## 5. API
 
 On a new controller `apps/api/src/works/upstream-pull-requests.controller.ts` _(new)_, `@Controller('api')`, following
-`apps/api/src/works/work-runs.controller.ts`. All routes JWT-guarded; `WorkOwnershipService.ensureCanView` /
-`ensureCanEdit`; another account's ids answer **404**.
+`apps/api/src/works/work-runs.controller.ts`. All routes JWT-guarded; the two reads call APW-01's shared
+`ensureCanViewOr404(workId, userId)` (resolution R-36: another account's App Work answers **404**, while `403` stays
+for a member without the required role) and the writes call `ensureCanEdit`; another account's ids answer **404**.
 
 | Method | Path                                                                  | Body / query                       | Returns                                                                                                                                                                                         | Throttle  |
 | ------ | --------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
@@ -750,7 +755,8 @@ timed out, and a row that has genuinely spent 90 running minutes becomes `failed
 **Kill switches, deny list and opt-out (added 2026-09-17, XC-10/XC-22).** The dispatchers themselves — not the
 endpoints that create work — read the operator switches, so an off switch fails closed whatever door the work came
 through: `UPSTREAM_PR_OPEN_DISPATCHER` and `UPSTREAM_PR_PUSH_DISPATCHER` refuse when
-`EVER_WORKS_UPSTREAM_PRS_ENABLED` is not `true` (CONTRACTS §7 carries the row), the status job dispatches no poll
+**`EVER_WORKS_APP_UPSTREAM_PRS_ENABLED`** is `false` (resolution R-30 — the binding name and the binding default,
+which is **`true`**: the family runs unless an operator turns it off; CONTRACTS §7), the status job dispatches no poll
 when it is off, and `UpstreamPreparationService.start` refuses `disabled` before it creates a row. The denial check
 (FR-41) is read once per eligibility evaluation and once again immediately before opening (§5), and the maintainer
 opt-out (FR-40) is read from the same repository read the eligibility service already performs — both additive to
@@ -1047,11 +1053,11 @@ P2 above are inside Wave 2 and therefore add no new wave slot.
 
 ## 13. Security and permissions (added 2026-09-17, SK-16)
 
-Every route of §5 is JWT-guarded and scoped through `WorkOwnershipService`: **view** for the two reads, **edit** for
-every write, and a foreign Work id answers `404` (never `403`, ACC-09-23). No route in this epic is `@Public`, none
-creates a scope or a role, and none is `@DelegatedRead` (a delegated Ever ID token must not reach any of them —
-`R-19` admits delegated tokens only on routes marked with that decorator, and ACC-09-35 additionally refuses a
-non-session actor on the two human-only ones).
+Every route of §5 is JWT-guarded and scoped through `WorkOwnershipService`: **view** for the two reads (through
+APW-01's `ensureCanViewOr404`, R-36), **edit** for every write, and a foreign Work id answers `404` (never `403`,
+ACC-09-23). No route in this epic is `@Public`, none creates a scope or a role, and none is `@DelegatedRead` (a
+delegated Ever ID token must not reach any of them — `R-19` admits delegated tokens only on routes marked with that
+decorator, and ACC-09-35 additionally refuses a non-session actor on the two human-only ones; R-32 binds those two).
 
 | Route                                                      | Who may call it                                      | Throttle  | Validating DTO          | Secret fields |
 | ---------------------------------------------------------- | ---------------------------------------------------- | --------- | ----------------------- | ------------- |
@@ -1075,6 +1081,15 @@ the pattern name only (G13); the preparation report is read by the workspace plu
 (§4); and the telemetry emitter strips content keys before `capture` (§9.1). The only `https` URLs the API returns
 are ones the provider itself supplied — the pull request URL and the agreement link — and both are validated as
 `https` before storage. `x-secret` fields: none — no request or response in this epic carries one.
+
+**The program's two normative registers (resolution R-37).** This epic owns rows **T-27** (publishing upstream in a
+member's name without that member's decision), **T-28** (the prepared diff carries secrets, the App spec, platform
+workflows or unrelated fork customisations), **T-29** (maintainers flooded — the programme becomes a spam source) and
+**B-9** (upstream repositories ← pull requests sent in the member's name) of the §10 threat register, each mapped to
+the control above and to its verifying ACC; and its three background jobs — `upstream-pr-status`, `upstream-pr-open`
+and `upstream-pr-push` — are the APW-09 rows of §11's operational signals, whose named alerts
+(`app_upstream_pr_poll_failing` on ≥ 5 consecutive poll failures being the one already recorded) are implemented by
+T18's and T26's tasks. [`THREAT-MODEL.md`](../THREAT-MODEL.md) carries the same rows with their residual risk.
 
 ---
 

@@ -687,9 +687,9 @@ A reviewer can run this list top to bottom against a running build with the flag
 ## 9. Open questions
 
 Each question below stays open until its row says otherwise. Every one is registered in the program
-clarifications register (`docs/specs/features/app-works/CLARIFICATIONS.md`, one row per marker, with the
-default the specs assume, the wave it blocks, who decides and its status); a question answered since this
-spec was drafted keeps its text and gains a **Resolved (…)** line underneath, and nothing is deleted.
+clarifications register ([`CLARIFICATIONS.md`](../CLARIFICATIONS.md) — these six are **CL-47**…**CL-52**, with the
+default the specs assume, the wave it blocks, who decides and its status); a question answered since this spec
+was drafted keeps its text and gains a **Resolved (…)** line underneath, and nothing is deleted.
 
 - **[NEEDS CLARIFICATION: where does the platform catalog live?]** ADR-014 puts catalogs in the
   `ever-works` organisation; the catalog describes the whole Ever family and P2 consumers live in
@@ -704,12 +704,13 @@ spec was drafted keeps its text and gains a **Resolved (…)** line underneath, 
   host as ADR-014's reader does, so the repository must be readable by the API process (public, as
   `ever-works/templates` is, or read with a token, as the Apps catalog's optional
   `EVER_WORKS_APPS_CATALOG_TOKEN` does); the drafts in [`catalog-draft/`](./catalog-draft/) become that
-  repository's first commit content (T18).
+  repository's first commit content (T18). Registered as **CL-47**.
 - **[NEEDS CLARIFICATION: where is the web component published?]** Program README open question 7.
   _Default: developed in the Ever Works monorepo during P1, extracted with history to a public `ever-co`
   repository and published under the `@ever-co` scope at P2._
-  **Register:** APW-11 question 2, open; README §8 question 7, with the P1 answer already settled by this spec
-  (the package lives in the monorepo, `"private": true`, and is mounted in the header from P1 — FR-45, T10, T28).
+  **Register:** APW-11 question 2 (**CL-48**), open; README §8 question 7, with the P1 answer already settled by
+  this spec (the package lives in the monorepo, `"private": true`, and is mounted in the header from P1 — FR-45,
+  T10, T28).
   The Wave 3 decision — the extraction repository, the npm scope and the names-only publish credential — is
   still the owner's, and T28 cannot finish without it.
 - **[NEEDS CLARIFICATION: which platforms are in the first catalog?]** Ever Works, Ever Gauzy and Ever
@@ -717,21 +718,22 @@ spec was drafted keeps its text and gains a **Resolved (…)** line underneath, 
   **Resolved in part (owner, 2026-09-17): the catalog repository exists and every platform entry is data in it**,
   so adding Rec or any other platform is a pull request against `ever-works/platforms` and never a release of
   Ever Works (FR-8, ADR-014). Still open: one named owner per entry beyond the first three, and the
-  per-environment addresses, which live only in that repository and never in this public spec (T18).
+  per-environment addresses, which live only in that repository and never in this public spec (T18). Registered
+  as **CL-49**.
 - **[NEEDS CLARIFICATION: should the launcher appear on public marketing sites?]** P2 supports a signed-out
   platform list, which would work on a marketing page. _Default: dashboards only._
-  **Register:** APW-11 question 4, open. Nothing in P1 changes if the answer is yes: FR-37's public platform list
-  is already readable without signing in, and adding a host page is additive work in P2.
+  **Register:** APW-11 question 4 (**CL-50**), open. Nothing in P1 changes if the answer is yes: FR-37's public
+  platform list is already readable without signing in, and adding a host page is additive work in P2.
 - **[NEEDS CLARIFICATION: exposure default for non-App Works.]** Off keeps the launcher about apps rather
   than every website. Owners with many sites may prefer on.
-  **Register:** APW-11 question 5, open; the default this spec assumes is **off** (FR-19), and an explicit
-  choice always wins in either direction, so answering "on" later is a default change and not a rewrite.
+  **Register:** APW-11 question 5 (**CL-51**), open; the default this spec assumes is **off** (FR-19), and an
+  explicit choice always wins in either direction, so answering "on" later is a default change and not a rewrite.
 - **[NEEDS CLARIFICATION: should App Works on a person's own cluster count as live?]** They do in this
   spec (a succeeded production deployment plus an address). The launcher does not probe reachability.
   **Narrowed (audit round, 2026-09-17):** _live_ is unchanged — a succeeded production deployment plus an
   address, never a reachability probe — but the address is now the platform's published primary address for an
   App Work (FR-55) and a paused, removed or quarantined App Work is not live (FR-56). The question is
-  registered as APW-11 question 6 and stays open only for the "no probe" half.
+  registered as APW-11 question 6 (**CL-52**) and stays open only for the "no probe" half.
 
 ---
 

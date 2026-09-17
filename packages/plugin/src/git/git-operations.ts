@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as crypto from 'node:crypto';
 import git from 'isomorphic-git';
 import { Agent as HttpAgent } from 'node:http';
 import { Agent as HttpsAgent } from 'node:https';
@@ -58,6 +59,110 @@ function slugifyText(text: string): string {
 		.replace(/(^-|-$)/g, '');
 }
 
+/**
+ * Prefix of every directory this class generates, separating new working copies from the ones the
+ * lossy `slugifyText(`${owner}-${repo}`)` key produced. Bumping the version is how a future key
+ * change stays additive: old directories are still readable, never rewritten.
+ */
+export const CHECKOUT_DIR_PREFIX = 'v2';
+
+/** Readable slug kept from each part of the identity, so directories stay human-identifiable. */
+export const CHECKOUT_DIR_SLUG_MAX_LENGTH = 40;
+
+/**
+ * Ceiling for one generated path component. Filesystems allow 255 (bytes on POSIX, UTF-16 units on
+ * Windows) and every component this module generates is far below it; the constant exists so a
+ * future change to the readable suffix cannot silently exceed it.
+ */
+export const CHECKOUT_DIR_NAME_MAX_LENGTH = 255;
+
+/**
+ * Checkout keys are caller-supplied and land in a path, so the shape is fixed rather than
+ * sanitised: lowercase letters, digits, `:`, `_` and `-`, starting with a letter or digit.
+ * `work:<workId>:<role>` is the convention.
+ */
+const CHECKOUT_KEY_PATTERN = /^[a-z0-9][a-z0-9:_-]{0,127}$/;
+
+/**
+ * A repository that was expected to exist does not (or is empty), and the caller asked not to be
+ * given an empty local repository instead.
+ *
+ * Thrown by `cloneOrPull` when `expectExisting: true` and the clone failed because the remote is
+ * missing/empty. Without that flag the lenient `git init` fallback still runs.
+ */
+export class RepositoryNotReadyError extends Error {
+	readonly code = 'repository_not_ready';
+
+	constructor(
+		readonly owner: string,
+		readonly repo: string,
+		options?: { cause?: unknown }
+	) {
+		super(
+			`Repository ${owner}/${repo} does not exist or is empty. ` +
+				'Refusing to initialise an empty local repository: the remote must be readable before this operation.'
+		);
+		this.name = 'RepositoryNotReadyError';
+		if (options && 'cause' in options) {
+			(this as Error & { cause?: unknown }).cause = options.cause;
+		}
+	}
+}
+
+/** Short, deterministic, case-sensitive digest — the exactness half of a checkout directory name. */
+function shortDigest(input: string): string {
+	return crypto.createHash('sha256').update(input, 'utf8').digest('hex').slice(0, 16);
+}
+
+/** Readable, filesystem-safe half of a checkout directory name. Empty for all-symbol input. */
+function slugPart(text: string, maxLength: number = CHECKOUT_DIR_SLUG_MAX_LENGTH): string {
+	const slug = slugifyText(text);
+	if (slug.length <= maxLength) {
+		return slug;
+	}
+	// Truncating may leave a trailing separator; drop it so no component ever ends in `-`.
+	return slug.slice(0, maxLength).replace(/-+$/, '');
+}
+
+function assertValidCheckoutKey(checkoutKey: string): void {
+	if (!CHECKOUT_KEY_PATTERN.test(checkoutKey)) {
+		throw new Error(
+			`Invalid checkout key ${JSON.stringify(checkoutKey)}: expected ${CHECKOUT_KEY_PATTERN} ` +
+				"(lowercase letters, digits, ':', '_' and '-', up to 128 characters)"
+		);
+	}
+}
+
+/**
+ * Directory NAME (one path component, relative to a base directory) for a working copy.
+ *
+ * Pure and deterministic, and exact: the name is a digest of the provider-visible identity plus a
+ * readable slug of it. That matters because the previous key — `slugifyText(`${owner}-${repo}`)` —
+ * was lossy AND case-insensitive, so two different repositories could resolve to ONE directory and
+ * share branch/commit state.
+ *
+ * - **Unique per provider + owner + repo.** The digest covers `cloneUrl`, which each provider
+ *   plugin builds from its own host, so `gitlab.com`'s `a/b` can never collide with `github.com`'s.
+ * - **Case-preserving.** `Owner/Repo` and `owner/repo` hash differently, and GitHub treats them as
+ *   different principals.
+ * - **Filesystem-safe.** Only `[a-z0-9-]` and hex survive; no separator, colon, `..`, leading dot or
+ *   trailing dot/space can be produced, whatever the input.
+ * - **Bounded.** Well under `CHECKOUT_DIR_NAME_MAX_LENGTH` for any input length.
+ * - **Readable.** The slug suffix keeps the owner/repository recognisable in logs.
+ */
+export function checkoutDirectoryName(cloneUrl: string, owner: string, repo: string, checkoutKey?: string): string {
+	if (checkoutKey !== undefined) {
+		assertValidCheckoutKey(checkoutKey);
+		return `${CHECKOUT_DIR_PREFIX}/k/${shortDigest(checkoutKey)}-${slugPart(checkoutKey)}`;
+	}
+
+	// `cloneUrl` carries the provider host, owner and repository name byte-for-byte — the exact
+	// identity, not a normalized approximation of it.
+	const identity = `${cloneUrl}\u0000${owner}\u0000${repo}`;
+
+	return `${CHECKOUT_DIR_PREFIX}/r/${shortDigest(identity)}-${slugPart(owner)}--${slugPart(repo)}`;
+}
+
 export interface GitOperationsConfig {
 	readonly baseDir?: string;
 	readonly defaultCommitter?: GitCommitter;
@@ -80,8 +185,17 @@ export class GitOperations implements IGitOperations {
 	}
 
 	async cloneOrPull(options: GitCloneOptions): Promise<string> {
-		const { owner, repo, token, committer, autoSwitchToMainBranch = true, branch } = options;
-		const dir = this.getLocalDir(owner, repo);
+		const {
+			owner,
+			repo,
+			token,
+			committer,
+			autoSwitchToMainBranch = true,
+			branch,
+			checkoutKey,
+			expectExisting
+		} = options;
+		const dir = this.getLocalDir(owner, repo, checkoutKey);
 		const url = this.getCloneUrl(owner, repo);
 		const auth = this.getAuth(token);
 
@@ -111,12 +225,16 @@ export class GitOperations implements IGitOperations {
 				singleBranch: true
 			});
 		} catch (error: unknown) {
-			const err = error as { code?: string; message?: string };
-			if (
-				err?.code === 'NotFoundError' ||
-				err?.message?.includes('Could not find') ||
-				err?.message?.includes('empty')
-			) {
+			if (this.isMissingRemoteError(error)) {
+				if (expectExisting === true) {
+					// A repository was expected here. The lenient path below would produce an
+					// empty local repository that LOOKS successful, and the platform would then
+					// commit into nothing — so drop the directory we just made and report the
+					// repository instead of inventing one.
+					await this.removeDirSafe(dir);
+					throw new RepositoryNotReadyError(owner, repo, { cause: error });
+				}
+
 				await git.init({ fs, dir, defaultBranch: branch || 'main' });
 				await git.addRemote({ fs, dir, remote: 'origin', url });
 			} else {
@@ -303,12 +421,42 @@ export class GitOperations implements IGitOperations {
 		return changes;
 	}
 
-	getLocalDir(owner: string, repo: string): string {
-		return path.join(this.baseDir, slugifyText(`${owner}-${repo}`));
+	/**
+	 * Working copy directory for `owner/repo` (or for `checkoutKey` inside it).
+	 *
+	 * The primary directory is a pure function of the provider identity, owner and repository — no
+	 * two coordinates can share it. When a checkout exists only under the pre-`v2` key, that one is
+	 * returned instead: the compatibility path is deliberately additive, so a working copy that
+	 * already exists is reused rather than orphaned. The new key wins as soon as it exists.
+	 */
+	getLocalDir(owner: string, repo: string, checkoutKey?: string): string {
+		const primary = path.join(
+			this.baseDir,
+			checkoutDirectoryName(this.getCloneUrl(owner, repo), owner, repo, checkoutKey)
+		);
+
+		// Keys are new by construction — nothing was ever written under one.
+		if (checkoutKey !== undefined) {
+			return primary;
+		}
+
+		if (this.existsSync(primary)) {
+			return primary;
+		}
+
+		const legacy = this.legacyLocalDir(owner, repo);
+		if (legacy && this.existsSync(legacy)) {
+			return legacy;
+		}
+
+		return primary;
 	}
 
-	async removeLocalDir(owner: string, repo: string): Promise<void> {
-		await this.removeDirSafe(this.getLocalDir(owner, repo));
+	async removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void> {
+		// Removes exactly the directory this repository is using — the resolved one. It never
+		// sweeps old-scheme checkouts on the caller's behalf, and never touches another
+		// repository's working copy.
+		await this.removeDirSafe(this.getLocalDir(owner, repo, checkoutKey));
 	}
 
 	async cloneBranch(params: GitCloneBranchOptions): Promise<string> {
@@ -441,6 +589,44 @@ export class GitOperations implements IGitOperations {
 		} catch {
 			return false;
 		}
+	}
+
+	/**
+	 * The pre-`v2` checkout directory for `owner/repo`, or `null` when the lossy key has nothing to
+	 * point at. `slugifyText` collapses every non-alphanumeric run, so an all-symbol owner/repo
+	 * yields the EMPTY string — and `path.join(baseDir, '')` is `baseDir` itself, which must never
+	 * be handed back as one repository's checkout (nor removed as one).
+	 */
+	private legacyLocalDir(owner: string, repo: string): string | null {
+		const name = slugifyText(`${owner}-${repo}`);
+
+		if (!name || name === '.' || name === '..') {
+			return null;
+		}
+
+		return path.join(this.baseDir, name);
+	}
+
+	private existsSync(dir: string): boolean {
+		try {
+			return fs.statSync(dir).isDirectory();
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * True when the clone failed because the REMOTE is missing or empty — the only case the
+	 * `git init` fallback is meant to absorb.
+	 */
+	private isMissingRemoteError(error: unknown): boolean {
+		const err = error as { code?: string; message?: string };
+
+		return (
+			err?.code === 'NotFoundError' ||
+			Boolean(err?.message?.includes('Could not find')) ||
+			Boolean(err?.message?.includes('empty'))
+		);
 	}
 
 	private async removeDirSafe(dir: string): Promise<void> {

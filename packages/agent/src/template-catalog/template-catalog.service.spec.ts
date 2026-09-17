@@ -604,4 +604,114 @@ describe('TemplateCatalogService', () => {
             ),
         );
     });
+
+    // APW-02 P0 (Wave 0 PR 0.2) — the fork request can now answer immediately, but nothing in P0
+    // resolves a pending fork: `WorkUpstreamState` and the `app-fork-readiness` job are APW-02 P1
+    // (T12/T24), and this epic's P0 gate ships no migration, job or route. So the create path must
+    // keep the provider's blocking default (fork creation stays exactly as it behaves today) while
+    // the capability itself is covered by the provider and facade specs. Whoever lands the
+    // readiness poller flips the guard below deliberately.
+    describe('forkTemplateForUser', () => {
+        const builtInTemplate = {
+            id: 'website-basic',
+            kind: 'website',
+            sourceType: 'built_in',
+            isActive: true,
+            name: 'Basic',
+            description: null,
+            framework: null,
+            previewImageUrl: null,
+            repositoryUrl: 'https://github.com/ever-works/basic-template',
+            repositoryOwner: 'ever-works',
+            repositoryName: 'basic-template',
+            branch: 'main',
+            syncBranches: ['main'],
+            betaBranch: null,
+            metadata: {},
+        };
+
+        beforeEach(() => {
+            templateRepository.findVisibleById.mockResolvedValue(builtInTemplate);
+            templateRepository.findOwnedCustomByRepositoryCoordinates.mockResolvedValue(null);
+            templateRepository.upsert.mockImplementation(async (row: any) => row);
+            gitFacade.getUser.mockResolvedValue({ login: 'acme-user' });
+            gitFacade.getOrganizations.mockResolvedValue([]);
+            gitFacade.getWebUrl.mockReturnValue('https://github.com/acme-user/basic-template');
+        });
+
+        it('does NOT ask for a non-blocking fork — P0 has no readiness poller to finish it', async () => {
+            gitFacade.forkRepository.mockResolvedValue({
+                owner: 'acme-user',
+                name: 'basic-template',
+                fullName: 'acme-user/basic-template',
+                defaultBranch: 'main',
+                isPrivate: false,
+                url: 'https://github.com/acme-user/basic-template',
+                cloneUrl: 'https://github.com/acme-user/basic-template.git',
+                isFork: true,
+                forkReadiness: 'ready',
+            });
+
+            const result = await service.forkTemplateForUser(
+                { kind: 'website', templateId: 'website-basic', targetOwner: 'acme-user' },
+                'user-1',
+            );
+
+            expect(gitFacade.forkRepository).toHaveBeenCalledWith(
+                'ever-works',
+                'basic-template',
+                { organization: undefined },
+                { userId: 'user-1', providerId: 'github' },
+            );
+            expect(result.created).toBe(true);
+            expect(result.forkReadiness).toBe('ready');
+            expect(result.repository.fullName).toBe('acme-user/basic-template');
+        });
+
+        it('reports ready for an existing fork resolved by the blocking path', async () => {
+            gitFacade.forkRepository.mockResolvedValue({
+                owner: 'acme-user',
+                name: 'basic-template',
+                fullName: 'acme-user/basic-template',
+                defaultBranch: 'main',
+                isPrivate: false,
+                url: 'https://github.com/acme-user/basic-template',
+                cloneUrl: 'https://github.com/acme-user/basic-template.git',
+                isFork: true,
+                forkReadiness: 'ready',
+            });
+
+            const result = await service.forkTemplateForUser(
+                { kind: 'website', templateId: 'website-basic', targetOwner: 'acme-user' },
+                'user-1',
+            );
+
+            // Already-forked is success, and the caller never had to wait on a second request.
+            expect(gitFacade.forkRepository).toHaveBeenCalledTimes(1);
+            expect(result.forkReadiness).toBe('ready');
+        });
+
+        it('passes the provider readiness through verbatim when a provider reports one', async () => {
+            gitFacade.forkRepository.mockResolvedValue({
+                owner: 'acme-user',
+                name: 'basic-template',
+                fullName: 'acme-user/basic-template',
+                defaultBranch: 'main',
+                isPrivate: false,
+                url: 'https://github.com/acme-user/basic-template',
+                cloneUrl: 'https://github.com/acme-user/basic-template.git',
+                isFork: true,
+                forkReadiness: 'pending',
+            });
+
+            const result = await service.forkTemplateForUser(
+                { kind: 'website', templateId: 'website-basic', targetOwner: 'acme-user' },
+                'user-1',
+            );
+
+            // The result type carries readiness so a future poller can act on it; this caller does
+            // not manufacture a pending one.
+            expect(result.forkReadiness).toBe('pending');
+        });
+    });
 });

@@ -9,9 +9,12 @@ import * as path from 'node:path';
  * Managed "Ever Works Git" storage provisions ONE repository and records it under
  * BOTH the `work` and `data` roles. `GitOperations.getLocalDir` is deterministic:
  *
- *     path.join(baseDir, slugifyText(`${owner}-${repo}`))
+ *     path.join(baseDir, checkoutDirectoryName(providerScopedKey))   // APW-02 P0
  *
- * so the markdown clone and the data clone resolve to the SAME directory. On the
+ * so the markdown clone and the data clone resolve to the SAME directory. (APW-02 P0 replaced
+ * the old `slugifyText(`${owner}-${repo}`)` key, which collided across case and across
+ * providers; the guard is indifferent to which key is in use because it compares resolved
+ * paths, and the test below is indifferent too.) On the
  * RECREATE path `MarkdownGeneratorService` then called `markdownRepo.resetFiles()`,
  * which deletes every entry outside a six-item allowlist — `data/`,
  * `categories.yml`, `tags.yml` and `.works/` all go — and the deletions are staged,

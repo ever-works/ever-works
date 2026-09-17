@@ -773,38 +773,43 @@ and returns focus to the button that opened it.
 ## 9. Open questions
 
 > **Register (added 2026-09-17).** Each marker below is one row of the program clarification register
-> ([`CLARIFICATIONS.md`](../CLARIFICATIONS.md)) — the five APW-08 rows are `CL-08-1`…`CL-08-5`, in this order.
-> A row records the question, the default this spec assumes, the wave it blocks, who decides and its status
-> (`open` · `resolved-by R-n` · `default accepted`). A marker is never deleted: when a binding resolution settles
-> it, the resolution line is added underneath the question and the question stays. **No APW-08 marker blocks
-> Wave 0 or P1**: every default below is already the behaviour P1 builds, and each is revisited before P2.
+> ([`CLARIFICATIONS.md`](../CLARIFICATIONS.md)) — the five APW-08 rows are **`CL-33`…`CL-37`** in this order, and
+> each line also carries this epic's own alias in brackets so both citations resolve (the register's
+> §2.1 recommendation). A row records the question, the default this spec assumes, the wave it blocks, who decides
+> and its status (`open` · `resolved-by R-n` · `default accepted`). A marker is never deleted: when a binding
+> resolution settles it, the resolution line is added underneath the question and the question stays. **No APW-08
+> marker blocks Wave 0 or P1**: every default below is already the behaviour P1 builds, and each is revisited
+> before P2.
 
 - **[NEEDS CLARIFICATION: "Live with warnings" closes the Task?]** Closed here (the app runs; APW-06 did not roll
   back) with a manual fix Task offered. The alternative treats a failed public smoke check as a failed delivery.
-  _Register `CL-08-1` — status: default accepted for P1 (FR-40); owner decides before P3._
-- **[NEEDS CLARIFICATION: `.github/workflows/**`protected by default?]\*\* It blocks CI changes an owner might want
-an Agent to make. An App spec opt-out could follow.
-_Register`CL-08-2` — status: open · owner. The default is blanket protection (FR-20, plan §11). An App spec
-  opt-out, if the owner asks for one, is an **addition**: the blanket default stays and the opt-out is new.\_
+  **Register `CL-33` (alias `CL-08-1`)** — status: default accepted for P1 (FR-40); owner decides before P3.
+- **[NEEDS CLARIFICATION: protecting every file under `.github/workflows/` by default?]** It blocks CI changes an
+  owner might want an Agent to make. An App spec opt-out could follow. **Register `CL-34` (alias `CL-08-2`)** —
+  status: open · owner; the default is blanket protection (FR-20, plan §11), where the App spec's own glob
+  semantics decide which files match. An App spec opt-out, if the owner asks for one, is an **addition**: the
+  blanket default stays and the opt-out is new.
 - **[NEEDS CLARIFICATION: CI checks and "a red check opens no pull request".]** CI checks need a pull request to
   exist, so cloud runs open one and the gate governs merge-readiness and the fix loop; Fleet runs keep "red opens
   nothing". Or open drafts until green?
-  _Register `CL-08-3` — status: default accepted for P1._ **Resolved (R-9, CONTRACTS §0):** R-9 makes the CI side a
-  per-check matrix job whose legs are named `Ever Works check: {name}` and whose `continue-on-error` carries
-  advisory semantics (FR-15, FR-76), so a red required leg is red on the pull request and the CI fix loop — not
-  "no pull request" — governs a cloud run. Opening drafts until green stays an open alternative; nothing here
-  removes the Fleet behaviour.
+  **Register `CL-35` (alias `CL-08-3`)** — status: default accepted for P1. **Resolved (R-9, CONTRACTS §0):** R-9
+  makes the CI side a per-check matrix job whose legs are named `Ever Works check: {name}` and whose
+  `continue-on-error` carries advisory semantics (FR-15, FR-76), so a red required leg is red on the pull request
+  and the CI fix loop — not "no pull request" — governs a cloud run. Opening drafts until green stays an open
+  alternative; nothing here removes the Fleet behaviour.
 - **[NEEDS CLARIFICATION: default change Agent.]** FR-42 uses the last Agent that worked on the Work, then the only
   pinned or assigned Agent; the fork lifecycle's conflict Tasks use the same rule (R-21). An explicit per-App-Work
   "Agent for changes" setting is the alternative.
-  _Register `CL-08-4` — status: resolved._ **Resolved (R-21, CONTRACTS §0):** the bootstrapping half is settled by
-  FR-42's new third branch — when nothing resolves and the person owns no Agent that may commit, the card offers to
-  create one from a named template and assign it (S32, ACC-08-40). The per-App-Work "Agent for changes" setting
-  remains an open alternative and is **not** removed by this: the resolution rule stays the default.
+  **Register `CL-36` (alias `CL-08-4`)** — status: resolved. **Resolved (R-21, CONTRACTS §0):** the bootstrapping
+  half is settled by FR-42's new third branch — when nothing resolves and the person owns no Agent that may commit,
+  the card offers to create one from a named template and assign it (S32, ACC-08-40). The per-App-Work "Agent for
+  changes" setting remains an open alternative and is **not** removed by this: the resolution rule stays the
+  default.
 - **[NEEDS CLARIFICATION: follow-up budget.]** 2 per change / 3 open per Work bound spend (each is at least one
   run); tie them to a monthly budget instead?
-  _Register `CL-08-5` — status: default accepted for P1 (FR-37, FR-38); owner decides before P3._ FR-73 adds the
-  monthly Work budget **alongside** the two counters — it does not replace them, so both bounds hold.
+  **Register `CL-37` (alias `CL-08-5`)** — status: default accepted for P1 (FR-37, FR-38); owner decides before P3.
+  FR-73 adds the monthly Work budget **alongside** the two counters — it does not replace them, so both bounds
+  hold.
 
 ---
 

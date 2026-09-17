@@ -465,14 +465,14 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		return this.gitOps!.getStatus(dir);
 	}
 
-	getLocalDir(owner: string, repo: string): string {
+	getLocalDir(owner: string, repo: string, checkoutKey?: string): string {
 		this.ensureGitOps();
-		return this.gitOps!.getLocalDir(owner, repo);
+		return this.gitOps!.getLocalDir(owner, repo, checkoutKey);
 	}
 
-	async removeLocalDir(owner: string, repo: string): Promise<void> {
+	async removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void> {
 		this.ensureGitOps();
-		return this.gitOps!.removeLocalDir(owner, repo);
+		return this.gitOps!.removeLocalDir(owner, repo, checkoutKey);
 	}
 
 	async replaceRemote(dir: string, remote: string, url: string): Promise<void> {

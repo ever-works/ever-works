@@ -25,6 +25,14 @@ export interface GitRepository {
 		readonly name: string;
 		readonly fullName: string;
 	};
+	/**
+	 * Set by `forkRepository` only. `pending` means the provider accepted the fork request but the
+	 * repository is not readable yet, so the caller must NOT clone or push into it — a background
+	 * readiness poller owns the wait.
+	 *
+	 * Absent on every other repository read, so existing callers are unaffected.
+	 */
+	readonly forkReadiness?: 'ready' | 'pending';
 }
 
 export interface GitBranch {
@@ -56,6 +64,25 @@ export interface GitCloneOptions {
 	readonly committer?: GitCommitter;
 	readonly branch?: string;
 	readonly autoSwitchToMainBranch?: boolean;
+	/**
+	 * Selects a working copy of its own for this call, instead of the one shared by every caller
+	 * of `owner/repo`. Use it whenever the caller mutates the checkout (branch, files, remotes) or
+	 * needs it to survive alongside another call for the same repository.
+	 *
+	 * Convention: `work:<workId>:<role>`. Optional — omitted means today's per-repository
+	 * directory, so existing callers keep their current behaviour.
+	 */
+	readonly checkoutKey?: string;
+	/**
+	 * Declares that the remote repository MUST exist. When set, a missing or empty remote throws
+	 * `RepositoryNotReadyError` instead of silently falling back to `git init` — which otherwise
+	 * turns a typo'd, deleted or unauthorised repository into an empty local one that looks
+	 * successful.
+	 *
+	 * Optional and opt-in: the lenient default (initialise and add the remote) is unchanged, and
+	 * is still correct for a brand-new repository we are about to populate.
+	 */
+	readonly expectExisting?: boolean;
 }
 
 /**
@@ -111,6 +138,16 @@ export interface ForkRepositoryOptions {
 	readonly name?: string;
 	readonly organization?: string;
 	readonly defaultBranchOnly?: boolean;
+	/**
+	 * `false` returns as soon as the provider has ACCEPTED the fork request, with
+	 * `forkReadiness: 'pending'`, instead of holding the caller while the fork bakes (seconds to
+	 * minutes). The returned coordinates are already usable for bookkeeping, but the repository
+	 * must not be cloned or pushed into until a readiness poller confirms it.
+	 *
+	 * Optional and opt-in: the default (`true`) keeps the existing blocking wait, so no existing
+	 * caller changes behaviour.
+	 */
+	readonly waitForReady?: boolean;
 }
 
 export interface TransferRepoOptions {
@@ -491,8 +528,16 @@ export interface IGitOperations {
 	getMainBranch(dir: string): Promise<string | null>;
 	switchBranch(dir: string, branch: string, create?: boolean): Promise<string>;
 	getStatus(dir: string): Promise<GitFileChange[]>;
-	getLocalDir(owner: string, repo: string): string;
-	removeLocalDir(owner: string, repo: string): Promise<void>;
+	/**
+	 * Absolute path of the working copy for `owner/repo`.
+	 *
+	 * The name is derived from the provider identity, the owner and the repository name
+	 * byte-for-byte, so two distinct coordinates can never share a directory. `checkoutKey` asks
+	 * for a working copy of its own instead (see `GitCloneOptions.checkoutKey`); omitting it keeps
+	 * the per-repository directory every existing caller already uses.
+	 */
+	getLocalDir(owner: string, repo: string, checkoutKey?: string): string;
+	removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void>;
 	replaceRemote(dir: string, remote: string, url: string): Promise<void>;
 	renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
 }

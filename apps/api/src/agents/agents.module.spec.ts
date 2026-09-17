@@ -442,13 +442,41 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
 
     const buildFacade = (gate: { assertAllowed: jest.Mock }, git: Record<string, jest.Mock>) => {
         const factory = findProvider(AGENT_GIT_FACADE);
-        return factory?.useFactory?.(git, { findById: jest.fn() }, gate, {
-            findById: jest.fn().mockResolvedValue({ id: 'work-1', checksPolicy: 'required' }),
-        }) as OpenPrFacade;
+        return factory?.useFactory?.(
+            git,
+            { findById: jest.fn() },
+            gate,
+            {
+                // APW-08 P0 — the adapter now resolves provider + owner + repo
+                // from the Work before it opens anything, so the fixture has to
+                // be a Work that HAS them. A Work without a git provider is a
+                // refusal (see the fail-closed specs below), not a `''` target.
+                findById: jest.fn().mockResolvedValue({
+                    id: 'work-1',
+                    kind: 'website',
+                    checksPolicy: 'required',
+                    gitProvider: 'github',
+                    getRepoOwner: () => 'acme',
+                    getWebsiteRepo: () => 'acme-website',
+                }),
+            },
+            {
+                resolve: jest.fn().mockResolvedValue({
+                    policy: { protectedBranches: ['main', 'master', 'develop', 'stage'] },
+                    source: 'default',
+                    chain: [],
+                }),
+            },
+        ) as OpenPrFacade;
     };
 
     const makeGit = () => ({
         getRepoDir: jest.fn().mockResolvedValue('/tmp/work-1'),
+        // APW-08 P0 — `openPullRequest` now resolves the base branch from the
+        // Work's repository when the caller omits it, so the facade it calls
+        // has to answer that question. An explicit `base` still bypasses both.
+        getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
+        getMainBranch: jest.fn().mockResolvedValue('main'),
         createPullRequest: jest.fn().mockResolvedValue({ number: 12, url: 'https://pr/12' }),
     });
 
@@ -458,6 +486,11 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
             AgentRepository,
             PullRequestGateService,
             WorkRepository,
+            // APW-08 P0 — APPENDED so the adapter can refuse a protected
+            // release branch from the Work's EFFECTIVE merge policy rather
+            // than from a second, hand-rolled list. Positional, like every
+            // argument above it.
+            MergePolicyService,
         ]);
     });
 
@@ -594,5 +627,367 @@ describe('api-side AgentsModule — AGENT_EMAIL_FACADE approve-before-send', () 
             { origin: 'agent' },
         );
         expect(result).toMatchObject({ held: true, messageId: 'm-2', targetAddress: 'peer@x.com' });
+    });
+});
+
+/**
+ * APW-08 P0 — the Agent-facing git tools resolve the provider, owner, repo
+ * and branch from the Work's OWN repository, and a push to a protected
+ * release branch is impossible.
+ *
+ * Before this, `commitToRepo` hardcoded `providerId = 'github'`, committed
+ * on whatever branch the clone happened to be on, and then RETURNED
+ * `branch ?? 'main'` — a branch it had not committed to; `openPullRequest`
+ * hardcoded `'github'` too and passed `owner: ''` / `repo: ''` to
+ * `createPullRequest`, which is not a pull request target at all. These
+ * specs pin the replacement: resolve from the Work (the same source
+ * `work.getRepoOwner('website')` / `work.getWebsiteRepo()` /
+ * `work.gitProvider` the rest of the platform reads), thread the branch
+ * into the commit, refuse the protected release branches BEFORE any git
+ * operation, and fail CLOSED — never back to `'github'`, `''` or `'main'`.
+ */
+describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution (APW-08 P0)', () => {
+    const WORK_ID = 'work-1';
+    const WORK_DIR = '/tmp/ever-works/work-1';
+
+    /** A non-GitHub provider id, so "resolved from the Work" is observable. */
+    const WORK_PROVIDER = 'gitlab';
+
+    type GitTools = CommitFacade & PrFacade;
+
+    type CommitFacade = {
+        commitToRepo: (input: Record<string, unknown>) => Promise<{
+            sha: string | null;
+            branch: string;
+            filesChanged: number;
+        }>;
+    };
+
+    type PrFacade = {
+        openPullRequest: (input: Record<string, unknown>) => Promise<{
+            number: number;
+            url: string;
+            state: string;
+        }>;
+    };
+
+    interface WorkOverrides {
+        kind?: string;
+        gitProvider?: string;
+        owner?: string;
+        websiteRepo?: string;
+        dataRepo?: string;
+    }
+
+    interface Harness {
+        facade: GitTools;
+        git: ReturnType<typeof makeGit>;
+        works: { findById: jest.Mock };
+        mergePolicy: { resolve: jest.Mock };
+        prGate: { assertAllowed: jest.Mock };
+    }
+
+    const PLATFORM_POLICY = { protectedBranches: ['main', 'master', 'develop', 'stage'] };
+
+    const makeWork = (overrides: WorkOverrides = {}) => {
+        const owner = overrides.owner ?? 'acme';
+        return {
+            id: WORK_ID,
+            kind: overrides.kind ?? 'website',
+            gitProvider: overrides.gitProvider ?? WORK_PROVIDER,
+            checksPolicy: 'off',
+            getRepoOwner: jest.fn(() => owner),
+            getWebsiteRepo: jest.fn(() => overrides.websiteRepo ?? 'acme-website'),
+            getDataRepo: jest.fn(() => overrides.dataRepo ?? 'acme-data'),
+        };
+    };
+
+    const makeGit = () => ({
+        getRepoDir: jest.fn().mockResolvedValue(WORK_DIR),
+        getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
+        getMainBranch: jest.fn().mockResolvedValue(null),
+        switchBranch: jest.fn().mockResolvedValue('feature/x'),
+        commit: jest.fn().mockResolvedValue('sha-1'),
+        push: jest.fn().mockResolvedValue(undefined),
+        createPullRequest: jest
+            .fn()
+            .mockResolvedValue({ number: 7, url: 'https://git.test/pr/7', state: 'open' }),
+    });
+
+    const build = (
+        options: {
+            work?: unknown;
+            git?: ReturnType<typeof makeGit>;
+            protectedBranches?: string[];
+        } = {},
+    ): Harness => {
+        const git = options.git ?? makeGit();
+        const works = {
+            findById: jest.fn().mockResolvedValue(options.work === undefined ? makeWork() : options.work),
+        };
+        const mergePolicy = {
+            resolve: jest.fn().mockResolvedValue({
+                policy: { protectedBranches: options.protectedBranches ?? PLATFORM_POLICY.protectedBranches },
+                source: 'default',
+                chain: [],
+            }),
+        };
+        const prGate = { assertAllowed: jest.fn().mockResolvedValue({ allowed: true }) };
+        const facade = findProvider(AGENT_GIT_FACADE)?.useFactory?.(
+            git,
+            { findById: jest.fn().mockResolvedValue({ id: 'agent-1', name: 'Ada', slug: 'ada' }) },
+            prGate,
+            works,
+            mergePolicy,
+        ) as GitTools;
+        return { facade, git, works, mergePolicy, prGate };
+    };
+
+    const commitInput = (extra: Record<string, unknown> = {}) => ({
+        userId: 'user-1',
+        agentId: 'agent-1',
+        workId: WORK_ID,
+        message: 'Add the pricing page',
+        ...extra,
+    });
+
+    const prInput = (extra: Record<string, unknown> = {}) => ({
+        userId: 'user-1',
+        agentId: 'agent-1',
+        workId: WORK_ID,
+        title: 'Add pricing',
+        body: 'Because the page was missing.',
+        head: 'feature/pricing',
+        ...extra,
+    });
+
+    describe('commitToRepo', () => {
+        it("uses the Work's OWN provider id — never the 'github' literal", async () => {
+            const { facade, git } = build();
+            await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            expect(git.commit).toHaveBeenCalledTimes(1);
+            expect(git.commit.mock.calls[0][0]).toBe(WORK_PROVIDER);
+            // The literal is gone from the whole call chain, not just one hop.
+            expect(JSON.stringify(git.commit.mock.calls)).not.toContain('github');
+
+            expect(git.getRepoDir).toHaveBeenCalledWith(
+                'work',
+                WORK_ID,
+                expect.objectContaining({ providerId: WORK_PROVIDER }),
+            );
+            // …and the empty provider that used to reach `getRepoDir` is gone too.
+            expect(git.getRepoDir.mock.calls[0][2].providerId).not.toBe('');
+
+            expect(git.push).toHaveBeenCalledWith(
+                { dir: WORK_DIR, force: false },
+                expect.objectContaining({ providerId: WORK_PROVIDER }),
+            );
+        });
+
+        it('threads the branch into the commit AND returns that same branch', async () => {
+            const { facade, git } = build();
+            const result = await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            expect(git.switchBranch).toHaveBeenCalledWith(
+                WORK_PROVIDER,
+                WORK_DIR,
+                'feature/pricing',
+                true,
+            );
+            expect(git.commit).toHaveBeenCalledWith(
+                WORK_PROVIDER,
+                WORK_DIR,
+                'Add the pricing page',
+                expect.objectContaining({ name: 'Ada' }),
+            );
+            // The switch happens BEFORE the commit: the commit lands on the
+            // branch we report, instead of the message merely claiming so.
+            expect(git.switchBranch.mock.invocationCallOrder[0]).toBeLessThan(
+                git.commit.mock.invocationCallOrder[0],
+            );
+            expect(result.branch).toBe('feature/pricing');
+            // An explicit branch needs no default-branch lookup.
+            expect(git.getRepository).not.toHaveBeenCalled();
+        });
+
+        it("resolves the Work's default branch when the caller supplies none — never assumes 'main'", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(commitInput());
+
+            expect(git.getRepository).toHaveBeenCalledWith(
+                'acme',
+                'acme-website',
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+            expect(git.switchBranch).toHaveBeenCalledWith(WORK_PROVIDER, WORK_DIR, 'trunk', true);
+            expect(result.branch).toBe('trunk');
+        });
+
+        it.each(['main', 'master', 'stage', 'MAIN', 'Master', 'STAGE', 'refs/heads/main'])(
+            'refuses the protected release branch %s BEFORE any git operation runs',
+            async (branch) => {
+                const { facade, git } = build();
+
+                const attempt = facade.commitToRepo(commitInput({ branch }));
+                await expect(attempt).rejects.toThrow(/protected/i);
+                await expect(attempt).rejects.toThrow(branch);
+
+                expect(git.getRepoDir).not.toHaveBeenCalled();
+                expect(git.switchBranch).not.toHaveBeenCalled();
+                expect(git.commit).not.toHaveBeenCalled();
+                expect(git.push).not.toHaveBeenCalled();
+            },
+        );
+
+        it("honours the platform's modelled protectedBranches, not just the built-in list", async () => {
+            const { facade, git, mergePolicy } = build({
+                protectedBranches: ['develop', 'release/frozen'],
+            });
+
+            const attempt = facade.commitToRepo(commitInput({ branch: 'release/frozen' }));
+            await expect(attempt).rejects.toThrow(/protected/i);
+            await expect(attempt).rejects.toThrow('release/frozen');
+
+            expect(mergePolicy.resolve).toHaveBeenCalledWith(expect.objectContaining({ workId: WORK_ID }));
+            expect(git.commit).not.toHaveBeenCalled();
+            expect(git.push).not.toHaveBeenCalled();
+        });
+
+        it("refuses the Work's own default branch when the policy protects it", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue({ defaultBranch: 'develop' });
+            const { facade } = build({ git });
+
+            const attempt = facade.commitToRepo(commitInput());
+            await expect(attempt).rejects.toThrow(/protected/i);
+            await expect(attempt).rejects.toThrow('develop');
+
+            // The refusal still lands before anything is staged, committed or pushed.
+            expect(git.switchBranch).not.toHaveBeenCalled();
+            expect(git.commit).not.toHaveBeenCalled();
+            expect(git.push).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when the Work has no git provider configured', async () => {
+            const { facade, git } = build({ work: makeWork({ gitProvider: '' }) });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /git provider/i,
+            );
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+            expect(git.commit).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when the Work cannot be found', async () => {
+            const { facade, git } = build({ work: null });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                WORK_ID,
+            );
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+            expect(git.commit).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when owner/repo cannot be resolved — never an empty-string target', async () => {
+            const { facade, git } = build({ work: makeWork({ owner: '', websiteRepo: '' }) });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /owner|repositor/i,
+            );
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+            expect(git.commit).not.toHaveBeenCalled();
+        });
+
+        it("fails closed when the Work's default branch cannot be resolved", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue(null);
+            git.getMainBranch.mockResolvedValue(null);
+            const { facade } = build({ git });
+
+            await expect(facade.commitToRepo(commitInput())).rejects.toThrow(/default branch/i);
+            expect(git.commit).not.toHaveBeenCalled();
+            expect(git.push).not.toHaveBeenCalled();
+        });
+
+        it('still does not swallow a push failure', async () => {
+            const git = makeGit();
+            git.push.mockRejectedValue(new Error('remote rejected the ref'));
+            const { facade } = build({ git });
+
+            await expect(
+                facade.commitToRepo(commitInput({ branch: 'feature/x' })),
+            ).rejects.toThrow(/push failed/);
+        });
+    });
+
+    describe('openPullRequest', () => {
+        it("passes the Work's REAL owner and repo — never empty strings", async () => {
+            const { facade, git } = build();
+
+            await facade.openPullRequest(prInput());
+
+            expect(git.createPullRequest).toHaveBeenCalledTimes(1);
+            const [prOptions, facadeOptions] = git.createPullRequest.mock.calls[0];
+            expect(prOptions.owner).toBe('acme');
+            expect(prOptions.repo).toBe('acme-website');
+            expect(prOptions.owner).not.toBe('');
+            expect(prOptions.repo).not.toBe('');
+            expect(facadeOptions.providerId).toBe(WORK_PROVIDER);
+        });
+
+        it("defaults the base branch to the Work's default branch and keeps an explicit base", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({ git });
+
+            await facade.openPullRequest(prInput());
+            expect(git.createPullRequest.mock.calls[0][0].base).toBe('trunk');
+
+            git.createPullRequest.mockClear();
+            await facade.openPullRequest(prInput({ base: 'release/next' }));
+            expect(git.createPullRequest.mock.calls[0][0].base).toBe('release/next');
+        });
+
+        it('fails closed when owner/repo cannot be resolved', async () => {
+            const { facade, git } = build({ work: makeWork({ owner: '', websiteRepo: '' }) });
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow(/owner|repositor/i);
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when the Work has no git provider configured', async () => {
+            const { facade, git } = build({ work: makeWork({ gitProvider: '' }) });
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow(/git provider/i);
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('regression guards', () => {
+        it('still succeeds when a caller supplies a providerId explicitly (legacy path)', async () => {
+            const { facade, git } = build();
+
+            const result = await facade.commitToRepo(
+                commitInput({ branch: 'feature/pricing', providerId: 'github' }),
+            );
+
+            expect(git.commit.mock.calls[0][0]).toBe('github');
+            expect(result.branch).toBe('feature/pricing');
+            expect(git.push).toHaveBeenCalledTimes(1);
+        });
+
+        it("keeps the `repo` Work kind's guarantee: its repository is the data repo, not a website repo", async () => {
+            const { facade, git } = build({
+                work: makeWork({ kind: 'repo', websiteRepo: 'must-not-be-used' }),
+            });
+
+            await facade.openPullRequest(prInput());
+
+            expect(git.createPullRequest.mock.calls[0][0].repo).toBe('acme-data');
+        });
     });
 });

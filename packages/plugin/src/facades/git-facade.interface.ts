@@ -162,8 +162,10 @@ export interface IGitFacade extends IBaseFacade {
 	 * @param providerId - Git provider ID
 	 * @param owner - Repository owner
 	 * @param repo - Repository name
+	 * @param checkoutKey - Optional per-caller working copy key (`work:<workId>:<role>`);
+	 *   omitted means the directory shared by every caller of this repository
 	 */
-	getLocalDir(providerId: string, owner: string, repo: string): string;
+	getLocalDir(providerId: string, owner: string, repo: string, checkoutKey?: string): string;
 
 	/**
 	 * Remove the local work for a repository.
@@ -171,8 +173,10 @@ export interface IGitFacade extends IBaseFacade {
 	 * @param providerId - Git provider ID
 	 * @param owner - Repository owner
 	 * @param repo - Repository name
+	 * @param checkoutKey - Optional per-caller working copy key; must match the one used to
+	 *   resolve the directory, otherwise the shared repository directory is removed
 	 */
-	removeLocalDir(providerId: string, owner: string, repo: string): Promise<void>;
+	removeLocalDir(providerId: string, owner: string, repo: string, checkoutKey?: string): Promise<void>;
 
 	/**
 	 * Get the raw file URL for a file in a repository.

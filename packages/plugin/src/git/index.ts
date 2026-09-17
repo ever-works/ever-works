@@ -1,4 +1,12 @@
-export { GitOperations, type GitOperationsConfig } from './git-operations.js';
+export {
+	GitOperations,
+	RepositoryNotReadyError,
+	checkoutDirectoryName,
+	CHECKOUT_DIR_PREFIX,
+	CHECKOUT_DIR_SLUG_MAX_LENGTH,
+	CHECKOUT_DIR_NAME_MAX_LENGTH,
+	type GitOperationsConfig
+} from './git-operations.js';
 
 export type {
 	IGitOperations,

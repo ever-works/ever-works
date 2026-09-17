@@ -14,21 +14,21 @@ one story per epic (the newest id on 2026-09-17 was EW-816). The draft bodies to
 then replace every `EW-TBD` in the table below with the returned keys and keep the epic → story mapping. Never
 put a guessed number in this column.
 
-| ID     | Epic                                           | Wave  | Spec  | Impl | Jira   | Branch / PR | Notes                                                        |
-| ------ | ---------------------------------------------- | ----- | ----- | ---- | ------ | ----------- | ------------------------------------------------------------ |
-| APW-01 | App Work kind & create from any repository URL | 1     | Draft | —    | EW-TBD | —           | Needs APW-03 P2, APW-06 T2–T3 and APW-13 P0 first (R-38)      |
-| APW-02 | Fork lifecycle                                 | 0 · 1 | Draft | —    | EW-TBD | —           | P0 (checkout keys, fork readiness) unblocks APW-01           |
-| APW-03 | App spec, Apps catalog, license gate           | 1 · 2 · 3 | Draft | — | EW-TBD | —           | Needs **`ever-works/templates`** (the listing repository, created 2026-09-17) — the earlier drafts called it `ever-works/apps` (R-29) |
-| APW-04 | App Provisioner                                | 1     | Draft | —    | EW-TBD | —           | Needs agent + skill entries in `ever-works/agents`, `skills` |
-| APW-05 | Builds                                         | 1 · 3 | Draft | —    | EW-TBD | —           | PR-lane specs run in the APW-13 P0 harness (R-38)            |
-| APW-06 | App runtime on Kubernetes                      | 1–3   | Draft | —    | EW-TBD | —           | Managed target stays off until APW-10 gate                   |
-| APW-07 | App env & dependencies                         | 1 · 2 | Draft | —    | EW-TBD | —           | P1a (contracts, entities, providers) lands with the foundations; P1b needs APW-01/APW-06 (R-38) |
-| APW-08 | Evolve loop                                    | 0 · 1 | Draft | —    | EW-TBD | —           | P0 = agent git tool fix (independent PR)                     |
-| APW-09 | Upstream pull requests                         | 1 · 2 | Draft | —    | EW-TBD | —           | Its own spec puts **P1 in Wave 1** and P2–P3 in Wave 2; the earlier cell read `2` alone |
-| APW-10 | Ever Works Apps hosting tier (launch gate)     | 2 · 3 | Draft | —    | EW-TBD | —           | Infra specifics in the private operations repository         |
-| APW-11 | App Launcher & Apps registry API               | 1 · 3 | Draft | —    | EW-TBD | —           | Reads `ever-works/platforms` (exists 2026-09-17)             |
-| APW-12 | Ever ID                                        | 2 · 3 | Draft | —    | EW-TBD | —           | Cross-repository (Ever Works, Teams, Gauzy)                  |
-| APW-13 | Golden paths & acceptance suite                | 0 · 1 · 2 | Draft | — | EW-TBD | —           | Fixture app → Umami → Cal.diy; **P0 is the harness other epics' PR lanes need, so it lands in Wave 0** (SK-13, R-38) |
+| ID     | Epic                                           | Wave      | Spec  | Impl | Jira   | Branch / PR | Notes                                                                                                                                 |
+| ------ | ---------------------------------------------- | --------- | ----- | ---- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| APW-01 | App Work kind & create from any repository URL | 1         | Draft | —    | EW-TBD | —           | Needs APW-03 P2, APW-06 T2–T3 and APW-13 P0 first (R-38)                                                                              |
+| APW-02 | Fork lifecycle                                 | 0 · 1     | Draft | —    | EW-TBD | —           | P0 (checkout keys, fork readiness) unblocks APW-01                                                                                    |
+| APW-03 | App spec, Apps catalog, license gate           | 1 · 2 · 3 | Draft | —    | EW-TBD | —           | Needs **`ever-works/templates`** (the listing repository, created 2026-09-17) — the earlier drafts called it `ever-works/apps` (R-29) |
+| APW-04 | App Provisioner                                | 1         | Draft | —    | EW-TBD | —           | Needs agent + skill entries in `ever-works/agents`, `skills`                                                                          |
+| APW-05 | Builds                                         | 1 · 3     | Draft | —    | EW-TBD | —           | PR-lane specs run in the APW-13 P0 harness (R-38)                                                                                     |
+| APW-06 | App runtime on Kubernetes                      | 1–3       | Draft | —    | EW-TBD | —           | Managed target stays off until APW-10 gate                                                                                            |
+| APW-07 | App env & dependencies                         | 1 · 2     | Draft | —    | EW-TBD | —           | P1a (contracts, entities, providers) lands with the foundations; P1b needs APW-01/APW-06 (R-38)                                       |
+| APW-08 | Evolve loop                                    | 0 · 1     | Draft | —    | EW-TBD | —           | P0 = agent git tool fix (independent PR)                                                                                              |
+| APW-09 | Upstream pull requests                         | 1 · 2     | Draft | —    | EW-TBD | —           | Its own spec puts **P1 in Wave 1** and P2–P3 in Wave 2; the earlier cell read `2` alone                                               |
+| APW-10 | Ever Works Apps hosting tier (launch gate)     | 2 · 3     | Draft | —    | EW-TBD | —           | Infra specifics in the private operations repository                                                                                  |
+| APW-11 | App Launcher & Apps registry API               | 1 · 3     | Draft | —    | EW-TBD | —           | Reads `ever-works/platforms` (exists 2026-09-17)                                                                                      |
+| APW-12 | Ever ID                                        | 2 · 3     | Draft | —    | EW-TBD | —           | Cross-repository (Ever Works, Teams, Gauzy)                                                                                           |
+| APW-13 | Golden paths & acceptance suite                | 0 · 1 · 2 | Draft | —    | EW-TBD | —           | Fixture app → Umami → Cal.diy; **P0 is the harness other epics' PR lanes need, so it lands in Wave 0** (SK-13, R-38)                  |
 
 ## Merge order
 

@@ -268,8 +268,12 @@ this, and the product says why.
   `upstreamPullRequests.maxOpen` (default **3**, hard ceiling **10**) — and never more than **10** whatever the spec
   says; at most **3** opened across all upstream repositories
   per 24 hours; at most **10** preparations started per 24 hours. Per App Work: at most **1** preparation running at
-  a time. Per open upstream pull request: at most **5** approved pushes per 24 hours.
-- **FR-27.** A refusal by limit says which limit and when the next slot opens (S20).
+  a time. Per open upstream pull request: at most **5** approved pushes per 24 hours. Every number in this requirement
+  is a **default**: an operator may raise one for the installation without a redeploy (program Resolution R-31 — the
+  caps and their overrides are tabulated there), and filling one is a refusal with copy, never a silent drop. Raising a
+  limit never removes FR-39's platform-wide ceiling, and no setting in the product may raise a limit at will.
+- **FR-27.** A refusal by limit says which limit and when the next slot opens (S20), and the response names **which**
+  of FR-26's limits was reached so the copy can say what to do about it.
 
 ### 4.7 Tracking
 
@@ -302,8 +306,7 @@ this, and the product says why.
   withdrawing need edit access and FR-3's GitHub condition. Another account's ids answer **not found**.
 - **FR-36.** Every user-visible string is translatable and never assembled from fragments.
 - **FR-37.** Activity records: proposed, approved, opened, updated, changes requested, needs signature, refused,
-  withdrawn, merged, closed — with the upstream repository, number and link, never the diff or body.
-- **FR-38.** Telemetry holds counts, states and ids only: proposals by outcome and refusal code, time from approval
+  withdrawn, merged, closed — with the upstream repository, number and link, never the diff or body.- **FR-38.** Telemetry holds counts, states and ids only: proposals by outcome and refusal code, time from approval
   to open, reviews, merges. Never titles, bodies, diffs, logins or repository names.
 
 ### 4.10 Additions (2026-09-17 — consideration, the credential of record, cost, accessibility, the switches)
@@ -315,7 +318,8 @@ removed, and the two switches it introduces fail closed so they can only stop wo
   there is a **platform-wide** ceiling on how many upstream pull requests Ever Works opens against one upstream
   repository per 24 hours, counted across every App Work, member and organization. Crossing it refuses
   `platformCapReached` with the next slot time, whatever the member's own allowance still permits. The ceiling is
-  an operator value, is shown to the member in the refusal, and is never zero by default. This bounds one popular
+  an operator value with its own override (program Resolution R-31's table), is shown to the member in the refusal,
+  and is never zero by default. This bounds one popular
   project's exposure to the platform; it does not replace, relax or raise any per-member limit.
 - **FR-40.** **A maintainer can say no without saying it to us.** When an upstream repository declares that it does
   not want automated or agent-authored contributions — a repository topic, a flag in the contribution guide, or a
@@ -360,13 +364,13 @@ removed, and the two switches it introduces fail closed so they can only stop wo
   scheduled work is cancelled, the fork branches this epic created for it are removed within the same 10 minutes
   FR-33 allows, and the member's GitHub connection is no longer used by any job. Nothing that already reached the
   upstream project is deleted, closed, commented on or edited by the platform (FR-32 stands), and the rows are
-  removed with the account as the platform's account-deletion cascade requires.
+  removed with the account as the platform's account-deletion cascade requires (program Resolution R-35).
 - **FR-46.** **An operator can stop upstream pull requests.** An operator kill switch turns this epic off and
-  **fails closed**: with it off, no preparation is started, no approval opens or pushes anything, no suggestion is
-  sent and no status poll is dispatched. Whatever is already open upstream is left exactly as it is — the switch
-  stops new work, it never withdraws, closes or deletes anything — and every surface stays readable, the Upstream
-  tab showing **"Upstream pull requests are paused by the platform."** with the existing rows and their last known
-  state. Turning it back on resumes polling and preparation with no state rewritten.
+  **fails closed** (program Resolution R-30): with it off, no preparation is started, no approval opens or pushes
+  anything, no suggestion is sent and no status poll is dispatched. Whatever is already open upstream is left exactly
+  as it is — the switch stops new work, it never withdraws, closes or deletes anything — and every surface stays
+  readable, the Upstream tab showing **"Upstream pull requests are paused by the platform."** with the existing rows
+  and their last known state. Turning it back on resumes polling and preparation with no state rewritten.
 - **FR-47.** **The preparation run reports through a contract, and the platform enforces FR-12.** The preparation
   Agent's result is a structured **preparation report** with a fixed shape and fixed caps (title, body, agreement
   link, the project's stated limits, the AI-policy quotation, the pieces that did not port, and the checks it ran).

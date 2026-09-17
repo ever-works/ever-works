@@ -169,6 +169,29 @@ function sanitizeDescription(description?: string): string {
 		.slice(0, 500);
 }
 
+/**
+ * The subset of a repository payload the fork path reads. Structural on purpose: the `POST /forks`
+ * response is mapped WITHOUT a second `GET /repos/...`, which may legitimately still 404 while the
+ * fork bakes.
+ */
+interface ForkRepositoryPayload {
+	readonly owner: { readonly login: string };
+	readonly name: string;
+	readonly full_name: string;
+	readonly description?: string | null;
+	readonly default_branch: string;
+	readonly private: boolean;
+	readonly html_url: string;
+	readonly clone_url: string;
+	readonly fork?: boolean;
+	readonly source?: { readonly full_name?: string } | null;
+	readonly parent?: {
+		readonly owner?: { readonly login: string } | null;
+		readonly name?: string;
+		readonly full_name: string;
+	} | null;
+}
+
 export class GitHubApiService {
 	/**
 	 * Verified-org membership check for PR authors. C-11 in the
@@ -472,12 +495,16 @@ export class GitHubApiService {
 	): Promise<GitRepository | null> {
 		const octokit = this.createOctokit(token, baseUrl);
 
-		if (options.name) {
-			const targetOwner = options.organization || (await this.getUser(token, baseUrl)).login;
-			const existing = await this.getRepository(targetOwner, options.name, token, baseUrl);
-			if (existing) {
-				return existing;
-			}
+		// Where the fork lands — needed to look for an existing one before asking for another.
+		const targetOwner = options.organization || (await this.getUser(token, baseUrl)).login;
+		const targetName = options.name ?? repo;
+
+		// Already forked is SUCCESS. GitHub answers a repeat fork request with the existing fork,
+		// but resolving it here means the platform does not depend on that (nor spend a request
+		// it may not get), and it can hand back a usable copy immediately.
+		const existing = await this.findExistingFork(octokit, targetOwner, targetName, owner, repo);
+		if (existing) {
+			return existing;
 		}
 
 		const { data } = await octokit.rest.repos.createFork({
@@ -491,13 +518,22 @@ export class GitHubApiService {
 		const newOwner = data.owner.login;
 		const newName = data.name;
 
+		// `waitForReady: false` — the caller wants the request back NOW. Fork readiness takes
+		// seconds to minutes, so answer with the provider's own response and let a readiness
+		// poller own the wait instead of holding an HTTP request open. The coordinates are
+		// already usable for bookkeeping; the repository itself is not readable yet.
+		if (options.waitForReady === false) {
+			return this.toForkRepository(data as unknown as ForkRepositoryPayload, 'pending');
+		}
+
 		const REPO_CHECK_INTERVAL_MS = 5000;
 		const MAX_REPO_CHECK_ATTEMPTS = 24;
 
 		for (let attempt = 1; attempt <= MAX_REPO_CHECK_ATTEMPTS; attempt++) {
 			try {
 				await octokit.rest.repos.get({ owner: newOwner, repo: newName });
-				return await this.getRepository(newOwner, newName, token, baseUrl);
+				const ready = await this.getRepository(newOwner, newName, token, baseUrl);
+				return ready ? { ...ready, forkReadiness: 'ready' } : ready;
 			} catch (err) {
 				if (err instanceof RequestError && err.status === 404) {
 					if (attempt < MAX_REPO_CHECK_ATTEMPTS) {
@@ -510,6 +546,77 @@ export class GitHubApiService {
 		}
 
 		return null;
+	}
+
+	/**
+	 * The existing repository this fork request would target, when it really IS a fork of
+	 * `owner/repo`.
+	 *
+	 * Identity is checked, never just the name: a same-named repository that is not a fork, or a
+	 * fork of some other upstream, is NOT "already forked" and must still be forked. `source` is
+	 * the immediate upstream while `parent` is the root of the fork network, so a fork of a fork
+	 * (and a renamed upstream) is recognised through `source` first. The comparison is
+	 * case-insensitive because GitHub treats owner/repository casing as cosmetic.
+	 */
+	private async findExistingFork(
+		octokit: Octokit,
+		targetOwner: string,
+		targetName: string,
+		owner: string,
+		repo: string
+	): Promise<GitRepository | null> {
+		let data: ForkRepositoryPayload;
+
+		try {
+			const response = await octokit.rest.repos.get({ owner: targetOwner, repo: targetName });
+			data = response.data as unknown as ForkRepositoryPayload;
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 404) {
+				return null;
+			}
+			throw err;
+		}
+
+		if (data.fork !== true) {
+			return null;
+		}
+
+		const upstream = data.source?.full_name ?? data.parent?.full_name ?? '';
+		if (upstream.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) {
+			return null;
+		}
+
+		return this.toForkRepository(data, 'ready');
+	}
+
+	/**
+	 * Map a repository payload the fork path already holds, without a second API call. Deliberately
+	 * separate from `getRepository`, which re-reads the repository and can 404 while a fork is
+	 * still being created.
+	 */
+	private toForkRepository(data: ForkRepositoryPayload, forkReadiness: 'ready' | 'pending'): GitRepository {
+		const parentFullName = data.parent?.full_name ?? '';
+		const [parentOwnerFromName, parentNameFromName] = parentFullName.split('/');
+
+		return {
+			owner: data.owner.login,
+			name: data.name,
+			fullName: data.full_name,
+			description: data.description ?? undefined,
+			defaultBranch: data.default_branch,
+			isPrivate: data.private,
+			url: data.html_url,
+			cloneUrl: data.clone_url,
+			isFork: data.fork ?? true,
+			parent: parentFullName
+				? {
+						owner: data.parent?.owner?.login ?? parentOwnerFromName ?? '',
+						name: data.parent?.name ?? parentNameFromName ?? '',
+						fullName: parentFullName
+					}
+				: undefined,
+			forkReadiness
+		};
 	}
 
 	async createRepositoryFromTemplate(
