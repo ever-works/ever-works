@@ -497,7 +497,12 @@ applies its own non-overridable overlays (runtime class, token, labels) — the 
 > `ever-works-apps` the field is allowed and the zone's own `restricted` policy still applies on top.
 
 Rollout classifier (§5.4) maps kubelet messages `container has runAsNonRoot and image will run as root` and
-`image has non-numeric user` to `image_runs_as_root` / `image_user_unverifiable` within 180 s. For
+`image has non-numeric user` to **`managed_root_forbidden`** / `image_user_unverifiable` within 180 s. (The
+classifier line previously named `image_runs_as_root`, which is **not** in §3.1's `AppFailureCode` union and is not a
+precondition code either — it is the camelCase **i18n leaf** `failures.imageRunsAsRoot`, whose code is
+`managed_root_forbidden`, per §10.3 and the `AppImageConfigReader` preconditions in §5.1. The union is the
+authority: `image_runs_as_root` was never a code, so nothing is added, removed or renamed here — the prose now names
+the code that actually exists, which is what T9's classifier has to return.) For
 `ever-works-apps` the refusal happens **before apply**: `AppImageConfigReader` _(new,
 `packages/agent/src/app-runtime/app-image-config.reader.ts`)_ reads the image config's `User` from the registry in
 the worker (manifest → `linux/amd64` entry of an index → config blob; pull credential from APW-05; 10 s timeout;
