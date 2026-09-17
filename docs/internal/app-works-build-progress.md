@@ -29,15 +29,27 @@ broken; 548 acceptance ids defined, 548 indexed, 0 orphaned**, exit 0. The check
 finding list to `tools/verify-spec-tree.report.txt`, because the console only prints the first 40 and that hid 60
 findings once.
 
-| Deliverable                | State                                                                                                                                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gap register               | 24 blockers: **20 fixed, 4 confirmed already discharged**. All high rows in APW-01/02/03/04/05/06/07/10/13 addressed. ~50 medium/low rows in APW-01/02/03 remain untouched and are listed per epic. |
-| Spec tree                  | `CLEAN`, 548/548 ids, 0 broken links                                                                                                                                                                |
-| Wave 0                     | **both PRs implemented, tested and pushed**                                                                                                                                                         |
-| **Shared contracts**       | **landed** — `packages/contracts/src/apps/`, 9 modules + 2 specs, 665 exported names (433 runtime), **0 collisions**, wired into the package root                                                   |
-| Ever ID                    | DNS live; manifests in `k8s-gitops` PR #56; deployment blocked by the backups-first gate                                                                                                            |
-| Test estate                | created (two Organizations), isolation proven                                                                                                                                                       |
-| Implementation (Waves 1–3) | **foundation laid, features not written** — the contracts every epic compiles against exist and are tested; the epics themselves are not implemented                                                |
+| Deliverable                | State                                                                                                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Gap register               | 24 blockers: **20 fixed, 4 confirmed already discharged**. All high rows in APW-01/02/03/04/05/06/07/10/13 addressed. ~50 medium/low rows in APW-01/02/03 remain untouched and are listed per epic.                                                          |
+| Spec tree                  | `CLEAN`, 548/548 ids, 0 broken links                                                                                                                                                                                                                         |
+| Wave 0                     | **both PRs implemented, tested and pushed**                                                                                                                                                                                                                  |
+| **Shared contracts**       | **landed** — `packages/contracts/src/apps/`, 9 modules + 2 specs, 665 exported names (433 runtime), **0 collisions**, wired into the package root                                                                                                            |
+| Ever ID                    | DNS live; manifests in `k8s-gitops` PR #56; deployment blocked by the backups-first gate                                                                                                                                                                     |
+| Test estate                | created (two Organizations), isolation proven                                                                                                                                                                                                                |
+| Implementation (Waves 1–3) | **Wave 1 foundation in progress.** Landed: the shared contracts (665 names) and `app-runtime.ts` (84 exports, 111 tests). In flight: the plugin App contract (T2), the agent ports (T3), the k8s renderer base (T4/T5). The epics' features are not written. |
+
+### The programme's real size (measured, not estimated)
+
+`node docs/specs/features/app-works/tools/wave-plan.mjs` reads the merge order out of `TRACKER.md` and every task
+heading out of each epic's `tasks.md`: **693 task headings across 13 epics** — APW-13 73 · APW-06 73 · APW-04 60 ·
+APW-03 57 · APW-08 56 · APW-10 53 · APW-12 53 · APW-02 51 · APW-05 48 · APW-07 48 · APW-01 44 · APW-09 44 ·
+APW-11 33.
+
+For scale: this branch has completed **Wave 0's 2 tasks** and **4 of Wave 1's foundation tasks** (T1, T4, T5, plus
+the contracts surface that T2/T3/T6 all compile against). Anyone reading this should treat "all waves end to end" as
+a multi-month engineering programme with a team, not a single session — the point of this file is that every step
+taken is _verified_, not that the whole thing is near done.
 
 ### ✅ SPEC FREEZE — the acceptance lanes pin this revision
 

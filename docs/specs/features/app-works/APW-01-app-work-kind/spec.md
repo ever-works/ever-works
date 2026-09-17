@@ -390,7 +390,13 @@ Every threshold below is a number on purpose.
   the App Provisioner (APW-04) once the source is on the default branch (after the commit, or after the setup
   pull request is merged), and MUST NOT start it twice for one App Work. A file holding only the source block is
   **not** an App spec, so the minimal path always starts provisioning; the question is asked of the commit the
-  source was recorded on, synchronously, and never of the asynchronous evaluation state.
+  source was recorded on, synchronously, and never of the asynchronous evaluation state. The member MAY decline
+  that start at creation, with **Let an agent work out how to run it** (offered when no Blueprint applies, ticked
+  by default): the choice is persisted on the App Work's source record and honoured until the source reaches the
+  default branch, including after a setup pull request is merged, so a declined App Work stays **Not started**
+  with **Provision** on the Overview (APW-04) instead of spending agent runs and build minutes; the form MUST
+  state that spend beside the checkbox. Declining never removes the Provisioner — APW-04's card and its
+  **Provision** action stay available, and nothing else about the App Work changes.
 - **FR-30.** While a setup pull request is open the App Work MUST show as waiting for that merge; once it is
   merged the App Work MUST become ready; closed without merging, the App Work MUST show that and offer **Try
   again**, which opens a new setup pull request.
@@ -562,46 +568,55 @@ All copy below is final English copy, keyed for translation.
 ├──────────────────────────────────────────────────────────────────────────────┤
 │  Where should it run?  (•) None  ( ) Your cluster  ( ) Ever Works Apps ⊘     │
 ├──────────────────────────────────────────────────────────────────────────────┤
+│  ☑ Let an agent work out how to run it      ← shown when no Blueprint applies│
+├──────────────────────────────────────────────────────────────────────────────┤
 │  Name [Tasks App]  Slug [tasks-app]  Description [acme/tasks-app]            │
 │                               [ Cancel ]  [ Fork and create App Work ]       │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Element                        | Copy                                                                                                                                                                     |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stars                          | `{count, plural, =1 {1 star} other {# stars}}`                                                                                                                           |
-| Default branch                 | `Default branch: {branch}`                                                                                                                                               |
-| Size (shown when > 100 MB)     | `Large repository ({size})`                                                                                                                                              |
-| Moved                          | `Moved to {fullName}`                                                                                                                                                    |
-| Is a fork                      | `This repository is a fork of {parent}.`                                                                                                                                 |
-| Own fork                       | `This is your fork of {parent}. Ever Works will follow {parent} as upstream.`                                                                                            |
-| Public fork note               | `Forks of public repositories are public.`                                                                                                                               |
-| Archived                       | `This repository is archived. Upstream sync stays off.`                                                                                                                  |
-| License chip                   | `License: {spdx}` · `License: not detected`                                                                                                                              |
-| License class (R-3)            | `Hosting allowed` (green) · `Your cluster, after you attest the license` (amber, red) · `License unknown — you'll attest it before deploying` (unknown)                  |
-| Blueprint badge                | `Verified Blueprint` · `Blueprint available` · `No Blueprint — an agent will work out how to run it` · `Blueprint check unavailable`                                     |
-| Link                           | `Link` — `Use this repository as it is. You can push to it, so changes land here directly.`                                                                              |
-| Link (on own fork)             | `Link — don't follow upstream`                                                                                                                                           |
-| Fork                           | `Fork` — `Make your own fork. You can sync it with upstream and propose changes back.`                                                                                   |
-| Fork into                      | `Fork into`                                                                                                                                                              |
-| Existing fork                  | `You already have a fork: {fullName}. Ever Works will use it.`                                                                                                           |
-| Private copy                   | `Private copy` — `Make a private repository with the same code.`                                                                                                         |
-| Private copy trade-off         | `A private copy is not linked to the original on GitHub, so it can't open pull requests to the original project. Upstream changes arrive as pull requests in your copy.` |
-| Link setup note                | `Ever Works opens a pull request that adds one file, .works/works.yml. Merge it to finish.`                                                                              |
-| Existing fork setup note       | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml.`                                                                             |
-| Link setup note (Blueprint)    | `Ever Works opens a pull request that adds .works/works.yml and the Blueprint's files. Merge it to finish.`                                                              |
-| Existing fork note (Blueprint) | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml and the Blueprint's files.`                                                   |
-| Prompts title                  | `Values this app needs`                                                                                                                                                  |
-| Prompt hint                    | `The {name} Blueprint asks for these. You can change them later in Settings.`                                                                                            |
-| Prompt required marker         | `Required`                                                                                                                                                               |
-| Prompts incomplete             | `Fill in the values the app needs first.`                                                                                                                                |
-| Deploy target title            | `Where should it run?`                                                                                                                                                   |
-| None (R-12)                    | `None — don't deploy yet` — `You can pick a target later.`                                                                                                               |
-| Your cluster                   | `Your cluster` — `Run it on your own Kubernetes cluster. You'll add the connection on the Deploy tab.`                                                                   |
-| Ever Works Apps                | `Ever Works Apps` — disabled: `Coming soon — managed hosting for apps isn't open yet.`                                                                                   |
-| Submit (per mode)              | `Link and create App Work` · `Fork and create App Work` · `Copy and create App Work`                                                                                     |
-| Submit pending                 | `Creating…`                                                                                                                                                              |
-| Success (link / fork / copy)   | `App Work created.` · `Fork requested — we'll tell you when it's ready.` · `Copy started — we'll tell you when it's ready.`                                              |
+| Element                        | Copy                                                                                                                                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stars                          | `{count, plural, =1 {1 star} other {# stars}}`                                                                                                                                                            |
+| Default branch                 | `Default branch: {branch}`                                                                                                                                                                                |
+| Size (shown when > 100 MB)     | `Large repository ({size})`                                                                                                                                                                               |
+| Moved                          | `Moved to {fullName}`                                                                                                                                                                                     |
+| Is a fork                      | `This repository is a fork of {parent}.`                                                                                                                                                                  |
+| Own fork                       | `This is your fork of {parent}. Ever Works will follow {parent} as upstream.`                                                                                                                             |
+| Public fork note               | `Forks of public repositories are public.`                                                                                                                                                                |
+| Archived                       | `This repository is archived. Upstream sync stays off.`                                                                                                                                                   |
+| License chip                   | `License: {spdx}` · `License: not detected`                                                                                                                                                               |
+| License class (R-3)            | `Hosting allowed` (green) · `Your cluster, after you attest the license` (amber, red) · `License unknown — you'll attest it before deploying` (unknown)                                                   |
+| Blueprint badge                | `Verified Blueprint` · `Blueprint available` · `No Blueprint — an agent will work out how to run it` · `Blueprint check unavailable`                                                                      |
+| Link                           | `Link` — `Use this repository as it is. You can push to it, so changes land here directly.`                                                                                                               |
+| Link (on own fork)             | `Link — don't follow upstream`                                                                                                                                                                            |
+| Fork                           | `Fork` — `Make your own fork. You can sync it with upstream and propose changes back.`                                                                                                                    |
+| Fork into                      | `Fork into`                                                                                                                                                                                               |
+| Existing fork                  | `You already have a fork: {fullName}. Ever Works will use it.`                                                                                                                                            |
+| Private copy                   | `Private copy` — `Make a private repository with the same code.`                                                                                                                                          |
+| Private copy trade-off         | `A private copy is not linked to the original on GitHub, so it can't open pull requests to the original project. Upstream changes arrive as pull requests in your copy.`                                  |
+| Link setup note                | `Ever Works opens a pull request that adds one file, .works/works.yml. Merge it to finish.`                                                                                                               |
+| Existing fork setup note       | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml.`                                                                                                              |
+| Link setup note (Blueprint)    | `Ever Works opens a pull request that adds .works/works.yml and the Blueprint's files. Merge it to finish.`                                                                                               |
+| Existing fork note (Blueprint) | `Ever Works didn't create this fork, so it opens a pull request that adds .works/works.yml and the Blueprint's files.`                                                                                    |
+| Prompts title                  | `Values this app needs`                                                                                                                                                                                   |
+| Prompt hint                    | `The {name} Blueprint asks for these. You can change them later in Settings.`                                                                                                                             |
+| Prompt required marker         | `Required`                                                                                                                                                                                                |
+| Prompts incomplete             | `Fill in the values the app needs first.`                                                                                                                                                                 |
+| Provision automatically        | `Let an agent work out how to run it` — shown only when no Blueprint applies (badge `No Blueprint — an agent will work out how to run it` or `Blueprint check unavailable`), ticked by default            |
+| Provision automatically (help) | `Starts when the repository is ready. It spends AI tokens and build runner minutes, within the provisioning caps. You can cancel it, or untick this and start it later from the Overview with Provision.` |
+| Deploy target title            | `Where should it run?`                                                                                                                                                                                    |
+| None (R-12)                    | `None — don't deploy yet` — `You can pick a target later.`                                                                                                                                                |
+| Your cluster                   | `Your cluster` — `Run it on your own Kubernetes cluster. You'll add the connection on the Deploy tab.`                                                                                                    |
+| Ever Works Apps                | `Ever Works Apps` — disabled: `Coming soon — managed hosting for apps isn't open yet.`                                                                                                                    |
+| Submit (per mode)              | `Link and create App Work` · `Fork and create App Work` · `Copy and create App Work`                                                                                                                      |
+| Submit pending                 | `Creating…`                                                                                                                                                                                               |
+| Name / Slug / Description      | `Name` · `Slug` · `Description`                                                                                                                                                                           |
+| Slug help                      | `URL-friendly identifier. Derived from the repository name — edit to override.`                                                                                                                           |
+| Invalid slug                   | `Use lowercase letters, digits and hyphens only, for example tasks-app`                                                                                                                                   |
+| Cancel                         | `Cancel`                                                                                                                                                                                                  |
+| Create failed (unknown reason) | `Couldn't create the App Work. Try again.`                                                                                                                                                                |
+| Success (link / fork / copy)   | `App Work created.` · `Fork requested — we'll tell you when it's ready.` · `Copy started — we'll tell you when it's ready.`                                                                               |
 
 ### 6.3 Unavailable reasons (exact copy per reason code)
 
@@ -649,6 +664,23 @@ Overview tiles and disappears when the App Work is ready.
 | Failed (access)                | `Ever Works lost access to GitHub while preparing this App Work.` · `Reconnect GitHub` · `Try again`                                  |
 | Failed (other)                 | `Preparing this App Work failed: {reason}` · `Try again`                                                                              |
 | Waiting for setup PR           | `Merge the setup pull request to finish.` · `Open pull request`                                                                       |
+
+**Failed reasons (fills `{reason}`).** The card never shows a raw code: a leading `handler_failed:` is stripped,
+`too_large` is shown as `too_large_for_private_copy`, `access_revoked` uses the **Failed (access)** row above and
+`setup_pull_request_closed` the **Setup PR closed** row, and every other or unknown code uses the last row.
+
+| Reason code                                          | Copy                                                                                                            |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `works_yml_unparseable`                              | `.works/works.yml on the default branch isn't valid YAML. Fix or remove the file, then try again.`              |
+| `works_yml_other_kind`                               | `.works/works.yml already declares a different kind of Work. Set kind: app or remove the file, then try again.` |
+| `push_rejected`                                      | `GitHub kept rejecting the commit that adds .works/works.yml.`                                                  |
+| `provider_unsupported`                               | `This repository's Git provider can't be set up automatically.`                                                 |
+| `too_large_for_private_copy` (and `too_large`)       | `The repository is too large for a private copy. Create a fork instead.`                                        |
+| `uses_lfs`                                           | `The repository uses Git LFS, which a private copy can't carry over. Create a fork instead.`                    |
+| any other or unknown code (incl. `handler_failed:*`) | `Something went wrong while setting up the repository.`                                                         |
+
+**Retry limit.** When `retry_limit_reached` is reported, or the Work's `manualRetriesLeft` is 0, **Try again** is
+disabled and the row reads `You've used all 3 retries for this hour. Try again later.`
 
 ### 6.5 Delete dialog
 
@@ -753,6 +785,11 @@ Each item is an acceptance scenario collected into [ACCEPTANCE.md](../ACCEPTANCE
 - [ ] **ACC-01-27** — The deploy target chosen at creation survives as the App runtime's target, derived once from
       the persisted plugin id: **None** for nothing, **Your cluster** for an apps-capable plugin, **Ever Works
       Apps** for the apps-tier plugin — and never through the platform's website managed-hosting id (FR-34).
+- [ ] **ACC-01-28** — Unticking **Let an agent work out how to run it** at creation persists the decline, starts
+      no provisioning run and no build once the source reaches the default branch (including after a setup pull
+      request is merged), leaves the Overview's Provisioning card in its Not started state with **Provision**,
+      and the same App Work provisions exactly once when the member presses it (APW-04); ticking it, or leaving
+      it at its default, provisions exactly once and the spend is disclosed on the form (FR-29a).
 
 ## 9. Open questions
 

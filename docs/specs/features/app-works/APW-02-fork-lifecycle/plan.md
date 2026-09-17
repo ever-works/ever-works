@@ -101,7 +101,7 @@ live in the private operations repository), R-21 (conflict Task Agent from APW-0
 
 ```
  caller ─► GitFacadeService.cloneOrPull({ owner, repo, checkoutKey?, expectExisting? })
-              coalesce key = [plugin, owner, repo, branch, switch, checkoutKey ?? '']
+              coalesce key = [plugin, owner, repo, branch, switch, checkoutKey ?? '', expectExisting === true]
               └─► plugin.cloneOrPull ─► GitOperations
                      dir = checkoutKey
                            ? <base>/v2/k/<sha256(checkoutKey)[0,16]>-<slug(checkoutKey)>
@@ -112,12 +112,23 @@ live in the private operations repository), R-21 (conflict Task Agent from APW-0
  caller ─► GitFacadeService.forkRepository(owner, repo, { organization?, name?, waitForReady? })
               └─► GitHubApiService.forkRepository
                      target = organization ?? getUser().login
-                     existing = GET /repos/{target}/{name ?? repo}
-                     existing.fork && lower(existing.source|parent.full_name) == lower(owner/repo) ─► return (forkReadiness computed)
+                     existing = findExistingFork(target, name ?? repo, owner, repo)   ← the full §4.3 lookup
+                     found ─► return (forkReadiness computed)
                      POST /repos/{owner}/{repo}/forks
                      waitForReady === false ─► return response mapped, forkReadiness: 'pending'
                      else poll 24 × 5 s (unchanged)
 ```
+
+**Every fork request uses the full lookup, not the name check alone (FR-10, S2, ACC-02-03).** A fork the member
+renamed answers to its **current** name, so `GET /repos/{target}/{name ?? repo}` 404s for it and the request would
+fall through to `POST /forks`. `forkRepository` therefore calls the same `findExistingFork` the rest of the epic
+uses — name check first (one call, the common case), then the GraphQL fork-network search filtered by owner, then
+the REST `/forks` pages — before it ever POSTs, and only the three-step result decides. P0 may land the name check
+alone (T5) **only** because P1 adds the widened lookup in the same file (T17) and wires it into `forkRepository`
+(T52); a build that stops at T5 has not delivered FR-10 and ACC-02-03 must not be signed off on it. `waitForReady`,
+the target owner, the identity rule (FR-11) and every existing caller (`forkTemplateForUser` included) are
+unchanged: the widened lookup returns the same repository the name check returns whenever both find one, so no
+caller sees a different fork than before.
 
 The hash makes identity exact — case-preserving, separator-safe and provider-scoped, because the clone URL embeds
 host, owner and name byte-for-byte; the slug suffix keeps directories readable in logs. `v2/` separates new copies from every legacy directory, which is never read
@@ -508,9 +519,13 @@ Error contract (body `{ status: 'error', code, message, details? }`):
 `packages/agent/src/facades/git.facade.ts` — one method per new capability (`findExistingFork`,
 `syncForkBranch`, `getForkDivergence`, `createRepositoryCopy`, `setActionsPermissions`, `createWebhook`,
 `deleteWebhook`, plus APW-09's `createBranchFromSha`, `updateBranchRef`), each `resolvePluginAndToken(options)` → materialise `plugin.<method>` → `typeof !== 'function'` ⇒
-`GitOperationNotSupportedError` (the existing 409 mapping). `cloneOrPull` adds `checkoutKey` to its coalescing key;
-`getLocalDir` / `removeLocalDir` gain the optional `checkoutKey`; `FacadeCloneOptions` gains `checkoutKey?` and
-`expectExisting?`. `IGitFacade.getLocalDir` gains the optional parameter.
+`GitOperationNotSupportedError` (the existing 409 mapping). `cloneOrPull` adds `checkoutKey` **and
+`expectExisting === true`** to its coalescing key — both, because two callers can otherwise share one in-flight
+clone with opposite expectations: a plain clone that finds an empty repository legitimately `git init`s the
+directory, and handing that directory to an `expectExisting` caller would answer success for a repository that does
+not exist yet, which is exactly what FR-8 forbids. Two calls with the same coordinates and different
+`expectExisting` therefore never coalesce; `getLocalDir` / `removeLocalDir` gain the optional `checkoutKey`;
+`FacadeCloneOptions` gains `checkoutKey?` and `expectExisting?`. `IGitFacade.getLocalDir` gains the optional parameter.
 
 `packages/plugins/github/src/github-errors.ts` **(new)** — `toGitProviderError(err: RequestError)`:
 
@@ -540,6 +555,10 @@ failures as `GitProviderRequestError` (which still carries `status`, so existing
 owner { login } } } }` filtered to `owner.login == target` (case-insensitive), then REST `getRepository` for the
   match; (3) when GraphQL is unavailable, REST `GET /repos/{o}/{r}/forks?sort=newest&per_page=100` for at most 3
   pages. The exact GraphQL argument set is pinned by the live contract probe (tasks T42) before merge.
+  **`forkRepository` calls this method** (T52): the three steps run before `POST /forks`, and step (2)/(3) are the
+  only reason a renamed fork is found (FR-10, S2). The lookup is bounded at 3 fork pages per request, and a
+  provider that answers neither step leaves behaviour exactly as it is today — the request proceeds to `POST
+  /forks`, which GitHub answers with the existing fork rather than creating a second one.
 - **`syncForkBranch`**: `POST /repos/{fork}/merge-upstream { branch }` → 200 `merge_type` `fast-forward` ⇒
   `fast_forwarded`, `merge` ⇒ `merged`, `none` ⇒ `up_to_date`; 409 ⇒ `conflict`; 422 ⇒ `unprocessable` (e.g. branch
   missing upstream after a rename). APW-02 calls it only on a behind-only fork, so `merged` indicates a race and is
@@ -756,9 +775,18 @@ it solely to refuse a desync it cannot honour. Before this note, only `schedule`
 `AppUpstreamStateService.recordConflict(workId, { pr, fromSha, toSha, commits, paths })` (API side, remote-proxied):
 
 1. Label `app-upstream-conflict:<workId>`; look up a non-terminal Task on the Work carrying it with
-   `TaskRepository.findByUserIdFiltered(ownerUserId, { workId, label, status: <open statuses> })` (the existing
-   case-insensitive JSON-token label filter). Found ⇒ post the update comment (spec §6.3) through the Task chat/comment
-   path the Task page already uses, keep `conflictTaskId`.
+   `TaskRepository.findByUserIdFiltered(ownerUserId, { workId, label, status: ['backlog', 'todo', 'in_progress',
+'in_review', 'blocked'] })` (the existing case-insensitive JSON-token label filter; the open statuses are exactly
+   `TASK_BOARD_STATUSES` minus the two terminal members `done` and `cancelled`,
+   `packages/contracts/src/tasks/task-board-columns.types.ts:19-27` — written out here so the filter is never a
+   placeholder, and derived from that constant so a new status joins the list by itself). Found ⇒ post the update
+   comment (spec §6.3) through the Task chat service the Task page already uses —
+   `TaskChatService.post(ownerUserId, { taskId, authorType: 'user', authorId: ownerUserId, body })`
+   (`packages/agent/src/tasks-domain/task-chat.service.ts:108`, `authorType: 'user' | 'agent'` with an `authorId` of
+   that kind) — with the comment body of spec §6.3, which contains **no `@`**: the service parses `@<slug>` mentions
+   server-side and fans out an agent run for each one (`:49`, `:149`), and this epic starts no run. The body is
+   written by the Work's owner as the acting user (there is no system actor), so the Task page shows it exactly as
+   a member's own comment; keep `conflictTaskId`.
 2. Else `TasksService.create(ownerUserId, { title, description, labels: [label], workId, agentId })` where `agentId` =
    `(await resolver.resolve({ userId: ownerUserId, workId }))?.agentId ?? null` — `resolver` is APW-08's
    `APP_WORK_AGENT_RESOLVER` (`packages/agent/src/app-works/app-work-agent-resolver.ts`, the change-Agent rule of
@@ -772,8 +800,10 @@ it solely to refuse a desync it cannot honour. Before this note, only `schedule`
 ### 6.6 `app-upstream-sync-dispatcher` (cron)
 
 `packages/tasks/src/tasks/trigger/app-upstream-sync-dispatcher.task.ts` **(new)** — `schedules.task({ id:
-'app-upstream-sync-dispatcher', cron: '*/10 * * * *' })`, cron validated like `data-repo-sync-dispatcher.task.ts`,
-calling the remote `AppUpstreamSyncDispatcherService.dispatchDue()` **(new)**
+'app-upstream-sync-dispatcher', cron: process.env.APP_UPSTREAM_SYNC_DISPATCHER_CRON ?? '*/10 * * * *' })`, cron
+validated like `data-repo-sync-dispatcher.task.ts` (its override variable is `DATA_SYNC_DISPATCHER_CRON`, read the
+same way, `:48-53`; an invalid override falls back to the default), calling the remote
+`AppUpstreamSyncDispatcherService.dispatchDue()` **(new)**
 `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts`:
 
 - `claimDue(now, 50)` (stamps `nextSyncAt` to the next slot before dispatch, so a failing Work cannot hot-loop);
@@ -835,6 +865,8 @@ appUpstream.warnings.appPermissionMissing / reviewGitHubAppAccess / openOnGitHub
 appUpstream.permissions.contents / pullRequests / administration / actions / webhooks
 appUpstream.reasons.<reasonCode>          (one leaf per sync/readiness reason code, camelCased)
 dashboard.activity.filters.types.appFork / appActions / appUpstream     "Fork" · "Inherited workflows" · "Upstream"
+dashboard.schedules.sourceTypes.appUpstreamSync    "Upstream sync"   (T53; the same leaf name in the 20 siblings)
+dashboard.schedules.entityKinds.appWork            "App Work"        (T53)
 ```
 
 Server-side Task title/description/comment templates (spec §6.3) are English constants in
@@ -844,7 +876,25 @@ Server-side Task title/description/comment templates (spec §6.3) are English co
 
 ## 9. Telemetry and failure modes
 
-### 9.1 Events (monitoring package; counters, durations, codes only)
+### 9.1 Events (an injected sink; counters, durations, codes only)
+
+**Where the events go (this is the fix, not a detail).** Neither `packages/agent` nor `packages/plugin` nor
+`packages/tasks` depends on a monitoring package, and both host packages deliberately avoid one: agent services
+take an **injected optional sink** (the precedent is
+`packages/agent/src/services/zero-friction-funnel.service.ts:56`, `FunnelAnalyticsSink.track(distinctId, …)`).
+This epic therefore declares `APP_UPSTREAM_TELEMETRY_SINK` in
+`packages/agent/src/app-works/app-upstream-telemetry.port.ts` **(new)** —
+`track(event: AppUpstreamTelemetryEvent, props: Record<string, string | number | boolean | undefined>, distinctId: string): void`,
+fire-and-forget, never throwing — bound in `apps/api` to the existing PostHog client
+(`packages/agent/src/services/`'s `FunnelAnalyticsSink` binding is the pattern), injected `@Optional()`, unbound ⇒
+counted and dropped. **`GitOperations` has no dependency injection at all**, so `git_checkout.not_ready` is emitted
+by the **facade** where it catches `RepositoryNotReadyError` (`packages/agent/src/facades/git.facade.ts`), never
+from the plugin — the plugin keeps throwing the typed error it throws today.
+**`distinctId` for a background job** is the Work owner's id (not the Work's, not a repository): every event above
+carries `workId` as a property instead, and a job with no resolvable owner emits with the constant
+`'system:app-works'`. The allow-list is enforced at the port boundary: a property not in the table below is dropped
+before it reaches the sink, so no repository name, URL, owner login, token or file content can travel even by
+mistake.
 
 | Event                         | Properties                                                                                   |
 | ----------------------------- | -------------------------------------------------------------------------------------------- |

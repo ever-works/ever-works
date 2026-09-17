@@ -99,11 +99,16 @@ _None in P0._
       **Modify** `packages/plugins/github/src/github.plugin.ts` — `getLocalDir` / `removeLocalDir` forward the optional
       key.
       **Modify** `packages/agent/src/facades/git.facade.ts` — `FacadeCloneOptions` gains `checkoutKey?`,
-      `expectExisting?`; the `cloneOrPull` coalescing key appends `cloneOptions.checkoutKey ?? ''`; `getLocalDir` /
+      `expectExisting?`; the `cloneOrPull` coalescing key appends **both** `cloneOptions.checkoutKey ?? ''` and
+      `cloneOptions.expectExisting === true` (FR-8: a plain clone and an `expectExisting` clone of the same
+      coordinates must never share one in-flight clone, because the plain one may legally leave an empty
+      `git init` directory behind and the `expectExisting` caller would then be handed it); `getLocalDir` /
       `removeLocalDir` accept and forward the key.
       **Test**: extend `packages/plugins/github/src/__tests__/github.plugin.spec.ts` (forwarding) and **create**
       `packages/agent/src/facades/__tests__/git.facade.checkout-key.spec.ts` — two calls with different keys for one repo
-      do not coalesce; two identical calls do (ACC-02-01).
+      do not coalesce; two identical calls do; **two calls with the same key whose `expectExisting` differs do not
+      coalesce**, and the `expectExisting` one still throws `RepositoryNotReadyError` when the repository is empty
+      (ACC-02-01, ACC-02-02).
       **Done when**: `pnpm --filter @ever-works/agent test` is green.
 
 - [ ] **T5. Fork requests find the real existing fork and can return immediately.**
@@ -111,7 +116,9 @@ _None in P0._
       and checks `<target>/<name ?? repo>`; returns it only when `fork === true` and `source.full_name` (else
       `parent.full_name`) equals `owner/repo` case-insensitively, with `forkReadiness` from its default-branch head;
       `waitForReady === false` returns the mapped `POST /forks` response with `forkReadiness: 'pending'`; the default
-      keeps the 24 × 5 s poll.
+      keeps the 24 × 5 s poll. **This is step (1) of the full lookup, not the whole of FR-10**: a fork the member
+      renamed is found only once **T52** routes `forkRepository` through T17's three-step `findExistingFork`, so
+      ACC-02-03 is not signed off on P0 alone.
       **Modify** `packages/plugins/github/src/github.plugin.ts` and `packages/agent/src/facades/git.facade.ts` — no
       signature change; forward the options object untouched.
       **Test**: **create** `packages/plugins/github/src/__tests__/github-api.service.fork.spec.ts` (Octokit mocked) —
@@ -264,7 +271,9 @@ limit)`, `findUnavailableDueForRecheck(nowMs, limit)`, `claimSetupPullRequestChe
 - [ ] **T17. `findExistingFork`.**
       **Modify** `packages/plugins/github/src/github-api.service.ts` and `packages/plugins/github/src/github.plugin.ts` —
       the three-step lookup of [plan §4.3](./plan.md) (same-name identity check, GraphQL forks with affiliations filtered
-      by owner, REST forks fallback ≤ 3 pages).
+      by owner, REST forks fallback ≤ 3 pages). The method is consumed in two directions: APW-01's inspect calls it
+      per candidate owner, and **`forkRepository` itself calls it before every create request (T52)** — so it is a
+      capability, never a private helper of the create path.
       **Test**: extend `packages/plugins/github/src/__tests__/github-api.service.fork.spec.ts` — renamed fork found via
       GraphQL; GraphQL error ⇒ REST fallback; nothing found ⇒ `null`; a match owned by another owner ignored (ACC-02-03).
       **Done when**: at most 1 REST + 1 GraphQL + 1 REST call on the happy path (asserted).
@@ -328,7 +337,11 @@ limit)`, `findUnavailableDueForRecheck(nowMs, limit)`, `claimSetupPullRequestChe
       **Test**: **create** `packages/agent/src/app-works/__tests__/app-upstream-state.service.spec.ts` — every error code
       of plan §4.1; events emitted exactly once across repeated calls; conflict Task Agent: resolver returns an id ⇒ Task
       `agentId` is that id; resolver returns `null`, throws or is unbound ⇒ `agentId` `null` and exactly one owner
-      notification; an open labelled Task is commented, not duplicated (ACC-02-11); `timeout` once per attempt and
+      notification; an open labelled Task is commented, not duplicated (ACC-02-11) **and the comment goes through
+      `TaskChatService.post` with `authorType: 'user'`, `authorId` = the Work's owner and a body that contains no
+      `@`** (asserted directly, because the chat service fans out one agent run per `@<slug>` mention and this path
+      must start none), while the Task lookup uses exactly the five open statuses of plan §6.5 — a Task in `done`
+      or `cancelled` is not commented and a replacement Task is created instead; `timeout` once per attempt and
       `retryReadiness` refused with `retry_limit_reached` on the 4th call in an hour (ACC-02-05); `fail('access_revoked')`
       then `retryReadiness` accepted (ACC-02-06); readiness from `probeReadiness` on an empty then non-empty repository
       (ACC-02-04); another account's Work ⇒ 404 (ACC-02-21).
@@ -493,11 +506,18 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
 
 - [ ] **T34. `app-upstream-sync-dispatcher` cron.**
       **Create** `packages/tasks/src/tasks/trigger/app-upstream-sync-dispatcher.task.ts` — `schedules.task` on
-      `'*/10 * * * *'` with the five-field validation and fallback copied from `data-repo-sync-dispatcher.task.ts`, calling
-      `APP_UPSTREAM_SYNC_DISPATCHER_SERVICE.dispatchDue()` and returning the counters.
+      `process.env.APP_UPSTREAM_SYNC_DISPATCHER_CRON ?? '*/10 * * * *'` with the five-field validation and fallback
+      copied from `data-repo-sync-dispatcher.task.ts` (which reads its own override the same way,
+      `data-repo-sync-dispatcher.task.ts:48-53`), calling
+      `APP_UPSTREAM_SYNC_DISPATCHER_SERVICE.dispatchDue()` and returning the counters. The variable name is
+      `APP_UPSTREAM_SYNC_DISPATCHER_CRON`, it is documented in `apps/api/.env.example` beside the other
+      `APP_*` switches, and it is listed in CONTRACTS §7 as an operator override — a dispatcher cron is not a
+      feature switch, so R-30's family switch (`EVER_WORKS_APP_SYNC_ENABLED`) stays the only on/off control.
       **Modify** `packages/tasks/src/tasks/trigger/index.ts` — export.
+      **Modify** `apps/api/.env.example` — `APP_UPSTREAM_SYNC_DISPATCHER_CRON` with its default.
       **Test**: **create** (new directory) `packages/tasks/src/tasks/trigger/__tests__/app-upstream-sync-dispatcher.task.spec.ts` —
-      invalid override falls back to the default cron.
+      the default is used when the variable is unset, a valid five-field override is honoured, and an invalid
+      override falls back to the default cron.
       **Done when**: a local run with a fixture due row dispatches one sync and stamps `nextSyncAt`.
 
 ## P1.7 — i18n, tests, docs
@@ -577,13 +597,26 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
 # Cross-phase closing tasks
 
 - [ ] **T39. Telemetry.**
+      **Create** `packages/agent/src/app-works/app-upstream-telemetry.port.ts` — `AppUpstreamTelemetryEvent`,
+      the per-event property allow-list and `APP_UPSTREAM_TELEMETRY_SINK` per [plan §9.1](./plan.md):
+      `track(event, props, distinctId)`, fire-and-forget, never throwing, unbound ⇒ counted and dropped. **No
+      package import**: `packages/agent`, `packages/plugin` and `packages/tasks` do not depend on a monitoring
+      package, and this epic does not add one.
+      **Modify** `apps/api/src/app-works/app-works.module.ts` — bind the token to the existing PostHog-backed sink
+      (the `FunnelAnalyticsSink` binding of `zero-friction-funnel.service.ts` is the pattern).
       **Modify** `packages/agent/src/app-works/app-fork-readiness.service.ts`,
-      `packages/agent/src/app-works/app-actions-hygiene.service.ts`, `packages/agent/src/app-works/app-upstream-sync.service.ts`,
-      `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts` and `packages/plugin/src/git/git-operations.ts`
-      (the `RepositoryNotReadyError` path) — wire the six events of [plan §9.1](./plan.md) through the monitoring package.
+      `packages/agent/src/app-works/app-actions-hygiene.service.ts`, `packages/agent/src/app-works/app-upstream-sync.service.ts`
+      and `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts` — emit the first six events of plan
+      §9.1 through the injected `@Optional()` sink, with `distinctId` = the Work owner's id (the constant
+      `'system:app-works'` when no owner resolves) and `workId` as a property. **`git_checkout.not_ready` is emitted
+      by the facade** — `packages/agent/src/facades/git.facade.ts` where it catches `RepositoryNotReadyError` — and
+      **not** from `packages/plugin/src/git/git-operations.ts`, which has no dependency injection and keeps throwing
+      the same typed error unchanged.
       **Test**: **create** `packages/agent/src/app-works/__tests__/app-upstream.telemetry.spec.ts` — each event emitted once
-      per outcome; no payload contains a repository name, owner, file path, commit message or token.
-      **Done when**: the spec is green.
+      per outcome with a bound sink; nothing thrown with the sink unbound; a property outside the allow-list is
+      dropped (assert the sink never sees it); no payload contains a repository name, owner, file path, commit
+      message or token; the facade, not the plugin, emits `git_checkout.not_ready`.
+      **Done when**: the spec is green and `git grep -n "monitoring" packages/agent/src/app-works packages/agent/src/facades` returns nothing.
 
 - [ ] **T40. Contracts and tracker.**
       **Modify** `docs/specs/features/app-works/TRACKER.md` — APW-02 P0/P1 status and PR links.
@@ -610,9 +643,19 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       `PATCH git/refs` force semantics; workflow disable on a fork; the 403 messages for a missing App permission; webhook
       create/update. Never point the probe at a third-party repository.
       **Create** the recorded fixtures under `packages/plugins/github/src/__tests__/fixtures/app-forks/`.
+      **Provisioning (owner action, before P1 merges).** The two variables above are **test-only** and belong to the
+      private operations repository, never to a deployable environment: `GITHUB_CONTRACT_PROBE_TOKEN` is a
+      fine-grained PAT scoped to that one organization with `contents`, `pull requests`, `actions` and
+      `administration`, and `GITHUB_CONTRACT_PROBE_ORG` names a dedicated throwaway organization — the **same**
+      organization APW-13's `E2E_*` suite uses as its `<e2e-upstream-org>` placeholder, so the estate provisions
+      one test organization and one scoped token, not two. CONTRACTS §7 lists both as test-only variables and
+      CONTRACTS §8 records the organization as the shared placeholder; until they are provisioned the probe stays
+      skipped and ACC-02-03, ACC-02-08 and ACC-02-20 keep their unit-level proof (T5, T17, T52, T20) without
+      claiming the live one.
       **Test**: with both variables exported in the shell,
       `cd packages/plugins/github && npx vitest run --config vitest.contract.config.ts`; the unit specs of T16–T21 then
-      assert against the committed fixtures (ACC-02-03, ACC-02-08, ACC-02-20).
+      assert against the committed fixtures (ACC-02-03, ACC-02-08, ACC-02-20); with either variable unset the probe
+      self-skips and the run is green.
       **Done when**: the probe's recorded responses are committed as fixtures and T16–T21's specs read them.
 
 - [ ] **T45 (P1, lands with T12–T13). Classify new tables for workspace backup (R-25).**
@@ -777,6 +820,68 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       environment variables are set, exactly as today.
       **Done when**: the hygiene spec is green with the one-path assertion and the probe's recorded result is
       committed as a fixture with its verdict written down.
+
+- [ ] **T52. Every fork request finds a renamed fork (FR-10, S2 — ACC-02-03).**
+      **Modify** `packages/plugins/github/src/github-api.service.ts` — `forkRepository` resolves the target owner
+      and the target name as it does today, then calls the **full** `findExistingFork` of [plan §4.3](./plan.md)
+      (T17: same-name identity check, GraphQL fork-network search filtered to `owner.login == target`, REST
+      `/repos/{o}/{r}/forks` fallback for at most 3 pages) **before** `POST /repos/{owner}/{repo}/forks`, and
+      returns what it finds with `forkReadiness: 'ready'`. Today's name-only check stays as step (1) of that
+      lookup — it is the cheap common case, not a separate path — so the change is additive: a fork that answers
+      to `<target>/<name ?? repo>` is found by the same first call as before, and a fork the member **renamed**
+      (which 404s on that call) is now found by step (2)/(3) instead of falling through to a create request.
+      `waitForReady: false` (FR-12), the 24 × 5 s poll (FR-13), the identity rule (FR-11: `source` first, then
+      `parent`, case-insensitive) and `forkTemplateForUser`'s behaviour are all unchanged; when steps (2) and (3)
+      find nothing, the request proceeds to `POST /forks` exactly as it does today.
+      **Modify** `packages/plugins/github/src/github.plugin.ts` and `packages/agent/src/facades/git.facade.ts` only
+      if T17's plugin/facade exposure of `findExistingFork` is not already in place — no signature change and no
+      new option.
+      **Test**: extend `packages/plugins/github/src/__tests__/github-api.service.fork.spec.ts` (Octokit mocked) —
+      a fork renamed to `me/tasks-fork` is returned with **zero** `createFork` calls and zero `repos.get` for
+      `<target>/<upstream name>` beyond the first 404, proved by the mock's call log; a same-named **non-fork** is
+      still not returned and still forks (FR-11); a fork of another upstream is still not returned; with the
+      GraphQL call failing the REST `/forks` fallback finds the renamed fork within 3 pages and makes no fourth
+      page request; nothing found ⇒ exactly one `createFork` call, unchanged; `waitForReady: false` still makes one
+      POST and no poll (ACC-02-03).
+      **Done when**: the spec is green, a renamed fork costs zero create requests, and
+      `packages/agent/src/template-catalog/template-catalog.service.spec.ts` (the `forkTemplateForUser` caller)
+      passes unchanged.
+
+- [ ] **T53. The Upstream sync appears in the Schedules view (FR-32 — ACC-E2E-05).**
+      ACC-E2E-05 asserts that "the Schedules view lists the Upstream sync with the spec's cron expression", and no
+      task in any epic put it there: this epic runs sync from its own dispatcher (`app-upstream-sync-dispatcher`,
+      §6.6) and the existing Schedules surface aggregates **seven** sources — recurring Tasks, Agent heartbeats,
+      Work schedules, Mission ticks, item source-validation, data-sync polling and inbound triggers
+      (`packages/agent/src/schedules/schedules.service.ts:163`, `schedule-view.types.ts:1-13`). This adds an eighth
+      source rather than a second schedules surface.
+      **Modify** `packages/agent/src/schedules/schedule-view.types.ts` — append `'app_upstream_sync'` to
+      `ScheduleSourceType` and `'app_work'` to `ScheduleOwnerType`. Both are **appends**: every existing member,
+      every switch over them and every existing row keeps its behaviour.
+      **Modify** `packages/agent/src/schedules/schedules.service.ts` — project the new source beside the seven
+      existing ones, with its own try/catch like each of them: one **read-only** row per App Work whose
+      `WorkUpstreamState.nextSyncAt` is set — `sourceType: 'app_upstream_sync'`, `ownerType: 'app_work'`,
+      `ownerId` = the Work id, `id` = `app_upstream_sync:<workId>` (the existing synthetic-key convention), the
+      schedule string = the App spec's `upstreamSync.schedule` (or `'0 6 * * 1'` when the spec sets none — the same
+      value §6.4 computes `nextSyncAt` from), `nextRunAt` = `nextSyncAt`, `status` = `active`, or `paused` when the
+      row is paused (`upstreamStatus` `archived`/`unavailable`, or `dataRepositoryStatus` `missing`).
+      **Modify** `packages/agent/src/schedules/schedule-control.service.ts` — `SOURCE_TYPES` gains the member, and
+      `runNow` for it delegates to this epic's existing `POST /api/works/:id/upstream/sync` (FR-33's 6-per-hour cap
+      and its refusal apply unchanged). Pause, resume, edit, duplicate and reassign are **not offered** for the
+      source, with their reason, because the schedule is spec-owned and the dispatcher is the only writer — the
+      existing controls for the other seven sources are untouched.
+      **Modify** `apps/web/src/lib/api/schedules.ts` — mirror both unions;
+      `apps/web/src/components/schedules/SchedulesList.tsx` and `SchedulesFilters.tsx` — the row renders the cron
+      and the next-run time with `dashboard.schedules.sourceTypes.appUpstreamSync` and
+      `dashboard.schedules.entityKinds.appWork` (plan §8).
+      **Test**: extend the schedules service spec — an App Work with `nextSyncAt` yields exactly one row carrying the
+      spec's cron and next-run time; an App Work with `nextSyncAt` null (a link, or a paused row) yields none or a
+      `paused` row respectively; `runNow` dispatches the upstream sync and nothing else; an unreadable
+      upstream-state source degrades to an empty slice while the other seven sources still return their rows; extend
+      `apps/web/src/components/schedules/SchedulesWorkspace.unit.spec.tsx` and the filters spec — the row shows its
+      cron and next-run time, offers **Sync now** only, and the new chip does not change any existing count
+      (ACC-E2E-05).
+      **Done when**: the Schedules view lists the Upstream sync with the spec's cron expression for a ready App Work,
+      and no other source's rows, counts or filters changed.
 
 ---
 

@@ -339,8 +339,12 @@ Licenses that require offering source to network users produce a visible source 
   license headers reported by the App Provisioner or a Build from their checkout; at most 20 evidence paths
   MUST be kept, and a scan cut short by a repository of more than 100,000 entries MUST be flagged incomplete.
 - **FR-55.** Classification MUST apply the registry's expression rules (OR takes the best class, AND the
-  worst); a mixed repository MUST take the worst class of its parts and at least `amber` when a part is
-  unidentified; no identifiable license MUST take the registry's `unknown` class, which is never `green`.
+  worst, on the fixed rank `green < amber < unknown < red`); a mixed repository MUST take the worst class of its
+  parts and at least `amber` when a part is unidentified; no identifiable license MUST take the registry's
+  `unknown` class, which is never `green`. The `unknown` class is the platform's own computation — detection found
+  nothing, or an operand is not listed — and it is **not** read from the registry's `unknown.class` key, which is
+  advisory display metadata: an implementer stores `class: 'unknown'`, so a repository without a license can never
+  be recorded as `amber` and can never carry an upstream agreement (catalog.md §4, ACC-03-30, ACC-03-47).
 - **FR-56.** The license MUST be evaluated on App Work creation before a deploy target can be chosen, when the
   effective spec moves to a commit that changes license-relevant files, on every Upstream sync, when the
   registry changes, and on **Re-check now** — within 20 seconds at the 95th percentile, using at most 12 file

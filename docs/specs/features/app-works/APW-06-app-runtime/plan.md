@@ -486,6 +486,16 @@ applies its own non-overridable overlays (runtime class, token, labels) — the 
 | `/tmp` emptyDir (`sizeLimit: 256Mi`)  | when read-only                                                                 | when read-only                                         |
 | namespace pod security                | enforce `baseline`, warn+audit `restricted`                                    | enforce `restricted`                                   |
 
+> **`runAsUser` — the one field that can rescue a named-user image (added 2026-09-17, gap APW06-G26).** The table
+> above pins `runAsNonRoot: true` on both targets (`true` always on `ever-works-apps`), and the classifier below maps
+> the kubelet's `image has non-numeric user` to `image_user_unverifiable`. An image whose `USER` is a **name** —
+> Umami's is `nextjs` — therefore fails on **both** targets with **no input the App author could set**, because
+> APW-03's `components` had no numeric-user field. Closed additively: **APW-03 `schema.md` §10 gains an optional
+> `components[].runAsUser` (integer, 1…4294967294, no default; validator rule R27)**, and the renderer passes it
+> through **verbatim** — `packages/plugins/k8s/src/app/app-security.ts`'s optional `runAsUser` seam **never derives**
+> a uid, and emits nothing when the field is absent, so every existing App spec renders byte-identically. On
+> `ever-works-apps` the field is allowed and the zone's own `restricted` policy still applies on top.
+
 Rollout classifier (§5.4) maps kubelet messages `container has runAsNonRoot and image will run as root` and
 `image has non-numeric user` to `image_runs_as_root` / `image_user_unverifiable` within 180 s. For
 `ever-works-apps` the refusal happens **before apply**: `AppImageConfigReader` _(new,

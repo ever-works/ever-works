@@ -75,15 +75,43 @@ gate._
       `APP_BLUEPRINT = 'app_blueprint'`, `APP_LICENSE = 'app_license'` to `ActivityActionType` (append only; varchar
       column, no migration). Rows written by this epic use these as `actionType` and the dotted CONTRACTS §6 name as
       `action` (R-2).
+      **Three fields every row of these three families must carry** (`CreateActivityLogDto` requires them —
+      `packages/agent/src/entities/activity-log.types.ts:427-433` — while the plan defines only the event name and
+      its `details`, §6.2, §6.3 and §2.5; Resolution **R-34** is the binding rule this task implements): - **`status`** — `ActivityStatus.COMPLETED` for a classification, an apply, an attestation, an upgrade notice
+      or a catalog refresh; `FAILED` for `app.spec.invalid`, an apply failure, a license refusal, a catalog read
+      that failed, and any `app.license.*` row that records a mismatch; `CANCELLED` only when a member cancels. - **`summary`** — one English template per event, plus its i18n key, because the web renders the summary
+      rather than deriving one: `app.spec.validated` → "App spec checked — {warningCount} warnings";
+      `app.spec.invalid` → "App spec has {errorCount} problems"; `app.spec.applied` → "App spec applied";
+      `app.blueprint.matched` → "Blueprint {name} matched"; `app.blueprint.applied` → "Blueprint {name} applied";
+      `app.blueprint.apply_failed` → "Blueprint {name} could not be applied"; `app.license.classified` →
+      "License classified: {class}"; `app.license.changed` → "License changed from {fromSpdx} to {toSpdx}";
+      `app.license.attestation_required` → "License attestation needed"; `app.license.declared_mismatch` →
+      "Declared license does not match the registry"; `apps.catalog.refreshed` → "Apps catalog refreshed".
+      (The final copy and its keys land with T18; this task declares the fields and the per-event templates so no
+      row is ever written with an empty `summary`.) - **`userId`** — the App Work's owner, **always**, including for webhook-, cron- and apply-job-triggered rows:
+      there is no system actor in the model, so a background row is attributed to the member whose Work it is
+      (the same rule T53's conflict comment uses). A row whose Work has no resolvable owner is not written; it is
+      counted and logged instead.
+      **Modify** `apps/web/src/components/activity-log/ActivityTypeBadge.tsx` — one colour and one
+      `TYPE_TO_I18N` entry per family (`app_spec`, `app_blueprint`, `app_license`), as APW-02 T30 does for its
+      three and APW-08 for its own; without this the three families render as raw enum text
+      (`ActivityTypeBadge.tsx:29-49`). **Modify** `apps/web/src/components/activity-log/ActivityFilters.tsx` and
+      `apps/web/messages/en.json` (+ the 20 siblings) — the matching filter labels and badge colours, which T18's
+      message spec asserts.
       **Create** `packages/agent/src/events/app-spec-applied.event.ts` (`EVENT_NAME = 'app.spec.applied'`,
       payload `{ workId, commitSha, previousCommitSha, specHash, addedDependencies, changedEnvNames, changedBlocks }`)
       and `packages/agent/src/events/app-license-changed.event.ts` (`'app.license.changed'`).
       **Modify** `packages/agent/src/events/index.ts` — export both.
       **Test**: extend `packages/agent/src/events/events.spec.ts` — names are unique and dotted; extend
       `packages/agent/src/entities/__tests__/activity-log.types.spec.ts` — the three values exist and existing values
-      are unchanged.
-      **Done when**: `pnpm --filter @ever-works/agent test -- events.spec activity-log.types` passes and no existing
-      enum value changed.
+      are unchanged; extend `packages/agent/src/activity-log/feed-kind.spec.ts` (via the `FEED_KIND_RULES` entry R-34
+      requires) and the publishable-activity spec so three new members are classified; **create**
+      `packages/agent/src/activity-log/__tests__/app-works-activity-rows.spec.ts` — every row written by this epic
+      carries a non-empty `summary`, a `status` and the Work owner's `userId`, and a row with no resolvable owner is
+      dropped rather than written blank (R-34).
+      **Done when**: `pnpm --filter @ever-works/agent test -- events.spec activity-log.types app-works-activity-rows`
+      passes, no existing enum value changed, and `ActivityTypeBadge` renders all three families with a colour and a
+      label instead of raw text.
 
 ## P1.2 — Schema and validator
 
@@ -410,8 +438,13 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       row dropped while the rest survive (ACC-03-17); expired evidence unverified (ACC-03-20); each availability
       reason from its fixture (ACC-03-21); a `red` row dropped (ACC-03-46); amber with and without an agreement, red
       and unknown (ACC-03-47); `{ open: false }` ⇒ `managedTierDisabled` and `{ open: true, scope: 'verified-blueprints' }` + unverified ⇒ `blueprintNotVerified` (ACC-03-48); an explicit match for an unlisted
-      repository never `available` (ACC-03-44).
-      **Done when**: the mapper file imports nothing from `process.env` and every reason has a named case.
+      repository never `available` (ACC-03-44); **the purity guard** — the same inputs give the same verdict with
+      `EVER_WORKS_APPS_MANAGED_ENABLED` set to both values in turn and with a throw-on-touch spy standing in for
+      `APPS_TIER_POLICY`, proving `managedHostingAvailability` and the mapper never reach for a policy or an
+      environment of their own (plan §2.4).
+      **Done when**: the mapper file imports nothing from `process.env`, neither `managedHostingAvailability` nor the
+      mapper calls `AppsTierPolicy` (the tier argument is the only way tier state enters), and every reason has a
+      named case.
 
 - [ ] **T24. `AppsCatalogService`.**
       **Create** `packages/agent/src/apps-catalog/apps-catalog.service.ts`, `packages/agent/src/apps-catalog/apps-catalog.module.ts`,
@@ -672,7 +705,13 @@ _Delivers spec FR-53…FR-65._
       Eligibility per R-3 (plan §2.6): Your cluster after the owner's attestation for amber, red and unknown; Ever Works
       Apps for green, and for amber only with a recorded upstream agreement; red and unknown never. Source offer
       required only when the obligation applies and the relation is `link` or the Work Repository is ahead of upstream
-      (plan §2.6, same condition as APW-06 FR-44). Activity `app.license.classified` / `changed` /
+      (plan §2.6, same condition as APW-06 FR-44). The four settled points of plan §2.6 are written into the code:
+      `getHostingEligibility(workId, opts?: { commitSha?: string })`, a **null** `aheadBy` counts as required, the
+      public check is `GitRepository.visibility === 'public'` (falling back to `isPrivate === false` from
+      `getRepository`, with `internal` or a failed lookup counting as not public), and `sourceOffer.url` is built with
+      `getFileWebUrl(dataOwner, dataRepo, commitSha, '')` — an **empty path returns the tree URL at that commit**
+      (`https://github.com/<o>/<r>/tree/<sha>`, no `lineAnchor`) and is `null` when the call carried no `commitSha`.
+      Activity `app.license.classified` / `changed` /
       `attestation_required` / `attested` with `actionType: APP_LICENSE` (R-2); `AppLicenseChangedEvent` on change.
       **Test**: `packages/agent/src/app-license/__tests__/app-license.service.spec.ts` — an amber Work refused for Ever
       Works Apps by `getHostingEligibility` (ACC-03-33); manager refused, owner recorded with text hash and commit, a new
@@ -745,15 +784,30 @@ _Delivers spec FR-53…FR-65._
 # Cross-phase closing tasks
 
 - [ ] **T49. Telemetry.**
+      **Create** `packages/agent/src/app-spec/app-spec-telemetry.port.ts` — `AppSpecTelemetryEvent`, the per-event
+      property allow-list and `APP_SPEC_TELEMETRY_SINK` per [plan §9.1](./plan.md): `track(event, props, distinctId)`,
+      fire-and-forget, never throwing; a property outside the allow-list is dropped at the port boundary; unbound ⇒
+      counted and dropped. **`packages/agent` gains no dependency**: it does not depend on `@ever-works/monitoring`
+      today (only `apps/api` does), and the agent-package precedent is a narrow injected client port
+      (`packages/agent/src/services/knowledge-base-reconcile.service.ts:55-67`).
       **Create** `packages/monitoring/src/posthog/app-spec-events.ts` — `emitAppSpecEvent(client, distinctId, event)`
       for the eight events of [plan §9.1](./plan.md) with a forbidden-property list (file content, env values, search
       text, user-typed repository names), modelled on `packages/monitoring/src/posthog/kb-events.ts`.
-      **Modify** `packages/monitoring/src/posthog/index.ts` — export it; `packages/agent/src/app-spec/app-spec.service.ts`,
+      **Modify** `packages/monitoring/src/posthog/index.ts` — export it.
+      **Modify** `apps/api/src/app-works/app-works.module.ts` (created by APW-02 T27) — bind
+      `APP_SPEC_TELEMETRY_SINK` to a sink that calls `emitAppSpecEvent` with the API's PostHog client, exactly as
+      `FunnelAnalyticsSink` is bound for `zero-friction-funnel.service.ts`. **Modify**
+      `packages/agent/src/app-spec/app-spec.service.ts`,
       `packages/agent/src/apps-catalog/apps-catalog.service.ts`, `packages/agent/src/apps-catalog/app-blueprint-apply.service.ts`,
-      `packages/agent/src/app-license/app-license.service.ts` — emit through it.
+      `packages/agent/src/app-license/app-license.service.ts` — inject the port `@Optional()` and emit through it;
+      no service imports the monitoring package.
       **Test**: `packages/monitoring/src/posthog/__tests__/app-spec-events.spec.ts` — no payload contains file
-      content, an env value, a search query or an upstream repository name typed by a user; forbidden keys throw.
-      **Done when**: `pnpm --filter @ever-works/monitoring test -- app-spec-events` passes.
+      content, an env value, a search query or an upstream repository name typed by a user; forbidden keys throw; and
+      `packages/agent/src/app-spec/__tests__/app-spec-telemetry.spec.ts` — the four services emit through the bound
+      fake, nothing is thrown with the port unbound, and a property outside the allow-list never reaches the sink.
+      **Done when**: `pnpm --filter @ever-works/monitoring test -- app-spec-events` passes,
+      `git grep -n "monitoring" packages/agent/package.json` still matches nothing, and the four services' specs are
+      green with the sink unbound.
 
 - [ ] **T50. User documentation.**
       **Create** `docs/features/app-blueprints.md` from [`user-doc-draft.md`](./user-doc-draft.md), updated to
@@ -889,6 +943,34 @@ test -- app-spec` stays green.
       **Done when**: the spec is green for all three drafts, and the same three files still fail for the reasons
       that are real defects (a reserved `EVER_WORKS_*` env name, a look-around `validate.pattern`, a below-minimum
       memory request) whenever those are reintroduced — a contrast case keeps that honest.
+
+- [ ] **T59 (P2, lands with T8 and T33). A machine-checkable schema and a fixture corpus beside the prose.**
+      This file is normative prose; until T8's generator exists there is nothing a Blueprint draft, a profile draft
+      or a CI job can be checked against, and drift has already happened once (a small validator found two invalid
+      Blueprint drafts). The corpus below is **additive documentation, committed with the spec**, not a second
+      source of truth: schema.md stays the reference and T8's generated schema stays the artifact the platform
+      ships.
+      **Create** `docs/specs/features/app-works/contracts/app-spec.schema.json` — JSON Schema **2020-12** mirroring
+      schema.md §1–§22: types, enums, bounds (`minLength`/`maxLength`/`maximum`/`minimum`), `required`,
+      `additionalProperties: false` with `patternProperties` `'^x-'` for extension keys. Structural only — the
+      cross-field rules (schema.md §22) stay in code, and the file's header comment says so.
+      **Create** `docs/specs/features/app-works/contracts/fixtures/app-spec/valid/*.yml` — the three Blueprint
+      drafts under `APW-13-golden-paths/blueprints/` plus schema.md §24.1, §24.2 and §24.3.
+      **Create** `docs/specs/features/app-works/contracts/fixtures/app-spec/invalid/<code>.yml` — one file per
+      structural issue code and one per rule in schema.md §22, each with a `# expect: <code>` header, so a failure
+      names the file that must report it.
+      **Modify** `docs/specs/features/app-works/APW-03-app-spec-and-catalog/schema.md` §0 — state that the
+      machine-checkable mirror of §1–§22 is `contracts/app-spec.schema.json` with its corpus, that it is checked in
+      CI, and that where the two ever disagree the **prose wins** and the JSON Schema is corrected.
+      **Test**: **create** `packages/agent/src/works-config/schema/__tests__/app-spec.corpus.spec.ts` — T8's
+      generated schema and `validateAppSpecDocument`/`validateAppSpecObject` give **identical** verdicts over every
+      file in the corpus (each `valid/*.yml` ⇒ no errors, each `invalid/<code>.yml` ⇒ exactly the code in its
+      header); the committed `contracts/app-spec.schema.json` accepts every `valid/*.yml` under `ajv` 2020-12
+      (`Ajv2020` from the root `node_modules`); and a drift guard fails when a `valid/*.yml` is edited without the
+      verdict being re-checked, so the corpus cannot rot silently.
+      **Done when**: the corpus spec is green, `npx ajv`-style validation of the corpus through
+      `contracts/app-spec.schema.json` agrees with the code validator, and the three Blueprint drafts are in the
+      corpus as `valid/` files (T58 keeps validating them where they live).
 
 ---
 
