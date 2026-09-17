@@ -739,6 +739,7 @@ export const HELP_ARTICLES = [
                 text: 'How to keep a Memory folder in Git',
                 level: 3,
             },
+            { id: 'knowledge-library', text: 'Knowledge library', level: 2 },
             { id: 'agent-memory', text: 'Agent Memory', level: 2 },
             { id: 'meetings', text: 'Meetings', level: 2 },
             {
