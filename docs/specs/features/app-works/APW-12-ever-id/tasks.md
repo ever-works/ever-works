@@ -369,7 +369,7 @@ _Delivers spec FR-1…FR-53 and ACC-12-01…ACC-12-39._
       the dialog renders only `Sign out` / `Cancel` and both callers behave exactly as they do today. No sign-out
       dialog exists on `develop`; this is an addition, not a replacement of one.
       **Origin signal (already specified, no new route):** `getEverIdLogoutUrl()` (T22) calls `GET
-    /api/auth/ever-id/logout-url`, which answers `404` for a session not opened with Ever ID ([plan §5.1](./plan.md))
+/api/auth/ever-id/logout-url`, which answers `404` for a session not opened with Ever ID ([plan §5.1](./plan.md))
       — a `200` is the signal that shows the `Also sign out of Ever ID` checkbox. The dialog asks once, on open.
       **Return path:** the API's end-session URL carries a `state`; T22 stores it in `ew_everid_logout_state`
       (600 s, HttpOnly, SameSite=Lax, `secure` from the public URL scheme, Path `/`, cleared on return), and the

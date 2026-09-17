@@ -13,19 +13,19 @@ pins, what licence it carries and whether it is verified.
 It is **not the machine source of truth for resolution**, and that distinction is the whole point of the
 owner's decision:
 
-| Question | Where the answer actually lives |
-| --- | --- |
-| Does template X exist? | The repository `ever-works/<x>-template`. The platform discovers templates by **scanning the catalog organization for repositories whose name ends in `template`** — `isStandardTemplateRepository` in `packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049`, discovery loop `:668-818`, organization from `config.websiteTemplate.getCatalogOrganization()`. |
-| Is it a website template or an app template, and does it carry the code or only metadata? | The template repository's own metadata: `.works/template.yml` (shape, app source) and `.works/works.yml` (the App spec, `blueprint` mode). |
-| Which commit is pinned, what licence class applies, may it run on Ever Works Apps, is it verified? | **This repository** (`manifest.json` + `licenses.yml`). That is the curation this listing adds. |
+| Question                                                                                           | Where the answer actually lives                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Does template X exist?                                                                             | The repository `ever-works/<x>-template`. The platform discovers templates by **scanning the catalog organization for repositories whose name ends in `template`** — `isStandardTemplateRepository` in `packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049`, discovery loop `:668-818`, organization from `config.websiteTemplate.getCatalogOrganization()`. |
+| Is it a website template or an app template, and does it carry the code or only metadata?          | The template repository's own metadata: `.works/template.yml` (shape, app source) and `.works/works.yml` (the App spec, `blueprint` mode).                                                                                                                                                                                                                                          |
+| Which commit is pinned, what licence class applies, may it run on Ever Works Apps, is it verified? | **This repository** (`manifest.json` + `licenses.yml`). That is the curation this listing adds.                                                                                                                                                                                                                                                                                     |
 
-So a new template becomes *usable* the moment its repository exists and carries valid metadata — no pull
+So a new template becomes _usable_ the moment its repository exists and carries valid metadata — no pull
 request here is needed for that. A pull request here is what makes it **listed**: badged, searchable in the
 catalog browser, pinned for production, and eligible (or not) for managed hosting.
 
 > **Why the repository is called `templates` and not `apps`.** It lists the whole template family — the four
 > Website/Work templates we already have plus one row per OSS app we support — not only apps. The plan's
-> *noun* for the app-facing catalogue stays **Apps catalog** (the create flow offers "Browse the Apps
+> _noun_ for the app-facing catalogue stays **Apps catalog** (the create flow offers "Browse the Apps
 > catalog", APW-01 FR-46a); only the repository moves. See [`../open-questions.md`](../open-questions.md)
 > OQ-01 for the alternative (renaming the noun too).
 
@@ -36,10 +36,10 @@ catalog browser, pinned for production, and eligible (or not) for managed hostin
 Every app template is one of two shapes. The shape is declared in `.works/template.yml` and is what decides
 **how many repositories get forked** when a user creates an App Work from it.
 
-| Shape | What the template repository holds | What provisioning forks (in the user's own account, with the user's own connection) |
-| --- | --- | --- |
-| **`code-bearing`** | The whole application codebase, kept in sync as a **public fork of the original project** with our metadata added (`.works/works.yml`, `.works/template.yml`, `README.md`, topic). Our commits sit on top of upstream's default branch; syncing means merging upstream into it. | **One fork**: the template repository. That fork **is** the App Work's Work Repository (role `website`) — it is built and deployed, and the App spec is applied into it. |
-| **`metadata-only`** | Only our metadata: the App spec, optional overlay files, the App Blueprint `README.md`. **No upstream source.** | **Two forks, in this order**: (1) the **app-source** repository named by `.works/template.yml:source.repo` — this one is the Work Repository, receives the applied App spec and is built and deployed; (2) the **template** repository — the user's own copy of the metadata, recorded as provenance, never a `RepositoryRole`. |
+| Shape               | What the template repository holds                                                                                                                                                                                                                                              | What provisioning forks (in the user's own account, with the user's own connection)                                                                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`code-bearing`**  | The whole application codebase, kept in sync as a **public fork of the original project** with our metadata added (`.works/works.yml`, `.works/template.yml`, `README.md`, topic). Our commits sit on top of upstream's default branch; syncing means merging upstream into it. | **One fork**: the template repository. That fork **is** the App Work's Work Repository (role `website`) — it is built and deployed, and the App spec is applied into it.                                                                                                                                                        |
+| **`metadata-only`** | Only our metadata: the App spec, optional overlay files, the App Blueprint `README.md`. **No upstream source.**                                                                                                                                                                 | **Two forks, in this order**: (1) the **app-source** repository named by `.works/template.yml:source.repo` — this one is the Work Repository, receives the applied App spec and is built and deployed; (2) the **template** repository — the user's own copy of the metadata, recorded as provenance, never a `RepositoryRole`. |
 
 A third `appSource.mode` exists for an app that ships only as a published image: **`image`** — no app-source
 repository, so provisioning forks the template repository only. None of the three golden-path templates uses
@@ -99,15 +99,17 @@ fork-sync job that merges upstream into the template repository.
 ## 3. Listing
 
 <!-- listing:start -->
-| Slug | Template | Kind | Shape | Pinned | Licence | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `directory-web` | [`ever-works/directory-web-template`](https://github.com/ever-works/directory-web-template) | website | — | `develop` (branch) | AGPL-3.0-only · green | production |
-| `directory-web-minimal` | [`ever-works/directory-web-minimal-template`](https://github.com/ever-works/directory-web-minimal-template) | website | — | `develop` (branch) | AGPL-3.0-only · green | production |
-| `web` | [`ever-works/web-template`](https://github.com/ever-works/web-template) | website | — | `main` (branch) | AGPL-3.0-only · green | production |
-| `web-minimal` | [`ever-works/web-minimal-template`](https://github.com/ever-works/web-minimal-template) | website | — | `main` (branch) | AGPL-3.0-only · green | production |
-| `cal-diy` | [`ever-works/cal-diy-template`](https://github.com/ever-works/cal-diy-template) | app | `code-bearing` | tag `v0.1.0` (not created yet) | MIT · green | placeholder |
-| `umami` | [`ever-works/umami-template`](https://github.com/ever-works/umami-template) | app | `metadata-only` → `umami-software/umami` | tag `v0.1.0` (not created yet) | MIT · green | placeholder |
-| `app-fixture-hello` | [`ever-works/app-fixture-hello-template`](https://github.com/ever-works/app-fixture-hello-template) | app | `metadata-only` → [`ever-works/app-fixture-hello`](https://github.com/ever-works/app-fixture-hello) | tag `v0.1.0` (not created yet) | MIT · green | placeholder |
+
+| Slug                    | Template                                                                                                    | Kind    | Shape                                                                                               | Pinned                         | Licence               | Status      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------- | ----------- |
+| `directory-web`         | [`ever-works/directory-web-template`](https://github.com/ever-works/directory-web-template)                 | website | —                                                                                                   | `develop` (branch)             | AGPL-3.0-only · green | production  |
+| `directory-web-minimal` | [`ever-works/directory-web-minimal-template`](https://github.com/ever-works/directory-web-minimal-template) | website | —                                                                                                   | `develop` (branch)             | AGPL-3.0-only · green | production  |
+| `web`                   | [`ever-works/web-template`](https://github.com/ever-works/web-template)                                     | website | —                                                                                                   | `main` (branch)                | AGPL-3.0-only · green | production  |
+| `web-minimal`           | [`ever-works/web-minimal-template`](https://github.com/ever-works/web-minimal-template)                     | website | —                                                                                                   | `main` (branch)                | AGPL-3.0-only · green | production  |
+| `cal-diy`               | [`ever-works/cal-diy-template`](https://github.com/ever-works/cal-diy-template)                             | app     | `code-bearing`                                                                                      | tag `v0.1.0` (not created yet) | MIT · green           | placeholder |
+| `umami`                 | [`ever-works/umami-template`](https://github.com/ever-works/umami-template)                                 | app     | `metadata-only` → `umami-software/umami`                                                            | tag `v0.1.0` (not created yet) | MIT · green           | placeholder |
+| `app-fixture-hello`     | [`ever-works/app-fixture-hello-template`](https://github.com/ever-works/app-fixture-hello-template)         | app     | `metadata-only` → [`ever-works/app-fixture-hello`](https://github.com/ever-works/app-fixture-hello) | tag `v0.1.0` (not created yet) | MIT · green           | placeholder |
+
 <!-- listing:end -->
 
 `placeholder` is honest here: none of the three app template repositories exists yet. They are created by
@@ -139,32 +141,36 @@ Envelope:
 	"$schema": "./schema/templates-manifest.schema.json",
 	"schemaVersion": 1,
 	"generatedBy": "manual",
-	"status": "seed",              // "live" once the repositories exist
+	"status": "seed", // "live" once the repositories exist
 	"catalogOrganization": "ever-works",
 	"updatedAt": "2026-09-17",
-	"templates": [ /* one row per template repository */ ],
-	"appSources": [ /* repositories a template row refers to, that are not templates */ ]
+	"templates": [
+		/* one row per template repository */
+	],
+	"appSources": [
+		/* repositories a template row refers to, that are not templates */
+	]
 }
 ```
 
 Fields that matter most (the JSON Schema is the full list):
 
-| Field | Meaning |
-| --- | --- |
-| `slug` | The listing key. For an app row it is also the App Blueprint `id` used by `POST /api/works` and `blueprintId` (APW-03 FR-81). |
-| `kind` | `website` (a Website/Work Template) or `app` (an App Blueprint). |
-| `status` | `production` · `beta` · `placeholder` · `deprecated`. A non-placeholder **app** row must pin a 40-hex `template.sha`; a non-placeholder **website** row keeps the existing branch-fork behaviour (`template.ref`, `sha: null`). |
-| `role` | Always `website` — the persisted `RepositoryRole` the template's output feeds. Constant on purpose (see §6). |
-| `workRepositorySuffix` | `-app` for an app template, `-website` for a website template. A suffix, never a role. |
-| `template.repo` / `.ref` / `.sha` / `.isGitHubTemplate` | The template repository to fork or generate from, and its pin. `template.sha` **is** the plan's `blueprint.sha` — it is not repeated anywhere else in the row. |
-| `shape` | App rows only: `code-bearing` or `metadata-only` (§1). |
-| `appSource.mode` | App rows only: `embedded` (the template holds the code) · `repository` (fork a second repository) · `image` (no app-source repository). |
-| `blueprint` | App rows only: `id`, semver `version`, `topic`, `verified`. `template.ref` must be the tag `v<version>` once published. |
-| `upstreams[]` | App rows only: the upstream `owner/repo` values (plus renames as `aliases` and `refs` constraints) this template serves. This is what makes the suffix scan able to match a pasted URL. |
-| `license` | `spdx`, `class` (`green`/`amber`/`red`) and where the classification came from. |
-| `managedHosting` | App rows only: `allowed`, an optional `reason`, and an optional `upstreamAgreement` (amber only). |
-| `trademark` | App rows only: `notice`, `displayNameSuffix`, `protectedPaths` — shown in the create form and enforced read-only for agents (APW-03 §8 `display.protectedPaths`). |
-| `notes[]` | Free text for the person keeping track. Never read by the platform. |
+| Field                                                   | Meaning                                                                                                                                                                                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`                                                  | The listing key. For an app row it is also the App Blueprint `id` used by `POST /api/works` and `blueprintId` (APW-03 FR-81).                                                                                                   |
+| `kind`                                                  | `website` (a Website/Work Template) or `app` (an App Blueprint).                                                                                                                                                                |
+| `status`                                                | `production` · `beta` · `placeholder` · `deprecated`. A non-placeholder **app** row must pin a 40-hex `template.sha`; a non-placeholder **website** row keeps the existing branch-fork behaviour (`template.ref`, `sha: null`). |
+| `role`                                                  | Always `website` — the persisted `RepositoryRole` the template's output feeds. Constant on purpose (see §6).                                                                                                                    |
+| `workRepositorySuffix`                                  | `-app` for an app template, `-website` for a website template. A suffix, never a role.                                                                                                                                          |
+| `template.repo` / `.ref` / `.sha` / `.isGitHubTemplate` | The template repository to fork or generate from, and its pin. `template.sha` **is** the plan's `blueprint.sha` — it is not repeated anywhere else in the row.                                                                  |
+| `shape`                                                 | App rows only: `code-bearing` or `metadata-only` (§1).                                                                                                                                                                          |
+| `appSource.mode`                                        | App rows only: `embedded` (the template holds the code) · `repository` (fork a second repository) · `image` (no app-source repository).                                                                                         |
+| `blueprint`                                             | App rows only: `id`, semver `version`, `topic`, `verified`. `template.ref` must be the tag `v<version>` once published.                                                                                                         |
+| `upstreams[]`                                           | App rows only: the upstream `owner/repo` values (plus renames as `aliases` and `refs` constraints) this template serves. This is what makes the suffix scan able to match a pasted URL.                                         |
+| `license`                                               | `spdx`, `class` (`green`/`amber`/`red`) and where the classification came from.                                                                                                                                                 |
+| `managedHosting`                                        | App rows only: `allowed`, an optional `reason`, and an optional `upstreamAgreement` (amber only).                                                                                                                               |
+| `trademark`                                             | App rows only: `notice`, `displayNameSuffix`, `protectedPaths` — shown in the create form and enforced read-only for agents (APW-03 §8 `display.protectedPaths`).                                                               |
+| `notes[]`                                               | Free text for the person keeping track. Never read by the platform.                                                                                                                                                             |
 
 `licenses.yml` is the registry APW-03's license gate reads (`catalog.md` §4): three fixed classes (green,
 amber, red), the obligations vocabulary, the attestation texts, and the aliases that map what a Git provider
@@ -209,11 +215,11 @@ Rules that are not negotiable:
 and the mapping is documented in the platform (`packages/contracts/src/domain/work-capabilities.ts:40-49`).
 There is **no new role** for templates, and none is added:
 
-| Role | UI label | What it holds for an App Work |
-| --- | --- | --- |
-| `website` | **Work Repository** | The app code — the fork that is built and deployed. Named `<slug>-app` (app template) or `<slug>-website` (website template / the unchanged default). |
-| `data` | Data Repository | The Work's *data*. Not used by an App Work. |
-| `work` | "{provider} Repository" | The generated, never-deployed output repository. Not used by an App Work. |
+| Role      | UI label                | What it holds for an App Work                                                                                                                         |
+| --------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `website` | **Work Repository**     | The app code — the fork that is built and deployed. Named `<slug>-app` (app template) or `<slug>-website` (website template / the unchanged default). |
+| `data`    | Data Repository         | The Work's _data_. Not used by an App Work.                                                                                                           |
+| `work`    | "{provider} Repository" | The generated, never-deployed output repository. Not used by an App Work.                                                                             |
 
 A user's own fork of the **template** repository is therefore **not** a role: it is recorded as provenance
 (§7) and linked in the UI, nothing more.
@@ -236,7 +242,7 @@ exactly like the Work's other repositories. The persisted provenance lives with 
    `ever-works/app-fixture-hello` carries so the acceptance harness can generate per-run upstreams from it
    (`APW-13` plan §4.1; `ACCEPTANCE.md` §0.3).
 
-Only (1) and (2) end in `template` *and* are listed here. (3) is a setting on a repository that is otherwise
+Only (1) and (2) end in `template` _and_ are listed here. (3) is a setting on a repository that is otherwise
 an ordinary app source — and the plan currently writes "template repository" for it and for (1) in the same
 breath, which is how `ever-works/app-fixture-hello` and `ever-works/app-fixture-hello-template` get confused.
 Resolution must never treat a GitHub template-repository setting as an App Blueprint.

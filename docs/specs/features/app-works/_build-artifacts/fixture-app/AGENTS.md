@@ -13,7 +13,7 @@ Read this before changing anything.
    fixture exists to build in under three minutes from a cold cache.
 2. **Keep a pull request under 200 changed lines** (`spec.agents.maxPullRequestChangedLines` in the
    Blueprint's App spec). Small changes keep the acceptance lanes readable.
-3. **Never touch `public/brand/**` or `LICENSE`.** They are the App spec's `display.protectedPaths`
+3. **Never touch `public/brand/**`or`LICENSE`.** They are the App spec's `display.protectedPaths`
    (ACC-NEG-04). A generated commit that edits them is refused, and this file is not a loophole.
 4. **The greeting lives in `src/greeting.mjs`** and nowhere else. If you are asked to change what the
    home page says, that is the file, and the string must appear verbatim in the page.
@@ -26,17 +26,17 @@ Read this before changing anything.
 
 ## What is where
 
-| Path                 | What it is                                                                   |
-| -------------------- | ---------------------------------------------------------------------------- |
-| `src/greeting.mjs`   | the string the home page renders — the evolve loop's target                   |
-| `src/server.mjs`     | the `web` component: `/`, `/healthz`, `/readyz`, `/marker`, `/state`, cron, mail |
-| `src/worker.mjs`     | the `worker` component: a heartbeat every 10 s                                |
-| `src/migrate.mjs`    | the `migrate` pre-deploy job: applies `migrations/*.sql` in order             |
-| `src/bootstrap.mjs`  | the `bootstrap` first-deploy job: internal vs public reachability             |
-| `migrations/*.sql`   | ordered, applied once, checksummed                                            |
-| `test/*.test.mjs`    | `npm test`                                                                    |
-| `tools/`             | local helpers: the format check, a Postgres stub, a smoke script              |
-| `variants/`          | the variant patches (see `VARIANTS.md`); not part of the image                |
+| Path                | What it is                                                                       |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `src/greeting.mjs`  | the string the home page renders — the evolve loop's target                      |
+| `src/server.mjs`    | the `web` component: `/`, `/healthz`, `/readyz`, `/marker`, `/state`, cron, mail |
+| `src/worker.mjs`    | the `worker` component: a heartbeat every 10 s                                   |
+| `src/migrate.mjs`   | the `migrate` pre-deploy job: applies `migrations/*.sql` in order                |
+| `src/bootstrap.mjs` | the `bootstrap` first-deploy job: internal vs public reachability                |
+| `migrations/*.sql`  | ordered, applied once, checksummed                                               |
+| `test/*.test.mjs`   | `npm test`                                                                       |
+| `tools/`            | local helpers: the format check, a Postgres stub, a smoke script                 |
+| `variants/`         | the variant patches (see `VARIANTS.md`); not part of the image                   |
 
 ## Environment the app reads
 

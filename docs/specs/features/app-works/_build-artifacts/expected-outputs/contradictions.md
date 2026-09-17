@@ -1,7 +1,7 @@
 # Contradictions
 
 **What this file is.** Every place the epics' renderer contract conflicts with what `manifest.renderer.ts`
-(and its plugin) actually does today; every conflict *between* epics; every App spec field with no rendering
+(and its plugin) actually does today; every conflict _between_ epics; every App spec field with no rendering
 rule; every rendered object with no spec field behind it; and the refusal/error-code mismatches. Nothing here
 is fixed by this directory — the golden files follow the epics, and each conflict is listed so the
 implementation does not discover it by accident.
@@ -50,7 +50,7 @@ and the input is a **singular** port (`types.ts:184` `containerPort: number`). A
 `Deployment`" (`plan.md:328`) named after the component (`plan.md:293`, names table). The two shapes cannot
 share a code path.
 
-APW-06 resolves this by *not* touching the file — "Pure functions from `AppRenderInput` to manifests; no I/O.
+APW-06 resolves this by _not_ touching the file — "Pure functions from `AppRenderInput` to manifests; no I/O.
 **The existing `manifest.renderer.ts` is not edited.**" (`plan.md:285`) — so this is a divergence to keep.
 The contradiction is documentary: APW-06 plan §1.1 presents `manifest.renderer.ts` as the model whose "pod and
 container defaults are chosen for platform-generated sites; App defaults for user-controlled code are defined
@@ -129,16 +129,16 @@ which is itself the contradiction in K-8.
 
 ### K-7. Two different resource default tables in one plugin
 
-| | `manifest.renderer.ts:94-105` | `APW-03 schema.md:192-195` |
-| --- | --- | --- |
-| `requests.cpu` | `100m` | `250m` |
-| `requests.memory` | `256Mi` | `512Mi` |
-| `limits.cpu` | `2` | *(none by default)* |
-| `limits.memory` | `2Gi` | `2 × memory` |
+|                   | `manifest.renderer.ts:94-105` | `APW-03 schema.md:192-195` |
+| ----------------- | ----------------------------- | -------------------------- |
+| `requests.cpu`    | `100m`                        | `250m`                     |
+| `requests.memory` | `256Mi`                       | `512Mi`                    |
+| `limits.cpu`      | `2`                           | _(none by default)_        |
+| `limits.memory`   | `2Gi`                         | `2 × memory`               |
 
 APW-06 renders straight from the spec ("`requests.cpu = resources.cpu`, `requests.memory = resources.memory`,
-`limits.memory = resources.memoryLimit`", `plan.md:379-381`), so a silent App component gets the *schema's*
-defaults while a silent site Work gets the *renderer's*. Two defaults tables with different numbers now live
+`limits.memory = resources.memoryLimit`", `plan.md:379-381`), so a silent App component gets the _schema's_
+defaults while a silent site Work gets the _renderer's_. Two defaults tables with different numbers now live
 in the same package.
 
 ### K-8. The plugin cannot address a digest today
@@ -154,10 +154,10 @@ in the same package.
 and `sanitiseDockerTag` (`k8s.plugin.ts:1285-1294`) strips `@`:
 
 ```ts
-	return input
-		.replace(/[^A-Za-z0-9_.-]+/g, '')
-		.replace(/^[._-]+/, '')
-		.slice(0, 128);
+return input
+	.replace(/[^A-Za-z0-9_.-]+/g, '')
+	.replace(/^[._-]+/, '')
+	.slice(0, 128);
 ```
 
 APW-06 requires `image: { reference: string /* …@sha256:<64 hex> */ }` (`plan.md:205`) and FR-32 ("Deployments
@@ -219,12 +219,12 @@ the epic does not say. Open question Q-8.
 
 `manifest.renderer.ts:225-241` builds rules with `backend.service.name = input.workSlug` and
 `ingressClassName: input.ingressClass` **unconditionally** (even when `input.ingressClass` is `undefined`);
-`buildIngress` returns `null` only when `hosts.length === 0` (`:211`). APW-06 names the Ingress *and* its
+`buildIngress` returns `null` only when `hosts.length === 0` (`:211`). APW-06 names the Ingress _and_ its
 backend after the **component** (`plan.md:293`), and refuses to render at all "when no class exists and no
 default class was detected (warning `no_ingress_controller`, public smoke skipped)" (`plan.md:446-447`). Two
 different absence rules, two different backend names.
 
-Worth noting what *is* reusable and should be: the strategy registry and its annotation/TLS shapes
+Worth noting what _is_ reusable and should be: the strategy registry and its annotation/TLS shapes
 (`ingress/nginx.strategy.ts:4-13`, `:17-27`, `:30-33`; `ingress/traefik.strategy.ts:4-12`;
 `ingress/generic.strategy.ts:12-25`; `ingress/strategy.registry.ts:16-17`, `:33-36`),
 `normaliseIngressHost`'s strict RFC-1123 rule (`k8s.plugin.ts:1296-1309`), `buildDnsGuidance`'s apex
@@ -296,13 +296,13 @@ one string — so on the managed target the renderer's own namespace rule is sim
 
 ### X-6. Two NetworkPolicy families — and R-15 names a third thing
 
-| | APW-06 plan §4.10 | APW-10 plan.md:320-334 |
-| --- | --- | --- |
-| names | `ew-default-deny`, `ew-allow-same-namespace`, `ew-allow-ingress`, `ew-allow-egress`, `ew-allow-deps` | `default-deny`, `allow-dns`, `allow-edge-ingress`, `allow-internet-egress`, `allow-tenant-data`, `quarantine` |
-| DNS | inside `ew-allow-egress` | its own `allow-dns` |
-| IPv4 excepts | 9 ranges | 11 ranges |
-| egress ports | unrestricted | 25 / 465 / 587 and mining ports omitted |
-| count | 5 | 6 |
+|              | APW-06 plan §4.10                                                                                    | APW-10 plan.md:320-334                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| names        | `ew-default-deny`, `ew-allow-same-namespace`, `ew-allow-ingress`, `ew-allow-egress`, `ew-allow-deps` | `default-deny`, `allow-dns`, `allow-edge-ingress`, `allow-internet-egress`, `allow-tenant-data`, `quarantine` |
+| DNS          | inside `ew-allow-egress`                                                                             | its own `allow-dns`                                                                                           |
+| IPv4 excepts | 9 ranges                                                                                             | 11 ranges                                                                                                     |
+| egress ports | unrestricted                                                                                         | 25 / 465 / 587 and mining ports omitted                                                                       |
+| count        | 5                                                                                                    | 6                                                                                                             |
 
 Both describe "the app's network isolation by default". `CONTRACTS.md:58` (R-15) then names the kept policy
 `ew-default-deny` — the APW-06 spelling — while APW-10 calls it `default-deny`. On the managed target the
@@ -329,11 +329,11 @@ Starter profile's `limits.cpu: 2` happens to admit but a third component would n
 
 ### X-9. The desired-state schema is narrower than the App spec
 
-| Resource | App spec allows | `Work` CRD allows |
-| --- | --- | --- |
-| components | 10 (`schema.md:179`) | 8 (`APW-10 plan.md:248`) |
-| cron entries | 20 (`schema.md:322`) | 10 (`plan.md:245`) |
-| volumes per component | 5 (`schema.md:196`) | 4 (`plan.md:243`) |
+| Resource              | App spec allows      | `Work` CRD allows        |
+| --------------------- | -------------------- | ------------------------ |
+| components            | 10 (`schema.md:179`) | 8 (`APW-10 plan.md:248`) |
+| cron entries          | 20 (`schema.md:322`) | 10 (`plan.md:245`)       |
+| volumes per component | 5 (`schema.md:196`)  | 4 (`plan.md:243`)        |
 
 A valid App spec can therefore be unrepresentable on the managed target, with the refusal code
 `SPEC_LIMIT_EXCEEDED` (`plan.md:265-268`) — which reads to the owner as "your app is too big" rather than "the
@@ -345,15 +345,15 @@ tier's schema is smaller than the spec's".
 `cron` entry narrowed to `{ name, schedule, http: { method, path, authEnv } }`. Against the App spec
 (`schema.md:311-331`) that silently drops:
 
-* every `smoke[]` check on the managed target — yet APW-06 §4.12 and FR-36 make smoke the Deployment's gate;
-* `cron[].http.authScheme` — so cal-diy's `booking-reminder`, `change-time-zone` and `webhook-triggers`
+- every `smoke[]` check on the managed target — yet APW-06 §4.12 and FR-36 make smoke the Deployment's gate;
+- `cron[].http.authScheme` — so cal-diy's `booking-reminder`, `change-time-zone` and `webhook-triggers`
   (`authScheme: raw`, works.yml:221, :226, :231) would be rendered as `bearer` and their routes would reject
   the call (the Blueprint's own comment: "some cron routes compare the raw Authorization header");
-* `cron[].http.expect` (default `[200, 201, 204]`, `schema.md:316`), `cron[].timeoutSeconds`,
+- `cron[].http.expect` (default `[200, 201, 204]`, `schema.md:316`), `cron[].timeoutSeconds`,
   `cron[].concurrency`, `cron[].component`;
-* `jobs[].http.expect` and `jobs[].http.authScheme`;
-* `components[].resources.cpuLimit` (the CRD has `cpu, memory, memoryLimit` only, `plan.md:242`);
-* probe `timeoutSeconds`/`initialDelaySeconds` (the CRD stores `probes` as an opaque object, `plan.md:242`).
+- `jobs[].http.expect` and `jobs[].http.authScheme`;
+- `components[].resources.cpuLimit` (the CRD has `cpu, memory, memoryLimit` only, `plan.md:242`);
+- probe `timeoutSeconds`/`initialDelaySeconds` (the CRD stores `probes` as an opaque object, `plan.md:242`).
 
 The renderer cannot invent these; the managed target is therefore strictly less capable than Your cluster for
 the same App spec, and no epic's acceptance criteria cover the loss.
@@ -371,7 +371,7 @@ APW-06 plan §4.4: for `ever-works-apps` "the refusal happens **before apply**: 
 the image config's `User` from the registry in the worker … Empty, `0`, `root`, `0:*` or a non-numeric user →
 precondition `managed_root_forbidden` / `image_user_unverifiable`".
 
-APW-10 plan.md:268: "Degraded reasons include `IMAGE_RUNS_AS_ROOT`, `QUOTA_EXCEEDED`" — a *status* reason, not
+APW-10 plan.md:268: "Degraded reasons include `IMAGE_RUNS_AS_ROOT`, `QUOTA_EXCEEDED`" — a _status_ reason, not
 a refusal — and the enforcement is an overlay (`runAsNonRoot: true`) plus admission refusing `runAsUser: 0`
 (LG-05, `plan.md:380`). Different timing (pre-apply vs post-apply/Degraded), different mechanism, different
 code names, and APW-10 owns the tier.
@@ -381,7 +381,7 @@ code names, and APW-10 owns the tier.
 APW-06 §4.3 renders `runtimeClassName` "when the policy names one" (`plan.md:341`), and §5.1 makes a null one
 a precondition (`managed_sandbox_unavailable`, R-24). APW-10's overlays overwrite it with the zone's sandbox
 class and "any conflicting rendered value is overwritten, never merged" (`plan.md:336-344`). So on the
-managed target the rendered value is never the applied value — which is fine, but it means the *golden file*
+managed target the rendered value is never the applied value — which is fine, but it means the _golden file_
 for the managed target must not assert `runtimeClassName`, and `AppsTierPolicy.podPolicy()`'s value
 ("informational for APW-06 renderer fixtures", APW-10 `plan.md:582`) is doubly informational.
 
@@ -409,21 +409,21 @@ Grep-verified against APW-06's plan and spec. Fields with no rule **by design** 
 agents, upstreamSync, upstreamPullRequests, provisioning, `display.protectedPaths`, `checks`) are marked
 "by design"; the rest are gaps.
 
-| Field | Defined at | Status |
-| --- | --- | --- |
-| `components[].args` | `schema.md:186` | **Gap.** §4.3 says "`command`/`args` from spec" once (`plan.md:342`) and never again; nothing says whether `args` is emitted as `containers[].args` or appended to `command`. These goldens emit `command` only, because neither Blueprint declares `args`. |
-| `components[].target` | `schema.md:187` | **Gap.** "Dockerfile stage override for this component" is a *build* concern that has no meaning after the image exists; no plan line says what a renderer does with it. |
-| probe `tcp: true` on a `worker` | `schema.md:198-201`, `:191` | **Gap.** §4.5 emits `tcpSocket { port: 'http' }`, but `http` is the container port *name*, and a worker has no port (`worker_port_forbidden`, `schema.md:188`). The schema warns about this (`worker_probe_without_port`) without resolving the rendered port name. |
-| `components[].resources.cpuLimit` on Your cluster | `schema.md:194` | **Ambiguous.** §4.5 defines `limits.cpu` explicitly only for `ever-works-apps` (`max(1, 4 × cpu)`) and says "`limits.cpu = resources.cpuLimit` when declared". Rendered here as omitted-because-undeclared; the "when declared" half is not stated for Your cluster. |
-| `env[].generate.keypair` → `<NAME>_PUBLIC` | `schema.md:253-262`; `CONTRACTS.md:54` | **Gap.** The public half is "exposed as `<NAME>_PUBLIC` only". No rule says whether that synthesised name is a key of the env Secret — which changes the checksum and therefore every derived object name. |
-| `smoke[].when: first-deploy` | `schema.md:357` | **Gap.** FR-36 says such checks "run only on the first Deployment", but the request list is rendered once into the runner ConfigMap, so a `first-deploy` smoke row is indistinguishable from an `always` one at render time. Either the renderer splits the list or the deployer filters it — neither is written. |
-| `smoke[].expect.maxLatencyMs` | `schema.md:356` | **Gap.** §4.8's request-list shape lists `name, status, latencyMs, failedExpectation?, found?` and never mentions the expectation's latency bound; T8's test does assert latency behaviour. These goldens omit `maxLatencyMs` from `requests.json`. |
-| `smoke[].component` | `schema.md:352` | **Gap.** "Must be `web`"; §4.11/§4.12 assume the primary component. Rendered here against the primary component only. |
-| `build.services[]` | `schema.md:167` | By design — an APW-05 input (the workflow's `services:` block), never a cluster object. |
-| `dependencies.*` details (`extensions`, `redis.persistence`, `maxmemoryPolicy`, `objectStorage.publicBuckets`) | `schema.md:209-214` | By design — APW-07's providers, not APW-06's renderer. But §4.2's apply order never lists dependency objects, so the ordering between a dependency's workloads and `ew-allow-deps` is unstated. |
-| `env[].validate` | `schema.md:242` | By design (APW-07 validates on generation). |
-| `checks[]` | `schema.md:365-368` | By design — an APW-05 workflow input; no Kubernetes object renders from it, so a 20-entry `checks` block has zero rendering rule. |
-| `appSpecVersion`, `kind`, `license`, `blueprint`, `source`, `display`, `agents`, `upstreamSync`, `upstreamPullRequests`, `provisioning` | `schema.md` passim | By design. |
+| Field                                                                                                                                   | Defined at                             | Status                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components[].args`                                                                                                                     | `schema.md:186`                        | **Gap.** §4.3 says "`command`/`args` from spec" once (`plan.md:342`) and never again; nothing says whether `args` is emitted as `containers[].args` or appended to `command`. These goldens emit `command` only, because neither Blueprint declares `args`.                                                       |
+| `components[].target`                                                                                                                   | `schema.md:187`                        | **Gap.** "Dockerfile stage override for this component" is a _build_ concern that has no meaning after the image exists; no plan line says what a renderer does with it.                                                                                                                                          |
+| probe `tcp: true` on a `worker`                                                                                                         | `schema.md:198-201`, `:191`            | **Gap.** §4.5 emits `tcpSocket { port: 'http' }`, but `http` is the container port _name_, and a worker has no port (`worker_port_forbidden`, `schema.md:188`). The schema warns about this (`worker_probe_without_port`) without resolving the rendered port name.                                               |
+| `components[].resources.cpuLimit` on Your cluster                                                                                       | `schema.md:194`                        | **Ambiguous.** §4.5 defines `limits.cpu` explicitly only for `ever-works-apps` (`max(1, 4 × cpu)`) and says "`limits.cpu = resources.cpuLimit` when declared". Rendered here as omitted-because-undeclared; the "when declared" half is not stated for Your cluster.                                              |
+| `env[].generate.keypair` → `<NAME>_PUBLIC`                                                                                              | `schema.md:253-262`; `CONTRACTS.md:54` | **Gap.** The public half is "exposed as `<NAME>_PUBLIC` only". No rule says whether that synthesised name is a key of the env Secret — which changes the checksum and therefore every derived object name.                                                                                                        |
+| `smoke[].when: first-deploy`                                                                                                            | `schema.md:357`                        | **Gap.** FR-36 says such checks "run only on the first Deployment", but the request list is rendered once into the runner ConfigMap, so a `first-deploy` smoke row is indistinguishable from an `always` one at render time. Either the renderer splits the list or the deployer filters it — neither is written. |
+| `smoke[].expect.maxLatencyMs`                                                                                                           | `schema.md:356`                        | **Gap.** §4.8's request-list shape lists `name, status, latencyMs, failedExpectation?, found?` and never mentions the expectation's latency bound; T8's test does assert latency behaviour. These goldens omit `maxLatencyMs` from `requests.json`.                                                               |
+| `smoke[].component`                                                                                                                     | `schema.md:352`                        | **Gap.** "Must be `web`"; §4.11/§4.12 assume the primary component. Rendered here against the primary component only.                                                                                                                                                                                             |
+| `build.services[]`                                                                                                                      | `schema.md:167`                        | By design — an APW-05 input (the workflow's `services:` block), never a cluster object.                                                                                                                                                                                                                           |
+| `dependencies.*` details (`extensions`, `redis.persistence`, `maxmemoryPolicy`, `objectStorage.publicBuckets`)                          | `schema.md:209-214`                    | By design — APW-07's providers, not APW-06's renderer. But §4.2's apply order never lists dependency objects, so the ordering between a dependency's workloads and `ew-allow-deps` is unstated.                                                                                                                   |
+| `env[].validate`                                                                                                                        | `schema.md:242`                        | By design (APW-07 validates on generation).                                                                                                                                                                                                                                                                       |
+| `checks[]`                                                                                                                              | `schema.md:365-368`                    | By design — an APW-05 workflow input; no Kubernetes object renders from it, so a 20-entry `checks` block has zero rendering rule.                                                                                                                                                                                 |
+| `appSpecVersion`, `kind`, `license`, `blueprint`, `source`, `display`, `agents`, `upstreamSync`, `upstreamPullRequests`, `provisioning` | `schema.md` passim                     | By design.                                                                                                                                                                                                                                                                                                        |
 
 ---
 
@@ -432,31 +432,31 @@ agents, upstreamSync, upstreamPullRequests, provisioning, `display.protectedPath
 Every row is a value a manifest needs that the App spec cannot express. **None of these is a request to add a
 field** — each is recorded so the source of truth is explicit and so nobody "fixes" it by inventing a key.
 
-| Object / field | Rule | Where its value actually comes from |
-| --- | --- | --- |
-| `Namespace` (existence, name, labels) | §4.1 | the Work's slug + uuid; `WorkAppRuntimeState` |
-| `ServiceAccount app` + `automountServiceAccountToken: false` | §4.1, §4.3 | constant |
-| `LimitRange ew-defaults` (all four values + `max`) | §4.2 | constants, per target |
-| `ResourceQuota ew-quota` (all 13 keys) | §4.2 | `AppsTierPolicy` |
-| `Secret app-pull` | §4.7 | APW-05 `AppImagePullCredentialSource` — the App spec has no registry field at all |
-| `ConfigMap app-platform-*` (all four/five names) | §4.7 | platform-injected; the App spec is forbidden from naming them (X-1) |
-| `ew-allow-egress`'s DNS rule, its 9 IPv4 + 4 IPv6 excepts | §4.10 | constants |
-| `ew-allow-ingress`'s controller namespace (+ its fallback) | §4.10 | `targetSettings.controllerNamespace` from the connection check |
-| `ew-allow-deps`' `extraEgress` addresses | §4.10 | APW-07 dependency egress data (host, ports) |
-| the five policy names themselves | §4.10 | constants |
-| `ConfigMap ew-runner-*` (name, script, mount paths) | §4.1, §4.8 | constants; `<hash10>` undefined (X-14) |
-| runner image, its `requests`/`limits`, its `runAsUser: 10001`, its `activeDeadlineSeconds = window + 30` | §4.8 | `APP_RUNNER_IMAGE` constant + `APP_*` constants (plan §5.3) |
-| `Deployment` `revisionHistoryLimit: 5`, `progressDeadlineSeconds`, `minReadySeconds`, `strategy`, `topologySpreadConstraints`, `enableServiceLinks`, `automountServiceAccountToken`, `imagePullPolicy`, `serviceAccountName` | §4.3 | constants + the deadline formula |
-| pod annotations `ever-works.io/env-checksum`, `-build-commit`, `-deployment-id` | §4.3 | `AppRenderInput.env.checksum`, `.specCommitSha`, `.deploymentId` |
-| PVC label `ever-works.io/retain: "true"`; annotation `ever-works.io/backup` | §4.1, §4.6 | the label is a constant; the annotation maps from `volumes[].backup` |
-| PVC `storageClassName` | §4.6 | `targetSettings.storageClass`, else the cluster default |
-| `Ingress` `ingressClassName`, strategy annotations, TLS mode, issuer, `previous` hosts | §4.11 | `AppRenderInput.ingress` + `hosts.previous` |
-| `Service` `type: ClusterIP`, `port: 80` | §4.3 | constant |
-| `Job`/`CronJob` `ttlSecondsAfterFinished: 86400`, `restartPolicy: Never`, `concurrencyPolicy`, `timeZone`, `startingDeadlineSeconds`, history limits | §4.8, §4.9 | constants (only `concurrency` and `timeoutSeconds` map to spec fields) |
-| the **inner** Job of a CronJob (`jobTemplate.spec.template.metadata.name`) | §4.1 names table gives `job-<name>-<deploymentShort>` and `run-<name>-<8 hex>` | **undefined.** A CronJob's inner Job must be unique per firing; a fixed name would collide. These goldens omit `metadata.name` so the controller generates it — open question Q-9. |
-| `purpose: 'verification'` namespaces' expiry annotation, `-v<attempt>` suffix, `emptyDir` volume substitution | §4.1, §4.12 | R-10 / APW-04 |
+| Object / field                                                                                                                                                                                                               | Rule                                                                           | Where its value actually comes from                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Namespace` (existence, name, labels)                                                                                                                                                                                        | §4.1                                                                           | the Work's slug + uuid; `WorkAppRuntimeState`                                                                                                                                      |
+| `ServiceAccount app` + `automountServiceAccountToken: false`                                                                                                                                                                 | §4.1, §4.3                                                                     | constant                                                                                                                                                                           |
+| `LimitRange ew-defaults` (all four values + `max`)                                                                                                                                                                           | §4.2                                                                           | constants, per target                                                                                                                                                              |
+| `ResourceQuota ew-quota` (all 13 keys)                                                                                                                                                                                       | §4.2                                                                           | `AppsTierPolicy`                                                                                                                                                                   |
+| `Secret app-pull`                                                                                                                                                                                                            | §4.7                                                                           | APW-05 `AppImagePullCredentialSource` — the App spec has no registry field at all                                                                                                  |
+| `ConfigMap app-platform-*` (all four/five names)                                                                                                                                                                             | §4.7                                                                           | platform-injected; the App spec is forbidden from naming them (X-1)                                                                                                                |
+| `ew-allow-egress`'s DNS rule, its 9 IPv4 + 4 IPv6 excepts                                                                                                                                                                    | §4.10                                                                          | constants                                                                                                                                                                          |
+| `ew-allow-ingress`'s controller namespace (+ its fallback)                                                                                                                                                                   | §4.10                                                                          | `targetSettings.controllerNamespace` from the connection check                                                                                                                     |
+| `ew-allow-deps`' `extraEgress` addresses                                                                                                                                                                                     | §4.10                                                                          | APW-07 dependency egress data (host, ports)                                                                                                                                        |
+| the five policy names themselves                                                                                                                                                                                             | §4.10                                                                          | constants                                                                                                                                                                          |
+| `ConfigMap ew-runner-*` (name, script, mount paths)                                                                                                                                                                          | §4.1, §4.8                                                                     | constants; `<hash10>` undefined (X-14)                                                                                                                                             |
+| runner image, its `requests`/`limits`, its `runAsUser: 10001`, its `activeDeadlineSeconds = window + 30`                                                                                                                     | §4.8                                                                           | `APP_RUNNER_IMAGE` constant + `APP_*` constants (plan §5.3)                                                                                                                        |
+| `Deployment` `revisionHistoryLimit: 5`, `progressDeadlineSeconds`, `minReadySeconds`, `strategy`, `topologySpreadConstraints`, `enableServiceLinks`, `automountServiceAccountToken`, `imagePullPolicy`, `serviceAccountName` | §4.3                                                                           | constants + the deadline formula                                                                                                                                                   |
+| pod annotations `ever-works.io/env-checksum`, `-build-commit`, `-deployment-id`                                                                                                                                              | §4.3                                                                           | `AppRenderInput.env.checksum`, `.specCommitSha`, `.deploymentId`                                                                                                                   |
+| PVC label `ever-works.io/retain: "true"`; annotation `ever-works.io/backup`                                                                                                                                                  | §4.1, §4.6                                                                     | the label is a constant; the annotation maps from `volumes[].backup`                                                                                                               |
+| PVC `storageClassName`                                                                                                                                                                                                       | §4.6                                                                           | `targetSettings.storageClass`, else the cluster default                                                                                                                            |
+| `Ingress` `ingressClassName`, strategy annotations, TLS mode, issuer, `previous` hosts                                                                                                                                       | §4.11                                                                          | `AppRenderInput.ingress` + `hosts.previous`                                                                                                                                        |
+| `Service` `type: ClusterIP`, `port: 80`                                                                                                                                                                                      | §4.3                                                                           | constant                                                                                                                                                                           |
+| `Job`/`CronJob` `ttlSecondsAfterFinished: 86400`, `restartPolicy: Never`, `concurrencyPolicy`, `timeZone`, `startingDeadlineSeconds`, history limits                                                                         | §4.8, §4.9                                                                     | constants (only `concurrency` and `timeoutSeconds` map to spec fields)                                                                                                             |
+| the **inner** Job of a CronJob (`jobTemplate.spec.template.metadata.name`)                                                                                                                                                   | §4.1 names table gives `job-<name>-<deploymentShort>` and `run-<name>-<8 hex>` | **undefined.** A CronJob's inner Job must be unique per firing; a fixed name would collide. These goldens omit `metadata.name` so the controller generates it — open question Q-9. |
+| `purpose: 'verification'` namespaces' expiry annotation, `-v<attempt>` suffix, `emptyDir` volume substitution                                                                                                                | §4.1, §4.12                                                                    | R-10 / APW-04                                                                                                                                                                      |
 
-Also rendered, with no *object* behind them but a rule: the **isolation probe** (§4.10) and the **hairpin/smoke
+Also rendered, with no _object_ behind them but a rule: the **isolation probe** (§4.10) and the **hairpin/smoke
 runner Jobs** (§4.11, §4.12) are created by `app-deployer` at deploy time and therefore appear in no
 desired-state golden file. Their absence from `manifests/` is deliberate.
 
@@ -556,34 +556,34 @@ APW-02 owns a different mechanism — `setActionsPermissions?` with `disableWork
 `volume_replicas`, `volume_shrink`, `privileged_port` and `cron_too_frequent` are "render-time checks"
 (`plan.md:501`) surfaced as preconditions — but `validateRenderInput` returns them from a **pure** function
 (T6, `tasks.md:113-114`), while the preconditions are evaluated service-side before rendering
-(`plan.md:144-145`). A pure renderer that returns validation results *and* renders is two behaviours in one
+(`plan.md:144-145`). A pure renderer that returns validation results _and_ renders is two behaviours in one
 signature; nothing says whether it renders nothing, renders partially, or throws.
 
 ---
 
 ## F. Smaller collisions worth knowing
 
-* **F-1.** `pullSecretNameFor(slug)` → `<slug>-pull` (`manifest.renderer.ts:302-304`) vs APW-06's fixed
+- **F-1.** `pullSecretNameFor(slug)` → `<slug>-pull` (`manifest.renderer.ts:302-304`) vs APW-06's fixed
   `app-pull` (`plan.md:296`). Two pull-secret conventions; if both ever render into one namespace the
   `imagePullSecrets` entry points at the wrong one.
-* **F-2.** APW-06 §4.1's Job name limit is 45 characters and APW-03's `Name` is 1–32 (`schema.md:21`):
+- **F-2.** APW-06 §4.1's Job name limit is 45 characters and APW-03's `Name` is 1–32 (`schema.md:21`):
   `job-` (4) + 32 + `-` (1) + `deploymentShort` (8) = **45 exactly**. Zero headroom, and the manual-run form
   `run-<name>-<8 hex>` is 44. The cap is asserted only by T4's test.
-* **F-3.** Non-deterministic fallbacks exist in the old path — `Date.now().toString(36).slice(0, 12)` for a
+- **F-3.** Non-deterministic fallbacks exist in the old path — `Date.now().toString(36).slice(0, 12)` for a
   missing sha (`k8s.plugin.ts:687`) and `t${Date.now().toString(36)}` for a missing revision (`:795`). Nothing
   like them may appear in the App renderer, and APW-06 §4 does not say so explicitly; `AppRenderInput` carries
   `deploymentShort` and `deploymentId` for exactly this reason.
-* **F-4.** ACC-E2E-05 asserts the ordering "bootstrap Job `completionTime` and in-cluster smoke result both
+- **F-4.** ACC-E2E-05 asserts the ordering "bootstrap Job `completionTime` and in-cluster smoke result both
   precede the Ingress `creationTimestamp`" (`ACCEPTANCE.md:340-341`). SSA **updates** an existing Ingress
   rather than recreating it, so the timestamps carry no ordering information on any Deployment after the
   first (a first-deploy Job does not run then either). The assertion is only meaningful on a first publish;
   the row does not say so.
-* **F-5.** Web-surface prerequisites for the App Deploy tab are not renderer contradictions but gate this
+- **F-5.** Web-surface prerequisites for the App Deploy tab are not renderer contradictions but gate this
   work: `apps/web/src/app/[locale]/(dashboard)/works/[id]/deploy/page.tsx` redirects to Overview when
   `!work.websiteRepositoryInitialized && !work.website` (`APW-06 plan.md:51`), so an App Work would never see
   its Deploy tab; §10.1 requires the kind-`app` branch to come first (`plan.md:994-995`). And
   `WorkCapabilities.builds` / `.appEnvironment` (R-7, `CONTRACTS.md:50`) must exist before either tab renders.
-* **F-6.** `isDeploymentPlugin` (`deployment.interface.ts:255-257`) gates on `capabilities.includes('deployment')`
+- **F-6.** `isDeploymentPlugin` (`deployment.interface.ts:255-257`) gates on `capabilities.includes('deployment')`
   only. APW-06 selects "the deployment plugin with `supportsApps === true` for the Work's `deployProvider`
   that does **not** declare `apps-tier`" (`plan.md:129-132`) — a selection rule with no guard, no type and no
   test today, and `supportsApps` is declared **optional** (`plan.md:252`), so every third-party deployment

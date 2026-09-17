@@ -17,7 +17,7 @@ them plus the web i18n keys.
 
 **Recommended default:** rename the **repository** only. Keep "Apps catalog" as the noun for the curated index
 of App Blueprints (now the `kind: app` rows of `ever-works/templates:manifest.json`), and add one vocabulary
-row for the repository itself ("Templates listing"). Rationale: users browse *apps*; the repository holds the
+row for the repository itself ("Templates listing"). Rationale: users browse _apps_; the repository holds the
 whole template family, which is a fact about our housekeeping, not about the product.
 
 **If the owner prefers the full rename:** the change is mechanical but wide — `README.md` §1, every
@@ -43,9 +43,9 @@ opposite directions for an unlisted but valid `-template` repository.
    APW-03's existing FR-43 behaviour, widened from two guessed names to the whole organization;
 4. otherwise the App Provisioner.
 
-So a new template works without a listing PR, and a listing row is still what makes it *listed*, pinned and
+So a new template works without a listing PR, and a listing row is still what makes it _listed_, pinned and
 badgeable. This is exactly the shape of `APW-03/spec.md:287-303` today, with the manifest replaced as the
-*only* discovery path.
+_only_ discovery path.
 
 **Impact:** the "listing row is the only way in" reading would mean every new template needs a catalogue PR to
 be usable at all, which contradicts the owner's sentence. The recommended reading keeps both features.
@@ -75,12 +75,12 @@ year).
 
 **Recommended default:** readiness is gated by the **Work Repository** fork only (the app source), so:
 
-| Already exists | Behaviour |
-| --- | --- |
-| Neither | fork the app source, then the template (FR-18c) |
-| App source only | adopt it, then fork the template |
-| Template only | adopt it, then fork the app source — the app source still gates `ready` |
-| Both | adopt both; `createdByThisWork = false` for each, so the first write is a **setup pull request** (R-4), never a push |
+| Already exists  | Behaviour                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Neither         | fork the app source, then the template (FR-18c)                                                                      |
+| App source only | adopt it, then fork the template                                                                                     |
+| Template only   | adopt it, then fork the app source — the app source still gates `ready`                                              |
+| Both            | adopt both; `createdByThisWork = false` for each, so the first write is a **setup pull request** (R-4), never a push |
 
 The interesting case is the last one: a member who already forked both repositories by hand gets a pull request
 rather than a direct commit, because the platform did not create either default branch. That is consistent with
@@ -111,7 +111,7 @@ owns (see OQ-08).
 ## OQ-06 · `.works/template.yml` as a separate file, or inside `.works/works.yml`?
 
 `blueprint` mode **forbids** `source` and `blueprint` in the App spec (`schema.md:80`,
-`blueprint_mode_forbidden_key`), because in a Work's spec those keys describe the *applied* relation. The
+`blueprint_mode_forbidden_key`), because in a Work's spec those keys describe the _applied_ relation. The
 template's own shape and app-source coordinates therefore need somewhere to live. Options: (a) a new
 `.works/template.yml`; (b) allow a restricted `source` block in `blueprint` mode and rewrite/remove it during
 apply.
@@ -194,7 +194,7 @@ these repositories, and a rule that forbids editing them would forbid the pin re
 
 **Recommended default:** when the first `code-bearing` template is created, add it to that document's named
 exception list (`AGENTS.md` already carries one such exception, `ever-co/awesome-selfhosted-data`) with the
-reason "maintained template fork — metadata on top, upstream sync by merge". Nothing in *this* plan changes; the
+reason "maintained template fork — metadata on top, upstream sync by merge". Nothing in _this_ plan changes; the
 note exists so the repository is not orphaned by our own guardrail.
 
 **Impact:** operational only, but it decides whether the pin-refresh job (APW-03 `catalog.md` §5 K3/C15) can run
@@ -227,10 +227,10 @@ Works.
 
 ---
 
-## OQ-14 · Where does the template fork's *sync* live?
+## OQ-14 · Where does the template fork's _sync_ live?
 
-For `code-bearing`, the *template* repository syncs with upstream on our side (a maintainer merges upstream into
-it). For `metadata-only`, the *member's* app-source fork syncs with upstream exactly like any App Work
+For `code-bearing`, the _template_ repository syncs with upstream on our side (a maintainer merges upstream into
+it). For `metadata-only`, the _member's_ app-source fork syncs with upstream exactly like any App Work
 (APW-02). The member's **template** fork, however, has no sync story: it is metadata that we improve over time.
 
 **Recommended default:** the template fork is refreshed by the **Blueprint upgrade path that already exists**

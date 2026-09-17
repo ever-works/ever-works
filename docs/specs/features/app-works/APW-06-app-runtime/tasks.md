@@ -351,7 +351,7 @@ kind, namespace, labelSelector)`, `deleteObject(…, propagationPolicy)`, `readP
       `isAppDeploymentPlugin` **and** `apps-tier`, only while `AppsTierPolicy.isOpen()`. Resolves the credential
       per plan §5.6 step 3 (`custom-kubeconfig` only for `your-cluster`; `AppsTierPolicy.resolveClusterCredential` only for
       `ever-works-apps`).
-      **Added (APW06-G02).** It is *constructed* in every process that imports `FacadesModule`, so it cannot refuse at
+      **Added (APW06-G02).** It is _constructed_ in every process that imports `FacadesModule`, so it cannot refuse at
       construction: **every method call** throws `APP_CLUSTER_IO_IN_API` unless `isAppClusterWorkerContext()` is true.
       **Create** `packages/agent/src/app-runtime/worker-context.ts` _(new)_ exporting
       `markAppClusterWorkerContext()` and `isAppClusterWorkerContext()` — a process-level flag, **not** an env var.
@@ -751,7 +751,7 @@ activity-log.listener` are green; Activity summaries name components/jobs/checks
       or above the platform domain → `null` while the shared default does not trip this check (ACC-06-27); configured →
       `rootDomain()` equals the apps domain; the apps-domain DNS configuration (`EVER_WORKS_APPS_DNS_ZONE_ID` /
       `EVER_WORKS_APPS_DNS_API_TOKEN`) is the only DNS configuration it reads — on the shared default it resolves the
-      zone for the platform domain, and it never silently falls back to the platform's *own* DNS provider instance.
+      zone for the platform domain, and it never silently falls back to the platform's _own_ DNS provider instance.
       **Done when**: `pnpm --filter @ever-works/agent test -- apps-domain-dns.service` is green and `EverWorksDnsService`
       is untouched.
 
@@ -1108,7 +1108,7 @@ Apply them in place; do not renumber._
   `packages/plugin/src/helpers/__tests__/cluster-address-policy.spec.ts`, which takes over the deny-CIDR cases
   (every CIDR, `::ffff:10.0.0.1`, `64:ff9b::a00:1`, a mixed public/private resolution, an allow-listed range accepted,
   the 10 s timeout, and `invalid` entries reported) — ACC-06-03. `pinKubeconfigServer(yaml, { allowlist, resolver?,
-  timeoutMs? })` imports `isPublicAddress` and `resolvePublicAddresses` from that helper, and the guard spec keeps the
+timeoutMs? })` imports `isPublicAddress` and `resolvePublicAddresses` from that helper, and the guard spec keeps the
   refusal, pinning and mocked-307 cases.
 - **T14 (APW06-G20).** Each App method reads the allow-list once per call from
   `parsePrivateAllowlist(process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST)` and passes it to

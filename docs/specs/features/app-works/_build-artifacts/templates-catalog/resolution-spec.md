@@ -18,26 +18,33 @@ repository **and, when the app source is separate, the app-source repository too
 
 ### 1.1 Inputs
 
-| Input | Source | Notes |
-| --- | --- | --- |
-| Pasted repository | the user | `owner/repo`, GitHub only, parsed by the existing Repository Work rules (APW-01 FR-6). |
-| Catalog organization | `config.websiteTemplate.getCatalogOrganization()` — read at `packages/agent/src/template-catalog/template-catalog.service.ts:622` and `:670` | The org the suffix scan walks. Never a user-supplied org: `SAFE_REPO_RE = /^ever-works\/[a-z0-9-]+$/` (`apps/api/src/works/works-template-catalog.service.ts:114`) exists so a hostile manifest cannot point the platform at attacker-controlled code. |
-| Explicit `blueprintId` | `POST /api/works`, `POST /api/works/app-source/inspect` (APW-01) | Highest precedence — it is how the acceptance harness names the fixture Blueprint (APW-03 plan `:245-248`). |
-| Listing (`manifest.json`) | `ever-works/templates` (renamed from `ever-works/apps`) | Curation: pin, licence class, managed-hosting decision, verification. |
-| Template metadata | each `-template` repository | **The source of truth for existence and shape.**
+| Input                     | Source                                                                                                                                       | Notes                                                                                                                                                                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pasted repository         | the user                                                                                                                                     | `owner/repo`, GitHub only, parsed by the existing Repository Work rules (APW-01 FR-6).                                                                                                                                                                 |
+| Catalog organization      | `config.websiteTemplate.getCatalogOrganization()` — read at `packages/agent/src/template-catalog/template-catalog.service.ts:622` and `:670` | The org the suffix scan walks. Never a user-supplied org: `SAFE_REPO_RE = /^ever-works\/[a-z0-9-]+$/` (`apps/api/src/works/works-template-catalog.service.ts:114`) exists so a hostile manifest cannot point the platform at attacker-controlled code. |
+| Explicit `blueprintId`    | `POST /api/works`, `POST /api/works/app-source/inspect` (APW-01)                                                                             | Highest precedence — it is how the acceptance harness names the fixture Blueprint (APW-03 plan `:245-248`).                                                                                                                                            |
+| Listing (`manifest.json`) | `ever-works/templates` (renamed from `ever-works/apps`)                                                                                      | Curation: pin, licence class, managed-hosting decision, verification.                                                                                                                                                                                  |
+| Template metadata         | each `-template` repository                                                                                                                  | **The source of truth for existence and shape.**                                                                                                                                                                                                       |
 
 ### 1.2 Outputs
 
 ```ts
 type TemplateResolution =
-  | { source: 'explicit' | 'listing' | 'scan' | 'probe'; kind: 'app';            // a usable app template
-      template: { owner, repo, ref, sha, shape, topics }, entry?: ListingEntry }
-  | { source: 'listing' | 'scan'; kind: 'website';                                // a website template
-      template: { owner, repo, ref, sha } }
-  | { source: 'none'; reason: 'notListed' | 'lookupFailed' | 'shapeMismatch' | 'blueprintNotFound' };
+	| {
+			source: 'explicit' | 'listing' | 'scan' | 'probe';
+			kind: 'app'; // a usable app template
+			template: { owner; repo; ref; sha; shape; topics };
+			entry?: ListingEntry;
+	  }
+	| {
+			source: 'listing' | 'scan';
+			kind: 'website'; // a website template
+			template: { owner; repo; ref; sha };
+	  }
+	| { source: 'none'; reason: 'notListed' | 'lookupFailed' | 'shapeMismatch' | 'blueprintNotFound' };
 ```
 
-`kind: 'website'` is *not* an App Blueprint: for an app Work it means "the `-template` repository carries no
+`kind: 'website'` is _not_ an App Blueprint: for an app Work it means "the `-template` repository carries no
 app metadata" and resolution continues (it can still be the source of a **Website** Work, and an App Work
 created from it gets no App spec → the App Provisioner).
 
@@ -46,18 +53,18 @@ created from it gets no App spec → the App Provisioner).
 The website-template discovery in `packages/agent/src/template-catalog/template-catalog.service.ts` is the
 working prototype of exactly this scan and **already implements the owner's rule**:
 
-| Behaviour | Code |
-| --- | --- |
-| Keep repositories whose name ends in `template` (case-insensitive) | `isStandardTemplateRepository` — `:1047-1049` (`/template$/i`) |
-| Walk the catalog org, 100 per page, stop on a short page | `:668-706` (`perPage = 100`, `maxPages = 50`) |
-| Warn when the page cap is hit | `:708-712` |
-| Skip repositories already represented by a curated entry | `:718-732` (builds a coordinate set from `listWebsiteTemplates()`) |
-| Sync gate: 1 h | `WEBSITE_DISCOVERY_SYNC_TTL_MS` — `:100` |
-| Re-attempt cooldown after **any** outcome: 5 min | `WEBSITE_DISCOVERY_ATTEMPT_COOLDOWN_MS` — `:112`, applied `:639-643` |
-| Hard deadline so a throttled GitHub never stalls a request: 8 s | `WEBSITE_DISCOVERY_DEADLINE_MS` — `:114`, applied `:648-665` |
-| Sanitize third-party text before persisting/showing it | `sanitizeDiscoveredDescription` — `:1022-1045` |
+| Behaviour                                                          | Code                                                                 |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Keep repositories whose name ends in `template` (case-insensitive) | `isStandardTemplateRepository` — `:1047-1049` (`/template$/i`)       |
+| Walk the catalog org, 100 per page, stop on a short page           | `:668-706` (`perPage = 100`, `maxPages = 50`)                        |
+| Warn when the page cap is hit                                      | `:708-712`                                                           |
+| Skip repositories already represented by a curated entry           | `:718-732` (builds a coordinate set from `listWebsiteTemplates()`)   |
+| Sync gate: 1 h                                                     | `WEBSITE_DISCOVERY_SYNC_TTL_MS` — `:100`                             |
+| Re-attempt cooldown after **any** outcome: 5 min                   | `WEBSITE_DISCOVERY_ATTEMPT_COOLDOWN_MS` — `:112`, applied `:639-643` |
+| Hard deadline so a throttled GitHub never stalls a request: 8 s    | `WEBSITE_DISCOVERY_DEADLINE_MS` — `:114`, applied `:648-665`         |
+| Sanitize third-party text before persisting/showing it             | `sanitizeDiscoveredDescription` — `:1022-1045`                       |
 
-APW-03's `AppsCatalogService` copies the *reader* pattern from
+APW-03's `AppsCatalogService` copies the _reader_ pattern from
 `apps/api/src/works/works-template-catalog.service.ts` (see `EXISTING-SUBSTRATE.md:57`) — tokenless raw read
 with an authenticated fallback, 1 h cache, 30 s negative cache, 8 s timeout, size guards
 (`apps/api/src/works/works-template-catalog.service.ts:88-119`, `:274-311`, `:338-390`) — and those numbers
@@ -85,12 +92,13 @@ kind: app
 shape: metadata-only
 
 source:
-  repo: umami-software/umami       # owner/name of the upstream project. Required in BOTH shapes:
-                                   #   code-bearing  → this repository is a fork of it
-                                   #   metadata-only → the app source lives there and is forked separately
-  defaultBranch: master
-  aliases: [umami-software/umami-app]   # ≤ 5 former names, matched case-insensitively
-  refs: { branches: [master], tags: '>=3.4.0' }   # optional: which upstream refs this template serves
+    repo:
+        umami-software/umami # owner/name of the upstream project. Required in BOTH shapes:
+        #   code-bearing  → this repository is a fork of it
+        #   metadata-only → the app source lives there and is forked separately
+    defaultBranch: master
+    aliases: [umami-software/umami-app] # ≤ 5 former names, matched case-insensitively
+    refs: { branches: [master], tags: '>=3.4.0' } # optional: which upstream refs this template serves
 
 # Optional, defaults shown
 specPath: .works/works.yml
@@ -99,24 +107,24 @@ overlayPath: overlay.yml
 
 Rules:
 
-| # | Rule |
-| --- | --- |
-| T1 | `kind` must be `app`. A `.works/template.yml` with any other `kind` is ignored (the resolver falls back to §2.2). |
-| T2 | `shape` is `code-bearing` \| `metadata-only`. Absent ⇒ the candidate is treated as **metadata-only but not auto-provisionable** — see T6. |
-| T3 | `source.repo` is required and must parse as `owner/name`. |
-| T4 | `shape: code-bearing` **requires** `source.repo` to be this repository's fork network root (or its immediate parent): the resolver reads the repository once (APW-02 adds `source`/`parent` to `getRepository`, CONTRACTS §3) and requires `isFork === true` with `source.full_name ?? parent.full_name === source.repo`. |
-| T5 | `shape: metadata-only` **requires** `source.repo` to differ from this repository's `owner/name`. |
-| T6 | T4/T5 failing is `shapeMismatch`: the candidate is **not** used for an automatic fork. It may still be shown as an **Unlisted Blueprint** with the mismatch surfaced, and resolution continues with the next candidate. |
-| T7 | A candidate with **no** `template.yml` whose `.works/works.yml` validates in `blueprint` mode is a metadata-only candidate *only if* a listing row (or an explicit `blueprintId`) names its app source; otherwise it resolves as `shapeMismatch` (we know the spec but not where the code is). |
-| T8 | Secrets, tokens and generated credentials never appear in this file (APW-03 `catalog.md` §7 rule 7). |
+| #   | Rule                                                                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | `kind` must be `app`. A `.works/template.yml` with any other `kind` is ignored (the resolver falls back to §2.2).                                                                                                                                                                                                         |
+| T2  | `shape` is `code-bearing` \| `metadata-only`. Absent ⇒ the candidate is treated as **metadata-only but not auto-provisionable** — see T6.                                                                                                                                                                                 |
+| T3  | `source.repo` is required and must parse as `owner/name`.                                                                                                                                                                                                                                                                 |
+| T4  | `shape: code-bearing` **requires** `source.repo` to be this repository's fork network root (or its immediate parent): the resolver reads the repository once (APW-02 adds `source`/`parent` to `getRepository`, CONTRACTS §3) and requires `isFork === true` with `source.full_name ?? parent.full_name === source.repo`. |
+| T5  | `shape: metadata-only` **requires** `source.repo` to differ from this repository's `owner/name`.                                                                                                                                                                                                                          |
+| T6  | T4/T5 failing is `shapeMismatch`: the candidate is **not** used for an automatic fork. It may still be shown as an **Unlisted Blueprint** with the mismatch surfaced, and resolution continues with the next candidate.                                                                                                   |
+| T7  | A candidate with **no** `template.yml` whose `.works/works.yml` validates in `blueprint` mode is a metadata-only candidate _only if_ a listing row (or an explicit `blueprintId`) names its app source; otherwise it resolves as `shapeMismatch` (we know the spec but not where the code is).                            |
+| T8  | Secrets, tokens and generated credentials never appear in this file (APW-03 `catalog.md` §7 rule 7).                                                                                                                                                                                                                      |
 
 ### 2.2 Fall-back discriminator (no `template.yml` yet)
 
-| Candidate carries | Classification |
-| --- | --- |
-| `.works/works.yml` valid in `blueprint` mode with root `kind: app` (or `spec.kind: app`) | **app template** |
-| `.works/template.yml` with `kind: app` | **app template** |
-| neither | **website template** — the `-template` suffix alone is not enough (README D4 `:136-137`). Ignored by the app path; usable by the website path. |
+| Candidate carries                                                                        | Classification                                                                                                                                 |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.works/works.yml` valid in `blueprint` mode with root `kind: app` (or `spec.kind: app`) | **app template**                                                                                                                               |
+| `.works/template.yml` with `kind: app`                                                   | **app template**                                                                                                                               |
+| neither                                                                                  | **website template** — the `-template` suffix alone is not enough (README D4 `:136-137`). Ignored by the app path; usable by the website path. |
 
 Verified today: none of the four website template repositories carries a `.works/` directory at all
 (`GET /repos/ever-works/<name>/contents/.works` → 404 for `directory-web-template`,
@@ -187,20 +195,20 @@ resolve({ owner, repo, ref?, blueprintId?, viewer }):
 
 ### 3.1 Index limits (all inherited, all binding)
 
-| Limit | Value | Why |
-| --- | --- | --- |
-| Page size / page cap | `perPage = 100`, `maxPages = 50` (≤ 5 000 repositories) | `template-catalog.service.ts:671-672`; a warning is logged when the cap is hit (`:708-712`). |
-| Stop condition | a page shorter than `perPage` | `:701-703`. |
-| Freshness | 1 h (`WEBSITE_DISCOVERY_SYNC_TTL_MS`, `:100`) | One index per catalog org per hour; the index is a `CACHE_MANAGER` entry `templates-index:<org>` holding `{ repos, fetchedAt, truncated }`. |
-| Re-attempt cooldown | 5 min after **any** outcome (`:112`, `:639-643`) | A failing or empty scan must not re-run a 50-page fetch on every create. |
-| Deadline | 8 s (`:114`, `:648-665`) | On the deadline the resolver serves the last good index (or none) and step 3 is skipped — creation never blocks on the scan. |
-| Curated-entry skip | candidates whose coordinates a listing row already names are skipped | `:718-732`; keeps one source of truth per repository. |
-| Match work | Building the index: 1 `listRepositories` request per 100 repositories. Per **candidate** (only names ending in `template` — 4 in `ever-works` today): 1 file read (`template.yml`), plus 1 more (`works.yml`) only when the first is absent, plus 1 repository read only for a `code-bearing` shape check. Candidate metadata is cached under `templates-index:<org>:<repo>@<headSha>` for 1 h, so the steady-state cost of a resolution is **zero** provider reads. | Bounded by the page cap and cut short by the deadline; the per-candidate work scales with the number of templates we keep, never with the size of the organization. |
-| Cache of results | `1 h` on a hit, `10 min` on a miss, keyed by canonical upstream (`+ blueprintId` when given) | FR-44, unchanged. |
-| Latency envelope | p95 ≤ 5 s; on provider error ⇒ `none(lookupFailed)` and creation proceeds | FR-44, unchanged. |
+| Limit                | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Why                                                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page size / page cap | `perPage = 100`, `maxPages = 50` (≤ 5 000 repositories)                                                                                                                                                                                                                                                                                                                                                                                                              | `template-catalog.service.ts:671-672`; a warning is logged when the cap is hit (`:708-712`).                                                                        |
+| Stop condition       | a page shorter than `perPage`                                                                                                                                                                                                                                                                                                                                                                                                                                        | `:701-703`.                                                                                                                                                         |
+| Freshness            | 1 h (`WEBSITE_DISCOVERY_SYNC_TTL_MS`, `:100`)                                                                                                                                                                                                                                                                                                                                                                                                                        | One index per catalog org per hour; the index is a `CACHE_MANAGER` entry `templates-index:<org>` holding `{ repos, fetchedAt, truncated }`.                         |
+| Re-attempt cooldown  | 5 min after **any** outcome (`:112`, `:639-643`)                                                                                                                                                                                                                                                                                                                                                                                                                     | A failing or empty scan must not re-run a 50-page fetch on every create.                                                                                            |
+| Deadline             | 8 s (`:114`, `:648-665`)                                                                                                                                                                                                                                                                                                                                                                                                                                             | On the deadline the resolver serves the last good index (or none) and step 3 is skipped — creation never blocks on the scan.                                        |
+| Curated-entry skip   | candidates whose coordinates a listing row already names are skipped                                                                                                                                                                                                                                                                                                                                                                                                 | `:718-732`; keeps one source of truth per repository.                                                                                                               |
+| Match work           | Building the index: 1 `listRepositories` request per 100 repositories. Per **candidate** (only names ending in `template` — 4 in `ever-works` today): 1 file read (`template.yml`), plus 1 more (`works.yml`) only when the first is absent, plus 1 repository read only for a `code-bearing` shape check. Candidate metadata is cached under `templates-index:<org>:<repo>@<headSha>` for 1 h, so the steady-state cost of a resolution is **zero** provider reads. | Bounded by the page cap and cut short by the deadline; the per-candidate work scales with the number of templates we keep, never with the size of the organization. |
+| Cache of results     | `1 h` on a hit, `10 min` on a miss, keyed by canonical upstream (`+ blueprintId` when given)                                                                                                                                                                                                                                                                                                                                                                         | FR-44, unchanged.                                                                                                                                                   |
+| Latency envelope     | p95 ≤ 5 s; on provider error ⇒ `none(lookupFailed)` and creation proceeds                                                                                                                                                                                                                                                                                                                                                                                            | FR-44, unchanged.                                                                                                                                                   |
 
 **Security, unchanged and non-negotiable:** the scan reads **only** repositories in the catalog organization,
-and `source.repo` / `upstreams[]` / `aliases` / `links` are matched as *data* — they are never fetched as code
+and `source.repo` / `upstreams[]` / `aliases` / `links` are matched as _data_ — they are never fetched as code
 (FR-31; `catalog.md` §1.4). A `code-bearing` template is forked **from the catalog org**, never from an
 upstream named inside a file.
 
@@ -208,12 +216,12 @@ upstream named inside a file.
 
 Existing codes stay; these are added (append-only, APW-03 owns the enum):
 
-| Code | Meaning | User-facing behaviour |
-| --- | --- | --- |
-| `shapeMismatch` | §2.1 T6/T7: the repository does not match its declared shape. | The candidate is not offered for automatic provisioning; the App Provisioner path runs. Recorded on the provisioning record, never as a silent fallback. |
-| `templateShapeUnknown` | The candidate is an app template with no `template.yml` and no listing row naming its app source. | Same. |
-| `sourceForkFailed` | The app-source fork (metadata-only) failed or timed out. | The App Work fails preparation with the existing fork failure codes; **nothing** is half-created: the App Work row is deleted and the orphan fork is adopted on retry (FR-24/FR-25). |
-| `templateForkFailed` | The template fork (metadata-only, second) failed or timed out. | **The App Work still becomes ready.** Provenance falls back to the catalog repository and the Upstream tab names the failure with a retry action. |
+| Code                   | Meaning                                                                                           | User-facing behaviour                                                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `shapeMismatch`        | §2.1 T6/T7: the repository does not match its declared shape.                                     | The candidate is not offered for automatic provisioning; the App Provisioner path runs. Recorded on the provisioning record, never as a silent fallback.                             |
+| `templateShapeUnknown` | The candidate is an app template with no `template.yml` and no listing row naming its app source. | Same.                                                                                                                                                                                |
+| `sourceForkFailed`     | The app-source fork (metadata-only) failed or timed out.                                          | The App Work fails preparation with the existing fork failure codes; **nothing** is half-created: the App Work row is deleted and the orphan fork is adopted on retry (FR-24/FR-25). |
+| `templateForkFailed`   | The template fork (metadata-only, second) failed or timed out.                                    | **The App Work still becomes ready.** Provenance falls back to the catalog repository and the Upstream tab names the failure with a retry action.                                    |
 
 ---
 
@@ -221,11 +229,11 @@ Existing codes stay; these are added (append-only, APW-03 owns the enum):
 
 The fork plan is a pure function of `shape` and `appSource.mode`:
 
-| Shape / mode | Fork 1 | Fork 2 | Work Repository (role `website`) | Provenance template repository |
-| --- | --- | --- | --- | --- |
-| `code-bearing` (`embedded`) | `ever-works/<app>-template` | — | Fork 1 | Fork 1 (the same repository) |
-| `metadata-only` (`repository`) | `source.repo` (the app source) | `ever-works/<app>-template` | Fork 1 | Fork 2, or the catalog repository when Fork 2 failed |
-| `metadata-only` (`image`) | `ever-works/<app>-template` | — | Fork 1 | Fork 1 |
+| Shape / mode                   | Fork 1                         | Fork 2                      | Work Repository (role `website`) | Provenance template repository                       |
+| ------------------------------ | ------------------------------ | --------------------------- | -------------------------------- | ---------------------------------------------------- |
+| `code-bearing` (`embedded`)    | `ever-works/<app>-template`    | —                           | Fork 1                           | Fork 1 (the same repository)                         |
+| `metadata-only` (`repository`) | `source.repo` (the app source) | `ever-works/<app>-template` | Fork 1                           | Fork 2, or the catalog repository when Fork 2 failed |
+| `metadata-only` (`image`)      | `ever-works/<app>-template`    | —                           | Fork 1                           | Fork 1                                               |
 
 Order and failure semantics:
 
@@ -244,11 +252,11 @@ Order and failure semantics:
    not change what is built. APW-02 tracks it as a second readiness target on the same Work; on failure the
    provenance falls back to the catalog repository and the failure is visible with a retry action
    (`templateForkFailed`).
-4. **Adoption beats creation, per repository.** If the member already has a fork of *that* repository in the
+4. **Adoption beats creation, per repository.** If the member already has a fork of _that_ repository in the
    chosen owner, it is adopted and no fork request is made (FR-19) — independently for Fork 1 and Fork 2.
 5. **"Never a second fork" keeps its meaning.** APW-01 S21 (`spec.md:197-199`, `plan.md:203`, `plan.md:854`)
    and APW-02 (`spec.md:38-39`) forbid asking GitHub for a second fork **of the same upstream into the same
-   account**. Forking a *different* repository (the template) is not that, and none of those statements may be
+   account**. Forking a _different_ repository (the template) is not that, and none of those statements may be
    read as forbidding it — but the wording must be qualified so nobody "fixes" the second fork away
    (`plan-changes.md` §6).
 6. **`-copy` naming stays private-copy-only.** FR-20's `-copy`, `-copy-2`…`-copy-5` variants apply to
@@ -257,12 +265,12 @@ Order and failure semantics:
 
 What is written where, once the repositories exist:
 
-| Fact | Where it is persisted |
-| --- | --- |
-| The Work Repository (owner/repo) | `relatedRepositories.website` — **and** `sourceRepository.owner/repo`, because `GitFacadeService.getRepoDir` clones the top-level pair (`APW-01 plan.md:222`). |
-| The upstream the Work follows | `sourceRepository.upstream {owner, repo, defaultBranch}` — the **original project**, not our template. For a `code-bearing` fork the Work's `parent` is our template and its fork-network root is the original, which is exactly what FR-40's root-first matching expects. |
-| The template the Work came from | `sourceRepository.template` (§7) — never a `RepositoryRole`. |
-| The applied pin | `WorkAppSpecState.blueprintSha` (APW-03) — for a listing row, `template.sha`; for an Unlisted candidate, the head sha resolved at apply time. |
+| Fact                             | Where it is persisted                                                                                                                                                                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The Work Repository (owner/repo) | `relatedRepositories.website` — **and** `sourceRepository.owner/repo`, because `GitFacadeService.getRepoDir` clones the top-level pair (`APW-01 plan.md:222`).                                                                                                             |
+| The upstream the Work follows    | `sourceRepository.upstream {owner, repo, defaultBranch}` — the **original project**, not our template. For a `code-bearing` fork the Work's `parent` is our template and its fork-network root is the original, which is exactly what FR-40's root-first matching expects. |
+| The template the Work came from  | `sourceRepository.template` (§7) — never a `RepositoryRole`.                                                                                                                                                                                                               |
+| The applied pin                  | `WorkAppSpecState.blueprintSha` (APW-03) — for a listing row, `template.sha`; for an Unlisted candidate, the head sha resolved at apply time.                                                                                                                              |
 
 ---
 
@@ -273,11 +281,11 @@ What is written where, once the repositories exist:
 (`packages/contracts/src/domain/work-capabilities.ts:40-49`) and in `README.md:78-91`. **No new role value is
 added for templates, app sources, or generated repositories.** Concretely, for an App Work:
 
-| Role | Used? | Named | Meaning |
-| --- | --- | --- | --- |
-| `website` → **"Work Repository"** | **yes, exactly one** | `<slug>-app` or `<slug>-website` | The app-code fork: the Work's deliverable, the App-spec holder, the build and deploy target. |
-| `data` → "Data Repository" | no | — | The Work's *data*. An App Work's data lives in the platform and in its App spec; the capability set turns this role off for kind `app`. |
-| `work` → "{provider} Repository" | no | — | The generated, never-deployed output repository. Not part of an App Work. |
+| Role                              | Used?                | Named                            | Meaning                                                                                                                                 |
+| --------------------------------- | -------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `website` → **"Work Repository"** | **yes, exactly one** | `<slug>-app` or `<slug>-website` | The app-code fork: the Work's deliverable, the App-spec holder, the build and deploy target.                                            |
+| `data` → "Data Repository"        | no                   | —                                | The Work's _data_. An App Work's data lives in the platform and in its App spec; the capability set turns this role off for kind `app`. |
+| `work` → "{provider} Repository"  | no                   | —                                | The generated, never-deployed output repository. Not part of an App Work.                                                               |
 
 Consequences that must be carried by other epics (they are the price of mapping the app-code fork to
 `website`, which the owner confirmed):
@@ -294,11 +302,11 @@ Consequences that must be carried by other epics (they are the price of mapping 
 
 ### 5.1 The `-app` / `-website` suffix rule
 
-| Situation | Work Repository name |
-| --- | --- |
-| Created from an **app** template | `<slug>-app` |
-| Created from a **website** template | `<slug>-website` (unchanged) |
-| Any other kind / legacy path | `<slug>-website` (unchanged: `work.entity.ts:843-853`) |
+| Situation                                                                             | Work Repository name                                       |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Created from an **app** template                                                      | `<slug>-app`                                               |
+| Created from a **website** template                                                   | `<slug>-website` (unchanged)                               |
+| Any other kind / legacy path                                                          | `<slug>-website` (unchanged: `work.entity.ts:843-853`)     |
 | A Work whose coordinates were recorded under the other suffix, or renamed by the user | **whatever is recorded** — never renamed, never re-derived |
 
 Rules:
@@ -336,20 +344,20 @@ the existing `sourceRepository` `simple-json` column, `APW-01 plan.md:222`):**
 ```ts
 // packages/contracts/src/api/work/import-source.dto.ts — SourceRepository gains one optional block
 interface SourceRepository<TImportedAt = string> {
-  // …existing fields unchanged…
-  template?: {
-    owner: string;                       // the template repository the Work was created from
-    repo: string;
-    url: string;                         // https URL built from the provider, never from user input
-    visibility: 'public' | 'private';    // snapshot, so the UI needs no GitHub round-trip
-    kind: 'website' | 'app';
-    shape?: 'code-bearing' | 'metadata-only';   // app templates only
-    blueprintId?: string;                // the listing slug / Apps catalog id
-    version?: string;                    // semver of the pinned release
-    sha?: string;                        // the applied template commit (40-hex)
-    forkedRepo?: { owner: string; repo: string };  // the user's own copy of the template, when made
-    resolvedAt: string;                  // ISO 8601
-  };
+	// …existing fields unchanged…
+	template?: {
+		owner: string; // the template repository the Work was created from
+		repo: string;
+		url: string; // https URL built from the provider, never from user input
+		visibility: 'public' | 'private'; // snapshot, so the UI needs no GitHub round-trip
+		kind: 'website' | 'app';
+		shape?: 'code-bearing' | 'metadata-only'; // app templates only
+		blueprintId?: string; // the listing slug / Apps catalog id
+		version?: string; // semver of the pinned release
+		sha?: string; // the applied template commit (40-hex)
+		forkedRepo?: { owner: string; repo: string }; // the user's own copy of the template, when made
+		resolvedAt: string; // ISO 8601
+	};
 }
 ```
 
@@ -375,32 +383,32 @@ the block above, because `RepoVisibility` is a role map and the template is not 
 
 ## 8. Worked examples
 
-| Case | Resolution | Fork plan | Work Repository |
-| --- | --- | --- | --- |
-| `calcom/cal.diy` (listing row `cal-diy`, `code-bearing`) | Step 2 — listing match on `upstreams[0].repo`, applied at `template.sha` | 1 fork: `ever-works/cal-diy-template` → `<member>/<slug>-app` | The fork; `parent = ever-works/cal-diy-template`, root = `calcom/cal.diy` |
-| `umami-software/umami` (listing row `umami`, `metadata-only`) | Step 2 — listing match | 2 forks: `umami-software/umami` first, then `ever-works/umami-template` | The app-source fork, at the template's pinned spec |
-| `ever-works/app-fixture-hello` in the test estate (explicit `blueprintId: app-fixture-hello`) | Step 1 — explicit id, then Step 2 on the `e2e` branch listing | 2 forks, same as Umami | The app-source fork |
-| A per-run generated upstream not in any catalog | Step 3 — scan finds nothing; Step 4 | — | The Work is created, then the App Provisioner studies it |
-| `ever-works/directory-web-template` used for a Website Work | Step 2/3 → `kind: 'website'` | 1 fork (existing behaviour) | The fork; suffix `-website` |
-| A candidate whose `template.yml` says `code-bearing` but the repository is not a fork of `source.repo` | `shapeMismatch` → candidate skipped → Step 4 | — | The Work is created, Provisioner path |
+| Case                                                                                                   | Resolution                                                               | Fork plan                                                               | Work Repository                                                           |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `calcom/cal.diy` (listing row `cal-diy`, `code-bearing`)                                               | Step 2 — listing match on `upstreams[0].repo`, applied at `template.sha` | 1 fork: `ever-works/cal-diy-template` → `<member>/<slug>-app`           | The fork; `parent = ever-works/cal-diy-template`, root = `calcom/cal.diy` |
+| `umami-software/umami` (listing row `umami`, `metadata-only`)                                          | Step 2 — listing match                                                   | 2 forks: `umami-software/umami` first, then `ever-works/umami-template` | The app-source fork, at the template's pinned spec                        |
+| `ever-works/app-fixture-hello` in the test estate (explicit `blueprintId: app-fixture-hello`)          | Step 1 — explicit id, then Step 2 on the `e2e` branch listing            | 2 forks, same as Umami                                                  | The app-source fork                                                       |
+| A per-run generated upstream not in any catalog                                                        | Step 3 — scan finds nothing; Step 4                                      | —                                                                       | The Work is created, then the App Provisioner studies it                  |
+| `ever-works/directory-web-template` used for a Website Work                                            | Step 2/3 → `kind: 'website'`                                             | 1 fork (existing behaviour)                                             | The fork; suffix `-website`                                               |
+| A candidate whose `template.yml` says `code-bearing` but the repository is not a fork of `source.repo` | `shapeMismatch` → candidate skipped → Step 4                             | —                                                                       | The Work is created, Provisioner path                                     |
 
 ---
 
 ## 9. What proves this (tests to write with the implementation)
 
-| # | Test | Proves |
-| --- | --- | --- |
-| R-1 | A repository named `*-template` **without** app metadata is never resolved as an App Blueprint | §2.2, D4 |
-| R-2 | The scan is capped at 50 pages, warns, and serves the last good index on the 8 s deadline | §3.1 |
-| R-3 | A second resolution inside 5 minutes after a failed scan does not re-fetch | §3.1 cooldown |
-| R-4 | A repository already named by a listing row is skipped by the scan | §3.1 curated skip |
-| R-5 | `shape: code-bearing` on a non-fork candidate yields `shapeMismatch` and the Provisioner path | T4/T6 |
-| R-6 | `metadata-only` yields exactly two forks in order, app source first | §4 |
-| R-7 | A failed template fork leaves the App Work ready and provenance pointing at the catalog repository | §3.2, §4.3 |
-| R-8 | No resolution path fetches a host or repository outside the catalog org (fetch-spy test) | FR-31 |
-| R-9 | A Work created from an app template is named `<slug>-app`; from a website template `<slug>-website`; recorded coordinates always win over both | §5.1 |
-| R-10 | `TemplateResolution` never produces a new `RepositoryRole` value (contract test on the enum) | §5 |
-| R-11 | `sourceRepository.template` round-trips and the Work Information row renders with a public and with a private template | §7 |
+| #    | Test                                                                                                                                           | Proves            |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| R-1  | A repository named `*-template` **without** app metadata is never resolved as an App Blueprint                                                 | §2.2, D4          |
+| R-2  | The scan is capped at 50 pages, warns, and serves the last good index on the 8 s deadline                                                      | §3.1              |
+| R-3  | A second resolution inside 5 minutes after a failed scan does not re-fetch                                                                     | §3.1 cooldown     |
+| R-4  | A repository already named by a listing row is skipped by the scan                                                                             | §3.1 curated skip |
+| R-5  | `shape: code-bearing` on a non-fork candidate yields `shapeMismatch` and the Provisioner path                                                  | T4/T6             |
+| R-6  | `metadata-only` yields exactly two forks in order, app source first                                                                            | §4                |
+| R-7  | A failed template fork leaves the App Work ready and provenance pointing at the catalog repository                                             | §3.2, §4.3        |
+| R-8  | No resolution path fetches a host or repository outside the catalog org (fetch-spy test)                                                       | FR-31             |
+| R-9  | A Work created from an app template is named `<slug>-app`; from a website template `<slug>-website`; recorded coordinates always win over both | §5.1              |
+| R-10 | `TemplateResolution` never produces a new `RepositoryRole` value (contract test on the enum)                                                   | §5                |
+| R-11 | `sourceRepository.template` round-trips and the Work Information row renders with a public and with a private template                         | §7                |
 
 ---
 

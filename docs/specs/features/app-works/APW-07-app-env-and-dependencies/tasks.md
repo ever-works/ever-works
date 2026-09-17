@@ -30,7 +30,7 @@
   `generate.keypair.format` schema field (R-11); APW-05's latest deployable Build with its
   **`buildValueFingerprints`** map (APW07-G03); APW-06's
   **`AppRuntimeTargetPort.prepareDependencyTarget`** (the runtime target resolver — `{ kubeconfig, context, namespace,
-  appPodLabels }`, plus the `unavailable` reasons), the `AppRuntimeEnvSource` port with `target`, `fingerprints` and
+appPodLabels }`, plus the `unavailable` reasons), the `AppRuntimeEnvSource` port with `target`, `fingerprints` and
   `resolveEphemeral(…, { dependencyOutputs })`, APW-06's current Deployment `appRender.envFingerprints`, domain state,
   the `delete-app-work`, `prepare-namespace` and `verification-deploy` ops (R-15, R-10, GAP-06) and its calls to
   `reconcile` / `ensureReadyForDeploy` / `onAppRemoved` / `list` / `provisionEphemeral` (APW-06 T69, T70, T58, T60);
@@ -526,7 +526,7 @@ resolved in the zone (APW-10); the platform never holds tenant data-server crede
       `IAppsTierProvider` fake — refs written per declared kind **through `setDependencies`**, never `applyWork`; ready
       mirrors zone status; no connection string or role name leaves the zone fake (ACC-07-26); **`managed-smtp` is offered
       on `ever-works-apps` and its outputs carry the relay endpoint, credential and from-address, so a `smtp: { required:
-      true }` App Work reaches `ready` while the tier's ports 25/465/587 stay refused (ACC-07-32, FR-61)**. Extend
+    true }` App Work reaches `ready` while the tier's ports 25/465/587 stay refused (ACC-07-32, FR-61)**. Extend
       `packages/agent/src/app-dependencies/__tests__/app-dependencies.service.spec.ts`
       — the facade never offers these providers for Your cluster or while the policy is closed, and a spy proves
       `EVER_WORKS_APPS_MANAGED_ENABLED` is never read. The live isolation checks (another App Work's role refused, 21st
@@ -706,7 +706,7 @@ kinds)` calling providers with `ephemeral: true` and returning outputs in memory
       operator, one without — plus an S3-compatible test server and a mail sink, but APW-13 sets up one kind cluster with
       no operator and no S3 server, and no spec file covers the live halves of ACC-07-14/15/16/20.
       **Modify** (through APW-13's owner) `.github/workflows/app-works-kind.yml` — a matrix `postgresOperator: [none,
-      cnpg]` installing a pinned operator release on the `cnpg` leg, plus the S3-compatible test server and the mail
+    cnpg]` installing a pinned operator release on the `cnpg` leg, plus the S3-compatible test server and the mail
       sink; **Create** `apps/web/e2e/flow-app-works-kind-dependencies.spec.ts` _(new)_ with one named scenario per
       ACC-07 id it proves (the operator path, the plain path, bucket creation, the no-storage-class failure, the 3×15 min
       retry); set `EVER_WORKS_APP_DEPENDENCY_PRIVATE_ALLOWLIST` for the local sink (T22, APW07-G09).

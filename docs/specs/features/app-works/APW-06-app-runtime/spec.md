@@ -253,14 +253,14 @@ Every threshold below is a number on purpose.
 - **FR-1.** Every App Work has exactly one deploy target: **None** (default; labelled **"None — don't deploy
   yet"**), **Your cluster** or **Ever Works Apps**. There is no separate "not yet" state. Changing the target never
   removes anything already running; the change dialog says so.
-  > **The choices are three; the shapes underneath are a family, and no shape is ever removed** (owner answer
-  > 2026-09-17, Resolution **R-27**). `Your cluster` is served by the Ever Works **shared** customer cluster, the
-  > internal admin cluster, or a **customer kubeconfig**; **Ever Works Apps** runs on the shared zone as a
-  > namespace-isolated tier *and* may be served by a customer cluster, a machine **connected to Ever Works**, or —
-  > as recorded extension points — a remote host over SSH or any further provider published as a `deployment`
-  > plugin. The taxonomy, its evidence and the per-shape gate attestations are in
-  > [`deploy-shapes.md`](./deploy-shapes.md). **This paragraph is additive: it grants no new requirement on any
-  > shipped shape and removes none.**
+    > **The choices are three; the shapes underneath are a family, and no shape is ever removed** (owner answer
+    > 2026-09-17, Resolution **R-27**). `Your cluster` is served by the Ever Works **shared** customer cluster, the
+    > internal admin cluster, or a **customer kubeconfig**; **Ever Works Apps** runs on the shared zone as a
+    > namespace-isolated tier _and_ may be served by a customer cluster, a machine **connected to Ever Works**, or —
+    > as recorded extension points — a remote host over SSH or any further provider published as a `deployment`
+    > plugin. The taxonomy, its evidence and the per-shape gate attestations are in
+    > [`deploy-shapes.md`](./deploy-shapes.md). **This paragraph is additive: it grants no new requirement on any
+    > shipped shape and removes none.**
 - **FR-2.** **None**: nothing is deployed; Builds still run; the Deploy tab explains the targets and offers
   **Connect your cluster**.
 - **FR-3.** **Your cluster** uses a kubeconfig stored encrypted for this App Work, never returned by any
@@ -575,7 +575,7 @@ Every threshold below is a number on purpose.
 | --------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Deployment**              | One row per deploy: state, provider, branch, commit, website, error. | The Build it deployed, target, per-component outcome, job outcomes, smoke results, the App spec commit, rollback facts, and the states **Rolled back** and **Skipped**. |
 | **Custom domain**           | Stored, verified, merged into the website's ingress.                 | For App Works: published only when verified; can be marked primary.                                                                                                     |
-| **Managed subdomain**       | One label per Work under the platform domain.                        | For App Works: under the apps domain, which defaults to the platform's own domain (`ever.works`) — never another Ever product's domain (owner decision 2026-09-17).      |
+| **Managed subdomain**       | One label per Work under the platform domain.                        | For App Works: under the apps domain, which defaults to the platform's own domain (`ever.works`) — never another Ever product's domain (owner decision 2026-09-17).     |
 | **Build** (APW-05)          | —                                                                    | The only source of images a Deployment may use.                                                                                                                         |
 | **Activity / Notification** | Existing.                                                            | App runtime events and four notification kinds (deploy failed, down, back, cluster unreachable).                                                                        |
 
@@ -700,25 +700,25 @@ dialog (S30, S31), next to APW-01's separate fork checkbox:
 
 ### 6.7 Copy
 
-| Element                  | Copy                                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| Deployment states        | `Queued` · `Deploying` · `Checking` · `Live` · `Live with warnings` · `Failed` · `Rolled back` · `Cancelled` · `Cancelled — quarantined` · `Skipped` |
-| App states               | `Not deployed` · `Live` · `Degraded` · `Down` · `Can't reach your cluster` · `Paused` · `Deleting…`                          |
-| Deployment states shown beside the app state | `Deploying` · `Checking` · `Live with warnings`                                                                  |
-| Published image          | `This image can't be downloaded without credentials. Ever Works deploys published images only when they are public.` · `This image is referenced by tag. Pin it by digest so every Deployment runs the same image.` |
-| Precondition list header | `Fix these before deploying:`                                                                                                 |
-| Kubeconfig refused       | `This kubeconfig {reason}. Use a service account token instead.`                                                              |
-| Not public               | `Ever Works can only reach clusters at a public address.`                                                                     |
-| Root image               | `This image runs as root.`                                                                                                    |
-| Isolation not enforced   | `Not enforced by your cluster's network plugin`                                                                               |
-| Hairpin warning          | `Your app can't reach its own address from inside the cluster.`                                                               |
-| Rollback disclaimer      | `Database changes made by later Deployments are not undone.`                                                                  |
-| Down notification        | `{app} is down` / `{check} has failed for {minutes} minutes.`                                                                 |
-| Back notification        | `{app} is back`                                                                                                               |
-| Target change            | `Changing the target doesn't remove anything already running.`                                                                |
-| Target labels            | `None — don't deploy yet` · `Your cluster` · `Ever Works Apps`                                                                |
-| Deleting                 | `Deleting…` · `Removing the app from your cluster. Stored data is kept.` · `Some objects may remain on your cluster: {names}` |
-| Attestation (non-owner)  | `Only the App Work's owner can attest.`                                                                                       |
+| Element                                      | Copy                                                                                                                                                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployment states                            | `Queued` · `Deploying` · `Checking` · `Live` · `Live with warnings` · `Failed` · `Rolled back` · `Cancelled` · `Cancelled — quarantined` · `Skipped`                                                                |
+| App states                                   | `Not deployed` · `Live` · `Degraded` · `Down` · `Can't reach your cluster` · `Paused` · `Deleting…`                                                                                                                 |
+| Deployment states shown beside the app state | `Deploying` · `Checking` · `Live with warnings`                                                                                                                                                                     |
+| Published image                              | `This image can't be downloaded without credentials. Ever Works deploys published images only when they are public.` · `This image is referenced by tag. Pin it by digest so every Deployment runs the same image.` |
+| Precondition list header                     | `Fix these before deploying:`                                                                                                                                                                                       |
+| Kubeconfig refused                           | `This kubeconfig {reason}. Use a service account token instead.`                                                                                                                                                    |
+| Not public                                   | `Ever Works can only reach clusters at a public address.`                                                                                                                                                           |
+| Root image                                   | `This image runs as root.`                                                                                                                                                                                          |
+| Isolation not enforced                       | `Not enforced by your cluster's network plugin`                                                                                                                                                                     |
+| Hairpin warning                              | `Your app can't reach its own address from inside the cluster.`                                                                                                                                                     |
+| Rollback disclaimer                          | `Database changes made by later Deployments are not undone.`                                                                                                                                                        |
+| Down notification                            | `{app} is down` / `{check} has failed for {minutes} minutes.`                                                                                                                                                       |
+| Back notification                            | `{app} is back`                                                                                                                                                                                                     |
+| Target change                                | `Changing the target doesn't remove anything already running.`                                                                                                                                                      |
+| Target labels                                | `None — don't deploy yet` · `Your cluster` · `Ever Works Apps`                                                                                                                                                      |
+| Deleting                                     | `Deleting…` · `Removing the app from your cluster. Stored data is kept.` · `Some objects may remain on your cluster: {names}`                                                                                       |
+| Attestation (non-owner)                      | `Only the App Work's owner can attest.`                                                                                                                                                                             |
 
 Keyboard: every action, dialog and table row is reachable by `Tab`; `Esc` closes dialogs and returns focus;
 states are text plus icon, never colour alone.

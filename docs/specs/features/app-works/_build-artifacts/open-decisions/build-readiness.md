@@ -13,10 +13,10 @@ real design decision.**
 
 Wave 0 is two small, independent PRs (`TRACKER.md:30`, `implementation-plan.md:57-62`):
 
-| PR | Scope | Open items that touch it |
-|----|-------|--------------------------|
-| **0.1** | Agent git tools: `commitToRepo` / `openPullRequest` resolve provider/owner/repo from the Work's repository, honour `branch`, refuse protected branches — tests first | **none** |
-| **0.2** | Checkout directory keys unique / case-preserving / provider-scoped; no silent `git init` when a repository is expected; non-blocking fork request with existing-fork lookup | **none** |
+| PR      | Scope                                                                                                                                                                       | Open items that touch it |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| **0.1** | Agent git tools: `commitToRepo` / `openPullRequest` resolve provider/owner/repo from the Work's repository, honour `branch`, refuse protected branches — tests first        | **none**                 |
+| **0.2** | Checkout directory keys unique / case-preserving / provider-scoped; no silent `git init` when a repository is expected; non-blocking fork request with existing-fork lookup | **none**                 |
 
 I checked each of the 66 `[NEEDS CLARIFICATION]` items against Wave 0: **not one of them is on the critical
 path.** Both PRs are bug fixes in code that already ships, both have failing-test-first proofs named in
@@ -24,6 +24,7 @@ path.** Both PRs are bug fixes in code that already ships, both have failing-tes
 direct reading of the source. **Wave 0 can start before the owner reads this sheet.**
 
 **Wave 0 is real and worth doing first — verified:**
+
 - `packages/agent/src/agents/agent-git-facade.ts:71-76` declares `AgentGitFacade`; `branch?: string` at `:38`.
 - `packages/agent/src/agents/agent-tool.service.ts:1276-1280` advertises `branch` in the tool schema and forwards
   it at `:1305` — **but the adapter never uses it**: `apps/api/src/agents/agents.module.ts:686-689` commits with
@@ -37,9 +38,8 @@ direct reading of the source. **Wave 0 can start before the owner reads this she
   `?? work.gitProvider` (`packages/agent/src/facades/git.facade.ts:1515`) and makes `getPluginSync('')` fall back
   to "first loaded git plugin" (`:1583-1594`).
 - `packages/plugin/src/git/git-operations.ts:306-308` keys the checkout directory on
-  `slugifyText(\`${owner}-${repo}\`)` — case-folded, hyphen-ambiguous, **no provider component**; and
-  `:113-125` **silently `git init`s an empty repository** when a clone fails with `NotFoundError` or "empty".
-- The workspace provider has a *second*, different key: pool = `repoKey(spec.repoUrl)` and worktree =
+  `slugifyText(\`${owner}-${repo}\`)`— case-folded, hyphen-ambiguous, **no provider component**; and`:113-125`**silently`git init`s an empty repository** when a clone fails with `NotFoundError` or "empty".
+- The workspace provider has a _second_, different key: pool = `repoKey(spec.repoUrl)` and worktree =
   `sanitizeSegment(spec.bindingKey)` where `bindingKey` is the **bare Task id**
   (`packages/plugins/local-workspace/src/local-workspace.plugin.ts:232-233`, `:1580-1586`;
   `packages/agent/src/tasks-domain/task-workspace.service.ts:249`).
@@ -57,9 +57,9 @@ edited on 2026-09-17) say the app-code repository is the **Work Repository, the 
 
 It cannot be flipped on its own. Verified: `packages/agent/src/entities/work.entity.ts:831` is
 `getRepoOwner(type: RepositoryRole = 'data')` — **`data` is the default** — and APW-08's own plan says the
-repo-kind precedent writes under `data` *"which is what `TaskWorkspaceService.provisionForRun` clones"*
+repo-kind precedent writes under `data` _"which is what `TaskWorkspaceService.provisionForRun` clones"_
 (`APW-08-evolve-loop/plan.md:28`), and that `EXISTING-SUBSTRATE.md` records `taskIsolationTargetRepo` as
-*"declared but not consumed"* with `task-workspace.service.ts:219-220` hard-coding `getRepoOwner()` /
+_"declared but not consumed"_ with `task-workspace.service.ts:219-220` hard-coding `getRepoOwner()` /
 `getDataRepo()`.
 
 **Why it blocks:** APW-01 P1.1 (contracts) and P1.3 (services) cannot be written until the role is fixed, and
@@ -75,13 +75,13 @@ call sites the App-Work case)? Full analysis at `decision-sheet.md` **C-09** and
 Two of these are repository/estate creation; neither is a design question, and neither can be done by an agent
 acting alone (org ownership and a machine user are involved).
 
-| # | Action | Why it blocks | Source |
-|---|--------|---------------|--------|
-| 2a | Create the catalog + template repositories: `ever-works/apps` (machine Apps catalog + `licenses.yml` + `schema/`), `ever-works/{cal-diy,umami,app-fixture-hello}-template`, `ever-works/app-fixture-hello` (the fixture's **source**, a different repo from its `-template`), plus `ever-works/agents`, `ever-works/skills`, `ever-works/missions`, `ever-works/platforms` | **APW-03 P1** (the whole catalog + licence gate) and **APW-13 P1** (fixtures, Blueprints) | `implementation-plan.md:47`; `CONTRACTS.md:430-437`; `TRACKER.md:16-17` |
-| 2b | Create the GitHub test estate: `<e2e-upstream-org>`, `<e2e-fork-org>`, the `<e2e-user>` machine user (read-only on the upstream org), the test cluster(s), the canary sink, the test DNS zone, the dedicated model-spend budget, and the `app-works-dev` / `app-works-stage` environments with the secrets and variables of `ACCEPTANCE.md` §0.4; plus one person-created fork each of Umami and Cal.diy in `<e2e-fork-org>` | **APW-13's nightly and golden-path lanes** — which are the **Wave 1 exit gate** (`implementation-plan.md:82-84`), and the `Test` lines of T20/T21 | `APW-13-golden-paths/tasks.md:221-237`; `ACCEPTANCE.md:80-123`; `implementation-plan.md:48`; `decision-sheet.md` J-08 |
+| #   | Action                                                                                                                                                                                                                                                                                                                                                                                                                       | Why it blocks                                                                                                                                     | Source                                                                                                                |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 2a  | Create the catalog + template repositories: `ever-works/apps` (machine Apps catalog + `licenses.yml` + `schema/`), `ever-works/{cal-diy,umami,app-fixture-hello}-template`, `ever-works/app-fixture-hello` (the fixture's **source**, a different repo from its `-template`), plus `ever-works/agents`, `ever-works/skills`, `ever-works/missions`, `ever-works/platforms`                                                   | **APW-03 P1** (the whole catalog + licence gate) and **APW-13 P1** (fixtures, Blueprints)                                                         | `implementation-plan.md:47`; `CONTRACTS.md:430-437`; `TRACKER.md:16-17`                                               |
+| 2b  | Create the GitHub test estate: `<e2e-upstream-org>`, `<e2e-fork-org>`, the `<e2e-user>` machine user (read-only on the upstream org), the test cluster(s), the canary sink, the test DNS zone, the dedicated model-spend budget, and the `app-works-dev` / `app-works-stage` environments with the secrets and variables of `ACCEPTANCE.md` §0.4; plus one person-created fork each of Umami and Cal.diy in `<e2e-fork-org>` | **APW-13's nightly and golden-path lanes** — which are the **Wave 1 exit gate** (`implementation-plan.md:82-84`), and the `Test` lines of T20/T21 | `APW-13-golden-paths/tasks.md:221-237`; `ACCEPTANCE.md:80-123`; `implementation-plan.md:48`; `decision-sheet.md` J-08 |
 
-> **On `ever-works/templates`:** `implementation-plan.md:47` now records the owner's answer that the *human
-> listing repo* is `ever-works/templates`. **I could not find that repository, or any reference to it, in the
+> **On `ever-works/templates`:** `implementation-plan.md:47` now records the owner's answer that the _human
+> listing repo_ is `ever-works/templates`. **I could not find that repository, or any reference to it, in the
 > code or in any App Works doc.** The suffix scan the owner describes **is** shipped — but it scans the whole
 > `ever-works` org for `*template` repos (`packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049`
 > with `packages/agent/src/config/index.ts:885-887`), and the machine catalog is read from `ever-works/apps`
@@ -92,33 +92,33 @@ acting alone (org ownership and a machine user are involved).
 
 `APW-06-app-runtime/spec.md:14` depends on APW-07 and `APW-07-app-env-and-dependencies/spec.md:13-14` depends on
 APW-06, yet `implementation-plan.md:74` puts **both** in Wave 1's first parallel step. `TRACKER.md:38-44` records
-this and recommends the fix — *"APW-07 owns the env/dependency contracts and lands first; APW-06 consumes them …
-APW-07's stated dependency on APW-06 becomes a dependency on APW-06's ports/interfaces only"*. **Apply that
+this and recommends the fix — _"APW-07 owns the env/dependency contracts and lands first; APW-06 consumes them …
+APW-07's stated dependency on APW-06 becomes a dependency on APW-06's ports/interfaces only"_. **Apply that
 one-line softening to `APW-07/spec.md:13-14` and the lane runs.** Not an owner decision; an editor's five-minute
 job.
 
 ## 3. What can proceed in parallel, starting now
 
-| Lane | Can start | Why it is unblocked |
-|------|-----------|---------------------|
-| **Wave 0 · PR 0.1** — agent git tools | **today** | No open item touches it; failing-test-first proof named |
-| **Wave 0 · PR 0.2** — checkout keys, fork readiness | **today** | Same |
-| **APW-03 P1** App spec schema + validator + `WorkAppSpecState` | after 2a (needs `ever-works/apps` to read; the schema itself can be written before it) | Its three §9 items are all resolvable from the plan's own defaults — `decision-sheet.md` D-01…D-03, all "plan already implies" |
-| **APW-02 P1** fork lifecycle + `WorkUpstreamState` + Upstream tab | **today** | All three §9 items are plan-implied (C-05, C-06, C-07) |
-| **APW-07 P1** env store + in-cluster dependency providers | **today** | All six §9 items plan-implied (B-12…B-17); the Postgres half reuses a shipped provisioner (`packages/agent/src/ever-works-providers/ever-works-db-provision.service.ts:101`) |
-| **APW-11 P1** App Launcher inside Ever Works | **today** | All six §9 items plan-implied (I-01…I-06); reads the already-shipped `ever-works/works` catalog pattern |
-| **APW-01 P1** | **after Blocker 1** | C-09 decides the contract |
-| **APW-05 P1 → APW-06 P1 → APW-04 P1** | after Blocker 1 and the APW-06↔APW-07 softening | — |
-| **Wave 2 work (APW-10 P1, APW-12 P0–P1)** | after §4 items 1 and 3 | APW-12's decisions are ready to be written down the moment the owner confirms `auth.ever.co` |
-| **Owner actions (2a, 2b) and filing the Jira tickets** | **today, in parallel with 0.1/0.2** | They are the longest-lead items in the program; the tickets are drafted and waiting |
+| Lane                                                              | Can start                                                                              | Why it is unblocked                                                                                                                                                          |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wave 0 · PR 0.1** — agent git tools                             | **today**                                                                              | No open item touches it; failing-test-first proof named                                                                                                                      |
+| **Wave 0 · PR 0.2** — checkout keys, fork readiness               | **today**                                                                              | Same                                                                                                                                                                         |
+| **APW-03 P1** App spec schema + validator + `WorkAppSpecState`    | after 2a (needs `ever-works/apps` to read; the schema itself can be written before it) | Its three §9 items are all resolvable from the plan's own defaults — `decision-sheet.md` D-01…D-03, all "plan already implies"                                               |
+| **APW-02 P1** fork lifecycle + `WorkUpstreamState` + Upstream tab | **today**                                                                              | All three §9 items are plan-implied (C-05, C-06, C-07)                                                                                                                       |
+| **APW-07 P1** env store + in-cluster dependency providers         | **today**                                                                              | All six §9 items plan-implied (B-12…B-17); the Postgres half reuses a shipped provisioner (`packages/agent/src/ever-works-providers/ever-works-db-provision.service.ts:101`) |
+| **APW-11 P1** App Launcher inside Ever Works                      | **today**                                                                              | All six §9 items plan-implied (I-01…I-06); reads the already-shipped `ever-works/works` catalog pattern                                                                      |
+| **APW-01 P1**                                                     | **after Blocker 1**                                                                    | C-09 decides the contract                                                                                                                                                    |
+| **APW-05 P1 → APW-06 P1 → APW-04 P1**                             | after Blocker 1 and the APW-06↔APW-07 softening                                        | —                                                                                                                                                                            |
+| **Wave 2 work (APW-10 P1, APW-12 P0–P1)**                         | after §4 items 1 and 3                                                                 | APW-12's decisions are ready to be written down the moment the owner confirms `auth.ever.co`                                                                                 |
+| **Owner actions (2a, 2b) and filing the Jira tickets**            | **today, in parallel with 0.1/0.2**                                                    | They are the longest-lead items in the program; the tickets are drafted and waiting                                                                                          |
 
 ## 4. The three things the owner must approve first
 
 **1 · The isolation claim is re-scoped per deploy shape — nothing is deleted, and the scope EXPANDS.**
-*(Revised 2026-09-17 after the owner's follow-up, which was unambiguous: "I don't know why this again and again
+_(Revised 2026-09-17 after the owner's follow-up, which was unambiguous: "I don't know why this again and again
 cause issues, please do full review etc. We do NOT change anything here or remove, we may EXPAND only!" The first
 draft of this section proposed **replacing** LG-01/LG-03/LG-16's wording; that proposal is **void**, because it
-framed a family of deploy shapes as a conflict.)* The platform already deploys to more than one place and the plan
+framed a family of deploy shapes as a conflict.)_ The platform already deploys to more than one place and the plan
 had been written as though it did not: the **Ever Works shared customer cluster** (`k8s-works-shared`), the
 **internal admin cluster** (`k8s-works`), a **customer kubeconfig** (`custom-kubeconfig`), the **Vercel** plugin
 (`deployment` capability), plus **Fleet agent enrollment** — which is exactly the "install and connect Agents on
@@ -133,9 +133,9 @@ supports — never marked "not applicable". This also settles APW-12's D3, which
 network-policy separation rather than separate hardware. Full row: `decision-sheet.md` **B-01** (now `PLAN`).
 
 **2 · The Public Suffix List apex is KEPT; the platform domain becomes the default — additive, nothing deleted.**
-*(Revised 2026-09-17 after the owner's follow-up: "please don't remove anything, just make sure we support
+_(Revised 2026-09-17 after the owner's follow-up: "please don't remove anything, just make sure we support
 sub-domains / custom domains etc etc." The first draft of this section proposed deleting the PSL path and its
-probes; that proposal is **void** and is left below only as the record of why the reconciliation was needed.)*
+probes; that proposal is **void** and is left below only as the record of why the reconciliation was needed.)_
 Three shapes now coexist and all three ship: **(a)** `<slug>.<EVER_WORKS_APPS_DOMAIN>`, which **defaults to
 `EVER_WORKS_DOMAIN`**, so a template install simply works as `my-cool-company-gauzy.ever.works`; **(b)** the
 tenant's custom domain and per-App-Work subdomains under it, through the shipped add/verify flow; **(c)** the
@@ -153,7 +153,7 @@ open question, APW-13 FR-52/ACC-13-20 + plan §8.4 + T34/T60, README Q2 and the 
 **3 · Fix the App Work repository role, then the Wave 1 lane opens.**
 One sentence: for an App Work, does the app-code fork occupy the persisted **`data`** role (recommended — it is
 what `GitFacadeService.getRepoDir` clones and what every Task path resolves, and the `-website`/`-app` suffix the
-owner approved is a *name*, not a role — `packages/agent/src/entities/work.entity.ts:831`, `:815-824`) or the
+owner approved is a _name_, not a role — `packages/agent/src/entities/work.entity.ts:831`, `:815-824`) or the
 **`website`** role (which needs five call sites taught the App-Work case)? This is Blocker 1 above. Full row:
 `decision-sheet.md` **C-09**.
 
@@ -163,7 +163,7 @@ anything in the program), filing the Jira epic + 13 stories (`decision-sheet.md`
 `jira-tickets.md`), and writing `auth.ever.co` into the four places that still call the Ever ID domain open
 (`contradictions.md` E-3).
 
-## 5. What is *not* blocking, despite looking like it
+## 5. What is _not_ blocking, despite looking like it
 
 - **The `[NEEDS CLARIFICATION]` items themselves.** I read every epic's §9 rather than trusting the count, and
   the count was exactly right at the time — **66**, in the per-epic split given (APW-01 4, APW-02 3, APW-03 3,
@@ -171,7 +171,7 @@ anything in the program), filing the Jira epic + 13 stories (`decision-sheet.md`
   **Since the owner's 2026-09-17 answers the epic count is 65** — APW-10's "which apex domain?" is answered in
   place and now reads `[ANSWERED 2026-09-17 — which apex domain?]` — and the other five APW-10 items are
   untouched. **Fifty-six of them already carry a `_Default:_` that the plan and the code both support** — they
-  are write-downs, not decisions (`decision-sheet.md` §0). Three of the remaining nine are owner *actions*, not
+  are write-downs, not decisions (`decision-sheet.md` §0). Three of the remaining nine are owner _actions_, not
   choices.
 - **APW-12's Ever ID.** The provider is decided and the integration constraints are written down
   (`idp-options.md` §6–§7). Only the **domain** was missing, and the owner has now given it. Nothing in Wave 0 or
@@ -179,7 +179,7 @@ anything in the program), filing the Jira epic + 13 stories (`decision-sheet.md`
 - **APW-10's prices** (`decision-sheet.md` B-03). No Wave 1 or Wave 2 code needs a number; only the Admin board's
   copy does. Decide it before the tier opens to users, not before Wave 1.
 - **The Blueprints' "Unverified" lists** (`blueprints/cal-diy/README.md:51-60`, `blueprints/umami/README.md:39-47`).
-  Thirteen items, every one a *measurement to take on the first verification run*, not a decision
+  Thirteen items, every one a _measurement to take on the first verification run_, not a decision
   (`decision-sheet.md` J-10). **There is exactly one literal `TODO(verify)` marker in the whole program** —
   `APW-13-golden-paths/plan.md:311` (`TODO(verify, APW-06)`, the Umami smoke-with-a-body item) — not "several".
 - **The request-body smoke question.** Already settled by reading the code: the only post-deploy checks that

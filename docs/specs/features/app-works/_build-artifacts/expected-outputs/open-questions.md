@@ -39,7 +39,7 @@ real App specs and are what the live lane deploys. APW-13's documents never ment
 files at all.
 
 **Impact:** if the fixtures are §24's samples, nothing in the suite asserts the two Blueprints' rendering, and
-ACC-E2E-05/ACC-13-* would be discovered at run time only. If they are the Blueprints, the three §24 samples
+ACC-E2E-05/ACC-13-\* would be discovered at run time only. If they are the Blueprints, the three §24 samples
 (the only specs exercising `strategy: image`, `redis`/`objectStorage` dependencies and a `worker` with
 `replicas: 2`) go unasserted.
 
@@ -53,7 +53,7 @@ actually runs.
 
 ## Q-3. Is the verification-runner script byte-specified?
 
-**Undecidable because:** APW-05 §4.10 describes the embedded script's *behaviour* in detail (plan schema
+**Undecidable because:** APW-05 §4.10 describes the embedded script's _behaviour_ in detail (plan schema
 check, the 12 GiB summed-memory refusal, throwaway `postgres`/`redis`/`minio` containers pinned by digest
 with no volumes, `openssl rand`/`openssl genpkey` materialisation into a `0600` env file, jobs run to
 completion with exit codes checked, readiness waits, smoke via `curl --max-time 30 --max-redirs 0`, per-job and
@@ -69,7 +69,7 @@ every implementation, and the workflow's own fingerprint (Q-1) would change.
 `EW_VERIFY_GENERATOR_UNSUPPORTED`, `EW_VERIFY_PROMPTED_UNSET`), the 60,000-character plan bound, the 12 GiB
 sum, the `shred -u` of the env file, `set +x`, one JSON row per job and per smoke request, and the absence of
 any generated value in captured stdout/stderr (T15's own assertions, `tasks.md:250-254`). The body ships in
-the generator's template literal; the golden compares its *behaviour*, and the `inputsHash` treats the script
+the generator's template literal; the golden compares its _behaviour_, and the `inputsHash` treats the script
 as a constant so the fingerprint is still stable per generator version.
 
 ---
@@ -141,7 +141,7 @@ names only four keys. Neither says which wins, and APW-10 owns the tier.
 `limits.cpu: 2` admits exactly two such components and no more.
 
 **Recommended default:** **APW-10's profile wins** (it is the tier's own admission contract and
-`AppsTierPolicy.podPolicy()` is the port that carries it), and APW-06's §4.2 numbers are the *fallback* when
+`AppsTierPolicy.podPolicy()` is the port that carries it), and APW-06's §4.2 numbers are the _fallback_ when
 `podPolicy()` returns nothing. This directory's `managed-overlay.yaml` files currently show APW-06's numbers
 because §4.2 states them concretely and FR-47 states only two profiles; **the golden files should be
 regenerated against the profile once APW-10 fixes the shipped values**, and the two documents' numbers
@@ -162,8 +162,8 @@ hand-edit made under the App manager survives a site render.
 
 **Recommended default:** **one manager per capability path is unnecessary; keep `ever-works-k8s-plugin`** for
 App objects on `your-cluster`, because (a) App objects live in a namespace the platform owns end to end, so
-there is no third party to protect, (b) the existing constant's "breaking change" warning is about *users
-already SSA-conflicting*, which no App Work can be on day one, and (c) a second constant doubles the places a
+there is no third party to protect, (b) the existing constant's "breaking change" warning is about _users
+already SSA-conflicting_, which no App Work can be on day one, and (c) a second constant doubles the places a
 future rename must touch. Record the choice in APW-06 §4.2 so it is not rediscovered.
 
 ---
@@ -189,8 +189,8 @@ kept" needs to mean for cron.
 **Undecidable because:** APW-06 §4.5 says the probe object takes `periodSeconds`, `timeoutSeconds`,
 `initialDelaySeconds`, `failureThreshold` from the spec and that "defaults [are] applied by the renderer only
 where the spec is silent" — but `APW-03 schema.md:20` says "Defaults are never written back into the file"
-(about the spec file), which does not settle whether they are written into the *manifest*. The deadline
-formula (`plan.md:577-579`) needs numeric values, so *something* must supply them.
+(about the spec file), which does not settle whether they are written into the _manifest_. The deadline
+formula (`plan.md:577-579`) needs numeric values, so _something_ must supply them.
 
 **Impact:** every probe object's bytes. A golden file that emits only declared fields would differ from one
 that emits the schema's defaults in dozens of lines.
@@ -211,7 +211,7 @@ single `fromEnv` argument `FIXTURE_BUILD_LABEL` is a literal, non-secret value (
 `EW_SECRET_NAMES` is empty and the step is not emitted.
 
 **Impact:** whether the reference golden file exercises the secret-in-image path at all. ACC-05-15's live half
-uses `variant/secret-in-image`, which is a *repository* variant, not a spec variant — so the check would be
+uses `variant/secret-in-image`, which is a _repository_ variant, not a spec variant — so the check would be
 asserted only there and by T15's shell test.
 
 **Recommended default** (implemented here): **keep the condition as written** — do not emit the step when no

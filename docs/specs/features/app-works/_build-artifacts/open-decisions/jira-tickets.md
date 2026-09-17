@@ -15,22 +15,22 @@
 
 ## 0. What to file, in one table
 
-| # | Type | Proposed key | Title | Wave (TRACKER) | Owns (acceptance ids) |
-|---|------|--------------|-------|----------------|------------------------|
-| 1 | Epic | `EW-817` | **App Works — any GitHub repository as a Work** | 0–3 | `ACC-E2E-01…14`, `ACC-NEG-01…16` (program-level) |
-| 2 | Story | `EW-818` | APW-01 — App Work kind & create from any repository URL | 1 | `ACC-01-01…20` |
-| 3 | Story | `EW-819` | APW-02 — Fork lifecycle | 0 · 1 | `ACC-02-01…23` |
-| 4 | Story | `EW-820` | APW-03 — App spec, Apps catalog, licence gate | 1 | `ACC-03-01…49` |
-| 5 | Story | `EW-821` | APW-04 — App Provisioner | 1 | `ACC-04-01…38` |
-| 6 | Story | `EW-822` | APW-05 — Builds | 1 · 3 | `ACC-05-01…30` |
-| 7 | Story | `EW-823` | APW-06 — App runtime on Kubernetes | 1–3 | `ACC-06-01…49` |
-| 8 | Story | `EW-824` | APW-07 — App env & dependencies | 1 · 2 | `ACC-07-01…31` |
-| 9 | Story | `EW-825` | APW-08 — Evolve loop | 0 · 1 | `ACC-08-01…32` |
-| 10 | Story | `EW-826` | APW-09 — Upstream pull requests | 1 · 2 | `ACC-09-01…23` |
-| 11 | Story | `EW-827` | APW-10 — Ever Works Apps hosting tier (launch gate) | 2 · 3 | `ACC-10-01…48` |
-| 12 | Story | `EW-828` | APW-11 — App Launcher & Apps registry API | 1 · 3 | `ACC-11-01…40` |
-| 13 | Story | `EW-829` | APW-12 — Ever ID | 2 · 3 | `ACC-12-01…40` + `XP-T-01…06`, `XP-G-01…06` |
-| 14 | Story | `EW-830` | APW-13 — Golden paths & acceptance suite | 1 · 2 | `ACC-13-01…20` |
+| #   | Type  | Proposed key | Title                                                   | Wave (TRACKER) | Owns (acceptance ids)                            |
+| --- | ----- | ------------ | ------------------------------------------------------- | -------------- | ------------------------------------------------ |
+| 1   | Epic  | `EW-817`     | **App Works — any GitHub repository as a Work**         | 0–3            | `ACC-E2E-01…14`, `ACC-NEG-01…16` (program-level) |
+| 2   | Story | `EW-818`     | APW-01 — App Work kind & create from any repository URL | 1              | `ACC-01-01…20`                                   |
+| 3   | Story | `EW-819`     | APW-02 — Fork lifecycle                                 | 0 · 1          | `ACC-02-01…23`                                   |
+| 4   | Story | `EW-820`     | APW-03 — App spec, Apps catalog, licence gate           | 1              | `ACC-03-01…49`                                   |
+| 5   | Story | `EW-821`     | APW-04 — App Provisioner                                | 1              | `ACC-04-01…38`                                   |
+| 6   | Story | `EW-822`     | APW-05 — Builds                                         | 1 · 3          | `ACC-05-01…30`                                   |
+| 7   | Story | `EW-823`     | APW-06 — App runtime on Kubernetes                      | 1–3            | `ACC-06-01…49`                                   |
+| 8   | Story | `EW-824`     | APW-07 — App env & dependencies                         | 1 · 2          | `ACC-07-01…31`                                   |
+| 9   | Story | `EW-825`     | APW-08 — Evolve loop                                    | 0 · 1          | `ACC-08-01…32`                                   |
+| 10  | Story | `EW-826`     | APW-09 — Upstream pull requests                         | 1 · 2          | `ACC-09-01…23`                                   |
+| 11  | Story | `EW-827`     | APW-10 — Ever Works Apps hosting tier (launch gate)     | 2 · 3          | `ACC-10-01…48`                                   |
+| 12  | Story | `EW-828`     | APW-11 — App Launcher & Apps registry API               | 1 · 3          | `ACC-11-01…40`                                   |
+| 13  | Story | `EW-829`     | APW-12 — Ever ID                                        | 2 · 3          | `ACC-12-01…40` + `XP-T-01…06`, `XP-G-01…06`      |
+| 14  | Story | `EW-830`     | APW-13 — Golden paths & acceptance suite                | 1 · 2          | `ACC-13-01…20`                                   |
 
 Counts are the id sweep recorded in `ACCEPTANCE.md:1269-1270` ("APW-01 20 · APW-02 23 · APW-03 49 · APW-04 38 ·
 APW-05 30 · APW-06 49 · APW-07 31 · APW-08 32 · APW-09 23 · APW-10 48 · APW-11 40 · APW-12 40 + 12 cross-platform ·
@@ -44,34 +44,34 @@ APW-13 20 — every id has exactly one row"), re-verified here by extracting eve
 
 > **Not verified against the live Jira project.** No Jira credential, MCP server or component list is present in
 > this workspace (`.mcp.json` does not exist at the repo root; the only reference to ticket tooling is
-> `knowledge/runbooks/JIRA_ATLASSIAN_MCP.md` in the *operator workspace repository*, which is not this repo —
+> `knowledge/runbooks/JIRA_ATLASSIAN_MCP.md` in the _operator workspace repository_, which is not this repo —
 > `docs/specs/features/tenants-and-organizations/tasks.md:300`). Everything below is a **proposal** derived from
 > the repo's own vocabulary. Confirm or adjust the component names at filing time; the labels are safe to use
 > as-is because they are all lower-case, hyphenated strings no Jira project can conflict with.
 
 **Labels (same set on the epic and on all 13 stories):**
 
-| Label | Meaning |
-|-------|---------|
-| `app-works` | Program membership — every ticket in this program carries it. |
-| `spec-kit` | Governed by the Spec Kit process (`docs/specs/README.md`, Constitution cited in `README.md:8`). |
-| `wave-0` `wave-1` `wave-2` `wave-3` | One per wave **the ticket touches** (a story may carry two: APW-02 carries `wave-0` and `wave-1`). |
-| `epic-apw-01` … `epic-apw-13` | One per story, so the epic's slice is filterable without a component. |
-| `needs-owner-decision` | Only on tickets held by an open item in `decision-sheet.md` that is marked **owner must decide**. Remove when decided. |
-| `cross-repo` | APW-12 only — its acceptance tests live in `ever-co/ever-teams` and `ever-co/ever-gauzy` (`ACCEPTANCE.md:1281-1282`). |
-| `operator-action` | Ticket contains an owner/operator action that no PR can complete (APW-13 T20, T21; APW-10 ship gates). |
+| Label                               | Meaning                                                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `app-works`                         | Program membership — every ticket in this program carries it.                                                          |
+| `spec-kit`                          | Governed by the Spec Kit process (`docs/specs/README.md`, Constitution cited in `README.md:8`).                        |
+| `wave-0` `wave-1` `wave-2` `wave-3` | One per wave **the ticket touches** (a story may carry two: APW-02 carries `wave-0` and `wave-1`).                     |
+| `epic-apw-01` … `epic-apw-13`       | One per story, so the epic's slice is filterable without a component.                                                  |
+| `needs-owner-decision`              | Only on tickets held by an open item in `decision-sheet.md` that is marked **owner must decide**. Remove when decided. |
+| `cross-repo`                        | APW-12 only — its acceptance tests live in `ever-co/ever-teams` and `ever-co/ever-gauzy` (`ACCEPTANCE.md:1281-1282`).  |
+| `operator-action`                   | Ticket contains an owner/operator action that no PR can complete (APW-13 T20, T21; APW-10 ship gates).                 |
 
 **Components (proposed — confirm against the project):**
 
-| Component | Used by |
-|-----------|---------|
-| `API` | APW-01, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12 |
-| `Web` | APW-01, 02, 05, 06, 07, 08, 10, 11, 12, 13 |
-| `Agent` | APW-04, 05, 06, 07, 08, 12 |
-| `Plugins` | APW-04, 05, 06, 07, 10, 12 |
-| `Platform / Infra` | APW-06, 10, 13 |
-| `Cross-repo` | APW-12 |
-| `Docs / Spec` | every story (each ships spec-kit artefacts and i18n) |
+| Component          | Used by                                              |
+| ------------------ | ---------------------------------------------------- |
+| `API`              | APW-01, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12       |
+| `Web`              | APW-01, 02, 05, 06, 07, 08, 10, 11, 12, 13           |
+| `Agent`            | APW-04, 05, 06, 07, 08, 12                           |
+| `Plugins`          | APW-04, 05, 06, 07, 10, 12                           |
+| `Platform / Infra` | APW-06, 10, 13                                       |
+| `Cross-repo`       | APW-12                                               |
+| `Docs / Spec`      | every story (each ships spec-kit artefacts and i18n) |
 
 **Fix version:** none. The program is not scheduled to a release; waves are the scheduling axis
 (`README.md:245-252`, `TRACKER.md:28-35`).
@@ -279,6 +279,7 @@ operator evidence (`ACCEPTANCE.md:1280`). Exercised by `ACC-E2E-07`, `ACC-E2E-14
 > R-5, R-12, R-15, R-16, R-24.
 
 **Acceptance ids owned:** `ACC-06-01` … `ACC-06-49` (49 ids — `spec.md` §8). Exercised by `ACC-E2E-05`,
+
 > `ACC-E2E-10`, `ACC-E2E-11`, `ACC-E2E-14`; `ACC-NEG-01`, `ACC-NEG-02`, `ACC-NEG-03`, `ACC-NEG-07`,
 > `ACC-NEG-11`, `ACC-NEG-12` (`ACCEPTANCE.md:889-947`).
 
@@ -385,7 +386,7 @@ Exercised by `ACC-E2E-08`; `ACC-NEG-06` (`ACCEPTANCE.md:1031-1061`).
 
 > **Held by open items:** the tier's location, its apex domain, prices, sandbox compatibility, the abuse rota and
 > the post-removal retention window are all unresolved in `spec.md:618-629` — see `decision-sheet.md` §B. Two of
-> them (location, domain) are already answered by the owner and now *contradict* the text in this epic — see
+> them (location, domain) are already answered by the owner and now _contradict_ the text in this epic — see
 > `contradictions.md`.
 
 ---
@@ -473,18 +474,18 @@ ids `XP-T-01…06` and `XP-G-01…06` (`cross-platform.md`), whose tests live in
 
 ## 4. Filing checklist (owner actions inside these tickets)
 
-| Ticket | Owner action | Source |
-|--------|--------------|--------|
-| `EW-817` | File the epic + 13 stories; paste the real keys into `TRACKER.md:14-26` (replacing `EW-TBD`). | `TRACKER.md:9-10`, `implementation-plan.md:46` |
-| `EW-820` | Create `ever-works/apps`, `ever-works/app-fixture-hello`, `ever-works/cal-diy-template`, `ever-works/umami-template`. | `implementation-plan.md:47` |
-| `EW-829` | Approve the Ever ID **domain**; confirm ZITADEL's configuration rows D2–D9. | `spec.md:588`, `idp-options.md` §6 |
-| `EW-827` | Approve the tier's location wording, the addressing decision (no PSL apex), prices, the abuse rota, the retention window. | `spec.md:618-629` + `contradictions.md` |
-| `EW-830` | Create the GitHub test organization, `<e2e-user>` machine user, test cluster(s), canary sink, DNS test zone and the dedicated model-spend budget; add the `app-works-dev` / `app-works-stage` environments and their secrets/variables. | `tasks.md:221-237`, `ACCEPTANCE.md:80-123` |
-| `EW-828` | Approve the publishing home of the App Launcher web component and the `ever-works/platforms` catalog. | `README.md:349-350`, `implementation-plan.md:52` |
+| Ticket   | Owner action                                                                                                                                                                                                                            | Source                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `EW-817` | File the epic + 13 stories; paste the real keys into `TRACKER.md:14-26` (replacing `EW-TBD`).                                                                                                                                           | `TRACKER.md:9-10`, `implementation-plan.md:46`   |
+| `EW-820` | Create `ever-works/apps`, `ever-works/app-fixture-hello`, `ever-works/cal-diy-template`, `ever-works/umami-template`.                                                                                                                   | `implementation-plan.md:47`                      |
+| `EW-829` | Approve the Ever ID **domain**; confirm ZITADEL's configuration rows D2–D9.                                                                                                                                                             | `spec.md:588`, `idp-options.md` §6               |
+| `EW-827` | Approve the tier's location wording, the addressing decision (no PSL apex), prices, the abuse rota, the retention window.                                                                                                               | `spec.md:618-629` + `contradictions.md`          |
+| `EW-830` | Create the GitHub test organization, `<e2e-user>` machine user, test cluster(s), canary sink, DNS test zone and the dedicated model-spend budget; add the `app-works-dev` / `app-works-stage` environments and their secrets/variables. | `tasks.md:221-237`, `ACCEPTANCE.md:80-123`       |
+| `EW-828` | Approve the publishing home of the App Launcher web component and the `ever-works/platforms` catalog.                                                                                                                                   | `README.md:349-350`, `implementation-plan.md:52` |
 
 ---
 
-## 5. What is *not* in these tickets
+## 5. What is _not_ in these tickets
 
 - **No ticket per task.** Each epic's `tasks.md` is the granular breakdown (e.g. APW-01 `tasks.md:42-609`,
   T1…T39). If the project wants task-level Jira issues, they are filed from those files after the story keys

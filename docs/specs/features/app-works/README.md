@@ -241,6 +241,10 @@ Task isolation (branch per Task), quality gates (checks from the App spec, run s
 (default: agents open PRs, humans merge) and the Fleet are reused unchanged. What is new: the data
 repository of an App Work is the Task target; a merge to the default branch triggers a Build and, when it
 is green, a Deployment; Goals and Missions can be scoped to an App Work; every step lands in Activity.
+**Vocabulary, binding (2026-09-17):** the Task target is the App Work's **Work Repository** — the persisted
+`RepositoryRole` value `website`, whose UI label is literally "Work Repository" — and **never** the `data` role,
+which holds the Work's data (content items, meta-data, setup parameters). Every pre-2026-09-17 occurrence of
+"data repository" that means app code reads as Work Repository (CONTRACTS §2's vocabulary fix).
 
 **D12 — Upstream is followed, never pushed to.**
 **Upstream sync** runs on a Schedule (GitHub's merge-upstream for forks; fetch-and-merge for private

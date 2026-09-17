@@ -14,31 +14,31 @@ decision that is already resolved in the plan and needs a yes.**
 
 ## 1. Where things live
 
-| What | Path |
-|---|---|
-| The plan (13 epics, contracts, acceptance) | `docs/specs/features/app-works/` |
-| Build order and owner decisions | [`../../../internal/app-works-implementation-plan.md`](../../../internal/app-works-implementation-plan.md) |
-| **Build artifacts produced 2026-09-17** | [`_build-artifacts/`](./_build-artifacts/) — see §4 |
-| Decision sheet for every open question | [`_build-artifacts/open-decisions/decision-sheet.md`](./_build-artifacts/open-decisions/decision-sheet.md) |
-| Stale text the owner's answers left behind | [`_build-artifacts/open-decisions/contradictions.md`](./_build-artifacts/open-decisions/contradictions.md) |
-| Ready-to-file Jira epic + 13 stories | [`_build-artifacts/open-decisions/jira-tickets.md`](./_build-artifacts/open-decisions/jira-tickets.md) |
-| Template/catalog decisions and the resolver | [`_build-artifacts/templates-catalog/`](./_build-artifacts/templates-catalog/) |
+| What                                        | Path                                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| The plan (13 epics, contracts, acceptance)  | `docs/specs/features/app-works/`                                                                           |
+| Build order and owner decisions             | [`../../../internal/app-works-implementation-plan.md`](../../../internal/app-works-implementation-plan.md) |
+| **Build artifacts produced 2026-09-17**     | [`_build-artifacts/`](./_build-artifacts/) — see §4                                                        |
+| Decision sheet for every open question      | [`_build-artifacts/open-decisions/decision-sheet.md`](./_build-artifacts/open-decisions/decision-sheet.md) |
+| Stale text the owner's answers left behind  | [`_build-artifacts/open-decisions/contradictions.md`](./_build-artifacts/open-decisions/contradictions.md) |
+| Ready-to-file Jira epic + 13 stories        | [`_build-artifacts/open-decisions/jira-tickets.md`](./_build-artifacts/open-decisions/jira-tickets.md)     |
+| Template/catalog decisions and the resolver | [`_build-artifacts/templates-catalog/`](./_build-artifacts/templates-catalog/)                             |
 
 ---
 
 ## 2. Owner decisions applied (2026-09-17)
 
-| Decision | Applied where |
-|---|---|
-| **Ever ID = ZITADEL**, self-hosted **as-is and unmodified**, one instance at **`auth.ever.co`** for every platform | `APW-12/idp-options.md` §6/§7 (status `Decided`, D1 = ZITADEL; Keycloak kept as the documented alternative); `cross-platform.md`; program README §8; implementation plan §2 |
-| **Pure addition** — every platform keeps its own authentication and its own user database; duplicated profiles accepted; no existing sign-in flow changes | `idp-options.md` §7 (binding constraints), `cross-platform.md` §1.1 |
-| **Provider plugins, one per provider** — `zitadel`, `keycloak`, `supertokens`, `auth0`; Gauzy integration is a plugin, **not core**; existing Keycloak core code moves into a plugin | `cross-platform.md` §5 + §3.1 (blast radius mapped in `idp-options.md` §7.3) |
-| **Three repository roles**: Data (`data`) · **Work Repository** (`website`, app code, optional `-app`/`-website` suffix) · GitHub generated output (`work`, never deployed) | README §1 repository-role note; `APW-01/plan.md` §3.1; `APW-08/tasks.md` T11; CONTRACTS §2 |
-| **Template provenance** — "Created from [public/private icon] Template Repo" in the Work Information block | README §1 note; `_build-artifacts/templates-catalog/plan-changes.md` C-2.4 |
-| **`ever-works/templates`** is the human listing; templates are `-template` repos found by the existing GitHub suffix scan; a template may be **code-bearing** or **metadata-only**; the user forks **both** when the source is separate | README **D4 rewritten**; `templates-catalog/resolution-spec.md` |
-| **Managed Apps tier runs like Works do today** — our own shared k8s with namespace isolation, plus connected customer nodes and customer clusters | implementation plan §2 row 5 (gate re-wording still to do — §6) |
-| **Addressing is additive** — `<slug>.ever.works` (the default apex), the tenant's custom domain (and subdomains under it), **and** a dedicated PSL-listed apex when an operator configures one; nothing removed | README **D10**, `CONTRACTS.md` R-16 + env table, `APW-06/plan.md` §8.3, `APW-10/spec.md` LG-15, `APW-13/plan.md` §8.4 |
-| Legal review of the licence classes: **yes, 100%**; Cal.diy: use the MIT community edition | `APW-13` unchanged; D13 confirmed |
+| Decision                                                                                                                                                                                                                                | Applied where                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ever ID = ZITADEL**, self-hosted **as-is and unmodified**, one instance at **`auth.ever.co`** for every platform                                                                                                                      | `APW-12/idp-options.md` §6/§7 (status `Decided`, D1 = ZITADEL; Keycloak kept as the documented alternative); `cross-platform.md`; program README §8; implementation plan §2 |
+| **Pure addition** — every platform keeps its own authentication and its own user database; duplicated profiles accepted; no existing sign-in flow changes                                                                               | `idp-options.md` §7 (binding constraints), `cross-platform.md` §1.1                                                                                                         |
+| **Provider plugins, one per provider** — `zitadel`, `keycloak`, `supertokens`, `auth0`; Gauzy integration is a plugin, **not core**; existing Keycloak core code moves into a plugin                                                    | `cross-platform.md` §5 + §3.1 (blast radius mapped in `idp-options.md` §7.3)                                                                                                |
+| **Three repository roles**: Data (`data`) · **Work Repository** (`website`, app code, optional `-app`/`-website` suffix) · GitHub generated output (`work`, never deployed)                                                             | README §1 repository-role note; `APW-01/plan.md` §3.1; `APW-08/tasks.md` T11; CONTRACTS §2                                                                                  |
+| **Template provenance** — "Created from [public/private icon] Template Repo" in the Work Information block                                                                                                                              | README §1 note; `_build-artifacts/templates-catalog/plan-changes.md` C-2.4                                                                                                  |
+| **`ever-works/templates`** is the human listing; templates are `-template` repos found by the existing GitHub suffix scan; a template may be **code-bearing** or **metadata-only**; the user forks **both** when the source is separate | README **D4 rewritten**; `templates-catalog/resolution-spec.md`                                                                                                             |
+| **Managed Apps tier runs like Works do today** — our own shared k8s with namespace isolation, plus connected customer nodes and customer clusters                                                                                       | implementation plan §2 row 5 (gate re-wording still to do — §6)                                                                                                             |
+| **Addressing is additive** — `<slug>.ever.works` (the default apex), the tenant's custom domain (and subdomains under it), **and** a dedicated PSL-listed apex when an operator configures one; nothing removed                         | README **D10**, `CONTRACTS.md` R-16 + env table, `APW-06/plan.md` §8.3, `APW-10/spec.md` LG-15, `APW-13/plan.md` §8.4                                                       |
+| Legal review of the licence classes: **yes, 100%**; Cal.diy: use the MIT community edition                                                                                                                                              | `APW-13` unchanged; D13 confirmed                                                                                                                                           |
 
 ---
 
@@ -57,7 +57,7 @@ decision that is already resolved in the plan and needs a yes.**
 
 **Wrong substrate claims** (the direction the docs' own rule calls dangerous — a false "we already have this")
 
-3. `EXISTING-SUBSTRATE.md` said *nothing reads* `tasks.checks`; it is read **and executed** (repository-declared
+3. `EXISTING-SUBSTRATE.md` said _nothing reads_ `tasks.checks`; it is read **and executed** (repository-declared
    commands, allowlist-gated), and only `tasks.base_branch` is unread.
 4. The agent-template row described a repo layout that does not exist (the shipped templates are an **in-code**
    catalog; the `ever-works/agents` reader fetches `manifest.json` only).
@@ -96,11 +96,11 @@ decision that is already resolved in the plan and needs a yes.**
     unsatisfiable. All 23 now have copy.
 16. **The fixture Blueprint could not validate at all** — its worker declared `memory: 48Mi`, below APW-03's own
     `MemQuantity` floor of `64Mi` (`schema.md:28`), which is an `out_of_range` error, and a spec with an error
-    deploys nothing. ACC-E2E-05 and the ACC-13-* lanes could never have run. Raised to `64Mi`. **Re-verified by
-    execution:** the validator now reports *"All 42 fixtures matched their recorded expectation"*.
+    deploys nothing. ACC-E2E-05 and the ACC-13-_ lanes could never have run. Raised to `64Mi`. **Re-verified by
+    execution:** the validator now reports _"All 42 fixtures matched their recorded expectation"\*.
 17. **No APW-13 Blueprint could pass catalog CI.** `schema.md` §3 forbade `source` and `blueprint` in
     **blueprint mode** (`blueprint_mode_forbidden_key`) while catalog CI check C4 requires zero errors — and all
-    three Blueprints declare both, because a Blueprint's file *becomes* the App Work's spec, where both are
+    three Blueprints declare both, because a Blueprint's file _becomes_ the App Work's spec, where both are
     present. §3 now allows them and the rule that applies instead is that `blueprint.repo` names the repository
     the file lives in. The artifact's validator was corrected in step, so the deleted rule cannot propagate into
     `app-spec.rules.ts`.
@@ -116,7 +116,7 @@ decision that is already resolved in the plan and needs a yes.**
     subdomain of **another Ever product's** domain (`ever.team`, `gauzy.co`, …). The original dedicated **PSL-listed
     apex is kept as a supported operator configuration**, with LG-15 and its `APEX_UNDER_PLATFORM_DOMAIN` /
     `APEX_NOT_ON_PSL` / `PSL_UNREACHABLE` probes **intact rather than deleted** — they apply whenever such an apex is
-    configured, which is the cookie-isolating setup. Where the shared default *is* used, the cookie-isolation work
+    configured, which is the cookie-isolating setup. Where the shared default _is_ used, the cookie-isolation work
     that the dedicated apex used to provide is carried explicitly (host-only `__Host-` Secure cookies on platform
     routes, no platform session cookie on app hosts, app hosts never serving platform pages), as R-16 now states.
     Third address shape added alongside: per-App-Work subdomains of the **tenant's** custom domain.
@@ -128,8 +128,8 @@ decision that is already resolved in the plan and needs a yes.**
 **The reviewed pass is complete: 78 lines renamed across 24 files**, and it was a review, not a substitution.
 
 The rule is stated once in [README §1](./README.md)'s repository-role note and once in
-[CONTRACTS §2](./CONTRACTS.md): *where an epic writes "the data repository" to mean app code, read "the Work
-Repository"*. **Nine instances were deliberately left**, and each is one of three legitimate kinds:
+[CONTRACTS §2](./CONTRACTS.md): _where an epic writes "the data repository" to mean app code, read "the Work
+Repository"_. **Nine instances were deliberately left**, and each is one of three legitimate kinds:
 
 - **Real identifiers** — `WorkLifecycleService.syncFromDataRepository` (`APW-01/plan.md:536`), the persisted
   `dataOwner` / `dataRepo` columns (`APW-02/plan.md:204`), `delete_data_repository` in the delete request
@@ -145,13 +145,13 @@ Repository"*. **Nine instances were deliberately left**, and each is one of thre
 
 ## 4. Build artifacts produced (all under `_build-artifacts/`)
 
-| Stream | Delivered | Evidence |
-|---|---|---|
-| `apw-03-schema/` | **`app-spec.schema.json`** — a real JSON Schema (draft 2020-12, 42 `$defs`) for the `app` kind spec, plus `validator-rules.md` mapping every `schema.md` rule to a schema construct or a named validator check | `evidence/validate.mjs` + **42 fixtures** (3 real Blueprints, the CONTRACTS examples, 18 negative fixtures, HEAD-revision controls) — **42/42 expectations met**, transcript included |
-| `templates-catalog/` | The **`ever-works/templates` listing seed** (`manifest.json`, JSON Schema, `licenses.yml`, README) and the **resolution spec** (suffix scan with its real limits, classification, fallback order, fork plan, the two shapes, roles, provenance) | manifest validated with ajv against a 13-case matrix; 12/12 links resolve; every code claim cites `file:line` |
-| `fixture-app/` | The **fixture application's source** — Dockerfile, `src/*.mjs`, migrations, `public/`, `test/` (7 files + helpers), `tools/` (incl. an in-process Postgres wire-protocol stub), `profiles/` (**5 App specs + a generator that validates them against the schema**), `.github/workflows/` (CI + the scheduled inherited-workflow marker), `VARIANTS.md` | **Executed, not asserted:** `npm run smoke` boots the app and calls every route — **18/18 checks pass**, including every App-spec observable (build-phase value in the image, no `localhost` in `/marker`, migration list, fresh worker heartbeat, `cronTicks` after an authorised tick, secret fingerprint only, volume writable, cron refuses anonymous, mail 503 without SMTP). `npm test`: **56/64 pass**. `profiles/`: **5/5 schema PASS**. Full transcripts and the honest gap list in [`fixture-app/evidence/proof.txt`](./_build-artifacts/fixture-app/evidence/proof.txt) |
-| `expected-outputs/` | The **build workflow** the APW-05 plugin writes (with a README of all 44 interpolation points and the exact canonical-JSON bytes behind the fingerprint) and **golden rendered manifests** for Cal.diy and the fixture — 24 and 19 objects for `your-cluster`, plus a managed overlay each | 29 YAML / 53 objects parse; **940 assertions, 0 failures**; no secret value, real hostname or cluster address (verified by grep) |
-| `open-decisions/` | **85-row decision sheet** (65 remaining `[NEEDS CLARIFICATION]` markers in the epics — APW-10's apex-domain question was answered 2026-09-17 and now reads `[ANSWERED …]` — plus the items found by reading the code), the contradictions list, and **Jira drafts** (`EW-817`…`EW-830`, deliberately **not** filed) | every row cites `file:line`; **no row needs the owner any more** — the 11 `OWNER` rows are all closed (§6) |
+| Stream               | Delivered                                                                                                                                                                                                                                                                                                                                              | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apw-03-schema/`     | **`app-spec.schema.json`** — a real JSON Schema (draft 2020-12, 42 `$defs`) for the `app` kind spec, plus `validator-rules.md` mapping every `schema.md` rule to a schema construct or a named validator check                                                                                                                                         | `evidence/validate.mjs` + **42 fixtures** (3 real Blueprints, the CONTRACTS examples, 18 negative fixtures, HEAD-revision controls) — **42/42 expectations met**, transcript included                                                                                                                                                                                                                                                                                                                                                                                              |
+| `templates-catalog/` | The **`ever-works/templates` listing seed** (`manifest.json`, JSON Schema, `licenses.yml`, README) and the **resolution spec** (suffix scan with its real limits, classification, fallback order, fork plan, the two shapes, roles, provenance)                                                                                                        | manifest validated with ajv against a 13-case matrix; 12/12 links resolve; every code claim cites `file:line`                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `fixture-app/`       | The **fixture application's source** — Dockerfile, `src/*.mjs`, migrations, `public/`, `test/` (7 files + helpers), `tools/` (incl. an in-process Postgres wire-protocol stub), `profiles/` (**5 App specs + a generator that validates them against the schema**), `.github/workflows/` (CI + the scheduled inherited-workflow marker), `VARIANTS.md` | **Executed, not asserted:** `npm run smoke` boots the app and calls every route — **18/18 checks pass**, including every App-spec observable (build-phase value in the image, no `localhost` in `/marker`, migration list, fresh worker heartbeat, `cronTicks` after an authorised tick, secret fingerprint only, volume writable, cron refuses anonymous, mail 503 without SMTP). `npm test`: **56/64 pass**. `profiles/`: **5/5 schema PASS**. Full transcripts and the honest gap list in [`fixture-app/evidence/proof.txt`](./_build-artifacts/fixture-app/evidence/proof.txt) |
+| `expected-outputs/`  | The **build workflow** the APW-05 plugin writes (with a README of all 44 interpolation points and the exact canonical-JSON bytes behind the fingerprint) and **golden rendered manifests** for Cal.diy and the fixture — 24 and 19 objects for `your-cluster`, plus a managed overlay each                                                             | 29 YAML / 53 objects parse; **940 assertions, 0 failures**; no secret value, real hostname or cluster address (verified by grep)                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `open-decisions/`    | **85-row decision sheet** (65 remaining `[NEEDS CLARIFICATION]` markers in the epics — APW-10's apex-domain question was answered 2026-09-17 and now reads `[ANSWERED …]` — plus the items found by reading the code), the contradictions list, and **Jira drafts** (`EW-817`…`EW-830`, deliberately **not** filed)                                    | every row cites `file:line`; **no row needs the owner any more** — the 11 `OWNER` rows are all closed (§6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### 4.1 Conflicts the artifacts found that an implementer must be briefed on
 
@@ -173,7 +173,7 @@ Repository"*. **Nine instances were deliberately left**, and each is one of thre
   be regenerated against APW-10's fixed profile once FR-47's values are settled (open question `Q-7`).
 - **`components[].target` needs a per-component build, which APW-05 declares out of scope** ("build matrices (one
   App spec, one image)", `APW-05/spec.md` §7). Either the field goes, or APW-05 states that `target` selects a
-  *stage within the one image*. No fixture uses it today.
+  _stage within the one image_. No fixture uses it today.
 - Two App-spec shapes the artifact accepts but recommends rejecting (`apw-03-schema/gaps-and-contradictions.md`
   Q3/Q5): `build.strategy: none` together with `components`, and `build.image` with a non-`image` strategy.
 - Wiring the schema in needs an **`APP_SPEC_VERSION` constant** beside `WORKS_CONFIG_SCHEMA_VERSION`
@@ -237,7 +237,7 @@ The decision sheet's 11 `OWNER` rows are now all closed. Each line below records
 2. **The managed-tier gate wording (B-01) — my earlier framing was wrong and the scope EXPANDS.** Re-verified against
    source: the platform already deploys to shared k8s (`k8s-works-shared`), to a **custom kubeconfig cluster**
    (`custom-kubeconfig`), and the Fleet can install agents on other machines; Vercel and further providers arrive as
-   plugins. **Nothing is removed or narrowed** — LG-01, LG-03 and LG-16 stay as attestable *options* on the gate
+   plugins. **Nothing is removed or narrowed** — LG-01, LG-03 and LG-16 stay as attestable _options_ on the gate
    board, and the deploy-target vocabulary **gains** the paths that already exist rather than replacing anything.
    "Connected customer nodes" is therefore not new scope invented here; it is the Fleet-agent path the platform
    already has, and it gets documented as a first-class deploy shape (implementation plan §2 row 5, APW-10 §3,
@@ -252,35 +252,36 @@ The decision sheet's 11 `OWNER` rows are now all closed. Each line below records
 4. **Create the repositories (D-04) — DONE 2026-09-17.** Created under `ever-works`, seeded from the artifact bundles
    in `_build-artifacts/`, and verified by API read-back:
 
-   | Repository | Visibility | Seeded | What it is |
-   | --- | --- | --- | --- |
-   | `ever-works/templates` | **public** (confirmed anonymously readable) | 18 files | The curated App Blueprint listing + the design's `manifest.json`/`licenses.yml`/schema + a validator workflow that ran **green on GitHub** |
-   | `ever-works/app-fixture-hello` | private | 54 files | The fixture's **application source**; `evidence/` moved to `docs/evidence/` and every relative reference updated |
-   | `ever-works/app-fixture-hello-template` | private | 9 files | The fixture's App Blueprint (metadata-only) |
-   | `ever-works/cal-diy-template` | private | 4 files | Cal.diy Blueprint (community build, MIT) |
-   | `ever-works/umami-template` | private | 4 files | Umami Blueprint |
-   | `ever-works/platforms` | private | 13 files | APW-11's launcher catalog (`platforms.json` + schema + validator, also **green on GitHub**) |
+    | Repository                              | Visibility                                  | Seeded   | What it is                                                                                                                                 |
+    | --------------------------------------- | ------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+    | `ever-works/templates`                  | **public** (confirmed anonymously readable) | 18 files | The curated App Blueprint listing + the design's `manifest.json`/`licenses.yml`/schema + a validator workflow that ran **green on GitHub** |
+    | `ever-works/app-fixture-hello`          | private                                     | 54 files | The fixture's **application source**; `evidence/` moved to `docs/evidence/` and every relative reference updated                           |
+    | `ever-works/app-fixture-hello-template` | private                                     | 9 files  | The fixture's App Blueprint (metadata-only)                                                                                                |
+    | `ever-works/cal-diy-template`           | private                                     | 4 files  | Cal.diy Blueprint (community build, MIT)                                                                                                   |
+    | `ever-works/umami-template`             | private                                     | 4 files  | Umami Blueprint                                                                                                                            |
+    | `ever-works/platforms`                  | private                                     | 13 files | APW-11's launcher catalog (`platforms.json` + schema + validator, also **green on GitHub**)                                                |
 
-   The three blueprint repos carry the `ever-works-app-blueprint` topic, which is the disambiguator D4/K-04 depends
-   on: the existing template scan is a bare `template$` suffix match
-   (`packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049`), so the topic — not the name — is
-   what separates an App Blueprint from a Website Template.
-   **Two follow-ups this created, both additive and both recorded rather than fixed unasked:**
-   (a) `ever-works/app-fixture-hello`'s own `ci` workflow is red in all three jobs — the documented fixture test
-   failures (56 pass / 7 fail / 1 cancelled of 64), a pre-existing 337-problem `format:check` that is byte-identical
-   to the source, and `profiles/_generate.mjs` reading `../../APW-13-golden-paths/…`, a path that only exists inside
-   this spec worktree; (b) the copied Blueprint READMEs still carry links that pointed into the spec tree, and each
-   repo's README now says so explicitly instead of silently carrying dead links.
-   One leak was caught in the process: the fixture's `.cache/` npm logs contain a machine user-profile path, so the
-   whole directory was excluded and `.cache/` gitignored — verified clean by `git grep` over HEAD.
+    The three blueprint repos carry the `ever-works-app-blueprint` topic, which is the disambiguator D4/K-04 depends
+    on: the existing template scan is a bare `template$` suffix match
+    (`packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049`), so the topic — not the name — is
+    what separates an App Blueprint from a Website Template.
+    **Two follow-ups this created, both additive and both recorded rather than fixed unasked:**
+    (a) `ever-works/app-fixture-hello`'s own `ci` workflow is red in all three jobs — the documented fixture test
+    failures (56 pass / 7 fail / 1 cancelled of 64), a pre-existing 337-problem `format:check` that is byte-identical
+    to the source, and `profiles/_generate.mjs` reading `../../APW-13-golden-paths/…`, a path that only exists inside
+    this spec worktree; (b) the copied Blueprint READMEs still carry links that pointed into the spec tree, and each
+    repo's README now says so explicitly instead of silently carrying dead links.
+    One leak was caught in the process: the fixture's `.cache/` npm logs contain a machine user-profile path, so the
+    whole directory was excluded and `.cache/` gitignored — verified clean by `git grep` over HEAD.
+
 5. **The GitHub test estate (J-08) — answered: use an Ever Works tenant.** The acceptance lanes provision their own
    **tenant inside Ever Works** instead of a separate test GitHub organization, which removes the org-provisioning
-   blocker entirely. `ACCEPTANCE.md` §0.3's "test organization + machine user" wording is re-read as *one Ever Works
-   tenant + its own connected GitHub account*, with `ever-works` fixtures as the throwaway upstreams.
+   blocker entirely. `ACCEPTANCE.md` §0.3's "test organization + machine user" wording is re-read as _one Ever Works
+   tenant + its own connected GitHub account_, with `ever-works` fixtures as the throwaway upstreams.
 6. **APW-06 ↔ APW-07 — resolved by research: the cycle breaks at the plugin boundary, not by picking a winner.**
    APW-07 owns the `IAppsTierProvider` port and the env/dependency rendering contract; APW-06 owns the
    `your-cluster` runtime that consumes it. APW-07's P1 (`app-render`) is implementable against fakes and lands
-   first; APW-06's P1 consumes it. Neither epic waits on the other's *runtime* — only on the interface, which is
+   first; APW-06's P1 consumes it. Neither epic waits on the other's _runtime_ — only on the interface, which is
    already fixed in CONTRACTS §3. Written into `TRACKER.md`; no further owner input needed.
 7. **Budget owner / abuse rota / retention number / Jira — proceed with tracking documents, Jira optional.** The
    owner's answer is "do whatever is needed … my goal is to build all this ASAP so we may just start implementation
@@ -302,14 +303,14 @@ Branch **`plan/any-repo-as-work`** on `ever-works/ever-works`, on top of `873274
 `origin/develop` @ `653449ad3`**: all four Wave 0 defects are still present at the same lines, so nothing here has
 been silently fixed upstream and nothing here is racing a fix).
 
-| Commit | Contents |
-| --- | --- |
-| `e47866dc7` | The App Works program itself — 13 epics, README, CONTRACTS, ACCEPTANCE, TRACKER, EXISTING-SUBSTRATE, internal implementation plan |
-| `cd9fb4c2d` | The owner's 2026-09-17 decisions applied, the blockers closed, `BUILD-READINESS.md` added (40 files, +781/−198) |
+| Commit      | Contents                                                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `e47866dc7` | The App Works program itself — 13 epics, README, CONTRACTS, ACCEPTANCE, TRACKER, EXISTING-SUBSTRATE, internal implementation plan                                                            |
+| `cd9fb4c2d` | The owner's 2026-09-17 decisions applied, the blockers closed, `BUILD-READINESS.md` added (40 files, +781/−198)                                                                              |
 | `b55f35e22` | `_build-artifacts/` — the schema + validator + 42 fixtures, the template-catalog design, the fixture application, the golden manifests, and the open-decision artifacts (145 files, +22,356) |
-| `498b50f4f` | **Additive-only pass**: D10 three address shapes, `deploy-shapes.md`, R-26/R-27, per-shape LG-01/03/15/16, all eleven owner answers closed |
-| `d9e228367` | `tools/verify-spec-tree.mjs` + the 24 broken `CONTRACTS.md §0` anchors repaired — tree now **CLEAN** |
-| `13efa24ee` | The implementation plan's eight decisions answered and the tier rule re-scoped per shape |
+| `498b50f4f` | **Additive-only pass**: D10 three address shapes, `deploy-shapes.md`, R-26/R-27, per-shape LG-01/03/15/16, all eleven owner answers closed                                                   |
+| `d9e228367` | `tools/verify-spec-tree.mjs` + the 24 broken `CONTRACTS.md §0` anchors repaired — tree now **CLEAN**                                                                                         |
+| `13efa24ee` | The implementation plan's eight decisions answered and the tier rule re-scoped per shape                                                                                                     |
 
 The earlier "whoever commits must include the Blueprint fixes" warning is **resolved**: the `EVER_WORKS_*` rename, the
 RE2-illegal password pattern and the fixture's below-floor memory went in with `cd9fb4c2d` and `b55f35e22`.
@@ -318,7 +319,7 @@ what the new `ever-works/*-template` repositories were seeded from, and every va
 hosts, synthetic digests, `<redacted>` for every secret). The private Workspace mirror carries the same tree under
 `knowledge/notes/2026-09-17-app-works/spec/`, kept in sync additively.
 
-**The PR is not open.** The program's own note stands — *"opening that PR is an owner call"* — and the branch is
+**The PR is not open.** The program's own note stands — _"opening that PR is an owner call"_ — and the branch is
 ready for one: `https://github.com/ever-works/ever-works/pull/new/plan/any-repo-as-work`.
 
 **Re-verify before branching Wave 0 off `develop`:** the cited line numbers in this report are against `873274c9f`.
@@ -334,8 +335,7 @@ cutting the branch is the standing rule (workspace NN #25).
    **not touched by a single open question**. **Its premises were re-verified on `origin/develop @ 653449ad3`:**
    `const providerId = 'github'` at `apps/api/src/agents/agents.module.ts:685` (commit) and `:706` (pull request),
    `branch: branch ?? 'main'` returned but unused at `:700`, `owner: ''` / `repo: ''` at `:732-733`, the
-   collision-prone `slugifyText(\`${owner}-${repo}\`)` checkout key at
-   `packages/plugin/src/git/git-operations.ts:306-308`, and the silent `git init` fallback at `:113-125`.
+   collision-prone `slugifyText(\`${owner}-${repo}\`)`checkout key at`packages/plugin/src/git/git-operations.ts:306-308`, and the silent `git init`fallback at`:113-125`.
 2. **Wave 1 foundations (parallel):** `APW-03` P1 · `APW-02` P1 · `APW-07` P1 · `APW-11` P1 · `APW-09` P1.
 3. **Wave 1 creation and running:** `APW-01` P1 → `APW-05` P1 → `APW-06` P1 → `APW-04` P1.
 4. **Wave 1 loop:** `APW-08` P1 → `APW-13` P1 — the owner's Cal.diy example green on a user cluster.
