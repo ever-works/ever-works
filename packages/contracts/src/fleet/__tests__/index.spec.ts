@@ -200,6 +200,14 @@ const QUESTION_EXPORTS = [
 	'FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES',
 	'parseFleetAgentTaskQuestionMarkdown',
 	'normalizeFleetAgentTaskQuestion',
+	// Containment record of a fleet run (self-build slice AK,
+	// `fleet-jobs.types.js`) — what the model step actually got, and every
+	// control it did not, with its reason.
+	'FLEET_AGENT_TASK_EXECUTION_PATHS',
+	'FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES',
+	'FLEET_AGENT_TASK_CONTAINMENT_MAX_CONTROL_CHARS',
+	'FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS',
+	'normalizeFleetAgentTaskContainment',
 	// Panic controls (EW-778) — fleet-panic.types.ts
 	'FLEET_AUDIT_ACTIONS',
 	'FLEET_AUDIT_DEFAULT_LIMIT',
@@ -318,6 +326,7 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetRunEnvGrants',
 	'parseFleetAgentTaskQuestionMarkdown',
 	'normalizeFleetAgentTaskQuestion',
+	'normalizeFleetAgentTaskContainment',
 	'normalizeFleetNodeWorkerState',
 	'isFleetRunTokenRouteAllowed',
 	'fleetRunTokenExpiryFromLease',
@@ -344,7 +353,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 179 runtime symbols', () => {
+	it('exposes exactly these 184 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -374,8 +383,14 @@ describe('fleet barrel', () => {
 		// GitHub installation token may ever be offered to, and it is a
 		// named export precisely so the node, the plugin and this guard
 		// cannot disagree about it.
+		// → 184 with the per-run containment record (self-build slice AK):
+		// the execution-path vocabulary, the three caps on a containment
+		// block, and the coercing reader the API side uses to trust a
+		// node's claim about how contained its own run was. All in
+		// `fleet-jobs.types.ts`, an existing module, so the witness table
+		// below needs no new row.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(179);
+		expect(Object.keys(fleet)).toHaveLength(184);
 	});
 
 	it.each([

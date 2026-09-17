@@ -1,8 +1,14 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, parse, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import {
+	applyIsolatedHomeEnv,
+	applyLocalSessionHomeEnv,
+	isolatedHomeLayout,
+	type IsolatedHomeLayout
+} from './isolated-home';
 
 /** The two local model CLIs a Fleet node currently knows how to run. */
 export type ModelExecutionProvider = 'claude-code' | 'codex';
@@ -336,22 +342,12 @@ export async function executeModelProcessInternal(
 				request.signal
 			);
 			const configHome = join(runRoot, request.provider === 'claude-code' ? 'claude' : 'codex');
-			const isolatedHome = join(runRoot, 'home');
-			const isolatedTemp = join(runRoot, 'tmp');
+			// Slice AK: the layout is built by the module the ORDINARY node
+			// command path now shares, so the set of redirected anchors
+			// cannot drift between the two executors.
+			const layout = isolatedHomeLayout(runRoot);
 			await withinExecutionDeadline(
-				() =>
-					Promise.all(
-						[
-							configHome,
-							isolatedTemp,
-							join(isolatedHome, 'AppData', 'Roaming'),
-							join(isolatedHome, 'AppData', 'Local'),
-							join(isolatedHome, '.cache'),
-							join(isolatedHome, '.config'),
-							join(isolatedHome, '.local', 'share'),
-							join(isolatedHome, '.local', 'state')
-						].map((path) => mkdir(path, { recursive: true }))
-					),
+				() => Promise.all([configHome, ...layout.directories].map((path) => mkdir(path, { recursive: true }))),
 				deadlineAt,
 				monotonicNow,
 				request.signal
@@ -361,8 +357,7 @@ export async function executeModelProcessInternal(
 				request.provider,
 				credential,
 				trusted.localSessionHome ?? configHome,
-				isolatedHome,
-				isolatedTemp,
+				layout,
 				io.parentEnv ?? process.env,
 				platform
 			);
@@ -902,8 +897,7 @@ function buildModelEnvironment(
 	provider: ModelExecutionProvider,
 	credential: SelectedCredential | null,
 	configHome: string,
-	isolatedHome: string,
-	isolatedTemp: string,
+	layout: IsolatedHomeLayout,
 	parentEnv: NodeJS.ProcessEnv,
 	platform: NodeJS.Platform
 ): Record<string, string> {
@@ -930,21 +924,9 @@ function buildModelEnvironment(
 	if (!hasEnvironmentName(env, 'PATH') && platform !== 'win32') {
 		env.PATH = '/usr/local/bin:/usr/bin:/bin';
 	}
-	const homeRoot = parse(isolatedHome).root;
-	const windowsDrive = /^([A-Za-z]:)[\\/]/u.exec(homeRoot)?.[1];
-	env.HOME = isolatedHome;
-	env.USERPROFILE = isolatedHome;
-	env.HOMEDRIVE = windowsDrive ?? homeRoot;
-	env.HOMEPATH = windowsDrive ? isolatedHome.slice(windowsDrive.length) : isolatedHome;
-	env.APPDATA = join(isolatedHome, 'AppData', 'Roaming');
-	env.LOCALAPPDATA = join(isolatedHome, 'AppData', 'Local');
-	env.XDG_CACHE_HOME = join(isolatedHome, '.cache');
-	env.XDG_CONFIG_HOME = join(isolatedHome, '.config');
-	env.XDG_DATA_HOME = join(isolatedHome, '.local', 'share');
-	env.XDG_STATE_HOME = join(isolatedHome, '.local', 'state');
-	env.TEMP = isolatedTemp;
-	env.TMP = isolatedTemp;
-	env.TMPDIR = isolatedTemp;
+	// Slice AK: one implementation of the home redirection, shared with the
+	// ordinary node command path — see `isolated-home.ts`.
+	applyIsolatedHomeEnv(env, layout);
 	env.CI = '1';
 	if (credential) {
 		const childCredentialName =
@@ -952,12 +934,14 @@ function buildModelEnvironment(
 		env[childCredentialName] = credential.value;
 	}
 
+	// The deliberately mirrored-in directory: either the run's own empty
+	// config home, or — when the operator configured one — the machine's
+	// real CLI session home, which is what keeps a locally authenticated
+	// identity working through the redirect.
+	applyLocalSessionHomeEnv(env, provider, configHome);
 	if (provider === 'claude-code') {
-		env.CLAUDE_CONFIG_DIR = configHome;
 		env.DISABLE_AUTOUPDATER = '1';
 		env.DISABLE_TELEMETRY = '1';
-	} else {
-		env.CODEX_HOME = configHome;
 	}
 	return env;
 }
