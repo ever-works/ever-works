@@ -42,8 +42,20 @@ function parseCsp(csp: string): Map<string, string[]> {
     return directives;
 }
 
-async function connectSrcFor(apiUrl: string): Promise<string[]> {
-    vi.stubEnv('NEXT_PUBLIC_API_URL', apiUrl);
+/**
+ * Both API env vars, stubbed together.
+ *
+ * `API_URL` has to be pinned as explicitly as `NEXT_PUBLIC_API_URL`: it is the
+ * value the attach-token routes mint `wsUrl` from, so leaving it to whatever
+ * the developer happens to export would make every case here env-dependent.
+ * `undefined` genuinely unsets the variable for the duration of the test.
+ */
+async function connectSrcForEnv(env: {
+    NEXT_PUBLIC_API_URL?: string;
+    API_URL?: string;
+}): Promise<string[]> {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', env.NEXT_PUBLIC_API_URL);
+    vi.stubEnv('API_URL', env.API_URL);
     vi.resetModules();
     const { default: proxy } = await import('./proxy');
     // `/en/dashboard` takes the legacy-locale redirect, the shortest branch
@@ -52,6 +64,24 @@ async function connectSrcFor(apiUrl: string): Promise<string[]> {
     const csp = response.headers.get('content-security-policy');
     expect(csp, 'proxy() must set Content-Security-Policy').toBeTruthy();
     return parseCsp(csp as string).get('connect-src') ?? [];
+}
+
+async function connectSrcFor(apiUrl: string): Promise<string[]> {
+    return connectSrcForEnv({ NEXT_PUBLIC_API_URL: apiUrl, API_URL: undefined });
+}
+
+/**
+ * The socket origin an attach-token response would actually name, computed
+ * through the SAME code path the BFF uses — `lib/constants.ts` `API_URL` and
+ * `lib/api/computer-bff.ts` `toComputerSocketUrl` — under whatever env is
+ * currently stubbed. Call this only after `connectSrcForEnv`, which resets the
+ * module registry so both modules re-read the stubbed env.
+ */
+async function mintedSocketOrigin(): Promise<string> {
+    const { API_URL } = await import('./lib/constants');
+    const { toComputerSocketUrl } = await import('./lib/api/computer-bff');
+    const wsUrl = toComputerSocketUrl(API_URL, '/ws/computer/8a2f0c3e');
+    return new URL(wsUrl).origin;
 }
 
 describe('web CSP connect-src authorises the live-view socket', () => {
@@ -106,5 +136,127 @@ describe('web CSP connect-src authorises the live-view socket', () => {
         expect(fromNextConfig).toBe(fromProxy);
         // Both must interpolate the socket origin right after the API origin.
         expect(fromNextConfig).toContain('${apiHost} ${apiWsHost}');
+    });
+});
+
+/**
+ * The socket source must name the origin the BFF ACTUALLY hands the browser.
+ *
+ * `NEXT_PUBLIC_API_URL` is the browser-facing API origin, but the live-view and
+ * streaming-terminal `wsUrl` is minted server-side from the SERVER-ONLY
+ * `API_URL` (`toComputerSocketUrl(API_URL, wsPath)`), and the browser opens
+ * exactly that URL — it cannot substitute the public origin. In this repo
+ * `NEXT_PUBLIC_API_URL` is set in one place only (`.github/workflows/e2e.yml`);
+ * `docker-compose.yml`, every `.deploy/k8s` manifest and `apps/web/.env.example`
+ * set `API_URL` alone. So a policy derived from `NEXT_PUBLIC_API_URL` only names
+ * the right host inside the CI job and nowhere else.
+ *
+ * Each case below is a real deployment shape, and each asserts the policy
+ * against the origin computed through the BFF's own code path rather than
+ * against a hand-written expectation of what the policy contains.
+ */
+describe('web CSP connect-src names the socket origin the BFF mints', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: true, isExpired: false });
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    const socketSourcesOf = (connect: string[]): string[] =>
+        connect.filter((source) => /^wss?:\/\//.test(source));
+
+    it.each([
+        {
+            shape: 'docker-compose.yml / k8s — only API_URL is set',
+            env: { API_URL: 'http://ever-works-api:3100' },
+            socket: 'ws://ever-works-api:3100',
+        },
+        {
+            shape: 'apps/web/.env.example — the documented local dev env',
+            env: { API_URL: 'http://localhost:3100' },
+            socket: 'ws://localhost:3100',
+        },
+        {
+            shape: 'public ingress + in-cluster API — both set and different',
+            env: {
+                NEXT_PUBLIC_API_URL: 'https://api.ever.works/api',
+                API_URL: 'http://ever-works-api:3100',
+            },
+            socket: 'ws://ever-works-api:3100',
+        },
+        {
+            shape: 'nothing set at all — both fall back',
+            env: {},
+            socket: 'ws://localhost:3100',
+        },
+        {
+            shape: '.github/workflows/e2e.yml — both set, one origin',
+            env: {
+                NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3100/api',
+                API_URL: 'http://127.0.0.1:3100',
+            },
+            socket: 'ws://127.0.0.1:3100',
+        },
+    ])('authorises the live-view socket for $shape', async ({ env, socket }) => {
+        const connect = await connectSrcForEnv(env);
+
+        // Guard the fixture itself: this is the origin `attach-token` would
+        // name for this env, straight out of the BFF's own helpers.
+        expect(await mintedSocketOrigin()).toBe(socket);
+        expect(
+            connect,
+            `connect-src does not authorise the minted socket origin ${socket}: "${connect.join(' ')}"`,
+        ).toContain(socket);
+    });
+
+    it('names both socket origins when the public and in-cluster API differ', async () => {
+        const connect = await connectSrcForEnv({
+            NEXT_PUBLIC_API_URL: 'https://api.ever.works/api',
+            API_URL: 'http://ever-works-api:3100',
+        });
+
+        // The browser-facing origin keeps its http + ws pair …
+        expect(connect).toContain('https://api.ever.works');
+        expect(connect).toContain('wss://api.ever.works');
+        // … and the origin the BFF actually mints from is authorised too.
+        expect(connect).toContain('ws://ever-works-api:3100');
+    });
+
+    it('emits exactly one socket source when the two origins coincide', async () => {
+        const connect = await connectSrcForEnv({
+            NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3100/api',
+            API_URL: 'http://127.0.0.1:3100',
+        });
+
+        expect(socketSourcesOf(connect)).toEqual(['ws://127.0.0.1:3100']);
+    });
+
+    it('drops an API_URL that is not an http(s) origin instead of emitting it', async () => {
+        const connect = await connectSrcForEnv({
+            NEXT_PUBLIC_API_URL: 'https://api.ever.works',
+            API_URL: 'file:///etc/passwd',
+        });
+
+        expect(socketSourcesOf(connect)).toEqual(['wss://api.ever.works']);
+    });
+
+    it('never widens the policy — every socket source is a bare scheme+host[:port]', async () => {
+        const connect = await connectSrcForEnv({
+            NEXT_PUBLIC_API_URL: 'https://api.ever.works',
+            API_URL: "http://ever-works-api:3100/x; default-src *; connect-src 'unsafe-inline'",
+        });
+
+        expect(socketSourcesOf(connect)).toEqual([
+            'wss://api.ever.works',
+            'ws://ever-works-api:3100',
+        ]);
+        for (const source of socketSourcesOf(connect)) {
+            // No bare `ws:` scheme, no wildcard, no directive separator.
+            expect(source).toMatch(/^wss?:\/\/[a-zA-Z0-9.-]+(?::\d{1,5})?$/);
+        }
     });
 });

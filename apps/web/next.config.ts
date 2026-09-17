@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { resolveApiCspHost, resolveApiCspSocketSources } from './src/lib/csp-api-sources';
 
 /**
  * @type any
@@ -37,23 +38,21 @@ const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
     .map((s) => s.trim())
     .filter(Boolean)
     .filter((s) => SAFE_CSP_HOST_SOURCE.test(s));
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
-const apiHost = (() => {
-    try {
-        return new URL(apiUrl).origin;
-    } catch {
-        return 'https://api.ever.works';
-    }
-})();
-// The live-view and streaming-terminal sockets hang off the SAME origin over
-// ws:/wss: (`lib/api/computer-bff.ts` toComputerSocketUrl, and the terminal
-// attach-token route). CSP3 scheme-part matching does NOT let an http(s)
-// source authorise a ws(s) URL, so the socket origin must be listed too —
-// without it every live view is refused with "violates … connect-src".
-// Derived from `apiHost`, never from the raw env: a malformed
-// NEXT_PUBLIC_API_URL still falls back to the hard-coded default and cannot
-// smuggle a directive separator into the policy.
-const apiWsHost = apiHost.replace(/^http/, 'ws');
+const apiHost = resolveApiCspHost();
+// The live-view and streaming-terminal sockets hang off the API origin over
+// ws:/wss:. CSP3 scheme-part matching does NOT let an http(s) source authorise
+// a ws(s) URL, so the socket origin must be listed too — without it every live
+// view is refused with "violates … connect-src".
+//
+// The socket URL the browser is handed is minted from the SERVER-ONLY
+// `API_URL` (`toComputerSocketUrl(API_URL, wsPath)` in the computer
+// attach-token route, and the same origin→ws twist in the terminal one), which
+// is a different host from `NEXT_PUBLIC_API_URL` in every shipped
+// configuration. `resolveApiCspSocketSources()` therefore emits the socket twin
+// of BOTH origins, de-duplicated: one source when they coincide, two exact
+// origins when they differ. Space-joined here so the directive below stays the
+// byte-twin of `src/proxy.ts`'s.
+const apiWsHost = resolveApiCspSocketSources().join(' ');
 const CSP = [
     "default-src 'self'",
     "base-uri 'self'",
