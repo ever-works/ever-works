@@ -1,0 +1,4 @@
+required:
+  - slug: provision-app
+    why: The playbook, hard rules and output contract the platform checks. Without it the agent cannot produce a provisioning result.
+recommended: []

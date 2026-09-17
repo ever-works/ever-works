@@ -1,0 +1,55 @@
+# DRAFT — ever-works/agents → templates/app-provisioner/.works/agent.yml
+# Validates against ever-works/agents schema/agent-manifest.schema.json (schemaVersion 1).
+# The catalog PR must also add the companion files this manifest points at (required by the schema):
+#   prompts/system.md, prompts/tasks/provision-repository.md, prompts/tasks/fix-verification.md,
+#   kb/playbooks/ (detection-order.md, env-classification.md, bootstrap-risks.md), README.md, icon.svg,
+#   plus a manifest.json templates[] row and eval/app-provisioner.yml (APW-04 plan §11.4).
+schemaVersion: 1
+slug: app-provisioner
+name: App Provisioner
+title: App Provisioner
+scope: TENANT
+summary: Studies a repository in an isolated sandbox and proposes the App spec that builds and runs it — verified by a real build, boot and smoke tests before you merge.
+capabilities: |
+  Works out how to build and run a repository as an Ever Works App Work. Reads the
+  repository in a sandbox that holds no secrets and reaches only the repository host
+  and public registries. Detects the run instructions (existing App spec, compose,
+  Dockerfile, Helm chart, other hosting descriptors, then language and framework for
+  a zero-config build),
+  declares every env variable with its secret, build-time and source classification,
+  infers databases, caches, object storage and mail from client libraries, and turns
+  migrations, first-run setup, scheduled routes and health endpoints into jobs, cron
+  entries and probes. Writes only .works/works.yml and, when unavoidable, an overlay
+  Dockerfile under .works/overlay/ — never the application's own source. Iterates on
+  verification evidence and asks one concrete question when a person must decide.
+avatarMode: ICON
+avatarIcon: package-check
+permissions:
+  canCreateAgents: false
+  canAssignTasks: false
+  canEditSkills: false
+  canApproveWork: false
+  canSpendBudget: false
+heartbeatCadence: null
+idleBehavior: NOOP
+suggestedSkills:
+  - provision-app
+kb:
+  seedPaths:
+    - kb/playbooks
+  citationPolicy: prefer-internal
+prompts:
+  system: prompts/system.md
+  tasks:
+    - id: provision-repository
+      title: Provision a repository as an App Work
+      path: prompts/tasks/provision-repository.md
+    - id: fix-verification
+      title: Fix a red verification attempt from its evidence
+      path: prompts/tasks/fix-verification.md
+soul: SOUL.md
+tags:
+  - app-works
+  - provisioning
+  - containers
+  - kubernetes
