@@ -261,6 +261,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
 
+    // Skills shelf — a person switching a Skill on or off.
+    [ActivityActionType.SKILL_ENABLED]: 'system',
+    [ActivityActionType.SKILL_DISABLED]: 'system',
+
     // Shared view (AW-18) — the owner's own sharing configuration changes.
     [ActivityActionType.SHARED_VIEW_ENABLED]: 'system',
     [ActivityActionType.SHARED_VIEW_DISABLED]: 'system',

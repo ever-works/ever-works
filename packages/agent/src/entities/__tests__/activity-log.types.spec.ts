@@ -84,6 +84,9 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Skills shelf — the workspace-level on/off switch.
+            ['SKILL_ENABLED', 'skill_enabled'],
+            ['SKILL_DISABLED', 'skill_disabled'],
             // Knowledge library — shelf curation (filing, archive, export)
             // and shared-folder rename.
             ['KB_DOCUMENT_ARCHIVED', 'kb_document_archived'],
@@ -164,10 +167,12 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +2 skill_enabled / skill_disabled (Skills shelf on/off switch) -> 159.
             // +5 kb_document_archived / _unarchived / _filed / _exported and
-            //    memory_folder_renamed (Knowledge library shelf) -> 162.
+            //    memory_folder_renamed (Knowledge library shelf) -> 162 on
+            //    develop's own base.
             //
-            // 🛑 171 is COUNTED from the merged enum, never added up from the
+            // 🛑 173 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -175,22 +180,42 @@ describe('activity-log.types', () => {
             // ActivityStatus, and including it inflates the total by 5.
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) and +5 knowledge
-            //    library literals -> 165.
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on this branch's own base; the same +3 reached develop together
+            //    with the +5 knowledge library literals, which develop counted
+            //    as -> 165 there.
             //
-            // Both land together when the Knowledge library shelf merges
-            // develop's Live Feed work: 162 (shelf side) and 160 (develop side)
-            // each counted from their own base, and the merged enum COUNTS 165.
-            // +1 agent_computer_controlled (Agent computers, take-over) -> 166
-            //    after the knowledge library branch merged develop's Agent
-            //    computers take-over work.
+            // Merging develop's Live Feed run lifecycle (+3, develop said 160)
+            // into the Skills shelf branch (+2 skill_enabled / skill_disabled,
+            // this branch said 159) -> 162, COUNTED from the merged enum.
+            // +1 agent_computer_controlled (Agent computers, take-over) —
+            //    develop said 161 on its own base; merged with the Skills
+            //    shelf branch's 162 this COUNTS to 163 from the merged enum,
+            //    not from adding either side's number.
+            // Merging develop again (it had reached 166 by landing the
+            // Knowledge library shelf's +5 kb_document_archived /
+            // _unarchived / _filed / _exported / memory_folder_renamed)
+            // into this branch's 163 COUNTS to 168 from the merged enum —
+            // the two skill_* literals are this branch's only additions that
+            // develop does not already carry.
+            //
+            // develop's own ledger for the same stretch, kept so neither
+            // side's bookkeeping is lost:
+            //   +3 agent_run_* (Live Feed — run lifecycle for non-heartbeat
+            //   triggers) and +5 knowledge library literals -> 165. Both land
+            //   together when the Knowledge library shelf merges develop's
+            //   Live Feed work: 162 (shelf side) and 160 (develop side) each
+            //   counted from their own base, and the merged enum COUNTS 165.
+            //   +1 agent_computer_controlled (Agent computers, take-over)
+            //   -> 166 after the knowledge library branch merged develop's
+            //   Agent computers take-over work.
             // +5 shared_view_enabled / _disabled / _regenerated /
-            //    _sections_changed / _indexing_changed (Shared view, AW-18) — this
-            //    branch's own additions, disjoint from everything develop grew
-            //    while it was open -> 171 COUNTED from the merged enum (this
-            //    branch budgeted 166, develop was at 166, and the five shared-view
-            //    literals are the only ones develop does not already have).
-            expect(literals).toHaveLength(171);
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) —
+            //    develop landed those while this branch was open and counted
+            //    171 there; merging that develop into this branch's 168 COUNTS
+            //    to 173 from the merged enum, the two skill_* literals still
+            //    being this branch's only additions develop does not carry.
+            expect(literals).toHaveLength(173);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
