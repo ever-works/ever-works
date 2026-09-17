@@ -184,9 +184,16 @@ describe('workspace backup scope isolation', () => {
         // used, not that the risk went away.
         expect(organizationScoped.length).toBeGreaterThanOrEqual(8);
 
+        // The `organization` rule itself still never asks for a bare
+        // `organizationId IS NULL`. A file that declares a personal rule is
+        // planned by THAT rule instead — covered by the next case — so what
+        // is asserted here is every organization-scoped file that does not.
         const planned = await planEverything(PERSONAL_WORKSPACE);
-        for (const { domain, plan } of planned) {
-            if (plan.spec.scope.by !== 'organization') continue;
+        const withoutPersonalRule = planned.filter(
+            ({ plan }) => plan.spec.scope.by === 'organization' && !plan.spec.personalScope,
+        );
+        expect(withoutPersonalRule.length).toBeGreaterThanOrEqual(4);
+        for (const { domain, plan } of withoutPersonalRule) {
             expect({
                 file: `${domain}/${plan.file}`,
                 matchesNothing: plan.query.matchesNothing === true,
@@ -196,6 +203,46 @@ describe('workspace backup scope isolation', () => {
                 matchesNothing: true,
                 equals: {},
             });
+        }
+    });
+
+    it('narrows an organization-scoped file by its owner in a personal workspace when it has one', async () => {
+        // The other half of the cross-account fix. Matching nothing kept a
+        // stranger's rows out, and ALSO dropped the owner's own: a person
+        // with no organization yet — the default state — lost every webhook
+        // subscription, code-host installation, onboarding request and email
+        // conversation from their archive. Those four tables have an owner
+        // column, so they are narrowed by it instead.
+        const planned = await planEverything(PERSONAL_WORKSPACE);
+        const personal = planned.filter(({ plan }) => plan.spec.personalScope);
+        expect(personal.map(({ plan }) => plan.spec.entity).sort()).toEqual([
+            'EmailConversation',
+            'GitHubAppInstallation',
+            'OnboardingRequest',
+            'WebhookSubscription',
+        ]);
+
+        for (const { domain, plan } of personal) {
+            const label = `${domain}/${plan.file}`;
+            expect({ label, matchesNothing: plan.query.matchesNothing }).toEqual({
+                label,
+                matchesNothing: undefined,
+            });
+            expect({ label, narrowedBy: narrowedBy(plan.query, PERSONAL_WORKSPACE) }).not.toEqual({
+                label,
+                narrowedBy: null,
+            });
+            const rule = plan.spec.personalScope!;
+            if (rule.by === 'workspace') {
+                // The owner AND the un-organized scope — never either alone.
+                expect({ label, equals: plan.query.equals }).toEqual({
+                    label,
+                    equals: { [rule.userColumn ?? 'userId']: USER, organizationId: null },
+                });
+            } else {
+                expect(rule.by).toBe('parent');
+                expect(plan.query.within).toBeDefined();
+            }
         }
     });
 
@@ -226,18 +273,21 @@ describe('workspace backup scope isolation', () => {
             },
         };
         const context: BackupCollectContext = { ...contextFor(PERSONAL_WORKSPACE), source };
-        const collector = BACKUP_COLLECTORS.get('connections');
+        // An organization's member list: a file that still matches nothing
+        // in a personal workspace. (Webhook subscriptions used to be the
+        // example; they are now narrowed by their owner instead.)
+        const collector = BACKUP_COLLECTORS.get('organizations');
         expect(collector).toBeDefined();
 
         const plans = await collector!.plan(context);
-        const subscriptions = plans.find((plan) => plan.spec.entity === 'WebhookSubscription');
-        expect(subscriptions?.query.matchesNothing).toBe(true);
+        const members = plans.find((plan) => plan.spec.entity === 'OrganizationMember');
+        expect(members?.query.matchesNothing).toBe(true);
 
         const rows: Record<string, unknown>[] = [];
-        for await (const row of collector!.rows(context, subscriptions!)) {
+        for await (const row of collector!.rows(context, members!)) {
             rows.push(row);
         }
         expect(rows).toEqual([]);
-        await expect(collector!.trims(context, [subscriptions!])).resolves.toEqual([]);
+        await expect(collector!.trims(context, [members!])).resolves.toEqual([]);
     });
 });

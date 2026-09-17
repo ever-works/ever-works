@@ -64,6 +64,8 @@ function harness(
         settleReturns?: boolean;
         /** The status the row is left at when the final settle misses. */
         settledElsewhereAs?: string;
+        /** Fields of the backup row other than its status, e.g. a personal workspace's null organization. */
+        row?: Record<string, unknown>;
     } = {},
 ): Harness {
     const rows = options.rows ?? {};
@@ -122,7 +124,7 @@ function harness(
         getRepository: (entity: string) => ({
             findOne: async () =>
                 entity === 'WorkspaceBackup'
-                    ? backupRow({ status: state.status })
+                    ? backupRow({ ...options.row, status: state.status })
                     : entity === 'User'
                       ? { id: 'u1', name: 'Owner', email: 'owner@example.invalid' }
                       : null,
@@ -368,6 +370,50 @@ describe('WorkspaceBackupRunner', () => {
             const knowledge = domain(h.terminal(), 'knowledge');
             expect(knowledge.error).toBeUndefined();
             expect(knowledge.records).toBeGreaterThan(0);
+        });
+    });
+
+    describe('a personal workspace’s own organization-less rows', () => {
+        // A person with no organization yet — the default state — owns
+        // webhook subscriptions, code-host installations, onboarding
+        // requests and email conversations whose `organizationId` is NULL.
+        // The cross-account fix planned those four files as matching
+        // nothing, so the owner's archive carried none of them and the
+        // domains still reported `complete` or `empty`.
+        const PERSONAL_OPTIONS: WorkspaceBackupRunOptions = {
+            ...OPTIONS,
+            workspace: { id: 'u1', slug: 'owner', displayName: 'Owner', kind: 'personal' },
+        };
+        const ROWS: Record<string, Record<string, unknown>[]> = {
+            ...Object.fromEntries(
+                referencedEntities().map((entity) => [entity, [] as Record<string, unknown>[]]),
+            ),
+            Agent: [{ id: 'a1', userId: 'u1', organizationId: null }],
+            WebhookSubscription: [{ id: 'wh1', accountId: 'u1', organizationId: null }],
+            GitHubAppInstallation: [{ id: 'gh1', createdByUserId: 'u1', organizationId: null }],
+            OnboardingRequest: [{ id: 'on1', accountId: 'u1', organizationId: null }],
+            EmailConversation: [{ id: 'ec1', agentId: 'a1', organizationId: null }],
+        };
+
+        function file(terminal: Record<string, unknown> | undefined, name: string) {
+            const summary = terminal?.manifestSummary as {
+                domains: { key: string; files: { name: string; records: number }[] }[];
+            };
+            return summary.domains
+                .flatMap((domain) => domain.files)
+                .find((entry) => entry.name === name);
+        }
+
+        it.each([
+            'data/connections/webhook-subscriptions.jsonl',
+            'data/connections/code-host-installations.jsonl',
+            'data/account/onboarding.jsonl',
+            'data/communication/email-conversations.jsonl',
+        ])('writes the owner’s rows into %s', async (name) => {
+            const h = harness({ rows: ROWS, row: { organizationId: null } });
+            await h.runner.run('b1', PERSONAL_OPTIONS);
+
+            expect(file(h.terminal(), name)?.records).toBe(1);
         });
     });
 

@@ -34,6 +34,28 @@ export class TypeOrmBackupRowSource implements BackupRowSource {
             .columns.some((candidate) => candidate.propertyName === column);
     }
 
+    /**
+     * Read from the entity's metadata, so the answer follows the schema: a
+     * column that becomes nullable later turns an "honestly empty" file into
+     * a reported gap without anyone having to remember to update a table.
+     * An unknown entity or column answers `true` — "it might be NULL" is the
+     * safe answer, because it reports a gap rather than claiming an absence.
+     */
+    isNullable(entity: string, column: string): boolean {
+        if (!this.hasEntity(entity)) {
+            return true;
+        }
+        const metadata = this.dataSource.getMetadata(entity);
+        const found = metadata.columns.find((candidate) => candidate.propertyName === column);
+        if (!found) {
+            return true;
+        }
+        if (found.isPrimary === true) {
+            return false;
+        }
+        return found.isNullable !== false;
+    }
+
     async page(
         query: BackupEntityQuery,
         offset: number,

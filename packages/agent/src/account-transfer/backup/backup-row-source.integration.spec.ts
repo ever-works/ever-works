@@ -3,7 +3,7 @@ import { BACKUP_DOMAINS } from '@ever-works/contracts';
 import { ENTITIES } from '../../database/_entities-inventory';
 import { TypeOrmBackupRowSource } from './backup-row-source';
 import { BACKUP_COLLECTORS } from './collectors';
-import { referencedEntities } from './collectors/domain-specs';
+import { BACKUP_DOMAIN_SPECS, referencedEntities } from './collectors/domain-specs';
 import type { BackupCollectContext, BackupScope } from './collectors/collector.types';
 
 /**
@@ -340,6 +340,297 @@ describe('TypeOrmBackupRowSource (better-sqlite3)', () => {
                 10,
             );
             expect(rows.map((row) => row.id)).toEqual([OWNER_AGENT]);
+        });
+    });
+
+    describe('a personal workspace still exports its owner’s own un-organized rows', () => {
+        // The half the sweep above cannot see. A person who has not created
+        // an organization yet is the DEFAULT state, and every webhook
+        // subscription, code-host installation, onboarding request and email
+        // conversation they make is stamped `organizationId = NULL`. The
+        // cross-account fix planned all four files as "matches nothing", so
+        // this owner's archive carried none of them — and still reported the
+        // domains `complete`. Here the owner's rows sit in the SAME tables as
+        // a stranger's, and both halves are asserted over one walk.
+        const OWN_AGENT = '77777777-7777-4777-8777-777777777777';
+        const OTHER_AGENT = '88888888-8888-4888-8888-888888888888';
+        const OWN = {
+            onboarding: idOf('own-on'),
+            conversation: idOf('own-ec'),
+            installation: idOf('own-gh'),
+            subscription: idOf('own-wh'),
+            delivery: idOf('own-wd'),
+        };
+        const OTHER_MARKERS = [
+            'other-stranger@example.invalid',
+            'https://other-strangers.example.invalid/hook',
+            'other-stranger-login',
+            'other-stranger-thread',
+        ];
+        const OWN_SECRET = 'enc::v1::owner-secret-value';
+
+        type Emitted = { entity: string; file: string; row: Record<string, unknown> };
+
+        beforeAll(async () => {
+            await dataSource.getRepository('Agent').insert([
+                {
+                    id: OWN_AGENT,
+                    userId: OWNER,
+                    name: 'Owner mail agent',
+                    slug: 'owner-mail-agent',
+                    scope: 'personal',
+                    status: 'active',
+                    permissions: {},
+                    tenantId: TENANT,
+                    organizationId: null,
+                },
+                {
+                    id: OTHER_AGENT,
+                    userId: STRANGER,
+                    name: 'Other stranger agent',
+                    slug: 'other-stranger-agent',
+                    scope: 'personal',
+                    status: 'active',
+                    permissions: {},
+                    tenantId: STRANGER_TENANT,
+                    organizationId: null,
+                },
+            ] as never);
+
+            await dataSource.getRepository('OnboardingRequest').insert([
+                {
+                    id: OWN.onboarding,
+                    githubIdentityHash: 'hash-owner',
+                    repoUrlCanonical: 'https://code.example.invalid/owner/repo',
+                    contactEmail: 'owner@example.invalid',
+                    accountId: OWNER,
+                    status: 'pending',
+                    tenantId: TENANT,
+                    organizationId: null,
+                },
+                {
+                    id: idOf('oth-on'),
+                    githubIdentityHash: 'hash-other-stranger',
+                    repoUrlCanonical: 'https://code.example.invalid/other/repo',
+                    contactEmail: 'other-stranger@example.invalid',
+                    accountId: STRANGER,
+                    status: 'pending',
+                    tenantId: STRANGER_TENANT,
+                    organizationId: null,
+                },
+            ] as never);
+            await dataSource.getRepository('EmailConversation').insert([
+                {
+                    id: OWN.conversation,
+                    agentId: OWN_AGENT,
+                    threadKey: 'owner-thread',
+                    participants: [{ address: 'owner@example.invalid' }],
+                    tenantId: TENANT,
+                    organizationId: null,
+                },
+                {
+                    id: idOf('oth-ec'),
+                    agentId: OTHER_AGENT,
+                    threadKey: 'other-stranger-thread',
+                    participants: [{ address: 'other-stranger@example.invalid' }],
+                    tenantId: STRANGER_TENANT,
+                    organizationId: null,
+                },
+            ] as never);
+            await dataSource.getRepository('GitHubAppInstallation').insert([
+                {
+                    id: OWN.installation,
+                    installationId: '11111',
+                    accountLogin: 'owner-login',
+                    accountType: 'User',
+                    targetType: 'User',
+                    createdByUserId: OWNER,
+                    tenantId: TENANT,
+                    organizationId: null,
+                },
+                {
+                    id: idOf('oth-gh'),
+                    installationId: '88888',
+                    accountLogin: 'other-stranger-login',
+                    accountType: 'Organization',
+                    targetType: 'Organization',
+                    createdByUserId: STRANGER,
+                    tenantId: STRANGER_TENANT,
+                    organizationId: null,
+                },
+            ] as never);
+            await dataSource.getRepository('WebhookSubscription').insert([
+                {
+                    id: OWN.subscription,
+                    accountId: OWNER,
+                    url: 'https://owner.example.invalid/hook',
+                    secretEncrypted: OWN_SECRET,
+                    events: ['work.created'],
+                    tenantId: TENANT,
+                    organizationId: null,
+                },
+                {
+                    id: idOf('oth-wh'),
+                    accountId: STRANGER,
+                    url: 'https://other-strangers.example.invalid/hook',
+                    secretEncrypted: 'enc::v1::other-stranger',
+                    events: ['work.created'],
+                    tenantId: STRANGER_TENANT,
+                    organizationId: null,
+                },
+            ] as never);
+            await dataSource.getRepository('WebhookDelivery').insert([
+                {
+                    id: OWN.delivery,
+                    subscriptionId: OWN.subscription,
+                    accountId: OWNER,
+                    event: 'work.created',
+                    payload: { note: 'owner-delivery' },
+                    tenantId: TENANT,
+                    organizationId: null,
+                },
+                {
+                    id: idOf('oth-wd'),
+                    subscriptionId: idOf('oth-wh'),
+                    accountId: STRANGER,
+                    event: 'work.created',
+                    payload: { note: 'other-stranger-delivery' },
+                    tenantId: STRANGER_TENANT,
+                    organizationId: null,
+                },
+            ] as never);
+        });
+
+        /** Every domain, walked in published order the way the runner walks it. */
+        async function walk(): Promise<{
+            emitted: Emitted[];
+            errorCodes: Map<string, string>;
+            registrations: Map<string, { ids: readonly string[]; complete: boolean }>;
+            unreadable: string[];
+        }> {
+            const registrations = new Map<string, { ids: readonly string[]; complete: boolean }>();
+            const context: BackupCollectContext = {
+                ...contextFor(source),
+                now: new Date(),
+                registerIds: (name, ids, complete = true) =>
+                    registrations.set(name, { ids, complete }),
+                idsFor: (name) => registrations.get(name)?.ids ?? [],
+                idsComplete: (name) => registrations.get(name)?.complete ?? true,
+            };
+            const emitted: Emitted[] = [];
+            const errorCodes = new Map<string, string>();
+            const unreadable: string[] = [];
+
+            for (const domain of BACKUP_DOMAINS) {
+                const collector = BACKUP_COLLECTORS.get(domain.key)!;
+                for (const plan of await collector.plan(context)) {
+                    const file = `${domain.dataDir}/${plan.file}`;
+                    if (plan.errorCode) errorCodes.set(file, plan.errorCode);
+                    try {
+                        for await (const row of collector.rows(context, plan)) {
+                            emitted.push({ entity: plan.spec.entity, file, row });
+                        }
+                    } catch (error) {
+                        unreadable.push(
+                            `${file}: ${error instanceof Error ? error.message : String(error)}`,
+                        );
+                    }
+                }
+            }
+            return { emitted, errorCodes, registrations, unreadable };
+        }
+
+        it('seeded both halves in every table (a silent zero would prove nothing)', async () => {
+            for (const [entity, own, other] of [
+                ['OnboardingRequest', OWN.onboarding, idOf('oth-on')],
+                ['EmailConversation', OWN.conversation, idOf('oth-ec')],
+                ['GitHubAppInstallation', OWN.installation, idOf('oth-gh')],
+                ['WebhookSubscription', OWN.subscription, idOf('oth-wh')],
+            ] as const) {
+                const ids = (await dataSource.getRepository(entity).find()).map(
+                    (row) => (row as { id: string }).id,
+                );
+                expect({ entity, own: ids.includes(own), other: ids.includes(other) }).toEqual({
+                    entity,
+                    own: true,
+                    other: true,
+                });
+            }
+        });
+
+        it.each([
+            ['OnboardingRequest', 'onboarding'],
+            ['EmailConversation', 'conversation'],
+            ['GitHubAppInstallation', 'installation'],
+            ['WebhookSubscription', 'subscription'],
+        ] as const)('exports the owner’s own %s rows', async (entity, key) => {
+            const { emitted, unreadable } = await walk();
+            expect(unreadable).toEqual([]);
+            const ids = emitted.filter((entry) => entry.entity === entity).map((e) => e.row.id);
+            expect(ids).toContain(OWN[key]);
+        });
+
+        it('exports none of the stranger’s rows from those same tables', async () => {
+            const { emitted } = await walk();
+            const leaked = emitted
+                .filter(({ row }) => {
+                    const text = JSON.stringify(row);
+                    return (
+                        OTHER_MARKERS.some((marker) => text.includes(marker)) ||
+                        STRANGER_MARKERS.some((marker) => text.includes(marker)) ||
+                        text.includes(STRANGER) ||
+                        text.includes(STRANGER_TENANT)
+                    );
+                })
+                .map(({ file, row }) => `${file}: ${JSON.stringify(row)}`);
+            expect(leaked).toEqual([]);
+        });
+
+        it('reports none of those four files as a gap', async () => {
+            const { errorCodes } = await walk();
+            expect(
+                [...errorCodes.entries()].filter(([file]) =>
+                    [
+                        'onboarding.jsonl',
+                        'email-conversations.jsonl',
+                        'code-host-installations.jsonl',
+                        'webhook-subscriptions.jsonl',
+                    ].some((name) => file.endsWith(name)),
+                ),
+            ).toEqual([]);
+        });
+
+        it('registers the owner’s webhook subscriptions as a whole id list', async () => {
+            const { registrations } = await walk();
+            const webhookIds = registrations.get('webhookIds');
+            expect(webhookIds?.complete).toBe(true);
+            expect(webhookIds?.ids).toContain(OWN.subscription);
+            expect(webhookIds?.ids).not.toContain(idOf('oth-wh'));
+        });
+
+        it('still redacts the owner’s webhook signing secret on the way out', async () => {
+            const { emitted } = await walk();
+            const subscription = emitted.find((entry) => entry.row.id === OWN.subscription);
+            expect(subscription).toBeDefined();
+            expect(JSON.stringify(subscription!.row)).not.toContain(OWN_SECRET);
+        });
+
+        it('only leaves an organization-scoped file empty where the schema proves it has no rows', () => {
+            // A file still planned as matching nothing in a personal workspace
+            // is honest only when its `organizationId` cannot be NULL. Every
+            // nullable one must carry a personal rule; checked against the
+            // real metadata so a schema change cannot quietly break it.
+            const unproven: string[] = [];
+            for (const spec of BACKUP_DOMAIN_SPECS) {
+                for (const file of spec.files) {
+                    if (file.scope.by !== 'organization' || file.personalScope) continue;
+                    if (!source.hasEntity(file.entity)) continue;
+                    if (source.isNullable(file.entity, 'organizationId')) {
+                        unproven.push(`${spec.key}/${file.file} (${file.entity})`);
+                    }
+                }
+            }
+            expect(unproven).toEqual([]);
         });
     });
 });

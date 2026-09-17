@@ -617,6 +617,310 @@ describe('EntityBackupCollector', () => {
     });
 });
 
+describe('a workspace with no organization, on organization-scoped tables', () => {
+    // A person who has not created an organization yet is the DEFAULT state:
+    // tenants are created lazily, and the scope-stamping subscriber writes
+    // `organizationId = NULL` onto every row they make. Their webhook
+    // subscriptions, code-host installations, onboarding requests and email
+    // conversations all sit there. The cross-account fix planned all four
+    // files as "matches nothing", so the owner's OWN rows vanished from the
+    // archive — and the domain still said `complete` or `empty`.
+    const PERSONAL = { userId: 'u1', organizationId: null, tenantId: 't1' };
+    const connections = BACKUP_DOMAIN_SPECS.find((candidate) => candidate.key === 'connections')!;
+
+    function registry() {
+        const registrations = new Map<string, { ids: readonly string[]; complete: boolean }>();
+        return {
+            registrations,
+            overrides: {
+                registerIds: (name: string, ids: readonly string[], complete = true) =>
+                    registrations.set(name, { ids, complete }),
+                idsFor: (name: string) => registrations.get(name)?.ids ?? [],
+                idsComplete: (name: string) => registrations.get(name)?.complete ?? true,
+            },
+        };
+    }
+
+    it('narrows the owner’s webhook subscriptions by their owner column, not by nothing', async () => {
+        const source = new FixtureRowSource(
+            { WebhookSubscription: [] },
+            { WebhookSubscription: ['id', 'accountId', 'organizationId'] },
+        );
+        const plans = await new EntityBackupCollector(connections).plan(
+            contextFor(source, { scope: PERSONAL }),
+        );
+        const subscriptions = plans.find((plan) => plan.spec.entity === 'WebhookSubscription')!;
+
+        expect(subscriptions.query.matchesNothing).toBeUndefined();
+        expect(subscriptions.query.equals).toEqual({ accountId: 'u1', organizationId: null });
+        expect(subscriptions.errorCode).toBeUndefined();
+    });
+
+    it('exports the owner’s own subscription rows and registers their ids as whole', async () => {
+        const source = new FixtureRowSource(
+            {
+                WebhookSubscription: [{ id: 'wh-own', accountId: 'u1', organizationId: null }],
+            },
+            { WebhookSubscription: ['id', 'accountId', 'organizationId'] },
+        );
+        const { registrations, overrides } = registry();
+        const context = contextFor(source, { scope: PERSONAL, ...overrides });
+        const collector = new EntityBackupCollector(connections);
+        const subscriptions = (await collector.plan(context)).find(
+            (plan) => plan.spec.entity === 'WebhookSubscription',
+        )!;
+
+        const rows: Record<string, unknown>[] = [];
+        for await (const row of collector.rows(context, subscriptions)) rows.push(row);
+
+        expect(rows.map((row) => row.id)).toEqual(['wh-own']);
+        expect(registrations.get('webhookIds')).toEqual({ ids: ['wh-own'], complete: true });
+    });
+
+    it('reaches the owner’s email conversations through their own agents', async () => {
+        const communication = BACKUP_DOMAIN_SPECS.find(
+            (candidate) => candidate.key === 'communication',
+        )!;
+        const source = new FixtureRowSource(
+            { EmailConversation: [] },
+            { EmailConversation: ['id', 'agentId', 'organizationId'] },
+        );
+        const { overrides } = registry();
+        const context = contextFor(source, { scope: PERSONAL, ...overrides });
+        context.registerIds('agentIds', ['agent-own']);
+
+        const conversations = (await new EntityBackupCollector(communication).plan(context)).find(
+            (plan) => plan.spec.entity === 'EmailConversation',
+        )!;
+
+        expect(conversations.query.matchesNothing).toBeUndefined();
+        expect(conversations.query.within).toEqual({ column: 'agentId', ids: ['agent-own'] });
+    });
+
+    it('reports a gap, not an absence, for a nullable table it cannot narrow', async () => {
+        // An `organization` file with no personal rule over a column that
+        // CAN be NULL: the owner's rows may exist and were not read.
+        const spec = {
+            key: 'connections' as const,
+            files: [
+                {
+                    file: 'subscriptions.jsonl',
+                    entity: 'WebhookSubscription',
+                    scope: { by: 'organization' as const },
+                },
+            ],
+        };
+        const source: BackupRowSource = {
+            hasEntity: () => true,
+            hasColumn: () => true,
+            isNullable: () => true,
+            page: async () => [],
+            countTrimmed: async () => 0,
+        };
+        const [plan] = await new EntityBackupCollector(spec).plan(
+            contextFor(source, { scope: PERSONAL }),
+        );
+
+        expect(plan.query.matchesNothing).toBe(true);
+        expect(plan.errorCode).toBe('scope_unresolved');
+    });
+
+    it('treats a source that cannot say whether the column is nullable as a gap', async () => {
+        const spec = {
+            key: 'connections' as const,
+            files: [
+                {
+                    file: 'subscriptions.jsonl',
+                    entity: 'WebhookSubscription',
+                    scope: { by: 'organization' as const },
+                },
+            ],
+        };
+        const source = new FixtureRowSource(
+            { WebhookSubscription: [] },
+            { WebhookSubscription: ['id', 'organizationId'] },
+        );
+        const [plan] = await new EntityBackupCollector(spec).plan(
+            contextFor(source, { scope: PERSONAL }),
+        );
+
+        expect(plan.errorCode).toBe('scope_unresolved');
+    });
+
+    it('reports a table whose organizationId cannot be NULL as honestly empty', async () => {
+        // An organization's members cannot belong to a workspace with no
+        // organization, so "you have none of these" is simply true there.
+        const organizations = BACKUP_DOMAIN_SPECS.find(
+            (candidate) => candidate.key === 'organizations',
+        )!;
+        const source: BackupRowSource = {
+            hasEntity: () => true,
+            hasColumn: () => true,
+            isNullable: () => false,
+            page: async () => {
+                throw new Error('an unscopable file must not be queried');
+            },
+            countTrimmed: async () => 0,
+        };
+        const members = (
+            await new EntityBackupCollector(organizations).plan(
+                contextFor(source, { scope: PERSONAL }),
+            )
+        ).find((plan) => plan.spec.entity === 'OrganizationMember')!;
+
+        expect(members.query.matchesNothing).toBe(true);
+        expect(members.errorCode).toBeUndefined();
+    });
+
+    it('registers a skipped parent as incomplete, so its children report the gap', async () => {
+        // The early returns used to sit before registration, so a skipped
+        // `webhook-subscriptions.jsonl` left `webhookIds` unregistered, an
+        // unregistered name read as complete, and `webhook-deliveries.jsonl`
+        // wrote nothing with no error behind it.
+        const spec = {
+            key: 'connections' as const,
+            files: [
+                {
+                    file: 'subscriptions.jsonl',
+                    entity: 'WebhookSubscription',
+                    scope: { by: 'organization' as const },
+                    registerIdsAs: 'webhookIds',
+                },
+                {
+                    file: 'deliveries.jsonl',
+                    entity: 'WebhookDelivery',
+                    scope: { by: 'parent' as const, column: 'subscriptionId', from: 'webhookIds' },
+                },
+            ],
+        };
+        const source: BackupRowSource = {
+            hasEntity: () => true,
+            hasColumn: () => true,
+            isNullable: () => true,
+            page: async () => [],
+            countTrimmed: async () => 0,
+        };
+        const { registrations, overrides } = registry();
+        const context = contextFor(source, { scope: PERSONAL, ...overrides });
+        const collector = new EntityBackupCollector(spec);
+
+        const [subscriptions] = await collector.plan(context);
+        for await (const _row of collector.rows(context, subscriptions)) void _row;
+
+        expect(registrations.get('webhookIds')).toEqual({ ids: [], complete: false });
+        const deliveries = (await collector.plan(context))[1];
+        expect(deliveries.errorCode).toBe('parent_ids_incomplete');
+    });
+
+    it('registers an honestly empty parent as complete', async () => {
+        const spec = {
+            key: 'organizations' as const,
+            files: [
+                {
+                    file: 'members.jsonl',
+                    entity: 'OrganizationMember',
+                    scope: { by: 'organization' as const },
+                    registerIdsAs: 'memberIds',
+                },
+            ],
+        };
+        const source: BackupRowSource = {
+            hasEntity: () => true,
+            hasColumn: () => true,
+            isNullable: () => false,
+            page: async () => [],
+            countTrimmed: async () => 0,
+        };
+        const { registrations, overrides } = registry();
+        const context = contextFor(source, { scope: PERSONAL, ...overrides });
+        const collector = new EntityBackupCollector(spec);
+
+        const [members] = await collector.plan(context);
+        for await (const _row of collector.rows(context, members)) void _row;
+
+        expect(registrations.get('memberIds')).toEqual({ ids: [], complete: true });
+    });
+
+    it('registers a parent this build does not carry as incomplete', async () => {
+        const { registrations, overrides } = registry();
+        const context = contextFor(new FixtureRowSource({}), overrides);
+        const collector = new EntityBackupCollector(connections);
+
+        const subscriptions = (await collector.plan(context)).find(
+            (plan) => plan.spec.entity === 'WebhookSubscription',
+        )!;
+        expect(subscriptions.unavailable).toBe(true);
+        for await (const _row of collector.rows(context, subscriptions)) void _row;
+
+        expect(registrations.get('webhookIds')).toEqual({ ids: [], complete: false });
+    });
+});
+
+describe('the personal scope rules in the coverage table', () => {
+    it('names only columns the entity actually declares', () => {
+        const problems: string[] = [];
+        for (const spec of BACKUP_DOMAIN_SPECS) {
+            for (const file of spec.files) {
+                const rule = file.personalScope;
+                if (!rule) continue;
+                const columns = columnsOf(file.entity);
+                if (columns.size === 0) continue;
+                const required =
+                    rule.by === 'workspace'
+                        ? [rule.userColumn ?? 'userId', 'organizationId']
+                        : rule.by === 'parent'
+                          ? [rule.column]
+                          : rule.by === 'user'
+                            ? ['userId']
+                            : ['organizationId'];
+                for (const column of required) {
+                    if (!columns.has(column)) {
+                        problems.push(`${spec.key}/${file.file}: ${file.entity} has no ${column}`);
+                    }
+                }
+            }
+        }
+        expect(problems).toEqual([]);
+    });
+
+    it('never reaches for a parent id set before something registers it', () => {
+        const registered = new Set<string>();
+        const problems: string[] = [];
+        for (const spec of BACKUP_DOMAIN_SPECS) {
+            for (const file of spec.files) {
+                const rule = file.personalScope;
+                if (rule?.by === 'parent' && !registered.has(rule.from)) {
+                    problems.push(`${spec.key}/${file.file} wants ${rule.from}`);
+                }
+                if (file.registerIdsAs) registered.add(file.registerIdsAs);
+            }
+        }
+        expect(problems).toEqual([]);
+    });
+
+    it('never falls back to organization scoping, which is what it exists to replace', () => {
+        for (const spec of BACKUP_DOMAIN_SPECS) {
+            for (const file of spec.files) {
+                if (!file.personalScope) continue;
+                expect(file.personalScope.by).not.toBe('organization');
+                expect(file.personalScope.by).not.toBe('owner');
+            }
+        }
+    });
+
+    it('covers the four nullable organization tables that hold an owner’s rows', () => {
+        const personal = BACKUP_DOMAIN_SPECS.flatMap((spec) =>
+            spec.files.filter((file) => file.personalScope).map((file) => file.entity),
+        );
+        expect(personal.sort()).toEqual([
+            'EmailConversation',
+            'GitHubAppInstallation',
+            'OnboardingRequest',
+            'WebhookSubscription',
+        ]);
+    });
+});
+
 describe('withRetries', () => {
     it('gives a transient failure two more goes before it gives up (spec FR-17)', async () => {
         let attempts = 0;
