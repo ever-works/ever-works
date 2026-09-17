@@ -11,6 +11,7 @@ import type { Agent, Task } from '@ever-works/agent/entities';
 import { SkillsService } from '@ever-works/agent/skills';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import {
+    isAgentReviewRunScope,
     resolveAcceptanceChecks,
     resolveChecksPolicy,
     resolveSetupSteps,
@@ -45,6 +46,15 @@ import {
 } from '@ever-works/contracts';
 import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
 import { FleetPushCredentialService } from './fleet-push-credential.service';
+import {
+    describeDelegationScopeNarrowing,
+    FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+    FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+} from './fleet-delegation-scope';
+import {
+    FleetAgentTaskPlanError,
+    FleetDelegationScopeRefusedError,
+} from './fleet-agent-task-plan.error';
 import type {
     FleetAgentTaskPlan,
     FleetAgentTaskPlanner,
@@ -94,12 +104,10 @@ export interface FleetAgentExecutionSettings {
     skipPermissions: boolean;
 }
 
-export class FleetAgentTaskPlanError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'FleetAgentTaskPlanError';
-    }
-}
+// Defined in a leaf file so the fleet-aware dispatcher and the fleet run
+// router can throw the G9 refusal without importing this service's DI graph;
+// re-exported here so every existing import of either class keeps working.
+export { FleetAgentTaskPlanError, FleetDelegationScopeRefusedError };
 
 /**
  * Agent execution v2 — the PLANNER: turns "run this Task on the owner's
@@ -143,6 +151,76 @@ export class FleetAgentTaskPlanError extends Error {
  * resumed run bypasses the transition service's status guards, and the
  * planner is the last place a stale answer for a finished Task can be
  * stopped before it becomes a job.
+ *
+ * ## Delegated runs with a narrowed scope never reach a node (G9)
+ *
+ * A sub-agent delegation admits its child under a NARROWED scope, snapshotted
+ * onto `agent_runs.delegationScope` (`SubAgentScope`: `allowedTools`,
+ * `allowedPaths`, `networkAccess`). On the platform runtime the in-process
+ * tool loop enforces `allowedTools` (`applyDelegationScope`). A fleet node
+ * enforces NOTHING of it, so
+ * {@link FleetAgentTaskPlannerService.refuseUnenforceableDelegationScope}
+ * refuses such a run before either execution mode builds a job for it:
+ *
+ *   - **What "narrows" means** — `allowedTools` is an array without the `'*'`
+ *     wildcard (`[]` included), OR `allowedPaths` is present (`[]` included),
+ *     OR `networkAccess` is present and not `true`. The single definition is
+ *     `describeDelegationScopeNarrowing` (`./fleet-delegation-scope.ts`).
+ *     It judges the scope's LIST the way the in-process filter reads it
+ *     (wildcard anywhere, absent or non-array = no restriction), not the
+ *     tool set that list would leave: a concrete list that happens to equal
+ *     the agent's whole catalog still narrows here, because the fleet has no
+ *     catalog to compare it against.
+ *   - **Why no node can enforce it today** — `model-cli` mode hands the CLI
+ *     a prompt and a worktree: Claude gets a permission mode (optionally
+ *     skip-permissions) and `--allowedTools mcp__<server>`, which APPROVES
+ *     the bridge rather than restricting built-ins; Codex gets a
+ *     `read-only` / `workspace-write` sandbox; neither receives a tool, path
+ *     or network list. The node then commits and pushes itself whenever the
+ *     plan's git policy says so, whatever tools the model had. The legacy
+ *     `command` mode runs the operator's shell template, which has no scope
+ *     input at all. No fleet contract field (`FleetAgentModelExecution`,
+ *     `FleetAgentTaskPayload`, the git policy) and no capability tag
+ *     (`browser`, `gpu`, `screen`, `input`, `attended`, `git-push`, the
+ *     provider tag) expresses scope enforcement. So the rule is
+ *     UNCONDITIONAL. (The platform runtime does not enforce `allowedPaths`
+ *     or `networkAccess` either; the fleet refuses on them anyway, because
+ *     a node additionally has a shell, a push and a credential of its own.)
+ *   - **What relaxing it would take** — a node capability tag, required on
+ *     the job and backed by an executor that proves, for the EXACT scope on
+ *     the run row: the CLI can call only the listed tools, with no shell or
+ *     git outside the list; every write is confined to `allowedPaths`; and
+ *     there is no outbound network, INCLUDING the node's own post-run push
+ *     and the MCP bridge. The scope must travel on the immutable job payload
+ *     and the node must fail the job closed when it cannot apply it. Until
+ *     such a capability exists and is required by the job, this refusal
+ *     stays.
+ *   - **Consequence** — the `delegateToAgent` tool narrows the child to the
+ *     parent's concrete tool list and always sets `networkAccess`, so today
+ *     practically every delegated child on a fleet tenant is refused. That
+ *     is deliberate: the tenant chose the fleet (their machines, credentials
+ *     and billing), so the refusal is visible on the run row and is never a
+ *     silent move to the cloud runtime.
+ *   - **Fail-closed read** — the scope lives ONLY on the run row, read by
+ *     the payload's `runId`. A dispatch with no `runId`, no bound run
+ *     repository, a read that throws (a corrupt `simple-json` value throws
+ *     inside `findOne`), a missing row, or a row owned by someone other than
+ *     the payload's user cannot prove the run is unrestricted and is
+ *     refused. Only a readable row whose scope is `null` (every ordinary,
+ *     non-delegated dispatch) or restricts nothing passes, unchanged.
+ *   - **Fail-closed wiring** — the check cannot be switched off by leaving it
+ *     out. The dispatcher refuses every fleet-bound run when it has neither
+ *     an explicit `delegationScopeGuard` nor a planner implementing this
+ *     method, and `FleetRunRouterService.enqueueAgentTask`
+ *     (the one writer of `agent-task` fleet rows) refuses any payload the
+ *     dispatcher did not clear through this method first, so a direct caller
+ *     of the router is refused too.
+ *   - **Not covered here** — a run whose row carries NO scope although its
+ *     work was delegated (a board re-run of the child Task, a fan-out, a
+ *     resume on develop) passes, exactly as it gets every tool on the
+ *     platform runtime; that scope loss happens upstream, when the row is
+ *     written. Jobs already in `fleet_jobs` before this rule shipped are
+ *     not re-checked at lease time.
  */
 @Injectable()
 export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
@@ -271,6 +349,78 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 settings.mode === 'model-cli' ? settings.provider : null,
             ),
         };
+    }
+
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — refuse an agent
+     * REVIEW run before any fleet job is built for it, in either mode.
+     *
+     * Why a review run can never run here: its only output is a verdict,
+     * recorded through `submitTaskReview`, and that tool exists only in
+     * the platform's in-process tool loop. A node runs a CLI on a prompt;
+     * its MCP bridge is off by default and exposes no verdict route. So a
+     * fleet review would spend a model run on one of the owner's PCs and
+     * could not possibly record anything, leaving its ledger row open and
+     * its budget slot spent. Worse, its brief travels on `pendingInput`,
+     * which {@link resolveOwnerMessages} renders as `# OWNER ANSWER` —
+     * the pull request author's diff, presented to the model as the owner's
+     * own words — cut to 16 KiB with no marker, and the model would be told
+     * to "make your changes here" in a worktree the node then pushes.
+     *
+     * Identified from the run ROW's admission scope (platform state written
+     * at dispatch), never from the queue payload, so a parked review run
+     * promoted later by the dispatch-gate drain is refused too.
+     *
+     * NOT the first refusal a review run meets on the fleet. The dispatcher
+     * asks the G9 delegation-scope guard
+     * ({@link refuseUnenforceableDelegationScope}) first, and the review-only
+     * scope always narrows, so with production wiring (the planner is the
+     * guard) a review run is refused there, as
+     * `fleet-delegation-scope-unenforceable`, and this method is never
+     * reached. It is reachable only behind an explicit
+     * `delegationScopeGuard` that admits the run. It stays the rule that
+     * matters if G9 is ever relaxed for nodes that can enforce a scope,
+     * because a verdict still cannot be recorded on a node.
+     *
+     * Fails closed: an unbound run repository, an unreadable row, or a run
+     * id whose row does not exist refuses the dispatch rather than guessing
+     * that it is not a review. A missing row is not evidence of an ordinary
+     * run: it is a run scope that cannot be verified at all, and behind a
+     * guard that admitted the payload nothing else would stop it reaching
+     * {@link plan}. No run id means no pre-created run row, which a review
+     * dispatch never produces (`TaskTransitionService.dispatchAgentRun`
+     * refuses to bind a review without one), so that payload is not a
+     * review and passes. The reasons here deliberately never carry the G9
+     * `fleet-delegation-scope-` prefix: they are this rule's refusals, not
+     * the delegation-scope guard's.
+     */
+    async refuseAgentReviewRun(payload: AgentTaskExecuteDispatchPayload): Promise<void> {
+        if (!payload.runId) return;
+        if (!this.runs) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} could not be checked before routing to the fleet (no run repository) — refusing rather than risk dispatching an agent review run a fleet node cannot complete`,
+            );
+        }
+        let run: Awaited<ReturnType<AgentRunRepository['findById']>>;
+        try {
+            run = await this.runs.findById(payload.runId);
+        } catch (err) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} could not be read before routing to the fleet — refusing rather than risk dispatching an agent review run a fleet node cannot complete: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+        if (!run) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} was not found before routing to the fleet — refusing rather than risk dispatching an agent review run a fleet node cannot complete`,
+            );
+        }
+        if (isAgentReviewRunScope(run.delegationScope)) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} is an agent code-review run, and review runs cannot execute on the fleet: a fleet node has no channel to record the reviewer's verdict. Route this Work's agent runs to the platform runtime to use agent reviewers.`,
+            );
+        }
     }
 
     async plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null> {
@@ -496,6 +646,112 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             // job changes shape because this slice exists.
             ...(mcp ? { mcp } : {}),
         };
+    }
+
+    /**
+     * Judgment layer G9 on the fleet — THROWS {@link FleetDelegationScopeRefusedError}
+     * when the run is a delegated run whose admission scope narrows what it
+     * may do, or when that cannot be ruled out. Resolves (and changes
+     * nothing) for every run whose row is readable and whose scope is `null`
+     * or restricts nothing. The rule, why no node can enforce it and what a
+     * future enforcement capability must prove are in the class doc.
+     *
+     * Called by the dispatcher for EVERY fleet-bound dispatch, BEFORE
+     * {@link plan} and before any fleet job row is written, so it covers the
+     * `model-cli` and legacy `command` modes alike (it reads no settings and
+     * never looks at the mode).
+     *
+     * Reads the run ROW (platform state written at admission), never the
+     * queue payload, which carries no scope: a parked child promoted later by
+     * the dispatch-gate drain is refused the same way, and so is a resumed
+     * run once `RunSteeringService.resume` carries the scope forward.
+     *
+     * FAIL CLOSED when the row cannot be read. Every production enqueue site
+     * (`TaskTransitionService.dispatchAgentRun`, `RunSteeringService.resume`,
+     * the dispatch-gate drain, `POST /agents/:id/assign-task`) pre-creates the
+     * row and passes its id, and each writes the row's `userId` as the
+     * payload's. So a missing `runId` (the transition service with no run
+     * repository, which also drops the scope it was handed), an unbound
+     * repository, a throwing read, a missing row or an owner mismatch is an
+     * anomaly in which the scope is unknown — never evidence that the run is
+     * unrestricted. A legitimately non-delegated run is a readable row with
+     * a `null` scope, and nothing else.
+     *
+     * How the refusal reaches the run row depends on the enqueue site, not on
+     * this method: the transition service, the dispatch-gate drain and resume
+     * record `dispatch-failed: <message>`; `POST /agents/:id/assign-task`
+     * records `enqueue-failed: <message>` and answers HTTP 500, as it does for
+     * every enqueue failure.
+     *
+     * Deliberately NOT inside {@link plan}. `plan` first resolves the tenant's
+     * execution settings (a plugin-settings read) and returns `null` in
+     * `command` mode right after that, before any Task or run read, so a
+     * refusal placed inside it would be ordered behind — and share the failure
+     * posture of — a settings lookup that has nothing to do with the scope.
+     * Its one run read (`resolveOwnerMessages`) is best-effort and swallows
+     * errors by design, the opposite of the fail-closed read this rule needs.
+     */
+    async refuseUnenforceableDelegationScope(
+        payload: AgentTaskExecuteDispatchPayload,
+    ): Promise<void> {
+        const unverifiable = (why: string): FleetDelegationScopeRefusedError =>
+            new FleetDelegationScopeRefusedError(
+                FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+                `the delegation scope of ${
+                    payload.runId ? `run ${payload.runId}` : `the run for task ${payload.taskId}`
+                } could not be verified before routing it to the fleet (${why}). Refused: a fleet node ` +
+                    `cannot enforce a narrowed delegation scope, so a run whose scope cannot be read is ` +
+                    `never assumed to be unrestricted.`,
+            );
+
+        if (!payload.runId) {
+            throw unverifiable('the dispatch carries no run id, so there is no run row to read');
+        }
+        if (!this.runs) {
+            throw unverifiable('no run repository is available to read the run row');
+        }
+        let run: Awaited<ReturnType<AgentRunRepository['findById']>>;
+        try {
+            run = await this.runs.findById(payload.runId);
+        } catch (err) {
+            throw unverifiable(
+                `the run row could not be read: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
+        if (!run) {
+            throw unverifiable('the run row does not exist');
+        }
+        if (run.userId !== payload.userId) {
+            throw unverifiable('the run row belongs to a different owner than the dispatch');
+        }
+
+        const narrowing = describeDelegationScopeNarrowing(run.delegationScope);
+        if (narrowing.length === 0) return;
+
+        // An agent REVIEW run (slice AD) is admitted under the review-only
+        // scope, which always narrows, so it is refused HERE — before
+        // `refuseAgentReviewRun` is ever asked. Same code (the review ledger's
+        // `refusalCode` and the specs key on it); only the wording differs, so
+        // the owner is not told a review run was a delegated sub-agent run.
+        if (isAgentReviewRunScope(run.delegationScope)) {
+            throw new FleetDelegationScopeRefusedError(
+                FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+                `run ${payload.runId} is an agent review run, and review runs cannot run on the fleet: ` +
+                    `its scope narrows what it may do (${narrowing.join('; ')}), which no fleet node can ` +
+                    `enforce, and a node has no channel to record the reviewer's verdict. Refused rather ` +
+                    `than run with more than the review admitted. Route this Work's agent runs to the ` +
+                    `platform runtime to use agent reviewers.`,
+            );
+        }
+
+        throw new FleetDelegationScopeRefusedError(
+            FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+            `run ${payload.runId} is a delegated sub-agent run whose scope narrows what it may do ` +
+                `(${narrowing.join('; ')}), and no fleet node can enforce a delegation scope: a node ` +
+                `runs a model CLI with its own shell, file and git access, and commits and pushes the ` +
+                `result itself. Refused rather than run with more than the delegation admitted. Route ` +
+                `this Work's agent runs to the platform runtime to delegate with a narrowed scope.`,
+        );
     }
 
     /**

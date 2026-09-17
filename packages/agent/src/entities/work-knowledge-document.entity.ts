@@ -49,6 +49,11 @@ import type { KbConsolidationMarker } from '../services/memory-consolidation';
 @Index(['organizationId', 'kbDocumentClass'])
 @Index(['workId', 'status'])
 @Index(['workId', 'updatedAt'])
+// Knowledge library — the folder-filtered list and the default
+// "recently changed" sort for the organization shelf and a Work's shelf.
+@Index('idx_wkd_folder', ['folderId'])
+@Index('idx_wkd_org_status_revision_at', ['organizationId', 'status', 'revisionAt'])
+@Index('idx_wkd_work_status_revision_at', ['workId', 'status', 'revisionAt'])
 export class WorkKnowledgeDocument {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -211,6 +216,60 @@ export class WorkKnowledgeDocument {
      */
     @Column({ type: 'varchar', nullable: true, name: 'review_state' })
     reviewState?: KbReviewState | null;
+
+    /**
+     * Knowledge library — the shared (organization-scope) folder this
+     * document is filed in. `NULL` = Unfiled. Raw uuid, no `@ManyToOne`
+     * (EW-654 no-cycle rule); the migration adds the FK to `memory_folders`
+     * with `ON DELETE SET NULL`, and the library service also clears it
+     * explicitly on folder delete so drivers without the FK behave alike.
+     * A document is filed only into a folder of its own Organization — a
+     * service-layer invariant, because the document's effective
+     * Organization may come from its Work rather than this row.
+     */
+    @Column({ type: 'uuid', nullable: true, name: 'folder_id' })
+    folderId?: string | null;
+
+    /**
+     * Knowledge library — substantive-change counter. Starts at 1 and moves
+     * by exactly 1 when the title, description, tags, class or the
+     * whitespace-normalized body changes.
+     *
+     * `updatedAt` cannot stand in for it: it is an `@UpdateDateColumn`, so
+     * it moves whenever the mirror job stamps `lastCommitSha`, the embed job
+     * stamps `lastIndexedAt`, or any other bookkeeping write touches the
+     * row. Driving "changed since you last read it" from `updatedAt` would
+     * flag every document for every reader after each background sweep.
+     */
+    @Column({ type: 'int', default: 1 })
+    revision: number;
+
+    /**
+     * When `revision` last moved. Powers "changed 06:04" and the default
+     * library sort without trusting `updatedAt` (see `revision`).
+     */
+    @Column({ type: Date, nullable: true, name: 'revision_at' })
+    revisionAt?: Date | null;
+
+    /**
+     * SHA-256 of the whitespace-normalized body (`kb-content-hash.ts`) —
+     * the comparison input for a substantive body change. `NULL` on rows
+     * that predate the library: the first write seeds it without moving
+     * `revision`, so shipping the library never flags old documents.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true, name: 'normalized_content_hash' })
+    normalizedContentHash?: string | null;
+
+    /** Knowledge library — when the document was last archived; `NULL` while on the shelf. */
+    @Column({ type: Date, nullable: true, name: 'archived_at' })
+    archivedAt?: Date | null;
+
+    /**
+     * Knowledge library — who archived it. Raw uuid; the migration adds the
+     * FK to `users` with `ON DELETE SET NULL`.
+     */
+    @Column({ type: 'uuid', nullable: true, name: 'archived_by_id' })
+    archivedById?: string | null;
 
     @CreateDateColumn()
     createdAt: Date;

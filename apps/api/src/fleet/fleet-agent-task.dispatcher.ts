@@ -14,6 +14,11 @@ import type {
     TaskAcceptanceCheck,
 } from '@ever-works/contracts';
 import type { FleetKillSwitchService } from '@ever-works/agent/fleet';
+import { FleetDelegationScopeRefusedError } from './fleet-agent-task-plan.error';
+import {
+    FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+    markDelegationScopeCleared,
+} from './fleet-delegation-scope';
 import {
     FleetKillSwitchActiveError,
     isFleetKillSwitchActiveError,
@@ -65,6 +70,38 @@ export interface FleetAgentTaskPlan {
 export interface FleetAgentTaskPlanner {
     plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null>;
     /**
+     * Judgment layer G9 on the fleet — THROWS when the run is a delegated
+     * run whose `agent_runs.delegationScope` NARROWS what it may do
+     * (`allowedTools` is an array without the `'*'` wildcard, `allowedPaths`
+     * is present, or `networkAccess` is present and not `true`; an ABSENT
+     * key restricts nothing), or when the run row cannot be read to rule
+     * that out. No fleet node can enforce a delegation scope — it runs a
+     * model CLI with shell and git access and pushes itself — so such a run
+     * must never become a fleet job.
+     *
+     * Called for EVERY fleet-bound dispatch, in both execution modes, BEFORE
+     * {@link plan} and before the job row is written. Its throw propagates
+     * like a planning failure and is NEVER turned into a move to the cloud
+     * runtime; the enqueue site records it on the run row
+     * (`dispatch-failed: …` from the transition service, the dispatch-gate
+     * drain and resume; `enqueue-failed: …` plus HTTP 500 from
+     * `POST /agents/:id/assign-task`). Resolves for a readable row whose
+     * scope is `null` or restricts nothing, and then the dispatch continues
+     * exactly as before.
+     *
+     * Optional on the planner because the guard is its own port
+     * ({@link FleetDelegationScopeGuard}); the planner serves as the guard
+     * when no explicit `delegationScopeGuard` is wired. Either way the
+     * dispatcher REQUIRES one for the fleet: with neither, every fleet-bound
+     * run is refused (`fleet-delegation-scope-unverifiable`) instead of the
+     * check being skipped. The api-side `FleetAgentTaskPlannerService` — the
+     * one `TasksModule` wires into the production dispatcher — always
+     * implements it, and its read fails closed (see
+     * `refuseUnenforceableDelegationScope` there for the rule, the read
+     * posture and what a node would have to prove).
+     */
+    refuseUnenforceableDelegationScope?(payload: AgentTaskExecuteDispatchPayload): Promise<void>;
+    /**
      * Self-build slice S — what the job WILL require, known before the
      * plan is built: the capability tags, resolved from the tenant's
      * execution settings alone (no Task / workspace reads, so a cloud
@@ -75,6 +112,47 @@ export interface FleetAgentTaskPlanner {
      * stamped with) and the queue SLA bounds a wrong "placed".
      */
     requirements?(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskRequirements>;
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — THROWS when the
+     * run is an agent REVIEW run, which must never execute on the fleet.
+     *
+     * A fleet node has no tool channel through which a verdict could be
+     * recorded (`submitTaskReview` lives only in the platform's in-process
+     * tool loop; the node's MCP bridge is off by default and exposes no
+     * verdict route), so a fleet review would be a paid model run with a
+     * structurally impossible outcome — and its brief would be rendered as
+     * an `# OWNER ANSWER`, i.e. the pull request author's diff presented to
+     * the model as the owner's own words. Called for every fleet-bound
+     * dispatch the delegation-scope guard admitted, in both execution modes,
+     * BEFORE {@link plan}; its throw propagates like a planning failure, so
+     * the run is marked `dispatch-failed` with the reason and the review
+     * ledger settles the claim `failed`. Fails closed: a run row it cannot
+     * read refuses too.
+     *
+     * The SECOND refusal a review run meets, not the first. The G9 guard
+     * ({@link refuseUnenforceableDelegationScope}) runs before it, and the
+     * review-only scope always narrows, so with production wiring (the
+     * planner is the guard) a review run is refused by G9 as
+     * `fleet-delegation-scope-unenforceable` and this method is never asked.
+     * It is reachable only behind an explicit `delegationScopeGuard` that
+     * admits the run, and it is the rule that still matters if G9 is ever
+     * relaxed for nodes that can enforce a scope: a verdict still cannot be
+     * recorded on a node.
+     *
+     * Optional so a planner double without it keeps working; the api-side
+     * `FleetAgentTaskPlannerService` always implements it.
+     */
+    refuseAgentReviewRun?(payload: AgentTaskExecuteDispatchPayload): Promise<void>;
+}
+
+/**
+ * Judgment layer G9 — the port the dispatcher asks whether a fleet-bound
+ * run's delegation scope lets it become a fleet job. Same contract as
+ * {@link FleetAgentTaskPlanner.refuseUnenforceableDelegationScope}: resolve
+ * to admit, throw to refuse (including when the run row cannot be read).
+ */
+export interface FleetDelegationScopeGuard {
+    refuseUnenforceableDelegationScope(payload: AgentTaskExecuteDispatchPayload): Promise<void>;
 }
 
 /** What {@link FleetAgentTaskPlanner.requirements} resolves. */
@@ -104,9 +182,22 @@ export interface FleetAwareDispatcherDeps {
     notifications?: Pick<NotificationService, 'notifyFleetRunnerFallback'>;
     /**
      * Agent execution v2 — supplies the model-CLI plan for a fleet-bound
-     * run. Absent = every fleet run is the legacy command job.
+     * run. Absent = every fleet run is the legacy command job (a
+     * {@link delegationScopeGuard} is still required, see there).
      */
     planner?: FleetAgentTaskPlanner;
+    /**
+     * Judgment layer G9 — the delegation-scope guard asked about EVERY
+     * fleet-bound run before a plan or a job exists. Absent = the planner,
+     * when it implements `refuseUnenforceableDelegationScope` (production:
+     * `TasksModule` wires `FleetAgentTaskPlannerService`, which does).
+     *
+     * FAILS CLOSED: with no explicit guard and no planner that implements
+     * the method, every fleet-bound run is REFUSED
+     * (`fleet-delegation-scope-unverifiable`) — never enqueued unchecked and
+     * never moved to the cloud. Cloud-routed runs never consult it.
+     */
+    delegationScopeGuard?: FleetDelegationScopeGuard;
     /**
      * Panic controls (EW-778) — the GLOBAL STOP FLAG. Consulted BEFORE
      * routing, and its refusal is the one error the routing catch below
@@ -168,6 +259,31 @@ export interface FleetAwareDispatcherDeps {
  * existing loud-degradation path. (The dispatch gate upstream parks every
  * run first; this seam is defence in depth for a gate that is absent or
  * mis-wired.)
+ *
+ * ## A fleet decision the fleet cannot honour (G9 delegation scope)
+ *
+ * Once the router answers `fleet` / `fleet-waiting`, the delegation-scope
+ * guard (`deps.delegationScopeGuard`, else the planner's
+ * `refuseUnenforceableDelegationScope`) runs FIRST — before `plan()` and
+ * before `enqueueAgentTask` writes the job row — so neither the `model-cli`
+ * nor the legacy `command` mode ever builds a job for a delegated run whose
+ * scope narrows the tool surface (or whose run row cannot be read). Its
+ * refusal propagates like any post-decision failure and the enqueue site
+ * records it on the run row (`dispatch-failed: fleet-delegation-scope-…: …`
+ * from the transition service, the drain and resume; `enqueue-failed: …`
+ * from `POST /agents/:id/assign-task`). It is deliberately NOT a cloud
+ * fallback: the tenant chose the fleet (their machines, credentials and
+ * billing), so relocating the run would be a decision nobody made. A
+ * `cloud` decision never consults it — the in-process tool loop enforces
+ * the scope there.
+ *
+ * The control fails closed at both ends. A dispatcher with no guard (no
+ * explicit guard, and no planner that implements the method) refuses the
+ * fleet-bound run
+ * rather than skipping the check. A payload that passed the guard is marked
+ * cleared, and `FleetRunRouterService.enqueueAgentTask` — the one writer of
+ * `agent-task` fleet rows — refuses any payload that was not, so a caller
+ * that goes straight to the router cannot write a job around the guard.
  */
 export function createFleetAwareAgentTaskExecuteDispatcher(
     delegate: AgentTaskExecuteDispatcher,
@@ -223,12 +339,32 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             }
 
             if (decision.target === 'fleet' || decision.target === 'fleet-waiting') {
+                // G9 — a delegated run whose scope no node can enforce is
+                // refused HERE, before either execution mode builds a job
+                // for it. Outside any try: it must propagate (the enqueue
+                // site fails the run), never become a cloud fallback. A
+                // missing guard refuses too (fail closed); a passed guard
+                // clears THIS payload for the router's job writer, just
+                // before the write below.
+                await refuseUnenforceableDelegationScope(deps, payload);
+
                 // Agent execution v2 — the plan is built AFTER the routing
                 // decision (a cloud run never pays for it) and its failure
                 // is NOT swallowed: a fleet run that cannot be planned has
                 // no honest fallback, so the transition service records
                 // the reason on the run row.
+                //
+                // Reviewer agent stage (slice AD): the SECOND refusal a
+                // review run meets, before either execution mode builds a
+                // job for it. The G9 guard above already refuses every
+                // review run (its scope always narrows), so this is reached
+                // only behind an explicit guard that admitted the run — see
+                // `FleetAgentTaskPlanner.refuseAgentReviewRun`.
+                if (deps.planner?.refuseAgentReviewRun) {
+                    await deps.planner.refuseAgentReviewRun(payload);
+                }
                 const plan = deps.planner ? await deps.planner.plan(payload) : null;
+                markDelegationScopeCleared(payload);
                 return router.enqueueAgentTask(payload, decision.queuedReason ?? null, plan);
             }
 
@@ -272,6 +408,41 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             return delegate.enqueue(payload);
         },
     };
+}
+
+/**
+ * G9 — ask the delegation-scope guard about a fleet-bound run, failing
+ * CLOSED when there is no guard to ask.
+ *
+ * NOT best-effort, unlike the lookups below: a guard that throws refuses the
+ * run, and a guard that is missing (no `delegationScopeGuard`, and no
+ * planner implementing `refuseUnenforceableDelegationScope`) refuses it
+ * too, because skipping the check would let a narrowed delegated child
+ * become a job on a node that cannot enforce its scope. Production always
+ * wires the real planner, so the missing-guard branch only fires for a
+ * mis-wired graph — where a visible refusal of every fleet-bound run is the
+ * honest outcome.
+ */
+async function refuseUnenforceableDelegationScope(
+    deps: FleetAwareDispatcherDeps,
+    payload: AgentTaskExecuteDispatchPayload,
+): Promise<void> {
+    const guard = deps.delegationScopeGuard ?? deps.planner;
+    if (!guard || typeof guard.refuseUnenforceableDelegationScope !== 'function') {
+        throw new FleetDelegationScopeRefusedError(
+            FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+            `the delegation scope of ${
+                payload.runId ? `run ${payload.runId}` : `the run for task ${payload.taskId}`
+            } could not be verified before routing it to the fleet (no delegation-scope guard is ` +
+                `wired into the fleet dispatcher: ${
+                    deps.planner
+                        ? 'the planner does not implement refuseUnenforceableDelegationScope'
+                        : 'no guard and no planner'
+                }). Refused: a fleet node cannot enforce a narrowed delegation scope, so a run whose ` +
+                `scope cannot be checked is never assumed to be unrestricted.`,
+        );
+    }
+    await guard.refuseUnenforceableDelegationScope(payload);
 }
 
 /**

@@ -148,9 +148,94 @@ The Platform uses ESLint with TypeScript-specific rules across all workspaces. T
 | Functions, Variables       | camelCase        | `getWorkById`, `itemCount`            |
 | Constants                  | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT`, `DEFAULT_LOCALE`   |
 
+## Before You Open a Pull Request
+
+**Pull requests no longer run the test suites.** Since 2026-09-14 `ci.yml` runs only on
+pushes to `stage` and `main` — a PR into `develop` produces zero check runs. The reason is
+in the header of `.github/workflows/ci.yml`: the suite expands to ~15 checks on the shared
+self-hosted ARC pool, and at 85 PR-triggered runs a week it was starving the deploy lanes.
+
+That moves the first line of defence onto your machine. Nothing enforces it, so this is a
+contract, not a gate.
+
+### The fast tier — run this every time (seconds)
+
+```bash
+pnpm format:check
+pnpm lint
+```
+
+This is not busywork: of the last 100 PR-triggered CI runs before the policy changed,
+`Check formatting` was the single most common avoidable failure after the dependency audit.
+It is also the cheapest command in the repo.
+
+### The full tier — run this when you have changed behaviour
+
+```bash
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm build
+pnpm lint
+pnpm test
+```
+
+`pnpm build` must precede `pnpm test` — turbo's `test` task declares no `dependsOn`, so a
+cold `pnpm test` fails to resolve workspace entry points.
+
+### The node/platform wire contract — run this if you touched a DTO or `packages/contracts`
+
+```bash
+pnpm --filter @ever-works/contracts test
+pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
+pnpm --filter @ever-works/contracts build
+pnpm --filter ever-works-node exec vitest run src/core/node-contract.conformance.spec.ts src/core/api-base.spec.ts
+```
+
+These are the same four commands `promotion-gate.yml` runs, and that gate has **no override
+label** — a broken wire contract stops the whole fleet at once.
+
+### What your machine cannot tell you
+
+| Not reproducible locally                | Why                                                                                                                | Where it actually runs   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| `job-runtime-real-infra`                | needs Redis + Postgres + Temporal auto-setup + an Inngest dev server                                               | push to `main` only      |
+| The `/login` redirect regression guard  | boots two production `next start` servers and uses `pkill`; not available in Git Bash                              | push to `stage` / `main` |
+| The four `job-runtime` real-infra specs | they `describe.skip` **silently** when `EW_TEST_REAL_*` is unset, so a green local run has executed the mocks only | push to `stage` / `main` |
+
+For the third row you can close most of the gap with
+`docker compose -f docker-compose.infra.yml up -d` and setting `EW_TEST_REAL_REDIS_URL` /
+`EW_TEST_REAL_PGBOSS_URL`. Temporal and Inngest have no local compose entry.
+
+### A note on `pnpm audit`
+
+CI retries transport errors three times and downgrades `ERR_PNPM_AUDIT_BAD_RESPONSE` to a
+warning, because npm retired the legacy audit endpoints. A bare local
+`pnpm audit --prod --audit-level=high` will hard-fail on that same outage. An
+`ERR_PNPM_AUDIT_BAD_RESPONSE` is an endpoint outage, not a finding.
+
+### If you want the full suite on your branch anyway
+
+```bash
+gh workflow run ci.yml --ref <your-branch>
+gh run watch
+```
+
+### Where a batch is really verified
+
+`develop -> stage` is the first rung that runs the suites, and `stage -> main` re-proves the
+exact commit being promoted. Note that the `develop -> stage` pull request runs only
+`promotion-gate`, which checks the node contract and **not** format, lint, build or test —
+so the first automatic execution of those on your batch is the push to `stage`, after that
+merge has already landed.
+
 ## Commit Conventions
 
-Both repositories enforce [Conventional Commits](https://www.conventionalcommits.org/) via **commitlint** and **husky** pre-commit hooks.
+Both repositories use [Conventional Commits](https://www.conventionalcommits.org/).
+
+> **Nothing enforces this automatically.** `.husky/commit-msg` is a single commented-out
+> line (disabled on 2026-02-11 in `ee573da0d`), and the repo has never had a `pre-commit`
+> or `pre-push` hook. There is no lefthook, simple-git-hooks, lint-staged or
+> `.pre-commit-config.yaml` either. The convention is honoured by hand.
 
 Use the following commit prefixes:
 

@@ -136,6 +136,9 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_COLLABORATOR_ENABLED,
     ActivityActionType.AGENT_COLLABORATOR_DISABLED,
     ActivityActionType.AGENT_COLLABORATOR_REMOVED,
+    // Agent computers — a stretch of someone's control of this Agent's machine,
+    // written by the activity-log listener with `details.resourceId` = the Agent.
+    ActivityActionType.AGENT_COMPUTER_CONTROLLED,
 ];
 
 /**
@@ -832,6 +835,66 @@ export class AgentsController {
         return dto;
     }
 
+    @Post(':id/heartbeat/pause')
+    @ApiOperation({
+        summary:
+            "Pause this Agent's heartbeat without pausing the Agent. The cadence and next slot are kept; assigned Task work, chat and manual run-now are unaffected.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async pauseHeartbeat(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.pauseHeartbeat(
+            auth.userId,
+            id,
+            this.scopeContext?.getScope(),
+        );
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.SCHEDULE_PAUSED,
+            details: {
+                scheduleId: `agent_heartbeat:${id}`,
+                sourceType: 'agent_heartbeat',
+                control: 'pause',
+                heartbeatPausedAt: dto.heartbeatPausedAt,
+            },
+        });
+        return dto;
+    }
+
+    @Post(':id/heartbeat/resume')
+    @ApiOperation({
+        summary:
+            "Resume this Agent's paused heartbeat with the cadence it had. A slot missed while paused is not replayed.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async resumeHeartbeat(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.resumeHeartbeat(
+            auth.userId,
+            id,
+            this.scopeContext?.getScope(),
+        );
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.SCHEDULE_RESUMED,
+            details: {
+                scheduleId: `agent_heartbeat:${id}`,
+                sourceType: 'agent_heartbeat',
+                control: 'resume',
+                nextHeartbeatAt: dto.nextHeartbeatAt,
+            },
+        });
+        return dto;
+    }
+
     @Post(':id/unarchive')
     @ApiOperation({
         summary:
@@ -1241,6 +1304,11 @@ export class AgentsController {
      * fresh run instead. Deliberately NOT a 409: "the run finished while you
      * were typing" is a normal race, not a client error, and the caller has a
      * defined next step.
+     *
+     * A REVIEW run (reviewer agent stage, slice AD) IS a 409, live or not:
+     * nothing is steered into a reviewer's conversation, because this route
+     * is reachable with a fleet run token — i.e. by the code's author — and a
+     * new conversation with the reviewer is not something a review supports.
      *
      * Ownership is enforced twice — `getOne` 404s a cross-user Agent, and
      * `RunSteeringService` loads the run through `findByIdAndUser`, so a run

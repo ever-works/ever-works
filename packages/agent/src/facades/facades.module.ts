@@ -6,6 +6,7 @@ import { PolicyModule } from '../policy/policy.module';
 import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
 import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
 import { EmailSendPolicyModule } from '../email/email-send-policy.module';
+import { ModelRoutingModule } from '../model-routing/model-routing.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -27,6 +28,7 @@ import { TerminalStreamFacadeService } from './terminal-stream.facade';
 import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
+import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -58,6 +60,9 @@ const FACADES = [
     // BudgetsModule already imported by this module. Goal evaluation
     // (PR-8) consumes it through FacadesModule.
     MetricsFacadeService,
+    // AW-15 — `connection-scopes` capability lookup (which access levels a
+    // provider declares). Depends only on the global PluginRegistryService.
+    ConnectionScopesFacadeService,
 ];
 
 /**
@@ -108,6 +113,12 @@ const FACADES = [
         // (approve-before-send + send ceilings). A DatabaseModule-only leaf,
         // so importing it here cannot cycle.
         EmailSendPolicyModule,
+        // Model accounts (AW-16) — binds MODEL_ROUTE_PLANNER, which
+        // AiFacadeService consumes around every model call (the workspace /
+        // Agent / schedule model ladder, several accounts per provider, and
+        // the record a Run keeps of what answered). A DatabaseModule +
+        // ActivityLogModule leaf with no facade imports, so it cannot cycle.
+        ModelRoutingModule,
     ],
     providers: FACADES,
     exports: FACADES,

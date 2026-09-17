@@ -8,6 +8,7 @@
  * decorators across the workspace boundary.
  */
 
+import type { OrganizationConnectionPolicy } from '../../connections/connection-transport-policy.types.js';
 import type { MergePolicyOverride } from '../../policy/merge-policy.types.js';
 
 export interface CreateOrganizationRequest {
@@ -60,6 +61,13 @@ export interface UpdateOrganizationRequest {
 	 * omitted INSIDE the object inherit individually.
 	 */
 	mergePolicy?: MergePolicyOverride | null;
+	/**
+	 * AW-15 — connection safety settings. Omit to leave unchanged; explicit
+	 * `null` resets every setting to its default. Today one setting:
+	 * `requireHttpsForCredentials` ("Require https for connection
+	 * credentials", default off).
+	 */
+	connectionPolicy?: OrganizationConnectionPolicy | null;
 }
 
 export interface OrganizationResponse {
@@ -87,6 +95,12 @@ export interface OrganizationResponse {
 	 * from this field alone — read `GET /api/merge-policy/resolve` for that.
 	 */
 	mergePolicy?: MergePolicyOverride | null;
+	/**
+	 * AW-15 — the stored connection safety settings. `null` / absent = every
+	 * default (literal connection credentials over plain http are allowed,
+	 * with a warning).
+	 */
+	connectionPolicy?: OrganizationConnectionPolicy | null;
 	createdAt: string;
 	updatedAt: string;
 }

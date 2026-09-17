@@ -2,6 +2,7 @@ import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nes
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import * as Sentry from '@sentry/nestjs';
+import { redactSecretUrl } from '../redaction/secret-url';
 
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
@@ -22,7 +23,9 @@ export class SentryInterceptor implements NestInterceptor {
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
         const request = context.switchToHttp().getRequest();
-        const { method, originalUrl, headers, body } = request;
+        const { method, headers, body } = request;
+        // Recorded URLs never carry a share token or a view session.
+        const originalUrl = redactSecretUrl(request.originalUrl);
 
         if (request.user) {
             Sentry.setUser({

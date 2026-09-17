@@ -95,6 +95,7 @@ function makeFullService(): AgentToolService {
                 assignees: stub(),
                 reviewers: stub(),
                 approvers: stub(),
+                agentReviews: stub(),
             },
             ingest: { repository: stub() },
             digest: { digestService: stub() },
@@ -154,6 +155,11 @@ describe('buildAgentToolCatalog', () => {
         expect(names).toContain('notifyChannel');
         // Domain chat tools (one representative per factory).
         expect(names).toContain('createTask');
+        // Reviewer agent stage (slice AD) — pinned BY NAME, because the
+        // set-equality case above compares two hand-built bundles and so
+        // cannot notice a sub-source both of them forget. The catalog
+        // omitted `agentReviews` until review found it.
+        expect(names).toContain('submitTaskReview');
         expect(names).toContain('resolve_merge_policy');
         expect(names).toContain('resolve_tool_grants');
     });

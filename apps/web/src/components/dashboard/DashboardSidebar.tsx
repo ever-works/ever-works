@@ -25,6 +25,7 @@ import {
     Lightbulb,
     Target,
     Gauge,
+    CalendarClock,
     // Bot / Sparkles / Users / Video no longer label a nav entry of their own —
     // Agents, Skills, Teams and Meetings folded into the two merged entries
     // below (navigation consolidation §3.2). Kept per the repo's no-removal
@@ -205,6 +206,12 @@ export function DashboardSidebar({
         },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
+        // Schedules workspace — everything that runs without the owner, from
+        // every source, with run-now / pause / resume. Sits just above Runs
+        // and Activity (the forecast beside the record of what ran) so Teams
+        // keeps its slot directly after Tasks and Runs stays right above
+        // Activity.
+        { name: t('navigation.schedules'), href: ROUTES.DASHBOARD_SCHEDULES, icon: CalendarClock },
         // Runs ledger (AW-09) — "what did my agents execute, and what did it
         // cost", placed right above Activity ("what changed in my workspace")
         // so the two neighbouring questions are learnt side by side.

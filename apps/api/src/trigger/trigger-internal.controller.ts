@@ -66,7 +66,9 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { FleetJobService } from '@ever-works/agent/fleet';
+import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService, NotificationChannelFacadeService } from '@ever-works/agent/facades';
@@ -79,6 +81,7 @@ import {
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import {
     CreditLedgerService,
     CreditsSweepService,
@@ -387,6 +390,26 @@ export class TriggerInternalController implements OnModuleInit {
         // channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly paygService?: PaygService,
+        // Model accounts (AW-16) — backs the `model-account-health` cron:
+        // the worker proxy calls `probeDueAccounts()` over the internal RPC
+        // channel, landing here where the AI provider plugins and their
+        // settings are loaded. Appended LAST + @Optional() per the arity rule
+        // above.
+        @Optional()
+        private readonly modelAccountHealthService?: ModelAccountHealthService,
+        // Named Conversations — backs the `agent-conversation-reply` task:
+        // the worker proxy calls `loadReplyContext`, `agentVisibleBody` and
+        // `appendAgentMessage` over the internal RPC channel. Appended LAST +
+        // @Optional() per the arity rule above.
+        @Optional()
+        private readonly conversationMessageService?: ConversationMessageService,
+        // Skills shelf — backs the `skill-readiness-sweep` cron: the worker
+        // proxy calls `sweepStale()` over the internal RPC channel, landing
+        // here where the Skill repositories, the tool-grant matrix and the
+        // credential port are wired. Appended LAST + @Optional() per the
+        // arity rule above.
+        @Optional()
+        private readonly skillReadinessService?: SkillReadinessService,
     ) {}
 
     onModuleInit() {
@@ -439,6 +462,10 @@ export class TriggerInternalController implements OnModuleInit {
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
+            // Named Conversations — agent-conversation-reply calls
+            // `loadReplyContext` / `agentVisibleBody` / `appendAgentMessage`
+            // here (allow-list auto-derived).
+            ConversationMessageService: this.conversationMessageService,
             TaskWorkspaceService: this.taskWorkspaceService,
             // Wave 3 M2 — agent-task-execute calls `runChecks` here after the
             // agent loop (quality gates; allow-list auto-derived).
@@ -499,6 +526,12 @@ export class TriggerInternalController implements OnModuleInit {
             // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
             // calls `syncDuePrStatuses()` here (allow-list auto-derived).
             TaskPrStatusService: this.taskPrStatusService,
+            // Model accounts (AW-16) — `model-account-health` calls
+            // `probeDueAccounts()` here (allow-list auto-derived).
+            ModelAccountHealthService: this.modelAccountHealthService,
+            // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
+            // here (allow-list auto-derived).
+            SkillReadinessService: this.skillReadinessService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

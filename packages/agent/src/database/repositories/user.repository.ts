@@ -262,6 +262,26 @@ export class UserRepository {
     }
 
     /**
+     * Another account of the Tenant, for data that must outlive
+     * `excludeUserId` (see `AnonymousUserCleanupService`). Organization
+     * membership is Tenant membership (`OrganizationMembershipService`), so
+     * this is "another member of the Organization". Registered accounts come
+     * before anonymous ones, active before inactive, then the
+     * longest-standing; `null` when the user was the Tenant's only member.
+     */
+    async findOtherTenantMember(tenantId: string, excludeUserId: string): Promise<User | null> {
+        return await this.repository
+            .createQueryBuilder('member')
+            .where('member.tenantId = :tenantId', { tenantId })
+            .andWhere('member.id != :excludeUserId', { excludeUserId })
+            .orderBy('member.isAnonymous', 'ASC')
+            .addOrderBy('member.isActive', 'DESC')
+            .addOrderBy('member.createdAt', 'ASC')
+            .addOrderBy('member.id', 'ASC')
+            .getOne();
+    }
+
+    /**
      * EW-617 G2: hard-delete an anonymous user. Cascades to its Works via
      * `work.user` ON DELETE CASCADE. Safe to call only after the row has been
      * verified `isAnonymous=true` to avoid wiping a real account by mistake.

@@ -1,4 +1,5 @@
 import {
+    IsBoolean,
     IsOptional,
     IsString,
     Length,
@@ -12,6 +13,21 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 // `@ever-works/agent/validation`. Importing the general `/dto` barrel here
 // would pull the whole entity graph into every consumer of this DTO.
 import { MergePolicyDto } from '@ever-works/agent/validation';
+
+/**
+ * AW-15 — connection safety settings for one organization. Every field is
+ * optional; an omitted field keeps its default.
+ */
+export class OrganizationConnectionPolicyDto {
+    @ApiPropertyOptional({
+        description:
+            'Require https for connection credentials. When true, a connection whose auth headers carry any value must use an https:// URL — literal values over plain http are refused, not just flagged. Default false: literal values over plain http keep working and are marked insecure_transport. Credential references are refused over plain http either way.',
+        default: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    requireHttpsForCredentials?: boolean;
+}
 
 /**
  * EW-658 — body for `PATCH /api/organizations/:id`. Mirrors
@@ -76,4 +92,16 @@ export class UpdateOrganizationDto {
     @ValidateNested()
     @Type(() => MergePolicyDto)
     mergePolicy?: MergePolicyDto | null;
+
+    @ApiPropertyOptional({
+        description:
+            'AW-15 — connection safety settings. Omit to leave unchanged; explicit null resets every setting to its default (off). Example: { "requireHttpsForCredentials": true }.',
+        type: OrganizationConnectionPolicyDto,
+        nullable: true,
+    })
+    // Nullable column: an explicit null is a valid "back to defaults".
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => OrganizationConnectionPolicyDto)
+    connectionPolicy?: OrganizationConnectionPolicyDto | null;
 }

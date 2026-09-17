@@ -27,7 +27,7 @@ export type RunLedgerStatus = (typeof RUN_LEDGER_STATUSES)[number];
 export const RUN_LEDGER_TERMINAL_STATUSES: readonly RunLedgerStatus[] = ['completed', 'failed', 'cancelled'];
 
 /** What started a run, mirroring `agent_runs.triggerKind`. */
-export const RUN_LEDGER_TRIGGER_KINDS = ['heartbeat', 'manual', 'task', 'chat', 'event'] as const;
+export const RUN_LEDGER_TRIGGER_KINDS = ['heartbeat', 'manual', 'task', 'chat', 'event', 'conversation'] as const;
 export type RunLedgerTriggerKind = (typeof RUN_LEDGER_TRIGGER_KINDS)[number];
 
 /** Default and maximum rows per ledger page. */

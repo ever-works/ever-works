@@ -18,7 +18,8 @@ import type { TerminalClientRole } from '../terminal/terminal-relay.registry';
  *   `viewer`        watches: receives pictures, may ask for a refresh or a
  *                   different quality, never sends input
  *   `driver`        holds control: may also send pointer, key, text and
- *                   scroll input (minted only once control ships)
+ *                   scroll input (minted only to a view that holds control,
+ *                   and gated again by the relay on every input frame)
  *   `worker`        the machine's own inbound leg: receives what viewers
  *                   ask for; minted only through the node-authenticated
  *                   internal route, never handed to a browser
@@ -44,6 +45,20 @@ export type ComputerRequestedRole = Extract<TerminalClientRole, 'viewer'>;
  */
 export function resolveRequestedComputerRole(_raw?: string | null): ComputerRequestedRole {
     return 'viewer';
+}
+
+/** Roles a browser may be minted for a live view: watching, or driving while it holds control. */
+export type ComputerMintedRole = Extract<TerminalClientRole, 'viewer' | 'driver'>;
+
+/**
+ * Does an attach-token request ask to drive the machine (`controller`, or
+ * the relay's own name for it, `driver`)? Asking is never enough: the
+ * controller mints `driver` only when the arbiter says the requesting view
+ * holds control right now, and `viewer` otherwise — the downgrade rule
+ * above still holds, it just has one more rung.
+ */
+export function wantsComputerControlRole(raw?: string | null): boolean {
+    return raw === 'controller' || raw === 'driver';
 }
 
 @Injectable()

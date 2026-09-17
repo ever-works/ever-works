@@ -215,6 +215,16 @@ export class ComputerSessionRepository {
         return (result.affected ?? 0) === 1;
     }
 
+    /** A controller's input arrived — the idle clock the receipt and the control arbiter read. */
+    async recordInput(id: string, at: Date): Promise<void> {
+        await this.repository.update({ id, status: Not('ended') }, { lastInputAt: at });
+    }
+
+    /** Replace the control spans. Written only by the control arbiter, after the lock itself moved. */
+    async setControlSpans(id: string, spans: ComputerSession['controlSpans']): Promise<void> {
+        await this.repository.update({ id }, { controlSpans: spans });
+    }
+
     /** Set once, never re-bound. */
     async bindRun(id: string, runId: string): Promise<boolean> {
         const result = await this.repository.update({ id, runId: IsNull() }, { runId });

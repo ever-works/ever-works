@@ -23,6 +23,8 @@ export class ConversationTitleService {
 
         const messageCount = conversation.messages?.length ?? 0;
         if (messageCount < 4 || conversation.metadata?.aiTitle) return;
+        // A name a person chose is never overwritten by a model (FR-6).
+        if (conversation.titleSource === 'user') return;
 
         try {
             const facadeOptions = await this.resolveFacadeOptions(userId);
@@ -73,12 +75,24 @@ export class ConversationTitleService {
 
             const title = response.choices[0]?.message?.content;
             if (title && typeof title === 'string' && title.trim().length > 0) {
-                await this.conversationRepo.updateTitle(
+                // The `titleSource` check above was read BEFORE the model
+                // call, which can take seconds — long enough for the person
+                // to rename the Conversation themselves. The write is
+                // therefore a compare-and-set on `titleSource` as well, and a
+                // refused one is dropped rather than retried: the name they
+                // chose stands (FR-6).
+                const written = await this.conversationRepo.updateTitle(
                     conversationId,
                     userId,
                     title.trim().substring(0, 100),
                     { aiTitle: true },
+                    { onlyWhenNotUserTitled: true },
                 );
+                if (!written) {
+                    this.logger.debug(
+                        `AI title dropped for conversation ${conversationId}: it was renamed while the title was being generated`,
+                    );
+                }
             }
         } catch (err) {
             this.logger.debug('AI title generation failed', err);
