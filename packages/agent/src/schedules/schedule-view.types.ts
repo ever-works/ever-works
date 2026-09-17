@@ -67,9 +67,18 @@ export interface ScheduleView {
     /** Whether this schedule is currently active/ticking. */
     enabled: boolean;
 
-    // ── Schedules workspace additions — every field below is ADDED; none of
-    // the fields above changed, so `GET /api/schedules` stays wire-compatible
-    // for Home's Soon block and the Activity tab.
+    // ── Schedules workspace additions. Every field below is OPTIONAL and is
+    // served only by the workspace reads: `GET /api/schedules/page`,
+    // `/health`, `findOne`, and the pause/resume responses.
+    //
+    // The flat `GET /api/schedules` stays at the thirteen keys above, and that
+    // is enforced by `narrowScheduleView` in `schedules.service.ts` rather
+    // than left to whoever adds the next field. An earlier version of this
+    // comment reasoned that adding keys kept the flat list wire-compatible
+    // because nothing was removed. That is true of the array shape and false
+    // of the row: `health.checkedAt` is computed per request, so the flat read
+    // stopped being a pure projection of stored state and began differing
+    // between two GETs with no write in between.
 
     /** Agent that would run this Schedule, or null when the source has none. */
     agentId?: string | null;

@@ -393,6 +393,18 @@ describe('SchedulesService — workspace additions', () => {
     beforeEach(() => jest.useFakeTimers().setSystemTime(now));
     afterEach(() => jest.useRealTimers());
 
+    /**
+     * The workspace additions (agent, health, controls, pausedAt, reason) are
+     * served by the PAGE read, so the tests below ask the surface that serves
+     * them. They used to read `getSchedules`, which carried the fields only
+     * because a row built for the workspace was being handed to the flat list
+     * by reference — the defect these tests now sit beside.
+     */
+    const workspaceRow = async (
+        service: SchedulesService,
+        filters: Parameters<SchedulesService['getPage']>[1] = {},
+    ) => (await service.getPage(SCOPE, filters)).items;
+
     it('getSchedules still returns a bare array whose original keys are all present', async () => {
         const service = emptyService({ triggers: manyTriggers(1) });
         const views = await service.getSchedules(SCOPE);
@@ -414,9 +426,47 @@ describe('SchedulesService — workspace additions', () => {
         ]) {
             expect(views[0]).toHaveProperty(key);
         }
-        // …plus the additive fields.
-        expect(views[0].health).toMatchObject({ ok: true });
-        expect(views[0].controls).toMatchObject({ runNow: false, resume: true });
+        // …and NOTHING else. This assertion used to say the opposite — that the
+        // flat list also carried the workspace additions — which is what let
+        // `health.checkedAt` (a `new Date()` per request) into a read-model that
+        // two end-to-end specs assert is byte-identical across two GETs with no
+        // write between them. The workspace reads them from `/page`.
+        expect(Object.keys(views[0]!).sort()).toEqual(
+            [
+                'cadenceHuman',
+                'cadenceRaw',
+                'enabled',
+                'id',
+                'lastRunAt',
+                'lastRunStatus',
+                'nextRunAt',
+                'ownerId',
+                'ownerLink',
+                'ownerName',
+                'ownerType',
+                'sourceType',
+                'status',
+            ].sort(),
+        );
+    });
+
+    it('serves the workspace additions on the page read, where the workspace asks for them', async () => {
+        const service = emptyService({ triggers: manyTriggers(1) });
+        const page = await service.getPage(SCOPE, {});
+        const item = page.items[0]!;
+        expect(item.health).toMatchObject({ ok: true });
+        expect(item.controls).toMatchObject({ runNow: false, resume: true });
+    });
+
+    it('returns an identical flat row for two reads with no write between them', async () => {
+        // The invariant the e2e specs assert, pinned here where it is cheap to
+        // run: the flat list is a projection of stored state, so nothing in it
+        // may be derived from the current clock.
+        const service = emptyService({ triggers: manyTriggers(1) });
+        const before = await service.getSchedules(SCOPE);
+        jest.setSystemTime(new Date(now.getTime() + 60_000));
+        const after = await service.getSchedules(SCOPE);
+        expect(after).toEqual(before);
     });
 
     it('a paused recurring Task keeps its cadence, reads paused, and is not flagged', async () => {
@@ -429,7 +479,7 @@ describe('SchedulesService — workspace additions', () => {
                 }),
             ],
         });
-        const [view] = await service.getSchedules(SCOPE);
+        const [view] = await workspaceRow(service);
         expect(view).toMatchObject({
             status: 'paused',
             enabled: false,
@@ -462,7 +512,7 @@ describe('SchedulesService — workspace additions', () => {
             agentRepo,
             assignees: [{ taskId: 'assigned', assigneeType: 'agent', assigneeId: 'agent-a' }],
         });
-        const views = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        const views = await workspaceRow(service, { sourceType: 'recurring_task' });
         const byId = Object.fromEntries(views.map((v) => [v.ownerId, v]));
         expect(byId.assigned).toMatchObject({ agentId: 'agent-a', agentName: 'Inbox agent' });
         expect(byId.own).toMatchObject({ agentId: 'agent-b', agentName: 'Analyst agent' });
@@ -479,7 +529,7 @@ describe('SchedulesService — workspace additions', () => {
             tasks: [recurringTask('task-a', { agentId: 'agent-z' })],
             agents: [{ id: 'agent-z', name: 'Old agent', status: 'archived' }],
         });
-        const [view] = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        const [view] = await workspaceRow(service, { sourceType: 'recurring_task' });
         expect(view.health).toMatchObject({ ok: false, reason: 'owner-archived' });
     });
 
@@ -495,7 +545,7 @@ describe('SchedulesService — workspace additions', () => {
             tasks: [recurringTask('task-u', { agentId: 'agent-q' })],
             agentRepo,
         });
-        const [view] = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        const [view] = await workspaceRow(service, { sourceType: 'recurring_task' });
         expect(view.health?.ok).toBe(true);
     });
 
@@ -514,7 +564,7 @@ describe('SchedulesService — workspace additions', () => {
                 },
             ],
         });
-        const [view] = await service.getSchedules(SCOPE);
+        const [view] = await workspaceRow(service);
         expect(view).toMatchObject({
             sourceType: 'agent_heartbeat',
             status: 'paused',
@@ -539,9 +589,12 @@ describe('SchedulesService — workspace additions', () => {
                 },
             ],
         });
-        const [view] = await service.getSchedules(SCOPE);
-        expect(view.status).toBe('ended');
-        expect(view.health?.ok).toBe(true);
+        // Status is a flat-list field; health is a workspace one. Reading both
+        // from the surface that serves each is the point of the split.
+        const [flat] = await service.getSchedules(SCOPE);
+        expect(flat!.status).toBe('ended');
+        const [view] = await workspaceRow(service);
+        expect(view!.health?.ok).toBe(true);
     });
 
     it('pages every row exactly once, 50 at a time, in a stable order', async () => {

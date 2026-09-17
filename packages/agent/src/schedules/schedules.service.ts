@@ -205,7 +205,7 @@ export class SchedulesService {
     ): Promise<ScheduleView[]> {
         const now = new Date();
         const { rows } = await this.collect(scope, now, 'capped');
-        let views = rows.map((row) => row.view);
+        let views = rows.map((row) => narrowScheduleView(row.view));
 
         if (filters.sourceType) {
             views = views.filter((view) => view.sourceType === filters.sourceType);
@@ -1063,4 +1063,43 @@ export class SchedulesService {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(`Schedules aggregation failed for source "${source}": ${message}`);
     }
+}
+
+/**
+ * The flat `GET /api/schedules` contract: exactly these thirteen keys.
+ *
+ * An explicit ALLOW-LIST, not a delete-list, because the failure this repairs
+ * was a field arriving by accident. A row built for the Schedules workspace is
+ * reused for every read, so when `171440089` added the workspace's own fields
+ * — agent, health, controls, pausedAt, reason — they appeared here too. The
+ * commit believed it had kept this endpoint compatible, and on the axis it
+ * checked (the bare-array shape, no key REMOVED) it had.
+ *
+ * Two e2e specs disagreed, and they were right for a sharper reason than key
+ * counting: `health.checkedAt` is `new Date()` per request, so the flat read —
+ * a pure projection of persisted state, asserted twice to be byte-identical
+ * across two GETs with nothing written between them — started changing on
+ * every call. A read-model that moves while nothing writes is wrong on its own
+ * terms, and no widening of the expected key set would have fixed it.
+ *
+ * The workspace additions are served where the workspace actually reads them:
+ * `GET /api/schedules/page`, `/health`, `findOne`, and the pause/resume
+ * responses.
+ */
+function narrowScheduleView(view: ScheduleView): ScheduleView {
+    return {
+        id: view.id,
+        sourceType: view.sourceType,
+        ownerType: view.ownerType,
+        ownerId: view.ownerId,
+        ownerName: view.ownerName,
+        ownerLink: view.ownerLink,
+        cadenceRaw: view.cadenceRaw,
+        cadenceHuman: view.cadenceHuman,
+        nextRunAt: view.nextRunAt,
+        lastRunAt: view.lastRunAt,
+        lastRunStatus: view.lastRunStatus,
+        status: view.status,
+        enabled: view.enabled,
+    };
 }
