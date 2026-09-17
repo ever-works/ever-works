@@ -419,7 +419,13 @@ the table is corrected in the same PR (resolution R-38, and [TRACKER](./TRACKER.
 9. **Repository content is untrusted input.** READMEs, issues, code comments, `AGENTS.md`, workflow files
    and App specs from a fork can contain prompt injection. Agents reading them run without secrets; checks
    declared in a repository run sandboxed; nothing from a repository is executed on platform
-   infrastructure outside a sandbox.
+   infrastructure outside a sandbox. **Qualified 2026-09-17 (Resolution R-33):** the two places a repository's
+   own checks may run are the App Work's own CI (read-only token, no secrets) and a Fleet node the owner
+   enrolled — and on a Fleet node the **setup steps and checks run with that machine's real home directory and
+   toolchain**. The containment a run reports covers the **model step only** and is environment construction, not
+   a filesystem or egress boundary; the owner's per-check admission (APW-08 FR-14, the EW-807 allow-list) is the
+   control there, and an App Work run is admitted to a Fleet node only when its reported containment includes the
+   isolated home and carries no downgrade affecting the workspace it will read.
 10. **Public-repository hygiene.** This repository is public: no competitor names
     (`docs/internal/launch-parity-backlog.md`), no infrastructure addresses, hostnames of internal systems
     or unfixed security findings, and no undisclosed third-party vulnerability details. Those live in the
@@ -488,7 +494,10 @@ Each has a recommended default that the epic specs assume until answered.
 7. **Where the App Launcher web component is published** — Ever Works monorepo package vs a cross-product
    repository in `ever-co`. _Default: a cross-product package in `ever-co`, since Gauzy and Teams consume it.
    Still open (CL-xx in [CLARIFICATIONS.md](./CLARIFICATIONS.md)); the platform catalog it reads is already
-   settled — `ever-works/platforms` exists (Resolution R-29)._
+   settled — `ever-works/platforms` exists (Resolution R-29)._ **The Wave 1 half is answered (2026-09-17):** the
+   component ships in this monorepo as `packages/app-launcher` (private, declared by `apps/web` in APW-11 T10) and
+   mounts in the Ever Works header from P1, so nothing waits on this question. What remains open is the **Wave 3
+   extraction** repository, the npm scope and the names-only publish credential (APW-11 T28, `EXT-30`).
 8. **First golden path** — validate the pipeline on a small app before the flagship? _Default: a fixture
    app and Umami first, **Cal.diy** as the flagship demo (APW-13)._
 9. **Single sign-on into a user's own App Works** — should a deployed App Work accept Ever ID as a sign-in

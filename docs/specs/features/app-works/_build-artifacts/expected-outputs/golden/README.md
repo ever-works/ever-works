@@ -10,9 +10,11 @@ golden/
 ├── check.mjs                          the check (zero dependencies, re-reads each Blueprint at run time)
 ├── __negative-control__/              THREE deliberately broken copies + their README — never "fix" them
 │   ├── README.md
+│   ├── .variants.json                           the three corruptions, as data
 │   ├── nc-01-port/app-fixture-hello/…           one port changed (8080 → 8081)
 │   ├── nc-02-latest-tag/app-fixture-hello/…     one image tag changed (digest → :latest)
 │   └── nc-03-literal-secret/app-fixture-hello/… one literal injected into the env Secret
+├── .generated-files.json              the generator's own file list (machine-readable provenance)
 ├── app-fixture-hello/
 │   ├── ever-works-build.yml           the workflow APW-05 writes into the Work Repository
 │   ├── your-cluster/                  20 objects — one file per object — for the `your-cluster` target
@@ -20,6 +22,9 @@ golden/
 ├── cal-diy/…                          25 objects
 └── umami/…                            16 objects; `ever-works-build.yml` is an explicit ABSENT marker
 ```
+
+The two dotfiles are inert metadata — `check.mjs` reads only `golden/<blueprint>/`, so neither can
+influence a verdict.
 
 One file per object, so a lane can diff, de-duplicate or point at a single object without parsing a
 multi-document YAML stream. The numeric prefixes are the renderer's apply order (APW-06 plan

@@ -723,11 +723,16 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
     ): Harness => {
         const git = options.git ?? makeGit();
         const works = {
-            findById: jest.fn().mockResolvedValue(options.work === undefined ? makeWork() : options.work),
+            findById: jest
+                .fn()
+                .mockResolvedValue(options.work === undefined ? makeWork() : options.work),
         };
         const mergePolicy = {
             resolve: jest.fn().mockResolvedValue({
-                policy: { protectedBranches: options.protectedBranches ?? PLATFORM_POLICY.protectedBranches },
+                policy: {
+                    protectedBranches:
+                        options.protectedBranches ?? PLATFORM_POLICY.protectedBranches,
+                },
                 source: 'default',
                 chain: [],
             }),
@@ -852,7 +857,9 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(attempt).rejects.toThrow(/protected/i);
             await expect(attempt).rejects.toThrow('release/frozen');
 
-            expect(mergePolicy.resolve).toHaveBeenCalledWith(expect.objectContaining({ workId: WORK_ID }));
+            expect(mergePolicy.resolve).toHaveBeenCalledWith(
+                expect.objectContaining({ workId: WORK_ID }),
+            );
             expect(git.commit).not.toHaveBeenCalled();
             expect(git.push).not.toHaveBeenCalled();
         });
@@ -918,9 +925,9 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             git.push.mockRejectedValue(new Error('remote rejected the ref'));
             const { facade } = build({ git });
 
-            await expect(
-                facade.commitToRepo(commitInput({ branch: 'feature/x' })),
-            ).rejects.toThrow(/push failed/);
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /push failed/,
+            );
         });
     });
 
