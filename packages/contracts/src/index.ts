@@ -1,5 +1,19 @@
 export * from './item/index.js';
 export * from './domain/index.js';
+// App Works (APW-01…APW-13) — the shared App/App-Work vocabulary: source and
+// inspect model, repository limits, upstream readiness, builds and the
+// verification plan, env and dependencies, the managed tier's desired state,
+// and Ever ID.
+//
+// A PLAIN `export *`, deliberately, not `export type *`. These modules carry
+// 433 runtime exports alongside their types (the closed-union arrays behind
+// `X = (typeof X)[number]`, the limits, and the pure resolvers such as
+// `resolveAppRepositoryModes`), and a type-only re-export would drop every one
+// of them from the package root while `tsc --noEmit` stayed silent in this
+// package — the break would only surface at a consumer as "X is not exported".
+// The barrel spec asserts there is no name collision across areas, and a scan
+// confirms all 433 are unique within this area, so the plain form is correct.
+export * from './apps/index.js';
 export * from './form/index.js';
 export * from './github/index.js';
 export * from './kb/index.js';
