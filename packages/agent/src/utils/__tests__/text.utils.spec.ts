@@ -1,4 +1,4 @@
-import { slugifyText, unSlugifyText } from '../text.utils';
+import { slugifyText, trimEdgeChars, unSlugifyText } from '../text.utils';
 
 describe('slugifyText', () => {
     it('lowercases and replaces single spaces with dashes', () => {
@@ -91,5 +91,29 @@ describe('unSlugifyText', () => {
 
     it('round-trip slugify→unSlugify on simple ASCII case', () => {
         expect(unSlugifyText(slugifyText('Hello World'))).toBe('Hello World');
+    });
+});
+
+describe('trimEdgeChars', () => {
+    it('strips only the given characters, and only at the edges', () => {
+        expect(trimEdgeChars('--a-b--', '-', '-')).toBe('a-b');
+        expect(trimEdgeChars('..-slug-.', '.-', '-')).toBe('slug-.');
+        expect(trimEdgeChars('keep', '-', '-')).toBe('keep');
+    });
+
+    it('returns empty when the whole string is trimmable, without overrunning', () => {
+        expect(trimEdgeChars('-----', '-', '-')).toBe('');
+        expect(trimEdgeChars('', '-', '-')).toBe('');
+    });
+
+    it('matches what the regex trim it replaced produced, including long runs', () => {
+        // The pattern it replaced was `/^-+|-+$/g`. Measured, V8 handles that
+        // one in linear time, so this is not a performance fix and the tests do
+        // not pretend otherwise — these pin behavioural equivalence, which is
+        // what the rewrite had to preserve.
+        const cases = ['--a--', '-', '', 'a', '-'.repeat(50_000) + 'a', 'a' + '-'.repeat(50_000)];
+        for (const value of cases) {
+            expect(trimEdgeChars(value, '-', '-')).toBe(value.replace(/^-+|-+$/g, ''));
+        }
     });
 });

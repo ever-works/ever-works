@@ -77,6 +77,20 @@ describe('renderKbMarkdownExport', () => {
         expect(renderKbMarkdownExport(input({ slug: '' })).filename).toBe('document.md');
     });
 
+    it('trims runs of separators at both edges, and only at the edges', () => {
+        // The edge trim moved off `/^[.-]+|-+$/g` (a pattern CodeQL reads as
+        // polynomial) onto a scan. These pin that the rewrite kept the exact
+        // behaviour, including the cases where the two could differ: a run long
+        // enough to matter, a dot that is only trimmed at the front, and an
+        // input that trims away to nothing.
+        expect(renderKbMarkdownExport(input({ slug: `${'-'.repeat(5_000)}a` })).filename).toBe(
+            'a.md',
+        );
+        expect(renderKbMarkdownExport(input({ slug: '..-report-.' })).filename).toBe('report-..md');
+        expect(renderKbMarkdownExport(input({ slug: '---' })).filename).toBe('document.md');
+        expect(renderKbMarkdownExport(input({ slug: 'a-b' })).filename).toBe('a-b.md');
+    });
+
     it('keeps an empty body as an empty section', () => {
         expect(renderKbMarkdownExport(input({ body: '' })).content.endsWith('\n---\n\n\n')).toBe(
             true,
