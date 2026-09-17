@@ -4,7 +4,12 @@ import { Repository } from 'typeorm';
 import { isAgentRunTimelineInsertionOrderTieBreak } from '@ever-works/contracts';
 import { AgentRunLog } from '../../entities/agent-run-log.entity';
 import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../insertion-order';
-import { keysetTieBreakSql, timeSortKeyColumnSql, timeSortKeyParameterSql } from '../time-sort-key';
+import {
+    keysetTieBreakSql,
+    timeSortKeyColumnSql,
+    timeSortKeyParameterSql,
+    timeSortKeyStrategy,
+} from '../time-sort-key';
 
 /**
  * Where a timeline page resumes from.
@@ -163,14 +168,30 @@ export class AgentRunLogRepository {
      *
      * The keyset is `(sort key, tie-break)`, both driver-shaped:
      *
-     * - The sort key is the canonical millisecond text of `createdAt`
-     *   (`time-sort-key.ts`), compared against the same rendering of the
-     *   cursor's bound `Date`. Comparing the raw column against a bound
-     *   `Date` instead — which is what this read used to do — skips EVERY
-     *   row that shares the cursor's second on the sqlite family, where
+     * - The sort key is driver-shaped, chosen by `timeSortKeyStrategy`.
+     *   On the sqlite family it is the canonical millisecond text of
+     *   `createdAt` (`time-sort-key.ts`), compared against the same
+     *   rendering of the cursor's bound `Date`: comparing the raw column
+     *   against a bound `Date` there — which is what this read used to do
+     *   — skips EVERY row that shares the cursor's second, because
      *   `@CreateDateColumn()` defaults to whole-second `datetime('now')`
-     *   text, and re-serves the cursor row on Postgres, whose microseconds
-     *   a millisecond cursor cannot name.
+     *   text while a `Date` binds as `'… 16:52:05.123'`. Everywhere else
+     *   the key is the COLUMN ITSELF at whatever resolution it stores.
+     *   Canonicalising it there would be a regression, not a fix: the
+     *   Postgres column is a `timestamp` carrying microseconds and the
+     *   tie-break below is a random uuid v4, so truncating the key to the
+     *   millisecond a cursor names orders rows written inside one
+     *   millisecond by uuid — an `assistant-message` row and the
+     *   `tool-invocation` row it triggered a few hundred microseconds
+     *   later come back in either order, and the transcript renders the
+     *   tool call above the message that requested it.
+     * - The cursor's instant half only ever names a millisecond
+     *   (`<epochMillis>_<tieBreak>`), so on a microsecond column it names
+     *   the START of the cursor row's millisecond. That WIDENS the page —
+     *   the cursor row and any sibling written in the same millisecond can
+     *   come back a second time — which is the same repeat-never-skip
+     *   trade the mismatched-cursor path below makes, and which every
+     *   consumer already absorbs by de-duplicating on row id.
      * - The tie-break is the engine `rowid` on the sqlite family, so rows
      *   appended inside one whole second come back in INSERTION order
      *   instead of random-uuid order, and the row's own id elsewhere. The
@@ -212,8 +233,18 @@ export class AgentRunLogRepository {
             .where('log.runId = :runId', { runId })
             .andWhere('log.step IN (:...steps)', { steps: [...steps] });
 
-        const keySql = timeSortKeyColumnSql(driverType, 'log.createdAt');
-        const cursorKeySql = timeSortKeyParameterSql(driverType, 'afterCreatedAt');
+        // Three ways, never "Postgres or else" (see `timeSortKeyStrategy`):
+        // ONLY the sqlite family may order this ascending keyset on a
+        // millisecond-truncated key, because only there is the tie-break
+        // (`rowid`) monotonic with insertion order. Postgres keeps its
+        // microsecond `timestamp` column — truncating it would order rows
+        // written inside one millisecond by random uuid — and every other
+        // driver keeps the portable raw-column predicate unchanged.
+        const canonicalKey = timeSortKeyStrategy(driverType) === 'canonical-text';
+        const keySql = canonicalKey ? timeSortKeyColumnSql(driverType, 'log.createdAt') : null;
+        const cursorKeySql = canonicalKey
+            ? timeSortKeyParameterSql(driverType, 'afterCreatedAt')
+            : null;
         const tieBreakSql = keysetTieBreakSql(qb, 'log.id');
 
         if (after) {
@@ -224,8 +255,11 @@ export class AgentRunLogRepository {
             // of an id-shaped cursor: repeat, never skip.
             const position = resolveCursorPosition(sqlite, after);
             if (!keySql || !cursorKeySql) {
-                // A driver with no canonical key: the raw-column keyset,
-                // unchanged.
+                // A driver that orders on the column itself — Postgres,
+                // where truncating would reorder inside a millisecond, and
+                // any driver `time-sort-key.ts` does not canonicalise: the
+                // raw-column keyset, unchanged, at the column's own
+                // resolution.
                 if (position) {
                     qb.andWhere(
                         `(log.createdAt > :afterCreatedAt OR (log.createdAt = :afterCreatedAt AND log.id > :${position.parameter}))`,

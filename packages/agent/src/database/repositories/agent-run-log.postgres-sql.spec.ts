@@ -9,10 +9,16 @@ import { AgentRunLogRepository } from './agent-run-log.repository';
  *
  * The fix for the whole-second cursor is per-driver, and the risk of a
  * per-driver fix is that it quietly changes the other driver. So this pins
- * both halves: Postgres keeps the `(instant, id)` keyset with NO rowid
- * anywhere and every camelCase identifier quoted, while the sqlite family
- * orders equal timestamps by insertion order and carries that same column
- * in its cursor predicate.
+ * both halves: Postgres keeps the `(instant, id)` keyset on the raw
+ * microsecond `timestamp` column — no canonical text key, no rowid
+ * anywhere, every camelCase identifier quoted — while the sqlite family,
+ * whose column is whole-second TEXT and whose tie-break IS insertion
+ * order, orders equal timestamps by that `rowid` and carries the same
+ * column in its cursor predicate.
+ *
+ * The starred Postgres case is the one that bites: a millisecond-truncated
+ * sort key is only safe where the tie-break is monotonic with insertion
+ * order, and Postgres's tie-break is a random uuid v4.
  *
  * No database is needed: the repository runs over an unconnected
  * DataSource with metadata built, and the terminal `getRawAndEntities` is
@@ -87,22 +93,66 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
     afterEach(() => jest.restoreAllMocks());
 
     describe('on Postgres', () => {
-        it('orders and pages on the canonical millisecond key, tie-broken by id', async () => {
+        /**
+         * Every millisecond-truncating rendering of the instant. The
+         * timeline page must contain NONE of them on Postgres: see the
+         * starred case below.
+         */
+        const TRUNCATED = [`to_char(`, `HH24:MI:SS.MS`, `strftime(`];
+
+        it('orders and pages on the microsecond timestamp column, tie-broken by id', async () => {
             const emitted = await captureSql(() =>
                 postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT, id: 'log-42' }),
             );
 
-            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
-            const cursorKey = `to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
             expect(emitted).toContain(
-                `AND (${key} > ${cursorKey} OR (${key} = ${cursorKey} AND "log"."id" > :afterId))`,
+                `AND ("log"."createdAt" > :afterCreatedAt OR ("log"."createdAt" = :afterCreatedAt AND "log"."id" > :afterId))`,
             );
-            expect(emitted).toContain(`ORDER BY ${key} ASC, "log"."id" ASC LIMIT 100`);
+            expect(emitted).toContain(`ORDER BY "log"."createdAt" ASC, "log"."id" ASC LIMIT 100`);
             // The sqlite-only insertion-order key must never reach Postgres.
             expect(emitted).not.toContain('rowid');
             // An unquoted `log.createdAt` would be a lower-cased, non-existent
             // column on Postgres.
             expect(emitted).not.toMatch(/(^|[^"])\blog\.[a-zA-Z]+/);
+        });
+
+        it('⭐ never truncates the timeline instant to the millisecond a cursor names', async () => {
+            // The regression this case exists for. `agent_run_logs.createdAt`
+            // is `timestamp DEFAULT now()` — microseconds — and each
+            // `append()` commits its own transaction, so an
+            // `assistant-message` row and the `tool-invocation` row it
+            // triggered land a few hundred microseconds apart INSIDE one
+            // millisecond. Ordering the page on a millisecond-truncated key
+            // collapses them to the same key and leaves the tie-break to
+            // decide, and Postgres's tie-break is a random uuid v4 — so the
+            // transcript renders the tool call above the assistant message
+            // that requested it, and two rejected calls in one round in
+            // arbitrary order. The column's own resolution is the only
+            // ordering that is chronological here.
+            // Sequentially: each capture installs and restores its own spy
+            // on the shared `SelectQueryBuilder.prototype`.
+            const pages: string[] = [];
+            pages.push(await captureSql(() => postgres.logs.findTimelinePage(RUN, STEPS, 100)));
+            pages.push(
+                await captureSql(() =>
+                    postgres.logs.findTimelinePage(RUN, STEPS, 100, {
+                        createdAt: AT,
+                        id: '00000000-0000-4000-8000-00000000cc62',
+                    }),
+                ),
+            );
+            pages.push(
+                await captureSql(() =>
+                    postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT }),
+                ),
+            );
+
+            for (const emitted of pages) {
+                for (const truncation of TRUNCATED) {
+                    expect(emitted).not.toContain(truncation);
+                }
+                expect(emitted).toContain(`ORDER BY "log"."createdAt" ASC, "log"."id" ASC`);
+            }
         });
 
         it('needs no cursor predicate on the first page', async () => {
@@ -124,9 +174,7 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
                 postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT, tieBreak: '42' }),
             );
 
-            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
-            const cursorKey = `to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
-            expect(sql).toContain(`AND ${key} >= ${cursorKey}`);
+            expect(sql).toContain(`AND "log"."createdAt" >= :afterCreatedAt`);
             expect(sql).not.toContain(':afterTieBreak');
             expect(sql).not.toContain('"log"."id" >');
             expect(Object.keys(parameters)).not.toContain('afterTieBreak');
@@ -147,10 +195,8 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
                 }),
             );
 
-            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
-            const cursorKey = `to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
             expect(sql).toContain(
-                `AND (${key} > ${cursorKey} OR (${key} = ${cursorKey} AND "log"."id" > :afterId))`,
+                `AND ("log"."createdAt" > :afterCreatedAt OR ("log"."createdAt" = :afterCreatedAt AND "log"."id" > :afterId))`,
             );
             expect(sql).not.toContain(':afterTieBreak');
             expect(parameters.afterId).toBe(id);
@@ -164,10 +210,7 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
                 postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT }),
             );
 
-            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
-            expect(sql).toContain(
-                `AND ${key} >= to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`,
-            );
+            expect(sql).toContain(`AND "log"."createdAt" >= :afterCreatedAt`);
             expect(sql).not.toContain(':afterId');
             expect(Object.values(parameters)).not.toContain('');
         });
