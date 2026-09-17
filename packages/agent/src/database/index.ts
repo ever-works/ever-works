@@ -64,6 +64,8 @@ export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';
 // Skill companion files (#2080) — per-skill uploaded file records.
 export * from './repositories/skill-file.repository';
+// Skills shelf — the queryable copy of each Skill's frontmatter tags.
+export * from './repositories/skill-tag.repository';
 // Agent Plugins MCP slice — feature-owned repositories, wired by McpModule.
 export * from './repositories/mcp-server-connection.repository';
 export * from './repositories/agent-mcp-server-binding.repository';

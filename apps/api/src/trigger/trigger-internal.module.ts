@@ -15,6 +15,7 @@ import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
+import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -104,6 +105,11 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // runs inline on every node lease poll; the cron is what makes a
         // fleet whose nodes ALL died still converge.
         AgentFleetModule,
+        // Skills shelf — exposes SkillReadinessService through the
+        // remote-proxy controller so the skill-readiness-sweep cron task (in
+        // packages/tasks) can drive `sweepStale()` over the internal RPC
+        // channel every hour.
+        AgentSkillsModule,
         // Named Conversations — exposes ConversationMessageService through
         // the remote-proxy controller so the agent-conversation-reply task
         // (in packages/tasks) can load the Conversation it answers and

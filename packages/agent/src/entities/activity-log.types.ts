@@ -244,6 +244,10 @@ export enum ActivityActionType {
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
     SKILL_FILE_EDITED = 'skill_file_edited',
+    // Skills shelf — the workspace-level on/off switch. Appended only; the
+    // column is a varchar, so no migration.
+    SKILL_ENABLED = 'skill_enabled',
+    SKILL_DISABLED = 'skill_disabled',
     // Repository registry (Feature G) — Settings → Repositories rows +
     // the Agent ↔ repo grant edge. Additive entries only (NN #20).
     REPO_CONNECTION_CREATED = 'repo_connection_created',
