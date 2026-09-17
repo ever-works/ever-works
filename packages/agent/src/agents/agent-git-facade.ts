@@ -34,7 +34,16 @@ export interface AgentCommitToRepoInput {
      * tools, not arbitrary unstaged changes.
      */
     files?: { path: string; body: string }[];
-    /** Branch name to commit against. Defaults to the Work's main branch. */
+    /**
+     * Branch name to commit against.
+     *
+     * **Pass a feature branch.** When omitted, the adapter resolves the Work's
+     * own default branch and then REFUSES the commit, because that branch is
+     * protected — `main`, `master` and `stage` are a non-configurable floor
+     * (APW-08 P0), and the Work's effective merge policy can protect more at
+     * any scope, never fewer. An Agent push straight to a release branch is the
+     * thing the refusal exists to make impossible; open a pull request instead.
+     */
     branch?: string;
 }
 

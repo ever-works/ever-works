@@ -1276,7 +1276,7 @@ export class AgentToolService {
                     branch: {
                         type: 'string',
                         description:
-                            "Branch name to commit against. Defaults to the Work's main branch.",
+                            "Branch name to commit against. Pass a FEATURE branch. When omitted the tool resolves the Work's own default branch and then refuses the commit, because that branch is protected — main, master and stage are always protected (APW-08 P0), and the Work's merge policy can protect more. To land work on a release branch, commit to a feature branch and open a pull request.",
                     },
                 },
                 required: ['message'],
