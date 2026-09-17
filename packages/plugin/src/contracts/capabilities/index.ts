@@ -5,6 +5,12 @@ export * from './git-provider.interface.js';
 export * from './git-provider.pr-insights.js';
 export * from './oauth.interface.js';
 export * from './deployment.interface.js';
+// App Works (APW-06 T2) — the App-deployment types the ten OPTIONAL App members
+// of `IDeploymentPlugin` consume (`AppRenderInput`, `AppDeployHooks`,
+// `AppDeployResult`, `AppStatusSnapshot`, `AppScaleResult`, …). Additive only:
+// nothing here changes the pre-existing deployment surface, so the `k8s` and
+// Vercel plugins compile and behave exactly as before.
+export * from './app-deployment.types.js';
 export * from './screenshot.interface.js';
 export * from './search.interface.js';
 export * from './content-extractor.interface.js';

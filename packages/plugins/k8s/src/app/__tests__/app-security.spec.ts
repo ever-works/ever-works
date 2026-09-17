@@ -43,6 +43,36 @@ const inputFor = (target: AppSecurityTarget, allowRoot = false, runAsUser?: numb
 const YOURS = 'your-cluster' as const;
 const MANAGED = 'ever-works-apps' as const;
 
+describe('the render-input type contract (T6 integration, APW06-G27)', () => {
+	/**
+	 * `AppSecurityTarget` is an ALIAS of the plugin contract's `AppDeployTarget`, not a local
+	 * two-value union. It used to be `'your-cluster' | 'ever-works-apps'`, which made
+	 * `AppRenderInput` **unassignable** to `AppSecurityInput` because `AppDeployTarget` really has
+	 * three values — `none` is a real deploy target (CONTRACTS R-12, restated by R-27):
+	 *
+	 *     TS2322: Type '"none"' is not assignable to type 'AppSecurityTarget'.
+	 *
+	 * T6 renders components through this module, so that incompatibility would have surfaced as a
+	 * compile error in the renderer rather than here. These assertions are the guard: the first
+	 * pins that `none` IS accepted, the second that both previously-supported values still work —
+	 * i.e. the fix widened the type rather than changing it.
+	 */
+	it('accepts every AppDeployTarget value, including `none`', () => {
+		const targets: AppSecurityTarget[] = ['none', 'your-cluster', 'ever-works-apps'];
+		expect(targets).toHaveLength(3);
+		for (const target of targets) {
+			// The §4.4 table only branches on the two deployed targets, but `none` must still be
+			// answerable rather than throwing: T6 may validate a render before a target exists.
+			expect(() => podSecurityPolicyForTarget(target)).not.toThrow();
+		}
+	});
+
+	it('keeps the two previously-supported targets working unchanged', () => {
+		expect(podSecurityPolicyForTarget('your-cluster')).toBe('baseline');
+		expect(podSecurityPolicyForTarget('ever-works-apps')).toBe('restricted');
+	});
+});
+
 describe('podSecurityContext — plan §4.4', () => {
 	// Row: pod `runAsNonRoot` | `true`; `false` when `allowRoot` | `true` always
 	it('§4.4 pod runAsNonRoot — true on your-cluster', () => {

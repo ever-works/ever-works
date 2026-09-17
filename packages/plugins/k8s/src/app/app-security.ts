@@ -26,8 +26,24 @@
  * fraction, `0`-with-`runAsNonRoot` handled by the caller's preconditions) is treated as not
  * supplied rather than silently rounded.
  */
-/** Deploy target, as `AppDeployTarget` in plan §3. */
-export type AppSecurityTarget = 'your-cluster' | 'ever-works-apps';
+import type { AppDeployTarget } from '@ever-works/plugin';
+
+/**
+ * Deploy target — **re-exported from the plugin contract, never redeclared.**
+ *
+ * This was a local two-value union (`'your-cluster' | 'ever-works-apps'`), written when plan §3
+ * still described the plugin's `AppDeployTarget` that way. `AppDeployTarget` is really the
+ * **three**-value union — `none` is a real value (CONTRACTS R-12: the deploy target is `None`,
+ * stored as `none`, with no separate "not yet" state; R-27 restates all three) — so the local
+ * union made `AppRenderInput` **unassignable** to `AppSecurityInput`:
+ *
+ *     TS2322: Type '"none"' is not assignable to type 'AppSecurityTarget'.
+ *
+ * Aliasing rather than redeclaring means the two can never drift again, and it *widens* this type
+ * instead of narrowing anything: every caller that only ever passed `your-cluster` or
+ * `ever-works-apps` keeps compiling unchanged.
+ */
+export type AppSecurityTarget = AppDeployTarget;
 
 /** §4.4 last row: the PodSecurity level a namespace enforces. */
 export type AppPodSecurityPolicy = 'restricted' | 'baseline';

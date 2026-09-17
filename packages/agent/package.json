@@ -101,6 +101,10 @@
             "types": "./dist/deployment-context/index.d.ts",
             "default": "./dist/deployment-context/index.js"
         },
+        "./app-runtime": {
+            "types": "./dist/app-runtime/index.d.ts",
+            "default": "./dist/app-runtime/index.js"
+        },
         "./plugins": {
             "types": "./dist/plugins/index.d.ts",
             "default": "./dist/plugins/index.js"
