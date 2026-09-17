@@ -14,7 +14,7 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiProperty, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiProperty, ApiQuery, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     ArrayMaxSize,
@@ -349,6 +349,13 @@ export class ConversationController {
      */
     @Get('mention-candidates')
     @ApiOperation({ summary: 'People and Agents the caller can mention' })
+    // Stated explicitly because the parameter below is typed `unknown` — which
+    // is what it genuinely is on the wire, but which emits `Object` into the
+    // decorator metadata Swagger reads without the CLI plugin. The published
+    // contract would then describe an object, and this document generates the
+    // MCP tool schemas, so a generated client would send the documented shape
+    // and be refused. The runtime type stays honest; the document does too.
+    @ApiQuery({ name: 'q', required: false, type: String, description: 'Name or slug prefix' })
     async mentionCandidates(@CurrentUser() auth: AuthenticatedUser, @Query('q') rawQ?: unknown) {
         if (!this.mentions) return { candidates: [] };
         // `?q=a&q=b` arrives as an ARRAY, not a string, and declaring the
