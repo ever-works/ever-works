@@ -328,12 +328,16 @@ describe('workspace backup redaction', () => {
             expect(row).not.toHaveProperty('paygSubscriptionItemId');
         });
 
-        it('exports a plan subscription as a record without its provider subscription or seat item', () => {
+        it('exports a plan subscription as a record without its provider subscription, seat item or payment-method bag', () => {
             // `data/billing/subscription.jsonl`. Spec FR-18.6 names
             // subscription identifiers outright, and both ids address a live
             // object at the payment provider — the subscription a later
             // lifecycle delivery updates or revokes, and the per-seat item a
-            // seat change creates or updates. Everything else is the record.
+            // seat change creates or updates. `paymentMethodMeta` is
+            // provider-specific payment-method data (FR-18.6's payment-method
+            // category); nothing writes it today, so the fixture sets it to
+            // prove a future writer's data cannot reach an archive.
+            // Everything else is the record.
             const subscriptionId = 'sub_plan_do_not_export_123';
             const seatItemId = 'si_seat_do_not_export_123';
             const row = redactRow('UserSubscription', {
@@ -348,12 +352,18 @@ describe('workspace backup redaction', () => {
                 providerSeatItemId: seatItemId,
                 currentPeriodEnd: '2026-10-01T00:00:00.000Z',
                 cancelAtPeriodEnd: true,
+                paymentMethodMeta: {
+                    brand: 'a-card-brand',
+                    last4: '4242',
+                    fingerprint: 'fp_do_not_export',
+                },
                 organizationId: 'o1',
                 createdAt: '2026-09-01T00:00:00.000Z',
             });
 
             expect(row).not.toHaveProperty('providerSubscriptionId');
             expect(row).not.toHaveProperty('providerSeatItemId');
+            expect(row).not.toHaveProperty('paymentMethodMeta');
             expect(row).toEqual({
                 id: 'us1',
                 userId: 'u1',

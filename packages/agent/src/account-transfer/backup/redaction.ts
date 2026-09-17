@@ -221,10 +221,25 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
     // subscription item a seat-quantity change creates or updates. The rest
     // of the row — plan, status, seats, billing provider, period end,
     // cancel-at-period-end — is the record, and still exports.
-    UserSubscription: Object.freeze(['providerSubscriptionId', 'providerSeatItemId']),
+    //
+    // `paymentMethodMeta` is a free-form bag documented as provider-specific
+    // payment-method data — the payment-method category FR-18.6 excludes.
+    // Nothing writes it today, so this drops nothing yet; it is here so that
+    // the first writer cannot put payment-method data into an archive
+    // without anyone deciding to.
+    UserSubscription: Object.freeze([
+        'providerSubscriptionId',
+        'providerSeatItemId',
+        'paymentMethodMeta',
+    ]),
     // `providerCustomerId` is not a column of `Invoice` (the customer id
     // lives on `BillingProfile`, dropped above). Kept pending review; see
     // `KNOWN_STALE_COLUMN_RULES` in `redaction.spec.ts`.
+    //
+    // Reviewed and deliberately KEPT: `hostedUrl` and `pdfUrl`. They are
+    // payment-provider links to this owner's own invoices, and the owner
+    // downloading their own archive is the audience that wants them working.
+    // Not an oversight — do not add them here without revisiting that call.
     Invoice: Object.freeze(['providerInvoiceId', 'providerCustomerId']),
     LicencePurchase: Object.freeze(['providerPaymentId']),
     // The ledger has no `providerEventId` column, which is why this rule
@@ -234,6 +249,12 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
     // allowance clawback. Every other key in that column (`run:{runId}`,
     // `daily:{userId}:{date}`, `grant:plan:…`) is a writer's replay guard,
     // not something a reader of the ledger needs, so the whole column goes.
+    //
+    // Reviewed and deliberately KEPT: `refId`. On `refType: 'billing-payment'`
+    // rows it carries the provider's payment id, but on every other row it is
+    // the link from a ledger entry to the run or subscription that caused it,
+    // and FR-18.6 does not name payment ids. Keeping the whole column keeps
+    // that record intact. Not an oversight — revisit before adding it here.
     CreditLedgerEntry: Object.freeze(['idempotencyKey']),
     // Neither column exists on `UsageLedgerEntry`: nothing forwards a usage
     // row to the payment provider, so no provider handle is ever stored on
