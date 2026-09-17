@@ -33,6 +33,7 @@ export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';
 export * from './repositories/conversation.repository';
+export * from './repositories/conversation-participant.repository';
 export * from './repositories/github-app-installation.repository';
 export * from './repositories/github-app-installation-repository.repository';
 export * from './repositories/github-app-user-link.repository';
@@ -63,6 +64,8 @@ export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';
 // Skill companion files (#2080) — per-skill uploaded file records.
 export * from './repositories/skill-file.repository';
+// Skills shelf — the queryable copy of each Skill's frontmatter tags.
+export * from './repositories/skill-tag.repository';
 // Agent Plugins MCP slice — feature-owned repositories, wired by McpModule.
 export * from './repositories/mcp-server-connection.repository';
 export * from './repositories/agent-mcp-server-binding.repository';
@@ -98,6 +101,7 @@ export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './repositories/memory-folder.repository';
+export * from './repositories/knowledge-document-reader-state.repository';
 // AW-14 What's new — per-person product changelog read state.
 export * from './repositories/product-changelog-read.repository';
 // Repository registry (Feature G) — repo connections + agent grants.

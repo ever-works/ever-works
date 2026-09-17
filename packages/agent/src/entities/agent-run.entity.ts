@@ -15,8 +15,17 @@ import type {
  * - `task`      — Task transitioned to `in_progress` with this Agent as assignee.
  * - `chat`      — `@<agent>` mention in a `task_chat_messages` row.
  * - `event`     — future use (webhook / external event hook; v2).
+ * - `conversation` — a person's message in a named Conversation with the
+ *                 Agent (a `conversation_messages` row; see
+ *                 `conversationMessageId`).
  */
-export type AgentRunTriggerKind = 'heartbeat' | 'manual' | 'task' | 'chat' | 'event';
+export type AgentRunTriggerKind =
+    | 'heartbeat'
+    | 'manual'
+    | 'task'
+    | 'chat'
+    | 'event'
+    | 'conversation';
 
 /**
  * Run lifecycle. Mirrors `WorkGenerationHistory` semantics:
@@ -44,6 +53,8 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 @Index('idx_agent_runs_status', ['status'])
 @Index('idx_agent_runs_task', ['taskId'])
 @Index('idx_agent_runs_chat_message', ['chatMessageId'])
+// Named Conversations — the reply run behind one Conversation message.
+@Index('idx_agent_runs_conversation_message', ['conversationMessageId'])
 // Run orchestration (Wave 4 M1) — cheap per-Work concurrency counts +
 // Sessions-view grouping both scan (workId, status).
 @Index('idx_agent_runs_work_status', ['workId', 'status'])
@@ -96,6 +107,21 @@ export class AgentRun {
     /** Populated only when `triggerKind = 'chat'`. FK to `task_chat_messages.id`. */
     @Column('uuid', { nullable: true })
     chatMessageId?: string | null;
+
+    /**
+     * Populated only when `triggerKind = 'conversation'`: the Conversation
+     * message this run replies to. FK to `conversation_messages.id`,
+     * `ON DELETE SET NULL` — deleting a Conversation keeps the run and its
+     * cost receipt.
+     *
+     * Its own column rather than a reuse of `chatMessageId`: that column is a
+     * key into `task_chat_messages` with its own index, and both the Task-chat
+     * in-flight lookup and the dispatch-gate drain read it as such.
+     * Overloading it would point one index at two tables. The `varchar(16)`
+     * `triggerKind` already fits `'conversation'`, so only this column is new.
+     */
+    @Column('uuid', { nullable: true })
+    conversationMessageId?: string | null;
 
     // ── Quality gates ──────────────────────────────────────────────
     /**

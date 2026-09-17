@@ -89,6 +89,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.SCHEDULE_UPDATED]: 'system',
     [ActivityActionType.SCHEDULE_DELETED]: 'system',
     [ActivityActionType.SCHEDULE_EXECUTED]: 'work',
+    // Schedules workspace pause / resume — an owner changing a cadence's
+    // control state, the same configuration shape as create/update/delete.
+    [ActivityActionType.SCHEDULE_PAUSED]: 'system',
+    [ActivityActionType.SCHEDULE_RESUMED]: 'system',
 
     // Import / export
     [ActivityActionType.IMPORT]: 'work',
@@ -270,6 +274,24 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.MODEL_ACCOUNT_RECONNECTED]: 'system',
     [ActivityActionType.MODEL_ACCOUNT_REORDERED]: 'system',
     [ActivityActionType.MODEL_POLICY_UPDATED]: 'system',
+
+    // Skills shelf — a person switching a Skill on or off.
+    [ActivityActionType.SKILL_ENABLED]: 'system',
+    [ActivityActionType.SKILL_DISABLED]: 'system',
+
+    // Shared view (AW-18) — the owner's own sharing configuration changes.
+    [ActivityActionType.SHARED_VIEW_ENABLED]: 'system',
+    [ActivityActionType.SHARED_VIEW_DISABLED]: 'system',
+    [ActivityActionType.SHARED_VIEW_REGENERATED]: 'system',
+    [ActivityActionType.SHARED_VIEW_SECTIONS_CHANGED]: 'system',
+    [ActivityActionType.SHARED_VIEW_INDEXING_CHANGED]: 'system',
+
+    // Knowledge library — shelf curation (filing, archive, export) and shared-folder rename.
+    [ActivityActionType.KB_DOCUMENT_ARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_UNARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_FILED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_EXPORTED]: 'work',
+    [ActivityActionType.MEMORY_FOLDER_RENAMED]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

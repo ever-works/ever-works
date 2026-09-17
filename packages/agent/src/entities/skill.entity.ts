@@ -8,7 +8,13 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type {
+    SkillReadinessDetail,
+    SkillReadinessState,
+    SkillReviewState,
+} from '@ever-works/contracts';
 import { User } from './user.entity';
+import { PortableDateColumn } from './_types';
 
 /**
  * Skills feature — Phase 8.1 (spec.md `features/skills/plan.md §3.1`).
@@ -42,6 +48,15 @@ export interface SkillFrontmatter {
 @Index('idx_skills_owner', ['ownerType', 'ownerId'])
 @Index('idx_skills_user', ['userId'])
 @Index('idx_skills_user_invocation', ['userId', 'invocationSlug'])
+// Skills shelf — the "needs attention" filter and summary count.
+@Index('idx_skills_user_readiness', ['userId', 'readiness'])
+// Skills shelf — the readiness sweep's oldest-verdict-first scan.
+@Index('idx_skills_readiness_checked', ['readinessCheckedAt'])
+// Skills shelf — one drafted Skill per run, as a database guarantee.
+@Index('uq_skills_captured_run', ['capturedFromRunId'], {
+    unique: true,
+    where: '"capturedFromRunId" IS NOT NULL',
+})
 export class Skill {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -116,4 +131,50 @@ export class Skill {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    // ── Skills shelf (additive; migration 1791110090000) ──────────────
+    // Appended after every pre-existing column on purpose — nothing above
+    // this line changed type, order or default.
+
+    /**
+     * The workspace-level off switch. `null` = on. A timestamp rather than a
+     * boolean so "when did this stop being used" needs no audit join.
+     * `SkillBindingRepository.resolveActive` excludes a Skill with this set;
+     * its bindings are never touched.
+     */
+    @PortableDateColumn({ nullable: true })
+    disabledAt?: Date | null;
+
+    /**
+     * Cached readiness verdict (`SkillReadinessState`). Starts `'unknown'` —
+     * a verdict nobody computed is never reported as ready, and reads "Not
+     * checked yet" rather than as a failure (a check that failed is
+     * `'check_failed'`).
+     */
+    @Column({ type: 'varchar', length: 24, default: 'unknown' })
+    readiness: SkillReadinessState;
+
+    /** Why the verdict is what it is. Identifiers only — never a credential value. */
+    @Column({ type: 'simple-json', nullable: true })
+    readinessDetail?: SkillReadinessDetail | null;
+
+    /** When the verdict was last computed; drives the hourly staleness sweep. */
+    @PortableDateColumn({ nullable: true })
+    readinessCheckedAt?: Date | null;
+
+    /**
+     * `'proposed'` for a Skill drafted by an agent and not yet accepted by a
+     * person; `null` means accepted. Same vocabulary and null-means-accepted
+     * convention as `work_knowledge_documents.reviewState`. A proposed Skill
+     * is excluded from `resolveActive`.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    reviewState?: SkillReviewState | null;
+
+    /**
+     * The `agent_runs.id` a drafted Skill came from. No FK: deleting a run
+     * must not delete the Skill it taught.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    capturedFromRunId?: string | null;
 }

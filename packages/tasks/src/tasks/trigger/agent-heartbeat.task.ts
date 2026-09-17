@@ -166,6 +166,19 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                 userId: payload.userId,
                 kind: 'heartbeat',
                 // No `signal` — see the note on the `run` params above.
+                //
+                // The row's OWN admission scope, whenever it has one
+                // (reviewer agent stage, slice AD). The legacy fallback
+                // above claims ANY in-flight run of this agent, and a
+                // payload `runId` is only checked against the agent — so
+                // the row executed here can be a delegated run or a review
+                // run that some other worker was meant to start. The tool
+                // loop narrows tools, withholds `transitionTask`, gates a
+                // review run on its brief and offers the verdict tool only
+                // from the scope on the CONTEXT; leaving it off made such a
+                // row run with the agent's full tool surface. An ordinary
+                // row has no scope and the call is unchanged.
+                ...(run.delegationScope ? { delegationScope: run.delegationScope } : {}),
             });
 
             if (result.status === 'assembled') {

@@ -126,6 +126,18 @@ export enum ActivityActionType {
     MEMORY_FOLDER_CREATED = 'memory_folder_created',
     MEMORY_FOLDER_DELETED = 'memory_folder_deleted',
     MEMORY_FOLDER_SYNCED = 'memory_folder_synced',
+    // Knowledge library — curation of the shared shelf. Read / unread and
+    // pins are personal and high-frequency, so they are never logged.
+    //   ARCHIVED   `{ documentId, workId, organizationId, folderId }`
+    //   UNARCHIVED `{ documentId, workId, organizationId, folderId, restoredToUnfiled }`
+    //   FILED      `{ documentId, workId, organizationId, fromFolderId, toFolderId }`
+    //   EXPORTED   `{ documentIds, format, documentCount, missingCount }`
+    //   MEMORY_FOLDER_RENAMED `{ folderId, oldPath, newPath, scope }`
+    KB_DOCUMENT_ARCHIVED = 'kb_document_archived',
+    KB_DOCUMENT_UNARCHIVED = 'kb_document_unarchived',
+    KB_DOCUMENT_FILED = 'kb_document_filed',
+    KB_DOCUMENT_EXPORTED = 'kb_document_exported',
+    MEMORY_FOLDER_RENAMED = 'memory_folder_renamed',
     // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
     // KB document is renamed and the rewriter sweeps the rest of the
     // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details
@@ -232,6 +244,10 @@ export enum ActivityActionType {
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
     SKILL_FILE_EDITED = 'skill_file_edited',
+    // Skills shelf — the workspace-level on/off switch. Appended only; the
+    // column is a varchar, so no migration.
+    SKILL_ENABLED = 'skill_enabled',
+    SKILL_DISABLED = 'skill_disabled',
     // Repository registry (Feature G) — Settings → Repositories rows +
     // the Agent ↔ repo grant edge. Additive entries only (NN #20).
     REPO_CONNECTION_CREATED = 'repo_connection_created',
@@ -327,6 +343,13 @@ export enum ActivityActionType {
     MODEL_ACCOUNT_RECONNECTED = 'model_account_reconnected',
     MODEL_ACCOUNT_REMOVED = 'model_account_removed',
     MODEL_POLICY_UPDATED = 'model_policy_updated',
+    // Schedules workspace — one row each time an owner pauses or resumes a
+    // cadence from any source (recurring Task, heartbeat, Mission tick,
+    // inbound Trigger). `details` carries `{ scheduleId, sourceType,
+    // control, before, after }`. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    SCHEDULE_PAUSED = 'schedule_paused',
+    SCHEDULE_RESUMED = 'schedule_resumed',
     // Live Feed — a run starting and a run reaching a terminal state, for
     // every trigger kind other than `heartbeat` (heartbeat runs keep the
     // three `agent_heartbeat_*` members above, unchanged). Declared here so
@@ -336,6 +359,16 @@ export enum ActivityActionType {
     AGENT_RUN_STARTED = 'agent_run_started',
     AGENT_RUN_COMPLETED = 'agent_run_completed',
     AGENT_RUN_FAILED = 'agent_run_failed',
+    // Shared view (AW-18) — the Workspace owner turning sharing on or off,
+    // regenerating the link, and changing what it publishes or whether
+    // crawlers may index it. One row per changed facet. `details` never
+    // carries the share token. Additive members — `activity_log.actionType`
+    // is a plain varchar, so no migration is needed.
+    SHARED_VIEW_ENABLED = 'shared_view_enabled',
+    SHARED_VIEW_DISABLED = 'shared_view_disabled',
+    SHARED_VIEW_REGENERATED = 'shared_view_regenerated',
+    SHARED_VIEW_SECTIONS_CHANGED = 'shared_view_sections_changed',
+    SHARED_VIEW_INDEXING_CHANGED = 'shared_view_indexing_changed',
 }
 
 /**
@@ -373,6 +406,14 @@ export interface CreateActivityLogDto {
     actorAgentId?: string | null;
     /** The actor's display name at the moment the record is written. */
     actorLabel?: string | null;
+    /**
+     * Explicit ownership stamp. Optional: when omitted the scope-stamping
+     * subscriber fills both from the request scope, as it always has. A
+     * writer acting on a Workspace named in the route (rather than the
+     * request's active scope) passes it so the row lands in that Workspace.
+     */
+    tenantId?: string | null;
+    organizationId?: string | null;
 }
 
 /**

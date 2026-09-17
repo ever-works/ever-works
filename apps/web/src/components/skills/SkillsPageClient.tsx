@@ -4,10 +4,13 @@ import { useEffect, useMemo, useState, useTransition, type FormEvent } from 'rea
 import { useTranslations } from 'next-intl';
 import { Download, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link, useRouter } from '@/i18n/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
+import type { Skill, SkillCardStateCounts, SkillCatalogEntry } from '@/lib/api/skills';
+import type { SkillProvenance, SkillReadinessFilter, SkillShelfSort } from '@ever-works/contracts';
 import { installCatalogSkillAction } from '@/app/actions/skills';
+import { SkillShelf, SkillShelfGrid } from './SkillShelf';
+import type { SkillTagFacetItem } from './SkillTagFilter';
 
 type Section = 'installed' | 'available' | 'custom';
 
@@ -28,7 +31,17 @@ interface SkillsPageClientProps {
         search: string;
         installedOffset: number;
         catalogOffset: number;
+        // Skills shelf — each absent at its default.
+        tags?: string[];
+        readiness?: SkillReadinessFilter;
+        provenance?: SkillProvenance;
+        enabled?: boolean;
+        sort?: SkillShelfSort;
     };
+    /** Skills shelf — tag chips with counts. */
+    tagFacets?: SkillTagFacetItem[];
+    /** Skills shelf — per-card-state counts for the summary line. */
+    counts?: SkillCardStateCounts | null;
     loadErrors?: {
         installed?: string | null;
         catalog?: string | null;
@@ -56,6 +69,8 @@ export function SkillsPageClient({
     loadErrors = {},
     basePath = ROUTES.DASHBOARD_SKILLS,
     hash = '',
+    tagFacets = [],
+    counts = null,
 }: SkillsPageClientProps) {
     const t = useTranslations('dashboard.skillsPage');
     const router = useRouter();
@@ -89,6 +104,11 @@ export function SkillsPageClient({
             search,
             installedOffset: filters.installedOffset,
             catalogOffset: filters.catalogOffset,
+            tags: filters.tags,
+            readiness: filters.readiness,
+            provenance: filters.provenance,
+            enabled: filters.enabled,
+            sort: filters.sort,
             ...updates,
         };
         const params = new URLSearchParams();
@@ -96,6 +116,12 @@ export function SkillsPageClient({
         if (next.search.trim()) params.set('search', next.search.trim());
         if (next.installedOffset > 0) params.set('installedOffset', String(next.installedOffset));
         if (next.catalogOffset > 0) params.set('catalogOffset', String(next.catalogOffset));
+        // Skills shelf — same order and default-omission as `buildSkillsHref`.
+        if (next.tags?.length) params.set('tags', next.tags.join(','));
+        if (next.readiness) params.set('readiness', next.readiness);
+        if (next.provenance) params.set('provenance', next.provenance);
+        if (next.enabled !== undefined) params.set('enabled', String(next.enabled));
+        if (next.sort && next.sort !== 'updated') params.set('sort', next.sort);
         router.replace(`${basePath}${params.size ? `?${params}` : ''}${hash}`);
     };
 
@@ -184,7 +210,26 @@ export function SkillsPageClient({
                     aria-labelledby="skills-tab-installed"
                     className="space-y-4"
                 >
-                    <InstalledList installed={installedItems} />
+                    <SkillShelf
+                        skills={installedItems}
+                        meta={installedMeta}
+                        counts={counts}
+                        tagFacets={tagFacets}
+                        filters={{
+                            search: filters.search,
+                            tags: filters.tags,
+                            readiness: filters.readiness,
+                            sort: filters.sort,
+                            provenance: filters.provenance,
+                            enabled: filters.enabled,
+                        }}
+                        onFiltersChange={(updates) => {
+                            if (updates.search !== undefined) setSearch(updates.search);
+                            updateUrl({ ...updates, installedOffset: 0 });
+                        }}
+                        onFirstPage={() => updateUrl({ installedOffset: 0 })}
+                        onBrowseCatalog={() => handleSectionChange('available')}
+                    />
                     <Pagination
                         total={installedMeta.total}
                         limit={installedMeta.limit}
@@ -239,6 +284,11 @@ function LoadError({ message }: { message: string }) {
     );
 }
 
+/**
+ * The Custom section's card grid. Skills shelf: the cards are the same
+ * `SkillShelfGrid` the Installed shelf renders, so a Skill shows the same
+ * badge and on/off switch wherever it appears; the empty state is unchanged.
+ */
 function InstalledList({ installed }: { installed: Skill[] }) {
     const t = useTranslations('dashboard.skillsPage');
     if (installed.length === 0) {
@@ -249,41 +299,7 @@ function InstalledList({ installed }: { installed: Skill[] }) {
             </div>
         );
     }
-    return (
-        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
-            {installed.map((s) => (
-                <Link
-                    key={s.id}
-                    href={ROUTES.DASHBOARD_SKILL(s.id)}
-                    className="group flex flex-col rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4 hover:border-border dark:hover:border-border-dark transition-colors"
-                >
-                    <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
-                            {s.title}
-                        </h3>
-                        <span className="shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
-                            {s.ownerType}
-                        </span>
-                    </div>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1.5 line-clamp-2 min-h-8">
-                        {s.description}
-                    </p>
-                    {s.invocationSlug && (
-                        <span className="self-start mt-2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                            /{s.invocationSlug}
-                        </span>
-                    )}
-                    <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/40 dark:border-border-dark/40 text-[11px] text-text-secondary dark:text-text-secondary-dark">
-                        <span className="min-w-0 truncate font-mono">{s.slug}</span>
-                        <span className="shrink-0 flex items-center gap-2">
-                            <span>v{s.version}</span>
-                            {s.sourceCatalogSlug && <span>{t('card.fromCatalog')}</span>}
-                        </span>
-                    </div>
-                </Link>
-            ))}
-        </div>
-    );
+    return <SkillShelfGrid skills={installed} />;
 }
 
 function CatalogList({

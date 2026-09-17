@@ -44,6 +44,13 @@ vi.mock('./MeetingCard', () => ({}));
 vi.mock('../meetings/MeetingCard', () => ({
     MeetingCard: () => <div data-testid="meeting-card" />,
 }));
+// The Library view owns its own network lifecycle; here it is a marker that
+// records what the shell hands it.
+vi.mock('@/components/knowledge/LibraryPanel', () => ({
+    LibraryPanel: ({ works }: { works?: { value: string; label: string }[] }) => (
+        <div data-testid="library-panel-stub" data-works={JSON.stringify(works ?? [])} />
+    ),
+}));
 
 import { MemoryShell } from './MemoryShell';
 import type { MemoryMeetingsData } from './MemoryMeetingsPanel';
@@ -197,5 +204,86 @@ describe('MemoryShell BFF transport', () => {
         expect(url).toBe('/api/memory/consolidate');
         expect(init?.method).toBe('POST');
         expect(new Headers(init?.headers).get(BROWSER_WORKSPACE_SCOPE_HEADER)).toBe('org:ever');
+    });
+});
+
+/**
+ * Knowledge library — the Library view is a second view of this page, not a
+ * second knowledge screen. The overview (everything above) stays the default
+ * and renders exactly as before; the Library view is chosen with the toggle,
+ * remembered per browser and mirrored to `?view=library`.
+ */
+describe('MemoryShell — Overview | Library view', () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+        window.history.replaceState({}, '', '/memory');
+    });
+
+    afterEach(() => {
+        cleanup();
+        window.localStorage.clear();
+        window.history.replaceState({}, '', '/');
+    });
+
+    it('defaults to the overview with every existing panel and no Library', () => {
+        render(<MemoryShell initial={initial} meetings={meetingsData()} />);
+
+        expect(screen.getByTestId('memory-view-overview').getAttribute('aria-pressed')).toBe(
+            'true',
+        );
+        expect(screen.getByTestId('memory-search')).not.toBeNull();
+        expect(screen.getByTestId('memory-consolidate-button')).not.toBeNull();
+        expect(screen.getByTestId('memory-files-panel')).not.toBeNull();
+        expect(screen.queryByTestId('library-panel-stub')).toBeNull();
+    });
+
+    it('renders the Library view for a ?view=library request, passing the Works it covers', () => {
+        const withWorks = {
+            ...initial,
+            facets: {
+                ...initial.facets,
+                works: [{ value: 'work-1', label: 'Support desk', count: 3 }],
+            },
+        } as MemoryResponse;
+        render(<MemoryShell initial={withWorks} initialView="library" />);
+
+        const panel = screen.getByTestId('library-panel-stub');
+        expect(JSON.parse(panel.getAttribute('data-works') ?? '[]')).toEqual([
+            { value: 'work-1', label: 'Support desk' },
+        ]);
+        expect(screen.getByTestId('memory-view-library').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.queryByTestId('memory-search')).toBeNull();
+        expect(screen.queryByTestId('memory-consolidate-button')).toBeNull();
+    });
+
+    it('switches views, remembers the choice and mirrors it to the URL without losing other keys', () => {
+        window.history.replaceState({}, '', '/org/ever/memory?source=manual');
+        render(<MemoryShell initial={initial} />);
+
+        fireEvent.click(screen.getByTestId('memory-view-library'));
+        expect(screen.getByTestId('library-panel-stub')).not.toBeNull();
+        expect(window.localStorage.getItem('memory-tab')).toBe('library');
+        expect(window.location.search).toBe('?source=manual&view=library');
+
+        fireEvent.click(screen.getByTestId('memory-view-overview'));
+        expect(screen.getByTestId('memory-search')).not.toBeNull();
+        expect(window.localStorage.getItem('memory-tab')).toBe('overview');
+        expect(window.location.search).toBe('?source=manual');
+    });
+
+    it('restores a remembered Library view on a bare /memory', async () => {
+        window.localStorage.setItem('memory-tab', 'library');
+        render(<MemoryShell initial={initial} />);
+
+        expect(await screen.findByTestId('library-panel-stub')).not.toBeNull();
+    });
+
+    it('does not let a remembered Library view hide an anchored or filtered overview link', () => {
+        window.localStorage.setItem('memory-tab', 'library');
+        window.history.replaceState({}, '', '/memory#meetings');
+        render(<MemoryShell initial={initial} meetings={meetingsData()} />);
+
+        expect(screen.queryByTestId('library-panel-stub')).toBeNull();
+        expect(screen.getByTestId('meetings-shell')).not.toBeNull();
     });
 });

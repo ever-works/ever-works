@@ -30,6 +30,7 @@ import {
     TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
+import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
@@ -40,6 +41,7 @@ import {
 } from '@ever-works/agent/subscriptions';
 import { FleetJobService } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -270,6 +272,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TaskChatService'),
             inject: [TriggerInternalApiClient],
         },
+        // Named Conversations — the agent-conversation-reply task loads the
+        // Conversation it answers and records the reply over the internal
+        // RPC channel. The real service (repositories, mention lookups) lives
+        // API-side, same shape as TaskChatService above.
+        {
+            provide: ConversationMessageService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'ConversationMessageService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Kanban run cockpit (plan 04 M5/M7) — the task-pr-status-sync
         // cron calls syncDuePrStatuses() over the internal RPC channel.
         // The real service needs the git facade (provider plugins are
@@ -408,6 +420,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'ModelAccountHealthService'),
             inject: [TriggerInternalApiClient],
         },
+        // Skills shelf — the skill-readiness-sweep cron calls `sweepStale()`
+        // on this proxy, which RPCs to the live API where the Skill, binding
+        // and connection repositories, the tool-grant matrix and the
+        // credential port are wired. Same shape as TerminalTranscriptService.
+        {
+            provide: SkillReadinessService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'SkillReadinessService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -430,6 +452,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskRecurrenceDispatcherService,
         TasksService,
         TaskChatService,
+        ConversationMessageService,
         TaskRunDenormService,
         TaskWorkspaceService,
         FleetJobService,
@@ -448,6 +471,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         MemoryConsolidationScheduleService,
         TerminalTranscriptService,
         ModelAccountHealthService,
+        SkillReadinessService,
     ],
 })
 export class TriggerInternalModule {}
