@@ -4,13 +4,20 @@
 name: Ever Works build
 on:
   pull_request: { branches: ['main'], types: [opened, synchronize, reopened] }
+  # APW-08 FR-76: the tracked-branch leg is kept as well as the pull-request leg, so a change that
+  # lands by merge commit without an intervening pull request is still checked. Reported only.
+  push: { branches: ['main'] }
 permissions: {}
 concurrency:
-  group: ever-works-build-${{ format('pr-{0}', github.event.pull_request.number) }}
+  group: ever-works-build-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('push-{0}', github.sha) }}
   cancel-in-progress: true
 jobs:
   checks:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: 'Ever Works check: ${{ matrix.check.name }}'
     runs-on: ubuntu-latest
     timeout-minutes: ${{ matrix.check.timeoutMinutes }}
@@ -31,7 +38,12 @@ jobs:
     steps:
       - uses: actions/checkout@‹pin:checkout›
         with:
-          { ref: '${{ github.event.pull_request.head.sha }}', fetch-depth: 1, persist-credentials: false, lfs: false }
+          {
+            ref: '${{ github.event_name == ''pull_request'' && github.event.pull_request.head.sha || github.sha }}',
+            fetch-depth: 1,
+            persist-credentials: false,
+            lfs: false
+          }
       - name: Run check
         env: { EW_CHECK_COMMAND_B64: '${{ matrix.check.commandB64 }}' }
         run: printf '%s' "$EW_CHECK_COMMAND_B64" | base64 -d > "$RUNNER_TEMP/ew-check.sh" && bash -e "$RUNNER_TEMP/ew-check.sh"

@@ -248,8 +248,9 @@ Licenses that require offering source to network users produce a visible source 
 ### 4.3 Apps catalog
 
 - **FR-27.** The catalog MUST be read from the configured catalog repository and ref (default
-  `ever-works/apps` at `main`), and a warning MUST be logged on every uncached read of a ref that is not a
-  40-character commit or a version tag.
+  **`ever-works/templates`** at `main` — CONTRACTS §7 and Resolution **R-29**; the drafts named
+  `ever-works/apps` and an installation still carrying that value keeps working), and a warning MUST be logged on
+  every uncached read of a ref that is not a 40-character commit or a version tag.
 - **FR-28.** The primary read MUST be tokenless with an 8-second timeout, falling back to an authenticated
   read; successes MUST be cached for 1 hour and failures for 30 seconds.
 - **FR-29.** An unavailable catalog MUST yield an empty result flagged unavailable — never an error — and the

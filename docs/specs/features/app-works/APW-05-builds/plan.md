@@ -274,7 +274,17 @@ jobs:
         with: { name: ever-works-build-result, path: ever-works-build-result.json, retention-days: 7, if-no-files-found: ignore }
 
   checks:                                                       # if spec.checks non-empty (R-9); the only job when strategy is image|none
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # Both triggers, and both are kept (APW-08 FR-76, reported here as APW05-G04's second leg):
+    # a same-repository pull request into the tracked branch, AND a push to the tracked branch — so a
+    # change that lands by merge commit without an intervening pull request is still checked. A pull
+    # request from ANOTHER repository runs no check (the head repository check), and neither does any
+    # other event. The tracked-branch leg is REPORTED ONLY: it never gates a Build (FR-15) and never
+    # fails the run by itself.
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.base.ref == '<tracked branch>') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/<tracked branch>')
     name: "Ever Works check: ${{ matrix.check.name }}"          # the check run name, exactly (FR-65)
     runs-on: <runner label>                                     # same selection as the build job (§4.4)
     timeout-minutes: ${{ matrix.check.timeoutMinutes }}
@@ -288,7 +298,10 @@ jobs:
           - { name: "<name>", required: <true|false>, timeoutMinutes: <ceil(timeoutSeconds / 60)>, commandB64: "<base64 of command>" }
     steps:
       - uses: actions/checkout@‹pin:checkout›
-        with: { ref: "${{ github.event.pull_request.head.sha }}", fetch-depth: 1, persist-credentials: false, lfs: false }
+        # The pull-request leg checks the PR head; the tracked-branch leg checks the pushed commit.
+        # `github.sha` is already the pushed head on a push event, so one expression covers both and
+        # neither leg can silently check the wrong commit.
+        with: { ref: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}", fetch-depth: 1, persist-credentials: false, lfs: false }
       - name: Run check
         env: { EW_CHECK_COMMAND_B64: "${{ matrix.check.commandB64 }}" }
         run: printf '%s' "$EW_CHECK_COMMAND_B64" | base64 -d > "$RUNNER_TEMP/ew-check.sh" && bash -e "$RUNNER_TEMP/ew-check.sh"
