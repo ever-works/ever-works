@@ -383,11 +383,40 @@ describe('SubAgentDelegationRunnerService', () => {
         expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
     });
 
-    it('still admits a non-archived child (the guard is not a blanket refusal)', async () => {
+    it('refuses a PAUSED child, and says why, instead of running it (AW-23)', async () => {
+        // Delegation was one of the five dispatch paths a pause did not
+        // bind on: a parent agent could spawn a paused child and it would
+        // run, on the one path a person never sees. The refusal is
+        // returned to the parent — written into its run log — rather than
+        // failing silently or stalling.
+        agents.findByIdAndUser.mockResolvedValue({
+            id: CHILD_AGENT,
+            userId: OWNER,
+            status: 'paused',
+            ...EVER_SCOPE,
+        });
+        collaborators.listForAgent.mockResolvedValue([
+            { collaboratorAgentId: CHILD_AGENT, enabled: true },
+        ]);
+
+        const result = await runner.run(request({ childAgentId: CHILD_AGENT }));
+
+        expect(result.status).toBe('refused');
+        expect(result.refusalCode).toBe('collaborator-not-allowed');
+        expect(result.summary).toMatch(/paused/);
+        expect(tasks.create).not.toHaveBeenCalled();
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('still admits a live child (the guard is not a blanket refusal)', async () => {
+        // `active`, not `paused`: AW-23 added a second status gate right
+        // beside the archived one, so a paused child is refused too. The
+        // point this case makes — the guard refuses a STATUS, not every
+        // named child — is unchanged.
         agents.findByIdAndUser.mockImplementation(async (id: string) => ({
             id,
             userId: OWNER,
-            status: 'paused',
+            status: 'active',
             ...EVER_SCOPE,
         }));
         collaborators.listForAgent.mockResolvedValue([
