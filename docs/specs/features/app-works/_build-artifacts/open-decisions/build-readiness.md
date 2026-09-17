@@ -114,31 +114,41 @@ job.
 
 ## 4. The three things the owner must approve first
 
-**1 · Re-word the isolation claim (highest impact — a security statement, not a preference).**
-The owner has answered that the managed tier runs "the same way Works run today — our own shared k8s with
-namespace-level isolation, plus connected customer nodes and customer k8s clusters". APW-10's launch gate still
-says the opposite in three items an operator must personally attest: LG-01 *"Tier compute hosts nothing belonging
-to the platform or to any production product"* (`APW-10-apps-hosting-tier/spec.md:183`), LG-03 *"Separate egress
-identity"* (`:185`), LG-16 *"Separate edge … a separate edge account is attested"* (`:198`), plus README D15's
-*"own hosts/network/egress identity"* (`README.md:209-213`). **Approve the replacement wording** — namespaces +
-quotas + node pool + network policy + dedicated egress + a separate ingress — **or** decide the tier gets its own
-hosts. Everything else about the tier can be built either way; only this changes what the gate claims. It also
-answers two dependants in the same breath: **connected customer nodes appear nowhere in the plan or the code and
-need one sentence plus a trust-boundary decision** (`contradictions.md` B-4, E-1), and APW-12's D3 ("a trusted
-tier separate from any tier running user-controlled code") needs the same reconciliation.
-Full row: `decision-sheet.md` **B-01**.
+**1 · The isolation claim is re-scoped per deploy shape — nothing is deleted, and the scope EXPANDS.**
+*(Revised 2026-09-17 after the owner's follow-up, which was unambiguous: "I don't know why this again and again
+cause issues, please do full review etc. We do NOT change anything here or remove, we may EXPAND only!" The first
+draft of this section proposed **replacing** LG-01/LG-03/LG-16's wording; that proposal is **void**, because it
+framed a family of deploy shapes as a conflict.)* The platform already deploys to more than one place and the plan
+had been written as though it did not: the **Ever Works shared customer cluster** (`k8s-works-shared`), the
+**internal admin cluster** (`k8s-works`), a **customer kubeconfig** (`custom-kubeconfig`), the **Vercel** plugin
+(`deployment` capability), plus **Fleet agent enrollment** — which is exactly the "install and connect Agents on
+such other machines" path the owner named, and which is already shipped substrate
+(`packages/contracts/src/fleet/fleet-node.types.ts:45-51,432-446`). So: **LG-01, LG-03 and LG-16 stay as gate items
+and each gains a per-shape attestation** (namespace + quota + LimitRange + NetworkPolicy + dedicated egress
+identity + a distinct ingress for the shared zone; the equivalent properties attested for a connected node or a
+customer cluster), and the shapes are written down in full — shipped versus extension point, honestly labelled —
+in [`APW-06-app-runtime/deploy-shapes.md`](../APW-06-app-runtime/deploy-shapes.md), now Resolution **R-27**. An
+item a shape genuinely cannot satisfy is recorded **`Failed` with its reason**, which the gate board already
+supports — never marked "not applicable". This also settles APW-12's D3, which needs the same namespace +
+network-policy separation rather than separate hardware. Full row: `decision-sheet.md` **B-01** (now `PLAN`).
 
-**2 · Drop the Public Suffix List apex — and accept the cookie consequence.**
-The owner's answer ("use the existing subdomain mechanism, `my-app.ever.works`") removes a weeks-long lead item,
-but it silently retires the *reason* D10 exists: `ever.works` **is** the platform's parent domain, so app
-subdomains share a registrable domain with the dashboard and D10's "cookie isolation" premise
-(`README.md:176-178`) no longer holds. LG-15 (`APW-10-apps-hosting-tier/spec.md:197`) requires an apex "present
-on the Public Suffix List", and **nothing in the platform consumes the PSL at all**
-(`packages/contracts/src/release/deployment-verification.types.ts:243-253` says the package "will not carry a
-PSL"). **Approve** (a) LG-15 re-worded to the installation's configured domain and its `APEX_NOT_ON_PSL` /
-`PSL_UNREACHABLE` probes deleted (`APW-10-apps-hosting-tier/plan.md:390`), and (b) the compensating control —
-`__Host-`-prefixed, host-only, `Secure` session cookies on dashboard and app hosts, with app hosts never able to
-set a cookie the dashboard reads. Full row: `decision-sheet.md` **B-02**; fix list: `contradictions.md` A-1…A-4.
+**2 · The Public Suffix List apex is KEPT; the platform domain becomes the default — additive, nothing deleted.**
+*(Revised 2026-09-17 after the owner's follow-up: "please don't remove anything, just make sure we support
+sub-domains / custom domains etc etc." The first draft of this section proposed deleting the PSL path and its
+probes; that proposal is **void** and is left below only as the record of why the reconciliation was needed.)*
+Three shapes now coexist and all three ship: **(a)** `<slug>.<EVER_WORKS_APPS_DOMAIN>`, which **defaults to
+`EVER_WORKS_DOMAIN`**, so a template install simply works as `my-cool-company-gauzy.ever.works`; **(b)** the
+tenant's custom domain and per-App-Work subdomains under it, through the shipped add/verify flow; **(c)** the
+original dedicated apex — outside every platform domain and **listed on the Public Suffix List** — still
+operator-selectable, still the only shape giving hard cookie isolation, with **LG-15 and its
+`APEX_UNDER_PLATFORM_DOMAIN` / `APEX_NOT_ON_PSL` / `PSL_UNREACHABLE` probes intact** and simply not exercised unless
+an operator configures such an apex. Where shape (a) is used, the compensating control is **mandatory**: host-only
+`__Host-`-prefixed `Secure` session cookies on dashboard and app hosts, no platform session cookie on app hosts,
+and app hosts that never serve platform pages. Note the PSL itself remains consumed by nothing in the platform
+today (`packages/contracts/src/release/deployment-verification.types.ts:243-253`) — which is precisely why keeping
+the check costs nothing until someone configures the dedicated apex. Full row: `decision-sheet.md` **B-02**;
+landed across D10, R-16, ACC-06-27, ACC-13-20, APW-06 S33/FR-40/FR-41/ACC-06-47, APW-10 LG-15 + its board row and
+open question, APW-13 FR-52/ACC-13-20 + plan §8.4 + T34/T60, README Q2 and the env table.
 
 **3 · Fix the App Work repository role, then the Wave 1 lane opens.**
 One sentence: for an App Work, does the app-code fork occupy the persisted **`data`** role (recommended — it is

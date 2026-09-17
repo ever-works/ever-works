@@ -18,6 +18,17 @@ matching row of `decision-sheet.md`.
 
 ## A. Owner answer 1 — "no separate PSL-listed user-apps domain"
 
+> **⚠️ SUPERSEDED 2026-09-17 (later the same day) — read [`../BUILD-READINESS.md`](../BUILD-READINESS.md) §2/§6 and
+> `README.md` D10 before acting on anything below.** The owner's follow-up was explicit: *"please don't remove
+> anything, just make sure we support sub-domains / custom domains etc etc"* — so this entry is **history, not
+> instruction**. What actually landed is the **additive** reconciliation: managed addresses **default** to the
+> platform's own domain (`my-cool-company-gauzy.ever.works`), the tenant's custom domain and its subdomains work
+> through the shipped add/verify flow, and **the dedicated Public-Suffix-List apex stays a supported operator
+> configuration with LG-15 and its `APEX_UNDER_PLATFORM_DOMAIN` / `APEX_NOT_ON_PSL` / `PSL_UNREACHABLE` probes
+> intact** — kept, never marked "not applicable". Everything below that proposes *dropping* the PSL apex, deleting
+> those probes, or rewriting LG-15 to a single installation domain is **void**. The text is kept because the
+> evidence it gathered (what consumes the PSL today, which code paths already ship) is still accurate.
+
 **Owner's answer:** *"No separate PSL-listed user-apps domain: use the existing subdomain mechanism
 (`my-app.ever.works`) or a tenant custom domain with per-app subdomains."*
 

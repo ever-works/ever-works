@@ -321,9 +321,12 @@ and, from a user browsing the Apps catalog:
 
 - **FR-51.** The deploy target a user picks to run nothing is named **None** in every lane, assertion and summary
   (program Resolution R-12); no scenario uses a separate "not yet" state.
-- **FR-52.** In Wave 1 an App Work on **Your cluster** is reached at `<slug>.<apps-domain>` when the installation under
-  test has a user-apps domain configured, and otherwise only through a custom domain in the test DNS zone; a lane
-  fails if an App Work is ever given an address under the platform's own parent domain (program Resolution R-16).
+- **FR-52.** In Wave 1 an App Work on **Your cluster** is reached at `<slug>.<apps-domain>`, where the apex is the
+  installation's `EVER_WORKS_APPS_DOMAIN` — **defaulting to the platform's own domain**, so `<slug>.ever.works` is a
+  valid result — **and** through a custom domain in the test DNS zone; an installation may instead configure a
+  dedicated user-apps apex, in which case `<slug>.<that-apex>` is the managed address (program Resolution R-16,
+  owner decision 2026-09-17: additive, nothing removed). A lane fails only when an App Work is given an address
+  under **another Ever product's** domain (`ever.team`, `gauzy.co`, …) — never for the platform's own domain.
 - **FR-53.** Every lane that creates App Works runs with App Works switched on in both the web and the API (program
   Resolution R-6); proving the refusal with the switch off belongs to the App Work kind epic.
 - **FR-54.** The App Launcher's own end-to-end scenario belongs to the App Launcher epic; the golden paths only run it
@@ -457,9 +460,10 @@ A reviewer can run this list against the lanes. Scenario ids match [ACCEPTANCE.m
 - [ ] **ACC-13-19** Every fixture variant branch builds to its declared outcome in the fixture repository's own CI:
       the out-of-memory, Dockerfile-error, missing-value, secret-in-image, build-timeout and disk-full variants fail
       the way their table row says, the services-postgres variant succeeds without touching any other database.
-- [ ] **ACC-13-20** On **Your cluster** the fixture App Work is live at `<slug>.<apps-domain>` when the dev
-      installation has a user-apps domain, otherwise only at its custom domain; no address under the platform's own
-      parent domain is ever assigned.
+- [ ] **ACC-13-20** On **Your cluster** the fixture App Work is live at `<slug>.<apps-domain>` (the apex defaults to
+      the platform's own domain in dev, so `ever.works` subdomains are valid; a dedicated PSL-listed apex remains a
+      supported configuration) **and** at its custom domain in the test DNS zone; no address under **another Ever
+      product's** domain is ever assigned.
 
 **Cross-cutting**
 

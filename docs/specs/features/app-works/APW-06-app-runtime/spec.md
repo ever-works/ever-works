@@ -215,11 +215,14 @@ Work itself is deleted.
 - **S32 — Delete while the cluster is unreachable.** **Given** an App Work whose cluster credential has expired,
   **when** the owner deletes it, **then** removal is retried 3 times over 15 minutes, the App Work is then deleted
   anyway, and Activity names every object that may remain on the cluster so the owner can remove it by hand.
-- **S33 — A public URL on Your cluster without a custom domain.** **Given** an installation whose operator configured
-  the user-apps domain, **when** an App Work first deploys to Your cluster whose ingress reports a public address,
-  **then** it is published at `<slug>.<apps-domain>` (a short suffix is added when the slug is taken) with a DNS record
-  pointing at that ingress, the URL uses `https` when the cluster has a certificate issuer selected, and custom domains
-  can still be added; **given** no user-apps domain is configured, **then** only custom domains are offered.
+- **S33 — A public URL on Your cluster without a custom domain.** **Given** an installation, **when** an App Work
+  first deploys to Your cluster whose ingress reports a public address, **then** it is published at
+  `<slug>.<apps-domain>` (a short suffix is added when the slug is taken) with a DNS record pointing at that
+  ingress, the URL uses `https` when the cluster has a certificate issuer selected, and custom domains can still
+  be added. `<apps-domain>` is `EVER_WORKS_APPS_DOMAIN`, **defaulting to the installation's platform domain**, so
+  the ordinary result is `<slug>.ever.works`; an operator may configure a dedicated apex instead (owner decision
+  2026-09-17, R-16 — additive). **Given** the managed shape is switched off or its apex fails validation — the
+  only case in which no managed address is offered — **then** only custom domains are offered.
 - **S34 — Verification before merge.** **Given** the App Provisioner verifies a proposal on an App Work that targets
   Your cluster, **when** a verification runs, **then** a temporary namespace separate from the live app is created with
   no public host, no custom domain and no DNS record, dependencies without persistent volumes, and smoke checks run from
@@ -236,6 +239,14 @@ Every threshold below is a number on purpose.
 - **FR-1.** Every App Work has exactly one deploy target: **None** (default; labelled **"None — don't deploy
   yet"**), **Your cluster** or **Ever Works Apps**. There is no separate "not yet" state. Changing the target never
   removes anything already running; the change dialog says so.
+  > **The choices are three; the shapes underneath are a family, and no shape is ever removed** (owner answer
+  > 2026-09-17, Resolution **R-27**). `Your cluster` is served by the Ever Works **shared** customer cluster, the
+  > internal admin cluster, or a **customer kubeconfig**; **Ever Works Apps** runs on the shared zone as a
+  > namespace-isolated tier *and* may be served by a customer cluster, a machine **connected to Ever Works**, or —
+  > as recorded extension points — a remote host over SSH or any further provider published as a `deployment`
+  > plugin. The taxonomy, its evidence and the per-shape gate attestations are in
+  > [`deploy-shapes.md`](./deploy-shapes.md). **This paragraph is additive: it grants no new requirement on any
+  > shipped shape and removes none.**
 - **FR-2.** **None**: nothing is deployed; Builds still run; the Deploy tab explains the targets and offers
   **Connect your cluster**.
 - **FR-3.** **Your cluster** uses a kubeconfig stored encrypted for this App Work, never returned by any
@@ -398,10 +409,14 @@ Every threshold below is a number on purpose.
   domains are published. DNS instructions use the address the cluster's ingress reports: an IP gives an `A`
   record, a hostname a `CNAME`.
 - **FR-40.** Managed subdomains are `<label>.<apps-domain>`, where the label is the App Work's slug (with a short
-  suffix when it is taken) and the apps domain is dedicated to user apps and is never the platform's own domain, a
-  parent of it, or under it; if it is not configured, managed subdomains are not offered and only custom domains are.
-  Labels are 3–63 characters, reserved labels are refused, and a label stays with its App Work across removals.
-- **FR-41.** From Wave 1, an App Work on Your cluster gets a managed subdomain whenever the apps domain is configured;
+  suffix when it is taken). `EVER_WORKS_APPS_DOMAIN` **defaults to the installation's platform domain**
+  (`EVER_WORKS_DOMAIN`), so the ordinary managed address is `<slug>.ever.works`; an operator may configure a
+  **dedicated** apps domain instead, which then must not be under any platform domain and must be on the Public
+  Suffix List (owner decision 2026-09-17, R-16 — the dedicated path is kept, not removed). Managed subdomains are
+  not offered only when the managed shape is switched off or the configured apex fails that validation; custom
+  domains are unaffected either way. Labels are 3–63 characters, reserved labels are refused, and a label stays
+  with its App Work across removals.
+- **FR-41.** From Wave 1, an App Work on Your cluster gets a managed subdomain whenever a valid apps domain resolves;
   its DNS record points at the address the cluster's ingress reports, only when that address is public, and is
   re-checked on every health poll (updated if it changes, withdrawn if it stops being public). Its URL uses `https`
   when the TLS choice is **certificates from my cluster's issuer** (a certificate is requested for it) and `http` with
@@ -719,9 +734,11 @@ states are text plus icon, never colour alone.
 - [ ] **ACC-06-44** Every new string exists in all locale files; the Deploy tab passes an automated accessibility check.
 - [ ] **ACC-06-45** Deleting a live App Work without stored data removes every workload, job, scheduled call, service, published host, DNS record, env secret and app network policy within 300 s, keeps volumes, dependencies and the deny-all policy, then deletes the App Work; Activity names what was kept (S30).
 - [ ] **ACC-06-46** **Also delete stored data** requires the exact slug; with it, dependencies are deprovisioned before volume claims and the namespace are deleted; an unreachable cluster is retried 3 times over 15 minutes before the App Work is deleted with the remaining objects named (S31, S32).
-- [ ] **ACC-06-47** With the apps domain configured, a first Deployment on Your cluster is published at `<slug>.<apps-domain>` with a record to the public ingress address, `https` only in issuer mode; without it, no managed subdomain is offered (S33).
+- [ ] **ACC-06-47** A first Deployment on Your cluster is published at `<slug>.<apps-domain>` (the apex defaults to the platform's own domain, so `<slug>.ever.works` is the ordinary result; a dedicated PSL-listed apex is also supported) with a record to the public ingress address, `https` only in issuer mode; only when the managed shape is off or its apex fails validation is no managed subdomain offered (S33).
 - [ ] **ACC-06-48** A verification target is a separate namespace with an expiry label, no Ingress, DNS record or persistent volume claim, in-namespace smoke, no Deployment row, and is removed entirely by destroy (S34).
 - [ ] **ACC-06-49** On Ever Works Apps the Deployment reaches the tier's plugin as desired state; no workload object is applied by the platform and the `k8s` plugin never receives the tier's credential.
+- [ ] **ACC-06-50** The deploy-target picker offers **None**, **Your cluster** and **Ever Works Apps**, each with a stated reason when it is unavailable; a shape the installation cannot serve is never offered, and **no shape that ships today is removed from the matrix**: an app-kind change leaves `allowedClusterSourcesFor` returning `k8s-works` (admin), `k8s-works-shared` and `custom-kubeconfig` exactly as before (R-27).
+- [ ] **ACC-06-51** The same fixture App Work deploys successfully through **both** shipped cluster sources — `custom-kubeconfig` and `k8s-works-shared` — proving the target is a configuration of one runtime rather than a fork of it (R-27, `deploy-shapes.md` §4).
 
 ## 9. Open questions
 

@@ -773,15 +773,25 @@ state so the resulting Build success auto-deploys even when `autoDeploy` is off.
 
 ### 8.3 Managed subdomain on the apps domain (Your cluster from Wave 1 — Resolution R-16)
 
-- **Phase.** Everything in this section except the `ever-works-apps` edge line ships in **P1**: when the operator has
-  configured the apps domain, an App Work on Your cluster gets `<slug>.<apps-domain>` with a DNS record to its public
-  ingress address; otherwise custom domains only. Never a label under `EVER_WORKS_DOMAIN`.
-- Config `packages/agent/src/config/index.ts` gains `everWorks.apps`: `getDomain()` (`EVER_WORKS_APPS_DOMAIN` **C**),
-  `getMaxPerUser()` (`EVER_WORKS_APPS_MAX_PER_USER` **C**, default 3), `getDnsZoneId()`
+- **Phase.** Everything in this section except the `ever-works-apps` edge line ships in **P1**: an App Work on Your
+  cluster gets `<slug>.<apps-domain>` with a DNS record to its public ingress address **and** any custom domains the
+  tenant adds. `<apps-domain>` is `EVER_WORKS_APPS_DOMAIN`, which **defaults to `EVER_WORKS_DOMAIN`** — so the
+  default managed address is `<slug>.ever.works` and a template install simply works (owner decision 2026-09-17,
+  R-16). An operator may point `EVER_WORKS_APPS_DOMAIN` at a dedicated apex outside every platform domain; that
+  configuration is kept in full, including its Public Suffix List checks (APW-10 LG-15) and the stricter validation
+  below. The managed shape is disabled only when the configured apex fails that validation.
+- Config `packages/agent/src/config/index.ts` gains `everWorks.apps`: `getDomain()` (`EVER_WORKS_APPS_DOMAIN` **C**,
+  default `EVER_WORKS_DOMAIN`), `getMaxPerUser()` (`EVER_WORKS_APPS_MAX_PER_USER` **C**, default 3), `getDnsZoneId()`
   (`EVER_WORKS_APPS_DNS_ZONE_ID` **C**), `getDnsApiToken()` (`EVER_WORKS_APPS_DNS_API_TOKEN` **C**, secret),
   `isClusterWorkerIsolated()`, `getClusterPrivateAllowlist()`.
-- Boot validation: the apps domain must not equal, end with `.`+, or be a suffix of `EVER_WORKS_DOMAIN` or the
-  host of the platform web/API URL; on violation the feature logs an error and `getDomain()` returns `null`.
+- Boot validation, in two branches. **Dedicated-apex branch** (operator set `EVER_WORKS_APPS_DOMAIN` explicitly): the
+  apex must not equal, end with `.`+, or be a suffix of `EVER_WORKS_DOMAIN` or the host of the platform web/API URL —
+  this is what keeps the cookie-isolating configuration honest. **Shared-default branch** (apex resolves to
+  `EVER_WORKS_DOMAIN`): the equality check is satisfied by definition and recorded as such; the platform-domain
+  safeguards of R-16 apply instead — host-only `__Host-` Secure cookies on platform routes, no platform session
+  cookie on app hosts, app hosts never serving platform pages. In both branches a malformed or unusable apex makes
+  the feature log an error and `getDomain()` return `null`, which disables the managed subdomain only — custom
+  domains keep working.
 - `AppsDomainDnsService` _(new, `packages/agent/src/ever-works-providers/apps-domain-dns.service.ts`)_ builds a
   `CloudflareDnsProvider({ apiToken, zoneId, rootDomain: appsDomain, targetHostname: '' })` — same precedent as
   `EverWorksDnsService` (a follow-up moves both behind the `dns` capability, EW-738).

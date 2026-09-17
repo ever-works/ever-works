@@ -66,6 +66,7 @@ deploy, never write" guarantee (EW-766). Where a new noun is genuinely required,
 | Producing a container image from a commit                                         | **Build** (`WorkBuild`) — **NEW entity**, justified in APW-05                                                   | "pipeline run", "CI job" as the noun                           |
 | Putting a built image live                                                        | **Deployment** (existing `WorkDeployment`)                                                                      | "release", "rollout" as the noun                               |
 | Where an App Work runs                                                            | **Deploy target**: **None**, **Your cluster** (custom kubeconfig), **Ever Works Apps** (managed, gated)         | "hosting plan", "environment" (Environments = agent sandboxes) |
+| The infrastructure a deploy target actually resolves to                           | **Deploy shape** — shared cluster · internal cluster · customer kubeconfig · connected Ever Works machine · SSH host · provider plugin. **A family, additive only** (R-27, [`deploy-shapes.md`](./APW-06-app-runtime/deploy-shapes.md)) | "the cluster" as if there were one, and any wording that drops a shape |
 | A database, cache or bucket the app needs                                         | **App dependency** (declared in the App spec, provisioned per App Work)                                         | "addon", "resource", "sidecar"                                 |
 | Bringing upstream changes into the fork                                           | **Upstream sync**                                                                                               | "rebase job", "update"                                         |
 | A pull request opened against the upstream repository                             | **Upstream pull request**                                                                                       | "contribution" as an entity                                    |
@@ -195,18 +196,35 @@ Work (Constitution VII), never logged, and rendered into a Secret. Generated sec
 and never rotated implicitly. This is a new store; the existing Stripe-shaped runtime-env allow-list is
 untouched.
 
-**D10 — User apps get a subdomain of the platform's own domain, or the tenant's custom domain.** *(Re-stated
-2026-09-17 on the owner's answer: no new Public-Suffix-List apex is registered.)* Managed subdomains for App Works
-live under `EVER_WORKS_DOMAIN` — `my-app.ever.works` — or under `<slug>.<tenant-custom-domain>`; custom domains
-reuse the existing add/verify flow. What remains forbidden is a subdomain under **another Ever product's** domain
-(`ever.team`, `gauzy.co`, …).
-**The premise this replaces, and why it matters:** the original D10 required a *separate, PSL-listed* apex for
-**cookie isolation** — `<slug>.<apps-domain>` meant an app could never set a cookie for a domain the platform's own
-session also uses. Sharing `ever.works` gives that up deliberately, so the isolation must now be carried by
-**host-only `__Host-` Secure cookies on platform routes, no platform session cookie on app hosts, and app hosts
-that never serve platform pages** — an implementation obligation, not a slogan. `R-16`, `ACC-06-27`, `ACC-13-20`
-and APW-06's domain section were reconciled with this in the same pass (they had forbidden exactly what the owner
-asked for).
+**D10 — Three address shapes, all supported; the apex is an operator choice and nothing was removed.**
+*(Made explicit 2026-09-17 on the owner's answer. This decision is **purely additive** — every address shape the
+earlier plan allowed still works; the platform-domain shape is added to them, not swapped in for them.)*
+
+An App Work is reachable by all three of these, in the order a Work usually acquires them:
+
+1. **A subdomain of the platform's own domain — `my-cool-company-gauzy.ever.works`.** This is the shape that now
+   works out of the box, because installing Gauzy from a template should just work at `<slug>.<EVER_WORKS_DOMAIN>`
+   the moment it deploys. `EVER_WORKS_APPS_DOMAIN` **defaults to `EVER_WORKS_DOMAIN`** and an operator may point it
+   at any other apex (see 3).
+2. **The tenant's own custom domain — `gauzy.my-cool-company.com`, added later.** The existing
+   add → verify → remove custom-domain flow is reused unchanged, an App Work may also take `<slug>.<tenant-domain>`
+   subdomains under it, and a tenant may attach a bare apex. Same flow as every other Work — no new mechanism.
+3. **A dedicated user-apps apex — `<slug>.<apps-domain>` under an apex outside every platform domain and listed on
+   the Public Suffix List.** **Still fully supported, still operator-selectable, never deprecated.** It remains the
+   right answer for an installation that wants hard **cookie isolation**: an app under a PSL-listed apex can never
+   set a cookie for a domain the platform's own session uses. LG-15 and its `APEX_NOT_ON_PSL` / `PSL_UNREACHABLE`
+   probes therefore **stay exactly as they are** — they apply whenever an operator configures such an apex, and are
+   simply not exercised by an installation that does not.
+
+**What is forbidden — unchanged before and after:** a managed address under **another Ever product's** domain
+(`ever.team`, `gauzy.co`, `cloc.*`, …).
+
+**What shape 1 costs, stated rather than hidden:** when an installation picks shape 1, an app and the platform
+share a registrable domain, so the isolation shape 3 exists to provide must be carried explicitly — host-only
+`__Host-` Secure cookies on platform routes, no platform session cookie on app hosts, and app hosts that never
+serve platform pages. Pick shape 3 and that work is unnecessary. Both are supported; the operator decides, and the
+implementation obligation follows the choice. `R-16`, `ACC-06-27`, `ACC-13-20` and APW-06's domain section were
+reconciled with this in the same pass — as additions, with the PSL path and its probes intact.
 
 **D11 — Evolving an App Work reuses the existing agent loop.**
 Task isolation (branch per Task), quality gates (checks from the App spec, run sandboxed), merge policy
@@ -238,10 +256,16 @@ provider) follows; platforms adopt it additively and keep their current sign-in 
 **not** the identity root for production platforms. Session tokens are never placed in URLs.
 
 **D15 — Running user-controlled code on shared infrastructure is gated.**
-Before **Ever Works Apps** accepts any App Work, APW-10's launch gate must pass: an isolated tier (own
-hosts/network/egress identity), sandboxed runtime, restricted pod security, default-deny networking,
-quotas, a namespace per App Work, no platform-wide credentials in tenant pods, abuse controls and a tested
-per-App-Work quarantine (R-20). Infrastructure specifics live in the private operations repository, not in this public spec.
+Before **Ever Works Apps** accepts any App Work, APW-10's launch gate must pass: an isolated tier, sandboxed
+runtime, restricted pod security, default-deny networking, quotas, a namespace per App Work, no platform-wide
+credentials in tenant pods, abuse controls and a tested per-App-Work quarantine (R-20). **Isolation is measured
+per deploy shape and every shape is kept** (R-27): on the shared zone the tier gets its own node pool, egress
+identity and ingress; on a machine the owner connects, a customer cluster, or a host reached by SSH, the same
+properties are attested **for that machine** — the gate item is located, never waived, and a shape that cannot
+satisfy an item is recorded `Failed` with its reason rather than skipped. The shape family, with what ships today
+and what is an extension point, is in
+[`APW-06-app-runtime/deploy-shapes.md`](./APW-06-app-runtime/deploy-shapes.md). Infrastructure specifics live in
+the private operations repository, not in this public spec.
 
 ---
 
@@ -300,6 +324,7 @@ dependencies.
 | [APW-04](./APW-04-app-provisioner/)          | App Provisioner: repository analysis → App spec PR → verification loop                     | Agents catalog, Skills catalog, Tasks, quality gates, ask-human           | XL  | APW-01, 03, 05, 06, 07 |
 | [APW-05](./APW-05-builds/)                   | Builds: `build` capability, GitHub Actions build plugin, in-cluster builder later          | plugin system, GitHub event intake, deploy service                        | L   | APW-02, 03, 07     |
 | [APW-06](./APW-06-app-runtime/)              | App runtime on Kubernetes: App renderer, deploy targets, domains, smoke tests, health      | `k8s` plugin, cluster-source matrix, subdomains, custom domains, verifier | XL  | APW-03, 05, 07, 10 |
+| ↳ [deploy-shapes.md](./APW-06-app-runtime/deploy-shapes.md) | **The deploy-shape family (R-27)** — shared cluster, internal cluster, custom kubeconfig, connected node, SSH host, provider plugins: what ships, what is an extension point, and why nothing here may be narrowed | cluster-source matrix, `deployment` plugin capability, Fleet node enrollment | — | — |
 | [APW-07](./APW-07-app-env-and-dependencies/) | App env & secrets store; App dependencies (Postgres, Redis, object storage)                | per-Work DB provisioner, plugin secret encryption                         | L   | APW-03, 06         |
 | [APW-08](./APW-08-evolve-loop/)              | Evolve loop: chat → Task → PR → merge → Build → Deployment; Goals & Missions on App Works  | Tasks, task isolation, quality gates, merge policy, Fleet, chat tools     | L   | APW-01, 03, 05, 06 |
 | [APW-09](./APW-09-upstream-pull-requests/)   | Upstream pull requests                                                                     | task isolation, GitHub PR API, approvals                                  | M   | APW-02, 08         |
@@ -364,8 +389,12 @@ Each has a recommended default that the epic specs assume until answered.
    gate, or on separately rented dedicated/cloud capacity? _Default: rented capacity for the untrusted tier;
    existing infrastructure keeps serving the platform and the other Ever products. The trade-offs are in
    the private operations repository._
-2. **User-apps apex domain** (PSL-listed) — which domain? _Default: a new domain registered for this
-   purpose; placeholder `<apps-domain>` in specs._
+2. **User-apps apex domain — ANSWERED 2026-09-17: the platform's own domain by default, a dedicated
+   PSL-listed apex optional.** `EVER_WORKS_APPS_DOMAIN` **defaults to `EVER_WORKS_DOMAIN`**, so managed
+   addresses are `<slug>.ever.works` and no domain registration or Public Suffix List submission sits on the
+   critical path; an operator may point it at a dedicated apex, and that configuration keeps the full PSL
+   checks (LG-15). `<apps-domain>` remains the placeholder in the epic specs and is correct either way.
+   See D10 above.
 3. **Free tier** — may unverified/free users run code on the managed tier? _Default: no; Wave 2 requires a
    verified, paying account._
 4. **Blueprint repository naming** — `<app>-template` (owner's suggestion) collides in suffix with Website

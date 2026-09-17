@@ -346,7 +346,10 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 
 - [ ] **T34. `app-works-kind.yml`.**
       **Create** `.github/workflows/app-works-kind.yml` (new) per [plan §9.2](./plan.md), copying the kind bootstrap steps
-      of `.github/workflows/k8s-e2e.yml`, with `EVER_WORKS_APP_WORKS_ENABLED=true` and `EVER_WORKS_APPS_DOMAIN` unset.
+      of `.github/workflows/k8s-e2e.yml`, with `EVER_WORKS_APP_WORKS_ENABLED=true`, `EVER_WORKS_APPS_DOMAIN` **left
+      unset so the shared default applies** (`EVER_WORKS_DOMAIN`) and the lane asserts the default managed address, and
+      `EVER_WORKS_APPS_DNS_ZONE_ID` / `EVER_WORKS_APPS_DNS_API_TOKEN` unset so no real zone is written; the lane also
+      reads the host the platform assigned and passes on a custom domain (plan §8.4).
       **Test**: `gh workflow run app-works-kind.yml --ref <branch>`.
       **Done when**: the run bootstraps kind and reaches the Playwright step (specs may be `fixme`).
 
@@ -562,14 +565,16 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       **Modify** `apps/web/e2e/flow-app-works-live-blueprint-path.spec.ts` (T38) and
       `apps/web/e2e/flow-app-works-kind-runtime.spec.ts` (T35) — when the platform assigned `<slug>.<apps-domain>`, assert
       it resolves to the user cluster's ingress and serves `/marker`; otherwise assert only the custom domain serves it;
-      in both cases assert no assigned host ends in the platform's own parent domain.
+      assert the assigned apex is the installation's configured one — the platform domain on the default, a dedicated apex
+      when one is configured — and assert no assigned host ends in **another Ever product's** domain (`ever.team`,
+      `gauzy.co`, …), never merely "the platform's parent domain", which is now a valid default (R-16).
       **Modify** `apps/web/e2e/flow-app-work-target-none.spec.ts` (T33) and
       `apps/web/e2e/flow-app-works-live-no-deploy-target.spec.ts` (T40) — the target reads **None — don't deploy yet**,
       the stored value is `none`, and no "not yet" state is asserted anywhere.
       **Test**: `apps/web/e2e/helpers/__tests__/app-works.unit.spec.ts` gains a `readAssignedHosts` case; the kind lane
-      (no apps domain) and a live nightly run on dev (ACC-13-20).
-      **Done when**: the kind run passes the custom-domain case, the nightly run passes whichever case dev is in, and a
-      host under the platform's parent domain makes the assertion fail in a unit case.
+      (shared default apex) and a live nightly run on dev (ACC-13-20).
+      **Done when**: the kind run passes the managed-address case, the nightly run passes whichever case dev is in, and a
+      host under another Ever product's domain makes the assertion fail in a unit case.
 
 ---
 

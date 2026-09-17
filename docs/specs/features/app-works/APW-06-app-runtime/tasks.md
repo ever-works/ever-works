@@ -586,9 +586,13 @@ activity-log.listener` are green; Activity summaries name components/jobs/checks
 
 - [ ] **T47. Apps-domain DNS.**
       **Create** `packages/agent/src/ever-works-providers/apps-domain-dns.service.ts` _(new)_ (plan §8.3).
-      **Test**: `packages/agent/src/ever-works-providers/__tests__/apps-domain-dns.service.spec.ts` _(new)_ — unconfigured →
-      `null` provider and managed subdomains hidden; a domain equal to, under or above the platform domain → `null`
-      (ACC-06-27); configured → `rootDomain()` equals the apps domain; the platform zone environment is never read.
+      **Test**: `packages/agent/src/ever-works-providers/__tests__/apps-domain-dns.service.spec.ts` _(new)_ — **apex unset
+      → the platform domain is used as the default root and managed subdomains ARE offered** (ACC-06-27, owner decision
+      2026-09-17); a malformed apex → `null` provider and managed subdomains hidden; a **dedicated** apex equal to, under
+      or above the platform domain → `null` while the shared default does not trip this check (ACC-06-27); configured →
+      `rootDomain()` equals the apps domain; the apps-domain DNS configuration (`EVER_WORKS_APPS_DNS_ZONE_ID` /
+      `EVER_WORKS_APPS_DNS_API_TOKEN`) is the only DNS configuration it reads — on the shared default it resolves the
+      zone for the platform domain, and it never silently falls back to the platform's *own* DNS provider instance.
       **Done when**: `pnpm --filter @ever-works/agent test -- apps-domain-dns.service` is green and `EverWorksDnsService`
       is untouched.
 
@@ -600,14 +604,15 @@ activity-log.listener` are green; Activity summaries name components/jobs/checks
       public ingress address (guard from T11) on `your-cluster`; the health poll re-validates every 10th poll and withdraws a
       non-public target.
       **Test**: extend `apps/api/src/plugins-capabilities/deploy/managed-subdomain.service.spec.ts` — kind `app` allocates
-      under the apps domain only and never under `EVER_WORKS_DOMAIN` (ACC-06-27). Extend
-      `packages/agent/src/app-runtime/__tests__/app-hosts.service.spec.ts` — a private ingress address never produces a
-      record, a changed public address updates it and a non-public one withdraws it (ACC-06-28); with the apps domain
-      configured a first `your-cluster` Deployment's hosts include `<slug>.<apps-domain>`, and without it only custom
-      domains (ACC-06-47).
+      under the **configured** apps domain, which defaults to `EVER_WORKS_DOMAIN` (so `<slug>.ever.works` is the expected
+      default and asserting it is the point of the case), and never under another Ever product's domain (ACC-06-27).
+      Extend `packages/agent/src/app-runtime/__tests__/app-hosts.service.spec.ts` — a private ingress address never
+      produces a record, a changed public address updates it and a non-public one withdraws it (ACC-06-28); a first
+      `your-cluster` Deployment's hosts include `<slug>.<apps-domain>` on the default apex **and** with a dedicated apex,
+      while only a switched-off or invalid managed shape leaves custom domains alone (ACC-06-47).
       **Done when**: `pnpm --filter ever-works-api test -- managed-subdomain.service` and
-      `pnpm --filter @ever-works/agent test -- app-hosts.service` are green and no App Work label is ever allocated under
-      `EVER_WORKS_DOMAIN`.
+      `pnpm --filter @ever-works/agent test -- app-hosts.service` are green and every allocated label sits under the
+      configured apps domain — the platform domain when it is the default, a dedicated apex when one is configured.
 
 ---
 
@@ -862,6 +867,41 @@ _Delivers FR-7 (scope `any`), FR-52, FR-53._
       object is yielded unchanged.
       **Done when**: `pnpm --filter @ever-works/agent test -- collectors redaction` is green and a backup of a workspace
       with one deployed App Work lists `data/works/app-runtime-states.jsonl` with one record.
+
+---
+
+## P1.11 — The deploy-shape family stays whole (R-27, added 2026-09-17)
+
+- [ ] **T66. Prove no shipped cluster source was narrowed.**
+      **Modify** nothing in `apps/api/src/plugins-capabilities/deploy/cluster-source-matrix.ts` — this task is a
+      **regression proof** for the owner's B-01 answer: the matrix must still return `k8s-works` for a platform admin
+      (admin-only org), `k8s-works-shared` always, and `custom-kubeconfig` for every owner outside the shared orgs,
+      in that UI order, with the three labels and descriptions unchanged.
+      **Test**: extend `apps/api/src/plugins-capabilities/deploy/cluster-source-matrix.spec.ts` — the three sources and
+      their exact labels/descriptions are asserted as a snapshot; a platform admin on a non-`ever-works` owner gets
+      `['k8s-works-shared', 'custom-kubeconfig']`; a non-admin on an `ever-works` owner gets
+      `['k8s-works-shared']`; no code path returns an empty list (ACC-06-50).
+      **Done when**: `pnpm --filter ever-works-api test -- cluster-source-matrix` is green and the diff touches only the
+      spec file.
+
+- [ ] **T67. Prove one runtime, two configurations.**
+      **Create** `packages/agent/src/facades/__tests__/deployment-context.resolver.spec.ts` _(new)_ — the resolver has no
+      unit suite of its own today, only indirect coverage through `deploy.facade.spec.ts`.
+      **Test**: for each shipped provider id (`k8s`, `ever-works`) crossed with each `ClusterSource`
+      (`k8s-works-shared`, `custom-kubeconfig`), assert the resolved context differs only in credential/namespace
+      handling and never in shape; a non-Kubernetes provider id (`vercel`) passes the token through untouched; a
+      `custom-kubeconfig` with an empty kubeconfig fails with `DEPLOY_MATRIX_VIOLATION`/`PLATFORM_KUBECONFIG_MISSING`
+      as today; the platform-managed sentinel resolves without an owner credential (ACC-06-51).
+      **Done when**: `pnpm --filter @ever-works/agent test -- deployment-context.resolver` is green and
+      `deploy.facade.spec.ts` is untouched.
+
+- [ ] **T68. Record the shapes that are extension points, not shipped paths.**
+      **Modify** `plan.md` — add a §8.4 pointer to [`deploy-shapes.md`](./deploy-shapes.md) and state that the
+      connected-node deploy executor (shape F) and the SSH provider (shape G) are **recorded additions**, not
+      deliverables of this epic, and that neither may be removed from the taxonomy when they are scheduled.
+      **Test**: none (documentation). The file is cited from `CONTRACTS.md` R-27, `spec.md` §4.1 and the program README.
+      **Done when**: `deploy-shapes.md` is linked from `plan.md`, `spec.md` and the README's artifact table, and every
+      claim in it names the file and line it was verified against.
 
 ---
 

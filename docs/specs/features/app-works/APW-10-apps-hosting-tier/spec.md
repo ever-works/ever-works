@@ -180,9 +180,9 @@ Every threshold is a number on purpose.
 
 | Id    | Item                               | Kind      | Phase | Passes when                                                                                                                                                        |
 | ----- | ---------------------------------- | --------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| LG-01 | Dedicated capacity                 | Attested  | P2    | Tier compute hosts nothing belonging to the platform or to any production product.                                                                                 |
+| LG-01 | Dedicated capacity                 | Attested  | P2    | **Attested per deploy shape (R-27), and no shape is dropped.** On the shared zone: the tier's namespaces and node pool host nothing belonging to the platform's own dashboard or to any production product. On a connected customer node / customer cluster / SSH host: that machine hosts nothing the platform depends on, and the operator attests it. Passes on whichever shape the tenant actually runs on; a shape that cannot satisfy it is recorded `Failed` with the reason, never skipped. |
 | LG-02 | Network segmentation               | Both      | P2    | A tenant cannot open a connection to any configured platform or production endpoint, nor to any address in private ranges; segmentation attested.                  |
-| LG-03 | Separate egress identity           | Both      | P2    | The public address a tenant's outbound traffic presents is not one used by the platform or a production product.                                                   |
+| LG-03 | Separate egress identity           | Both      | P2    | **Evaluated per deploy shape (R-27).** On the shared zone the public address a tenant's outbound traffic presents is the tier's own egress identity, not one used by the platform or a production product; on a connected customer node or customer cluster the tenant's egress is the identity that shape provides, and the item passes when it is distinguishable from the platform's own — the operator attests which. The requirement is never removed, only located.       |
 | LG-04 | Sandboxed runtime, enforced        | Automated | P2    | The probe runs under the sandbox kernel; a workload without the sandbox runtime is refused or forced onto it.                                                      |
 | LG-05 | Restricted pod security by default | Automated | P2    | Privileged, root, host-namespace and host-path workloads are refused in tenant namespaces.                                                                         |
 | LG-06 | Default-deny networking            | Automated | P2    | Tenant A cannot connect to tenant B; tenant workloads accept traffic only from the tier's edge.                                                                    |
@@ -194,8 +194,8 @@ Every threshold is a number on purpose.
 | LG-12 | Platform credential is narrow      | Automated | P2    | The platform's credential can read and write only the tier's own desired-state objects in one namespace — nothing else.                                            |
 | LG-13 | Image supply chain                 | Automated | P2    | Unsigned images and images outside the tenant's registry space are refused; an image with a blocked vulnerability is refused at promotion.                         |
 | LG-14 | Tenant-only data servers           | Both      | P2    | A tenant cannot connect to another tenant's database; data servers serve only the tier; backups and a restore test within 90 days are attested.                    |
-| LG-15 | User-apps domain                   | Both      | P2    | Managed addresses use a dedicated apex that is not under any platform domain and is present on the Public Suffix List.                                             |
-| LG-16 | Separate edge                      | Both      | P2    | A canary address under the apex serves HTTPS with a valid wildcard certificate through the tier's own edge; a separate edge account is attested.                   |
+| LG-15 | User-apps domain                   | Both      | P2    | The hostname root the installation serves managed addresses under is checked against the host's own configuration: when an operator has configured a **dedicated** user-apps apex, it must not be under any platform domain and must be present on the Public Suffix List (this is the cookie-isolating configuration, kept and still supported — owner decision 2026-09-17); when the installation serves managed addresses under its **platform** domain (the default), the item passes with the shared-domain note recorded and the cookie controls of R-16 in force.                                             |
+| LG-16 | Separate edge                      | Both      | P2    | A canary address serves HTTPS with a valid wildcard certificate through the edge that fronts the share the tenant runs on, and that edge is distinct from the platform's own where the shape provides one; a separate edge account is attested when the shape has one. On the shared zone the tier's ingress is its own, as LG-06 and LG-12 already require (`deploy-shapes.md` §3, R-27). |
 | LG-17 | Custom hostnames                   | Automated | P2    | A canary custom hostname is active through the hostname-for-SaaS mechanism; a host not registered to that App Work is refused.                                     |
 | LG-18 | Tenant quarantine drill            | Automated | P2    | Quarantine isolates ≤ 15 s, reaches zero replicas ≤ 60 s, shows unavailable ≤ 120 s; release restores ≤ 180 s; a data marker survives.                             |
 | LG-19 | Abuse controls                     | Both      | P2    | Bandwidth limits are applied; a benign sensor test event raises a signal ≤ 120 s; eligibility rules, abuse contact and acceptable-use policy attested.             |
@@ -456,6 +456,14 @@ All copy is final English copy.
 ╚══════╧══════════════════════════════════╧═══════════╧════════════════════════════╝
 ```
 
+> **LG-15 renders differently per configuration, and both are shipped** (owner decision 2026-09-17). On an
+> installation with a **dedicated** user-apps apex the row and its probes are exactly as drawn above
+> (`Passed` · `Failed` with `APEX_UNDER_PLATFORM_DOMAIN` / `APEX_NOT_ON_PSL` · `Inconclusive` with
+> `PSL_UNREACHABLE`). On an installation serving managed addresses under its **platform** domain — the default —
+> the row reads `LG-15│ User-apps domain │ Passed │ Shared platform domain …` and the shared-domain
+> note is recorded as the item's evidence. The probes are never deleted; they simply have nothing to fetch
+> when no dedicated apex is configured.
+
 | Element       | Copy                                                                                                                                                                                                   |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | States        | `Closed` · `Open for verified Blueprints` · `Open for all App Works`                                                                                                                                   |
@@ -617,8 +625,13 @@ All copy is final English copy.
 
 - **[NEEDS CLARIFICATION: where does the tier run?]** README open question 1. _Default: rented dedicated
   capacity for the untrusted tier; the decision and its trade-offs are in the private operations plan._
-- **[NEEDS CLARIFICATION: which apex domain?]** README open question 2; its Public Suffix List listing takes
-  weeks and gates LG-15.
+- **[ANSWERED 2026-09-17 — which apex domain?]** The default is **the installation's own platform domain**
+  (`EVER_WORKS_APPS_DOMAIN` defaults to `EVER_WORKS_DOMAIN`), so managed addresses are
+  `<slug>.ever.works` out of the box and **no Public Suffix List submission is on the critical path**. An
+  operator may still configure a **dedicated** apex outside every platform domain, and if they do, the PSL
+  listing and LG-15's probes (`APEX_UNDER_PLATFORM_DOMAIN`, `APEX_NOT_ON_PSL`, `PSL_UNREACHABLE`) apply in
+  full — that path is kept, not removed. The cookie consequence of the default is carried by R-16's
+  host-only `__Host-` controls. See README D10.
 - **[NEEDS CLARIFICATION: prices.]** Credit prices per hosting unit and what Starter and Standard cost.
 - **[NEEDS CLARIFICATION: sandbox compatibility.]** Some software does not run under a sandboxed kernel.
   Do incompatible App Blueprints stay **Your cluster** only (default), or does a stronger-isolation

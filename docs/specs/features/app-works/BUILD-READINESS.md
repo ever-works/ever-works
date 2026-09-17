@@ -37,7 +37,7 @@ decision that is already resolved in the plan and needs a yes.**
 | **Template provenance** — "Created from [public/private icon] Template Repo" in the Work Information block | README §1 note; `_build-artifacts/templates-catalog/plan-changes.md` C-2.4 |
 | **`ever-works/templates`** is the human listing; templates are `-template` repos found by the existing GitHub suffix scan; a template may be **code-bearing** or **metadata-only**; the user forks **both** when the source is separate | README **D4 rewritten**; `templates-catalog/resolution-spec.md` |
 | **Managed Apps tier runs like Works do today** — our own shared k8s with namespace isolation, plus connected customer nodes and customer clusters | implementation plan §2 row 5 (gate re-wording still to do — §6) |
-| **No new PSL apex domain** — `<slug>.ever.works` or the tenant's custom domain | implementation plan §2 row 4 (D10/LG-15 re-wording still to do — §6) |
+| **Addressing is additive** — `<slug>.ever.works` (the default apex), the tenant's custom domain (and subdomains under it), **and** a dedicated PSL-listed apex when an operator configures one; nothing removed | README **D10**, `CONTRACTS.md` R-16 + env table, `APW-06/plan.md` §8.3, `APW-10/spec.md` LG-15, `APW-13/plan.md` §8.4 |
 | Legal review of the licence classes: **yes, 100%**; Cal.diy: use the MIT community edition | `APW-13` unchanged; D13 confirmed |
 
 ---
@@ -111,11 +111,15 @@ decision that is already resolved in the plan and needs a yes.**
     ran straight into the components table — there was no `## 10.`. Heading added.
 20. **The plan forbade exactly what the owner asked for.** `R-16`, `ACC-06-27`, `ACC-13-20` and APW-06's domain
     section all said user apps must **never** live under the platform's own domain — while the owner's answer is
-    `my-app.ever.works`. All four now allow it and forbid only a subdomain of **another Ever product's** domain;
-    `EVER_WORKS_APPS_DOMAIN` now defaults to `EVER_WORKS_DOMAIN`; and **D10 was re-stated rather than silently
-    kept**: the cookie-isolation argument that motivated a separate, PSL-listed apex is now an explicit
-    implementation obligation (host-only `__Host-` Secure cookies on platform routes, no platform session cookie
-    on app hosts, app hosts never serving platform pages).
+    `my-app.ever.works`. Fixed **additively**: `EVER_WORKS_APPS_DOMAIN` now defaults to `EVER_WORKS_DOMAIN`, so
+    `<slug>.ever.works` is the out-of-the-box managed address, and the only thing forbidden — before and after — is a
+    subdomain of **another Ever product's** domain (`ever.team`, `gauzy.co`, …). The original dedicated **PSL-listed
+    apex is kept as a supported operator configuration**, with LG-15 and its `APEX_UNDER_PLATFORM_DOMAIN` /
+    `APEX_NOT_ON_PSL` / `PSL_UNREACHABLE` probes **intact rather than deleted** — they apply whenever such an apex is
+    configured, which is the cookie-isolating setup. Where the shared default *is* used, the cookie-isolation work
+    that the dedicated apex used to provide is carried explicitly (host-only `__Host-` Secure cookies on platform
+    routes, no platform session cookie on app hosts, app hosts never serving platform pages), as R-16 now states.
+    Third address shape added alongside: per-App-Work subdomains of the **tenant's** custom domain.
 
 ---
 
@@ -213,36 +217,50 @@ Repository"*. **Nine instances were deliberately left**, and each is one of thre
 
 ---
 
-## 6. What still needs the owner
+## 6. What still needs the owner — **all eleven answered 2026-09-17**
 
-**Wave 1 approvals** (from the decision sheet's 11 `OWNER` rows; the count below is after the two already resolved):
+The decision sheet's 11 `OWNER` rows are now all closed. Each line below records the answer and where it landed.
 
-1. **The repository role (C-09) — resolved in the plan, needs a yes.** App code is the Work Repository
-   (`website` role). The alternative the audit preferred (keep `data` mechanically) would show Cal.com's source
-   under the label "Data Repository" and leave an App Work no room for a real data repository. Reverting is a
-   two-line change if you disagree.
-2. **The managed-tier gate wording (B-01).** Your shared-cluster answer contradicts LG-01, LG-03 and LG-16 — all
-   *operator-attested* items asserting separate hosts/network/egress identity — and D15. Approve replacement
-   wording, or decide the tier gets its own hosts. **"Connected customer nodes" appears nowhere in the plan or the
-   code**: it is genuinely new scope and needs its own epic or an explicit deferral.
-3. **The PSL apex decision's remaining tail (B-02).** The domain reconciliation itself is **done** (D10 re-stated,
-   R-16 / ACC-06-27 / ACC-13-20 / APW-06 aligned, `EVER_WORKS_APPS_DOMAIN` defaulting to `ever.works`). What still
-   needs you: **LG-15** in APW-10's launch gate requires a PSL-listed apex and carries `APEX_NOT_ON_PSL` /
-   `PSL_UNREACHABLE` probes — confirm they are marked *not applicable (owner decision 2026-09-17)* rather than
-   deleted (no-removal rule), and confirm the compensating control in D10 (`__Host-` cookies) is the one you want
-   rather than a future dedicated apex.
-4. **Create the repositories (D-04):** `ever-works/templates`, `ever-works/{cal-diy,umami,app-fixture-hello}-template`,
-   `ever-works/app-fixture-hello` (the fixture's source, a different repository from its `-template`), and
-   `ever-works/platforms` (APW-11 P2). All are 404 today.
-5. **The GitHub test estate (J-08):** the acceptance lanes need a test organization, a machine user and per-run
-   throwaway upstreams (`ACCEPTANCE.md` §0.3).
-6. **APW-06 ↔ APW-07** declare each other as dependencies. Recommended: **APW-07 owns the env/dependency contracts
-   and lands first**; its dependency on APW-06 narrows to APW-06's ports/interfaces only (already written into
-   `TRACKER.md`).
-7. **Name a budget owner**, the abuse rota, **one retention number** (asked three times as B-09/B-14/B-15), and
-   whether to file the Jira tickets now. Prices are not urgent.
+1. **The repository role (C-09) — YES.** App code is the Work Repository (`website` role); the `-app` / `-website`
+   suffix rule is optional. Landed in `APW-01/spec.md` FR-2/FR-20a, `APW-08/tasks.md` T11, README §1 and CONTRACTS §2.
+2. **The managed-tier gate wording (B-01) — my earlier framing was wrong and the scope EXPANDS.** Re-verified against
+   source: the platform already deploys to shared k8s (`k8s-works-shared`), to a **custom kubeconfig cluster**
+   (`custom-kubeconfig`), and the Fleet can install agents on other machines; Vercel and further providers arrive as
+   plugins. **Nothing is removed or narrowed** — LG-01, LG-03 and LG-16 stay as attestable *options* on the gate
+   board, and the deploy-target vocabulary **gains** the paths that already exist rather than replacing anything.
+   "Connected customer nodes" is therefore not new scope invented here; it is the Fleet-agent path the platform
+   already has, and it gets documented as a first-class deploy shape (implementation plan §2 row 5, APW-10 §3,
+   CONTRACTS deploy-target table).
+3. **The PSL apex decision (B-02) — additive, and nothing deleted.** D10 now states three coexisting address shapes
+   (`<slug>.ever.works` by default, the tenant's custom domain, and a dedicated **PSL-listed** apex when an operator
+   configures one). LG-15 and its `APEX_UNDER_PLATFORM_DOMAIN` / `APEX_NOT_ON_PSL` / `PSL_UNREACHABLE` probes are
+   **kept verbatim** and re-worded to apply per configuration; the shared default carries R-16's `__Host-` cookie
+   controls explicitly. Reconciled across D10, R-16, ACC-06-27, ACC-13-20, APW-06 S33/FR-40/FR-41/ACC-06-47,
+   APW-10 LG-15 + its board row + its open question, APW-13 FR-52/ACC-13-20 + plan §8.4 + T34/T60, README Q2, and the
+   env table.
+4. **Create the repositories (D-04) — yes, private where possible, `ever-works/templates` public 100%.** The list is
+   unchanged (`ever-works/templates` **public**; `{cal-diy,umami,app-fixture-hello}-template`,
+   `ever-works/app-fixture-hello`, `ever-works/platforms` private preferred). Tracked as §8 step 0; all still 404 as
+   of this writing.
+5. **The GitHub test estate (J-08) — answered: use an Ever Works tenant.** The acceptance lanes provision their own
+   **tenant inside Ever Works** instead of a separate test GitHub organization, which removes the org-provisioning
+   blocker entirely. `ACCEPTANCE.md` §0.3's "test organization + machine user" wording is re-read as *one Ever Works
+   tenant + its own connected GitHub account*, with `ever-works` fixtures as the throwaway upstreams.
+6. **APW-06 ↔ APW-07 — resolved by research: the cycle breaks at the plugin boundary, not by picking a winner.**
+   APW-07 owns the `IAppsTierProvider` port and the env/dependency rendering contract; APW-06 owns the
+   `your-cluster` runtime that consumes it. APW-07's P1 (`app-render`) is implementable against fakes and lands
+   first; APW-06's P1 consumes it. Neither epic waits on the other's *runtime* — only on the interface, which is
+   already fixed in CONTRACTS §3. Written into `TRACKER.md`; no further owner input needed.
+7. **Budget owner / abuse rota / retention number / Jira — proceed with tracking documents, Jira optional.** The
+   owner's answer is "do whatever is needed … my goal is to build all this ASAP so we may just start implementation
+   with some tracking docs, without JIRA". So: **`TRACKER.md` is the tracking system of record**, the Jira export
+   (`_build-artifacts/open-decisions/jira-tickets.md`) is kept as a ready-to-import artifact and **not** filed; the
+   abuse rota, budget owner and the single retention number are recorded as **named placeholders in the gate
+   attestations** (attested at launch, not now), and retention stays at the documented 30-day default until the
+   owner names the number. Prices remain not urgent.
 
-**Also outstanding from earlier:** whether to commit this work, and the Jira project key.
+**Also outstanding from earlier:** ~~whether to commit this work~~ — **committed and pushed** (§7);
+~~the Jira project key~~ — **not needed** unless the export is ever imported.
 
 ---
 

@@ -434,13 +434,17 @@ for **Your cluster** (in-namespace Postgres), so the lane also exercises that pa
 App Work's custom kubeconfig. Host names resolve to the kind ingress through a public wildcard-DNS resolver (an external
 dependency accepted for this lane only; a `/etc/hosts` entry per App Work is the fallback).
 
-**Public addresses on Your cluster (Resolution R-16).** Wave 1 has no managed tier, so an App Work on **Your cluster**
-gets `<slug>.<apps-domain>` only when the installation under test sets `EVER_WORKS_APPS_DOMAIN` (and its DNS zone), with
-the DNS record pointing at the user cluster's ingress; otherwise it is reachable only through a custom domain. The kind
-lane runs with `EVER_WORKS_APPS_DOMAIN` unset and uses a custom domain; the nightly lane reads the host the platform
-assigned (`GET /api/works/:id/app-status`) and asserts whichever case the dev installation is in, and in both cases that
-the host does not end in the platform's own parent domain. The deploy target that runs nothing is **None** (value `none`,
-R-12) in every spec and summary.
+**Public addresses on Your cluster (Resolution R-16, owner decision 2026-09-17).** Wave 1 has no managed tier, so an App
+Work on **Your cluster** gets `<slug>.<apps-domain>` with the DNS record pointing at the user cluster's ingress, **and**
+any custom domain the tenant adds. The apex is the installation's `EVER_WORKS_APPS_DOMAIN`, which **defaults to
+`EVER_WORKS_DOMAIN`** — so `<slug>.ever.works` is the expected managed address on a default installation — while an
+installation that configures a dedicated user-apps apex gets `<slug>.<that-apex>` and keeps APW-10's PSL checks. The kind
+lane runs with the shared default in force and asserts the managed address it produces, with no real DNS zone
+configured, and still exercises a custom domain; the nightly lane reads the host the platform assigned
+(`GET /api/works/:id/app-status`) and asserts whichever case the dev installation is in — in both cases that the host is
+under the installation's own configured apex or the tenant's custom domain, and never under another Ever product's
+domain (`ever.team`, `gauzy.co`, …). The deploy target that runs nothing is **None** (value `none`, R-12) in every spec
+and summary.
 
 ### 8.5 Interlocks (enforced in `app-works-live.setup.ts`, re-checked by each destructive helper)
 
