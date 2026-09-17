@@ -51,9 +51,17 @@ import {
  *     `NotificationChannel.targetConfig` is a live bot token / webhook URL —
  *     so only the decorator identifies them.
  *
- * A fourth, narrower pass covers `BillingProfile`: the archive publishes a
- * `payment_identifiers` exclusion, so every `provider*`/`payg*` identifier
- * column on that entity needs a rule or a reviewed exemption too.
+ * A fourth, narrower pass covers every entity the `billing` domain exports:
+ * the archive publishes a `payment_identifiers` exclusion, so every
+ * `provider*`/`payg*` identifier column on any of them needs a rule or a
+ * reviewed exemption too. The entity set is read from the domain table, not
+ * copied, so a billing entity added to the archive later is covered the day
+ * it is added.
+ *
+ * The per-entity column tables below are checked in the other direction as
+ * well: every column they name has to be declared on its entity. A rule on a
+ * column that does not exist deletes nothing, so an identifier whose column
+ * is renamed would otherwise lose its protection without any test noticing.
  *
  * A new secret column therefore cannot silently start being exported: it
  * either gets a rule or it gets an explicit, reviewed "this is not a secret"
@@ -205,9 +213,32 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
         'paygSubscriptionId',
         'paygSubscriptionItemId',
     ]),
+    // The plan subscription row (`data/billing/subscription.jsonl`). Spec
+    // FR-18.6 names subscription identifiers outright, and both of these
+    // address a live object at the payment provider: `providerSubscriptionId`
+    // is what a later subscription lifecycle delivery uses to update or
+    // revoke exactly this row, and `providerSeatItemId` is the per-seat
+    // subscription item a seat-quantity change creates or updates. The rest
+    // of the row — plan, status, seats, billing provider, period end,
+    // cancel-at-period-end — is the record, and still exports.
+    UserSubscription: Object.freeze(['providerSubscriptionId', 'providerSeatItemId']),
+    // `providerCustomerId` is not a column of `Invoice` (the customer id
+    // lives on `BillingProfile`, dropped above). Kept pending review; see
+    // `KNOWN_STALE_COLUMN_RULES` in `redaction.spec.ts`.
     Invoice: Object.freeze(['providerInvoiceId', 'providerCustomerId']),
     LicencePurchase: Object.freeze(['providerPaymentId']),
-    CreditLedgerEntry: Object.freeze(['providerEventId']),
+    // The ledger has no `providerEventId` column, which is why this rule
+    // used to delete nothing: the provider EVENT id is written into
+    // `idempotencyKey`, as `{provider}:evt:{eventId}` on a credit purchase or
+    // refund reversal and `revoke:plan:{provider}:evt:{eventId}` on a plan
+    // allowance clawback. Every other key in that column (`run:{runId}`,
+    // `daily:{userId}:{date}`, `grant:plan:…`) is a writer's replay guard,
+    // not something a reader of the ledger needs, so the whole column goes.
+    CreditLedgerEntry: Object.freeze(['idempotencyKey']),
+    // Neither column exists on `UsageLedgerEntry`: nothing forwards a usage
+    // row to the payment provider, so no provider handle is ever stored on
+    // it. Kept pending review; see `KNOWN_STALE_COLUMN_RULES` in
+    // `redaction.spec.ts`.
     UsageLedgerEntry: Object.freeze(['providerMeterId', 'providerEventId']),
 });
 
