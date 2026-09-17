@@ -24,9 +24,12 @@ export interface ActivityFeedPageRows {
      * other — and a padded key sorts after the row it came from, so the cursor
      * would match its own row and the page would never advance.
      *
-     * Only ever the store's own key: a row the store gave none for is ABSENT
-     * rather than carrying a re-derived one, so the caller mints no cursor and
-     * the feed ends instead of repeating its head.
+     * On those two engines it is only ever the store's own key: a row the
+     * store gave none for is ABSENT rather than carrying a re-derived one, so
+     * the caller mints no cursor and the feed ends instead of repeating its
+     * head. Any other driver has no known stored text form, so its key is
+     * derived from the hydrated row — see {@link
+     * ActivityLogRepository.findFeedPage}.
      */
     sortKeys: Map<string, string>;
     hasMore: boolean;
@@ -371,6 +374,14 @@ export class ActivityLogRepository {
      * expanded `a < x OR (a = x AND b < y)` form, portable across Postgres
      * and better-sqlite3 (mirrors `AgentRunLogRepository.findTimelineByRun`).
      *
+     * The sort key a cursor carries is read from the store's own text ONLY on
+     * the two engines whose stored form is known (Postgres and the sqlite
+     * family). `DatabaseType` also admits mysql/mariadb, which share neither
+     * that text form nor the identifier quoting it needs, so every other
+     * driver keeps the fully portable path: no driver-specific raw select, the
+     * cursor bound as a typed `Date`, and the key derived from the hydrated
+     * row.
+     *
      * Always bounded by the owner AND the request's ownership scope; the
      * scope is a separate argument so no filter object can widen it.
      * Reads `limit + 1` rows to answer `hasMore` without a COUNT.
@@ -380,6 +391,11 @@ export class ActivityLogRepository {
         ownershipScope: OwnershipScope,
     ): Promise<ActivityFeedPageRows> {
         const postgres = this.isPostgres();
+        const sqlite = this.isSqlite();
+        // Only these two engines have a known stored text form for the
+        // ordering column, so only they can hand the cursor the store's own
+        // key. Anything else takes the portable path in full.
+        const storedSortKey = postgres || sqlite;
         const qb = this.repository
             .createQueryBuilder('activity')
             .leftJoin('activity.work', 'work')
@@ -401,31 +417,38 @@ export class ActivityLogRepository {
         }
 
         if (options.cursor) {
-            // Both engines compare the store's OWN key for the last row of the
-            // previous page, so the predicate compares exactly what
+            // Both text-keyed engines compare the store's OWN key for the last
+            // row of the previous page, so the predicate compares exactly what
             // `ORDER BY activity.createdAt` orders by. Postgres: a
             // microsecond-precise text key the timestamp column parses back to
-            // the same instant. better-sqlite3: the stored text verbatim — the
-            // column holds what `datetime('now')` wrote, which has no
+            // the same instant. The sqlite family: the stored text verbatim —
+            // the column holds what `datetime('now')` wrote, which has no
             // fractional second, and a JS `Date` binds as '…:12.000', which
             // sorts AFTER '…:12' and brings the cursor row back on every page.
-            const cursorCreatedAt = postgres
-                ? options.cursor.createdAt
-                : toSqliteStoredTimestamp(options.cursor.createdAt);
+            // Every other driver binds the typed `Date` the key came from,
+            // which its own date column compares as an instant, not as text.
+            const cursorCreatedAt = this.feedCursorBinding(options.cursor.createdAt);
             qb.andWhere(
                 '(activity.createdAt < :feedCursorCreatedAt OR (activity.createdAt = :feedCursorCreatedAt AND activity.id < :feedCursorId))',
                 { feedCursorCreatedAt: cursorCreatedAt, feedCursorId: options.cursor.id },
             );
         }
 
-        // The key a cursor carries is always the store's own text for the row,
-        // never a re-rendering of it through a JS `Date`.
-        qb.addSelect(
-            postgres
-                ? `to_char(activity."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.US')`
-                : `replace(CAST(activity."createdAt" AS TEXT), ' ', 'T')`,
-            'feed_sort_key',
-        );
+        // On the two text-keyed engines the key a cursor carries is the
+        // store's own text for the row, never a re-rendering of it through a
+        // JS `Date`. The column reference comes from the builder's own
+        // identifier escaping, so a quoting style can never leak into a
+        // dialect that reads it as something else: `"createdAt"` is an
+        // identifier on Postgres and sqlite but a string literal on MySQL.
+        const createdAtColumn = `activity.${qb.escape('createdAt')}`;
+        if (postgres) {
+            qb.addSelect(
+                `to_char(${createdAtColumn}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
+                'feed_sort_key',
+            );
+        } else if (sqlite) {
+            qb.addSelect(`replace(CAST(${createdAtColumn} AS TEXT), ' ', 'T')`, 'feed_sort_key');
+        }
 
         qb.orderBy('activity.createdAt', 'DESC')
             .addOrderBy('activity.id', 'DESC')
@@ -440,16 +463,31 @@ export class ActivityLogRepository {
                 sortKeys.set(id, key);
             }
         }
-        // Deliberately NO fallback key. Re-deriving one from the hydrated
-        // `createdAt` would re-introduce the defect this method exists to fix:
-        // `new Date(row.createdAt).toISOString()` always carries a fractional
-        // part, and on sqlite '…:34.000' sorts AFTER the stored '…:34', so the
+        // On the two text-keyed engines, deliberately NO fallback key.
+        // Re-deriving one from the hydrated `createdAt` would re-introduce the
+        // defect this method exists to fix: `new
+        // Date(row.createdAt).toISOString()` always carries a fractional part,
+        // and on sqlite '…:34.000' sorts AFTER the stored '…:34', so the
         // cursor would match its own row and the feed would re-read its own head
         // forever. A row the store gave no key for simply has none, and
         // `FeedService` then mints no `nextCursor` — the feed ENDS instead of
         // repeating itself. Unreachable while both engines select
         // `feed_sort_key`, and it stays honest if that ever changes shape.
         const rows = entities.slice(0, options.limit);
+        if (!storedSortKey) {
+            // Every other driver selects no `feed_sort_key` at all, so the key
+            // is derived from the hydrated row — the portable behaviour, and
+            // what keeps the feed paging there: with `sortKeys` empty,
+            // `FeedService` mints `nextCursor: null` and reports
+            // `hasMore: false`, silently ending the feed after one page. The
+            // padding that breaks sqlite is harmless here, because the cursor
+            // then binds as a typed `Date` compared as an instant.
+            for (const row of rows) {
+                if (!sortKeys.has(row.id)) {
+                    sortKeys.set(row.id, new Date(row.createdAt).toISOString());
+                }
+            }
+        }
         return { rows, sortKeys, hasMore: entities.length > options.limit };
     }
 
@@ -677,8 +715,37 @@ export class ActivityLogRepository {
         });
     }
 
+    /**
+     * The value the feed's keyset predicate compares against, in whatever form
+     * the driver's own ordering understands: Postgres' microsecond text, the
+     * sqlite family's stored text, or — for any other driver — the typed
+     * `Date` the key was minted from, which is what this repository bound
+     * before either text form existed.
+     */
+    private feedCursorBinding(createdAt: string): string | Date {
+        if (this.isPostgres()) return createdAt;
+        if (this.isSqlite()) return toSqliteStoredTimestamp(createdAt);
+        return new Date(createdAt);
+    }
+
+    private driverType(): string {
+        return String(this.repository.manager?.connection?.options?.type ?? '');
+    }
+
     private isPostgres(): boolean {
-        return this.repository.manager?.connection?.options?.type === 'postgres';
+        return this.driverType() === 'postgres';
+    }
+
+    /**
+     * The sqlite family — every `DatabaseType` whose `datetime` column holds
+     * the text `datetime('now')` wrote (`better-sqlite3`, `sqlite`,
+     * `sqlite3`). Asked apart from "not Postgres" on purpose: `DatabaseType`
+     * also admits `mysql` and `mariadb`, which share neither that stored text
+     * form nor sqlite's identifier quoting, so "not Postgres" is not the same
+     * question as "sqlite".
+     */
+    private isSqlite(): boolean {
+        return this.driverType().includes('sqlite');
     }
 
     async countByStatus(userId: string, status: ActivityStatus): Promise<number> {
