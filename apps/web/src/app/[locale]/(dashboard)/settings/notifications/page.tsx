@@ -1,20 +1,20 @@
 import { createHmac } from 'node:crypto';
 import { authAPI } from '@/lib/api';
 import { notificationPreferencesAPI } from '@/lib/api/notification-preferences';
-import { notificationChannelsAPI } from '@/lib/api/notification-channels';
 import { NotificationPreferencesSettings } from '@/components/settings/NotificationPreferencesSettings';
 import { NovuInbox } from '@/components/notifications/NovuInbox';
 
 /**
- * EW-664 / EW-679 — Notification preferences settings page.
+ * Settings -> Notifications (EW-664 / EW-679; AW-13 notification matrix).
+ *
+ * One read for the whole matrix, plus the profile read the optional Novu
+ * widget needs. Each read degrades on its own, so a Novu or profile failure
+ * can never blank the matrix, and a matrix failure renders a load error that
+ * promises nothing changed.
  */
 export default async function NotificationPreferencesPage() {
-    const [eventTypes, preferences, channels, profile] = await Promise.all([
-        notificationPreferencesAPI.listEventTypes().catch(() => []),
-        notificationPreferencesAPI
-            .getPreferences()
-            .catch(() => ({ subscriptions: [], preference: null, mutes: [] })),
-        notificationChannelsAPI.list().catch(() => []),
+    const [matrix, profile] = await Promise.all([
+        notificationPreferencesAPI.getMatrix().catch(() => null),
         authAPI.getProfile().catch(() => null),
     ]);
 
@@ -33,11 +33,7 @@ export default async function NotificationPreferencesPage() {
             {profile?.id ? (
                 <NovuInbox subscriberId={profile.id} subscriberHash={subscriberHash} />
             ) : null}
-            <NotificationPreferencesSettings
-                initialEventTypes={eventTypes}
-                initialPreferences={preferences}
-                initialChannels={channels}
-            />
+            <NotificationPreferencesSettings initialMatrix={matrix} />
         </div>
     );
 }

@@ -3,20 +3,28 @@ import { describe, expect, it } from 'vitest';
 import * as root from '../index.js';
 
 import * as agents from '../agents/index.js';
+import * as billing from '../billing/index.js';
 import * as computer from '../computer/index.js';
 import * as connections from '../connections/index.js';
+import * as conversations from '../conversations/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
+import * as email from '../email/index.js';
 import * as feed from '../feed/index.js';
 import * as fleet from '../fleet/index.js';
 import * as form from '../form/index.js';
 import * as github from '../github/index.js';
 import * as hitl from '../hitl/index.js';
+import * as home from '../home/index.js';
 import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
+import * as memory from '../memory/index.js';
+import * as modelRouting from '../model-routing/index.js';
+import * as notifications from '../notifications/index.js';
+import * as playbook from '../playbook/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
@@ -45,20 +53,28 @@ import * as workflow from '../workflow/index.js';
 /** [area name, namespace] for every barrel `src/index.ts` re-exports. */
 const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
+	['billing', billing],
 	['computer', computer],
 	['connections', connections],
+	['conversations', conversations],
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
+	['email', email],
 	['feed', feed],
 	['fleet', fleet],
 	['form', form],
 	['github', github],
 	['hitl', hitl],
+	['home', home],
 	['inbox', inbox],
 	['ingest', ingest],
 	['item', item],
 	['kb', kb],
+	['memory', memory],
+	['model-routing', modelRouting],
+	['notifications', notifications],
+	['playbook', playbook],
 	['policy', policy],
 	['release', release],
 	['runs', runs],
@@ -73,8 +89,21 @@ describe('src/index.ts — the package root barrel', () => {
 	it('re-exports every area listed in the source file', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
+		// COUNTED off the AREAS array above, never added up from two branches'
+		// numbers: develop and this branch each reported the total from their
+		// own base (develop lacked the AW-13 `notifications` area, this branch
+		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
+		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(23);
+		// 31 is COUNTED from the AREAS array above after merging develop into
+		// the AW-19 Home branch, not added up from either side’s number: develop
+		// stood at 30 areas and this branch at 23, and the merged barrel carries
+		// the union of both plus the `home` area AW-19 adds — counting the merged
+		// array gives 31. Note `src/index.ts` has 32 `export *` lines but only 31
+		// AREAS: `./fleet/fleet-task-workspace.types.js` is a second sub-path of
+		// the existing `fleet` area, not a new area.
+		// Recount the array after every merge instead of trusting either side.
+		expect(exportLines).toBe(31);
 	});
 
 	it('has no name exported by two different areas', () => {

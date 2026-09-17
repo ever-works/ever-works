@@ -4,8 +4,9 @@ import {
     NotFoundException,
     UnprocessableEntityException,
 } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { MemoryFoldersService } from '../memory-folders.service';
-import { MemoryFolder } from '../../entities/memory-folder.entity';
+import { MemoryFolder, MemoryFolderScope } from '../../entities/memory-folder.entity';
 
 const USER = 'user-1';
 
@@ -263,6 +264,451 @@ describe('MemoryFoldersService', () => {
             await expect(service.createFolder(USER, { name: 'Docs' })).resolves.toMatchObject({
                 path: '/Docs',
             });
+        });
+    });
+});
+
+describe('MemoryFoldersService — shared (organization) folders', () => {
+    const ORG = 'org-1';
+    const ADMIN = 'user-admin';
+
+    function shared(partial: Partial<MemoryFolder>): MemoryFolder {
+        return folder({
+            userId: ADMIN,
+            organizationId: ORG,
+            scope: MemoryFolderScope.ORGANIZATION,
+            ...partial,
+        });
+    }
+
+    let folders: Record<string, jest.Mock>;
+    let activityLog: { log: jest.Mock };
+    let service: MemoryFoldersService;
+    const TX_MANAGER = { tx: 'manager' };
+
+    beforeEach(() => {
+        folders = {
+            // One transaction per tree mutation; the unit harness runs `fn`
+            // against the same mock, standing in for the tx-bound repository.
+            withOrganizationTree: jest.fn(async (_org: string, fn: Function) =>
+                fn(folders, TX_MANAGER),
+            ),
+            create: jest.fn(async (input) => shared({ ...input, id: 'created' })),
+            findById: jest.fn(async () => null),
+            findByPath: jest.fn(async () => null),
+            listByUser: jest.fn(async () => []),
+            update: jest.fn(async () => undefined),
+            updateSubtreePaths: jest.fn(async () => undefined),
+            deleteByIds: jest.fn(async () => undefined),
+            findOrganizationFolder: jest.fn(async () => null),
+            listByOrganization: jest.fn(async () => []),
+            countByOrganization: jest.fn(async () => 0),
+            listOrganizationChildren: jest.fn(async () => []),
+            listOrganizationSubtree: jest.fn(async () => []),
+            updateOrganizationSubtreePaths: jest.fn(async () => undefined),
+            deleteOrganizationFoldersByIds: jest.fn(async () => undefined),
+        };
+        activityLog = { log: jest.fn(async () => undefined) };
+        service = new MemoryFoldersService(
+            folders as never,
+            { countByFolderIds: jest.fn(), clearFolders: jest.fn() } as never,
+            { countByFolderIds: jest.fn(), clearFolders: jest.fn() } as never,
+            activityLog as never,
+        );
+    });
+
+    const byId = (...rows: MemoryFolder[]) =>
+        folders.findOrganizationFolder.mockImplementation(
+            async (_org: string, id: string) => rows.find((row) => row.id === id) ?? null,
+        );
+
+    describe('createOrganizationFolder', () => {
+        it('creates an organization-scope folder stamped with the Organization', async () => {
+            await service.createOrganizationFolder(ORG, ADMIN, { name: 'Playbooks' });
+            expect(folders.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: ADMIN,
+                    organizationId: ORG,
+                    scope: MemoryFolderScope.ORGANIZATION,
+                    path: '/Playbooks',
+                    parentId: null,
+                }),
+            );
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'memory_folder_created',
+                    details: expect.objectContaining({
+                        scope: 'organization',
+                        organizationId: ORG,
+                    }),
+                }),
+            );
+        });
+
+        it('never touches the per-person lookups', async () => {
+            await service.createOrganizationFolder(ORG, ADMIN, { name: 'Playbooks' });
+            expect(folders.findById).not.toHaveBeenCalled();
+            expect(folders.findByPath).not.toHaveBeenCalled();
+        });
+
+        it('allows a folder at depth 5', async () => {
+            byId(shared({ id: 'd4', path: '/a/b/c/d' }));
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'e', parentId: 'd4' }),
+            ).resolves.toBeDefined();
+        });
+
+        it('refuses a folder at depth 6 with the depth message', async () => {
+            byId(shared({ id: 'd5', path: '/a/b/c/d/e' }));
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'f', parentId: 'd5' }),
+            ).rejects.toMatchObject({
+                response: { message: 'Folders can be nested up to 5 levels deep.' },
+            });
+            expect(folders.create).not.toHaveBeenCalled();
+        });
+
+        it('refuses the 501st folder in an Organization', async () => {
+            folders.countByOrganization.mockResolvedValue(500);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'One more' }),
+            ).rejects.toBeInstanceOf(UnprocessableEntityException);
+            expect(folders.create).not.toHaveBeenCalled();
+        });
+
+        it('allows the 500th folder', async () => {
+            folders.countByOrganization.mockResolvedValue(499);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'Last one' }),
+            ).resolves.toBeDefined();
+        });
+
+        it('refuses a sibling name that differs only by case, quoting the existing name', async () => {
+            folders.listOrganizationChildren.mockResolvedValue([
+                shared({ id: 's', name: 'Support' }),
+            ]);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'support' }),
+            ).rejects.toMatchObject({
+                response: { message: 'A folder called "Support" already exists here.' },
+            });
+        });
+
+        it.each([
+            ['empty', '   '],
+            ['longer than 120 characters', 'x'.repeat(121)],
+        ])('refuses a name that is %s', async (_label, name) => {
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('404s a parent that belongs to another Organization', async () => {
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'X', parentId: 'foreign' }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+    });
+
+    describe('renameOrganizationFolder', () => {
+        it('rewrites the subtree paths and logs a rename', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            await service.renameOrganizationFolder(ORG, ADMIN, 'p', 'Guides');
+            expect(folders.updateOrganizationSubtreePaths).toHaveBeenCalledWith(
+                ORG,
+                '/Playbooks',
+                '/Guides',
+            );
+            expect(folders.update).toHaveBeenCalledWith('p', { name: 'Guides' });
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'memory_folder_renamed',
+                    details: expect.objectContaining({ oldPath: '/Playbooks', newPath: '/Guides' }),
+                }),
+            );
+        });
+
+        it('allows a case-only rename of the same folder', async () => {
+            byId(shared({ id: 'p', name: 'playbooks', path: '/playbooks' }));
+            folders.listOrganizationChildren.mockResolvedValue([
+                shared({ id: 'p', name: 'playbooks', path: '/playbooks' }),
+            ]);
+            await expect(
+                service.renameOrganizationFolder(ORG, ADMIN, 'p', 'Playbooks'),
+            ).resolves.toBeDefined();
+        });
+
+        it('refuses a rename onto a sibling name', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            folders.listOrganizationChildren.mockResolvedValue([
+                shared({ id: 'p', name: 'Playbooks' }),
+                shared({ id: 'r', name: 'Reports', path: '/Reports' }),
+            ]);
+            await expect(
+                service.renameOrganizationFolder(ORG, ADMIN, 'p', 'reports'),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(folders.updateOrganizationSubtreePaths).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('moveOrganizationFolder', () => {
+        it('refuses a move into the folder subtree with the exact message', async () => {
+            byId(
+                shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }),
+                shared({ id: 's', name: 'Support', path: '/Playbooks/Support', parentId: 'p' }),
+            );
+            await expect(
+                service.moveOrganizationFolder(ORG, ADMIN, 'p', 's'),
+            ).rejects.toMatchObject({
+                response: { message: 'A folder cannot be moved inside itself.' },
+            });
+            expect(folders.updateOrganizationSubtreePaths).not.toHaveBeenCalled();
+        });
+
+        it('refuses a move into itself', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            await expect(
+                service.moveOrganizationFolder(ORG, ADMIN, 'p', 'p'),
+            ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        });
+
+        it('refuses a move that would push a descendant past depth 5', async () => {
+            byId(
+                shared({ id: 'p', name: 'p', path: '/p' }),
+                shared({ id: 'deep', name: 'd', path: '/x/y/z/d' }),
+            );
+            // `/p` reaches two levels down (/p/q/r); under /x/y/z/d that is depth 7.
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/p' }),
+                shared({ id: 'q', path: '/p/q' }),
+                shared({ id: 'r', path: '/p/q/r' }),
+            ]);
+            await expect(
+                service.moveOrganizationFolder(ORG, ADMIN, 'p', 'deep'),
+            ).rejects.toMatchObject({
+                response: { code: 'FolderDepthLimit' },
+            });
+        });
+
+        it('moves a folder under a new parent, rewriting subtree paths', async () => {
+            byId(
+                shared({ id: 'p', name: 'Support', path: '/Support' }),
+                shared({ id: 'pb', name: 'Playbooks', path: '/Playbooks' }),
+            );
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/Support' }),
+            ]);
+            await service.moveOrganizationFolder(ORG, ADMIN, 'p', 'pb');
+            expect(folders.updateOrganizationSubtreePaths).toHaveBeenCalledWith(
+                ORG,
+                '/Support',
+                '/Playbooks/Support',
+            );
+            expect(folders.update).toHaveBeenCalledWith('p', { parentId: 'pb' });
+        });
+    });
+
+    describe('deleteOrganizationFolder', () => {
+        it('unfiles the whole subtree BEFORE deleting the folders, and deletes no document', async () => {
+            byId(shared({ id: 'p', path: '/Playbooks' }));
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/Playbooks' }),
+                shared({ id: 's', path: '/Playbooks/Support' }),
+            ]);
+            const order: string[] = [];
+            const unfile = jest.fn(async (ids: string[]) => {
+                order.push(`unfile:${ids.join(',')}`);
+                return 12;
+            });
+            folders.deleteOrganizationFoldersByIds.mockImplementation(async () => {
+                order.push('delete');
+            });
+
+            const result = await service.deleteOrganizationFolder(ORG, ADMIN, 'p', unfile);
+
+            expect(order).toEqual(['unfile:p,s', 'delete']);
+            expect(result).toEqual({ deletedFolders: 2, unfiledDocuments: 12 });
+            expect(folders.deleteOrganizationFoldersByIds).toHaveBeenCalledWith(ORG, ['p', 's']);
+        });
+
+        it('404s a folder of another Organization and unfiles nothing', async () => {
+            const unfile = jest.fn();
+            await expect(
+                service.deleteOrganizationFolder(ORG, ADMIN, 'foreign', unfile),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(unfile).not.toHaveBeenCalled();
+        });
+
+        it('unfiles and deletes inside one tree transaction, handing unfile that transaction', async () => {
+            byId(shared({ id: 'p', path: '/Playbooks' }));
+            folders.listOrganizationSubtree.mockResolvedValue([shared({ id: 'p' })]);
+            const unfile = jest.fn(async () => 1);
+            await service.deleteOrganizationFolder(ORG, ADMIN, 'p', unfile);
+            expect(folders.withOrganizationTree).toHaveBeenCalledWith(ORG, expect.any(Function));
+            expect(unfile).toHaveBeenCalledWith(['p'], TX_MANAGER);
+        });
+
+        it('records no activity when the delete fails part-way', async () => {
+            byId(shared({ id: 'p', path: '/Playbooks' }));
+            folders.listOrganizationSubtree.mockResolvedValue([shared({ id: 'p' })]);
+            folders.deleteOrganizationFoldersByIds.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.deleteOrganizationFolder(
+                    ORG,
+                    ADMIN,
+                    'p',
+                    jest.fn(async () => 3),
+                ),
+            ).rejects.toThrow('db down');
+            expect(activityLog.log).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('shared tree mutations are atomic', () => {
+        /**
+         * A tree lock that behaves like the Postgres advisory lock: each
+         * mutation runs to completion before the next one starts, against an
+         * in-memory table.
+         */
+        function serialisedTree(rows: MemoryFolder[]) {
+            let tail: Promise<unknown> = Promise.resolve();
+            folders.countByOrganization.mockImplementation(async () => rows.length);
+            folders.listOrganizationChildren.mockImplementation(
+                async (_org: string, parentId: string | null) =>
+                    rows.filter((row) => (row.parentId ?? null) === parentId),
+            );
+            folders.create.mockImplementation(async (input: Partial<MemoryFolder>) => {
+                const row = shared({ ...input, id: `f${rows.length}` });
+                rows.push(row);
+                return row;
+            });
+            folders.withOrganizationTree.mockImplementation(
+                (_org: string, fn: (tree: unknown, manager: unknown) => Promise<unknown>) => {
+                    const run = tail.then(() => fn(folders, TX_MANAGER));
+                    tail = run.catch(() => undefined);
+                    return run;
+                },
+            );
+        }
+
+        it('runs the cap check, the sibling check and the insert inside the tree transaction', async () => {
+            let inTree = false;
+            const seenInTree: string[] = [];
+            folders.withOrganizationTree.mockImplementation(
+                async (_org: string, fn: (tree: unknown, manager: unknown) => Promise<unknown>) => {
+                    inTree = true;
+                    try {
+                        return await fn(folders, TX_MANAGER);
+                    } finally {
+                        inTree = false;
+                    }
+                },
+            );
+            for (const name of ['countByOrganization', 'listOrganizationChildren', 'create']) {
+                const original = folders[name].getMockImplementation();
+                folders[name].mockImplementation(async (...args: unknown[]) => {
+                    if (inTree) seenInTree.push(name);
+                    return original?.(...args);
+                });
+            }
+            await service.createOrganizationFolder(ORG, ADMIN, { name: 'Playbooks' });
+            expect(seenInTree).toEqual([
+                'countByOrganization',
+                'listOrganizationChildren',
+                'create',
+            ]);
+        });
+
+        it('two concurrent creates at 499 folders admit exactly one', async () => {
+            const rows = Array.from({ length: 499 }, (_v, i) =>
+                shared({ id: `existing-${i}`, name: `F${i}`, path: `/F${i}` }),
+            );
+            serialisedTree(rows);
+            const results = await Promise.allSettled([
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'Last one' }),
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'One more' }),
+            ]);
+            expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+            expect(rows).toHaveLength(500);
+            const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+            expect(rejected.reason).toMatchObject({ response: { code: 'FolderLimitReached' } });
+        });
+
+        it('two concurrent creates of "Support" and "support" admit exactly one', async () => {
+            const rows: MemoryFolder[] = [];
+            serialisedTree(rows);
+            const results = await Promise.allSettled([
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'Support' }),
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'support' }),
+            ]);
+            expect(rows.map((row) => row.name)).toEqual(['Support']);
+            const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+            expect(rejected.reason).toBeInstanceOf(ConflictException);
+            expect(rejected.reason).toMatchObject({
+                response: { message: 'A folder called "Support" already exists here.' },
+            });
+        });
+
+        it('maps a case-insensitive unique-index violation to the same 409, quoting the folder that won', async () => {
+            const violation = new QueryFailedError('INSERT', [], {
+                code: '23505',
+                message: 'duplicate key value violates unique constraint',
+            } as unknown as Error);
+            folders.create.mockRejectedValue(violation);
+            // The in-transaction check saw no sibling; by the time the error
+            // is mapped, the winner is visible.
+            folders.listOrganizationChildren
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([shared({ id: 'won', name: 'Support' })]);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'support' }),
+            ).rejects.toMatchObject({
+                response: {
+                    code: 'FolderNameDuplicate',
+                    message: 'A folder called "Support" already exists here.',
+                },
+            });
+            expect(activityLog.log).not.toHaveBeenCalled();
+        });
+
+        it('rename and move rewrite paths and the folder row inside one tree transaction', async () => {
+            byId(
+                shared({ id: 'p', name: 'Support', path: '/Support' }),
+                shared({ id: 'pb', name: 'Playbooks', path: '/Playbooks' }),
+            );
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/Support' }),
+            ]);
+            let inTree = false;
+            const writesOutsideTree: string[] = [];
+            folders.withOrganizationTree.mockImplementation(
+                async (_org: string, fn: (tree: unknown, manager: unknown) => Promise<unknown>) => {
+                    inTree = true;
+                    try {
+                        return await fn(folders, TX_MANAGER);
+                    } finally {
+                        inTree = false;
+                    }
+                },
+            );
+            for (const name of ['updateOrganizationSubtreePaths', 'update']) {
+                folders[name].mockImplementation(async () => {
+                    if (!inTree) writesOutsideTree.push(name);
+                });
+            }
+            await service.renameOrganizationFolder(ORG, ADMIN, 'p', 'Help');
+            await service.moveOrganizationFolder(ORG, ADMIN, 'p', 'pb');
+            expect(folders.withOrganizationTree).toHaveBeenCalledTimes(2);
+            expect(writesOutsideTree).toEqual([]);
+        });
+
+        it('a rename whose folder-row write fails surfaces the failure and logs nothing', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            folders.update.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.renameOrganizationFolder(ORG, ADMIN, 'p', 'Guides'),
+            ).rejects.toThrow('db down');
+            expect(activityLog.log).not.toHaveBeenCalled();
         });
     });
 });

@@ -33,6 +33,7 @@ import {
     VectorStoreNotConfiguredError,
 } from '../facades/vector-store.facade';
 import { rrfBlend } from './kb-rrf';
+import { hashNormalizedBody } from './kb-content-hash';
 import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
 import type { KbConsolidationMarker } from './memory-consolidation';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
@@ -60,6 +61,7 @@ import { KbRetrievalLogRepository } from '../database/repositories/kb-retrieval-
 import { z } from 'zod';
 import { KB_DOCUMENT_CLASSES } from '@ever-works/contracts';
 import { sanitizeDescription } from '../utils/sanitize.util';
+import { trimEdgeChars } from '../utils/text.utils';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -80,6 +82,13 @@ import type {
  * Spec: docs/specs/features/knowledge-base/spec.md §8 (storage).
  */
 export const KB_STORAGE_PLUGIN = 'KB_STORAGE_PLUGIN';
+
+/**
+ * Knowledge library — how many compare-and-set rounds an edit makes before
+ * giving up. Each lost round means another edit of the same document landed
+ * in between, so five in a row is contention no human edit produces.
+ */
+const KB_EDIT_MAX_ATTEMPTS = 5;
 
 /**
  * How much of an uploaded document the auto-classifier is allowed to see.
@@ -987,7 +996,18 @@ export class KnowledgeBaseService {
      */
     async resolveContext(
         workId: string,
-        opts: { query?: string; limit?: number; consumerKind?: string } = {},
+        opts: {
+            query?: string;
+            limit?: number;
+            consumerKind?: string;
+            /**
+             * Knowledge library — opt in to dropping archived documents from
+             * `queryRetrieved`. Omitted (the default) keeps the long-standing
+             * behaviour: a direct query hit on an archived document still
+             * surfaces, demoted and labelled historical.
+             */
+            excludeArchived?: boolean;
+        } = {},
     ): Promise<KbContextBundle> {
         const alwaysInjected = await this.fetchAlwaysInjectedDocs(workId);
 
@@ -1002,7 +1022,9 @@ export class KnowledgeBaseService {
         const trimmedQuery = opts.query?.trim() ?? '';
         const queryRetrieved =
             trimmedQuery.length > 0
-                ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8)
+                ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8, {
+                      excludeArchived: opts.excludeArchived,
+                  })
                 : [];
 
         // Memory upgrades M10 — record what we just injected, for which
@@ -1179,6 +1201,7 @@ export class KnowledgeBaseService {
         workId: string,
         query: string,
         limit: number,
+        opts: { excludeArchived?: boolean } = {},
     ): Promise<KbDocumentBodyDto[]> {
         // Over-fetch chunk hits: supersession substitution below can
         // CONVERGE several hits onto one survivor (and dead chains drop
@@ -1202,6 +1225,12 @@ export class KnowledgeBaseService {
             if (results.length >= limit) break;
             const doc = await this.resolveCurrentDocument(workId, docId);
             if (!doc || included.has(doc.id)) continue;
+            // Knowledge library — archived documents are skipped ONLY when
+            // the caller opts in. By default a direct semantic hit on an
+            // archived document still reaches the bundle as historical
+            // context (a decision archived through the review action relies
+            // on that), exactly as before the library existed.
+            if (opts.excludeArchived === true && doc.status === KbDocumentStatus.ARCHIVED) continue;
             // M7 — unreviewed (`proposed`) docs never reach a prompt, not
             // even via a direct semantic hit. They stay retrievable through
             // the normal list/get endpoints (the review queue), only the
@@ -1350,6 +1379,11 @@ export class KnowledgeBaseService {
             generatedByAgentRunId: input.generatedByAgentRunId ?? null,
             createdById: input.userId,
             updatedById: input.userId,
+            // Knowledge library — a new document starts at revision 1 with
+            // its body fingerprint seeded, so the first real edit compares.
+            revision: 1,
+            revisionAt: new Date(),
+            normalizedContentHash: hashNormalizedBody(body),
             metadata: { ...(input.metadata ?? {}), body } as Record<string, unknown>,
             // M7 — agent-authored docs land as `proposed` (review-gated:
             // excluded from injection until a human accepts). Human /
@@ -1388,28 +1422,37 @@ export class KnowledgeBaseService {
         }
         this.assertNotLockedFull(existing);
 
-        const patch: Partial<WorkKnowledgeDocument> = { updatedById: userId };
-        if (input.title !== undefined) patch.title = input.title;
-        if (input.description !== undefined) patch.description = input.description;
-        if (input.tags !== undefined) patch.tags = input.tags;
-        if (input.categories !== undefined) patch.categories = input.categories;
-        if (input.language !== undefined) patch.language = input.language;
-        if (input.status !== undefined) patch.status = input.status;
-        if (input.class !== undefined) patch.kbDocumentClass = input.class;
+        // Content, fingerprint and revision land in one compare-and-set on
+        // the revision the patch is computed from; a lost race recomputes the
+        // patch against the row as it now is (see `writeAtRevision`).
+        const updated = await this.writeAtRevision(workId, docId, existing, (row) => {
+            const patch: Partial<WorkKnowledgeDocument> = { updatedById: userId };
+            if (input.title !== undefined) patch.title = input.title;
+            if (input.description !== undefined) patch.description = input.description;
+            if (input.tags !== undefined) patch.tags = input.tags;
+            if (input.categories !== undefined) patch.categories = input.categories;
+            if (input.language !== undefined) patch.language = input.language;
+            if (input.status !== undefined) patch.status = input.status;
+            if (input.class !== undefined) patch.kbDocumentClass = input.class;
 
-        if (input.body !== undefined) {
-            patch.wordCount = this.countWords(input.body);
-            patch.tokenCount = this.estimateTokens(input.body);
-            patch.metadata = {
-                ...(existing.metadata ?? {}),
-                body: input.body,
-            } as Record<string, unknown>;
-        }
+            if (input.body !== undefined) {
+                patch.wordCount = this.countWords(input.body);
+                patch.tokenCount = this.estimateTokens(input.body);
+                patch.metadata = {
+                    ...(row.metadata ?? {}),
+                    body: input.body,
+                } as Record<string, unknown>;
+            }
 
-        const updated = await this.documentRepository.update(docId, patch);
-        if (!updated) {
-            throw new NotFoundException(`KB document not found after update: ${docId}`);
-        }
+            const revision = this.revisionPatch(row, {
+                title: patch.title ?? row.title,
+                description: input.description !== undefined ? input.description : row.description,
+                tags: input.tags !== undefined ? input.tags : row.tags,
+                kbDocumentClass: patch.kbDocumentClass ?? row.kbDocumentClass,
+                body: input.body !== undefined ? input.body : this.bodyOf(row),
+            });
+            return { patch: Object.assign(patch, revision.patch), bump: revision.bump };
+        });
 
         if (input.tags?.length) {
             await this.ensureTagsExist(workId, input.tags);
@@ -1618,6 +1661,12 @@ export class KnowledgeBaseService {
             status: KbDocumentStatus.ARCHIVED,
             updatedById: userId,
         };
+        // Knowledge library — archive bookkeeping, stamped only on the
+        // transition so archiving twice keeps the original who/when.
+        const wasArchived = existing.status === KbDocumentStatus.ARCHIVED;
+        if (!wasArchived) {
+            Object.assign(patch, this.archiveBookkeeping(existing, userId));
+        }
         if (
             existing.kbDocumentClass === KbDocumentClass.DECISION &&
             existing.decision?.status !== KbDecisionStatus.ARCHIVED
@@ -1627,6 +1676,19 @@ export class KnowledgeBaseService {
                 status: KbDecisionStatus.ARCHIVED,
             };
         }
+        // Knowledge library — remember the decision status this archive
+        // replaced, so `unarchiveDocument` can put it back. Recorded when
+        // the document leaves the shelf or when this call flips the decision;
+        // a repeat archive that changes neither keeps the first record.
+        if (
+            existing.kbDocumentClass === KbDocumentClass.DECISION &&
+            (!wasArchived || patch.decision)
+        ) {
+            patch.metadata = {
+                ...(patch.metadata ?? existing.metadata ?? {}),
+                archivedFromDecisionStatus: existing.decision?.status ?? KbDecisionStatus.PROPOSED,
+            } as Record<string, unknown>;
+        }
 
         const updated = await this.documentRepository.update(docId, patch);
         if (!updated) {
@@ -1635,7 +1697,74 @@ export class KnowledgeBaseService {
         // M12 — see transitionDecisionStatus: the sidecar's `status` and
         // `review_state` both move on an archive.
         await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
+        if (!wasArchived) {
+            await this.recordDocumentActivity(
+                userId,
+                ActivityActionType.KB_DOCUMENT_ARCHIVED,
+                `Archived knowledge document ${updated.title}`,
+                updated,
+                { folderId: updated.folderId ?? null },
+            );
+        }
         return this.toBodyDto(updated);
+    }
+
+    /**
+     * Knowledge library — restore an archived document to the shelf.
+     *
+     * The inverse of {@link archiveDocument}. NOT `restoreDocumentFromHistory`
+     * (that one restores a body from an old commit). Flips `status` back to
+     * `active`, clears the archive bookkeeping, and leaves the folder, the
+     * version history and everyone's read state exactly as they were. The
+     * document returns to the folder it was archived from; when that folder
+     * was deleted meanwhile the folder column is already `NULL`, so it lands
+     * in Unfiled and `restoredToUnfiled` says so.
+     *
+     * A decision archived by {@link archiveDocument} also had its decision
+     * status set to `archived`; restoring puts back the status recorded at
+     * archive time (see {@link restoredDecision}), so a document back on the
+     * shelf never carries a decision that still reads archived.
+     *
+     * Owner-scoped (`ensureCanEdit`). Idempotent: restoring a document that
+     * is not archived returns it unchanged and writes nothing.
+     */
+    async unarchiveDocument(
+        workId: string,
+        docId: string,
+        userId: string,
+    ): Promise<{ document: KbDocumentBodyDto; restoredToUnfiled: boolean; changed: boolean }> {
+        await this.ownershipService.ensureCanEdit(workId, userId);
+
+        const existing = await this.documentRepository.findById(workId, docId);
+        if (!existing) {
+            throw new NotFoundException(`KB document not found: ${docId}`);
+        }
+        if (existing.status !== KbDocumentStatus.ARCHIVED) {
+            return { document: this.toBodyDto(existing), restoredToUnfiled: false, changed: false };
+        }
+
+        const restoredToUnfiled = this.restoresToUnfiled(existing);
+        const patch: Partial<WorkKnowledgeDocument> = {
+            ...this.unarchivePatch(existing),
+            updatedById: userId,
+        };
+        const decision = this.restoredDecision(existing);
+        if (decision) {
+            patch.decision = decision;
+        }
+        const updated = await this.documentRepository.update(docId, patch);
+        if (!updated) {
+            throw new NotFoundException(`KB document not found after restore: ${docId}`);
+        }
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
+        await this.recordDocumentActivity(
+            userId,
+            ActivityActionType.KB_DOCUMENT_UNARCHIVED,
+            `Restored knowledge document ${updated.title}`,
+            updated,
+            { folderId: updated.folderId ?? null, restoredToUnfiled },
+        );
+        return { document: this.toBodyDto(updated), restoredToUnfiled, changed: true };
     }
 
     async deleteDocument(workId: string, docId: string, userId: string): Promise<void> {
@@ -1762,9 +1891,38 @@ export class KnowledgeBaseService {
             );
         }
 
-        const updated = await this.documentRepository.findById(workId, docId);
+        let updated = await this.documentRepository.findById(workId, docId);
         if (!updated) {
             throw new NotFoundException(`KB document vanished mid-restore: ${docId}`);
+        }
+
+        // Knowledge library — a restored body is a real change for readers
+        // when it differs (whitespace-insensitively) from what they read.
+        // The fingerprint and the revision move together in one
+        // compare-and-set on the revision the restored row carries.
+        const revision = this.revisionPatch(existing, {
+            title: updated.title,
+            description: updated.description,
+            tags: updated.tags,
+            kbDocumentClass: updated.kbDocumentClass,
+            body: this.bodyOf(updated),
+        });
+        if (Object.keys(revision.patch).length > 0 || revision.bump) {
+            const restored = updated;
+            updated = await this.writeAtRevision(workId, docId, restored, (row) =>
+                row === restored
+                    ? revision
+                    : // Another edit landed after the restore and already
+                      // recorded its own revision; only an unseeded
+                      // fingerprint is left to fill in.
+                      this.revisionPatch(row, {
+                          title: row.title,
+                          description: row.description,
+                          tags: row.tags,
+                          kbDocumentClass: row.kbDocumentClass,
+                          body: this.bodyOf(row),
+                      }),
+            );
         }
 
         await this.enqueueMirror(
@@ -2157,6 +2315,9 @@ export class KnowledgeBaseService {
             source: input.source ?? ('user' as KbDocumentSource),
             createdById: userId,
             updatedById: userId,
+            revision: 1,
+            revisionAt: new Date(),
+            normalizedContentHash: hashNormalizedBody(body),
             metadata: { body } as Record<string, unknown>,
             // M7 — same review-gate derivation as `createDocument`: the
             // consolidation synthesis path passes `source: agent` so
@@ -2373,6 +2534,91 @@ export class KnowledgeBaseService {
         }
 
         return this.toDto(updated);
+    }
+
+    /**
+     * Knowledge library — archive an organization document from the shelf.
+     *
+     * Archiving an organization document is the same row transition as
+     * rejecting it ({@link rejectOrgDocument}): `status: 'archived'` and the
+     * overlay retracted from every Work for an inheritable class — plus the
+     * archive bookkeeping the shelf shows. Delegating keeps one implementation of that
+     * transition. Authorization (Organization membership / admin) is the
+     * controller's, exactly as for reject.
+     */
+    async archiveOrgDocument(
+        organizationId: string,
+        docId: string,
+        userId: string,
+    ): Promise<KbDocumentDto | null> {
+        const existing = await this.documentRepository.findOrgById(organizationId, docId);
+        if (!existing) return null;
+        const wasArchived = existing.status === KbDocumentStatus.ARCHIVED;
+        const archived = await this.rejectOrgDocument(organizationId, docId, userId);
+        if (archived && !wasArchived) {
+            // The shelf's archive bookkeeping (who, when, which folder) rides
+            // on a second write so the reject transition itself stays exactly
+            // what the review queue has always written.
+            await this.documentRepository.update(docId, this.archiveBookkeeping(existing, userId));
+            await this.recordDocumentActivity(
+                userId,
+                ActivityActionType.KB_DOCUMENT_ARCHIVED,
+                `Archived knowledge document ${archived.title}`,
+                existing,
+                { folderId: existing.folderId ?? null },
+            );
+        }
+        return archived;
+    }
+
+    /**
+     * Knowledge library — restore an archived organization document.
+     *
+     * Flips `status` back to `active`, clears the archive bookkeeping, and
+     * re-runs the overlay fanout for an inheritable class (the counterpart
+     * of the retraction archive performed). `reviewState` is untouched, so a
+     * still-`proposed` document stays withheld from context injection.
+     * Idempotent; `null` when the document is not this Organization's.
+     */
+    async unarchiveOrgDocument(
+        organizationId: string,
+        docId: string,
+        userId: string,
+    ): Promise<{ document: KbDocumentDto; restoredToUnfiled: boolean; changed: boolean } | null> {
+        const existing = await this.documentRepository.findOrgById(organizationId, docId);
+        if (!existing) return null;
+        if (existing.status !== KbDocumentStatus.ARCHIVED) {
+            return { document: this.toDto(existing), restoredToUnfiled: false, changed: false };
+        }
+
+        const restoredToUnfiled = this.restoresToUnfiled(existing);
+        const updated = await this.documentRepository.update(docId, {
+            ...this.unarchivePatch(existing),
+            updatedById: userId,
+        });
+        if (!updated) return null;
+
+        if (
+            (KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>).includes(
+                updated.kbDocumentClass,
+            )
+        ) {
+            await this.enqueueOrgOverlayFanout(
+                organizationId,
+                updated.id,
+                'upsert',
+                updated.path,
+                updated.kbDocumentClass,
+            );
+        }
+        await this.recordDocumentActivity(
+            userId,
+            ActivityActionType.KB_DOCUMENT_UNARCHIVED,
+            `Restored knowledge document ${updated.title}`,
+            updated,
+            { folderId: updated.folderId ?? null, restoredToUnfiled },
+        );
+        return { document: this.toDto(updated), restoredToUnfiled, changed: true };
     }
 
     async listOrgDocuments(
@@ -3600,11 +3846,8 @@ export class KnowledgeBaseService {
 
     private slugFromFilename(filename: string): string {
         const base = filename.replace(/\.[^.]+$/, '');
-        return base
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .slice(0, 96);
+        const hyphenated = base.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return trimEdgeChars(hyphenated, '-', '-').slice(0, 96);
     }
 
     private humanizeFilename(filename: string): string {
@@ -3692,6 +3935,207 @@ export class KnowledgeBaseService {
         return Math.ceil(body.length / 4);
     }
 
+    // ─── Knowledge library helpers ───────────────────────────────────────────
+
+    /**
+     * The revision fields a write must carry, given the row before it and
+     * the substantive fields after it.
+     *
+     *  - Title, description, tag set, class or normalized-body hash changed
+     *    → new hash, and `bump` so {@link writeAtRevision} writes the next
+     *    revision in the same statement.
+     *  - Otherwise (a whitespace-only edit, a status / language / lock /
+     *    bookkeeping write) → nothing, except that a row whose stored hash
+     *    is still `NULL` (it predates the library) gets its hash seeded.
+     *
+     * The body a stored `NULL` hash stands for is the row's own body, so the
+     * comparison uses a fingerprint computed from it: shipping the library
+     * flags no existing document as changed, while the first real edit of
+     * one moves its revision exactly like any later edit.
+     *
+     * The patch never carries `revision` itself: only {@link writeAtRevision}
+     * derives it, from the very row its compare-and-set is guarded on.
+     */
+    private revisionPatch(
+        existing: WorkKnowledgeDocument,
+        next: {
+            title: string;
+            description?: string | null;
+            tags?: string[] | null;
+            kbDocumentClass: KbDocumentClass;
+            body: string;
+        },
+    ): { patch: Partial<WorkKnowledgeDocument>; bump: boolean } {
+        const nextHash = hashNormalizedBody(next.body);
+        const storedHash = existing.normalizedContentHash || null;
+        const baselineHash = storedHash ?? hashNormalizedBody(this.bodyOf(existing));
+        const substantive =
+            nextHash !== baselineHash ||
+            next.title !== existing.title ||
+            (next.description ?? null) !== (existing.description ?? null) ||
+            next.kbDocumentClass !== existing.kbDocumentClass ||
+            !sameTagSet(next.tags, existing.tags);
+        if (substantive) {
+            return { patch: { normalizedContentHash: nextHash }, bump: true };
+        }
+        if (!storedHash) {
+            return { patch: { normalizedContentHash: nextHash }, bump: false };
+        }
+        return { patch: {}, bump: false };
+    }
+
+    /**
+     * Write an edit of `existing` — its content, fingerprint and (for a
+     * substantive edit) its next revision — in ONE conditional UPDATE that
+     * lands only while the row still carries the revision the edit was
+     * computed from.
+     *
+     * When another edit moved the revision first, nothing is written: the
+     * row is read again, `build` recomputes the patch against it (so the
+     * edit applies to the current body and metadata, and takes the next free
+     * revision), and the write is retried. The stored content and its
+     * revision therefore always come from the same edit, and two concurrent
+     * edits can never share a revision number.
+     *
+     * Throws 404 when the document is gone, 403 when a retry finds it fully
+     * locked, and 409 only after {@link KB_EDIT_MAX_ATTEMPTS} lost rounds in a
+     * row — contention no human edit produces.
+     */
+    private async writeAtRevision(
+        workId: string,
+        docId: string,
+        existing: WorkKnowledgeDocument,
+        build: (row: WorkKnowledgeDocument) => {
+            patch: Partial<WorkKnowledgeDocument>;
+            bump: boolean;
+        },
+    ): Promise<WorkKnowledgeDocument> {
+        let current = existing;
+        for (let attempt = 0; attempt < KB_EDIT_MAX_ATTEMPTS; attempt += 1) {
+            const { patch, bump } = build(current);
+            const expectedRevision = current.revision ?? 1;
+            if (bump) {
+                patch.revision = expectedRevision + 1;
+                patch.revisionAt = new Date();
+            }
+            if (Object.keys(patch).length === 0) return current;
+            const updated = await this.documentRepository.update(docId, patch, {
+                expectedRevision,
+            });
+            if (updated) return updated;
+            const reloaded = await this.documentRepository.findById(workId, docId);
+            if (!reloaded) {
+                throw new NotFoundException(`KB document not found after update: ${docId}`);
+            }
+            this.assertNotLockedFull(reloaded);
+            current = reloaded;
+        }
+        throw new ConflictException(
+            `KB document ${docId} changed too often to save this edit; reload and retry`,
+        );
+    }
+
+    private bodyOf(doc: WorkKnowledgeDocument): string {
+        const body = (doc.metadata ?? {}).body;
+        return typeof body === 'string' ? body : '';
+    }
+
+    /**
+     * Archive bookkeeping: who and when, plus the folder the document sat in
+     * (kept in `metadata` so a later restore can tell "was never filed" from
+     * "its folder was deleted meanwhile").
+     */
+    private archiveBookkeeping(
+        existing: WorkKnowledgeDocument,
+        userId: string,
+    ): Partial<WorkKnowledgeDocument> {
+        return {
+            archivedAt: new Date(),
+            archivedById: userId,
+            metadata: {
+                ...(existing.metadata ?? {}),
+                archivedFromFolderId: existing.folderId ?? null,
+            } as Record<string, unknown>,
+        };
+    }
+
+    private unarchivePatch(existing: WorkKnowledgeDocument): Partial<WorkKnowledgeDocument> {
+        const metadata = { ...(existing.metadata ?? {}) } as Record<string, unknown>;
+        delete metadata.archivedFromFolderId;
+        delete metadata.archivedFromDecisionStatus;
+        return {
+            status: KbDocumentStatus.ACTIVE,
+            archivedAt: null,
+            archivedById: null,
+            metadata,
+        };
+    }
+
+    /**
+     * The decision state a restored document must carry, or `undefined` to
+     * leave it alone.
+     *
+     * Only a decision-class document whose decision still reads `archived`
+     * is touched. It gets back the status recorded when it was archived
+     * (`metadata.archivedFromDecisionStatus`) — which may itself be
+     * `archived`, when the decision had been archived before the document
+     * was, and then nothing changes. With no record (archived before the
+     * library existed) it falls back to `proposed`, the status the review
+     * flow treats as a decision without a settled status; a proposed
+     * decision is not injected by default, so the fallback never promotes
+     * anything into agent context.
+     *
+     * Restoring deliberately steps outside `KB_DECISION_STATUS_TRANSITIONS`
+     * (where `archived` is terminal): it undoes an archive, it is not a
+     * forward transition.
+     */
+    private restoredDecision(existing: WorkKnowledgeDocument): KbDecisionState | undefined {
+        if (existing.kbDocumentClass !== KbDocumentClass.DECISION) return undefined;
+        if (existing.decision?.status !== KbDecisionStatus.ARCHIVED) return undefined;
+        const recorded = (existing.metadata ?? {}).archivedFromDecisionStatus;
+        const status = (Object.values(KbDecisionStatus) as string[]).includes(recorded as string)
+            ? (recorded as KbDecisionStatus)
+            : KbDecisionStatus.PROPOSED;
+        if (status === KbDecisionStatus.ARCHIVED) return undefined;
+        return { ...existing.decision, status };
+    }
+
+    private restoresToUnfiled(existing: WorkKnowledgeDocument): boolean {
+        const from = (existing.metadata ?? {}).archivedFromFolderId;
+        return typeof from === 'string' && from.length > 0 && !existing.folderId;
+    }
+
+    /** Best-effort activity row for a document-level library action. */
+    private async recordDocumentActivity(
+        userId: string,
+        actionType: ActivityActionType,
+        summary: string,
+        doc: WorkKnowledgeDocument,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                workId: doc.workId ?? undefined,
+                actionType,
+                action: actionType,
+                status: ActivityStatus.COMPLETED,
+                summary,
+                details: {
+                    documentId: doc.id,
+                    workId: doc.workId ?? null,
+                    organizationId: doc.organizationId ?? null,
+                    ...details,
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record activity ${actionType} for doc ${doc.id}: ${(error as Error).message}`,
+            );
+        }
+    }
+
     private toDto(doc: WorkKnowledgeDocument): KbDocumentDto {
         return {
             id: doc.id,
@@ -3755,6 +4199,17 @@ function mergeClassFilters(opts: {
     }
     if (opts.class) return [opts.class];
     return multi;
+}
+
+/** Tag lists compare as sets: reordering tags is not a change. */
+function sameTagSet(a: string[] | null | undefined, b: string[] | null | undefined): boolean {
+    const left = new Set(a ?? []);
+    const right = new Set(b ?? []);
+    if (left.size !== right.size) return false;
+    for (const tag of left) {
+        if (!right.has(tag)) return false;
+    }
+    return true;
 }
 
 function toTagDto(tag: WorkKnowledgeTag): KbTagDto {

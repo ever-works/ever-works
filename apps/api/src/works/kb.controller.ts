@@ -251,7 +251,7 @@ export class KbController {
     @ApiOperation({
         summary: 'Restore a KB document to a prior Git commit',
         description:
-            'Reads the body at the supplied commit SHA from the Work data repo, applies it to the document row, and enqueues a fresh Git mirror so the head commit moves forward with the restored content.',
+            'Reads the body at the supplied commit SHA from the Work data repo, applies it to the document row, and enqueues a fresh Git mirror so the head commit moves forward with the restored content. This restores a BODY from history; to bring an archived document back to the shelf use `/unarchive`.',
     })
     @ApiResponse({ status: 200, description: 'KB document restored' })
     @ApiResponse({ status: 404, description: 'Document or commit not found' })
@@ -353,6 +353,24 @@ export class KbController {
         @Param('docId', new ParseUUIDPipe()) docId: string,
     ) {
         return this.kb.archiveDocument(workId, docId, auth.userId);
+    }
+
+    @Post('works/:id/kb/documents/:docId/unarchive')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Restore an archived KB document to the shelf (the inverse of archive)',
+        description:
+            'Flips an archived document back to active, clears who archived it and when, and returns it to the folder it was archived from (Unfiled when that folder no longer exists, reported as `restoredToUnfiled`). A decision document gets back the decision status it had before it was archived. Version history, folder and read state are untouched. This is NOT `/restore`, which restores a body from a Git commit. Requires edit access. Idempotent.',
+    })
+    @ApiResponse({ status: 200, description: '{ document, restoredToUnfiled, changed }' })
+    @ApiResponse({ status: 403, description: 'No edit access to the Work' })
+    @ApiResponse({ status: 404, description: 'Document not found' })
+    async unarchiveDocument(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+    ) {
+        return this.kb.unarchiveDocument(workId, docId, auth.userId);
     }
 
     @Get('works/:id/kb/documents/:docId/citations')

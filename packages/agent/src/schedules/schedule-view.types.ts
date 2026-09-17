@@ -66,6 +66,165 @@ export interface ScheduleView {
     status: ScheduleStatus;
     /** Whether this schedule is currently active/ticking. */
     enabled: boolean;
+
+    // ── Schedules workspace additions — every field below is ADDED; none of
+    // the fields above changed, so `GET /api/schedules` stays wire-compatible
+    // for Home's Soon block and the Activity tab.
+
+    /** Agent that would run this Schedule, or null when the source has none. */
+    agentId?: string | null;
+    /** Display name of {@link agentId}, when it resolved. */
+    agentName?: string | null;
+    /** OK / NEVER RUNS verdict, computed at read time. */
+    health?: ScheduleHealth;
+    /** Which of the six row controls apply, with a reason for each that does not. */
+    controls?: ScheduleControls;
+    /**
+     * ISO instant the Schedule was paused through a pause that preserves the
+     * cadence (recurring Task, heartbeat), else null. Sources whose pause is
+     * their own status (Mission, inbound Trigger, Work schedule) report it
+     * through `status` only.
+     */
+    pausedAt?: string | null;
+    /**
+     * One-line explanation when {@link nextRunAt} is null for a reason the
+     * surface should say out loud. A translation key under
+     * `dashboard.schedules.nextReasons`, never a sentence.
+     */
+    nextRunReasonKey?: ScheduleNextRunReasonKey | null;
+}
+
+/** Why a row has no next fire — see {@link ScheduleView.nextRunReasonKey}. */
+export type ScheduleNextRunReasonKey =
+    | 'paused'
+    | 'eventDriven'
+    | 'ended'
+    | 'beyondLookahead'
+    | 'notScheduledYet'
+    | 'ownerInactive';
+
+/** The closed set of NEVER RUNS reasons. */
+export type ScheduleHealthReason =
+    | 'impossible-date'
+    | 'ended'
+    | 'exhausted'
+    | 'past-one-shot'
+    | 'unparseable'
+    | 'no-agent'
+    | 'owner-archived';
+
+/** How a NEVER RUNS reason can be repaired. */
+export type ScheduleRepairClass = 'automatic' | 'choice' | 'none';
+
+export interface ScheduleHealth {
+    ok: boolean;
+    reason: ScheduleHealthReason | null;
+    /** Translation key under `dashboard.schedules.health.reasons`, or null when OK. */
+    reasonKey: string | null;
+    repair: ScheduleRepairClass;
+    /** ISO instant the verdict was computed. */
+    checkedAt: string | null;
+}
+
+/** The six row controls, in menu order. */
+export type ScheduleControlName = 'runNow' | 'pause' | 'resume' | 'edit' | 'duplicate' | 'reassign';
+
+/**
+ * Translation keys (under `dashboard.schedules.controlReasons`) explaining
+ * why a control is disabled on a row.
+ */
+export type ScheduleControlReasonKey =
+    | 'eventDriven'
+    | 'managedOnWork'
+    | 'alreadyPaused'
+    | 'notPaused'
+    | 'ended'
+    | 'ownerArchived'
+    | 'ownerInactive'
+    | 'noAgent'
+    | 'noAuthoredForm'
+    | 'notAvailableYet';
+
+export interface ScheduleControls {
+    runNow: boolean;
+    pause: boolean;
+    resume: boolean;
+    edit: boolean;
+    duplicate: boolean;
+    reassign: boolean;
+    /** Pausing this row pauses its whole owner (a Mission tick) — ask first. */
+    pauseNeedsAcknowledgement: boolean;
+    /** Per-control reason key when that control is false. */
+    disabledReasons: Partial<Record<ScheduleControlName, ScheduleControlReasonKey>>;
+}
+
+/** A proposed repair — shown before anything is written. */
+export interface ScheduleRepairProposal {
+    repair: ScheduleRepairClass;
+    /** The value a repair would replace (a cadence, an ISO instant, a cap). */
+    before: string | null;
+    /** The value a repair would write; null for `choice` / `none` repairs. */
+    after: string | null;
+    /**
+     * When the repair REMOVES a value rather than rewriting one (clear the
+     * end date, clear the occurrence cap), a translation key under
+     * `dashboard.schedules.health.repairs` describing it instead of `after`.
+     */
+    afterKey?: 'clearEndDate' | 'clearOccurrenceCap' | null;
+    /** Stable hash of the before-state, echoed back when a repair is applied. */
+    beforeHash: string | null;
+}
+
+/** Page filters for `GET /api/schedules/page` (all optional). */
+export interface SchedulePageFilters extends ScheduleQueryFilters {
+    agentId?: string;
+    status?: ScheduleStatus;
+    health?: 'ok' | 'never-runs';
+    /** Case-insensitive match against the Schedule name, cadence and Agent. */
+    q?: string;
+}
+
+/** One page of the workspace Schedules list. */
+export interface SchedulePage {
+    items: ScheduleView[];
+    /** Opaque cursor for the next page, or null on the last page. */
+    nextCursor: string | null;
+    /** Rows matching the filters, across every page. */
+    total: number;
+    /** Rows before any filter — lets the surface say "you have N in total". */
+    unfilteredTotal: number;
+    countsBySourceType: Record<ScheduleSourceType, number>;
+    countsByStatus: Record<ScheduleStatus, number>;
+    healthCounts: { ok: number; neverRuns: number };
+    /** Sources whose query failed; their rows are missing from this page. */
+    degradedSources: ScheduleSourceType[];
+    /** ISO instant health was computed for this page. */
+    healthCheckedAt: string | null;
+    /** Server clock, so countdowns do not trust the browser's. */
+    generatedAt: string;
+}
+
+/** One flagged row in the health summary. */
+export interface ScheduleHealthFlag extends ScheduleRepairProposal {
+    id: string;
+    sourceType: ScheduleSourceType;
+    ownerName: string;
+    ownerLink: string;
+    reason: ScheduleHealthReason;
+    reasonKey: string;
+}
+
+/** `GET /api/schedules/health` — a side-effect-free dry run. */
+export interface ScheduleHealthSummary {
+    checkedAt: string;
+    counts: {
+        ok: number;
+        neverRuns: number;
+        byReason: Partial<Record<ScheduleHealthReason, number>>;
+    };
+    /** Capped at {@link SCHEDULE_HEALTH_FLAG_CAP} rows. */
+    flagged: ScheduleHealthFlag[];
+    degradedSources: ScheduleSourceType[];
 }
 
 /** Optional server-side filters for the aggregation (all optional). */

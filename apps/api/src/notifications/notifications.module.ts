@@ -10,10 +10,17 @@ import { NotificationPreferencesController } from './notification-preferences.co
 import { NotificationPreferencesService } from './notification-preferences.service';
 import { NotificationFanoutListener } from './notification-fanout.listener';
 import { NotificationEventTypeBootstrap } from './notification-event-type-bootstrap.service';
+import { NotificationMatrixController } from './notification-matrix.controller';
+import { NotificationMatrixService } from './notification-matrix.service';
 
 @Module({
     imports: [AgentNotificationsModule, DatabaseModule, FacadesModule, AuthModule],
-    controllers: [NotificationsController, NotificationPreferencesController],
+    controllers: [
+        NotificationsController,
+        NotificationPreferencesController,
+        // AW-13 Attention controls — the notification matrix read + reset.
+        NotificationMatrixController,
+    ],
     providers: [
         NotificationCleanupService,
         DistributedTaskLockService,
@@ -29,6 +36,8 @@ import { NotificationEventTypeBootstrap } from './notification-event-type-bootst
         // notification event types into the registry. Core event types are
         // seeded by SeedNotificationEventTypes1780000010000.
         NotificationEventTypeBootstrap,
+        // AW-13 Attention controls — composes Settings -> Notifications.
+        NotificationMatrixService,
     ],
     exports: [AgentNotificationsModule, NotificationPreferencesService],
 })

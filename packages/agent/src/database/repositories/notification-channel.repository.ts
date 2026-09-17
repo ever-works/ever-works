@@ -47,6 +47,15 @@ export class NotificationChannelRepository {
         });
     }
 
+    /**
+     * Attention controls (AW-13) — every channel the user owns, disabled ones
+     * included, newest first. The notification matrix shows a disabled
+     * channel's column greyed out so its stored selections stay visible.
+     */
+    async findAllByUser(userId: string): Promise<NotificationChannel[]> {
+        return this.repository.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    }
+
     async update(id: string, patch: Partial<NotificationChannel>): Promise<void> {
         await this.repository.update({ id }, patch);
     }

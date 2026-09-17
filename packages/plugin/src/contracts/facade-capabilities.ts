@@ -96,6 +96,12 @@ export const PLUGIN_CAPABILITIES = {
 	// external events into the platform ingest pipeline. See
 	// capabilities/event-source.interface.ts.
 	EVENT_SOURCE: 'event-source',
+	// Capability & playbook catalogue (AW-21) — plugins that supply Playbook
+	// catalogue entries (packaged outcomes: trigger, steps, required
+	// capabilities, artefacts, escalation points). Consumed only through
+	// PlaybookCatalogFacadeService. See
+	// capabilities/playbook-provider.interface.ts.
+	PLAYBOOK_PROVIDER: 'playbook-provider',
 	// AW-15 — optional access-level declaration ("Read only" / "Read and
 	// write") mapped onto the tool-grant lattice. Declared alongside a
 	// provider's main capability; see

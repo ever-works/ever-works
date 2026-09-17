@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
-import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
+import { KnowledgeBaseModule, MemoryFactsModule, WorkModule } from '@ever-works/agent/services';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { MissionsModule } from '@ever-works/agent/missions';
@@ -10,10 +10,13 @@ import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { GoalsModule } from '@ever-works/agent/goals';
 import { AgentsModule, TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import { ConversationsModule } from '@ever-works/agent/conversations';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
+import { ModelRoutingModule } from '@ever-works/agent/model-routing';
+import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -103,6 +106,27 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // runs inline on every node lease poll; the cron is what makes a
         // fleet whose nodes ALL died still converge.
         AgentFleetModule,
+        // Memory facts (AW-07) — exposes MemoryFactEmbedService and
+        // MemoryFactSweepService through the remote-proxy controller so the
+        // memory-fact-embed task and the memory-fact-gc cron (in
+        // packages/tasks) run here, where the AI provider and vector-store
+        // plugins are loaded.
+        MemoryFactsModule,
+        // Model accounts (AW-16) — exposes ModelAccountHealthService through
+        // the remote-proxy controller so the model-account-health cron task
+        // (in packages/tasks) can drive `probeDueAccounts()` over the
+        // internal RPC channel, where the AI provider plugins are loaded.
+        ModelRoutingModule,
+        // Skills shelf — exposes SkillReadinessService through the
+        // remote-proxy controller so the skill-readiness-sweep cron task (in
+        // packages/tasks) can drive `sweepStale()` over the internal RPC
+        // channel every hour.
+        AgentSkillsModule,
+        // Named Conversations — exposes ConversationMessageService through
+        // the remote-proxy controller so the agent-conversation-reply task
+        // (in packages/tasks) can load the Conversation it answers and
+        // record the Agent's reply over the internal RPC channel.
+        ConversationsModule,
     ],
     controllers: [TriggerInternalController],
 })

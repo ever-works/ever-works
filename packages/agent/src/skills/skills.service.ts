@@ -11,8 +11,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
 import { Repository } from 'typeorm';
+import {
+    deriveSkillCardState,
+    normalizeSkillTags,
+    type SkillCardState,
+} from '@ever-works/contracts';
 import type { Skill, SkillFrontmatter, SkillOwnerType } from '../entities/skill.entity';
 import { SkillRepository, type ListSkillsFilter } from '../database/repositories/skill.repository';
+import type { OwnershipScope } from '../database/ownership-scope';
 import {
     SkillBindingRepository,
     type ResolvedSkill,
@@ -32,6 +38,8 @@ import { Mission } from '../entities/mission.entity';
 // (token + pure function) so the skills subpath gains no runtime graph.
 import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-grant.enforcer';
 import { filterSkillsByToolGrants } from '../policy/skill-activation';
+import { SkillTagRepository } from '../database/repositories/skill-tag.repository';
+import { SkillReadinessService } from './skill-readiness.service';
 
 export interface CreateSkillInput {
     ownerType: SkillOwnerType;
@@ -83,6 +91,15 @@ export interface CreateBindingInput {
 
 const MAX_BODY_BYTES = 64 * 1024;
 
+/** Skills shelf — the result of the on/off switch. */
+export interface SkillSwitchResult {
+    id: string;
+    cardState: SkillCardState;
+    disabledAt: Date | null;
+    /** False when the Skill was already in the requested state (idempotent no-op). */
+    changed: boolean;
+}
+
 /**
  * Skills feature — Phase 9.
  *
@@ -110,6 +127,11 @@ export class SkillsService {
         @Optional()
         @Inject(TOOL_GRANT_ENFORCER)
         private readonly toolGrants?: ToolGrantEnforcer,
+        // Skills shelf — tag reindex + readiness on every write. APPENDED LAST
+        // + `@Optional()` so every existing positional construction keeps
+        // working; unbound → writes behave exactly as before.
+        @Optional() private readonly skillTags?: SkillTagRepository,
+        @Optional() private readonly readiness?: SkillReadinessService,
     ) {}
 
     // ── Skill CRUD ────────────────────────────────────────────────
@@ -121,8 +143,13 @@ export class SkillsService {
         return this.skills.findByUserIdFiltered(userId, filter);
     }
 
-    async getOne(userId: string, id: string): Promise<Skill> {
-        const skill = await this.skills.findByIdAndUser(id, userId);
+    /**
+     * One of the caller's Skills, or 404. `ownershipScope` (the request's
+     * active workspace) also 404s a Skill stamped for another workspace;
+     * omitted, the lookup is the user-scoped one every existing caller uses.
+     */
+    async getOne(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<Skill> {
+        const skill = await this.skills.findByIdAndUser(id, userId, ownershipScope);
         if (!skill) throw new NotFoundException(`Skill ${id} not found.`);
         return skill;
     }
@@ -167,6 +194,7 @@ export class SkillsService {
             version: input.version ?? '1.0.0',
             invocationSlug,
         });
+        await this.afterSkillWrite(created);
         return created;
     }
 
@@ -192,6 +220,7 @@ export class SkillsService {
         await this.skills.updateByIdAndUser(id, userId, patch);
         const refreshed = await this.skills.findByIdAndUser(id, userId);
         if (!refreshed) throw new NotFoundException(`Skill ${id} vanished after update.`);
+        await this.afterSkillWrite(refreshed);
         return refreshed;
     }
 
@@ -236,6 +265,7 @@ export class SkillsService {
             skillId: created.id,
             actionType: ActivityActionType.SKILL_INSTALLED,
         });
+        await this.afterSkillWrite(created);
         return created;
     }
 
@@ -271,6 +301,7 @@ export class SkillsService {
             skillId: input.skillId,
             actionType: ActivityActionType.SKILL_ATTACHED_TO_AGENT,
         });
+        await this.refreshReadiness(userId, input.skillId);
         return binding;
     }
 
@@ -281,7 +312,72 @@ export class SkillsService {
         // clause so a TOCTOU gap after the guard above cannot delete another
         // user's binding (cross-user IDOR).
         await this.bindings.deleteByIdAndUser(bindingId, userId);
+        await this.refreshReadiness(userId, binding.skillId);
         return { deleted: true };
+    }
+
+    // ── Skills shelf: the on/off switch ───────────────────────────
+
+    /**
+     * Switch a Skill back on. Idempotent — an already-on Skill succeeds and
+     * changes nothing. Bindings are never read or written: the switch lives
+     * on the Skill, and `resolveActive` honours it.
+     */
+    async enable(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<SkillSwitchResult> {
+        return this.setSwitch(userId, id, true, ownershipScope);
+    }
+
+    /**
+     * Switch a Skill off for every run assembled from now on, at every scope.
+     * Idempotent. A run already executing keeps the context it was admitted
+     * with. Bindings are never touched, so switching it back on restores
+     * exactly the previous behaviour.
+     */
+    async disable(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<SkillSwitchResult> {
+        return this.setSwitch(userId, id, false, ownershipScope);
+    }
+
+    private async setSwitch(
+        userId: string,
+        id: string,
+        on: boolean,
+        ownershipScope?: OwnershipScope,
+    ): Promise<SkillSwitchResult> {
+        // The workspace check happens here, before any write: a Skill from
+        // another workspace is not found. Its scope stamp never changes, so
+        // the id + user WHERE below cannot then reach a different workspace.
+        const skill = await this.getOne(userId, id, ownershipScope);
+        const alreadyInState = on ? !skill.disabledAt : !!skill.disabledAt;
+        if (alreadyInState) {
+            return {
+                id,
+                cardState: deriveSkillCardState(skill),
+                disabledAt: skill.disabledAt ?? null,
+                changed: false,
+            };
+        }
+        const disabledAt = on ? null : new Date();
+        // Ownership in the WHERE clause, never `updateById`.
+        await this.skills.updateByIdAndUser(id, userId, { disabledAt });
+        await this.logActivity({
+            userId,
+            skillId: id,
+            actionType: on ? ActivityActionType.SKILL_ENABLED : ActivityActionType.SKILL_DISABLED,
+        });
+        return {
+            id,
+            cardState: deriveSkillCardState({ ...skill, disabledAt }),
+            disabledAt,
+            changed: true,
+        };
     }
 
     /**
@@ -378,6 +474,51 @@ export class SkillsService {
     }
 
     // ── internals ─────────────────────────────────────────────────
+
+    /**
+     * Skills shelf — after the Skill's own definition was written: re-derive
+     * its tag rows from `frontmatter.tags` and recompute its readiness.
+     *
+     * Best-effort on purpose: the Skill write already succeeded, and failing
+     * the request now would report an error for a Skill that exists. A
+     * failure is logged and the hourly readiness sweep re-derives both from
+     * the definition, so the stored tags converge on what the Skill says.
+     */
+    private async afterSkillWrite(skill: Skill): Promise<void> {
+        if (this.skillTags) {
+            try {
+                const { tags, dropped } = normalizeSkillTags(skill.frontmatter?.tags);
+                await this.skillTags.replaceForSkill(skill.id, skill.userId, tags, {
+                    tenantId: skill.tenantId ?? null,
+                    organizationId: skill.organizationId ?? null,
+                });
+                if (dropped.length > 0) {
+                    this.logger.debug(
+                        `Skill ${skill.id} declares ${tags.length + dropped.length} tags; kept the first ${tags.length}.`,
+                    );
+                }
+            } catch (err) {
+                this.logger.warn(`Tag reindex failed for skill ${skill.id}: ${err}`);
+            }
+        }
+        if (this.readiness) {
+            try {
+                await this.readiness.refreshSkill(skill);
+            } catch (err) {
+                this.logger.warn(`Readiness refresh failed for skill ${skill.id}: ${err}`);
+            }
+        }
+    }
+
+    /** Skills shelf — recompute readiness after the Skill's reach changed. Best-effort. */
+    private async refreshReadiness(userId: string, skillId: string): Promise<void> {
+        if (!this.readiness) return;
+        try {
+            await this.readiness.refresh(userId, skillId);
+        } catch (err) {
+            this.logger.warn(`Readiness refresh failed for skill ${skillId}: ${err}`);
+        }
+    }
 
     private async logActivity(args: {
         userId: string;

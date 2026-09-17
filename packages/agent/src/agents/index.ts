@@ -6,6 +6,11 @@ export * from './agent-templates';
 export * from './agent-templates.service';
 export * from './role-seeding';
 export * from './role-seeding.service';
+// AW-20 P1 — the roster: blueprints (build-time content), the seam that
+// attaches a Skill, and the provisioning state machine itself.
+export * from './roster-blueprints';
+export * from './roster-skill-binder.port';
+export * from './roster-provisioning.service';
 export * from './agent-file.service';
 export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';

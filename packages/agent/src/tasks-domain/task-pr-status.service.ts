@@ -395,6 +395,9 @@ export class TaskPrStatusService {
                 return Object.assign(task, { ciCheckedAt: checkedAt });
             }
             const patch = this.toCachePatch(status, checkedAt);
+            // Reviewer agent stage (slice AD) — the head this Task had
+            // recorded BEFORE this read, so a moved head is detectable below.
+            const previousPrHead = task.prHeadSha ?? null;
             await this.tasks.updatePrStatusCache(task.id, patch);
             // CI feedback + autonomous fix loop (slice AC, EW-806): the
             // provider's answer includes the pull request's CURRENT head,
@@ -428,6 +431,61 @@ export class TaskPrStatusService {
                 Object.assign(task, { branchState: 'merged' });
             }
             Object.assign(task, patch);
+
+            // Reviewer agent stage (slice AD, EW-811) — a push while the
+            // Task sits in `in_review` is not an ENTRY into `in_review`, so
+            // the transition hook never sees it: slice AC's fix loop
+            // resumes the run and pushes a new commit without moving the
+            // Task. This read is where the platform learns the head moved,
+            // so this is where the new commit gets its review. Bounded by
+            // the review ledger's per-(reviewer, head) claim and lifetime
+            // budget; fire-and-forget so a review hiccup never fails a
+            // status refresh.
+            if (
+                task.status === TaskStatus.IN_REVIEW &&
+                patch.prHeadSha &&
+                patch.prHeadSha !== previousPrHead &&
+                this.transitions?.requestAgentReviews
+            ) {
+                void this.transitions.requestAgentReviews(task).catch((error: unknown) => {
+                    this.logger.warn(
+                        `Task ${task.id}: agent review re-plan threw after a head change: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                });
+            } else if (
+                // CodeRabbit CR-2 — the head did NOT move, and this is still
+                // the one place that visits every open-PR Task on a schedule
+                // (the two-minute sweep; the on-demand refresh too). Planning
+                // that never happened — a process killed between persisting
+                // `in_review` (or a head change) and planning, a transient
+                // provider failure — is recovered here instead of stalling
+                // until the next push. `reconcileAgentReviews` is bounded by
+                // the plan memory on the Task row: a steady-state Task costs
+                // two ledger reads, a deterministically refused head costs no
+                // provider call ever again, and a transient failure is retried
+                // with capped backoff. Fire-and-forget, never a refresh failure.
+                //
+                // Only while the pull request THIS read reports is still open
+                // (or draft): planning refuses a merged or closed one
+                // (`pr-closed`) only after a Work read and a provider read of
+                // its own, so reconciling the refresh that first sees the
+                // merge would buy exactly that — and nothing else.
+                task.status === TaskStatus.IN_REVIEW &&
+                (patch.prState === 'open' || patch.prState === 'draft') &&
+                patch.prHeadSha &&
+                patch.prHeadSha === previousPrHead &&
+                typeof this.transitions?.reconcileAgentReviews === 'function'
+            ) {
+                void this.transitions.reconcileAgentReviews(task).catch((error: unknown) => {
+                    this.logger.warn(
+                        `Task ${task.id}: agent review reconcile threw after a PR status refresh: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                });
+            }
 
             // Release promotion lane (slice AI) — runs BEFORE the merge
             // gate, and deliberately runs whatever CI says: a promotion
@@ -516,7 +574,20 @@ export class TaskPrStatusService {
             return false;
         }
         try {
-            await this.transitions.transition(task, TaskStatus.DONE, { actorType: 'agent' });
+            await this.transitions.transition(task, TaskStatus.DONE, {
+                actorType: 'agent',
+                // Reviewer agent stage (review of Greptile P1-A on PR #2419):
+                // the approver gate binds agent decisions to the MERGED head —
+                // `refreshTask` assigned `prHeadSha` from the provider's answer
+                // moments ago, and a merged pull request's head never moves
+                // again. Passed explicitly because the Task's other head
+                // column (`ciHeadSha`) is written by a compare-and-set that can
+                // lose to a check delivery in the same poll; the gate used to
+                // refuse on that disagreement, and since a merge is completed
+                // only once (the sweep never re-selects a merged pull request)
+                // the refusal was permanent.
+                livePullRequestHeadSha: task.prHeadSha ?? null,
+            });
             this.logger.log(`Task ${task.id} completed — PR #${task.prNumber} merged.`);
             return true;
         } catch (error) {

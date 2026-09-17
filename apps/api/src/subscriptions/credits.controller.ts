@@ -5,7 +5,9 @@ import {
     Header,
     HttpCode,
     HttpStatus,
+    Inject,
     Logger,
+    Optional,
     Query,
     Res,
     UseGuards,
@@ -17,12 +19,14 @@ import { AuthSessionGuard, CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { ScopeContextService } from '@src/scope';
 import {
+    CREDIT_PRICE_LIST,
     CreditLedgerService,
     InvalidUsagePeriodError,
     USAGE_EXPORT_COLUMNS,
     USAGE_SUMMARY_GROUP_BYS,
     UsageSummaryService,
     creditsPricingView,
+    type CreditPriceList,
     type UsageExportRow,
     type UsageExportStream,
     type UsageSummaryGroupBy,
@@ -122,6 +126,10 @@ export class CreditsController {
         // B29 — the active Organization for the CSV export's scope
         // filter. Read from the request scope context, never a param.
         private readonly scopeContext: ScopeContextService,
+        // AW-17 — the bound credit price list, so the pricing view publishes
+        // the SAME list the write path prices with. Appended + @Optional():
+        // unbound falls back to the published default inside the view.
+        @Optional() @Inject(CREDIT_PRICE_LIST) private readonly priceList?: CreditPriceList,
     ) {}
 
     @Get('balance')
@@ -143,12 +151,16 @@ export class CreditsController {
         summary: 'Get credits pricing',
         description:
             'How a credit is priced on this deployment (billing spec FR-13): credits per dollar, ' +
-            'platform margin, daily allowance, credit packs and the pay-as-you-go tiers. Read-only; ' +
+            'platform margin, daily allowance, credit packs and the pay-as-you-go tiers — plus the ' +
+            'published credit price list (what each kind of call costs, its version and the date ' +
+            'it took effect) and settlementMode, which says whether those prices are charged ' +
+            '(price_list) or are reference prices beside a debit from provider cost ' +
+            '(provider_cost, the default). Readable with no payment provider configured. Read-only; ' +
             'server-authored; nothing here is writable over HTTP.',
     })
     @ApiResponse({ status: 200, description: 'Credits pricing view' })
     getPricing() {
-        return { status: 'success', ...creditsPricingView() };
+        return { status: 'success', ...creditsPricingView(this.priceList) };
     }
 
     @Get('ledger')
@@ -228,10 +240,14 @@ export class CreditsController {
             'Streams every metered usage event attributed to the authenticated user inside the ' +
             "period as CSV. Scoped to the request's active Organization when there is one, so a " +
             "user acting inside one Org never exports another Org's spend. period accepts " +
-            'YYYY-MM (default: current month), 7d, or 30d.',
+            'YYYY-MM (default: current month), 7d, or 30d. Refused with 400, before any byte is ' +
+            'written, when the period resolves to more than 50,000 rows or spans more than 92 days.',
     })
     @ApiResponse({ status: 200, description: 'CSV stream of usage events' })
-    @ApiResponse({ status: 400, description: 'Invalid period or format' })
+    @ApiResponse({
+        status: 400,
+        description: 'Invalid period or format, or the export is too large',
+    })
     async exportUsageCsv(
         @CurrentUser() auth: AuthenticatedUser,
         @Res() res: StreamingCsvResponse,
@@ -243,6 +259,12 @@ export class CreditsController {
 
         let stream: UsageExportStream;
         try {
+            // AW-17 — refuse an oversized export BEFORE anything is streamed:
+            // never a truncated file presented as complete.
+            await this.usageSummaryService.assertExportWithinLimits(auth.userId, {
+                period: query.period,
+                organizationId,
+            });
             stream = this.usageSummaryService.createExport(auth.userId, {
                 period: query.period,
                 organizationId,
@@ -250,6 +272,11 @@ export class CreditsController {
         } catch (error) {
             // Defence-in-depth: the DTO regex already rejects bad periods.
             if (error instanceof InvalidUsagePeriodError) {
+                throw new BadRequestException(error.message);
+            }
+            // Stable-named (sibling of InvalidUsagePeriodError): the message
+            // already states the limit.
+            if (error instanceof Error && error.name === 'UsageExportTooLargeError') {
                 throw new BadRequestException(error.message);
             }
             throw error;

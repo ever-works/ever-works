@@ -8,6 +8,8 @@ import {
     OrganizationRepository,
     UserRepository,
 } from '@src/database';
+import { resolveMuteCategory, urgentEventBypassesQuietHours } from './core-event-catalogue';
+import { storedChoiceDecidesTargets, storedChoiceKeepsInApp } from './notification-choice';
 
 /**
  * Notifications v2 (EW-664 / EW-677 / T22).
@@ -15,7 +17,9 @@ import {
  * Resolves the channel list for a given `(userId, eventTypeKey)` pair
  * with full fallback semantics:
  *
- * 1. Per-user subscription row, if any.
+ * 1. Per-user subscription row, when it decides the targets (a choice saved
+ *    in the notification matrix, even an empty one; any other row only when
+ *    it names at least one target — see `notification-choice.ts`).
  * 2. Organisation default channel map (when the user's tenant owns
  *    exactly one organisation — see `resolveOrgDefaultChannels`).
  * 3. Event-type default channels.
@@ -27,8 +31,11 @@ import {
  *    mute, drop all non-`in-app` channels (in-app still records the
  *    notification for retrospective viewing).
  * 5. Quiet hours: when `now ∈ [quietHoursStart, quietHoursEnd]` in
- *    the user's configured timezone AND `eventType.urgent === false`,
- *    drop all non-`in-app` channels.
+ *    the user's configured timezone, defer all non-`in-app` channels —
+ *    unless the event comes through quiet hours
+ *    (`urgentEventBypassesQuietHours`: urgent events that came through
+ *    before AW-13 always do; urgent events since AW-13 only when the user
+ *    opted in with `urgentBypassesQuietHours`).
  *
  * **Deferred from v1**:
  * - BullMQ delayed-delivery: quiet-hours-caught non-urgent events
@@ -55,6 +62,14 @@ export interface ResolvedChannelPlan {
 @Injectable()
 export class UserNotificationSubscriptionService {
     private readonly logger = new Logger(UserNotificationSubscriptionService.name);
+
+    /**
+     * Attention controls (AW-13) — how many times each unregistered event key
+     * was resolved by this process. A non-zero entry means a producer emits a
+     * key with no registry row: the notification is still written in-app, but
+     * it can never be routed anywhere else until the key is registered.
+     */
+    private readonly unregisteredEventKeys = new Map<string, number>();
 
     constructor(
         private readonly eventTypes: NotificationEventTypeRepository,
@@ -83,7 +98,8 @@ export class UserNotificationSubscriptionService {
 
     /**
      * Deferral-aware resolution. `immediate` always carries `'in-app'`
-     * (unless muted). For a non-urgent event inside the user's quiet
+     * (unless muted). For an event that does not come through quiet hours
+     * (see `urgentEventBypassesQuietHours`) inside the user's quiet
      * hours, non-in-app channels move to `deferred` with `deferUntil`
      * set to the end-of-window instant (ISO) — the producer enqueues
      * them on the Trigger.dev delivery task with that `delay` instead of
@@ -93,7 +109,7 @@ export class UserNotificationSubscriptionService {
     async resolvePlan(userId: string, eventTypeKey: string): Promise<ResolvedChannelPlan> {
         const eventType = await this.eventTypes.findByKey(eventTypeKey);
         if (!eventType) {
-            this.logger.debug(`Unknown event type ${eventTypeKey}; defaulting to in-app only`);
+            this.recordUnregisteredEventKey(eventTypeKey);
             return { immediate: ['in-app'], deferred: [] };
         }
 
@@ -106,17 +122,34 @@ export class UserNotificationSubscriptionService {
         // Category mute (drops non-in-app). `isMuted` already accounts
         // for mutedUntil expiry semantics.
         if (this.mutes) {
-            const muted = await this.mutes.isMuted(userId, eventType.category);
+            // Attention controls (AW-13): a registry category that is not
+            // itself a mutable category (e.g. `agents`) is muted through the
+            // category it names, so every registered event can be muted.
+            const muteCategory = resolveMuteCategory(eventType.category) ?? eventType.category;
+            const muted = await this.mutes.isMuted(userId, muteCategory);
             if (muted) {
                 channels = channels.filter((c) => c === 'in-app');
             }
         }
 
-        // Quiet hours: defer (not drop) non-in-app channels for non-urgent
-        // events so they fire at end-of-window.
-        if (this.preferences && !eventType.urgent && channels.some((c) => c !== 'in-app')) {
+        // Quiet hours: defer (not drop) non-in-app channels so they fire at
+        // end-of-window. Urgent events come through — except, since AW-13,
+        // the ones that did not come through before: those wait unless the
+        // person opted in (`urgentBypassesQuietHours`). Checking "always
+        // through" first keeps the preference read off the hot path for
+        // events that never wait.
+        const eventRef = { key: eventTypeKey, urgent: eventType.urgent, source: eventType.source };
+        if (
+            this.preferences &&
+            !urgentEventBypassesQuietHours(eventRef, false) &&
+            channels.some((c) => c !== 'in-app')
+        ) {
             const pref = await this.preferences.findByUser(userId);
-            if (pref?.quietHoursStart && pref?.quietHoursEnd) {
+            if (
+                pref?.quietHoursStart &&
+                pref?.quietHoursEnd &&
+                !urgentEventBypassesQuietHours(eventRef, pref.urgentBypassesQuietHours === true)
+            ) {
                 const now = new Date();
                 const timeZone = pref.timezone ?? 'UTC';
                 if (isWithinQuietHours(now, pref.quietHoursStart, pref.quietHoursEnd, timeZone)) {
@@ -134,14 +167,59 @@ export class UserNotificationSubscriptionService {
         return { immediate: channels, deferred: [] };
     }
 
+    /**
+     * Attention controls (AW-13) — does the user's own choice for this event
+     * keep the in-app notification interrupting?
+     *
+     * Only a choice the user saved in the notification matrix that leaves
+     * `in-app` out answers no. No subscription, a subscription stored before
+     * AW-13 or through the API / chat assistant (no matrix marker), an
+     * organisation default or an event default all answer yes, so those
+     * notifications keep reaching the bell exactly as before. An unknown
+     * event key also answers yes. See `notification-choice.ts`.
+     */
+    async isInAppSelected(userId: string, eventTypeKey: string): Promise<boolean> {
+        const eventType = await this.eventTypes.findByKey(eventTypeKey);
+        if (!eventType) return true;
+        const sub = await this.subscriptions.findForEvent(userId, eventTypeKey);
+        return storedChoiceKeepsInApp(sub);
+    }
+
+    /**
+     * Snapshot of unregistered event keys resolved by this process, with the
+     * number of times each was seen (see {@link resolvePlan}).
+     */
+    getUnregisteredEventKeyCounts(): ReadonlyMap<string, number> {
+        return new Map(this.unregisteredEventKeys);
+    }
+
+    private recordUnregisteredEventKey(eventTypeKey: string): void {
+        const seen = (this.unregisteredEventKeys.get(eventTypeKey) ?? 0) + 1;
+        this.unregisteredEventKeys.set(eventTypeKey, seen);
+        if (seen === 1) {
+            // Loud once per key per process: an unregistered key silently
+            // degrades to in-app forever unless someone notices.
+            this.logger.warn(
+                `Unregistered notification event key "${eventTypeKey}": delivered in-app only. Register it in the core event catalogue.`,
+            );
+        }
+    }
+
     private async loadInitialChannels(
         userId: string,
         eventTypeKey: string,
         eventDefaults: string[] | undefined,
     ): Promise<string[]> {
         const sub = await this.subscriptions.findForEvent(userId, eventTypeKey);
-        if (sub?.channelIds && sub.channelIds.length > 0) {
-            return [...sub.channelIds];
+        // Attention controls (AW-13, "turning everything off for one row
+        // sticks"): a choice saved in the notification matrix wins even when
+        // it is EMPTY, so that gesture never quietly re-enables the defaults.
+        // Every other stored row (stored before AW-13, or written through the
+        // API / chat assistant) keeps its original meaning: an empty list
+        // falls back to the organisation / event defaults, so nobody who had
+        // one stored stops receiving anything. See `notification-choice.ts`.
+        if (sub && storedChoiceDecidesTargets(sub)) {
+            return [...(sub.channelIds ?? [])];
         }
         // Organisation defaults sit between the per-user subscription and
         // the event-type defaults: a user with no explicit subscription
@@ -172,14 +250,9 @@ export class UserNotificationSubscriptionService {
         userId: string,
         eventTypeKey: string,
     ): Promise<string[] | undefined> {
-        if (!this.orgDefaults || !this.organizations || !this.users) return undefined;
         try {
-            const user = await this.users.findById(userId);
-            if (!user?.tenantId) return undefined;
-            const orgs = await this.organizations.findByTenantId(user.tenantId);
-            if (orgs.length !== 1) return undefined;
-            const def = await this.orgDefaults.findByOrg(orgs[0].id);
-            const channels = def?.defaults?.[eventTypeKey];
+            const defaults = await this.loadOrgDefaultMap(userId);
+            const channels = defaults?.[eventTypeKey];
             return Array.isArray(channels) && channels.length > 0 ? channels : undefined;
         } catch (err) {
             this.logger.debug(
@@ -189,6 +262,24 @@ export class UserNotificationSubscriptionService {
             );
             return undefined;
         }
+    }
+
+    /**
+     * The organisation default channel map that applies to `userId` — same
+     * rule as {@link resolveOrgDefaultChannels}: only when the user's tenant
+     * owns exactly one organisation. Undefined when no map applies or the org
+     * stack is not wired. Exposed so a reader composing many events at once
+     * (the notification matrix) resolves the map once instead of per event.
+     * Throws on repository failure; callers decide how to degrade.
+     */
+    async loadOrgDefaultMap(userId: string): Promise<Record<string, string[]> | undefined> {
+        if (!this.orgDefaults || !this.organizations || !this.users) return undefined;
+        const user = await this.users.findById(userId);
+        if (!user?.tenantId) return undefined;
+        const orgs = await this.organizations.findByTenantId(user.tenantId);
+        if (orgs.length !== 1) return undefined;
+        const def = await this.orgDefaults.findByOrg(orgs[0].id);
+        return def?.defaults ?? undefined;
     }
 }
 

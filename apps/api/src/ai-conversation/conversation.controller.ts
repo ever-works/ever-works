@@ -1,7 +1,9 @@
 import {
+    BadRequestException,
     Controller,
     Get,
     Post,
+    Put,
     Delete,
     Patch,
     Body,
@@ -10,8 +12,10 @@ import {
     Query,
     HttpCode,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiProperty, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiProperty, ApiQuery, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
     ArrayMaxSize,
     IsArray,
@@ -19,15 +23,36 @@ import {
     IsObject,
     IsOptional,
     IsString,
+    IsUUID,
     MaxLength,
     ValidateIf,
     ValidateNested,
+    isUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+    CONVERSATION_CONTEXT_TYPES,
+    CONVERSATION_KINDS,
+    isConversationContextType,
+    isConversationKind,
+    type ConversationContextType,
+    type ConversationKind,
+} from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 import { ConversationRepository } from '@ever-works/agent/database';
+import {
+    ConversationMentionService,
+    ConversationMessageService,
+    ConversationService,
+} from '@ever-works/agent/conversations';
+import { ScopeContextService } from '../scope/scope-context.service';
 import { ConversationTitleService } from './conversation-title.service';
+import {
+    ConversationNameDto,
+    MarkConversationReadDto,
+    SendConversationMessageDto,
+} from './dto/conversation.dto';
 
 // Largest page size a client may request from `GET /api/conversations`.
 // Security (DoS): the `limit` query param is otherwise passed straight to
@@ -35,6 +60,14 @@ import { ConversationTitleService } from './conversation-title.service';
 // `?limit=1000000` and force a large table scan on the shared DB. Mirrors
 // the `@Max(200)` cap used by `ListAgentsQueryDto` (see `dto/agent.dto.ts`).
 const MAX_CONVERSATIONS_PAGE_SIZE = 200;
+
+/** Default and largest page of `GET /api/conversations/:id/messages`. */
+const DEFAULT_MESSAGES_PAGE_SIZE = 50;
+const MAX_MESSAGES_PAGE_SIZE = 200;
+/** Longest `q` the mention picker may send. */
+const MAX_MENTION_QUERY_CHARS = 80;
+/** Every write added for named Conversations: 30 per person per minute (FR-47). */
+const CONVERSATION_WRITE_THROTTLE = { long: { limit: 30, ttl: 60_000 } };
 
 /**
  * Body for `POST /api/conversations`.
@@ -68,6 +101,32 @@ class CreateConversationDto {
     @IsString()
     @MaxLength(100)
     model?: string;
+
+    // ── Named Conversations with Agents. All optional: a body that sends
+    // none of them creates exactly the Conversation it always did.
+
+    /** Only `direct` can be opened here today. */
+    @ApiProperty({ required: false, enum: CONVERSATION_KINDS })
+    @IsOptional()
+    @IsIn(CONVERSATION_KINDS)
+    kind?: ConversationKind;
+
+    /** The Agent a `direct` Conversation is addressed at — fixed for its lifetime. */
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+
+    /** What the Conversation is about — fixed at creation. Sent with `contextId`. */
+    @ApiProperty({ required: false, enum: CONVERSATION_CONTEXT_TYPES })
+    @IsOptional()
+    @IsIn(CONVERSATION_CONTEXT_TYPES)
+    contextType?: ConversationContextType;
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    contextId?: string;
 }
 
 /**
@@ -193,6 +252,14 @@ export class ConversationController {
     constructor(
         private readonly repo: ConversationRepository,
         private readonly titleService: ConversationTitleService,
+        // Named Conversations with Agents. Appended LAST + @Optional() so the
+        // positional `new ConversationController(repo, titleService)` in the
+        // specs keeps compiling, and so every pre-existing route behaves
+        // exactly as before whether or not they are bound.
+        @Optional() private readonly conversations?: ConversationService,
+        @Optional() private readonly messages?: ConversationMessageService,
+        @Optional() private readonly mentions?: ConversationMentionService,
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get()
@@ -201,6 +268,14 @@ export class ConversationController {
         @CurrentUser() auth: AuthenticatedUser,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        // Named Conversations — optional filters. A request that sends none
+        // of them gets today's response, byte for byte; one that sends any
+        // gets the named-list rows (kind, Agent, name source, last activity,
+        // unread count) scoped to the active Organization.
+        @Query('kind') kind?: string,
+        @Query('agentId') agentId?: string,
+        @Query('contextType') contextType?: string,
+        @Query('contextId') contextId?: string,
     ) {
         // Security (DoS): clamp client-supplied paging so a hostile `limit`
         // (e.g. `?limit=1000000`) cannot be forwarded verbatim to TypeORM's
@@ -208,7 +283,7 @@ export class ConversationController {
         // preserved so the repository default (50) still applies.
         const parsedLimit = limit ? parseInt(limit, 10) : undefined;
         const parsedOffset = offset ? parseInt(offset, 10) : undefined;
-        return this.repo.findByUser(auth.userId, {
+        const paging = {
             limit:
                 parsedLimit === undefined || Number.isNaN(parsedLimit)
                     ? undefined
@@ -217,18 +292,95 @@ export class ConversationController {
                 parsedOffset === undefined || Number.isNaN(parsedOffset)
                     ? undefined
                     : Math.max(parsedOffset, 0),
-        });
+        };
+        const wantsNamedList =
+            kind !== undefined ||
+            agentId !== undefined ||
+            contextType !== undefined ||
+            contextId !== undefined;
+        if (wantsNamedList && this.conversations) {
+            return this.conversations.list(
+                auth.userId,
+                {
+                    ...paging,
+                    ...parseListFilters({ kind, agentId, contextType, contextId }),
+                },
+                this.scope(),
+            );
+        }
+        return this.repo.findByUser(auth.userId, paging);
     }
 
     @Post()
     @ApiOperation({ summary: 'Create a conversation' })
     async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateConversationDto) {
+        const named =
+            body.kind !== undefined ||
+            body.agentId !== undefined ||
+            body.contextType !== undefined ||
+            body.contextId !== undefined;
+        if (named && this.conversations) {
+            return this.conversations.create(
+                auth.userId,
+                {
+                    kind: body.kind,
+                    agentId: body.agentId,
+                    title: body.title,
+                    providerId: body.providerId,
+                    model: body.model,
+                    contextType: body.contextType,
+                    contextId: body.contextId,
+                },
+                this.scope(),
+            );
+        }
         return this.repo.create({
             userId: auth.userId,
             title: body.title,
             providerId: body.providerId,
             model: body.model,
         });
+    }
+
+    /**
+     * The mention picker (FR-25..FR-27): at most eight Agents the caller can
+     * address, most recently addressed first. Declared BEFORE `:id` so the
+     * uuid pipe never captures `mention-candidates`.
+     */
+    @Get('mention-candidates')
+    @ApiOperation({ summary: 'People and Agents the caller can mention' })
+    // Stated explicitly because the parameter below is typed `unknown` — which
+    // is what it genuinely is on the wire, but which emits `Object` into the
+    // decorator metadata Swagger reads without the CLI plugin. The published
+    // contract would then describe an object, and this document generates the
+    // MCP tool schemas, so a generated client would send the documented shape
+    // and be refused. The runtime type stays honest; the document does too.
+    @ApiQuery({ name: 'q', required: false, type: String, description: 'Name or slug prefix' })
+    async mentionCandidates(@CurrentUser() auth: AuthenticatedUser, @Query('q') rawQ?: unknown) {
+        if (!this.mentions) return { candidates: [] };
+        // `?q=a&q=b` arrives as an ARRAY, not a string, and declaring the
+        // parameter `string` does not make it one. The cap below would then
+        // measure an array's element count — two repetitions are under any
+        // character cap — and hand a non-string to a service that does string
+        // work on it. Repeating `q` is not something a real client does, so
+        // refuse it rather than guessing which value was meant.
+        if (rawQ !== undefined && typeof rawQ !== 'string') {
+            throw new BadRequestException('q must be a single string value.');
+        }
+        // Re-derived rather than cast: the line above has already refused every
+        // other shape, so this is the same value, and the type follows from a
+        // check the compiler can see.
+        const q = typeof rawQ === 'string' ? rawQ : undefined;
+        if (q !== undefined && q.length > MAX_MENTION_QUERY_CHARS) {
+            throw new BadRequestException(
+                `q must be at most ${MAX_MENTION_QUERY_CHARS} characters.`,
+            );
+        }
+        const candidates = await this.mentions.resolveCandidates(q ?? '', {
+            userId: auth.userId,
+            scope: this.scope(),
+        });
+        return { candidates };
     }
 
     @Get(':id')
@@ -300,6 +452,130 @@ export class ConversationController {
         return { success: true };
     }
 
+    /**
+     * Set or clear the name a person gives a Conversation (FR-5, FR-6).
+     * `{ "name": "…" }` sets it and stops automatic titling; `{ "name": null }`
+     * clears it and lets automatic titling run again.
+     */
+    @Put(':id/name')
+    @Throttle(CONVERSATION_WRITE_THROTTLE)
+    @ApiOperation({ summary: 'Set or clear the name of a conversation' })
+    async setName(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: ConversationNameDto,
+    ) {
+        const conversation = await this.requireConversations().rename(
+            id,
+            auth.userId,
+            body.name,
+            this.scope(),
+        );
+        return {
+            id: conversation.id,
+            title: conversation.title ?? null,
+            titleSource: conversation.titleSource ?? null,
+        };
+    }
+
+    /** A page of messages, oldest first; `before` (a message id) pages backwards. */
+    @Get(':id/messages')
+    @ApiOperation({ summary: 'List messages of a conversation' })
+    async listMessages(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query('limit') limit?: string,
+        @Query('before') before?: string,
+    ) {
+        const parsed = limit ? parseInt(limit, 10) : NaN;
+        const pageSize = Number.isNaN(parsed)
+            ? DEFAULT_MESSAGES_PAGE_SIZE
+            : Math.min(Math.max(parsed, 1), MAX_MESSAGES_PAGE_SIZE);
+        if (before !== undefined && !isUUID(before)) {
+            throw new BadRequestException('before must be a message id.');
+        }
+        const messages = await this.requireMessages().listMessages(
+            auth.userId,
+            id,
+            { limit: pageSize, before },
+            this.scope(),
+        );
+        return { messages };
+    }
+
+    /**
+     * A person's message to the Agents of this Conversation. Returns the
+     * stored message and, per addressed Agent, what happened (`delivered`,
+     * `queued`, `skipped`, `refused`). A repeated `clientMessageId` returns the
+     * first message and starts nothing (FR-41). Refusals carry a
+     * `failureCode` so the composer can keep the text and say why.
+     */
+    @Post(':id/messages/send')
+    @HttpCode(202)
+    @Throttle(CONVERSATION_WRITE_THROTTLE)
+    @ApiOperation({ summary: 'Send a message to the Agents of a conversation' })
+    async send(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: SendConversationMessageDto,
+    ) {
+        return this.requireMessages().send(
+            auth.userId,
+            id,
+            {
+                body: body.body,
+                clientMessageId: body.clientMessageId,
+                attachments: body.attachments,
+                model: body.model,
+            },
+            this.scope(),
+        );
+    }
+
+    /** Send a failed message again. `409` unless it is `failed` (FR-44). */
+    @Post(':id/messages/:messageId/retry')
+    @HttpCode(202)
+    @Throttle(CONVERSATION_WRITE_THROTTLE)
+    @ApiOperation({ summary: 'Retry a message that failed to send' })
+    async retry(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('messageId', ParseUUIDPipe) messageId: string,
+    ) {
+        return this.requireMessages().retry(auth.userId, id, messageId, this.scope());
+    }
+
+    /** Discard a failed message. `409` unless it is `failed` (FR-44). */
+    @Delete(':id/messages/:messageId')
+    @HttpCode(204)
+    @Throttle(CONVERSATION_WRITE_THROTTLE)
+    @ApiOperation({ summary: 'Discard a message that failed to send' })
+    async discard(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('messageId', ParseUUIDPipe) messageId: string,
+    ) {
+        await this.requireMessages().discard(auth.userId, id, messageId, this.scope());
+    }
+
+    /** Move the caller's read position (FR-24). */
+    @Post(':id/read')
+    @HttpCode(204)
+    @Throttle(CONVERSATION_WRITE_THROTTLE)
+    @ApiOperation({ summary: 'Mark a conversation read up to a message' })
+    async markRead(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: MarkConversationReadDto,
+    ) {
+        await this.requireConversations().markRead(
+            id,
+            auth.userId,
+            body.lastReadMessageId,
+            this.scope(),
+        );
+    }
+
     @Delete(':id')
     @HttpCode(204)
     @ApiOperation({ summary: 'Delete a conversation' })
@@ -315,4 +591,63 @@ export class ConversationController {
         const count = await this.repo.deleteAllByUser(auth.userId);
         return { deleted: count };
     }
+
+    // ── internals ──────────────────────────────────────────────────────
+
+    private scope() {
+        return this.scopeContext?.getScope();
+    }
+
+    /** The named-Conversation routes need their services; absent, they do not exist. */
+    private requireConversations(): ConversationService {
+        if (!this.conversations) throw new NotFoundException();
+        return this.conversations;
+    }
+
+    private requireMessages(): ConversationMessageService {
+        if (!this.messages) throw new NotFoundException();
+        return this.messages;
+    }
+}
+
+/**
+ * Validate the named-list filters. Only the NEW parameters are validated —
+ * unknown query parameters stay ignored, as they always were on this route.
+ */
+function parseListFilters(raw: {
+    kind?: string;
+    agentId?: string;
+    contextType?: string;
+    contextId?: string;
+}): {
+    kind?: ConversationKind;
+    agentId?: string;
+    contextType?: ConversationContextType;
+    contextId?: string;
+} {
+    const filters: {
+        kind?: ConversationKind;
+        agentId?: string;
+        contextType?: ConversationContextType;
+        contextId?: string;
+    } = {};
+    if (raw.kind !== undefined) {
+        if (!isConversationKind(raw.kind)) throw new BadRequestException('Unknown kind.');
+        filters.kind = raw.kind;
+    }
+    if (raw.agentId !== undefined) {
+        if (!isUUID(raw.agentId)) throw new BadRequestException('agentId must be a uuid.');
+        filters.agentId = raw.agentId;
+    }
+    if (raw.contextType !== undefined) {
+        if (!isConversationContextType(raw.contextType)) {
+            throw new BadRequestException('Unknown contextType.');
+        }
+        filters.contextType = raw.contextType;
+    }
+    if (raw.contextId !== undefined) {
+        if (!isUUID(raw.contextId)) throw new BadRequestException('contextId must be a uuid.');
+        filters.contextId = raw.contextId;
+    }
+    return filters;
 }

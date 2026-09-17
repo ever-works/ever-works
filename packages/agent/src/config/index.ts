@@ -39,7 +39,10 @@ import {
     EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
     EMAIL_WORKSPACE_DAILY_CAP,
     EMAIL_WORKSPACE_MONTHLY_CAP,
+    DEFAULT_CREDIT_SETTLEMENT_MODE,
+    isCreditSettlementMode,
     type AgentInboxMode,
+    type CreditSettlementMode,
     type EmailSendCapField,
 } from '@ever-works/contracts';
 import { DatabaseType } from '@src/database';
@@ -57,6 +60,14 @@ import {
     MAX_CI_AUTO_RESUME_ATTEMPTS,
     clampAutoResumeAttempts,
 } from '../tasks-domain/task-ci-auto-resume';
+// Same reasoning as the import above: the clamps that decide how much
+// money the reviewer agent stage may spend live next to the constants
+// they clamp against, and their unit tests are only worth anything if
+// these are the functions actually shipped.
+import {
+    clampAgentReviewApproversPerEntry,
+    clampAgentReviewRunsPerTask,
+} from '../tasks-domain/task-agent-review';
 type AppType = 'cli' | 'api';
 
 /**
@@ -945,6 +956,27 @@ export const config = {
                 return catalogCreditsMarginPercent();
             },
             /**
+             * AW-17 — how a run's platform-paid spend becomes a credits debit
+             * (`CREDITS_SETTLEMENT_MODE`).
+             *
+             * - `provider_cost` (default): every billable row settles from its
+             *   provider cost at `CREDITS_PER_DOLLAR` and the margin above —
+             *   exactly how runs were debited before the credit price list.
+             * - `price_list`: rows priced by a fixed `per-unit` entry debit their
+             *   published credits; every other row still settles from cost.
+             *
+             * Unset or unrecognised resolves to the default, so an install that
+             * configures nothing is billed exactly as before. Accepts either
+             * `_` or `-` and any case (`price-list`, `PRICE_LIST`).
+             */
+            getSettlementMode(): CreditSettlementMode {
+                const raw = (process.env.CREDITS_SETTLEMENT_MODE || '')
+                    .trim()
+                    .toLowerCase()
+                    .replace(/-/g, '_');
+                return isCreditSettlementMode(raw) ? raw : DEFAULT_CREDIT_SETTLEMENT_MODE;
+            },
+            /**
              * When true, consumption may take a balance below zero
              * (overdraft). Default false: a debit that would cross zero
              * is rejected with `InsufficientCreditsError` (mapped 4xx —
@@ -1565,6 +1597,46 @@ export const config = {
             // to DEFAULT_CI_AUTO_RESUME_ATTEMPTS.
             return clampAutoResumeAttempts(
                 parseInt(process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS ?? '', 10),
+            );
+        },
+        /**
+         * Reviewer agent stage (self-build slice AD, EW-811) — how many
+         * REVIEW runs one Task may ever buy.
+         *
+         * 💸 THIS KNOB SPENDS MONEY. Each review is a full
+         * `agent-task-execute` run on a fleet PC whose input is a pull
+         * request diff. The default of FOUR caps what this feature can add
+         * to any one Task, forever — not four per push, not four per
+         * reviewer, four in total across every entry into `in_review`.
+         *
+         * `0` switches the stage OFF: agent approver rows are still
+         * honoured by the `in_review → done` gate (they stay `pending`, so
+         * a human still has to look), no diff is fetched and no run
+         * starts. Values are clamped to 0..12; an unparseable value falls
+         * back to the default rather than silently disabling a shipped
+         * stage.
+         *
+         * The COUNTER is not here — it is rows in `task_agent_reviews`.
+         * This is only the ceiling.
+         */
+        getAgentReviewMaxRunsPerTask() {
+            return clampAgentReviewRunsPerTask(
+                parseInt(process.env.TASK_AGENT_REVIEW_MAX_RUNS ?? '', 10),
+            );
+        },
+        /**
+         * Reviewer agent stage — how many approvers ONE entry into
+         * `in_review` may fan out to.
+         *
+         * A different question from the lifetime budget above: that one
+         * stops a Task bouncing in and out of review forever, this one
+         * stops a single transition starting six runs at once because
+         * somebody attached six agent approvers. Clamped to 0..5; `0`
+         * dispatches nothing.
+         */
+        getAgentReviewMaxApproversPerEntry() {
+            return clampAgentReviewApproversPerEntry(
+                parseInt(process.env.TASK_AGENT_REVIEW_MAX_APPROVERS ?? '', 10),
             );
         },
         /**

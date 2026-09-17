@@ -26,6 +26,11 @@ export class NotificationRepository {
             isRead: false,
             isDismissed: false,
         });
+        // Attention controls (AW-13): only a silent row sets the flag; every
+        // other row keeps the column default (false).
+        if (dto.isSilent === true) {
+            notification.isSilent = true;
+        }
         return await this.repository.save(notification);
     }
 
@@ -33,7 +38,14 @@ export class NotificationRepository {
         userId: string,
         options: NotificationQueryOptions = {},
     ): Promise<Notification[]> {
-        const { unreadOnly, undismissedOnly = true, limit = 50, offset = 0, category } = options;
+        const {
+            unreadOnly,
+            undismissedOnly = true,
+            limit = 50,
+            offset = 0,
+            category,
+            includeSilent = false,
+        } = options;
 
         const queryBuilder = this.repository
             .createQueryBuilder('notification')
@@ -51,6 +63,12 @@ export class NotificationRepository {
 
         if (category) {
             queryBuilder.andWhere('notification.category = :category', { category });
+        }
+
+        // Attention controls (AW-13): a row written silently (the user turned
+        // in-app off for its event) stays out of the default list.
+        if (!includeSilent) {
+            queryBuilder.andWhere('notification.isSilent = :isSilent', { isSilent: false });
         }
 
         // Exclude expired notifications (expiresAt is stored as bigint timestamp)
@@ -102,6 +120,8 @@ export class NotificationRepository {
             .where('notification.userId = :userId', { userId })
             .andWhere('notification.isRead = :isRead', { isRead: false })
             .andWhere('notification.isDismissed = :isDismissed', { isDismissed: false })
+            // Attention controls (AW-13): a silent row never counts as unread.
+            .andWhere('notification.isSilent = :isSilent', { isSilent: false })
             .andWhere('(notification.expiresAt IS NULL OR notification.expiresAt > :now)', {
                 now: Date.now(),
             })

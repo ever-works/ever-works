@@ -14,6 +14,7 @@ import { TimestampColumn } from './_types';
 @Entity({ name: 'notifications' })
 @Index(['userId', 'isRead'])
 @Index(['userId', 'deduplicationKey'], { unique: true })
+@Index('idx_notifications_user_silent_read', ['userId', 'isSilent', 'isRead'])
 export class Notification {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -55,6 +56,15 @@ export class Notification {
 
     @Column({ default: false })
     isPersistent: boolean;
+
+    /**
+     * Attention controls (AW-13) — written without interrupting. The user has
+     * turned in-app off for this event, so the row is excluded from the
+     * unread count and from the default notification list, and stays
+     * retrievable on request. Persistent rows are never silent.
+     */
+    @Column({ default: false })
+    isSilent: boolean;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs.
     // Both NULL until the owning user creates their first Organization

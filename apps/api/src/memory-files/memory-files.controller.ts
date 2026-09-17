@@ -9,12 +9,14 @@ import {
     HttpStatus,
     Logger,
     NotFoundException,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
     Post,
     Query,
     Res,
+    ServiceUnavailableException,
     UploadedFile,
     UseInterceptors,
 } from '@nestjs/common';
@@ -26,6 +28,8 @@ import {
     MemoryFoldersService,
     MemoryFolderSyncService,
     KnowledgeBaseService,
+    KnowledgeLibraryService,
+    type KnowledgeLibraryActor,
     type MemoryFileRow,
 } from '@ever-works/agent/services';
 import { UserUploadRepository, WorkKnowledgeUploadRepository } from '@ever-works/agent/database';
@@ -39,6 +43,7 @@ import {
     DeleteMemoryFolderQueryDto,
     DownloadMemoryFileQueryDto,
     ListMemoryFilesQueryDto,
+    MemoryFolderTreeQueryDto,
     MoveMemoryFilesDto,
     UpdateMemoryFolderDto,
     UploadMemoryFileDto,
@@ -93,14 +98,42 @@ export class MemoryFilesController {
         private readonly kbUploads: WorkKnowledgeUploadRepository,
         private readonly scopeContext: ScopeContextService,
         private readonly membership: OrganizationMembershipService,
+        // Knowledge library — shared (organization-scope) folder writes.
+        // Optional and appended last so every existing construction keeps
+        // working; the personal-folder paths never touch it.
+        @Optional() private readonly library?: KnowledgeLibraryService,
     ) {}
 
     @Get('tree')
     @ApiOperation({
         summary: 'The caller’s Memory folder tree with per-folder file counts',
+        description:
+            'Omit `scope` (or pass `user`) for the caller’s personal Files tree, exactly as before. `scope=organization` returns the active Organization’s shared Knowledge library folders (they hold documents, not files, so `fileCount` is 0; the library tree carries document counts).',
     })
     @ApiResponse({ status: 200, description: '{ folders }' })
-    async getTree(@CurrentUser() auth: AuthenticatedUser) {
+    async getTree(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: MemoryFolderTreeQueryDto = {},
+    ) {
+        if (query?.scope === 'organization') {
+            const organizationId = this.scopeContext.getOrganizationId();
+            if (!organizationId) return { folders: [] };
+            await this.membership.ensureMember(organizationId, auth.userId);
+            const rows = await this.foldersService.listOrganizationFolders(organizationId);
+            return {
+                folders: rows.map((f) => ({
+                    id: f.id,
+                    name: f.name,
+                    parentId: f.parentId ?? null,
+                    path: f.path,
+                    ownerAgentId: null,
+                    syncRepo: null,
+                    fileCount: 0,
+                    createdAt: f.createdAt.toISOString(),
+                    updatedAt: f.updatedAt.toISOString(),
+                })),
+            };
+        }
         const folders = await this.foldersService.getTree(auth.userId);
         return { folders };
     }
@@ -186,6 +219,19 @@ export class MemoryFilesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateMemoryFolderDto,
     ) {
+        if (body.scope === 'organization') {
+            if (body.ownerAgentId) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message: 'A shared folder cannot be private to one agent',
+                });
+            }
+            const { library, actor } = await this.requireLibraryActor(auth);
+            return library.createFolder(actor, {
+                name: body.name,
+                parentId: body.parentId ?? null,
+            });
+        }
         return this.foldersService.createFolder(auth.userId, {
             name: body.name,
             parentId: body.parentId ?? null,
@@ -205,6 +251,28 @@ export class MemoryFilesController {
         @Param('id', new ParseUUIDPipe()) id: string,
         @Body() body: UpdateMemoryFolderDto,
     ) {
+        const shared = await this.findSharedFolder(id);
+        if (shared) {
+            // Shared folders carry no git-sync target: renaming and moving
+            // are the only edits a library folder has.
+            if (body.syncRepo !== undefined || body.clearSyncRepo) {
+                throw new BadRequestException({
+                    status: 'error',
+                    message: 'A shared folder has no git-sync target',
+                });
+            }
+            const { library, actor } = await this.requireLibraryActor(auth);
+            let folder = shared;
+            if (body.name !== undefined) {
+                folder = await library.renameFolder(actor, id, body.name);
+            }
+            if (body.moveToRoot) {
+                folder = await library.moveFolder(actor, id, null);
+            } else if (body.parentId !== undefined) {
+                folder = await library.moveFolder(actor, id, body.parentId);
+            }
+            return folder;
+        }
         if (body.name !== undefined) {
             await this.foldersService.renameFolder(auth.userId, id, body.name);
         }
@@ -235,6 +303,12 @@ export class MemoryFilesController {
         @Param('id', new ParseUUIDPipe()) id: string,
         @Query() query: DeleteMemoryFolderQueryDto,
     ) {
+        if (await this.findSharedFolder(id)) {
+            // Shared folders hold documents, and deleting one only ever
+            // unfiles them, so no `recursive` confirmation is needed here.
+            const { library, actor } = await this.requireLibraryActor(auth);
+            return library.deleteFolder(actor, id);
+        }
         return this.foldersService.deleteFolder(auth.userId, id, {
             recursive: query.recursive === 'true',
         });
@@ -330,6 +404,48 @@ export class MemoryFilesController {
     }
 
     // ─── internal ────────────────────────────────────────────────────────
+
+    /**
+     * The shared folder `id` of the active Organization, or `null` — in which
+     * case the route takes its original per-person path unchanged.
+     */
+    private async findSharedFolder(id: string) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId || !this.library) return null;
+        return this.foldersService.findOrganizationFolder(organizationId, id);
+    }
+
+    /**
+     * Resolve the library actor for a shared-folder write: an active
+     * Organization, membership (404 on mismatch), and `ensureAdmin` as the
+     * seam for who may manage organization content.
+     */
+    private async requireLibraryActor(
+        auth: AuthenticatedUser,
+    ): Promise<{ library: KnowledgeLibraryService; actor: KnowledgeLibraryActor }> {
+        if (!this.library) {
+            throw new ServiceUnavailableException({
+                status: 'error',
+                message: 'Shared folders are not available in this deployment',
+            });
+        }
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            throw new NotFoundException({ status: 'error', message: 'Folder not found' });
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+        let canManageOrganization = false;
+        try {
+            await this.membership.ensureAdmin(organizationId, auth.userId);
+            canManageOrganization = true;
+        } catch {
+            canManageOrganization = false;
+        }
+        return {
+            library: this.library,
+            actor: { userId: auth.userId, organizationId, canManageOrganization },
+        };
+    }
 
     private async resolveBytes(
         userId: string,

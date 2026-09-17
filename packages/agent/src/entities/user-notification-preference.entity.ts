@@ -34,6 +34,16 @@ export class UserNotificationPreference {
     @Column({ type: 'varchar', length: 64, nullable: true })
     timezone?: string | null;
 
+    /**
+     * Attention controls (AW-13) — the person's own opt-in to let every
+     * urgent event through their quiet hours. Default false: only the events
+     * that already came through quiet hours before AW-13 do (see
+     * `quietHoursBypassNeedsOptIn` in `core-event-catalogue.ts`); everything
+     * else keeps waiting until the window ends.
+     */
+    @Column({ type: 'boolean', default: false })
+    urgentBypassesQuietHours: boolean;
+
     @UpdateDateColumn()
     updatedAt: Date;
 }
