@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readdirSync } from '
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { LocalWorkspacePlugin } from '../local-workspace.plugin.js';
+import { LocalWorkspacePlugin, assertRemoteCloneUrl } from '../local-workspace.plugin.js';
 
 /**
  * Hermetic loopback suite: a real local BARE repo plays "origin"
@@ -703,5 +703,38 @@ describe('finalize — cancellation (agent execution v2 review follow-up)', () =
 		).rejects.toMatchObject({ name: 'AbortError' });
 		expect(abortedDuringDiff).toBe(true);
 		expect(() => git(originDir, 'rev-parse', '--verify', 'refs/heads/task/cancel-diff')).toThrow();
+	});
+});
+
+describe('clone URL refusal', () => {
+	// This plugin hands `spec.repoUrl` to `git remote add` and `git fetch`, and
+	// the PRIMARY workspace URL is not validated upstream — only mounts are. An
+	// external reviewer caught that the first version of this guard covered only
+	// the sibling `sandbox-workspace` plugin; two identical call sites with one
+	// guard between them protect neither.
+	it.each([
+		['a transport helper whose address ext:: runs as a command', 'ext::sh -c id'],
+		['a bare transport-helper prefix', '::whoami'],
+		['a value git reads as an option', '--upload-pack=calc.exe'],
+		['an ssh option in the scp-like host position', 'git@-oProxyCommand=calc:x'],
+		['an ssh option in the URL host position', 'ssh://-oProxyCommand=calc/x.git']
+	])('refuses %s', (_label, repoUrl) => {
+		expect(() => assertRemoteCloneUrl(repoUrl)).toThrow(/option or a transport helper/);
+	});
+
+	it.each([
+		['https', 'https://github.com/ever-works/ever-works.git'],
+		['ssh://', 'ssh://git@github.com/ever-works/ever-works.git'],
+		['scp-like ssh', 'git@github.com:ever-works/ever-works.git'],
+		['an IPv6 host', 'https://[::1]/x.git'],
+		['the file:// origin this suite uses', 'file:///tmp/origin.git']
+	])('accepts %s', (_label, repoUrl) => {
+		expect(() => assertRemoteCloneUrl(repoUrl)).not.toThrow();
+	});
+
+	it('refuses a hostile URL at provision, before git runs or a directory is made', async () => {
+		await expect(
+			plugin.provision({ ...spec('lw-hostile', 'task/hostile-aaaa1111'), repoUrl: 'ext::sh -c id' })
+		).rejects.toThrow(/option or a transport helper/);
 	});
 });

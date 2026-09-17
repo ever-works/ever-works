@@ -219,6 +219,14 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	async provision(spec: WorkspaceProvisionSpec): Promise<WorkspaceHandle> {
 		throwIfAborted(spec.signal);
+		// Refused before `git` is touched and before any directory is created.
+		// This plugin has the same exposure as `sandbox-workspace`: it hands
+		// `spec.repoUrl` straight to `git remote add` and `git fetch`, and the
+		// PRIMARY workspace URL is not validated upstream — only mounts are.
+		// An external reviewer caught that the first version of this guard
+		// covered only the sibling plugin; a fix that protects one of two
+		// identical call sites protects neither.
+		assertRemoteCloneUrl(spec.repoUrl);
 		await this.ensureGit(spec.signal);
 		const base = this.baseDir(spec.settings);
 		const poolDir = join(base, REPOS_DIR, repoKey(spec.repoUrl));
@@ -854,6 +862,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	/** Inject per-operation auth into the URL of ONE command invocation. */
 	private authedUrl(repoUrl: string, auth: WorkspaceProvisionSpec['auth']): string {
+		// Every remote operation funnels through here, including ones that read
+		// a URL back off a persisted handle rather than the provision spec, so
+		// one missed call site cannot reintroduce the hole.
+		assertRemoteCloneUrl(repoUrl);
 		if (!auth?.token) return repoUrl;
 		try {
 			const url = new URL(repoUrl);
@@ -1769,4 +1781,60 @@ function throwIfFinalizeAborted(signal?: AbortSignal): void {
 	const error = new Error(reason instanceof Error ? reason.message : 'Workspace finalize was cancelled');
 	error.name = 'AbortError';
 	throw error;
+}
+
+/**
+ * Refuse a clone URL that `git` would read as anything other than a remote.
+ *
+ * Two shapes reach `git` as an ARGUMENT and execute a command on the machine
+ * running this plugin — which, for a Fleet node, is somebody's actual PC:
+ *
+ *   - a value starting with `-`, parsed as an OPTION rather than a repository
+ *     (`--upload-pack=<cmd>` runs `<cmd>`);
+ *   - `<helper>::<address>`, git's transport-helper syntax, whose `ext::` form
+ *     runs its address verbatim.
+ *
+ * Neither is a local path, so a local-path deny-list does not see them.
+ *
+ * DUPLICATED, deliberately, from `sandbox-workspace`: both are standalone ESM
+ * packages whose only shared dependency is `@ever-works/plugin`, and moving the
+ * rule there would need that package rebuilt before either plugin could load
+ * it. Two identical call sites with one guard between them is the failure this
+ * function exists to prevent, so it lives next to each call site until the
+ * shared home is worth the build. Keep the two in step.
+ *
+ * WHAT THIS DOES NOT DECIDE: which remotes a host is willing to clone. That is
+ * the host's policy — the platform's mount rules refuse `file:` and local paths
+ * so a node cannot clone its own disk, while this package's tests legitimately
+ * use `file://` origins.
+ */
+export function assertRemoteCloneUrl(repoUrl: string): void {
+	if (!isSafeCloneArgument(repoUrl)) {
+		// The URL is not echoed: it can carry credentials, and a caller that
+		// sent one already knows what it sent.
+		throw new WorkspaceNotProvisionedError(
+			'repoUrl would reach git as an option or a transport helper, not as a repository — the local-workspace provider refuses it.'
+		);
+	}
+}
+
+function isSafeCloneArgument(url: string): boolean {
+	if (url.startsWith('-')) return false;
+	// Anchored, so an IPv6 host (`https://[::1]/x.git`) is unaffected.
+	if (/^[A-Za-z0-9+.-]*::/.test(url)) return false;
+	// scp-like SSH is judged on its own shape: the host must begin
+	// alphanumerically, or `git@-oProxyCommand=…:x` hands ssh an option.
+	if (/^[A-Za-z0-9._-]+@/.test(url)) {
+		return /^[A-Za-z0-9._-]+@[A-Za-z0-9][A-Za-z0-9._-]*:(?![\/])/.test(url);
+	}
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		// Not a URL and not scp-like: git reads it as a path, which is the
+		// host's policy to allow or refuse, not an execution vector.
+		return true;
+	}
+	// The same option-in-the-host-position problem, reached through a real URL.
+	return !parsed.hostname.startsWith('-');
 }

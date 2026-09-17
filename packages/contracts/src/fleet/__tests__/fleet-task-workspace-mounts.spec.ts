@@ -156,6 +156,25 @@ describe('normalizeFleetTaskWorkspaceMounts', () => {
 			{ ...template, repoUrl: 'git@-oProxyCommand=calc:x' },
 			/remote, token-free/
 		],
+		// Found by an external reviewer on the first version of this rule, which
+		// guarded the host of the scp-like form but not of a parsed URL. It
+		// parses cleanly, hostname `-oProxyCommand=calc`, and git hands the host
+		// to ssh.
+		[
+			'an ssh option in the URL host position',
+			{ ...template, repoUrl: 'ssh://-oProxyCommand=calc/x.git' },
+			/remote, token-free/
+		],
+		// The userless scp spelling stays refused ON PURPOSE: `host:path` and a
+		// Windows drive-relative path are the same shape, so accepting it would
+		// let `C:repos\secret` name a remote — on the only platform the fleet
+		// runs on.
+		['a userless scp-like remote', { ...template, repoUrl: 'github.com:owner/repo.git' }, /remote, token-free/],
+		[
+			'a Windows drive-relative path, which the userless form would mimic',
+			{ ...template, repoUrl: 'C:repos\secret' },
+			/remote, token-free/
+		],
 		[
 			'a git:// URL, which is unauthenticated plaintext',
 			{ ...template, repoUrl: 'git://host/r.git' },

@@ -248,6 +248,14 @@ function isRemoteCloneUrl(url: string): boolean {
 	// real, used form — the mount fixtures use it. The host must begin
 	// alphanumerically, so `git@-oProxyCommand=…:x` cannot sneak an ssh option
 	// through in the host position.
+	//
+	// The USER part is required, and that is deliberate rather than an
+	// oversight — a reviewer asked for the userless spelling
+	// (`github.com:owner/repo.git`), which git does accept. Allowing it here
+	// would make `host:path` and a Windows DRIVE-RELATIVE path the same shape:
+	// `C:repos\secret` becomes host `C`, path `repos\secret`, and a node would
+	// clone its own disk. The fleet runs on Windows only, so that collision is
+	// not hypothetical. Anyone needing the userless form can write `git@`.
 	if (/^[A-Za-z0-9._-]+@[A-Za-z0-9][A-Za-z0-9._-]*:(?![\\/])/.test(url)) return true;
 	let parsed: URL;
 	try {
@@ -255,6 +263,13 @@ function isRemoteCloneUrl(url: string): boolean {
 	} catch {
 		return false;
 	}
+	// The option-in-the-host-position problem again, reached through a REAL
+	// URL rather than the scp-like form: `ssh://-oProxyCommand=calc/x.git`
+	// parses cleanly, with hostname `-oProxyCommand=calc`, and git hands the
+	// host to ssh. The scp-like branch above guards its own host and an
+	// earlier version of this function guarded only that one — an external
+	// reviewer caught the gap, and it was real.
+	if (parsed.hostname.startsWith('-')) return false;
 	// http(s) carries the userinfo that node-side credential injection needs;
 	// ssh is the documented alternative. Everything else — `file:`, `git:`,
 	// drive letters, bare paths — is either local (a node reading its own
