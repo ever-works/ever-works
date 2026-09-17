@@ -185,19 +185,29 @@ export function KbDocumentContextMenu({
         async (body: UpdateKbDocumentInput) => {
             setPending(true);
             setError(null);
-            const result = await updateKbDocumentAction({
-                workId,
-                docId: document.id,
-                body,
-            });
-            setPending(false);
-            if (result.success && result.data) {
-                onPatched?.(result.data);
-                router.refresh();
-                return { ok: true as const, data: result.data };
+            try {
+                const result = await updateKbDocumentAction({
+                    workId,
+                    docId: document.id,
+                    body,
+                });
+                if (result.success && result.data) {
+                    onPatched?.(result.data);
+                    router.refresh();
+                    return { ok: true as const, data: result.data };
+                }
+                setError(result.error ?? tMenu('lockedDisabledTooltip'));
+                return { ok: false as const, error: result.error ?? null };
+            } catch {
+                // A rejected server-action invocation (a dropped connection, a
+                // redeploy) never returns a result — say so rather than leaving
+                // the item pending with no explanation.
+                const message = tMenu('updateFailed');
+                setError(message);
+                return { ok: false as const, error: message };
+            } finally {
+                setPending(false);
             }
-            setError(result.error ?? tMenu('lockedDisabledTooltip'));
-            return { ok: false as const, error: result.error ?? null };
         },
         [workId, document.id, onPatched, router, tMenu],
     );
@@ -206,13 +216,41 @@ export function KbDocumentContextMenu({
         async (mode: KbLockMode) => {
             setPending(true);
             setError(null);
-            const result = await lockKbDocumentAction({
+            try {
+                const result = await lockKbDocumentAction({
+                    workId,
+                    docId: document.id,
+                    path: document.path,
+                    mode,
+                });
+                if (result.success && result.data) {
+                    onPatched?.(result.data);
+                    router.refresh();
+                    closeMenu();
+                } else {
+                    setError(result.error ?? null);
+                }
+            } catch {
+                // A rejected server-action invocation (a dropped connection, a
+                // redeploy) never returns a result — say so rather than leaving
+                // the item pending with no explanation.
+                setError(tMenu('lockFailed'));
+            } finally {
+                setPending(false);
+            }
+        },
+        [workId, document.id, document.path, onPatched, router, closeMenu, tMenu],
+    );
+
+    const onUnlock = useCallback(async () => {
+        setPending(true);
+        setError(null);
+        try {
+            const result = await unlockKbDocumentAction({
                 workId,
                 docId: document.id,
                 path: document.path,
-                mode,
             });
-            setPending(false);
             if (result.success && result.data) {
                 onPatched?.(result.data);
                 router.refresh();
@@ -220,27 +258,15 @@ export function KbDocumentContextMenu({
             } else {
                 setError(result.error ?? null);
             }
-        },
-        [workId, document.id, document.path, onPatched, router, closeMenu],
-    );
-
-    const onUnlock = useCallback(async () => {
-        setPending(true);
-        setError(null);
-        const result = await unlockKbDocumentAction({
-            workId,
-            docId: document.id,
-            path: document.path,
-        });
-        setPending(false);
-        if (result.success && result.data) {
-            onPatched?.(result.data);
-            router.refresh();
-            closeMenu();
-        } else {
-            setError(result.error ?? null);
+        } catch {
+            // A rejected server-action invocation (a dropped connection, a
+            // redeploy) never returns a result — say so rather than leaving
+            // the item pending with no explanation.
+            setError(tMenu('unlockFailed'));
+        } finally {
+            setPending(false);
         }
-    }, [workId, document.id, document.path, onPatched, router, closeMenu]);
+    }, [workId, document.id, document.path, onPatched, router, closeMenu, tMenu]);
 
     const onArchive = useCallback(async () => {
         const r = await applyPatch({ status: 'archived' });
@@ -302,21 +328,29 @@ export function KbDocumentContextMenu({
     const onDelete = useCallback(async () => {
         setPending(true);
         setError(null);
-        const result = await deleteKbDocumentAction({
-            workId,
-            docId: document.id,
-            path: document.path,
-        });
-        setPending(false);
-        if (result.success) {
-            setDeleteOpen(false);
-            closeMenu();
-            router.refresh();
-            router.push(ROUTES.DASHBOARD_WORK_KB(workId));
-        } else {
-            setError(result.error ?? null);
+        try {
+            const result = await deleteKbDocumentAction({
+                workId,
+                docId: document.id,
+                path: document.path,
+            });
+            if (result.success) {
+                setDeleteOpen(false);
+                closeMenu();
+                router.refresh();
+                router.push(ROUTES.DASHBOARD_WORK_KB(workId));
+            } else {
+                setError(result.error ?? null);
+            }
+        } catch {
+            // A rejected server-action invocation (a dropped connection, a
+            // redeploy) never returns a result — say so rather than leaving
+            // the confirm button pending with no explanation.
+            setError(tMenu('deleteFailed'));
+        } finally {
+            setPending(false);
         }
-    }, [workId, document.id, document.path, router, closeMenu]);
+    }, [workId, document.id, document.path, router, closeMenu, tMenu]);
 
     const onRestore = useCallback(async () => {
         setPending(true);
