@@ -94,6 +94,31 @@ describe('AgentRunLogRepository — session-detail timeline reads', () => {
             expect(cursorPredicate[1]).toEqual({ afterCreatedAt: createdAt, afterId: 'log-42' });
         });
 
+        it('⭐ never binds an insertion-order tie-break against the id column', async () => {
+            // This mock stands in for a driver whose tie-break column is
+            // the row id. An integer insertion-order key is a position in
+            // the OTHER store's ordering, not an id here, so the cursor is
+            // honoured as the start of its instant instead of being
+            // compared against ids — a comparison that is a failed query,
+            // not merely a wrong page, against a `uuid` column.
+            const createdAt = new Date('2026-08-14T10:00:00.000Z');
+            await logs.findTimelineByRun('r1', ['tool-invocation'], 100, {
+                createdAt,
+                tieBreak: '42',
+            });
+            const cursorPredicate = predicates[2];
+            expect(cursorPredicate[0]).toBe('log.createdAt >= :afterCreatedAt');
+            expect(cursorPredicate[1]).toEqual({ afterCreatedAt: createdAt });
+        });
+
+        it('⭐ never binds an empty row id when the cursor carries neither half', async () => {
+            const createdAt = new Date('2026-08-14T10:00:00.000Z');
+            await logs.findTimelineByRun('r1', ['tool-invocation'], 100, { createdAt });
+            const cursorPredicate = predicates[2];
+            expect(cursorPredicate[0]).not.toContain(':afterId');
+            expect(Object.values(cursorPredicate[1] ?? {})).not.toContain('');
+        });
+
         it('short-circuits an empty step list', async () => {
             await expect(logs.findTimelineByRun('r1', [], 100)).resolves.toEqual([]);
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();

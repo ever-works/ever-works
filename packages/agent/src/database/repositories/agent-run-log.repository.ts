@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isAgentRunTimelineInsertionOrderTieBreak } from '@ever-works/contracts';
 import { AgentRunLog } from '../../entities/agent-run-log.entity';
 import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../insertion-order';
 import { keysetTieBreakSql, timeSortKeyColumnSql, timeSortKeyParameterSql } from '../time-sort-key';
@@ -13,6 +14,11 @@ import { keysetTieBreakSql, timeSortKeyColumnSql, timeSortKeyParameterSql } from
  * page exact. `id` is the older, weaker form of the same thing: a cursor
  * minted before the tie-break column was driver-aware. At least one must
  * be set; `tieBreak` wins when both are.
+ *
+ * Neither is trusted to be a shape THIS store can compare: a cursor may
+ * have been minted by a different driver (or by hand), and the read widens
+ * a half it cannot use rather than binding it. See
+ * {@link AgentRunLogRepository.findTimelinePage}.
  */
 export interface AgentRunTimelineCursor {
     createdAt: Date;
@@ -37,6 +43,57 @@ export interface AgentRunTimelinePage {
 
 /** Raw alias the sqlite tie-break is selected under. */
 const TIE_BREAK_ALIAS = 'timeline_tie_break';
+
+/** A cursor half this driver can compare, with the name it binds under. */
+interface ResolvedCursorPosition {
+    /** Kept distinct so each branch's emitted SQL stays what it was. */
+    parameter: 'afterTieBreak' | 'afterId';
+    value: string | number;
+}
+
+/**
+ * The half of `after` that names a position THIS driver's tie-break column
+ * can be compared against, or `undefined` when the cursor carries none.
+ *
+ * The tie-break column is driver-shaped (see `keysetTieBreakSql`), so the
+ * set of values it can hold is too:
+ *
+ * - on the sqlite family it is the engine `rowid`, an INTEGER, so the
+ *   insertion-order form is the only half that is a position there — which
+ *   is why an id-shaped cursor has always been widened instead;
+ * - everywhere else it is the row's own uuid id, and the insertion-order
+ *   form is not an id at all. Binding one anyway is not a wrong page but a
+ *   FAILED query: Postgres resolves the untyped parameter against the
+ *   `uuid` primary key and raises `invalid input syntax for type uuid`,
+ *   which leaves the endpoint as an HTTP 500. That is the case this
+ *   function exists to keep out of the query.
+ *
+ * `tieBreak` is preferred over `id` when both are usable; a half this
+ * driver cannot use is skipped rather than rejected, and the caller then
+ * honours the cursor as "the start of the millisecond it names" — the page
+ * may REPEAT rows the caller already has (every consumer de-duplicates on
+ * row id) but can never skip one.
+ */
+function resolveCursorPosition(
+    sqlite: boolean,
+    after: AgentRunTimelineCursor,
+): ResolvedCursorPosition | undefined {
+    const halves = [
+        ['afterTieBreak', after.tieBreak],
+        ['afterId', after.id],
+    ] as const;
+    for (const [parameter, half] of halves) {
+        if (typeof half !== 'string' || half.length === 0) continue;
+        const insertionOrder = isAgentRunTimelineInsertionOrderTieBreak(half);
+        if (sqlite) {
+            // rowid is an integer column; an id is text.
+            if (insertionOrder) return { parameter, value: Number(half) };
+        } else if (!insertionOrder) {
+            return { parameter, value: half };
+        }
+    }
+    return undefined;
+}
 
 @Injectable()
 export class AgentRunLogRepository {
@@ -130,6 +187,16 @@ export class AgentRunLogRepository {
      * de-duplicate on row id) but can never skip one, and the next cursor
      * it hands back is exact. Off the sqlite family the id IS the
      * tie-break, so those cursors stay exact as they are.
+     *
+     * The MIRROR of that — a `rowid`-shaped cursor arriving at a driver
+     * whose tie-break column is the row's uuid id — is widened the same
+     * way, and must be: binding an integer against a `uuid` column is not
+     * a wrong page but a failed query (`invalid input syntax for type
+     * uuid` on Postgres), which surfaces as an HTTP 500 rather than as the
+     * 400 a malformed cursor deserves. A cursor is therefore never taken
+     * on trust to match this store; see `resolveCursorPosition`, and
+     * `@ever-works/contracts`'s `run-timeline-cursor.ts` for the closed set
+     * of shapes the edge admits.
      */
     async findTimelinePage(
         runId: string,
@@ -150,26 +217,35 @@ export class AgentRunLogRepository {
         const tieBreakSql = keysetTieBreakSql(qb, 'log.id');
 
         if (after) {
+            // Never bind a half this driver's tie-break column cannot hold
+            // — see `resolveCursorPosition`. With none, the cursor is
+            // honoured as the start of the millisecond it names on EVERY
+            // driver, which is the sqlite family's long-standing treatment
+            // of an id-shaped cursor: repeat, never skip.
+            const position = resolveCursorPosition(sqlite, after);
             if (!keySql || !cursorKeySql) {
                 // A driver with no canonical key: the raw-column keyset,
                 // unchanged.
+                if (position) {
+                    qb.andWhere(
+                        `(log.createdAt > :afterCreatedAt OR (log.createdAt = :afterCreatedAt AND log.id > :${position.parameter}))`,
+                        {
+                            afterCreatedAt: after.createdAt,
+                            [position.parameter]: position.value,
+                        },
+                    );
+                } else {
+                    qb.andWhere('log.createdAt >= :afterCreatedAt', {
+                        afterCreatedAt: after.createdAt,
+                    });
+                }
+            } else if (position) {
                 qb.andWhere(
-                    '(log.createdAt > :afterCreatedAt OR (log.createdAt = :afterCreatedAt AND log.id > :afterId))',
-                    { afterCreatedAt: after.createdAt, afterId: after.id ?? '' },
-                );
-            } else if (after.tieBreak !== undefined) {
-                qb.andWhere(
-                    `(${keySql} > ${cursorKeySql} OR (${keySql} = ${cursorKeySql} AND ${tieBreakSql} > :afterTieBreak))`,
+                    `(${keySql} > ${cursorKeySql} OR (${keySql} = ${cursorKeySql} AND ${tieBreakSql} > :${position.parameter}))`,
                     {
                         afterCreatedAt: after.createdAt,
-                        // rowid is an integer column; an id is text.
-                        afterTieBreak: sqlite ? Number(after.tieBreak) : after.tieBreak,
+                        [position.parameter]: position.value,
                     },
-                );
-            } else if (!sqlite) {
-                qb.andWhere(
-                    `(${keySql} > ${cursorKeySql} OR (${keySql} = ${cursorKeySql} AND ${tieBreakSql} > :afterId))`,
-                    { afterCreatedAt: after.createdAt, afterId: after.id ?? '' },
                 );
             } else {
                 qb.andWhere(`${keySql} >= ${cursorKeySql}`, {

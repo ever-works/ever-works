@@ -34,7 +34,12 @@ import {
 } from '@ever-works/agent/agent-approvals';
 // Capabilities tab — the one init-script size cap, shared with the
 // service-side byte check.
-import { AGENT_INIT_SCRIPT_MAX_BYTES } from '@ever-works/contracts';
+// Session detail — the one timeline-cursor shape, shared with the
+// controller's parser and the store's keyset predicate.
+import {
+    AGENT_INIT_SCRIPT_MAX_BYTES,
+    AGENT_RUN_TIMELINE_CURSOR_PATTERN,
+} from '@ever-works/contracts';
 // Entity-free validation subpath on purpose — see the docstring on
 // `@ever-works/agent/validation`.
 import { MergePolicyDto } from '@ever-works/agent/validation';
@@ -656,12 +661,20 @@ export class ListRunSessionsQueryDto {
  * timestamps by, so it is EITHER an integer insertion-order key or a uuid
  * row id. Both are accepted: a uuid keeps every cursor a browser minted
  * before the integer form existed working.
+ *
+ * Those two are also ALL that is accepted, and the shared pattern is what
+ * keeps that promise honest. A tie-break of some third shape is a value no
+ * store's tie-break column can hold — binding one against the run-log
+ * `uuid` primary key is `invalid input syntax for type uuid` on Postgres,
+ * i.e. a 500 for what this decorator exists to answer as a 400 — so the
+ * edge admits exactly the set `@ever-works/contracts` also teaches the
+ * store to consume. See `run-timeline-cursor.ts`.
  */
 export class SessionDetailQueryDto {
     @ApiProperty({ required: false, description: 'Opaque timeline cursor from `nextCursor`.' })
     @IsOptional()
     @IsString()
-    @Matches(/^\d{1,15}_(?:[0-9a-fA-F-]{36}|\d{1,19})$/)
+    @Matches(AGENT_RUN_TIMELINE_CURSOR_PATTERN)
     cursor?: string;
 
     @ApiProperty({ required: false, minimum: 1, maximum: 200 })

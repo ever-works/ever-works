@@ -144,6 +144,27 @@ describe('AgentRunLogRepository — session-detail timeline paging (integration)
         expect(resumed.tieBreaks.get(last.id)).toMatch(/^\d+$/);
     });
 
+    it('⭐ widens a tie-break minted by another store rather than skipping the page', async () => {
+        // The mirror of the case above: a cursor whose tie-break half is a
+        // uuid row id — the shape every non-sqlite store hands out —
+        // arriving at a store whose tie-break column is the integer
+        // `rowid`. Coercing it to a number yields NaN, and `rowid > NaN`
+        // matches NOTHING: the page comes back empty and the caller is told
+        // the transcript ended. Widening to the cursor's instant is the
+        // same repeat-never-skip treatment an id-shaped cursor gets.
+        for (const message of ['a', 'b', 'c']) await append(message, '2026-09-17 16:52:05');
+        await append('d', '2026-09-17 16:52:06');
+        const page = await logs.findTimelinePage(RUN, STEPS, 100);
+        const middle = page.rows[1];
+
+        const resumed = await logs.findTimelinePage(RUN, STEPS, 100, {
+            createdAt: middle.createdAt,
+            tieBreak: middle.id,
+        });
+
+        expect(resumed.rows.map((row) => row.message)).toEqual(['a', 'b', 'c', 'd']);
+    });
+
     it('never reads another run, and still short-circuits an empty step list', async () => {
         await append('mine', '2026-09-17 16:52:05');
         const otherRepository = dataSource.getRepository(AgentRunLog);

@@ -45,11 +45,26 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
 
     /** Run `call`, returning the SQL of the select it executed. */
     async function captureSql(call: () => Promise<unknown>): Promise<string> {
-        const captured: string[] = [];
+        const { sql } = await captureQuery(call);
+        return sql;
+    }
+
+    /**
+     * The same capture, keeping the BOUND PARAMETERS too.
+     *
+     * The SQL alone cannot see the defect these Postgres cases pin: an
+     * integer bound against the `uuid` primary key renders as the same
+     * `"log"."id" > :param` text a uuid does, and only fails once the
+     * driver binds it.
+     */
+    async function captureQuery(
+        call: () => Promise<unknown>,
+    ): Promise<{ sql: string; parameters: Record<string, unknown> }> {
+        const captured: Array<{ sql: string; parameters: Record<string, unknown> }> = [];
         const spy = jest
             .spyOn(SelectQueryBuilder.prototype, 'getRawAndEntities')
             .mockImplementation(function (this: SelectQueryBuilder<AgentRunLog>) {
-                captured.push(this.getQuery());
+                captured.push({ sql: this.getQuery(), parameters: this.getParameters() });
                 return Promise.resolve({ entities: [], raw: [] });
             });
         try {
@@ -95,6 +110,66 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
 
             expect(emitted).not.toContain(':afterCreatedAt');
             expect(emitted).toContain('LIMIT 100');
+        });
+
+        it('⭐ widens an insertion-order cursor instead of binding it to the uuid id', async () => {
+            // The tie-break Postgres orders by is the row's uuid id, so an
+            // integer insertion-order key — what the sqlite family hands
+            // out, and what the edge accepts so a cursor survives a store
+            // change mid-session — is not a position here. Binding it
+            // anyway is `invalid input syntax for type uuid`, i.e. an HTTP
+            // 500 for a request that is merely un-resumable. Widening to
+            // the cursor's millisecond repeats rows, never skips them.
+            const { sql, parameters } = await captureQuery(() =>
+                postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT, tieBreak: '42' }),
+            );
+
+            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+            const cursorKey = `to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+            expect(sql).toContain(`AND ${key} >= ${cursorKey}`);
+            expect(sql).not.toContain(':afterTieBreak');
+            expect(sql).not.toContain('"log"."id" >');
+            expect(Object.keys(parameters)).not.toContain('afterTieBreak');
+            expect(Object.keys(parameters)).not.toContain('afterId');
+            expect(parameters.afterCreatedAt).toBe(AT);
+        });
+
+        it("⭐ falls back to the id half when the tie-break half is not this store's", async () => {
+            // Both halves set is what a client mid-migration sends. The id
+            // is the half Postgres can compare, so the page stays EXACT
+            // rather than widening.
+            const id = '00000000-0000-4000-8000-00000000cc62';
+            const { sql, parameters } = await captureQuery(() =>
+                postgres.logs.findTimelinePage(RUN, STEPS, 100, {
+                    createdAt: AT,
+                    tieBreak: '42',
+                    id,
+                }),
+            );
+
+            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+            const cursorKey = `to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+            expect(sql).toContain(
+                `AND (${key} > ${cursorKey} OR (${key} = ${cursorKey} AND "log"."id" > :afterId))`,
+            );
+            expect(sql).not.toContain(':afterTieBreak');
+            expect(parameters.afterId).toBe(id);
+            expect(Object.values(parameters)).not.toContain('42');
+        });
+
+        it('⭐ binds no empty row id when the cursor names no comparable position', async () => {
+            // `AgentRunTimelineCursor.id` is optional, and an empty string
+            // is as invalid a uuid as an integer is.
+            const { sql, parameters } = await captureQuery(() =>
+                postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT }),
+            );
+
+            const key = `to_char("log"."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+            expect(sql).toContain(
+                `AND ${key} >= to_char(CAST(:afterCreatedAt AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`,
+            );
+            expect(sql).not.toContain(':afterId');
+            expect(Object.values(parameters)).not.toContain('');
         });
     });
 
