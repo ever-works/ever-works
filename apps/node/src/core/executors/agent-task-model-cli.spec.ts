@@ -675,7 +675,7 @@ describe('runAgentTaskJob — model-step containment (self-build slice AK)', () 
 		// ordering is exercised by `isolated-home.spec.ts`, which takes roots as
 		// data rather than resolving them through the host.
 		const { spawns, spawnFn } = envRecordingSpawn();
-		const windowsHome = 'C:\Users\owner';
+		const windowsHome = 'C:\\Users\\owner';
 
 		await runAgentTaskJob(
 			job(payload),
