@@ -38,6 +38,42 @@ findings once.
 | Test estate | created (two Organizations), isolation proven |
 | Implementation (Waves 1–3) | **not started** — the specs are now buildable, the code is not written |
 
+### ✅ SPEC FREEZE — the acceptance lanes pin this revision
+
+**The specs are frozen as of `9a379106b`** (2026-09-17). The golden-outputs work proved why this matters: every spec
+file changed *while that work was in flight* (APW-05 `plan.md` 1173→1763 lines, APW-06 1195→1852, APW-10 1033→1127,
+and two changes altered golden output mid-task — APW-10 gained `authScheme` and `smtp` in `dependencies`, APW-05
+gained the `verify` job).
+
+`_build-artifacts/expected-outputs/golden/README.md` §8 records a **sha256 per spec file** at the revision the
+goldens were derived from. **Any acceptance lane that compares real platform output against these goldens must pin
+that revision**, or it will fail on drift rather than on a defect. Freeze revision:
+
+| Item | Value |
+| --- | --- |
+| Branch | `feat/app-works-implementation` |
+| Commit | `9a379106b` (see the log below for later commits) |
+| Spec tree | 124 files, 1830 relative links, **0 broken**; **548 acceptance ids defined / 548 indexed** |
+| Golden checker | `node check.mjs` → **All 2064 golden assertions passed**, exit 0 |
+| Blueprint specs (live) | `cal-diy-template` 22238 B · `umami-template` 9304 B · `app-fixture-hello-template` 6770 B |
+
+### Known baseline conditions (recorded, deliberately NOT "fixed")
+
+- **Prettier drift is pre-existing.** `npx prettier --check` fails on ~57 app-works markdown files, including all
+  four programme-level files. Proven pre-existing: `git show HEAD:<file> | npx prettier --check --stdin-filepath
+  <file>` fails on the HEAD revision too. Nobody ran `--write`, because reformatting aligned tables and prose in
+  files other agents are editing would be a large, unwanted diff. **`pnpm format:check` is therefore NOT clean on
+  this branch** and the programme's Definition of Done still lists it — this needs one deliberate pass.
+- **Five Blueprint ✗ spec findings are recorded, not fixed** (golden `README.md` §5): two of three Blueprints declare
+  a cron that the managed tier refuses (`CRON_TOO_FREQUENT`); the fixture and Cal.diy declare `smtp`, which a
+  *verification* Build cannot start (`verificationDependencyUnsupported`) so only Umami is runner-verifiable as
+  written; the App spec's component/cron/volume caps (10/20/5) exceed the Work CRD's (8/10/4) so
+  `SPEC_LIMIT_EXCEEDED` can refuse a spec APW-03 accepted; Umami's image switches user by NAME and nothing renders
+  `runAsUser`; and `EW_VERIFY_BUILD` has no derivable value.
+- **`_build-artifacts/expected-outputs/manifests/` is stale** relative to the Blueprints (the fixture worker still
+  renders 48Mi/96Mi where the Blueprint now says 64Mi/128Mi) and is not prettier-formatted. Recorded; the newer
+  `golden/` tree supersedes it and nothing was deleted.
+
 ---
 
 ## 1. Track A — close the gap register
