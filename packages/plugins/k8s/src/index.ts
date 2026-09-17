@@ -43,3 +43,7 @@ export * from './types.js';
 // cluster access, exported for APW-10's in-zone controller and for the rest of `src/app/`.
 export * from './app/app-names.js';
 export * from './app/app-security.js';
+// App manifest renderer (APW-06 T6, plan §4.2–§4.7/§4.11/§4.12) and its network policies (T7,
+// plan §4.10) — the pure library R-5 asks for: `AppRenderInput` in, cluster objects out, no I/O.
+export * from './app/app-network-policy.renderer.js';
+export * from './app/app-manifest.renderer.js';

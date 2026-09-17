@@ -1,0 +1,106 @@
+{
+	"_comment": "APW-06 T6 golden input, built from APW-03 schema.md §24.2 (prebuilt image, single web component). Every host is RFC 2606 (example.com), every address is RFC 5737 (192.0.2.0/24) and the digest is a synthetic 64-hex value — no real digest, token or hostname.",
+	"ref": {
+		"workId": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+		"namespace": "ew-analytics-0f8e2c1a",
+		"target": "your-cluster",
+		"kubeContext": "kind-app-runtime",
+		"clusterFingerprint": "sha256:fixture-cluster-fingerprint"
+	},
+	"purpose": "deploy",
+	"workSlug": "analytics",
+	"deploymentId": "3f2b1c4d-2222-4b3c-8d4e-5f6071829304",
+	"deploymentShort": "3f2b1c4d",
+	"specCommitSha": "0123456789abcdef0123456789abcdef01234567",
+	"isFirstDeploymentOnCluster": true,
+	"skipPreDeployJobs": false,
+	"image": {
+		"reference": "registry.example.com/example-org/analytics@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	},
+	"components": [
+		{
+			"name": "web",
+			"role": "web",
+			"port": 3000,
+			"replicas": 1,
+			"writableRootFilesystem": false,
+			"probes": {
+				"startup": {
+					"http": "/api/heartbeat",
+					"periodSeconds": 10,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 30
+				},
+				"readiness": {
+					"http": "/api/heartbeat",
+					"periodSeconds": 10,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 3
+				}
+			},
+			"resources": { "cpu": "250m", "memory": "512Mi", "memoryLimit": "1Gi" },
+			"volumes": [],
+			"primary": true,
+			"deadlineSeconds": 750,
+			"internalUrl": "http://web.ew-analytics-0f8e2c1a.svc.cluster.local"
+		}
+	],
+	"jobs": [
+		{
+			"name": "set-admin-password",
+			"when": "first-deploy",
+			"component": "web",
+			"http": {
+				"method": "POST",
+				"path": "/api/setup/admin",
+				"body": { "password": "{{env.ADMIN_PASSWORD}}" },
+				"expect": { "status": [200, 201] }
+			},
+			"timeoutSeconds": 600,
+			"retries": 0
+		}
+	],
+	"cron": [],
+	"smoke": [
+		{
+			"name": "heartbeat",
+			"component": "web",
+			"http": { "method": "GET", "path": "/api/heartbeat" },
+			"expect": { "status": [200], "maxLatencyMs": 2000 },
+			"when": "always"
+		}
+	],
+	"env": {
+		"values": {
+			"ADMIN_PASSWORD": "fixture-placeholder-admin-password",
+			"DATABASE_URL": "postgres://app:fixture-placeholder-password@db.example.com:5432/analytics",
+			"DISABLE_TELEMETRY": "1"
+		},
+		"checksum": "9c1f0a4b7d2e3508",
+		"secretNames": ["ADMIN_PASSWORD", "DATABASE_URL"]
+	},
+	"hosts": { "primary": "analytics.example.com", "extra": [], "previous": [] },
+	"ingress": {
+		"className": "nginx",
+		"controllerNamespace": "ingress-nginx",
+		"tls": "cert-manager",
+		"issuer": "letsencrypt"
+	},
+	"network": { "isolation": true, "extraEgress": [], "needsHairpin": false },
+	"policy": {
+		"podSecurity": "baseline",
+		"allowRoot": false,
+		"runtimeClassName": null,
+		"quota": null,
+		"limitRange": {
+			"defaultRequest": { "cpu": "100m", "memory": "128Mi" },
+			"defaultLimit": { "cpu": "1", "memory": "512Mi", "ephemeralStorage": "1Gi" },
+			"max": { "cpu": "8", "memory": "64Gi" }
+		},
+		"cronMinIntervalMinutes": 5,
+		"scaleFailedFirstDeployToZero": true,
+		"requireIsolationEnforced": true
+	}
+}

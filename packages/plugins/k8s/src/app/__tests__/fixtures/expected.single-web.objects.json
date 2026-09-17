@@ -1,0 +1,548 @@
+[
+	{
+		"apiVersion": "v1",
+		"kind": "Namespace",
+		"metadata": {
+			"name": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app",
+				"pod-security.kubernetes.io/enforce": "baseline",
+				"pod-security.kubernetes.io/warn": "restricted",
+				"pod-security.kubernetes.io/audit": "restricted"
+			}
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "ServiceAccount",
+		"metadata": {
+			"name": "app",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"automountServiceAccountToken": false
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "LimitRange",
+		"metadata": {
+			"name": "ew-defaults",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"limits": [
+				{
+					"type": "Container",
+					"defaultRequest": {
+						"cpu": "100m",
+						"memory": "128Mi"
+					},
+					"default": {
+						"cpu": "1",
+						"memory": "512Mi",
+						"ephemeral-storage": "1Gi"
+					},
+					"max": {
+						"cpu": "8",
+						"memory": "64Gi"
+					}
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-default-deny",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {},
+			"policyTypes": ["Ingress", "Egress"]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-same-namespace",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchExpressions": [
+					{
+						"key": "ever-works.io/isolation-probe",
+						"operator": "DoesNotExist"
+					}
+				]
+			},
+			"policyTypes": ["Ingress", "Egress"],
+			"ingress": [
+				{
+					"from": [
+						{
+							"podSelector": {}
+						}
+					]
+				}
+			],
+			"egress": [
+				{
+					"to": [
+						{
+							"podSelector": {}
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-egress",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchExpressions": [
+					{
+						"key": "ever-works.io/isolation-probe",
+						"operator": "DoesNotExist"
+					}
+				]
+			},
+			"policyTypes": ["Egress"],
+			"egress": [
+				{
+					"to": [
+						{
+							"namespaceSelector": {
+								"matchLabels": {
+									"kubernetes.io/metadata.name": "kube-system"
+								}
+							},
+							"podSelector": {
+								"matchLabels": {
+									"k8s-app": "kube-dns"
+								}
+							}
+						}
+					],
+					"ports": [
+						{
+							"protocol": "UDP",
+							"port": 53
+						},
+						{
+							"protocol": "TCP",
+							"port": 53
+						}
+					]
+				},
+				{
+					"to": [
+						{
+							"ipBlock": {
+								"cidr": "0.0.0.0/0",
+								"except": [
+									"10.0.0.0/8",
+									"172.16.0.0/12",
+									"192.168.0.0/16",
+									"100.64.0.0/10",
+									"169.254.0.0/16",
+									"127.0.0.0/8",
+									"0.0.0.0/8",
+									"224.0.0.0/4",
+									"240.0.0.0/4"
+								]
+							}
+						}
+					]
+				},
+				{
+					"to": [
+						{
+							"ipBlock": {
+								"cidr": "::/0",
+								"except": ["fc00::/7", "fe80::/10", "::1/128", "ff00::/8"]
+							}
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-ingress",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchLabels": {
+					"ever-works.io/component": "web"
+				}
+			},
+			"policyTypes": ["Ingress"],
+			"ingress": [
+				{
+					"from": [
+						{
+							"namespaceSelector": {
+								"matchLabels": {
+									"kubernetes.io/metadata.name": "ingress-nginx"
+								}
+							}
+						}
+					],
+					"ports": [
+						{
+							"protocol": "TCP",
+							"port": 3000
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-deps",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchExpressions": [
+					{
+						"key": "ever-works.io/isolation-probe",
+						"operator": "DoesNotExist"
+					}
+				]
+			},
+			"policyTypes": ["Egress"],
+			"egress": []
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "Secret",
+		"metadata": {
+			"name": "app-env-9c1f0a4b7d",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"type": "Opaque",
+		"immutable": true,
+		"stringData": {
+			"ADMIN_PASSWORD": "fixture-placeholder-admin-password",
+			"DATABASE_URL": "postgres://app:fixture-placeholder-password@db.example.com:5432/analytics",
+			"DISABLE_TELEMETRY": "1"
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "app-platform-9c1f0a4b7d",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"immutable": true,
+		"data": {
+			"EVER_WORKS_APP_URL": "https://analytics.example.com",
+			"EVER_WORKS_APP_HOST": "analytics.example.com",
+			"EVER_WORKS_APP_COMMIT": "0123456789abcdef0123456789abcdef01234567"
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "Service",
+		"metadata": {
+			"name": "web",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"ever-works.io/component": "web",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"type": "ClusterIP",
+			"selector": {
+				"ever-works.io/component": "web"
+			},
+			"ports": [
+				{
+					"name": "http",
+					"port": 80,
+					"protocol": "TCP",
+					"targetPort": 3000
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "web",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"ever-works.io/component": "web",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			},
+			"annotations": {
+				"ever-works.io/deployment-id": "3f2b1c4d-2222-4b3c-8d4e-5f6071829304"
+			}
+		},
+		"spec": {
+			"replicas": 1,
+			"revisionHistoryLimit": 5,
+			"progressDeadlineSeconds": 750,
+			"selector": {
+				"matchLabels": {
+					"ever-works.io/component": "web"
+				}
+			},
+			"strategy": {
+				"type": "RollingUpdate",
+				"rollingUpdate": {
+					"maxSurge": 0,
+					"maxUnavailable": 1
+				}
+			},
+			"minReadySeconds": 0,
+			"template": {
+				"metadata": {
+					"labels": {
+						"ever-works.io/component": "web",
+						"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+						"app.kubernetes.io/part-of": "analytics",
+						"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+						"ever-works.io/kind": "app"
+					},
+					"annotations": {
+						"ever-works.io/env-checksum": "9c1f0a4b7d2e3508",
+						"ever-works.io/build-commit": "0123456789abcdef0123456789abcdef01234567"
+					}
+				},
+				"spec": {
+					"serviceAccountName": "app",
+					"automountServiceAccountToken": false,
+					"enableServiceLinks": false,
+					"securityContext": {
+						"runAsNonRoot": true,
+						"seccompProfile": {
+							"type": "RuntimeDefault"
+						}
+					},
+					"containers": [
+						{
+							"name": "web",
+							"image": "registry.example.com/example-org/analytics@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+							"imagePullPolicy": "IfNotPresent",
+							"ports": [
+								{
+									"name": "http",
+									"containerPort": 3000,
+									"protocol": "TCP"
+								}
+							],
+							"envFrom": [
+								{
+									"secretRef": {
+										"name": "app-env-9c1f0a4b7d",
+										"optional": false
+									}
+								},
+								{
+									"configMapRef": {
+										"name": "app-platform-9c1f0a4b7d",
+										"optional": false
+									}
+								}
+							],
+							"resources": {
+								"requests": {
+									"cpu": "250m",
+									"memory": "512Mi"
+								},
+								"limits": {
+									"memory": "1Gi"
+								}
+							},
+							"readinessProbe": {
+								"httpGet": {
+									"path": "/api/heartbeat",
+									"port": "http"
+								},
+								"periodSeconds": 10,
+								"timeoutSeconds": 5,
+								"initialDelaySeconds": 0,
+								"failureThreshold": 3
+							},
+							"startupProbe": {
+								"httpGet": {
+									"path": "/api/heartbeat",
+									"port": "http"
+								},
+								"periodSeconds": 10,
+								"timeoutSeconds": 5,
+								"initialDelaySeconds": 0,
+								"failureThreshold": 30
+							},
+							"securityContext": {
+								"allowPrivilegeEscalation": false,
+								"capabilities": {
+									"drop": ["ALL"]
+								},
+								"readOnlyRootFilesystem": true
+							},
+							"volumeMounts": [
+								{
+									"name": "tmp",
+									"mountPath": "/tmp"
+								}
+							]
+						}
+					],
+					"topologySpreadConstraints": [
+						{
+							"maxSkew": 1,
+							"topologyKey": "kubernetes.io/hostname",
+							"whenUnsatisfiable": "ScheduleAnyway",
+							"labelSelector": {
+								"matchLabels": {
+									"ever-works.io/component": "web"
+								}
+							}
+						}
+					],
+					"volumes": [
+						{
+							"name": "tmp",
+							"emptyDir": {
+								"sizeLimit": "256Mi"
+							}
+						}
+					]
+				}
+			}
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "Ingress",
+		"metadata": {
+			"name": "web",
+			"namespace": "ew-analytics-0f8e2c1a",
+			"labels": {
+				"ever-works.io/component": "web",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "analytics",
+				"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+				"ever-works.io/kind": "app"
+			},
+			"annotations": {
+				"cert-manager.io/cluster-issuer": "letsencrypt"
+			}
+		},
+		"spec": {
+			"ingressClassName": "nginx",
+			"rules": [
+				{
+					"host": "analytics.example.com",
+					"http": {
+						"paths": [
+							{
+								"path": "/",
+								"pathType": "Prefix",
+								"backend": {
+									"service": {
+										"name": "web",
+										"port": {
+											"number": 80
+										}
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"tls": [
+				{
+					"hosts": ["analytics.example.com"],
+					"secretName": "analytics-example-com-tls"
+				}
+			]
+		}
+	}
+]
