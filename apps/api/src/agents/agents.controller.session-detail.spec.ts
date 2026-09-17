@@ -142,6 +142,17 @@ describe('AgentsController — session detail (Feature K)', () => {
             findTimelineByRun: jest.fn().mockResolvedValue([]),
             countByRunSteps: jest.fn().mockResolvedValue(0),
         };
+        // The endpoint reads the page-with-cursor-positions variant. This
+        // stub delegates to `findTimelineByRun` so the cases below stay
+        // expressed in rows, and mirrors the repository's contract that off
+        // the sqlite family a row's cursor tie-break IS its id.
+        agentRunLogs.findTimelinePage = jest.fn(async (...args: unknown[]) => {
+            const rows = await agentRunLogs.findTimelineByRun(...args);
+            return {
+                rows,
+                tieBreaks: new Map(rows.map((row: { id: string }) => [row.id, row.id])),
+            };
+        });
         controller = new AgentsController(
             { getOne: jest.fn().mockResolvedValue({ id: baseRun().agentId }) } as any, // service
             {} as any, // files
@@ -298,6 +309,46 @@ describe('AgentsController — session detail (Feature K)', () => {
             expect.arrayContaining(['assistant-message', 'user-message', 'tool-invocation']),
             2,
             { createdAt, id: lastId },
+        );
+    });
+
+    it('⭐ stamps every entry with the store-side cursor, and round-trips it back', async () => {
+        // On the sqlite family the tie-break is an insertion-order key, not
+        // the row id, so the position inside one timestamp is something only
+        // the store can name. The entry carries it, and a cursor that names
+        // it must come back as a tie-break — never be misread as a row id,
+        // which is what would let a page skip rows.
+        const createdAt = new Date('2026-08-14T10:05:00.000Z');
+        const rows = [
+            logRow({ id: '00000000-0000-0000-0000-00000000cc62', createdAt }),
+            logRow({ id: '00000000-0000-0000-0000-00000000cc63', createdAt }),
+        ];
+        agentRunLogs.findTimelinePage.mockResolvedValue({
+            rows,
+            tieBreaks: new Map([
+                [rows[0].id, '41'],
+                [rows[1].id, '42'],
+            ]),
+        });
+
+        const first = await controller.getRunSessionDetail(auth, runId, { limit: 2 });
+
+        expect(first.timeline.entries.map((entry) => entry.cursor)).toEqual([
+            `${createdAt.getTime()}_41`,
+            `${createdAt.getTime()}_42`,
+        ]);
+        expect(first.timeline.nextCursor).toBe(`${createdAt.getTime()}_42`);
+
+        await controller.getRunSessionDetail(auth, runId, {
+            limit: 2,
+            cursor: first.timeline.nextCursor!,
+        });
+
+        expect(agentRunLogs.findTimelinePage).toHaveBeenLastCalledWith(
+            runId,
+            expect.arrayContaining(['assistant-message', 'user-message', 'tool-invocation']),
+            2,
+            { createdAt, tieBreak: '42' },
         );
     });
 

@@ -34,6 +34,8 @@ import {
 } from '@ever-works/agent/agent-approvals';
 // Capabilities tab — the one init-script size cap, shared with the
 // service-side byte check.
+// Session detail — the one timeline-cursor shape, shared with the
+// controller's parser and the store's keyset predicate.
 // AW-23 — the pause-note cap, the batched status-read cap and the held
 // list's page size, imported rather than re-typed so the dialog counter,
 // the validator and the query cap can never disagree.
@@ -41,6 +43,7 @@ import {
     AGENT_HALT_NOTE_MAX,
     AGENT_HELD_WORK_PAGE_SIZE,
     AGENT_INIT_SCRIPT_MAX_BYTES,
+    AGENT_RUN_TIMELINE_CURSOR_PATTERN,
     AGENT_STATUS_BATCH_MAX,
 } from '@ever-works/contracts';
 // Entity-free validation subpath on purpose — see the docstring on
@@ -683,15 +686,28 @@ export class ListRunSessionsQueryDto {
 /**
  * Session detail (Feature K) — query for
  * `GET /api/agents/runs/:runId/detail`. The cursor is the opaque
- * `<epochMillis>_<uuid>` token the previous page's `nextCursor` carried;
- * the format is validated at the edge so a garbage cursor is a 400, not
- * a silently ignored restart.
+ * `<epochMillis>_<tieBreak>` token the previous page's `nextCursor`
+ * carried; the format is validated at the edge so a garbage cursor is a
+ * 400, not a silently ignored restart.
+ *
+ * The tie-break half is whichever column the store orders equal
+ * timestamps by, so it is EITHER an integer insertion-order key or a uuid
+ * row id. Both are accepted: a uuid keeps every cursor a browser minted
+ * before the integer form existed working.
+ *
+ * Those two are also ALL that is accepted, and the shared pattern is what
+ * keeps that promise honest. A tie-break of some third shape is a value no
+ * store's tie-break column can hold — binding one against the run-log
+ * `uuid` primary key is `invalid input syntax for type uuid` on Postgres,
+ * i.e. a 500 for what this decorator exists to answer as a 400 — so the
+ * edge admits exactly the set `@ever-works/contracts` also teaches the
+ * store to consume. See `run-timeline-cursor.ts`.
  */
 export class SessionDetailQueryDto {
     @ApiProperty({ required: false, description: 'Opaque timeline cursor from `nextCursor`.' })
     @IsOptional()
     @IsString()
-    @Matches(/^\d{1,15}_[0-9a-fA-F-]{36}$/)
+    @Matches(AGENT_RUN_TIMELINE_CURSOR_PATTERN)
     cursor?: string;
 
     @ApiProperty({ required: false, minimum: 1, maximum: 200 })

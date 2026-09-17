@@ -27,6 +27,7 @@ import {
     AgentHaltReason,
     AgentHaltService,
     AgentRunLogRepository,
+    type AgentRunTimelineCursor,
     AgentRunRepository,
     AgentScheduleDispatcherService,
     AGENT_HEARTBEAT_TRIGGER,
@@ -208,6 +209,14 @@ export interface SessionTimelineEntry {
     id: string;
     kind: 'assistant-message' | 'user-message' | 'tool-call' | 'marker';
     createdAt: string;
+    /**
+     * The cursor that resumes exactly after THIS row. The live-follow poll
+     * follows from the last row on screen, so it needs the server's own
+     * cursor: deriving one from `createdAt` + `id` cannot name a position
+     * inside a whole second on the sqlite family, where `createdAt`
+     * defaults to `datetime('now')`.
+     */
+    cursor: string;
     /** Message rows + marker rows: the (already redacted, capped) text. */
     text: string | null;
     toolName: string | null;
@@ -219,7 +228,7 @@ export interface SessionTimelineEntry {
     truncated: boolean;
 }
 
-function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
+function toSessionTimelineEntry(log: AgentRunLog, tieBreak?: string): SessionTimelineEntry {
     const md = (log.metadata ?? {}) as Record<string, unknown>;
     const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
     const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
@@ -232,6 +241,7 @@ function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
               ? log.step
               : 'marker',
         createdAt: log.createdAt.toISOString(),
+        cursor: timelineCursorOf(log, tieBreak),
         text: isTool ? null : log.message,
         toolName: isTool ? str(md.toolName) : null,
         callId: isTool ? str(md.callId) : null,
@@ -245,22 +255,33 @@ function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
 }
 
 /**
- * Parse the `<epochMillis>_<uuid>` cursor the previous page returned.
+ * Parse the `<epochMillis>_<tieBreak>` cursor the previous page returned.
  * The DTO already regex-validated the shape; a still-unparsable value
  * degrades to "first page" rather than erroring.
+ *
+ * The tie-break half is whichever column the store orders equal
+ * timestamps by — an integer insertion-order key on the sqlite family, a
+ * uuid row id elsewhere — so a digits-only tail is handed over as the
+ * exact position and a uuid tail as the older, id-shaped one. The
+ * repository knows which of the two ITS driver can honour, and honours an
+ * id-shaped cursor it cannot use as "the start of the millisecond it
+ * names": rows may repeat (the client de-duplicates on row id), none are
+ * skipped, and the cursor it hands back next is exact. So a cursor a
+ * browser is still holding mid-session keeps working.
  */
-function parseTimelineCursor(cursor?: string): { createdAt: Date; id: string } | undefined {
+function parseTimelineCursor(cursor?: string): AgentRunTimelineCursor | undefined {
     if (!cursor) return undefined;
     const separator = cursor.indexOf('_');
     if (separator <= 0) return undefined;
     const ms = Number(cursor.slice(0, separator));
-    const id = cursor.slice(separator + 1);
-    if (!Number.isFinite(ms) || id.length === 0) return undefined;
-    return { createdAt: new Date(ms), id };
+    const tail = cursor.slice(separator + 1);
+    if (!Number.isFinite(ms) || tail.length === 0) return undefined;
+    const createdAt = new Date(ms);
+    return /^\d+$/.test(tail) ? { createdAt, tieBreak: tail } : { createdAt, id: tail };
 }
 
-function timelineCursorOf(log: AgentRunLog): string {
-    return `${log.createdAt.getTime()}_${log.id}`;
+function timelineCursorOf(log: AgentRunLog, tieBreak?: string): string {
+    return `${log.createdAt.getTime()}_${tieBreak ?? log.id}`;
 }
 
 @ApiTags('agents')
@@ -606,11 +627,12 @@ export class AgentsController {
         }
         const limit = query.limit ?? 100;
         const after = parseTimelineCursor(query.cursor);
-        const [timelineRows, messages, toolCalls] = await Promise.all([
-            this.agentRunLogs.findTimelineByRun(runId, SESSION_TIMELINE_STEPS, limit, after),
+        const [timelinePage, messages, toolCalls] = await Promise.all([
+            this.agentRunLogs.findTimelinePage(runId, SESSION_TIMELINE_STEPS, limit, after),
             this.agentRunLogs.countByRunSteps(runId, SESSION_MESSAGE_STEPS),
             this.agentRunLogs.countByRunSteps(runId, ['tool-invocation']),
         ]);
+        const timelineRows = timelinePage.rows;
         const filesTouched = (run.workspaceMeta?.filesTouched ?? []).filter(
             (p): p is string => typeof p === 'string' && p.length > 0,
         );
@@ -632,10 +654,15 @@ export class AgentsController {
             },
             filesTouched,
             timeline: {
-                entries: timelineRows.map((row) => toSessionTimelineEntry(row)),
+                entries: timelineRows.map((row) =>
+                    toSessionTimelineEntry(row, timelinePage.tieBreaks.get(row.id)),
+                ),
                 // A full page means there MAY be more; the client stops on
                 // the first short page.
-                nextCursor: last && timelineRows.length === limit ? timelineCursorOf(last) : null,
+                nextCursor:
+                    last && timelineRows.length === limit
+                        ? timelineCursorOf(last, timelinePage.tieBreaks.get(last.id))
+                        : null,
                 limit,
             },
         };
