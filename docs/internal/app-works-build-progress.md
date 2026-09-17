@@ -24,6 +24,20 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done and verified · `[!
 **Baseline at branch creation:** spec tree **CLEAN** — 84 files, 935 relative links, 0 broken; **445 acceptance ids
 defined, 445 indexed, 0 orphaned**, exit 0.
 
+**Current state (2026-09-17, end of round 1):** spec tree **CLEAN** again — **124 files, 1829 relative links, 0
+broken; 548 acceptance ids defined, 548 indexed, 0 orphaned**, exit 0. The checker now always writes its complete
+finding list to `tools/verify-spec-tree.report.txt`, because the console only prints the first 40 and that hid 60
+findings once.
+
+| Deliverable | State |
+| --- | --- |
+| Gap register | 24 blockers: **20 fixed, 4 confirmed already discharged**. All high rows in APW-01/02/03/04/05/06/07/10/13 addressed. ~50 medium/low rows in APW-01/02/03 remain untouched and are listed per epic. |
+| Spec tree | `CLEAN`, 548/548 ids, 0 broken links |
+| Wave 0 | **both PRs implemented, tested and pushed** |
+| Ever ID | DNS live; manifests in `k8s-gitops` PR #56; deployment blocked by the backups-first gate |
+| Test estate | created (two Organizations), isolation proven |
+| Implementation (Waves 1–3) | **not started** — the specs are now buildable, the code is not written |
+
 ---
 
 ## 1. Track A — close the gap register
@@ -161,6 +175,23 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 ## 5. Log
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
+
+- **2026-09-17 · `85fef39ed` — Wave 0 landed, and the spec tree is CLEAN at 548/548.** Both Wave 0 PRs are
+  implemented, tested and pushed; the 100 missing acceptance ids were indexed; five new programme documents arrived
+  (THREAT-MODEL, GITHUB-PERMISSIONS, CLARIFICATIONS, JIRA-DRAFT, CONFIGURATION); resolutions continue to R-39; the
+  golden expected-outputs tree and its negative controls land with a non-vacuous checker. **Two files a generator had
+  deleted were restored rather than accepting the deletion.** Tests: plugin 419, github-plugin 172, git.facade 103,
+  template-catalog 119, regression sweep 1208; type-check exit 0 for plugin/github-plugin/agent.
+- **2026-09-17 · `2895456f3` — APW-06/07/10 blockers closed**, including the single reconciled ordering for the
+  namespace↔dependency cycle and the SMTP relay that leaves LG-08 (ports 25/465/587) untouched.
+- **2026-09-17 · `662851875` — APW-01/02/03/04/05/13 blockers closed**, including `XC-01` (PR/verify builds no longer
+  get every `EW_` build secret) and `XC-02` (a workflow diff can no longer ride an upstream sync unconfirmed).
+- **2026-09-17 · the three repaired Blueprint specs are LIVE.** Verified byte-for-byte: `cal-diy-template`
+  22238 bytes, `umami-template` 9304, `app-fixture-hello-template` 6770 — local and remote sizes match. Until now the
+  fixes existed only in the programme's spec tree, so the repositories the platform actually reads were still wrong.
+- **2026-09-17 · the worktree was reconciled against the additive-only rule.** A generator had deleted two golden
+  manifests; both were restored from `HEAD` rather than accepting the deletion, and the branch now reports **zero
+  deleted files**.
 
 - **2026-09-17 · 🔴 fleet incident found and escalated (read-only).** The on-site Ceph RGW is down; WAL archiving to
   `s3://pg-backups` has failed since 13:50Z. Confirmed from both sides of the network, recorded on the fleet board
