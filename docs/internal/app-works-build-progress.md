@@ -41,15 +41,36 @@ findings once.
 
 ### Wave 1 foundation ledger (what "done" means here)
 
-| Task      | Deliverable                                                                                                             | Test evidence                                                      |
-| --------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| contracts | `packages/contracts/src/apps/` — 10 modules, 3 specs                                                                    | contracts **3332 / 80 files**, 0 collisions                        |
-| **T1**    | `app-runtime.ts` — 84 exports (12 unions, 38 precondition + 18 failure codes, 52 numbers)                               | +111 tests, pins proven by 3 perturbations                         |
-| **T4/T5** | `app-names.ts` + `app-security.ts` — every name/label of plan §4.1, the whole §4.4 table                                | k8s plugin **242 / 12 files** (was 184/10), one test per §4.4 cell |
-| T2        | `packages/plugin/src/contracts/capabilities/app-deployment.types.ts` + the ten **optional** `IDeploymentPlugin` members | running                                                            |
-| T3        | `packages/agent/src/app-runtime/{ports,default-ports,index}.ts`                                                         | running                                                            |
-| T6/T7     | `app-manifest.renderer.ts` + `app-network-policy.renderer.ts`                                                           | running                                                            |
-| APW-11 T1 | `app-launcher.ts`                                                                                                       | running                                                            |
+| Task      | Deliverable                                                                                                                | Test evidence                                                                                                          |
+| --------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| contracts | `packages/contracts/src/apps/` — 10 modules, 3 specs                                                                       | contracts **3332 / 80 files**, 0 collisions                                                                            |
+| **T1**    | `app-runtime.ts` — 84 exports (12 unions, 38 precondition + 18 failure codes, 52 numbers)                                  | +111 tests, pins proven by 3 perturbations                                                                             |
+| **T4/T5** | `app-names.ts` + `app-security.ts` — every name/label of plan §4.1, the whole §4.4 table                                   | k8s plugin **242 / 12 files** (was 184/10), one test per §4.4 cell                                                     |
+| **T2**    | `app-deployment.types.ts` (29 types) + the ten **optional** `IDeploymentPlugin` members + `isAppDeploymentPlugin`          | plugin **458 / 32 files** (was 419/31); **vercel 51/2 IDENTICAL** and still builds — no existing plugin needed an edit |
+| **T3**    | `packages/agent/src/app-runtime/{ports,default-ports,index}.ts` — every interface of plan §9.6 + five fail-closed bindings | agent **16 tests**; the `./app-runtime` subpath resolves after a build                                                 |
+| T6/T7     | `app-manifest.renderer.ts` + `app-network-policy.renderer.ts`                                                              | running                                                                                                                |
+| APW-11 T1 | `app-launcher.ts`                                                                                                          | running                                                                                                                |
+
+**Two foundation tasks own a guard worth knowing about:**
+
+- **T3 carries the R-5 guard**: a test that walks `packages/agent/src/app-runtime/` at run time and asserts no file in it
+  mentions the managed-tier ceiling environment variable — with a vacuity check (it asserts it really read the files) and
+  a known-good control, so it cannot pass by scanning nothing. It was proven by appending the forbidden string and
+  watching the test fail.
+- **T5 carries the §4.4 invariant**: one `it` per cell of the plan's security table, plus a matrix assertion that no
+  rendered container lacks `allowPrivilegeEscalation: false` and `capabilities.drop: [ALL]`.
+
+**APW06-G27 — an integration break found by one agent in another's file, and fixed the same round.** T2's agent proved
+with a temporary probe that `app-security.ts`'s _local_ two-value `AppSecurityTarget` made `AppRenderInput`
+**unassignable** to `AppSecurityInput` (`TS2322`, the literal `none` is not assignable) — `AppDeployTarget` really has
+three values (R-12), and T6 renders components through that module. Fixed by aliasing `AppSecurityTarget` to the plugin
+contract's `AppDeployTarget` instead of redeclaring it, with a spec guard pinning all three values _and_ the two
+previously-supported ones, so the fix **widened** the type rather than changing it.
+
+**⚠️ Environment hazard the agents hit, worth a CI fix:** the plugin packages resolve `IDeploymentPlugin` from
+`packages/plugin/dist`, not source — so `k8s`/`vercel` type-checks can pass against a stale contract and prove nothing
+about additivity. Proved by making a member required and watching both still exit 0. `@ever-works/plugin` must be built
+before dependent suites run, and the documented workflow does not say so.
 
 ### The programme's real size (measured, not estimated)
 
