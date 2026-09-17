@@ -606,8 +606,12 @@ test.describe('Onboarding deep — auto-open/badge state machine across complete
     }) => {
         const token = (await registerUserViaAPI(request)).access_token;
 
-        // Advance to the plugins step (index 4 of the 11-step default flow),
-        // then dismiss WITHOUT completing → the "show badge" quadrant.
+        // Seed the deploy-choice position — index 4 of the 11-step default
+        // flow — then dismiss WITHOUT completing → the "show badge" quadrant.
+        // Nothing here navigates the wizard; `lastStep` is written directly,
+        // and all the badge needs is a position below the derived total. It
+        // said "the plugins step" when the flow was 6 steps long and index 4
+        // really was `plugins-catalog`; at 11 steps that is index 9.
         await patchState(request, token, { lastStep: 4 });
         const dismissRes = await request.post(ONB.dismiss, { headers: authedHeaders(token) });
         expect(dismissRes.status()).toBe(200);
