@@ -225,6 +225,17 @@ export enum ActivityActionType {
     // pair (details.collaboratorAgentId) alongside the parent agent.
     // Additive members only — `activity_log.actionType` is a plain
     // varchar, so no migration.
+    // AW-23 — the agent brake and the stated halt reason. Additive
+    // members only; `activity_log.actionType` is a plain varchar, so no
+    // migration.
+    //
+    // 🛑 `AGENT_BLOCKED_ON_CREDENTIAL` carries a display name and a
+    // coarse kind and NEVER any part of a credential.
+    AGENT_BLOCKED_ON_CREDENTIAL = 'agent_blocked_on_credential',
+    /** The brake parked a run because the agent is paused. Nothing failed. */
+    AGENT_RUN_HELD = 'agent_run_held',
+    /** A Resume released held work. */
+    AGENT_RUNS_RELEASED = 'agent_runs_released',
     AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
     AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
     AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',

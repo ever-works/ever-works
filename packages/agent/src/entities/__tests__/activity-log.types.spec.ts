@@ -353,7 +353,34 @@ describe('activity-log.types', () => {
             // the only ones this branch lacked. Neither 182 nor 183 is the
             // answer, and 182 + 183 is nonsense — 194 was COUNTED off the
             // merged enum, and must be recounted after every merge.
-            expect(literals).toHaveLength(194);
+            //
+            // This AW-23 branch's own ledger for the same stretch, kept so
+            // neither side's bookkeeping is lost:
+            //   +5 shared_view_enabled / _disabled / _regenerated /
+            //   _sections_changed / _indexing_changed (Shared view, AW-18) —
+            //   develop landed those while this branch was open and counted
+            //   171 there; merging that develop into the Skills shelf branch's
+            //   168 COUNTED to 173 from the merged enum, the two skill_*
+            //   literals still being that branch's only additions develop did
+            //   not carry.
+            //   +3 agent_blocked_on_credential / agent_run_held /
+            //   agent_runs_released (the agent brake and the stated halt
+            //   reason, AW-23) — this branch's only additions, disjoint from
+            //   everything develop grew while it was open -> 176 COUNTED from
+            //   the merged enum, not added up from the ledger above.
+            //
+            // Merging that develop (194, AW-07 memory facts + context files
+            // included) into this AW-23 branch (176) COUNTS 197 from the merged
+            // enum: agent_blocked_on_credential / agent_run_held /
+            // agent_runs_released are the only three literals develop does not
+            // carry, and the twenty-one literals develop grew while this branch
+            // was open (memory_fact_* x6, memory_facts_cleared, context_file_*
+            // x3, context_budget_exceeded, model_account_* x7,
+            // model_policy_updated, schedule_paused, schedule_resumed) the only
+            // ones this branch lacked. Neither 176 nor 194 is the answer, and
+            // 176 + 194 is nonsense — 197 was COUNTED off the merged enum, and
+            // must be recounted after every merge.
+            expect(literals).toHaveLength(197);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

@@ -129,6 +129,11 @@ import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent
 // ConversationsModule imports only DatabaseModule and the agent-side
 // AgentsModule (never anything api-side), so no cycle is introduced.
 import { ConversationsModule, ConversationMessageService } from '@ever-works/agent/conversations';
+// AW-23 — AgentApprovalsService backs the identity card's "Waiting on
+// you" reason (pending proposals alongside open escalations). The
+// agent-side AgentApprovalsModule registers its own two entities and
+// imports nothing else, so no cycle is introduced.
+import { AgentApprovalsModule } from '@ever-works/agent/agent-approvals';
 // ActivityLogService is injected @Optional() into AgentsController for
 // the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
 // run-cancelled / task-assigned) and the GET :id/events feed. Without
@@ -147,6 +152,7 @@ import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
 import { RosterSkillBinderAdapter } from './roster-skill-binder.adapter';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
+import { AgentIdentityService } from './agent-identity.service';
 import { AgentCollaboratorsController } from './agent-collaborators.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
@@ -229,10 +235,17 @@ const HELD_FOR_APPROVAL_NOTE =
         // Named Conversations — supplies ConversationMessageService for the
         // AGENT_RUN_CONVERSATION_REPLY_POSTER binding below.
         ConversationsModule,
+        // AW-23 — the identity card's "Waiting on you" reason counts
+        // PENDING approval proposals alongside open escalations.
+        // AgentApprovalsModule is a leaf (its own entities and nothing
+        // api-side), so no cycle is introduced.
+        AgentApprovalsModule,
     ],
     controllers: [AgentsController, AgentCollaboratorsController, AgentTemplatesController],
     providers: [
         AgentTemplateCatalogService,
+        // AW-23 — composes the one payload the identity card paints from.
+        AgentIdentityService,
         // Security: provided LOCALLY (not exported) so the merge-policy
         // chat tool's owner check runs the same `ensureAccess` gate the
         // HTTP surface does. Its deps (WorkRepository / WorkMemberRepository)

@@ -10,7 +10,14 @@ import {
     Not,
     Repository,
 } from 'typeorm';
-import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
+import {
+    Agent,
+    AgentHaltReason,
+    AgentScope,
+    AgentStatus,
+    type AgentHaltDetail,
+    type AgentTarget,
+} from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { ownershipSqlPredicate, ownershipWhere, type OwnershipScope } from '../ownership-scope';
@@ -536,6 +543,131 @@ export class AgentRepository {
             .andWhere('status IN (:...from)', { from: fromList })
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    // ── Halt reason (AW-23) ────────────────────────────────────────
+
+    /**
+     * Record WHY this Agent stopped — but only if it is not already
+     * halted for the same reason.
+     *
+     * The guard is what makes pressing Pause twice honest. A stale
+     * browser tab re-posting a pause must not overwrite the first note
+     * with an empty one, must not move the timestamp, and must not
+     * relabel the author: the FIRST halt is the one that tells the story.
+     * Returns whether THIS call wrote, so the caller can skip the second
+     * activity row too.
+     *
+     * The CAS is on `haltReason` rather than the whole row: a halt for a
+     * DIFFERENT reason (a credential rejection landing on an agent a
+     * person had already paused) is genuinely new information and does
+     * overwrite.
+     */
+    async writeHalt(
+        id: string,
+        patch: {
+            haltReason: AgentHaltReason;
+            haltNote?: string | null;
+            haltedAt?: Date;
+            haltedByUserId?: string | null;
+            haltedRunId?: string | null;
+            haltDetail?: AgentHaltDetail | null;
+            /** Consecutive halts for this reason — computed by the caller. */
+            haltRepeatCount: number;
+        },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Agent)
+            .set({
+                haltReason: patch.haltReason,
+                haltNote: patch.haltNote ?? null,
+                haltedAt: patch.haltedAt ?? new Date(),
+                haltedByUserId: patch.haltedByUserId ?? null,
+                haltedRunId: patch.haltedRunId ?? null,
+                haltDetail: patch.haltDetail ?? null,
+                haltRepeatCount: patch.haltRepeatCount,
+                haltRepeatReason: patch.haltReason,
+                updatedAt: new Date(),
+            })
+            .where('id = :id', { id })
+            .andWhere('(haltReason IS NULL OR haltReason != :reason)', {
+                reason: patch.haltReason,
+            })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Clear the halt record. Called on resume, on activation from draft
+     * and on unarchive — and at no other time, so a reason survives for
+     * exactly as long as it is true.
+     *
+     * `haltRepeatCount` and `haltRepeatReason` are deliberately NOT
+     * touched here: together they are what lets the card say "halted for
+     * this reason twice" after a resume that did not fix anything. They
+     * reset when the NEXT halt carries a different reason (see
+     * `AgentHaltService`).
+     */
+    async clearHalt(id: string): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(Agent)
+            .set({
+                haltReason: null,
+                haltNote: null,
+                haltedAt: null,
+                haltedByUserId: null,
+                haltedRunId: null,
+                haltDetail: null,
+                updatedAt: new Date(),
+            })
+            .where('id = :id', { id })
+            .execute();
+    }
+
+    /**
+     * Batched status read for the roster poll (AW-23) — ONE query for up
+     * to `AGENT_STATUS_BATCH_MAX` agents, never one request per card.
+     *
+     * Owner-bounded by `userId` and by the ownership scope, so ids the
+     * caller does not own simply do not come back: a roster poll that
+     * happens to include a foreign id degrades to a shorter list rather
+     * than 404-ing the whole batch.
+     */
+    async findStatusRows(
+        userId: string,
+        ids: readonly string[],
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent[]> {
+        const unique = [...new Set(ids)].filter((id) => typeof id === 'string' && id.length > 0);
+        if (unique.length === 0) return [];
+        const qb = this.repository
+            .createQueryBuilder('agent')
+            .select([
+                'agent.id',
+                'agent.userId',
+                'agent.name',
+                'agent.status',
+                'agent.haltReason',
+                'agent.haltNote',
+                'agent.haltedAt',
+                'agent.haltedRunId',
+                'agent.haltDetail',
+                'agent.haltRepeatCount',
+                'agent.haltRepeatReason',
+                'agent.errorCount',
+                'agent.lastRunAt',
+                'agent.nextHeartbeatAt',
+            ])
+            .where('agent.userId = :userId', { userId })
+            .andWhere('agent.id IN (:...ids)', { ids: unique });
+
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        return qb.getMany();
     }
 
     /**

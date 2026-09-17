@@ -144,6 +144,24 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
                     message,
                 );
             }
+            // AW-23 — a PAUSED child is the same kind of gate, for the
+            // same reason: nothing downstream re-checks status, so
+            // delegating to a paused agent would run it and make the
+            // pause a lie on the one path a person never sees. Refused
+            // rather than held: a delegation is a parent agent's
+            // synchronous request, and the refusal is written into the
+            // parent's run log so it can say why instead of stalling.
+            if (child.status === AgentStatus.PAUSED) {
+                const message = `agent ${childAgentId} is paused and cannot be spawned as a sub-agent`;
+                this.logger.warn(
+                    `Delegation ${request.delegationId} refused (collaborator-not-allowed): ${message}`,
+                );
+                return refuseSubAgentDelegation(
+                    request.delegationId,
+                    'collaborator-not-allowed',
+                    message,
+                );
+            }
             const rules = await this.collaborators.listForAgent(parent.id);
             const decision = evaluateCollaboratorDelegation(parent.id, childAgentId, rules);
             if (decision.allowed === false) {

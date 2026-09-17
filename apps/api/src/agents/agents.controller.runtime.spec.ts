@@ -1292,8 +1292,11 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         it('consults the gate with the Task scope', async () => {
             const gate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
             await gatedController(gate).assignTask(auth, agentId, { taskId });
+            // AW-23 appended `agentId` so the gate's agent-brake
+            // middleware can see which agent the run belongs to; the
+            // three scope carriers are unchanged.
             expect(gate.admit).toHaveBeenCalledWith(
-                { userId: 'u1', workId, organizationId: 'org-1' },
+                { userId: 'u1', workId, organizationId: 'org-1', agentId },
                 expect.any(Function),
             );
         });

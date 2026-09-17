@@ -34,7 +34,15 @@ import {
 } from '@ever-works/agent/agent-approvals';
 // Capabilities tab — the one init-script size cap, shared with the
 // service-side byte check.
-import { AGENT_INIT_SCRIPT_MAX_BYTES } from '@ever-works/contracts';
+// AW-23 — the pause-note cap, the batched status-read cap and the held
+// list's page size, imported rather than re-typed so the dialog counter,
+// the validator and the query cap can never disagree.
+import {
+    AGENT_HALT_NOTE_MAX,
+    AGENT_HELD_WORK_PAGE_SIZE,
+    AGENT_INIT_SCRIPT_MAX_BYTES,
+    AGENT_STATUS_BATCH_MAX,
+} from '@ever-works/contracts';
 // Entity-free validation subpath on purpose — see the docstring on
 // `@ever-works/agent/validation`.
 import { MergePolicyDto } from '@ever-works/agent/validation';
@@ -723,6 +731,71 @@ export class ResumeRunDto {
     @IsString()
     @MaxLength(16384)
     message?: string;
+}
+
+/**
+ * AW-23 — the OPTIONAL body of `POST /api/agents/:id/pause`.
+ *
+ * Optional in the strict sense: the endpoint kept its path, its verb and
+ * its success shape, and a pause posted with no body at all behaves
+ * exactly as it did before this shipped. Everything here is something a
+ * person chose to add.
+ */
+export class PauseAgentDto {
+    /**
+     * Why this agent is being paused, in the owner's own words. Shown on
+     * the identity card and carried into the activity entry, so the
+     * answer to "why is this one stopped?" survives the person who knew.
+     *
+     * Secret-scanned on write: the note is stored as plain text and
+     * rendered back, so a pasted key is refused rather than persisted.
+     */
+    @ApiProperty({ required: false, maxLength: AGENT_HALT_NOTE_MAX })
+    @IsOptional()
+    @IsString()
+    @MaxLength(AGENT_HALT_NOTE_MAX)
+    note?: string;
+
+    /**
+     * Also ask any run still in flight to stop, through the existing
+     * cooperative interrupt.
+     *
+     * Defaults to false on purpose: a pause stops everything NEW and lets
+     * what is already running finish. Killing live work is a second,
+     * explicit decision, never a side effect of pressing Pause.
+     */
+    @ApiProperty({ required: false, default: false })
+    @IsOptional()
+    @IsBoolean()
+    stopInFlight?: boolean;
+}
+
+/**
+ * AW-23 — query for the batched roster read `GET /api/agents/status`.
+ *
+ * One request covers a whole visible page of agents. Over
+ * `AGENT_STATUS_BATCH_MAX` ids the request is refused rather than
+ * silently truncated, so a caller can never believe it polled more
+ * agents than it did.
+ */
+export class AgentStatusQueryDto {
+    @ApiProperty({
+        description: `Comma-separated Agent ids. At most ${AGENT_STATUS_BATCH_MAX}.`,
+    })
+    @IsString()
+    @IsNotEmpty()
+    ids: string;
+}
+
+/** AW-23 — query for `GET /api/agents/:id/held`. */
+export class ListAgentHeldQueryDto {
+    @ApiProperty({ required: false, default: AGENT_HELD_WORK_PAGE_SIZE })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
 }
 
 /**
