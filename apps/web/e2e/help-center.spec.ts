@@ -43,21 +43,31 @@ async function signedIn(
     return { page, close: () => context.close() };
 }
 
+/**
+ * The Help drawer's dialog — a SCOPE, never a visibility target. Headless UI
+ * renders the `role="dialog"` element as `relative z-50` with every child
+ * `position: fixed`, so its own box is zero-height and Playwright never calls
+ * it visible even while the drawer is open. The tabs live in the drawer header,
+ * outside the panel, so tab lookups stay scoped to the dialog.
+ */
 const helpDialog = (page: Page) =>
     page.getByRole('dialog').filter({ has: page.getByTestId('help-center-panel') });
+
+/** The manual panel inside the Help dialog — what "the drawer is open" is asserted on. */
+const helpPanel = (page: Page) => helpDialog(page).getByTestId('help-center-panel');
 
 /** Press `?` until the drawer is open — rides out the dev-mode hydration race. */
 async function openWithShortcut(page: Page) {
     await expect(async () => {
         if (
-            !(await helpDialog(page)
+            !(await helpPanel(page)
                 .isVisible()
                 .catch(() => false))
         ) {
             await page.locator('body').click({ position: { x: 5, y: 5 } });
             await page.keyboard.press('?');
         }
-        await expect(helpDialog(page)).toBeVisible({ timeout: 3_000 });
+        await expect(helpPanel(page)).toBeVisible({ timeout: 3_000 });
     }).toPass({ timeout: 45_000 });
 }
 
@@ -112,7 +122,7 @@ test.describe('Help centre — reaching the manual', () => {
             await expect(control).toBeVisible({ timeout: 30_000 });
             await expect(control).toHaveAttribute('aria-label', 'Help — press ?');
             await control.click();
-            await expect(helpDialog(page)).toBeVisible();
+            await expect(helpPanel(page)).toBeVisible();
             await page.keyboard.press('Escape');
             await expect(page.getByTestId('help-center-panel')).toHaveCount(0);
             await expect(control).toBeFocused();
@@ -143,7 +153,7 @@ test.describe('Help centre — reaching the manual', () => {
 
             await page.keyboard.press('Escape');
             await expect(dialog.getByTestId('help-browse')).toBeVisible();
-            await expect(dialog).toBeVisible();
+            await expect(helpPanel(page)).toBeVisible();
 
             await page.keyboard.press('Escape');
             await expect(page.getByTestId('help-center-panel')).toHaveCount(0);
