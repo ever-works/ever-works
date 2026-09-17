@@ -25,6 +25,14 @@ export const ONBOARDING_TELEMETRY_EVENTS = [
     'onboarding_plugins_step_skipped',
     'onboarding_plugins_step_advanced',
     'onboarding_ever_works_quota_blocked',
+    // AW-20 P1 — the "Your agents" step. Closed-vocabulary properties
+    // only: blueprint slug, lane keys, outcome enums, counts and
+    // durations. Never an agent name, never a lane label, never a
+    // provider's reason string.
+    'onboarding_roster_blueprint_selected',
+    'onboarding_roster_provision_started',
+    'onboarding_roster_provision_finished',
+    'onboarding_roster_intro_viewed',
 ] as const;
 
 export type OnboardingTelemetryEvent = (typeof ONBOARDING_TELEMETRY_EVENTS)[number];

@@ -129,6 +129,48 @@ describe('model-catalog', () => {
             const match = matchModelCatalogEntry('nonexistent-model-xyz', candidates);
             expect(match).toBeNull();
         });
+
+        it('should ignore a tag past the length cap rather than scan it', () => {
+            // Two controls stand between a caller-supplied model id and the tag
+            // patterns: this length cap, and a parameter-size pattern rewritten
+            // so it cannot re-split two adjacent digit runs (measured on the old
+            // spelling: 32k digits cost 2.1s; the new one is 0.1ms flat).
+            //
+            // NOTE ON WHAT IS NOT TESTED HERE: with both controls in place no
+            // elapsed-time assertion can distinguish either one — the cap
+            // short-circuits before the pattern runs, and the pattern is linear
+            // once it does. A timing test would therefore pass with either fix
+            // reverted, which is a test that asserts nothing. These assert
+            // behaviour instead; the timing evidence lives in the measurements
+            // quoted beside the constants.
+            const oversized = matchModelCatalogEntry(`qwen3-32b:${'a'.repeat(200)}`, candidates);
+            expect(oversized?.id).toBe('qwen/qwen3-32b');
+
+            // A 32k-digit tag is the shape that used to stall. It resolves
+            // through the base name, and resolves at all.
+            const hostile = matchModelCatalogEntry(`qwen3-32b:${'1'.repeat(32_000)}x`, candidates);
+            expect(hostile?.id).toBe('qwen/qwen3-32b');
+        });
+
+        it('should still read a tag that sits just under the length cap', () => {
+            // The cap must not swallow tags a real client sends: 128 characters
+            // is far past any real tag, so a tag at the boundary is still parsed
+            // rather than discarded.
+            const atCap = `q4_k_m${'-x'.repeat(60)}`;
+            expect(atCap.length).toBeLessThanOrEqual(128);
+            expect(matchModelCatalogEntry(`qwen3-32b:${atCap}`, candidates)?.id).toBe(
+                'qwen/qwen3-32b',
+            );
+        });
+
+        it('should still read ordinary parameter-size tags', () => {
+            // Guards the rewritten pattern's semantics, which must be unchanged:
+            // a plain size, a decimal size, and an active-parameter suffix.
+            expect(matchModelCatalogEntry('qwen3:32b', candidates)?.id).toBe('qwen/qwen3-32b');
+            expect(matchModelCatalogEntry('qwen/qwen3.5:9b', candidates)?.id).toBe(
+                'qwen/qwen3.5-9b',
+            );
+        });
     });
 
     describe('catalog fetching', () => {

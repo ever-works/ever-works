@@ -1,5 +1,20 @@
+import {
+    SKILL_PROVENANCES,
+    SKILL_READINESS_FILTERS,
+    SKILL_SHELF_SORTS,
+    SKILL_TAG_FILTER_MAX,
+    normalizeSkillTag,
+    type SkillProvenance,
+    type SkillReadinessFilter,
+    type SkillShelfSort,
+} from '@ever-works/contracts';
 import { skillsAPI } from '@/lib/api/skills';
-import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
+import type {
+    Skill,
+    SkillCardStateCounts,
+    SkillCatalogEntry,
+    SkillTagFacet,
+} from '@/lib/api/skills';
 
 /**
  * Navigation consolidation (docs/specs/features/navigation-consolidation):
@@ -27,6 +42,14 @@ export interface SkillsPageFilters {
     search: string;
     installedOffset: number;
     catalogOffset: number;
+    // ── Skills shelf — each absent (undefined) at its default ──
+    /** Selected tag chips (AND), normalised, at most 6. */
+    tags?: string[];
+    readiness?: SkillReadinessFilter;
+    provenance?: SkillProvenance;
+    enabled?: boolean;
+    /** Absent = `updated`. */
+    sort?: SkillShelfSort;
 }
 
 export interface SkillsPageData {
@@ -36,6 +59,10 @@ export interface SkillsPageData {
     catalogTotal: number;
     catalogLimit: number;
     loadErrors: { installed: string | null; catalog: string | null };
+    /** Skills shelf — tag chips. Empty when the facet call failed (the shelf still renders). */
+    tagFacets?: SkillTagFacet[];
+    /** Skills shelf — per-card-state counts for the summary line. */
+    counts?: SkillCardStateCounts | null;
 }
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -56,18 +83,54 @@ function parseSection(value: string | string[] | undefined): SkillsSection {
     return SKILLS_SECTIONS.includes(raw as SkillsSection) ? (raw as SkillsSection) : 'installed';
 }
 
+function parseTags(value: string | string[] | undefined): string[] | undefined {
+    const raw = firstParam(value);
+    if (!raw) return undefined;
+    const tags: string[] = [];
+    for (const part of raw.split(',')) {
+        const tag = normalizeSkillTag(part);
+        if (tag && !tags.includes(tag)) tags.push(tag);
+    }
+    return tags.length > 0 ? tags.slice(0, SKILL_TAG_FILTER_MAX) : undefined;
+}
+
+function parseOneOf<T extends string>(
+    value: string | string[] | undefined,
+    allowed: readonly T[],
+): T | undefined {
+    const raw = firstParam(value);
+    return raw && (allowed as readonly string[]).includes(raw) ? (raw as T) : undefined;
+}
+
+function parseEnabled(value: string | string[] | undefined): boolean | undefined {
+    const raw = firstParam(value);
+    return raw === 'true' ? true : raw === 'false' ? false : undefined;
+}
+
 /**
- * Whitelists the four query params the Skills catalog understands. Anything
- * unknown is dropped rather than forwarded, so a hand-crafted URL can't widen
- * the backend query.
+ * Whitelists the query params the Skills catalog understands: the original
+ * four plus the shelf's five (`tags`, `readiness`, `provenance`, `enabled`,
+ * `sort`). Anything unknown — or any malformed shelf value — is dropped rather
+ * than forwarded, so a hand-crafted URL can't widen the backend query.
  */
 export function parseSkillsSearchParams(params: SearchParams): SkillsPageFilters {
-    return {
+    const filters: SkillsPageFilters = {
         section: parseSection(params.section),
         search: firstParam(params.search)?.trim() ?? '',
         installedOffset: parseOffset(params.installedOffset),
         catalogOffset: parseOffset(params.catalogOffset),
     };
+    const tags = parseTags(params.tags);
+    if (tags) filters.tags = tags;
+    const readiness = parseOneOf(params.readiness, SKILL_READINESS_FILTERS);
+    if (readiness) filters.readiness = readiness;
+    const provenance = parseOneOf(params.provenance, SKILL_PROVENANCES);
+    if (provenance) filters.provenance = provenance;
+    const enabled = parseEnabled(params.enabled);
+    if (enabled !== undefined) filters.enabled = enabled;
+    const sort = parseOneOf(params.sort, SKILL_SHELF_SORTS);
+    if (sort && sort !== 'updated') filters.sort = sort;
+    return filters;
 }
 
 /**
@@ -85,6 +148,11 @@ export function buildSkillsHref(
     if (filters.search.trim()) params.set('search', filters.search.trim());
     if (filters.installedOffset > 0) params.set('installedOffset', String(filters.installedOffset));
     if (filters.catalogOffset > 0) params.set('catalogOffset', String(filters.catalogOffset));
+    if (filters.tags?.length) params.set('tags', filters.tags.join(','));
+    if (filters.readiness) params.set('readiness', filters.readiness);
+    if (filters.provenance) params.set('provenance', filters.provenance);
+    if (filters.enabled !== undefined) params.set('enabled', String(filters.enabled));
+    if (filters.sort && filters.sort !== 'updated') params.set('sort', filters.sort);
     return `${basePath}${params.size ? `?${params}` : ''}${hash}`;
 }
 
@@ -97,12 +165,17 @@ export function buildSkillsHref(
  * page into the error boundary.
  */
 export async function loadSkillsPageData(filters: SkillsPageFilters): Promise<SkillsPageData> {
-    const [installed, catalog] = await Promise.all([
+    const [installed, catalog, facets] = await Promise.all([
         skillsAPI
             .listInstalled({
                 limit: SKILLS_PAGE_SIZE,
                 offset: filters.installedOffset,
                 search: filters.search,
+                tags: filters.tags,
+                readiness: filters.readiness,
+                provenance: filters.provenance,
+                enabled: filters.enabled,
+                sort: filters.sort,
             })
             .then(
                 (result) => ({ result, error: null as string | null }),
@@ -131,6 +204,15 @@ export async function loadSkillsPageData(filters: SkillsPageFilters): Promise<Sk
                     error: 'catalog',
                 }),
             ),
+        // Skills shelf — tag chips. Same defensive posture: a failing facet
+        // call leaves the chip row empty, never the shelf. Wrapped so even a
+        // synchronous throw becomes a handled rejection.
+        Promise.resolve()
+            .then(() => skillsAPI.listTags())
+            .then(
+                (result) => result?.tags ?? [],
+                () => [] as SkillTagFacet[],
+            ),
     ]);
 
     return {
@@ -140,5 +222,7 @@ export async function loadSkillsPageData(filters: SkillsPageFilters): Promise<Sk
         catalogTotal: catalog.result.total ?? 0,
         catalogLimit: SKILLS_PAGE_SIZE,
         loadErrors: { installed: installed.error, catalog: catalog.error },
+        tagFacets: facets,
+        counts: 'counts' in installed.result ? (installed.result.counts ?? null) : null,
     };
 }

@@ -54,6 +54,12 @@ export interface RunSettlementResult {
      * published prices debited). Absent when the run had nothing to settle.
      */
     settlementMode?: CreditSettlementMode;
+    /**
+     * Model accounts (AW-16) — the workspace's own Model Accounts whose served
+     * spend was excluded from the debit. Set only when there was any; a plugin
+     * a Model Account served in full is also listed in `exemptPluginIds`.
+     */
+    exemptModelAccountIds?: string[];
 }
 
 export interface RunCostSettler {

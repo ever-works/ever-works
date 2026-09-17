@@ -1,5 +1,6 @@
 import type { TasksService } from '../tasks-domain/tasks.service';
 import type { TaskChatService } from '../tasks-domain/task-chat.service';
+import type { TaskAgentReviewService } from '../tasks-domain/task-agent-review.service';
 import type {
     TaskAssigneeRepository,
     TaskReviewerRepository,
@@ -49,7 +50,7 @@ import type { InboxToolService } from '../inbox/agent-inbox-tools';
  */
 export const AGENT_DOMAIN_TOOL_SOURCES = 'AGENT_DOMAIN_TOOL_SOURCES' as const;
 
-/** Tasks surface — createTask / commentOnTask / transitionTask. */
+/** Tasks surface — createTask / commentOnTask / transitionTask / submitTaskReview. */
 export interface AgentTaskToolSource {
     tasksService: TasksService;
     chatService: TaskChatService;
@@ -61,6 +62,17 @@ export interface AgentTaskToolSource {
     assignees?: TaskAssigneeRepository;
     reviewers?: TaskReviewerRepository;
     approvers?: TaskApproverRepository;
+    /**
+     * Reviewer agent stage (slice AD, EW-811) — backs `submitTaskReview`.
+     * Individually optional like every other sub-bundle here: unbound,
+     * the tool is not offered and no agent approval can be recorded.
+     */
+    agentReviews?: Pick<TaskAgentReviewService, 'submitVerdict'> &
+        // Settles the review bound to a review run that started without its
+        // brief (a job-runtime retry). Optional so a bundle that only backs
+        // the verdict tool still type-checks; unbound, the tool loop still
+        // refuses to call the model for that run.
+        Partial<Pick<TaskAgentReviewService, 'abandonRunWithoutBrief'>>;
 }
 
 export interface AgentIngestToolSource {

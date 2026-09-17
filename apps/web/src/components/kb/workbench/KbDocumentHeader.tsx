@@ -6,6 +6,7 @@ import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { updateKbDocumentAction } from '@/app/actions/works/kb-document';
 import type { KbDocumentDto } from '@ever-works/contracts';
+import { DocumentShelfControls } from '@/components/knowledge/DocumentShelfControls';
 
 /**
  * EW-641 slice A — slim title row above the workbench editor.
@@ -20,6 +21,10 @@ import type { KbDocumentDto } from '@ever-works/contracts';
  *
  * Out of scope (deliberately): tags editor, description editor, lock
  * toggle. Those land in the slice-B metadata side panel.
+ *
+ * Knowledge library: after the chips, the shelf controls — the folder
+ * breadcrumb, File, Archive / Restore and Export — so a document can be
+ * curated without leaving the workbench.
  */
 export interface KbDocumentHeaderProps {
     workId: string;
@@ -155,6 +160,8 @@ export function KbDocumentHeader({ workId, document }: KbDocumentHeaderProps) {
             >
                 {document.language || 'en'}
             </span>
+
+            <DocumentShelfControls workId={workId} document={document} />
 
             {error ? (
                 <span

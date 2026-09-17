@@ -10,8 +10,27 @@ import { ChatHistory } from './ChatHistory';
 import { CanvasProvider } from './canvas/CanvasProvider';
 import { CanvasBridge } from './canvas/CanvasBridge';
 import { CanvasOverlay } from './canvas/CanvasOverlay';
+import { AgentConversation } from './conversations/AgentConversation';
+import type { ConversationKind } from '@ever-works/contracts';
 
-export function ChatInterface() {
+export interface ChatInterfaceProps {
+    /**
+     * A named Conversation with an Agent. Absent (every existing caller),
+     * this is the AI assistant's thread, rendered exactly as before.
+     */
+    kind?: ConversationKind;
+    /** Opens the docked panel's participant switcher from the assistant's toolbar. */
+    onSwitch?: () => void;
+}
+
+export function ChatInterface({ kind, onSwitch }: ChatInterfaceProps = {}) {
+    // The Conversation's id and participant are read from `ChatProvider`, so
+    // the view stays mounted while a first message creates the Conversation.
+    if (kind) return <AgentConversation />;
+    return <AssistantChatInterface onSwitch={onSwitch} />;
+}
+
+function AssistantChatInterface({ onSwitch }: { onSwitch?: () => void }) {
     const {
         messages,
         status,
@@ -41,6 +60,7 @@ export function ChatInterface() {
                     onSelectProvider={setSelectedProvider}
                     onNewChat={resetChat}
                     onOpenHistory={() => setShowHistory(true)}
+                    onSwitch={onSwitch}
                 />
 
                 {messages.length === 0 ? (

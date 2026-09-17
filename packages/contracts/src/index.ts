@@ -28,10 +28,20 @@ export * from './inbox/index.js';
 // Agent email (AW-05) — approve-before-send statuses and modes, plus the
 // per-inbox / per-workspace send ceilings and their pure resolution.
 export * from './email/index.js';
+// Model accounts (AW-16) — several credentials per AI provider, in order, the
+// workspace / Agent / schedule model ladder, and the record a Run keeps of
+// what actually answered it.
+export * from './model-routing/index.js';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Memory facts + context-file vocabulary (AW-07) — the atomic tier of Memory
+// and the shared limits every surface validates against.
+export * from './memory/index.js';
+// Conversations — kinds, participants, send status and delivery outcomes for
+// named conversations with Agents.
+export * from './conversations/index.js';
 // Connections (AW-15) — plain-English scope presets expressed on the
 // tool-grant lattice, and the shared connection-health vocabulary.
 export * from './connections/index.js';
@@ -44,3 +54,6 @@ export * from './runs/index.js';
 // Meters and the credit price list (AW-17) — which of three ways a unit of
 // spend was paid for, and what a kind of call costs before it is made.
 export * from './billing/index.js';
+// Attention controls (AW-13) — the notification matrix (one row per event,
+// one column per delivery target) and the attention budget meter shape.
+export * from './notifications/index.js';

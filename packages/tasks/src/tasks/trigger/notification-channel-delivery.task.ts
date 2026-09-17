@@ -55,6 +55,7 @@ export const notificationChannelDeliveryTask = task<
                     rich: payload.rich,
                     messageRef: payload.messageRef,
                     eventType: payload.eventType,
+                    content: payload.content,
                 },
                 payload.options,
                 payload.eventType,

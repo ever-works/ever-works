@@ -48,6 +48,8 @@ function makeUsage(overrides: Record<string, jest.Mock> = {}) {
         getRunCostByPlugin: jest
             .fn()
             .mockResolvedValue([{ pluginId: 'openrouter', costCents: 37 }]),
+        // AW-16 — no usage served by a Model Account unless a test says so.
+        getRunCostByModelAccount: jest.fn().mockResolvedValue([]),
         ...overrides,
     };
 }
@@ -117,6 +119,8 @@ function makeService(
         payg?: Record<string, jest.Mock>;
         /** A real ledger service in place of the jest.fn() shell (conversion under test). */
         ledgerInstance?: CreditLedgerService;
+        /** Model Account lookups (AW-16); absent by default. */
+        modelAccounts?: Record<string, jest.Mock>;
     } = {},
 ) {
     const agentRuns = makeAgentRuns(parts.agentRuns);
@@ -128,6 +132,7 @@ function makeService(
         parts.notifications === null ? undefined : makeNotifications(parts.notifications);
     const settings = parts.settings === null ? undefined : makeSettings(parts.settings);
     const payg = parts.payg;
+    const modelAccounts = parts.modelAccounts;
     const service = new RunCostSettlementService(
         agentRuns as any,
         usage as any,
@@ -138,6 +143,7 @@ function makeService(
         settings as any,
         undefined, // auto-recharge — covered by its own spec
         payg as any,
+        modelAccounts as any,
     );
     return {
         service,
@@ -149,7 +155,24 @@ function makeService(
         notifications,
         settings,
         payg,
+        modelAccounts,
     };
+}
+
+/**
+ * A real `CreditLedgerService` over a recording repository, so a debit is
+ * computed by the production cost → credits conversion, not by a mock.
+ */
+function makeRealLedger() {
+    const writes: Array<{ amountCredits: number; costCentsRef: number | null }> = [];
+    const repository = {
+        recordAtomic: jest.fn(async (write: any) => {
+            writes.push(write);
+            return { status: 'created', entry: { id: `entry-${writes.length}`, ...write } };
+        }),
+    };
+    const ledger = new CreditLedgerService(repository as any, {} as any, {} as any);
+    return { ledger, repository, writes };
 }
 
 describe('RunCostSettlementService', () => {
@@ -1055,6 +1078,251 @@ describe('RunCostSettlementService', () => {
             expect(split.fixedRows).toEqual([]);
             expect(split.workspacePluginIds).toEqual([]);
             expect(split.legacySpend).toEqual([{ pluginId: 'openrouter', costCents: 12 }]);
+        });
+    });
+
+    describe('settleRun — usage served by a Model Account (AW-16)', () => {
+        const OWN_ACCOUNT = '5a1d3c9e-0b6f-4e2a-9c71-2f8e4d6b1a01';
+        const OTHER_ACCOUNT = '5a1d3c9e-0b6f-4e2a-9c71-2f8e4d6b1a02';
+
+        /** A credit-enforced plan: enforcement on, plan carries `credit-limited`. */
+        function enforceCredits() {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            // A non-trivial conversion, so "exactly what develop debits" is
+            // not satisfied by accident: 37¢ × 1 credit/¢ × 1.2 → ceil 45.
+            process.env.CREDITS_PER_DOLLAR = '100';
+            process.env.CREDITS_MARGIN_PERCENT = '20';
+        }
+
+        /** One 37¢ openrouter call on the run, platform key in plugin settings. */
+        function settle(options: {
+            servedBy?: string;
+            accounts?: Array<{ id: string; workspaceKey: string; providerPluginId: string }>;
+            modelAccountsWired?: boolean;
+            run?: Record<string, unknown>;
+            spend?: Array<{ pluginId: string; costCents: number }>;
+            accountSpend?: Array<{ pluginId: string; modelAccountId: string; costCents: number }>;
+            findOwnershipByIds?: jest.Mock;
+        }) {
+            const real = makeRealLedger();
+            const accountSpend =
+                options.accountSpend ??
+                (options.servedBy
+                    ? [{ pluginId: 'openrouter', modelAccountId: options.servedBy, costCents: 37 }]
+                    : []);
+            const parts = makeService({
+                ...(options.run
+                    ? { agentRuns: { findOne: jest.fn().mockResolvedValue(options.run) } }
+                    : {}),
+                usage: {
+                    getRunCostByPlugin: jest
+                        .fn()
+                        .mockResolvedValue(
+                            options.spend ?? [{ pluginId: 'openrouter', costCents: 37 }],
+                        ),
+                    getRunCostByModelAccount: jest.fn().mockResolvedValue(accountSpend),
+                },
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ...(options.modelAccountsWired === false
+                    ? {}
+                    : {
+                          modelAccounts: {
+                              findOwnershipByIds:
+                                  options.findOwnershipByIds ??
+                                  jest.fn().mockResolvedValue(options.accounts ?? []),
+                          },
+                      }),
+            });
+            // Swap in the real ledger (keeps the service's other collaborators).
+            const service = new RunCostSettlementService(
+                parts.agentRuns as any,
+                parts.usage as any,
+                real.ledger,
+                parts.entitlements as any,
+                parts.users as any,
+                parts.notifications as any,
+                parts.settings as any,
+                undefined,
+                undefined,
+                parts.modelAccounts as any,
+            );
+            return { ...parts, service, real };
+        }
+
+        it('a call served by the workspace’s own Model Account debits 0 on a credit-enforced plan', async () => {
+            enforceCredits();
+            const { service, real, agentRuns, usage } = settle({
+                servedBy: OWN_ACCOUNT,
+                accounts: [
+                    { id: OWN_ACCOUNT, workspaceKey: 'org:org-1', providerPluginId: 'openrouter' },
+                ],
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(usage.getRunCostByModelAccount).toHaveBeenCalledWith('run-1');
+            expect(result.status).toBe('settled');
+            expect(result.totalCostCents).toBe(37);
+            expect(result.billableCostCents).toBe(0);
+            expect(result.debitedCredits).toBe(0);
+            expect(real.repository.recordAtomic).not.toHaveBeenCalled();
+            // Counted as owner-paid exactly like a workspace's own key.
+            expect(result.exemptPluginIds).toEqual(['openrouter']);
+            expect(result.exemptModelAccountIds).toEqual([OWN_ACCOUNT]);
+            // The cost estimate still carries the full metered spend.
+            expect(agentRuns.update).toHaveBeenCalledWith('run-1', { costCents: 37 });
+        });
+
+        it('the same call through platform credentials debits exactly what it did before, via the existing conversion', async () => {
+            enforceCredits();
+            const expected = makeRealLedger().ledger.creditsForCostCents(37);
+            expect(expected).toBe(45);
+
+            // No Model Account served it: the new lookup finds nothing.
+            const platform = settle({
+                accounts: [
+                    { id: OWN_ACCOUNT, workspaceKey: 'org:org-1', providerPluginId: 'openrouter' },
+                ],
+            });
+            // The path before Model Accounts existed: no account repository at all.
+            const before = settle({ modelAccountsWired: false });
+
+            const withAccounts = await platform.service.settleRun('run-1');
+            const withoutAccounts = await before.service.settleRun('run-1');
+
+            for (const [result, real] of [
+                [withAccounts, platform.real],
+                [withoutAccounts, before.real],
+            ] as const) {
+                expect(result.status).toBe('settled');
+                expect(result.billableCostCents).toBe(37);
+                expect(result.debitedCredits).toBe(expected);
+                expect(result.exemptPluginIds).toEqual([]);
+                expect(result.exemptModelAccountIds).toBeUndefined();
+                expect(real.writes).toEqual([
+                    expect.objectContaining({
+                        amountCredits: -expected,
+                        costCentsRef: 37,
+                        idempotencyKey: 'run:run-1',
+                    }),
+                ]);
+            }
+            // Nothing to confirm, so no account lookup either.
+            expect(platform.modelAccounts!.findOwnershipByIds).not.toHaveBeenCalled();
+        });
+
+        it('does not honour a modelAccountId that belongs to another workspace', async () => {
+            enforceCredits();
+            const { service, real, modelAccounts } = settle({
+                servedBy: OTHER_ACCOUNT,
+                accounts: [
+                    {
+                        id: OTHER_ACCOUNT,
+                        workspaceKey: 'org:org-2',
+                        providerPluginId: 'openrouter',
+                    },
+                ],
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(modelAccounts!.findOwnershipByIds).toHaveBeenCalledWith([OTHER_ACCOUNT]);
+            expect(result.billableCostCents).toBe(37);
+            expect(result.debitedCredits).toBe(real.ledger.creditsForCostCents(37));
+            expect(result.exemptPluginIds).toEqual([]);
+            expect(result.exemptModelAccountIds).toBeUndefined();
+        });
+
+        it('does not honour the run owner’s personal account on an organization run, nor an unknown id', async () => {
+            enforceCredits();
+            const personal = settle({
+                servedBy: OWN_ACCOUNT,
+                accounts: [
+                    {
+                        id: OWN_ACCOUNT,
+                        workspaceKey: 'user:user-1',
+                        providerPluginId: 'openrouter',
+                    },
+                ],
+            });
+            const unknown = settle({ servedBy: OWN_ACCOUNT, accounts: [] });
+
+            for (const { service, real } of [personal, unknown]) {
+                const result = await service.settleRun('run-1');
+                expect(result.debitedCredits).toBe(real.ledger.creditsForCostCents(37));
+            }
+        });
+
+        it('honours a personal workspace’s own account on a run outside any organization', async () => {
+            enforceCredits();
+            const { service } = settle({
+                run: { ...RUN, organizationId: null },
+                servedBy: OWN_ACCOUNT,
+                accounts: [
+                    {
+                        id: OWN_ACCOUNT,
+                        workspaceKey: 'user:user-1',
+                        providerPluginId: 'openrouter',
+                    },
+                ],
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(result.debitedCredits).toBe(0);
+        });
+
+        it('does not honour an account held for a different provider than the row’s plugin', async () => {
+            enforceCredits();
+            const { service, real } = settle({
+                servedBy: OWN_ACCOUNT,
+                accounts: [
+                    { id: OWN_ACCOUNT, workspaceKey: 'org:org-1', providerPluginId: 'anthropic' },
+                ],
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(result.debitedCredits).toBe(real.ledger.creditsForCostCents(37));
+        });
+
+        it('exempts only the served part of a plugin’s spend and leaves every other row as it was', async () => {
+            enforceCredits();
+            const { service, real } = settle({
+                spend: [
+                    { pluginId: 'openrouter', costCents: 50 },
+                    { pluginId: 'tavily', costCents: 12 },
+                ],
+                accountSpend: [
+                    { pluginId: 'openrouter', modelAccountId: OWN_ACCOUNT, costCents: 30 },
+                ],
+                accounts: [
+                    { id: OWN_ACCOUNT, workspaceKey: 'org:org-1', providerPluginId: 'openrouter' },
+                ],
+            });
+
+            const result = await service.settleRun('run-1');
+
+            // 20¢ of openrouter on the platform key + 12¢ of tavily.
+            expect(result.totalCostCents).toBe(62);
+            expect(result.billableCostCents).toBe(32);
+            expect(result.debitedCredits).toBe(real.ledger.creditsForCostCents(32));
+            // openrouter was only partly served by the account.
+            expect(result.exemptPluginIds).toEqual([]);
+            expect(result.exemptModelAccountIds).toEqual([OWN_ACCOUNT]);
+        });
+
+        it('bills the served spend at the platform rate when account ownership cannot be read', async () => {
+            enforceCredits();
+            const { service, real } = settle({
+                servedBy: OWN_ACCOUNT,
+                findOwnershipByIds: jest.fn().mockRejectedValue(new Error('DB down')),
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(result.status).toBe('settled');
+            expect(result.debitedCredits).toBe(real.ledger.creditsForCostCents(37));
         });
     });
 

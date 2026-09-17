@@ -199,6 +199,16 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 scopeContext: taskRow
                     ? `Task ${taskRow.slug ?? taskRow.id}: ${taskRow.title}\nStatus: ${taskRow.status}\nPriority: ${taskRow.priority}`
                     : null,
+                // The row's OWN admission scope, whenever it has one
+                // (reviewer agent stage, slice AD). The T6 fallback above
+                // claims ANY in-flight run of this agent on this Task —
+                // which, while a review is running, is the REVIEW run. The
+                // tool loop narrows tools, gates a review run on its brief
+                // and offers the verdict tool only from the scope on the
+                // CONTEXT; leaving it off made that review row run with the
+                // agent's full tool surface. An ordinary row has no scope
+                // and the call is unchanged.
+                ...(run.delegationScope ? { delegationScope: run.delegationScope } : {}),
             });
 
             if (result.status === 'assembled') {

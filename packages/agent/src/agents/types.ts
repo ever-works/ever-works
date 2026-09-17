@@ -33,6 +33,11 @@ export interface AgentDto {
     slug: string;
     title: string | null;
     capabilities: string | null;
+    /**
+     * AW-20 — the area of work this Agent owns. A label, never a
+     * permission; `null` on every Agent that has not been given one.
+     */
+    lane: string | null;
     aiProviderId: string | null;
     modelId: string | null;
     /**
@@ -50,6 +55,8 @@ export interface AgentDto {
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: Date | null;
+    /** Schedules — non-null when the heartbeat is paused (the Agent itself may be ACTIVE). */
+    heartbeatPausedAt: Date | null;
     lastRunAt: Date | null;
     lastRunStatus: string | null;
     errorCount: number;
@@ -95,6 +102,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         slug: agent.slug,
         title: agent.title ?? null,
         capabilities: agent.capabilities ?? null,
+        lane: agent.lane ?? null,
         aiProviderId: agent.aiProviderId ?? null,
         modelId: agent.modelId ?? null,
         environmentId: agent.environmentId ?? null,
@@ -110,6 +118,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         heartbeatCadence: agent.heartbeatCadence ?? null,
         idleBehavior: agent.idleBehavior,
         nextHeartbeatAt: agent.nextHeartbeatAt ?? null,
+        heartbeatPausedAt: agent.heartbeatPausedAt ?? null,
         lastRunAt: agent.lastRunAt ?? null,
         lastRunStatus: agent.lastRunStatus ?? null,
         errorCount: agent.errorCount,

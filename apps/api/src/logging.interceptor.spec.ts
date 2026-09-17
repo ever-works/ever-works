@@ -271,4 +271,38 @@ describe('LoggingInterceptor', () => {
             ).toBe(true);
         });
     });
+
+    describe('share token redaction (debug-on)', () => {
+        const TOKEN = 'Zb3kQ9x_T1-vYwP0aLmN8cR4sD6fG2hJ5kL7qW9eR1t';
+
+        beforeEach(() => {
+            process.env.HTTP_DEBUG = 'true';
+        });
+
+        it('never writes a share token into the request or response line', async () => {
+            const next: CallHandler = { handle: () => of('payload') };
+            const ctx = buildContext({ method: 'GET', originalUrl: `/en/share/${TOKEN}` });
+
+            await lastValueFrom(interceptor.intercept(ctx, next));
+
+            const lines = logSpy.mock.calls.map((call) => String(call[0]));
+            expect(lines).toContain('Incoming Request: GET /en/share/[redacted]');
+            expect(lines.join(' | ')).not.toContain(TOKEN);
+        });
+
+        it('never writes a share token into the error line', async () => {
+            const err = Object.assign(new Error('boom'), { response: { statusCode: 404 } });
+            const next: CallHandler = { handle: () => throwError(() => err) };
+            const ctx = buildContext({
+                method: 'GET',
+                originalUrl: `/api/public/shared-view/board?token=${TOKEN}`,
+            });
+
+            await expect(lastValueFrom(interceptor.intercept(ctx, next))).rejects.toBe(err);
+
+            const lines = errorSpy.mock.calls.map((call) => String(call[0]));
+            expect(lines.join(' | ')).not.toContain(TOKEN);
+            expect(lines[0]).toContain('token=[redacted]');
+        });
+    });
 });

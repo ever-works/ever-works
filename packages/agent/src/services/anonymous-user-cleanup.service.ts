@@ -1,5 +1,10 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { UserRepository } from '../database';
+import {
+    MemoryFolderRepository,
+    OrganizationRepository,
+    TenantRepository,
+    UserRepository,
+} from '../database';
 
 /**
  * Injection token for the active storage backend (an `IStoragePlugin`).
@@ -42,6 +47,14 @@ export interface AnonymousUserCleanupSummary {
  * goes away. Order matters: row-delete first would lose the userId we
  * need to derive the prefix.
  *
+ * Knowledge library — an anonymous account can belong to an Organization
+ * and create its shared folders. A shared folder records its creator in
+ * `memory_folders.userId`, whose FK is `ON DELETE CASCADE`, so deleting
+ * the row would delete the Organization's folders with it. Before the row
+ * goes, those folders are handed to another member of the Organization
+ * (see {@link handOverSharedFolders}); only when nobody else is left does
+ * the cascade take them, along with the Organization's last member.
+ *
  * The service is intentionally idempotent and resilient: a single
  * row-delete or storage-delete failure logs + continues so one stuck
  * user doesn't block the rest of the batch.
@@ -55,6 +68,11 @@ export class AnonymousUserCleanupService {
         @Optional()
         @Inject(ANON_CLEANUP_STORAGE_PLUGIN)
         private readonly storage?: StorageGcBackend,
+        // Optional so every existing wiring (and the unit specs) still
+        // constructs; `DatabaseModule` provides all three in production.
+        @Optional() private readonly memoryFolders?: MemoryFolderRepository,
+        @Optional() private readonly organizations?: OrganizationRepository,
+        @Optional() private readonly tenants?: TenantRepository,
     ) {}
 
     async purgeExpired(now: Date = new Date()): Promise<AnonymousUserCleanupSummary> {
@@ -81,6 +99,22 @@ export class AnonymousUserCleanupService {
         }
 
         for (const user of expired) {
+            // Step 0: hand the user's shared folders to another member of
+            // each Organization. A failure skips this user for the run —
+            // deleting the row anyway would cascade the folders away — and
+            // the next nightly run retries.
+            try {
+                await this.handOverSharedFolders(user.id);
+            } catch (cause) {
+                summary.failed += 1;
+                const error = cause instanceof Error ? cause.message : String(cause);
+                summary.failures.push({ userId: user.id, error });
+                this.logger.error(
+                    `anonymous-user-cleanup: shared-folder hand-over failed for ${user.id} (user kept for the next run): ${error}`,
+                );
+                continue;
+            }
+
             // Step 1: GC the user's uploaded files. Best-effort — we log
             // and count failures but still delete the user row so the
             // TTL contract holds.
@@ -114,5 +148,66 @@ export class AnonymousUserCleanupService {
         );
 
         return summary;
+    }
+
+    /**
+     * Re-attribute every shared folder `userId` created to another member of
+     * the same Organization, so the `memory_folders.userId` cascade does not
+     * delete it with the account.
+     *
+     * The successor is the Organization's Tenant owner — the account the
+     * Organization lives under, and the only elevated role the schema has
+     * (`OrganizationMembershipService.ensureAdmin` is membership today) —
+     * unless that is the user being deleted; then another member of the
+     * Tenant (`UserRepository.findOtherTenantMember`). With no other member
+     * the folders are left to the cascade: the Organization has lost its
+     * last member too.
+     *
+     * A no-op when the folder repositories are not wired.
+     */
+    private async handOverSharedFolders(userId: string): Promise<void> {
+        if (!this.memoryFolders || !this.organizations || !this.tenants) return;
+
+        const organizationIds =
+            await this.memoryFolders.listOrganizationIdsWithFoldersCreatedBy(userId);
+        for (const organizationId of organizationIds) {
+            const successorId = await this.findSharedFolderSuccessor(organizationId, userId);
+            if (!successorId) {
+                this.logger.log(
+                    `anonymous-user-cleanup: ${userId} was the last member of organization ${organizationId}; its shared folders go with the account`,
+                );
+                continue;
+            }
+            const moved = await this.memoryFolders.reassignOrganizationFolders(
+                organizationId,
+                userId,
+                successorId,
+            );
+            this.logger.log(
+                `anonymous-user-cleanup: handed ${moved} shared folder(s) of organization ${organizationId} from ${userId} to ${successorId}`,
+            );
+        }
+    }
+
+    private async findSharedFolderSuccessor(
+        organizationId: string,
+        userId: string,
+    ): Promise<string | null> {
+        const organization = await this.organizations!.findById(organizationId);
+        if (!organization?.tenantId) return null;
+
+        const tenant = await this.tenants!.findById(organization.tenantId);
+        if (tenant && tenant.ownerUserId !== userId) {
+            const owner = await this.userRepository.findById(tenant.ownerUserId);
+            if (owner && owner.tenantId === organization.tenantId) {
+                return owner.id;
+            }
+        }
+
+        const member = await this.userRepository.findOtherTenantMember(
+            organization.tenantId,
+            userId,
+        );
+        return member?.id ?? null;
     }
 }

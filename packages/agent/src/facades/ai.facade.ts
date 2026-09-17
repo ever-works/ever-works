@@ -1,5 +1,6 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
+import type { ReasoningEffort } from '@ever-works/contracts';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type {
     AskJsonOptions,
@@ -31,6 +32,12 @@ import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 import { fetchModelCatalog, matchModelCatalogEntry } from './model-catalog';
 import type { ModelCatalogEntry } from './model-catalog';
+import {
+    MODEL_ROUTE_PLANNER,
+    type ModelAccountSelection,
+    type ModelRoutePlan,
+    type ModelRoutePlanner,
+} from '../model-routing/model-route-planner.port';
 
 export class AiFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -86,8 +93,168 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         @Optional() workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly pluginUsageService?: PluginUsageService,
         @Optional() private readonly budgetGuard?: BudgetGuardService,
+        // Model accounts (AW-16) — the model ladder + provider accounts.
+        // Unbound = no planner = every call resolves exactly as before.
+        @Optional()
+        @Inject(MODEL_ROUTE_PLANNER)
+        private readonly modelRoutePlanner?: ModelRoutePlanner,
     ) {
         super(registry, settingsService, workPluginRepository);
+    }
+
+    /**
+     * Model accounts (AW-16) — what the model ladder wants for this call.
+     *
+     * Null (an unbound planner, nothing configured, or ANY failure reading the
+     * ladder) leaves the call exactly as it was: a Run never fails because the
+     * routing tables could not be read.
+     *
+     * A Work that selected its own AI plugin keeps it: the workspace default
+     * is wider than a Work, so it never overrides one.
+     */
+    private async planModelRoute(
+        facadeOptions: FacadeOptions,
+        requested: {
+            providerId?: string;
+            modelId?: string;
+            hasComplexity?: boolean;
+            effort?: ReasoningEffort;
+            /** The call's own `routing.scheduleId`; wins over the facade options'. */
+            scheduleId?: string;
+        },
+    ): Promise<ModelRoutePlan | null> {
+        if (!this.modelRoutePlanner) return null;
+        try {
+            const plan = await this.modelRoutePlanner.plan({
+                userId: facadeOptions.userId,
+                workId: facadeOptions.workId,
+                agentId: facadeOptions.agentId,
+                runId: facadeOptions.runId,
+                scheduleId: requested.scheduleId ?? facadeOptions.scheduleId,
+                requestedProviderId: requested.providerId,
+                requestedModelId: requested.modelId,
+                hasComplexity: requested.hasComplexity,
+                requestedEffort: requested.effort,
+            });
+            if (
+                plan &&
+                plan.primarySource === 'workspace' &&
+                plan.providerPluginId &&
+                facadeOptions.workId &&
+                (await this.findActivePluginForWork(facadeOptions.workId))
+            ) {
+                return {
+                    workspaceKey: plan.workspaceKey,
+                    primarySource: 'default',
+                    reasoningEffort: plan.reasoningEffort,
+                    runTimeoutSeconds: plan.runTimeoutSeconds,
+                    accountsAvailable: plan.accountsAvailable,
+                };
+            }
+            return plan;
+        } catch (error) {
+            this.logger.warn(
+                `Model routing unavailable, using plugin settings: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * Model accounts (AW-16) — lay the first usable Model Account's
+     * credentials over the plugin's resolved settings.
+     *
+     * Only the plugin's own secret (`x-secret`) keys are ever replaced — an
+     * account cannot repoint an endpoint or change a model setting. A
+     * credential the Work itself configured stays in force: a Work-level key
+     * is the narrowest choice there is.
+     */
+    private async applyModelAccount(
+        plan: ModelRoutePlan | null,
+        plugin: IAiProviderPlugin,
+        settings: Record<string, unknown>,
+        facadeOptions: FacadeOptions,
+    ): Promise<{ settings: Record<string, unknown>; account: ModelAccountSelection | null }> {
+        if (!plan || !plan.accountsAvailable || !this.modelRoutePlanner) {
+            return { settings, account: null };
+        }
+        try {
+            const account = await this.modelRoutePlanner.selectAccount(plan, plugin.id);
+            if (!account) return { settings, account: null };
+            const secretKeys = secretSettingKeys(plugin);
+            const keys = Object.keys(account.credentials).filter((key) => secretKeys.has(key));
+            if (keys.length === 0) return { settings, account: null };
+            if (
+                facadeOptions.workId &&
+                (await this.hasWorkLevelCredential(plugin.id, keys, facadeOptions))
+            ) {
+                return { settings, account: null };
+            }
+            const merged: Record<string, unknown> = { ...settings };
+            for (const key of keys) {
+                merged[key] = account.credentials[key];
+            }
+            return { settings: merged, account };
+        } catch (error) {
+            this.logger.warn(
+                `Model account lookup failed, using plugin settings: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { settings, account: null };
+        }
+    }
+
+    private async hasWorkLevelCredential(
+        pluginId: string,
+        keys: readonly string[],
+        facadeOptions: FacadeOptions,
+    ): Promise<boolean> {
+        const service = this.settingsService as
+            | (PluginSettingsService & { getResolvedSettings?: unknown })
+            | undefined;
+        if (!service || typeof service.getResolvedSettings !== 'function') return false;
+        const resolved = await service.getResolvedSettings(pluginId, {
+            userId: facadeOptions.userId,
+            workId: facadeOptions.workId,
+            includeSecrets: true,
+        });
+        return keys.some((key) => resolved[key]?.source === 'work' && !!resolved[key]?.value);
+    }
+
+    /** Model accounts (AW-16) — record on the Run what answered. Never throws. */
+    private async recordModelAnswer(
+        plan: ModelRoutePlan | null,
+        facadeOptions: FacadeOptions,
+        provider: string,
+        model: string | undefined,
+        account: ModelAccountSelection | null,
+        startedAt: number,
+        requestedEffort?: ReasoningEffort,
+    ): Promise<void> {
+        if (!this.modelRoutePlanner || !facadeOptions.runId || !model) return;
+        await this.modelRoutePlanner
+            .recordAnswer({
+                runId: facadeOptions.runId,
+                plan,
+                provider,
+                model,
+                account: account ? { accountId: account.accountId, label: account.label } : null,
+                durationMs: Date.now() - startedAt,
+                requestedEffort,
+            })
+            .catch(() => undefined);
+    }
+
+    /** Model accounts (AW-16) — a call on an account failed; a credential rejection marks it at once. */
+    private async reportModelAccountFailure(
+        account: ModelAccountSelection | null,
+        error: unknown,
+    ): Promise<void> {
+        if (!account || !this.modelRoutePlanner) return;
+        await this.modelRoutePlanner.reportFailure(account.accountId, error).catch(() => undefined);
     }
 
     private async enforceBudget(
@@ -166,18 +333,37 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         options: AskJsonOptions<Template> | undefined,
         facadeOptions: FacadeOptions,
     ): Promise<AskJsonResponse<T>> {
+        const requestedProvider =
+            options?.routing?.providerOverride ?? facadeOptions.providerOverride;
+        const route = await this.planModelRoute(facadeOptions, {
+            providerId: requestedProvider,
+            modelId: options?.routing?.modelOverride,
+            hasComplexity: !!options?.routing?.complexity,
+            effort: options?.routing?.reasoningEffort,
+            scheduleId: options?.routing?.scheduleId,
+        });
+
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
-            options?.routing?.providerOverride ?? facadeOptions.providerOverride,
+            route?.providerPluginId ?? requestedProvider,
             facadeOptions.userId,
             facadeOptions.workId,
         );
 
-        const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions.userId,
-            workId: facadeOptions.workId,
-        });
+        const { settings, account } = await this.applyModelAccount(
+            route,
+            plugin,
+            await this.getResolvedSettings(plugin.id, {
+                userId: facadeOptions.userId,
+                workId: facadeOptions.workId,
+            }),
+            facadeOptions,
+        );
 
-        const model = this.resolveModel(plugin, settings, options?.routing);
+        const routing: AiRoutingOptions | undefined =
+            route?.modelId !== undefined
+                ? { ...options?.routing, modelOverride: route.modelId }
+                : options?.routing;
+        const model = this.resolveModel(plugin, settings, routing);
 
         await this.enforceBudget(facadeOptions, plugin, model, settings);
 
@@ -190,7 +376,23 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 settings,
             });
 
-        const response = await this.withEscalation(call, settings, model, options?.routing);
+        const startedAt = Date.now();
+        let response: AskJsonCompletionResponse;
+        try {
+            response = await this.withEscalation(call, settings, model, routing);
+        } catch (error) {
+            await this.reportModelAccountFailure(account, error);
+            throw error;
+        }
+        await this.recordModelAnswer(
+            route,
+            facadeOptions,
+            plugin.id,
+            response.model,
+            account,
+            startedAt,
+            options?.routing?.reasoningEffort,
+        );
 
         const validated = schema.safeParse(response.result);
         if (!validated.success) {
@@ -222,6 +424,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 operation: 'askJson',
                 promptTokens: response.usage?.promptTokens,
                 completionTokens: response.usage?.completionTokens,
+                // AW-16 — the Model Account whose credentials served the call.
+                ...(account ? { modelAccountId: account.accountId } : {}),
             },
         });
 
@@ -360,34 +564,65 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         options: ChatCompletionOptions,
         facadeOptions: FacadeOptions,
     ): Promise<ChatCompletionResponse> {
+        const routingHints = options as unknown as AiRoutingOptions;
+        const route = await this.planModelRoute(facadeOptions, {
+            providerId: facadeOptions.providerOverride,
+            modelId: options.model ?? routingHints.modelOverride,
+            hasComplexity: !!routingHints.complexity,
+            effort: routingHints.reasoningEffort,
+            scheduleId: routingHints.scheduleId,
+        });
+
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
-            facadeOptions.providerOverride,
+            route?.providerPluginId ?? facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.workId,
         );
 
-        const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions.userId,
-            workId: facadeOptions.workId,
-        });
+        const { settings, account } = await this.applyModelAccount(
+            route,
+            plugin,
+            await this.getResolvedSettings(plugin.id, {
+                userId: facadeOptions.userId,
+                workId: facadeOptions.workId,
+            }),
+            facadeOptions,
+        );
 
-        const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
+        const model = this.resolveModel(plugin, settings, routingHints);
+        const effectiveModel = route?.modelId ?? options.model ?? model;
 
         await this.enforceBudget(
             facadeOptions,
             plugin,
-            options.model ?? model,
+            effectiveModel,
             settings,
             options.maxTokens,
         );
 
         const mergedOptions: ChatCompletionOptions = {
             ...options,
-            model: options.model ?? model,
+            model: effectiveModel,
             settings,
         };
 
-        const response = await plugin.createChatCompletion(mergedOptions);
+        const startedAt = Date.now();
+        let response: ChatCompletionResponse;
+        try {
+            response = await plugin.createChatCompletion(mergedOptions);
+        } catch (error) {
+            await this.reportModelAccountFailure(account, error);
+            throw error;
+        }
+        await this.recordModelAnswer(
+            route,
+            facadeOptions,
+            plugin.id,
+            response.model,
+            account,
+            startedAt,
+            routingHints.reasoningEffort,
+        );
 
         const cost = await this.calculateCost(plugin, response.model, response.usage, settings);
         await this.pluginUsageService?.record({
@@ -409,6 +644,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 operation: 'createChatCompletion',
                 promptTokens: response.usage?.promptTokens,
                 completionTokens: response.usage?.completionTokens,
+                // AW-16 — the Model Account whose credentials served the call.
+                ...(account ? { modelAccountId: account.accountId } : {}),
             },
         });
 
@@ -419,30 +656,47 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         options: ChatCompletionOptions,
         facadeOptions: FacadeOptions,
     ): AsyncGenerator<ChatCompletionChunk> {
+        // AW-16 — a streamed call resolves its route once, before the first
+        // byte; it is never re-routed mid-stream.
+        const routingHints = options as unknown as AiRoutingOptions;
+        const route = await this.planModelRoute(facadeOptions, {
+            providerId: facadeOptions.providerOverride,
+            modelId: options.model ?? routingHints.modelOverride,
+            hasComplexity: !!routingHints.complexity,
+            effort: routingHints.reasoningEffort,
+            scheduleId: routingHints.scheduleId,
+        });
+
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
-            facadeOptions.providerOverride,
+            route?.providerPluginId ?? facadeOptions.providerOverride,
             facadeOptions.userId,
             facadeOptions.workId,
         );
 
-        const settings = await this.getResolvedSettings(plugin.id, {
-            userId: facadeOptions.userId,
-            workId: facadeOptions.workId,
-        });
+        const { settings, account } = await this.applyModelAccount(
+            route,
+            plugin,
+            await this.getResolvedSettings(plugin.id, {
+                userId: facadeOptions.userId,
+                workId: facadeOptions.workId,
+            }),
+            facadeOptions,
+        );
 
-        const model = this.resolveModel(plugin, settings, options as unknown as AiRoutingOptions);
+        const model = this.resolveModel(plugin, settings, routingHints);
+        const effectiveModel = route?.modelId ?? options.model ?? model;
 
         await this.enforceBudget(
             facadeOptions,
             plugin,
-            options.model ?? model,
+            effectiveModel,
             settings,
             options.maxTokens,
         );
 
         const mergedOptions: ChatCompletionOptions = {
             ...options,
-            model: options.model ?? model,
+            model: effectiveModel,
             stream: true,
             settings,
         };
@@ -450,6 +704,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         let chunkCount = 0;
         let contentChars = 0;
         let streamedModel = mergedOptions.model ?? model;
+        const startedAt = Date.now();
 
         try {
             for await (const chunk of plugin.createStreamingChatCompletion(mergedOptions)) {
@@ -465,8 +720,22 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
                 yield chunk;
             }
+        } catch (error) {
+            await this.reportModelAccountFailure(account, error);
+            throw error;
         } finally {
             if (chunkCount > 0) {
+                // Awaited, so what answered is on the Run before the stream
+                // completes (recordModelAnswer never throws).
+                await this.recordModelAnswer(
+                    route,
+                    facadeOptions,
+                    plugin.id,
+                    streamedModel,
+                    account,
+                    startedAt,
+                    routingHints.reasoningEffort,
+                );
                 this.pluginUsageService
                     ?.record({
                         workId: facadeOptions.workId,
@@ -487,6 +756,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                             operation: 'createStreamingChatCompletion',
                             chunkCount,
                             contentChars,
+                            // AW-16 — the Model Account whose credentials served the call.
+                            ...(account ? { modelAccountId: account.accountId } : {}),
                         },
                     })
                     .catch(() => {
@@ -1066,4 +1337,20 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         this.logger.debug(`No model routing configured, plugin ${plugin.id} will use default`);
         return undefined;
     }
+}
+
+/**
+ * Model accounts (AW-16) — the keys a Model Account may supply for a plugin:
+ * exactly the settings its schema marks `x-secret`.
+ */
+function secretSettingKeys(plugin: IAiProviderPlugin): Set<string> {
+    const properties = (plugin.settingsSchema?.properties ?? {}) as Record<
+        string,
+        { 'x-secret'?: boolean }
+    >;
+    return new Set(
+        Object.entries(properties)
+            .filter(([, property]) => property?.['x-secret'] === true)
+            .map(([key]) => key),
+    );
 }

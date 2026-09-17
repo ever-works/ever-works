@@ -3,11 +3,13 @@ import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
 
 const listInstalled = vi.fn();
 const listCatalog = vi.fn();
+const listTags = vi.fn();
 
 vi.mock('@/lib/api/skills', () => ({
     skillsAPI: {
         listInstalled: (...args: unknown[]) => listInstalled(...args),
         listCatalog: (...args: unknown[]) => listCatalog(...args),
+        listTags: (...args: unknown[]) => listTags(...args),
     },
 }));
 
@@ -194,5 +196,126 @@ describe('loadSkillsPageData', () => {
         expect(data.installed).toEqual([]);
         expect(data.catalog).toEqual([]);
         expect(data.catalogTotal).toBe(0);
+    });
+});
+
+describe('Skills shelf params', () => {
+    it('whitelists tags, readiness, provenance, enabled and sort', () => {
+        expect(
+            parseSkillsSearchParams({
+                tags: 'Billing, email,billing',
+                readiness: 'attention',
+                provenance: 'firstParty',
+                enabled: 'false',
+                sort: 'name',
+                bogus: 'x',
+            }),
+        ).toEqual({
+            ...DEFAULT_FILTERS,
+            tags: ['billing', 'email'],
+            readiness: 'attention',
+            provenance: 'firstParty',
+            enabled: false,
+            sort: 'name',
+        });
+    });
+
+    it('drops malformed shelf values back to their defaults', () => {
+        const filters = parseSkillsSearchParams({
+            tags: '!!!,  ',
+            readiness: 'broken',
+            provenance: 'stolen',
+            enabled: 'yes',
+            sort: 'random',
+        });
+        expect(filters).toEqual(DEFAULT_FILTERS);
+        expect(filters.tags).toBeUndefined();
+        expect(parseSkillsSearchParams({ sort: 'updated' }).sort).toBeUndefined();
+    });
+
+    it('caps a hand-crafted URL at six tags', () => {
+        expect(parseSkillsSearchParams({ tags: 'a,b,c,d,e,f,g,h' }).tags).toEqual([
+            'a',
+            'b',
+            'c',
+            'd',
+            'e',
+            'f',
+        ]);
+    });
+
+    it('buildSkillsHref serialises the shelf params and round-trips through the parser', () => {
+        const filters: SkillsPageFilters = {
+            ...DEFAULT_FILTERS,
+            tags: ['billing', 'email'],
+            readiness: 'attention',
+            provenance: 'package',
+            enabled: true,
+            sort: 'attention',
+        };
+        const href = buildSkillsHref('/agents', filters, '#skills');
+        expect(href).toBe(
+            '/agents?tags=billing%2Cemail&readiness=attention&provenance=package&enabled=true&sort=attention#skills',
+        );
+        const query = Object.fromEntries(new URL(href, 'http://x').searchParams);
+        expect(parseSkillsSearchParams(query)).toEqual(filters);
+        expect(buildSkillsHref('/agents', { ...DEFAULT_FILTERS, sort: 'updated' }, '#skills')).toBe(
+            '/agents#skills',
+        );
+    });
+});
+
+describe('loadSkillsPageData — shelf data', () => {
+    beforeEach(() => {
+        listInstalled.mockReset();
+        listCatalog.mockReset();
+        listTags.mockReset();
+        listCatalog.mockResolvedValue({ entries: [], total: 0 });
+    });
+
+    it('forwards the shelf filters and returns the facets and counts from the same parallel fetch', async () => {
+        const counts = {
+            ready: 1,
+            needs_setup: 0,
+            missing_requirements: 0,
+            blocked_by_access: 0,
+            unknown: 0,
+            check_failed: 0,
+            disabled: 0,
+            needs_review: 0,
+        };
+        listInstalled.mockResolvedValue({
+            data: [],
+            meta: { total: 0, limit: 50, offset: 0 },
+            counts,
+        });
+        listTags.mockResolvedValue({ tags: [{ tag: 'billing', count: 2 }], total: 1 });
+
+        const data = await loadSkillsPageData({
+            ...DEFAULT_FILTERS,
+            tags: ['billing'],
+            sort: 'name',
+        });
+
+        expect(listInstalled).toHaveBeenCalledWith(
+            expect.objectContaining({ tags: ['billing'], sort: 'name', limit: SKILLS_PAGE_SIZE }),
+        );
+        expect(data.tagFacets).toEqual([{ tag: 'billing', count: 2 }]);
+        expect(data.counts).toEqual(counts);
+    });
+
+    it('a failing facet call leaves the chip row empty, never the shelf', async () => {
+        listInstalled.mockResolvedValue({
+            data: [makeSkill()],
+            meta: { total: 1, limit: 50, offset: 0 },
+        });
+        listTags.mockRejectedValue(new Error('facets down'));
+
+        const data = await loadSkillsPageData(DEFAULT_FILTERS);
+
+        expect(data.tagFacets).toEqual([]);
+        expect(data.installed).toHaveLength(1);
+        expect(data.counts).toBeNull();
+        expect(data.loadErrors).toEqual({ installed: null, catalog: null });
     });
 });

@@ -4,6 +4,7 @@ import {
     ConflictException,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     Header,
     HttpCode,
@@ -15,6 +16,7 @@ import {
     Patch,
     Post,
     Query,
+    Req,
     ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -126,6 +128,32 @@ function clampNumeric(raw: string | undefined, max: number): number {
     const parsed = Number(raw);
     if (!Number.isFinite(parsed) || parsed <= 0) return max;
     return Math.min(Math.floor(parsed), max);
+}
+
+/**
+ * `requireAllApprovers` is refused for a FLEET-RUN credential unless it
+ * only makes the gate stricter (found in review of self-build slice AD,
+ * EW-811).
+ *
+ * The flag is the approver POLICY: `→ done` runs its approver check only
+ * while it is true, so `false` switches the gate off for every approver,
+ * human or agent — the same override as `force` on a transition. The MCP
+ * whitelist withholds it (`omitArgs: ['requireAllApprovers']` on create and
+ * update), but a fleet-run token acts AS the owner on routes the token
+ * surface admits, and a path allowlist cannot see a body field. `true` (the
+ * default) is let through: it can only keep the gate on.
+ */
+function refuseRunTokenApproverPolicy(
+    body: { requireAllApprovers?: unknown } | null | undefined,
+    req: { fleetRunCredential?: unknown } | undefined,
+): void {
+    if (!req?.fleetRunCredential) return;
+    const policy = body?.requireAllApprovers;
+    if (policy !== undefined && policy !== true) {
+        throw new ForbiddenException(
+            "A fleet-run credential cannot relax a Task's approver policy.",
+        );
+    }
 }
 
 @ApiTags('tasks')
@@ -290,8 +318,14 @@ export class TasksController {
     @ApiOperation({ summary: 'Create a Task.' })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
-    async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateTaskDto) {
+    async create(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateTaskDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: { fleetRunCredential?: unknown },
+    ) {
         if (!body?.title) throw new BadRequestException('title is required.');
+        refuseRunTokenApproverPolicy(body, req);
         return this.service.create(
             auth.userId,
             {
@@ -422,7 +456,10 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateTaskDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: { fleetRunCredential?: unknown },
     ) {
+        refuseRunTokenApproverPolicy(body, req);
         // `scheduledAt` arrives as an ISO string on the wire and the
         // service works in `Date` (the column is a timestamptz). The
         // three states are distinct: absent = untouched, null = clear
@@ -496,6 +533,20 @@ export class TasksController {
             },
             this.scopeContext.getScope(),
         );
+    }
+
+    @Post(':id/recurring/run-now')
+    @ApiOperation({
+        summary:
+            'Fire this recurring template now, out of band. Spawns one instance and dispatches it through the same gated path a scheduled fire uses; the next scheduled fire is NOT moved. Allowed on a paused template (does not resume it). 409 SCHEDULE_ALREADY_RUNNING / SCHEDULE_NO_AGENT / SCHEDULE_OWNER_ARCHIVED; 400 SCHEDULE_NOT_RECURRING.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async runRecurringNow(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.runRecurringNow(auth.userId, id, this.scopeContext.getScope());
     }
 
     // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
@@ -582,9 +633,22 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: TransitionTaskDto,
+        // Appended LAST so positional callers (specs) keep their meaning.
+        @Req() req?: { fleetRunCredential?: unknown },
     ) {
         if (!Object.values(TaskStatus).includes(body?.to)) {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
+        }
+        // `force` overrides the approver gate on `in_review → done`. It is a
+        // human-in-the-loop gate answer, withheld from the MCP surface
+        // (`omitArgs: ['force']`), and a fleet-run token acts AS the owner —
+        // so a model holding one could send the field directly and step
+        // over every approver, human or agent. The route allowlist cannot
+        // see a body field, so the refusal lives here.
+        if (body.force === true && req?.fleetRunCredential) {
+            throw new ForbiddenException(
+                'A fleet-run credential cannot force a Task transition past its approver gate.',
+            );
         }
         return this.service.transition(
             auth.userId,

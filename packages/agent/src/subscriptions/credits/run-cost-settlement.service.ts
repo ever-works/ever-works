@@ -9,6 +9,9 @@ import {
     type RunPluginSpend,
 } from '@src/database/repositories/plugin-usage.repository';
 import { UsageMeter, UsagePayer } from '@src/entities/_types';
+import { ModelAccountRepository } from '@src/database/repositories/model-account.repository';
+import { modelWorkspaceKey } from '../../model-routing/model-workspace';
+import { isOwnerPaidUsage } from './owner-paid-usage';
 import type { RunCostSettler, RunSettlementResult } from '@src/database/run-cost-settler';
 import { NotificationService } from '@src/notifications/notification.service';
 import { PluginSettingsService } from '@src/plugins/services/plugin-settings.service';
@@ -78,6 +81,13 @@ import { PaygService } from '../billing/payg.service';
  *
  * If the classified read fails, the whole run settles the pre-meter way. In
  * both modes a Workspace-owned key is never debited.
+ *
+ * MODEL ACCOUNTS (AW-16): a Model Account is the workspace's own provider
+ * credential, so a call it served is exempt the same way, row by row — the
+ * AI facade stamps `metadata.modelAccountId` on the usage row, and the spend
+ * is exempt when that account belongs to the run's workspace (and provider).
+ * An id naming another workspace's account, or no account, is not honoured.
+ * The rule itself lives in {@link isOwnerPaidUsage}.
  */
 @Injectable()
 export class RunCostSettlementService implements RunCostSettler, RunCreditsPrecheck {
@@ -111,6 +121,10 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
         // debit. @Optional() for the same reason as auto-recharge: a missing
         // binding means no overflow metering, never a failed settlement.
         @Optional() private readonly paygService?: PaygService,
+        // Model accounts (AW-16) — confirms the account named on a usage row
+        // belongs to the run's workspace. @Optional(): unbound means no
+        // Model Account exemption (bill at the platform rate, never on doubt).
+        @Optional() private readonly modelAccountRepository?: ModelAccountRepository,
     ) {}
 
     /** Never rejects — see the RunCostSettler contract. */
@@ -184,9 +198,43 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 ...exemptFixed,
             ]);
 
+            // Model accounts (AW-16) — spend a Model Account of the run's own
+            // workspace served is not billable. It is provider-cost spend, so
+            // it comes off the LEGACY (provider-cost) leg below; the fixed
+            // price-list leg debits published credits, never provider cost,
+            // and is untouched by it. In `provider_cost` mode legacySpend IS
+            // the run's whole per-plugin spend, so this is byte-for-byte the
+            // pre-merge AW-16 subtraction.
+            const accountPaid = await this.resolveModelAccountPaidSpend(
+                run,
+                result.exemptPluginIds,
+            );
+
             const legacyBillableCents = metered.legacySpend
                 .filter((row) => !exempt.includes(row.pluginId))
-                .reduce((sum, row) => sum + row.costCents, 0);
+                .reduce((sum, row) => {
+                    const ownerPaid = accountPaid.byPlugin.get(row.pluginId);
+                    return ownerPaid === undefined
+                        ? sum + row.costCents
+                        : sum + Math.max(0, row.costCents - ownerPaid);
+                }, 0);
+            if (accountPaid.accountIds.length > 0) {
+                result.exemptModelAccountIds = accountPaid.accountIds;
+                // A plugin whose whole provider-cost spend a Model Account
+                // served ran entirely on the workspace's own credentials.
+                for (const row of metered.legacySpend) {
+                    const ownerPaid = accountPaid.byPlugin.get(row.pluginId);
+                    if (
+                        ownerPaid !== undefined &&
+                        row.costCents > 0 &&
+                        ownerPaid >= row.costCents &&
+                        !result.exemptPluginIds.includes(row.pluginId)
+                    ) {
+                        result.exemptPluginIds.push(row.pluginId);
+                    }
+                }
+            }
+
             const billedFixed = metered.fixedRows.filter(
                 (row) =>
                     !(
@@ -374,7 +422,8 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
         const exempt: string[] = [];
         for (const row of spend) {
             if (row.costCents <= 0) continue;
-            if (isFleetModelPluginId(row.pluginId)) {
+            // Fleet rows: the plugin id alone is the provenance.
+            if (isOwnerPaidUsage({ pluginId: row.pluginId })) {
                 exempt.push(row.pluginId);
                 continue;
             }
@@ -384,8 +433,12 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                     row.pluginId,
                     { userId, workId, includeSecrets: true },
                 );
-                const source = resolved['apiKey']?.source;
-                if (source === 'user' || source === 'work') {
+                if (
+                    isOwnerPaidUsage({
+                        pluginId: row.pluginId,
+                        apiKeySource: resolved['apiKey']?.source,
+                    })
+                ) {
                     exempt.push(row.pluginId);
                 }
             } catch (err) {
@@ -421,6 +474,66 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 `Run ${runId}: classified usage read failed, settling from provider cost: ${err}`,
             );
             return [];
+        }
+    }
+
+    /**
+     * Model accounts (AW-16) — the spend, per plugin, that a Model Account
+     * belonging to the run's workspace served. Plugins already exempt as a
+     * whole are not looked at. Any failure (or no account repository wired)
+     * returns nothing, so that spend bills at the platform rate: never exempt
+     * on doubt.
+     */
+    private async resolveModelAccountPaidSpend(
+        run: AgentRun,
+        exemptPluginIds: readonly string[],
+    ): Promise<{ byPlugin: Map<string, number>; accountIds: string[] }> {
+        const paid = { byPlugin: new Map<string, number>(), accountIds: [] as string[] };
+        if (!this.modelAccountRepository) return paid;
+        try {
+            const rows = (await this.pluginUsageRepository.getRunCostByModelAccount(run.id)).filter(
+                (row) => row.costCents > 0 && !exemptPluginIds.includes(row.pluginId),
+            );
+            if (rows.length === 0) return paid;
+
+            const accounts = new Map(
+                (
+                    await this.modelAccountRepository.findOwnershipByIds(
+                        rows.map((row) => row.modelAccountId),
+                    )
+                ).map((account) => [account.id, account]),
+            );
+            const workspaceKey = modelWorkspaceKey({
+                userId: run.userId,
+                tenantId: run.tenantId ?? null,
+                organizationId: run.organizationId ?? null,
+            });
+            for (const row of rows) {
+                if (
+                    !isOwnerPaidUsage({
+                        pluginId: row.pluginId,
+                        modelAccountId: row.modelAccountId,
+                        modelAccount: accounts.get(row.modelAccountId) ?? null,
+                        workspaceKey,
+                    })
+                ) {
+                    continue;
+                }
+                paid.byPlugin.set(
+                    row.pluginId,
+                    (paid.byPlugin.get(row.pluginId) ?? 0) + row.costCents,
+                );
+                if (!paid.accountIds.includes(row.modelAccountId)) {
+                    paid.accountIds.push(row.modelAccountId);
+                }
+            }
+            return paid;
+        } catch (err) {
+            this.logger.debug(
+                `Run settlement: model account ownership unresolved for run ${run.id} ` +
+                    `(billing at platform rate): ${err}`,
+            );
+            return { byPlugin: new Map(), accountIds: [] };
         }
     }
 
