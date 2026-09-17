@@ -50,6 +50,8 @@ export interface AgentDto {
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: Date | null;
+    /** Schedules — non-null when the heartbeat is paused (the Agent itself may be ACTIVE). */
+    heartbeatPausedAt: Date | null;
     lastRunAt: Date | null;
     lastRunStatus: string | null;
     errorCount: number;
@@ -110,6 +112,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         heartbeatCadence: agent.heartbeatCadence ?? null,
         idleBehavior: agent.idleBehavior,
         nextHeartbeatAt: agent.nextHeartbeatAt ?? null,
+        heartbeatPausedAt: agent.heartbeatPausedAt ?? null,
         lastRunAt: agent.lastRunAt ?? null,
         lastRunStatus: agent.lastRunStatus ?? null,
         errorCount: agent.errorCount,

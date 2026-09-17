@@ -330,6 +330,13 @@ export enum ActivityActionType {
     // varchar, so no migration is needed.
     INBOX_ITEM_CREATED = 'inbox_item_created',
     INBOX_ITEM_ANSWERED = 'inbox_item_answered',
+    // Schedules workspace — one row each time an owner pauses or resumes a
+    // cadence from any source (recurring Task, heartbeat, Mission tick,
+    // inbound Trigger). `details` carries `{ scheduleId, sourceType,
+    // control, before, after }`. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    SCHEDULE_PAUSED = 'schedule_paused',
+    SCHEDULE_RESUMED = 'schedule_resumed',
     // Live Feed — a run starting and a run reaching a terminal state, for
     // every trigger kind other than `heartbeat` (heartbeat runs keep the
     // three `agent_heartbeat_*` members above, unchanged). Declared here so

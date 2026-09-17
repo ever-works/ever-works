@@ -50,6 +50,8 @@ describe('activity-log.types', () => {
             ['SCHEDULE_UPDATED', 'schedule_updated'],
             ['SCHEDULE_DELETED', 'schedule_deleted'],
             ['SCHEDULE_EXECUTED', 'schedule_executed'],
+            ['SCHEDULE_PAUSED', 'schedule_paused'],
+            ['SCHEDULE_RESUMED', 'schedule_resumed'],
             // Import / Export
             ['IMPORT', 'import'],
             ['EXPORT', 'export'],
@@ -167,14 +169,34 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
-            // +2 skill_enabled / skill_disabled (Skills shelf on/off switch) -> 159.
+            // +2 schedule_paused / schedule_resumed (Schedules workspace
+            //    pause that keeps the cadence) -> 159.
+            //
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop, which did not yet carry schedule_paused /
+            //    schedule_resumed.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop, on the same Live-Feed-only base.
+            // Merge of develop's Live Feed + Agent computers members with this
+            // branch's Schedules workspace pause/resume members:
+            // 157 base + 2 + 3 + 1 -> 163.
+            //
             // +5 kb_document_archived / _unarchived / _filed / _exported and
             //    memory_folder_renamed (Knowledge library shelf) -> 162 on
-            //    develop's own base.
+            //    develop, on its own Live-Feed base.
             //
-            // 🛑 173 is COUNTED from the merged enum, never added up from the
+            // develop's own ledger for the Skills shelf stretch, kept so
+            // neither side's bookkeeping is lost:
+            //   +2 skill_enabled / skill_disabled (Skills shelf on/off
+            //   switch) -> 159 on develop's own base.
+            //   +5 kb_document_archived / _unarchived / _filed / _exported and
+            //   memory_folder_renamed (Knowledge library shelf) -> 162 on
+            //   develop's own base.
+            //
+            // 🛑 175 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
-            // (this one said 157, develop was at 153), so after a merge neither
+            // (this one said 159, develop was at 160), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
@@ -210,12 +232,30 @@ describe('activity-log.types', () => {
             //   -> 166 after the knowledge library branch merged develop's
             //   Agent computers take-over work.
             // +5 shared_view_enabled / _disabled / _regenerated /
-            //    _sections_changed / _indexing_changed (Shared view, AW-18) —
-            //    develop landed those while this branch was open and counted
-            //    171 there; merging that develop into this branch's 168 COUNTS
-            //    to 173 from the merged enum, the two skill_* literals still
-            //    being this branch's only additions develop does not carry.
-            expect(literals).toHaveLength(173);
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) — this
+            //    branch's own additions, disjoint from everything develop grew
+            //    while it was open -> 171 COUNTED from the merged enum (this
+            //    branch budgeted 166, develop was at 166, and the five shared-view
+            //    literals are the only ones develop does not already have).
+            // +2 schedule_paused / schedule_resumed (Schedules workspace pause
+            //    that keeps the cadence) — this branch's own additions, the only
+            //    two literals develop does not already have -> 173 COUNTED from
+            //    the merged enum (this branch budgeted 163, develop was at 171).
+            //
+            // develop's own ledger for the shared-view stretch, kept so neither
+            // side's bookkeeping is lost:
+            //   the five shared_view_* literals landed on develop while the
+            //   Skills shelf branch was open and counted 171 there; merging that
+            //   develop into the shelf branch's 168 COUNTED 173, the two skill_*
+            //   literals being that branch's only additions develop lacked.
+            //
+            // Merging that develop (173, Skills shelf included) into this
+            // branch (173, Schedules workspace pause included) COUNTS 175 from
+            // the merged enum: schedule_paused / schedule_resumed are the only
+            // two literals develop does not carry, and skill_enabled /
+            // skill_disabled the only two this branch did not. Neither side's
+            // 173 is the answer and the two must never be added together.
+            expect(literals).toHaveLength(175);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
