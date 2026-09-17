@@ -18,7 +18,7 @@ with APW-09) and the non-production env override `EVER_WORKS_APP_FORK_READINESS_
 `Work.kind = 'app'` and `sourceRepository.upstream`, APW-03's `AppLicenseService.previewUpstream` / `request`, APW-05's
 `APP_BUILD_WORKFLOW_PATH` (`packages/contracts/src/apps/builds.ts`) and APW-08's change-Agent resolution (`APP_WORK_AGENT_RESOLVER`).
 
-**Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+**Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 R-1 (shared types in `packages/contracts/src/apps/app-upstream.ts`), R-2 (`actionType` `app_fork` / `app_actions` /
 `app_upstream`, dotted `action`), R-4 (the readiness job follows a setup pull request to merge — §6.2), R-8 (one
 Upstream tab — §5.1), R-14 (the existing checkout-directory weakness is described generically; exact reproductions

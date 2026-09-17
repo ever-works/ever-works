@@ -38,7 +38,7 @@ app's authors; non-commercial and no-hosting licenses never on the managed tier 
 Licenses that require offering source to network users produce a visible source link; trademarked names carry
 "(community build)".
 
-> **Program audit resolutions applied (2026-09-17).** [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)
+> **Program audit resolutions applied (2026-09-17).** [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)
 > is binding: R-1 (shared types in the program's one contracts folder), R-2 (Activity naming), R-3 (red and amber
 > licenses), R-4 (first write into the Work Repository), R-5 (managed-tier availability comes from the tier's own
 > open state), R-11 (key pair formats), R-13 (`auto` zero-config builds) and R-22 (runnable test locations). Where
@@ -692,7 +692,7 @@ action, focus returns to the opener.
 
 ## 9. Open questions
 
-**Resolved by the program audit** ([CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+**Resolved by the program audit** ([CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 
 - ~~Red licenses on Your cluster~~ — **R-3**: allowed after the owner's attestation; never on Ever Works Apps; never
   in the Apps catalog.

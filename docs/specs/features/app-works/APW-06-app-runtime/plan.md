@@ -10,7 +10,7 @@
 **Last updated**: 2026-09-17
 **Contracts**: [`../CONTRACTS.md`](../CONTRACTS.md) — names below marked **C** are binding there.
 
-> **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5))
+> **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
 > binding on this plan: **R-1** shared types in `packages/contracts/src/apps/` (§5.3); **R-2** Activity `actionType`
 > families `app_deploy`, `app_job`, `app_smoke`, `app_health` (§9.4); **R-3** no `licenseAttestation` here — eligibility
 > is read from APW-03's `AppLicenseService.getHostingEligibility` (§5.2, §7.2); **R-5** on Ever Works Apps the platform

@@ -23,7 +23,7 @@
   `pnpm --filter ever-works-api test -- <pattern>` (Jest); web unit `pnpm --filter ever-works-web test -- <pattern>`
   (Vitest); web e2e `pnpm --filter ever-works-web test:e2e -- <file>` (Playwright, `apps/web/e2e/`). Nothing is placed
   under `apps/api/test/` (Resolution R-22).
-- Binding program resolutions ([CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+- Binding program resolutions ([CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
   R-1 shared types in `packages/contracts/src/apps/`; R-2 Activity `action` = dotted name, `actionType` = family;
   R-3 red/amber hosting; R-4 first write; R-5 `AppsTierPolicy`; R-11 key pair formats; R-13 `auto`; R-22 test
   locations.

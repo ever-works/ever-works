@@ -10,7 +10,7 @@
 **Status**: `Draft`
 **Last updated**: 2026-09-17
 **Authored against**: `develop` @ `a655b53ca` · **Re-aligned**: `develop` @ `ee45946e5` with
-[CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)
+[CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)
 
 > **Program audit resolutions applied (binding).** R-1 — every shared type lives in `packages/contracts/src/apps/`
 > (§3.2). R-2 — Activity rows carry the dotted §6 name in `action` and `app_spec` / `app_blueprint` / `app_license` in

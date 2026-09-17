@@ -11,7 +11,7 @@ the builds routes, `app-build-*` jobs and `app.build.*` events)
 **Status**: `Draft`
 **Last updated**: 2026-09-17
 
-> **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5))
+> **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
 > binding on this plan: **R-1** shared types in `packages/contracts/src/apps/` (§3.2); **R-2** Activity `action` =
 > dotted event, `actionType` = `app_build` (§7.3); **R-4** a linked repository always gets a pull request (§4.6);
 > **R-5** the managed builder resolves only through `AppsTierPolicy` (§4.13); **R-7** `WorkCapabilities.builds` is set

@@ -13,7 +13,7 @@ ranges are fixed by [APW-03 `schema.md` §11, §12, §21, §22](../APW-03-app-sp
 **Status**: `Draft`
 **Last updated**: 2026-09-17
 
-> **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5))
+> **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
 > binding on this plan: **R-1** shared types in `packages/contracts/src/apps/` (§3.3); **R-2** Activity `action` = dotted
 > event, `actionType` = `app_env` / `app_dependency` (§7); **R-5** managed providers resolve only through
 > `AppsTierPolicy.isOpen()` — `EVER_WORKS_APPS_MANAGED_ENABLED` is never read (§4.11); **R-10**

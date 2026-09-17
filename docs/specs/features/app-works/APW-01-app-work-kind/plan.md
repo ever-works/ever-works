@@ -22,7 +22,7 @@ capability `commitFiles?`; APW-04's `AppProvisioningService.start`; APW-06's `su
 `WorkAppRuntimeState.target`, the `AppsTierPolicy` port (implemented by APW-10) and its binding of
 `APP_WORK_DELETION_PORT` (`AppRuntimeDeletionService`), which calls back this epic's `completeAppWorkDeletion(workId)`.
 
-**Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+**Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 R-1 (shared types live in `packages/contracts/src/apps/`), R-2 (`actionType` `app_source`, dotted `action`), R-3
 (license chip classes), R-4 (first write: one `commitFiles` commit on a repository this App Work created, a setup
 pull request otherwise — never a clone, never a push to a default branch the platform did not create), R-5 (managed

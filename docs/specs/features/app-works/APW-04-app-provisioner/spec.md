@@ -19,7 +19,7 @@ renderer + smoke tests), APW-07 (env + dependencies) · **Depended on by**: APW-
 > Agent template, one Skill, one record type and one Overview card, and drives the existing loop with them.
 > Program decision **D5** is binding: the Provisioner is an Agent + a Skill running a Task, not a service.
 
-> **Program audit resolutions applied (2026-09-17).** [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)
+> **Program audit resolutions applied (2026-09-17).** [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)
 > is binding: R-10 (the build, runtime and env verification hooks this epic asked for are accepted and built by
 > their owners), R-13 (the zero-config build strategy is `auto`; the builder behind it is never named), R-17 (safety
 > rails: parked runs are waits, a safety-gate refusal asks a person, and the proposal's commits and pull request go

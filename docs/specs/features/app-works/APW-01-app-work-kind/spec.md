@@ -18,7 +18,7 @@
 > it accepts today. The new kind is additional vocabulary plus an additional branch of the create path.
 
 > **Program audit resolutions applied (2026-09-17).** This spec follows
-> [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5):
+> [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5):
 > R-3 (license classes at creation), R-4 (the first write into the Work Repository), R-6 (the kind switch refuses
 > every client), R-7 (Builds and App environment capabilities), R-12 (deploy target **None**) and R-15 (deleting an
 > App Work). Where older text in this epic disagreed, the resolution wins and the text below was aligned.

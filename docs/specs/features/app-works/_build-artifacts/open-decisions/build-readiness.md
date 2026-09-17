@@ -127,7 +127,7 @@ such other machines" path the owner named, and which is already shipped substrat
 and each gains a per-shape attestation** (namespace + quota + LimitRange + NetworkPolicy + dedicated egress
 identity + a distinct ingress for the shared zone; the equivalent properties attested for a connected node or a
 customer cluster), and the shapes are written down in full — shipped versus extension point, honestly labelled —
-in [`APW-06-app-runtime/deploy-shapes.md`](../APW-06-app-runtime/deploy-shapes.md), now Resolution **R-27**. An
+in [`APW-06-app-runtime/deploy-shapes.md`](../../APW-06-app-runtime/deploy-shapes.md), now Resolution **R-27**. An
 item a shape genuinely cannot satisfy is recorded **`Failed` with its reason**, which the gate board already
 supports — never marked "not applicable". This also settles APW-12's D3, which needs the same namespace +
 network-policy separation rather than separate hardware. Full row: `decision-sheet.md` **B-01** (now `PLAN`).
@@ -165,11 +165,14 @@ anything in the program), filing the Jira epic + 13 stories (`decision-sheet.md`
 
 ## 5. What is *not* blocking, despite looking like it
 
-- **The 66 `[NEEDS CLARIFICATION]` items themselves.** I read every epic's §9 rather than trusting the count, and
-  the count is exactly right — **66**, in the per-epic split given (APW-01 4, APW-02 3, APW-03 3, APW-04 5,
-  APW-05 6, APW-06 5, APW-07 6, APW-08 5, APW-09 4, APW-10 6, APW-11 6, APW-12 6, APW-13 7). **Fifty-six of them
-  already carry a `_Default:_` that the plan and the code both support** — they are write-downs, not decisions
-  (`decision-sheet.md` §0). Three of the remaining ten are owner *actions*, not choices.
+- **The `[NEEDS CLARIFICATION]` items themselves.** I read every epic's §9 rather than trusting the count, and
+  the count was exactly right at the time — **66**, in the per-epic split given (APW-01 4, APW-02 3, APW-03 3,
+  APW-04 5, APW-05 6, APW-06 5, APW-07 6, APW-08 5, APW-09 4, APW-10 6, APW-11 6, APW-12 6, APW-13 7).
+  **Since the owner's 2026-09-17 answers the epic count is 65** — APW-10's "which apex domain?" is answered in
+  place and now reads `[ANSWERED 2026-09-17 — which apex domain?]` — and the other five APW-10 items are
+  untouched. **Fifty-six of them already carry a `_Default:_` that the plan and the code both support** — they
+  are write-downs, not decisions (`decision-sheet.md` §0). Three of the remaining nine are owner *actions*, not
+  choices.
 - **APW-12's Ever ID.** The provider is decided and the integration constraints are written down
   (`idp-options.md` §6–§7). Only the **domain** was missing, and the owner has now given it. Nothing in Wave 0 or
   Wave 1 depends on Ever ID (it is Wave 2, `TRACKER.md:25`).

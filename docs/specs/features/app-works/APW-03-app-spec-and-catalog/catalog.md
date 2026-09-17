@@ -24,7 +24,7 @@
    catalog service never fetches them. A repository no entry lists (for example one generated per test run) gets a
    Blueprint only when the caller names the Blueprint `id` explicitly (spec FR-81).
 5. **Red licenses never appear.** An entry whose license classifies `red` fails CI (D13), and the platform drops such a
-   row if one is ever served ([CONTRACTS.md Resolution R-3](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)).
+   row if one is ever served ([CONTRACTS.md Resolution R-3](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)).
 6. **Amber needs the authors' agreement for managed hosting.** An `amber` entry may offer Ever Works Apps only when it
    records an upstream agreement (§3.1, R-3); without one it runs on **Your cluster** only, after the owner's
    attestation.

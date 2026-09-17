@@ -14,7 +14,7 @@
 cluster access, domains) · **Depended on by**: APW-05 (build-phase values), APW-06 (runtime values, dependency
 outputs, deploy preconditions), APW-10 (managed data servers, P2)
 
-> **Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+> **Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 > R-5 (managed dependencies only while APW-10's tier is open, asked through its tier policy), R-10 (ephemeral values for
 > verification), R-11 (keypair formats), R-12 (deploy target **None**), R-15 (deleting an App Work keeps data unless
 > confirmed), R-2 (Activity naming), R-22.

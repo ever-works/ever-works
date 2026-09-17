@@ -22,7 +22,7 @@
 - Phase boundaries are ship boundaries: `develop` must be green and deployable at the end of each phase.
 - **P0 is independently shippable** on branch `feat/apw-02-fork-lifecycle-p0` and touches no table, route, job or UI;
   P1 ships on `feat/apw-02-fork-lifecycle`.
-- **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5))
+- **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
   applied here: R-1 (T11), R-2 (T15), R-4 (T43), R-8 (T30, T36), R-14 (T2 — generic fixtures only), R-21 (T23), R-22
   (no suite under `apps/api/test/`).
 - Unit and controller tests never call GitHub. Live behaviour is pinned once by the contract probe (T42) against a

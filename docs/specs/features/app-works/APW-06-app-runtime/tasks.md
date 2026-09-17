@@ -27,7 +27,7 @@
 - **Additive guard for every task:** the existing suites `packages/plugins/k8s/src/__tests__/*.spec.ts`,
   `apps/api/src/plugins-capabilities/deploy/*.spec.ts` and `apps/web/e2e/flow-work-deploy-*.spec.ts` pass with no
   edits to existing assertions.
-- **Resolutions that shape these tasks** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+- **Resolutions that shape these tasks** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
   R-2 (Activity families), R-3 (eligibility read from APW-03, no attestation stored here), R-5 (Ever Works Apps only
   through `AppsTierPolicy` and the `apps-tier` deployment plugin), R-10 (verification targets), R-12 (target **None**),
   R-15 (deleting an App Work), R-16 (managed subdomain on Your cluster in Wave 1), R-24 (sandboxed runtime from Wave 2).

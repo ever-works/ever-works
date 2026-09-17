@@ -18,7 +18,7 @@ matching row of `decision-sheet.md`.
 
 ## A. Owner answer 1 — "no separate PSL-listed user-apps domain"
 
-> **⚠️ SUPERSEDED 2026-09-17 (later the same day) — read [`../BUILD-READINESS.md`](../BUILD-READINESS.md) §2/§6 and
+> **⚠️ SUPERSEDED 2026-09-17 (later the same day) — read [`../../BUILD-READINESS.md`](../../BUILD-READINESS.md) §2/§6 and
 > `README.md` D10 before acting on anything below.** The owner's follow-up was explicit: *"please don't remove
 > anything, just make sure we support sub-domains / custom domains etc etc"* — so this entry is **history, not
 > instruction**. What actually landed is the **additive** reconciliation: managed addresses **default** to the

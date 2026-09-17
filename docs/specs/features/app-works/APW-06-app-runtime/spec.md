@@ -15,7 +15,7 @@ APW-05 (Builds, image pull access), APW-07 (env values, App dependencies), APW-1
 gate, its `apps-tier` capability and tier policy, P2+), APW-01 (deleting an App Work) · **Depended on by**: APW-04,
 APW-08, APW-11, APW-13
 
-> **Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+> **Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 > R-3 (one license attestation, owned by APW-03), R-5 (on Ever Works Apps the platform only hands over desired state),
 > R-10 (verification targets for the App Provisioner), R-12 (deploy target **None**), R-15 (deleting an App Work),
 > R-16 (a public URL on Your cluster in Wave 1), R-24 (sandboxed runtime from Wave 2), R-2 (Activity naming), R-22.

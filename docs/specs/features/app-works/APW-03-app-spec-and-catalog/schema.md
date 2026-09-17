@@ -169,7 +169,7 @@ Server-only: a declared `spdx` or `class` that differs from detection is warning
 | `resources.memory`         | MemQuantity | `7Gi`                             | `1Gi`–`64Gi`.                                                                                                     |
 | `resources.timeoutMinutes` | integer     | `60`                              | 5–180.                                                                                                            |
 
-**Strategies** ([CONTRACTS.md Resolution R-13](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+**Strategies** ([CONTRACTS.md Resolution R-13](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 `dockerfile` builds the named Dockerfile; `image` deploys a prebuilt image and runs no Build; `none` builds and runs
 nothing; `auto` is a **zero-config build** — the build plugin detects the language and framework from the repository
 and builds an image without a Dockerfile. Which builder implements `auto` is the build plugin's choice and is never
@@ -255,7 +255,7 @@ At most 200 entries; `name` unique. Each entry has **exactly one** value source 
 | `keypair`  | object  | `{ type: ed25519 }` | `keypair` only. See below. Public half exposed as `<NAME>_PUBLIC` only. |
 | `rotate`   | enum    | `never`             | `never` is the only value in `appSpecVersion: 1`.                       |
 
-**`generate.keypair`** ([CONTRACTS.md Resolution R-11](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5))
+**`generate.keypair`** ([CONTRACTS.md Resolution R-11](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
 
 | Field         | Type    | Default   | Rules                                                                                                                                                                                           |
 | ------------- | ------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

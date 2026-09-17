@@ -40,7 +40,7 @@ second provider builds for the managed **Ever Works Apps** tier inside the isola
 rootless and sandboxed, with an egress allowlist, hard caps, a vulnerability scan and a signature the hosting tier
 verifies before it runs anything.
 
-> **Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)):
+> **Program audit resolutions applied** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)):
 > R-9 (checks in the user's CI), R-10 (verification inside the runner), R-13 (`auto` build strategy), R-23 (fixture
 > branches belong to APW-13), R-24 (sandboxed in-zone builds arrive in Wave 3), R-5 (the managed tier is reached only
 > through APW-10's tier policy), R-4 (a linked repository always receives a pull request).

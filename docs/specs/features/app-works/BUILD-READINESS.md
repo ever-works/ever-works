@@ -151,7 +151,7 @@ Repository"*. **Nine instances were deliberately left**, and each is one of thre
 | `templates-catalog/` | The **`ever-works/templates` listing seed** (`manifest.json`, JSON Schema, `licenses.yml`, README) and the **resolution spec** (suffix scan with its real limits, classification, fallback order, fork plan, the two shapes, roles, provenance) | manifest validated with ajv against a 13-case matrix; 12/12 links resolve; every code claim cites `file:line` |
 | `fixture-app/` | The **fixture application's source** — Dockerfile, `src/*.mjs`, migrations, `public/`, `test/` (7 files + helpers), `tools/` (incl. an in-process Postgres wire-protocol stub), `profiles/` (**5 App specs + a generator that validates them against the schema**), `.github/workflows/` (CI + the scheduled inherited-workflow marker), `VARIANTS.md` | **Executed, not asserted:** `npm run smoke` boots the app and calls every route — **18/18 checks pass**, including every App-spec observable (build-phase value in the image, no `localhost` in `/marker`, migration list, fresh worker heartbeat, `cronTicks` after an authorised tick, secret fingerprint only, volume writable, cron refuses anonymous, mail 503 without SMTP). `npm test`: **56/64 pass**. `profiles/`: **5/5 schema PASS**. Full transcripts and the honest gap list in [`fixture-app/evidence/proof.txt`](./_build-artifacts/fixture-app/evidence/proof.txt) |
 | `expected-outputs/` | The **build workflow** the APW-05 plugin writes (with a README of all 44 interpolation points and the exact canonical-JSON bytes behind the fingerprint) and **golden rendered manifests** for Cal.diy and the fixture — 24 and 19 objects for `your-cluster`, plus a managed overlay each | 29 YAML / 53 objects parse; **940 assertions, 0 failures**; no secret value, real hostname or cluster address (verified by grep) |
-| `open-decisions/` | **85-row decision sheet** (66 `[NEEDS CLARIFICATION]` markers + 19 items found by reading the code), the contradictions list, and **Jira drafts** (`EW-817`…`EW-830`) | every row cites `file:line`; 11 rows need the owner, 73 are plan-implied |
+| `open-decisions/` | **85-row decision sheet** (65 remaining `[NEEDS CLARIFICATION]` markers in the epics — APW-10's apex-domain question was answered 2026-09-17 and now reads `[ANSWERED …]` — plus the items found by reading the code), the contradictions list, and **Jira drafts** (`EW-817`…`EW-830`, deliberately **not** filed) | every row cites `file:line`; **no row needs the owner any more** — the 11 `OWNER` rows are all closed (§6) |
 
 ### 4.1 Conflicts the artifacts found that an implementer must be briefed on
 
@@ -214,6 +214,17 @@ Repository"*. **Nine instances were deliberately left**, and each is one of thre
   `ever-works/directory-web-template`** (same repository id 912916449), so the `ever-works/works` listing's
   `marketing-site` and `directory` blueprints currently fork **one** repository — while a proper
   `ever-works/web-template` exists. One-line data fix in `ever-works/works` (owner's call).
+- **The spec tree now checks itself** — [`tools/verify-spec-tree.mjs`](./tools/verify-spec-tree.mjs), zero
+  dependencies, writable-nothing. It walks every `.md` under this folder, resolves every relative link and every
+  `#anchor`, and cross-checks the acceptance ids an epic spec defines against the ids `ACCEPTANCE.md` indexes.
+  Current run: **84 files, 934 relative links, 0 broken; 445 acceptance ids defined, 445 indexed, 0 orphaned —
+  `CLEAN`, exit 0.** Re-run it before every push:
+  `node docs/specs/features/app-works/tools/verify-spec-tree.mjs`.
+  Getting it to `CLEAN` found a real, pre-existing defect the earlier link sweep had missed: **all 24 links to
+  `CONTRACTS.md §0` carried the wrong fragment** (`…binding--2026-09-17…` with doubled dashes where the heading's em
+  dash sits) and had never resolved — they do now. The verifier also deliberately reproduces GitHub's heading-slug
+  rule (punctuation **vanishes** rather than becoming a separator), which is what the bad fragment got wrong.
+  Line endings were re-checked after the repair: **84 files, 0 CRLF**.
 
 ---
 

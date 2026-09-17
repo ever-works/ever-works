@@ -21,7 +21,7 @@ APW-09 (fork network)
 > repository must already exist.
 
 > **Program audit resolutions applied (2026-09-17).** This spec follows
-> [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5):
+> [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5):
 > R-1 and R-2 (in the plan), R-4 (the setup pull request an App Work may wait for), R-8 (the **Upstream** tab), R-14
 > (existing weaknesses described generically) and R-21 (who a conflict Task is assigned to). Where older text in this
 > epic disagreed, the resolution wins and the text below was aligned.

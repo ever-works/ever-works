@@ -22,7 +22,7 @@
 - **Prerequisites:** APW-02 P0 (its T1–T8) and APW-02 P1 (its T9–T34, T43, T44), and APW-03 P1 (resolver, App spec
   service, apply job, `commitFiles?`, `AppsCatalogBrowser`) are merged. Tasks below name the APW-02/03/04/06/10
   symbols they consume; they never re-declare them.
-- **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5))
+- **Program audit resolutions** ([CONTRACTS §0](../CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5))
   applied here: R-1 (T2), R-2 (T6), R-3 (T12, T22), R-4 (T13, T15, T24), R-5 (T12, T13, T14), R-6 (T12, T13, T17),
   R-7 (T3), R-12 (T2, T22, T28), R-15 (T39), R-22 (no suite under `apps/api/test/`).
 - No task in this file performs a real GitHub write. Live-provider scenarios run in APW-13's suite against a

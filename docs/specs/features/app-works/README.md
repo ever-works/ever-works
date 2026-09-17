@@ -244,7 +244,7 @@ managed hosting allowed; AGPL-modified apps get a visible "Source" link to the d
 (source-available licenses that restrict hosting — **Your cluster** with the owner's attestation; **Ever Works
 Apps** only with a recorded upstream agreement), **red** (non-commercial or no-hosting — never offered on the
 managed tier and never in the catalog; allowed on **Your cluster** only after the owner's attestation — see
-[CONTRACTS.md Resolution R-3](./CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)). The
+[CONTRACTS.md Resolution R-3](./CONTRACTS.md#0-program-audit-resolutions-binding-2026-09-17-against-develop-ee45946e5)). The
 license is re-evaluated on every upstream sync. Trademarked names are displayed as "<name> (community
 build)" when the blueprint requires it, and blueprint-declared branding paths are read-only to agents.
 The registry is legal-reviewed before launch.
