@@ -88,8 +88,16 @@ export function isCreditSettlementMode(value: unknown): value is CreditSettlemen
 	return typeof value === 'string' && (CREDIT_SETTLEMENT_MODES as readonly string[]).includes(value);
 }
 
-/** Display groups of the price list. */
-export const CREDIT_PRICE_GROUPS = ['research', 'data', 'tools', 'models'] as const;
+/**
+ * Display groups of the price list.
+ *
+ * `hosting` is appended by the App Works programme (APW-10 FR-50, T50): the
+ * managed Apps tier's `hosting.*` keys and `relay.messages` need a group of
+ * their own rather than being filed under `tools`, so the price list can show
+ * what a hosted App Work costs separately from what an agent run costs.
+ * Appended, never inserted, so every existing group keeps its position.
+ */
+export const CREDIT_PRICE_GROUPS = ['research', 'data', 'tools', 'models', 'hosting'] as const;
 export type CreditPriceGroup = (typeof CREDIT_PRICE_GROUPS)[number];
 
 /**
