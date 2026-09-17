@@ -95,9 +95,14 @@ export function isPostgresDriver(type: unknown): boolean {
  *   rows written inside one millisecond by uuid — the session transcript
  *   then renders a tool call above the assistant message that requested
  *   it. The column therefore keeps its own resolution in both the ORDER
- *   BY and the keyset equality, and the cursor's coarser millisecond
- *   widens the page instead: it may REPEAT rows the caller already has
- *   (every consumer de-duplicates on row id) but can never skip one.
+ *   BY and the keyset equality. That makes the cursor's millisecond
+ *   useless as a lower bound: the cursor row's own microseconds still
+ *   exceed it, so a page whose rows all share that millisecond would be
+ *   served again with the identical cursor, forever. A keyset on this
+ *   strategy must anchor on the cursor row's STORED instant instead —
+ *   `AgentRunLogRepository.findTimelinePage` reads it with a sub-select
+ *   by the cursor's id — and fall back to the millisecond (widened to its
+ *   start: repeat, never skip) only when that row no longer exists.
  * - `'portable-column'` — every other driver, i.e. the raw-column
  *   predicate these reads have always emitted. Nothing is narrowed here.
  *

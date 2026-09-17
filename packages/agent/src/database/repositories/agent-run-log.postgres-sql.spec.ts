@@ -11,7 +11,9 @@ import { AgentRunLogRepository } from './agent-run-log.repository';
  * per-driver fix is that it quietly changes the other driver. So this pins
  * both halves: Postgres keeps the `(instant, id)` keyset on the raw
  * microsecond `timestamp` column — no canonical text key, no rowid
- * anywhere, every camelCase identifier quoted — while the sqlite family,
+ * anywhere, every camelCase identifier quoted, and an id cursor anchored
+ * on the cursor row's STORED instant rather than the millisecond the
+ * cursor names — while the sqlite family,
  * whose column is whole-second TEXT and whose tie-break IS insertion
  * order, orders equal timestamps by that `rowid` and carries the same
  * column in its cursor predicate.
@@ -100,20 +102,48 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
          */
         const TRUNCATED = [`to_char(`, `HH24:MI:SS.MS`, `strftime(`];
 
+        /**
+         * The cursor row's STORED instant, looked up by the id half of the
+         * cursor and scoped to the run being read.
+         */
+        const ANCHOR = `(SELECT "timelineAnchor"."createdAt" AS "timelineAnchor_createdAt" FROM "agent_run_logs" "timelineAnchor" WHERE "timelineAnchor"."id" = :afterId AND "timelineAnchor"."runId" = :runId)`;
+        /** Strictly after the anchor row; the cursor's millisecond only when it is gone. */
+        const ANCHORED = `AND ("log"."createdAt" > ${ANCHOR} OR ("log"."createdAt" = ${ANCHOR} AND "log"."id" > :afterId) OR (${ANCHOR} IS NULL AND "log"."createdAt" >= :afterCreatedAt))`;
+
         it('orders and pages on the microsecond timestamp column, tie-broken by id', async () => {
             const emitted = await captureSql(() =>
                 postgres.logs.findTimelinePage(RUN, STEPS, 100, { createdAt: AT, id: 'log-42' }),
             );
 
-            expect(emitted).toContain(
-                `AND ("log"."createdAt" > :afterCreatedAt OR ("log"."createdAt" = :afterCreatedAt AND "log"."id" > :afterId))`,
-            );
+            expect(emitted).toContain(ANCHORED);
             expect(emitted).toContain(`ORDER BY "log"."createdAt" ASC, "log"."id" ASC LIMIT 100`);
             // The sqlite-only insertion-order key must never reach Postgres.
             expect(emitted).not.toContain('rowid');
             // An unquoted `log.createdAt` would be a lower-cased, non-existent
             // column on Postgres.
             expect(emitted).not.toMatch(/(^|[^"])\blog\.[a-zA-Z]+/);
+        });
+
+        it('⭐ anchors an id cursor on the stored row, never on the millisecond it names', async () => {
+            // The loop this case exists for. `pg` builds the cursor row's
+            // `Date` with its microseconds cut off, so `:afterCreatedAt` is
+            // `.123` for a row stored at `.123456` — and that row satisfies
+            // `"log"."createdAt" > :afterCreatedAt` again. A full page whose
+            // rows share the last row's millisecond (every page at
+            // `limit=1`) then comes back identical, with the identical
+            // `nextCursor`, forever. The walk itself is exercised end to
+            // end in `apps/api`'s `agents.controller.session-detail.paging.spec.ts`.
+            const id = '00000000-0000-4000-8000-00000000cc62';
+            const { sql, parameters } = await captureQuery(() =>
+                postgres.logs.findTimelinePage(RUN, STEPS, 1, { createdAt: AT, id }),
+            );
+
+            expect(sql).toContain(ANCHORED);
+            // The truncated instant is never the keyset's lower bound while
+            // the cursor row can be found.
+            expect(sql).not.toContain(`"log"."createdAt" > :afterCreatedAt`);
+            expect(sql).not.toContain(`"log"."createdAt" = :afterCreatedAt`);
+            expect(parameters).toMatchObject({ runId: RUN, afterId: id, afterCreatedAt: AT });
         });
 
         it('⭐ never truncates the timeline instant to the millisecond a cursor names', async () => {
@@ -195,9 +225,7 @@ describe('AgentRunLogRepository — per-driver SQL for the timeline page', () =>
                 }),
             );
 
-            expect(sql).toContain(
-                `AND ("log"."createdAt" > :afterCreatedAt OR ("log"."createdAt" = :afterCreatedAt AND "log"."id" > :afterId))`,
-            );
+            expect(sql).toContain(ANCHORED);
             expect(sql).not.toContain(':afterTieBreak');
             expect(parameters.afterId).toBe(id);
             expect(Object.values(parameters)).not.toContain('42');

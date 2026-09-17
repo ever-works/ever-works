@@ -186,12 +186,25 @@ export class AgentRunLogRepository {
      *   later come back in either order, and the transcript renders the
      *   tool call above the message that requested it.
      * - The cursor's instant half only ever names a millisecond
-     *   (`<epochMillis>_<tieBreak>`), so on a microsecond column it names
-     *   the START of the cursor row's millisecond. That WIDENS the page —
-     *   the cursor row and any sibling written in the same millisecond can
-     *   come back a second time — which is the same repeat-never-skip
-     *   trade the mismatched-cursor path below makes, and which every
-     *   consumer already absorbs by de-duplicating on row id.
+     *   (`<epochMillis>_<tieBreak>`), and `pg` truncates the microseconds
+     *   away when it builds the row's `Date`, so on Postgres that half
+     *   cannot say where the cursor row IS. Comparing the column against
+     *   it is not a harmless widening: the cursor row itself satisfies
+     *   `createdAt > :afterCreatedAt` again (`.123456 > .123`), so a full
+     *   page whose rows all share the last row's millisecond — every page
+     *   at `limit=1`, and a message plus its tool call at `limit=2` —
+     *   comes back IDENTICAL, with the identical `nextCursor`, forever.
+     *   De-duplicating on row id cannot rescue a pager whose cursor never
+     *   moves. So on Postgres an id-shaped cursor is ANCHORED instead: the
+     *   predicate reads the cursor row's own stored `createdAt` (a
+     *   sub-select scoped to the run) and pages strictly after that exact
+     *   `(createdAt, id)` position, which is the same order the ORDER BY
+     *   walks. The cursor's millisecond is used only when that row cannot
+     *   be found (deleted, or an id from another run), and then as "the
+     *   start of the millisecond it names" — repeat, never skip, and the
+     *   next cursor it hands back names a row that exists, so is anchored.
+     *   The wire format is unchanged, so a cursor a browser already holds
+     *   is still accepted and resumes right after the row it names.
      * - The tie-break is the engine `rowid` on the sqlite family, so rows
      *   appended inside one whole second come back in INSERTION order
      *   instead of random-uuid order, and the row's own id elsewhere. The
@@ -240,7 +253,8 @@ export class AgentRunLogRepository {
         // microsecond `timestamp` column — truncating it would order rows
         // written inside one millisecond by random uuid — and every other
         // driver keeps the portable raw-column predicate unchanged.
-        const canonicalKey = timeSortKeyStrategy(driverType) === 'canonical-text';
+        const strategy = timeSortKeyStrategy(driverType);
+        const canonicalKey = strategy === 'canonical-text';
         const keySql = canonicalKey ? timeSortKeyColumnSql(driverType, 'log.createdAt') : null;
         const cursorKeySql = canonicalKey
             ? timeSortKeyParameterSql(driverType, 'afterCreatedAt')
@@ -257,10 +271,41 @@ export class AgentRunLogRepository {
             if (!keySql || !cursorKeySql) {
                 // A driver that orders on the column itself — Postgres,
                 // where truncating would reorder inside a millisecond, and
-                // any driver `time-sort-key.ts` does not canonicalise: the
-                // raw-column keyset, unchanged, at the column's own
-                // resolution.
-                if (position) {
+                // any driver `time-sort-key.ts` does not canonicalise.
+                if (position && strategy === 'native-column') {
+                    // Postgres: anchor on the cursor row's STORED instant.
+                    // The bound `:afterCreatedAt` is that instant cut to
+                    // the millisecond, which the cursor row itself still
+                    // exceeds — comparing against it re-serves the same
+                    // full page with the same cursor forever. The anchor
+                    // is found by primary key, so its id IS the bound
+                    // position and `(createdAt, id) > (anchor, :position)`
+                    // is exactly "after the cursor row" in the ORDER BY
+                    // below. The sub-select is uncorrelated (evaluated
+                    // once) and scoped to this run, so a row id from
+                    // another run is "not found", never an anchor.
+                    // `createdAt` is NOT NULL, so a NULL sub-select means
+                    // exactly "no such row": only then is the cursor's
+                    // millisecond used, widened to its start. Built
+                    // through the query builder so the table and column
+                    // identifiers come from entity metadata.
+                    const anchorCreatedAtSql = qb
+                        .subQuery()
+                        .select('timelineAnchor.createdAt')
+                        .from(this.repository.target, 'timelineAnchor')
+                        .where(`timelineAnchor.id = :${position.parameter}`)
+                        .andWhere('timelineAnchor.runId = :runId')
+                        .getQuery();
+                    qb.andWhere(
+                        `(log.createdAt > ${anchorCreatedAtSql} OR (log.createdAt = ${anchorCreatedAtSql} AND log.id > :${position.parameter}) OR (${anchorCreatedAtSql} IS NULL AND log.createdAt >= :afterCreatedAt))`,
+                        {
+                            afterCreatedAt: after.createdAt,
+                            [position.parameter]: position.value,
+                        },
+                    );
+                } else if (position) {
+                    // Every other non-canonical driver: the raw-column
+                    // keyset, unchanged, at the column's own resolution.
                     qb.andWhere(
                         `(log.createdAt > :afterCreatedAt OR (log.createdAt = :afterCreatedAt AND log.id > :${position.parameter}))`,
                         {
