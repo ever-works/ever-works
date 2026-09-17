@@ -291,6 +291,28 @@ export const kbAPI = {
     },
 
     /**
+     * `POST /api/works/:id/kb/documents/:docId/unarchive` — the inverse of
+     * `archiveDocument`: back to the shelf, into the folder it was archived
+     * from (`restoredToUnfiled` when that folder is gone). Not `/restore`,
+     * which restores a body from a Git commit. Idempotent.
+     */
+    unarchiveDocument: async (
+        workId: string,
+        docId: string,
+    ): Promise<{ document: KbDocumentBodyDto; restoredToUnfiled: boolean; changed: boolean }> => {
+        return serverMutation<{
+            document: KbDocumentBodyDto;
+            restoredToUnfiled: boolean;
+            changed: boolean;
+        }>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/unarchive`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
      * `POST /api/works/:id/kb/documents/:docId/decision-status` — memory
      * upgrades M4 decision status machine. The review queue's
      * "Supersede" action uses it with `status: 'superseded'` plus the

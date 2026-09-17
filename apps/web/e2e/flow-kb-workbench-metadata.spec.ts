@@ -312,4 +312,78 @@ test.describe('KB workbench metadata panel — slice B', () => {
         const chip = page.getByTestId('kb-workbench-status-chip');
         await expect(chip).toHaveAttribute('data-kb-status', 'archived', { timeout: 45_000 });
     });
+
+    /**
+     * Knowledge library — the header's shelf controls. This spec's Works live
+     * in the personal workspace, so the two controls that belong to an
+     * Organization's library (File, Export) stay visible but disabled with
+     * their reason, while Archive and Restore — which use the Work's own
+     * endpoints — work, and the header swaps one for the other.
+     */
+    test('the header archives and restores in place, and explains File and Export need an organization', async ({
+        page,
+        request,
+    }) => {
+        test.setTimeout(180_000);
+        const id = runId();
+        const seeded = loadSeededTestUser();
+        const { access_token } = await loginViaAPI(request, {
+            email: seeded.email,
+            password: seeded.password,
+        });
+        const { id: workId } = await createWorkViaAPI(request, access_token, {
+            name: `KB Shelf Controls ${id}`,
+        });
+        const doc = await seedKbMarkdownDoc(request, access_token, workId, {
+            filename: `shelf-${id}.md`,
+            body: `# Shelf ${id}\n`,
+            targetClass: 'brand',
+        });
+
+        await page.goto(`/en/works/${workId}/kb/${doc.path}`, { waitUntil: 'domcontentloaded' });
+        const controls = page.getByTestId('kb-workbench-shelf-controls');
+        await expect(controls).toBeVisible({ timeout: 60_000 });
+        await expect(controls).toHaveAttribute('data-library-state', 'unavailable', {
+            timeout: 30_000,
+        });
+        await expect(page.getByTestId('kb-workbench-file-button')).toHaveAttribute(
+            'data-disabled-reason',
+            /organization/,
+        );
+        await expect(page.getByTestId('kb-workbench-export-button')).toHaveAttribute(
+            'data-disabled-reason',
+            /organization/,
+        );
+
+        /** Server-side truth for this doc's status. */
+        const statusOnServer = async (): Promise<string | null> => {
+            const res = await request.get(
+                `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
+                { headers: authedHeaders(access_token) },
+            );
+            return res.ok() ? (((await res.json()) as { status?: string }).status ?? null) : null;
+        };
+
+        // Archive is a SERVER ACTION behind a hydrated click: drive it to the
+        // persisted state, re-clicking only while the server still says active.
+        const archive = page.getByTestId('kb-workbench-archive-button');
+        await expect(async () => {
+            if ((await statusOnServer()) !== 'archived') {
+                await archive.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            expect(await statusOnServer()).toBe('archived');
+        }).toPass({ timeout: 60_000 });
+
+        const restore = page.getByTestId('kb-workbench-restore-button');
+        await expect(restore).toBeVisible({ timeout: 30_000 });
+        await expect(async () => {
+            if ((await statusOnServer()) !== 'active') {
+                await restore.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            expect(await statusOnServer()).toBe('active');
+        }).toPass({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-archive-button')).toBeVisible({
+            timeout: 30_000,
+        });
+    });
 });

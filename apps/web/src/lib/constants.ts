@@ -182,6 +182,9 @@ export const ROUTES = {
     // `/meetings` (index only) redirects here. `/meetings/new` and
     // `/meetings/[id]` are unchanged.
     DASHBOARD_MEMORY_MEETINGS: '/memory#meetings',
+    // Knowledge library — the organization shelf over the Knowledge Base,
+    // a view of the Memory page rather than a route of its own.
+    DASHBOARD_MEMORY_LIBRARY: '/memory?view=library',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)

@@ -198,6 +198,17 @@ describe('activity-log.types', () => {
             // into this branch's 163 COUNTS to 168 from the merged enum —
             // the two skill_* literals are this branch's only additions that
             // develop does not already carry.
+            //
+            // develop's own ledger for the same stretch, kept so neither
+            // side's bookkeeping is lost:
+            //   +3 agent_run_* (Live Feed — run lifecycle for non-heartbeat
+            //   triggers) and +5 knowledge library literals -> 165. Both land
+            //   together when the Knowledge library shelf merges develop's
+            //   Live Feed work: 162 (shelf side) and 160 (develop side) each
+            //   counted from their own base, and the merged enum COUNTS 165.
+            //   +1 agent_computer_controlled (Agent computers, take-over)
+            //   -> 166 after the knowledge library branch merged develop's
+            //   Agent computers take-over work.
             // +5 shared_view_enabled / _disabled / _regenerated /
             //    _sections_changed / _indexing_changed (Shared view, AW-18) —
             //    develop landed those while this branch was open and counted

@@ -241,7 +241,7 @@ The knowledge library is the organization's shelf over the Knowledge Base: every
 
 Filing, archiving, restoring, folder create / rename / delete and exports each leave an activity entry.
 
-The Library view on this page is coming; the shelf is available over REST today (see the API reference below).
+The shelf is the **Library** view of this page — switch the view toggle at the top from Overview to Library. See [Knowledge Library](./knowledge-library.md) for the full guide.
 
 ## Agent Memory
 
@@ -310,7 +310,7 @@ The org-wide surfaces — the aggregation, the review queue, consolidation and F
 
 - **External memory and RAG plugins.** The plugin manifest carries `memory` and `rag` categories with capability contracts (`IMemoryPlugin`, `IRagPlugin`) for pluggable organization memory frameworks and composed retrieval pipelines. **No plugin ships under either category yet** — they are contracts only, sitting beside the existing `vector-store` and `content-extractor` seams rather than replacing them. Built-in retrieval is unchanged and remains the default.
 - **Mission and Team facets, and the graph view** of the Memory feed, are deferred behind cross-feature prerequisites.
-- **The Library view** — the folder rail, shelf and Archived view for the knowledge library — follows its REST surface.
+- **Unread badges, pins and `#` references** for the [Knowledge Library](./knowledge-library.md) follow its shelf.
 
 Everything else on this page is shipped and reachable today.
 
@@ -343,6 +343,7 @@ Everything else on this page is shipped and reachable today.
 | `PATCH` | `/api/knowledge/documents/file`                | File up to 100 documents into a shared folder, or `folderId: null` to unfile     |
 | `POST`  | `/api/knowledge/documents/:docId/archive`      | Archive a document from the shelf                                                |
 | `POST`  | `/api/knowledge/documents/:docId/unarchive`    | Restore an archived document to its folder                                       |
+| `GET`   | `/api/knowledge/documents/:docId`              | One document as a shelf row — its folder, Work and whether you can edit it       |
 | `GET`   | `/api/knowledge/documents/:docId/export`       | Download one document as Markdown with YAML front matter                         |
 | `POST`  | `/api/works/:id/kb/documents/:docId/unarchive` | Restore an archived Work document (the inverse of `/archive`)                    |
 | `GET`   | `/api/organizations/:orgId/kb/documents`       | List organization-level documents                                                |

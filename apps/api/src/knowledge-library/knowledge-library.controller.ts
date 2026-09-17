@@ -134,6 +134,23 @@ export class KnowledgeLibraryController {
         return this.library.tree(actor);
     }
 
+    @Get('documents/:docId')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'One document as a knowledge library row',
+        description:
+            'The shelf row for a single document — its shared folder and folder path, Work name, revision, archive state and whether the caller may file, archive or restore it. The per-Work workbench header reads this to show the folder breadcrumb and the curation controls in place. Requires view access to the document’s Work; a document the caller cannot view is reported as not found.',
+    })
+    @ApiResponse({ status: 200, description: 'KbLibraryDocumentDto' })
+    @ApiResponse({ status: 404, description: 'Document not found in this Organization' })
+    async get(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+    ): Promise<KbLibraryDocumentDto> {
+        const actor = await this.requireActor(auth);
+        return this.library.getDocument(actor, docId);
+    }
+
     @Patch('documents/file')
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
