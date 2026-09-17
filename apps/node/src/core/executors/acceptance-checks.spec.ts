@@ -433,6 +433,98 @@ describe('buildNodeCheckEnv — per-repository grants open the platform-owned re
 	});
 });
 
+/**
+ * Per-command containment (self-build slice AK).
+ *
+ * The scrub decides which of this machine's names a command may SEE. The
+ * overlay decides where THAT command's home, temp and provider config
+ * are, and it has to win over the scrub rather than be filtered by it —
+ * `HOME` and `APPDATA` are on the allowlist and carry the machine's real
+ * values, while `CLAUDE_CONFIG_DIR` is on no list at all and would be
+ * dropped, severing the CLI login the redirect exists to preserve.
+ */
+describe('buildNodeCheckEnv — the containment overlay is applied LAST', () => {
+	const parent: NodeJS.ProcessEnv = {
+		PATH: '/usr/bin',
+		HOME: '/home/owner',
+		USERPROFILE: 'C:\\Users\\owner',
+		APPDATA: 'C:\\Users\\owner\\AppData\\Roaming',
+		TEMP: 'C:\\Users\\owner\\AppData\\Local\\Temp',
+		LANG: 'en_US.UTF-8',
+		// Toolchain anchors the allowlist forwards as absolute paths. They
+		// are here so the assertions below are about what the overlay does
+		// and does not do, rather than about a fixture too thin to tell.
+		PNPM_HOME: 'C:\\Users\\owner\\AppData\\Local\\pnpm',
+		CARGO_HOME: 'C:\\Users\\owner\\.cargo'
+	};
+	const overlay = {
+		HOME: '/run/home',
+		USERPROFILE: '/run/home',
+		APPDATA: '/run/home/AppData/Roaming',
+		TEMP: '/run/tmp',
+		TMP: '/run/tmp',
+		TMPDIR: '/run/tmp',
+		CLAUDE_CONFIG_DIR: '/home/owner/.claude'
+	};
+
+	it('overrides the allow-listed real home instead of being overridden by it', () => {
+		const env = buildNodeCheckEnv(undefined, parent, undefined, overlay);
+		expect(env.HOME).toBe('/run/home');
+		expect(env.USERPROFILE).toBe('/run/home');
+		expect(env.APPDATA).toBe('/run/home/AppData/Roaming');
+		expect(env.TEMP).toBe('/run/tmp');
+		// EVERY name the overlay claims is the overlay's value, and no
+		// spelling of one survives alongside it.
+		for (const [name, value] of Object.entries(overlay)) {
+			expect(Object.keys(env).filter((key) => key.toUpperCase() === name.toUpperCase())).toEqual([name]);
+			expect(env[name]).toBe(value);
+		}
+	});
+
+	it('does NOT claim to scrub the real home out of names it never redirects', () => {
+		// The narrow truth, asserted so nobody reads the test above as the
+		// wider one. `buildNodeCheckEnv` forwards the toolchain anchors as
+		// absolute paths whatever the overlay says, which is why the node
+		// reports a standing `toolchain-anchors` downgrade instead of
+		// letting `isolatedHome: true` imply this env is home-free.
+		const env = buildNodeCheckEnv(undefined, parent, undefined, overlay);
+		expect(env.PNPM_HOME).toBe('C:\\Users\\owner\\AppData\\Local\\pnpm');
+		expect(env.CARGO_HOME).toBe('C:\\Users\\owner\\.cargo');
+	});
+
+	it('carries a name the allowlist would have dropped — the CLI login', () => {
+		// Without the overlay this name is not forwarded at all, which is
+		// exactly why a redirect that relied on the allowlist would sever
+		// the machine's Claude Code session.
+		expect(
+			buildNodeCheckEnv(undefined, { ...parent, CLAUDE_CONFIG_DIR: '/home/owner/.claude' }).CLAUDE_CONFIG_DIR
+		).toBeUndefined();
+		expect(buildNodeCheckEnv(undefined, parent, undefined, overlay).CLAUDE_CONFIG_DIR).toBe('/home/owner/.claude');
+	});
+
+	it('deletes the parent’s own spelling, so a Windows child cannot see both', () => {
+		const windowsParent: NodeJS.ProcessEnv = { Path: 'C:\\Windows', Temp: 'C:\\Users\\owner\\Temp' };
+		const env = buildNodeCheckEnv(undefined, windowsParent, undefined, { TEMP: 'C:\\run\\tmp' });
+		expect(Object.keys(env).filter((key) => key.toUpperCase() === 'TEMP')).toEqual(['TEMP']);
+		expect(env.TEMP).toBe('C:\\run\\tmp');
+	});
+
+	it('beats the HOME and TMPDIR back-fills, which run immediately before it', () => {
+		// A parent with no home at all: today the back-fill puts this
+		// machine's real home back. The overlay has to land after it.
+		const env = buildNodeCheckEnv(undefined, { PATH: '/usr/bin' }, undefined, overlay);
+		expect(env.HOME).toBe('/run/home');
+		expect(env.TMPDIR).toBe('/run/tmp');
+	});
+
+	it('is absent by default, so a command with no overlay behaves exactly as before', () => {
+		const env = buildNodeCheckEnv(undefined, parent);
+		expect(env.HOME).toBe('/home/owner');
+		expect(env.TEMP).toBe('C:\\Users\\owner\\AppData\\Local\\Temp');
+		expect(env.CLAUDE_CONFIG_DIR).toBeUndefined();
+	});
+});
+
 describe('the CHECKOUT must not be able to choose the program (EW-807)', () => {
 	/**
 	 * THE control that makes an exact-match command allow-list mean

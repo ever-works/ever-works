@@ -1784,6 +1784,58 @@ describe('parseAgentTaskResult', () => {
         expect(JSON.stringify(parsed)).not.toContain('ew_run_');
     });
 
+    /**
+     * Self-build slice AK — the containment record.
+     *
+     * The only way this block can do harm is by OVER-reporting, so it is
+     * narrowed here rather than carried through on the raw spread: a node
+     * claiming the hardened executor, or an `isolatedHome` that is not a
+     * literal `true`, must read as the weaker thing. The normalizer also
+     * supplies the `isolated-home` downgrade a node may have omitted, so a
+     * reader can rely on "false always says why".
+     */
+    it('normalises the containment record (slice AK), coercing toward LESS containment', () => {
+        expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.containment).toBeNull();
+
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                containment: {
+                    executionPath: 'ordinary',
+                    isolatedHome: true,
+                    localSessionHome: '/home/owner/.claude',
+                    downgrades: [{ control: 'network-egress', reason: 'no egress subsystem' }],
+                },
+            })!.containment,
+        ).toEqual({
+            executionPath: 'ordinary',
+            isolatedHome: true,
+            localSessionHome: '/home/owner/.claude',
+            downgrades: [{ control: 'network-egress', reason: 'no egress subsystem' }],
+        });
+
+        // Garbage of every shape → null, i.e. a run that said nothing.
+        for (const containment of [null, 'ordinary', 42, []]) {
+            expect(
+                parseAgentTaskResult({ status: 'succeeded', taskId: TASK, containment })!
+                    .containment,
+            ).toBeNull();
+        }
+
+        // An unknown path reads as `ordinary`, never `hardened`, and a
+        // truthy-but-not-`true` isolation reads as no isolation at all.
+        const coerced = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            containment: { executionPath: 'super-hardened', isolatedHome: 'yes', downgrades: [] },
+        })!.containment!;
+        expect(coerced.executionPath).toBe('ordinary');
+        expect(coerced.isolatedHome).toBe(false);
+        // ...and the missing explanation is supplied rather than left off.
+        expect(coerced.downgrades.map((entry) => entry.control)).toEqual(['isolated-home']);
+    });
+
     it('normalises the owner question (slice Q): absent or garbage → null, oversize text sliced, unknown keys dropped', () => {
         expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.question).toBeNull();
         expect(

@@ -141,6 +141,45 @@ describe('normalizeFleetTaskWorkspaceMounts', () => {
 		['a traversing repositoryId', { ...template, repositoryId: 'ever-works/../x' }, /repository identity/],
 		['a missing repoUrl', { ...template, repoUrl: '  ' }, /repoUrl is required/],
 		['a file: URL', { ...template, repoUrl: 'file:///tmp/repo' }, /remote, token-free/],
+		// Both of these reach `git` as an ARGUMENT on a Fleet node, which is
+		// somebody's actual PC, and a mount URL is tenant-configurable — a repo
+		// connection can point anywhere. The deny-list these replaced only
+		// stopped a node reading its own disk.
+		[
+			'a transport helper, whose address ext:: runs as a command',
+			{ ...template, repoUrl: 'ext::sh -c id' },
+			/remote, token-free/
+		],
+		['a URL git would read as an option', { ...template, repoUrl: '--upload-pack=calc.exe' }, /remote, token-free/],
+		[
+			'an ssh option smuggled into the host position',
+			{ ...template, repoUrl: 'git@-oProxyCommand=calc:x' },
+			/remote, token-free/
+		],
+		// Found by an external reviewer on the first version of this rule, which
+		// guarded the host of the scp-like form but not of a parsed URL. It
+		// parses cleanly, hostname `-oProxyCommand=calc`, and git hands the host
+		// to ssh.
+		[
+			'an ssh option in the URL host position',
+			{ ...template, repoUrl: 'ssh://-oProxyCommand=calc/x.git' },
+			/remote, token-free/
+		],
+		// The userless scp spelling stays refused ON PURPOSE: `host:path` and a
+		// Windows drive-relative path are the same shape, so accepting it would
+		// let `C:repos\secret` name a remote — on the only platform the fleet
+		// runs on.
+		['a userless scp-like remote', { ...template, repoUrl: 'github.com:owner/repo.git' }, /remote, token-free/],
+		[
+			'a Windows drive-relative path, which the userless form would mimic',
+			{ ...template, repoUrl: 'C:repos\secret' },
+			/remote, token-free/
+		],
+		[
+			'a git:// URL, which is unauthenticated plaintext',
+			{ ...template, repoUrl: 'git://host/r.git' },
+			/remote, token-free/
+		],
 		['a Windows local path', { ...template, repoUrl: 'C:\\repos\\template' }, /remote, token-free/],
 		['a POSIX local path', { ...template, repoUrl: '/srv/repos/template' }, /remote, token-free/],
 		['a control character in the URL', { ...template, repoUrl: 'https://x/y\nz' }, /remote, token-free/],
@@ -151,6 +190,21 @@ describe('normalizeFleetTaskWorkspaceMounts', () => {
 		['a fractional depth', { ...template, depth: 1.5 }, /depth must be an integer/]
 	])('refuses %s', (_label, entry, message) => {
 		expect(() => normalizeFleetTaskWorkspaceMounts([entry], PRIMARY)).toThrow(message);
+	});
+
+	it.each([
+		['https', 'https://github.com/ever-works/directory-web-template.git'],
+		['http', 'http://gitlab.example/acme/widgets.git'],
+		['ssh://', 'ssh://git@github.com/ever-works/directory-web-template.git'],
+		['scp-like ssh', 'git@github.com:ever-works/directory-web-template.git'],
+		['an IPv6 host', 'https://[::1]/ever-works/directory-web-template.git']
+	])('still accepts a %s clone URL', (_label, repoUrl) => {
+		// The rule above is an allow-list, so every legitimate form it has to
+		// keep is pinned here. The scp-like form in particular is not a
+		// parseable URL and is what the `workspace` fixture uses, and the IPv6
+		// host proves the transport-helper rule is anchored rather than a bare
+		// `::` search.
+		expect(normalizeFleetTaskWorkspaceMounts([{ ...template, repoUrl }], PRIMARY)[0]?.repoUrl).toBe(repoUrl);
 	});
 
 	it('names the offending entry by index', () => {

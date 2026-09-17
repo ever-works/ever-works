@@ -382,6 +382,102 @@ describe('KbDocumentContextMenu', () => {
         });
     });
 
+    // A rejected server-action invocation (a dropped connection, a redeploy)
+    // never returns a result. Each of these asserts the same two things the
+    // Restore fix pinned: the failure is named, and the control it came from
+    // is usable again instead of stuck behind `pending`.
+
+    it('reports an archive whose server action rejects, and leaves the menu usable', async () => {
+        updateActionMock.mockRejectedValueOnce(new Error('connection lost'));
+        render(
+            <KbDocumentContextMenu workId="work-1" document={doc()}>
+                <a data-testid="row">row</a>
+            </KbDocumentContextMenu>,
+        );
+        openMenu();
+        fireEvent.click(screen.getByTestId('kb-workbench-context-archive'));
+
+        expect((await screen.findByTestId('kb-workbench-context-menu-error')).textContent).toBe(
+            'updateFailed',
+        );
+        await waitFor(() =>
+            expect(
+                (screen.getByTestId('kb-workbench-context-archive') as HTMLButtonElement).disabled,
+            ).toBe(false),
+        );
+    });
+
+    it('reports a lock whose server action rejects, and leaves the menu usable', async () => {
+        lockActionMock.mockRejectedValueOnce(new Error('connection lost'));
+        render(
+            <KbDocumentContextMenu workId="work-1" document={doc()}>
+                <a data-testid="row">row</a>
+            </KbDocumentContextMenu>,
+        );
+        openMenu();
+        fireEvent.click(screen.getByTestId('kb-workbench-context-lock'));
+        fireEvent.click(screen.getByTestId('kb-workbench-context-lock-full'));
+
+        expect((await screen.findByTestId('kb-workbench-context-menu-error')).textContent).toBe(
+            'lockFailed',
+        );
+        await waitFor(() =>
+            expect(
+                (screen.getByTestId('kb-workbench-context-lock-full') as HTMLButtonElement)
+                    .disabled,
+            ).toBe(false),
+        );
+    });
+
+    it('reports an unlock whose server action rejects, and leaves the menu usable', async () => {
+        unlockActionMock.mockRejectedValueOnce(new Error('connection lost'));
+        render(
+            <KbDocumentContextMenu
+                workId="work-1"
+                document={doc({ locked: true, lockMode: 'full' })}
+            >
+                <a data-testid="row">row</a>
+            </KbDocumentContextMenu>,
+        );
+        openMenu();
+        fireEvent.click(screen.getByTestId('kb-workbench-context-unlock'));
+
+        expect((await screen.findByTestId('kb-workbench-context-menu-error')).textContent).toBe(
+            'unlockFailed',
+        );
+        await waitFor(() =>
+            expect(
+                (screen.getByTestId('kb-workbench-context-unlock') as HTMLButtonElement).disabled,
+            ).toBe(false),
+        );
+    });
+
+    it('reports a delete whose server action rejects, and leaves the dialog usable', async () => {
+        deleteActionMock.mockRejectedValueOnce(new Error('connection lost'));
+        render(
+            <KbDocumentContextMenu workId="work-1" document={doc()}>
+                <a data-testid="row">row</a>
+            </KbDocumentContextMenu>,
+        );
+        openMenu();
+        fireEvent.click(screen.getByTestId('kb-workbench-context-delete'));
+
+        fireEvent.change(await screen.findByTestId('kb-workbench-context-delete-input'), {
+            target: { value: 'Brand voice' },
+        });
+        fireEvent.click(screen.getByTestId('kb-workbench-context-delete-confirm'));
+
+        expect((await screen.findByTestId('kb-workbench-context-delete-error')).textContent).toBe(
+            'deleteFailed',
+        );
+        await waitFor(() =>
+            expect(
+                (screen.getByTestId('kb-workbench-context-delete-confirm') as HTMLButtonElement)
+                    .disabled,
+            ).toBe(false),
+        );
+    });
+
     it('Escape closes the menu', () => {
         render(
             <KbDocumentContextMenu workId="work-1" document={doc()}>

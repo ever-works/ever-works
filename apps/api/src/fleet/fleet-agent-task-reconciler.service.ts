@@ -27,6 +27,7 @@ import {
     INBOX_MAX_BODY_CHARS,
     fleetModelCostUsdToCents,
     fleetModelPluginId,
+    normalizeFleetAgentTaskContainment,
     normalizeFleetAgentTaskQuestion,
     normalizeFleetTaskWorkspaceMounts,
     type FleetAgentTaskGitResult,
@@ -947,6 +948,15 @@ export function parseAgentTaskResult(
         // travel as an object nobody validated. It can never carry the
         // token: the node has no path to put one there.
         mcp: normalizeMcpResult(raw.mcp),
+        // Self-build slice AK: what containment the model step actually
+        // got, narrowed at the boundary for the same reason `mcp` is. The
+        // raw spread above already carries it, UNVALIDATED — and this is
+        // the one block on the result whose only failure mode is
+        // over-reporting, so a node that sends `executionPath: 'hardened'`
+        // or `isolatedHome: 'yes'` must be coerced toward LESS containment
+        // here rather than believed. The normalizer also supplies the
+        // `isolated-home` downgrade a node may have omitted.
+        containment: normalizeFleetAgentTaskContainment(raw.containment),
         taskId: typeof raw.taskId === 'string' ? raw.taskId : '',
         runId: typeof raw.runId === 'string' ? raw.runId : null,
         checks,

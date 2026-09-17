@@ -1,9 +1,12 @@
 import { statSync } from 'fs';
 import { promises as fs } from 'fs';
-import { tmpdir } from 'os';
+import { homedir, tmpdir } from 'os';
 import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import type {
+	FleetAgentExecutionProvider,
 	FleetAgentModelExecution,
+	FleetAgentTaskContainment,
+	FleetAgentTaskContainmentDowngrade,
 	FleetAgentTaskGitResult,
 	FleetAgentTaskMcpBridge,
 	FleetAgentTaskMcpResult,
@@ -40,9 +43,20 @@ import {
 	runNodeCommandStep,
 	type AcceptanceChecksIo,
 	type NodeCheckResult,
+	type NodeCommandEnvOverlay,
 	type NodeCommandLimits,
 	type WireCheck
 } from './acceptance-checks';
+import {
+	applyIsolatedHomeEnv,
+	applyLocalSessionHomeEnv,
+	CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME,
+	claudeConfigRelocationLoss,
+	isolatedHomeLayout,
+	ISOLATED_HOME_RESIDUAL_ENV_NAMES,
+	MODEL_SESSION_HOME_DIR_NAME,
+	parseClaudeConfig
+} from '../model-execution/isolated-home';
 import { resolveCommandRoot, type CommandRootFs } from './command-roots';
 import {
 	collectOwnerQuestion,
@@ -153,6 +167,34 @@ export interface AgentTaskScratchFs {
 	 */
 	readFile(path: string): Promise<string | null>;
 	remove(path: string): Promise<void>;
+	/**
+	 * Create one directory (and its parents) under a scratch dir this seam
+	 * already created (self-build slice AK). Used to build the model step's
+	 * per-run isolated home.
+	 *
+	 * OPTIONAL, and its absence is a containment DOWNGRADE, not a silent
+	 * no-op: an embedder or a test that supplies its own in-memory scratch
+	 * filesystem genuinely cannot create a real home, and the run must
+	 * report that it went without one rather than claim a containment it
+	 * did not get. {@link defaultScratchFs} — what production uses —
+	 * implements it.
+	 */
+	mkdir?(path: string): Promise<void>;
+}
+
+/**
+ * Read-only access to the machine's own CLI config files (self-build
+ * slice AK).
+ *
+ * Separate from {@link AgentTaskScratchFs} on purpose: that seam owns
+ * paths the RUN created and may delete, this one reads two files the
+ * MACHINE OWNER owns and that the node must never write. Keeping them
+ * apart is what makes "the node never writes to the owner's home" a
+ * property of the types rather than of a reviewer's attention.
+ */
+export interface AgentTaskSessionConfigFs {
+	/** File contents, or null when it is absent. Errors propagate — see `claudeSessionRelocationLoss`. */
+	readFile(path: string): Promise<string | null>;
 }
 
 /** Injected so the executor is testable without spawning processes. */
@@ -343,6 +385,53 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Root for per-job scratch files (instructions / CLI output). */
 	scratchRoot?: string;
 	scratchFs?: AgentTaskScratchFs;
+	/**
+	 * Self-build slice AK — whether the model step gets a per-run ISOLATED
+	 * HOME. Defaults to `'isolated'`, which is the safe direction, and the
+	 * node's own composition root passes nothing, so a fleet PC gets the
+	 * isolated home without configuring anything.
+	 *
+	 * `'inherit'` is the escape hatch for a machine whose CLI keeps its
+	 * session somewhere this node cannot resolve. It is deliberately NOT
+	 * reachable from the CLI or an environment variable yet: the seam
+	 * exists so an embedder (and these tests) can exercise the degraded
+	 * path, and adding an operator-facing flag is a decision to make once
+	 * a real machine needs it, not a knob to ship ahead of the need.
+	 *
+	 * Whichever way it is set, it is never silent: the run reports
+	 * `isolatedHome: false` with a downgrade naming this setting, so "we
+	 * turned it off once for a debug session" cannot become "nobody
+	 * noticed it has been off for a month".
+	 */
+	modelHomeIsolation?: 'isolated' | 'inherit';
+	/**
+	 * Self-build slice AK — where each provider's real CLI session lives,
+	 * for the ONE directory the isolated home deliberately mirrors back in.
+	 *
+	 * Defaults to `<real home>/.claude` and `<real home>/.codex`, which is
+	 * where both CLIs put it. See `MODEL_SESSION_HOME_ENV_NAME` for the
+	 * trade-off in full.
+	 *
+	 * Like {@link modelHomeIsolation} this is an EMBEDDER seam, not an
+	 * operator knob: there is no CLI flag and no environment variable for
+	 * it, and the one read is in `resolveLocalSessionHome`. It exists so a
+	 * machine that moved its CLI config can be handled without a code
+	 * change the day one does.
+	 *
+	 * Deliberately NOT `string | null`. `null` reads as "mirror nothing,
+	 * isolate completely", and it used to fall through to the default real
+	 * home — the one setting that would TIGHTEN containment, failing open
+	 * and silently. A value is a path or the key is absent.
+	 */
+	modelSessionHome?: Partial<Record<FleetAgentExecutionProvider, string>>;
+	/**
+	 * Self-build slice AK — reads the two `.claude.json` files that decide
+	 * whether relocating `CLAUDE_CONFIG_DIR` is safe on this machine. Reads
+	 * only, never writes: the files belong to the machine owner, not to the
+	 * run. Defaults to {@link defaultSessionConfigFs}; a test or an embedder
+	 * supplies its own so the check is deterministic.
+	 */
+	sessionConfigFs?: AgentTaskSessionConfigFs;
 	/**
 	 * Self-build slice Q: reads / removes the owner-question file in the
 	 * worktree (and in writable mounts). Defaults to `node:fs`.
@@ -727,6 +816,12 @@ async function runResolvedAgentTask(
 	// reported, never a failure. A run whose platform tools did not come up
 	// is a run without tools, not a broken run.
 	let mcp: FleetAgentTaskMcpResult | null = null;
+	// Slice AK: what containment the model step actually got. Null while no
+	// model step has run — which is the honest reading for a run that had
+	// no `execution` block, or whose setup blocked before the model: there
+	// was nothing to contain, and claiming a containment for a step that
+	// never happened would be the same lie in the other direction.
+	let containment: FleetAgentTaskContainment | null = null;
 	// EW-807: a blocked setup skips the model entirely. With no dependencies
 	// installed the model step would fail for a reason that has nothing to do
 	// with the change, which is the failure this slice exists to stop.
@@ -743,6 +838,7 @@ async function runResolvedAgentTask(
 		);
 		model = modelStep.model;
 		mcp = modelStep.mcp;
+		containment = modelStep.containment;
 		throwIfAgentTaskAborted(signal);
 		if (model.status !== 'succeeded') {
 			failures.push(describeModelFailure(model));
@@ -880,6 +976,14 @@ async function runResolvedAgentTask(
 		// asked for one. NEVER carries the token — only whether the bridge
 		// ran and how many tool calls went through it.
 		...(mcp ? { mcp } : {}),
+		// Slice AK: present whenever a model step ran, ALWAYS — including
+		// on a failed run, whose containment is exactly as interesting. It
+		// is deliberately not conditional on something having gone wrong:
+		// a record that only appears when it is bad teaches a reader to
+		// treat its absence as "fine", and the absence would then also mean
+		// "an older node", "a refactor dropped the call" and "the control
+		// was never wired".
+		...(containment ? { containment } : {}),
 		...(failures.length > 0 ? { failureReason: failures.join('; ') } : {})
 	});
 }
@@ -1072,7 +1176,11 @@ async function runModelStep(
 	 * a granted credential.
 	 */
 	runSecretValues: readonly string[] = []
-): Promise<{ model: FleetAgentTaskModelResult; mcp: FleetAgentTaskMcpResult | null }> {
+): Promise<{
+	model: FleetAgentTaskModelResult;
+	mcp: FleetAgentTaskMcpResult | null;
+	containment: FleetAgentTaskContainment;
+}> {
 	const executable = io.modelCli?.[execution.provider];
 	if (typeof executable !== 'string' || !executable.trim()) {
 		throw new AgentTaskPayloadError(
@@ -1091,6 +1199,19 @@ async function runModelStep(
 	// changed-file count — by construction rather than by an exclude rule,
 	// which is why `.ever-works/` needed one and this does not.
 	const mcpConfigPath = join(scratchDir, 'mcp.json');
+	// Slice AK: built BEFORE the bridge, because the overlay has to exist
+	// before anything is spawned with it.
+	//
+	// It does NOT survive a throw, and this comment used to claim it did.
+	// `startBridge` below, the mount-grant assertion, an abort rejection
+	// out of `runNodeCommandStep` and the `throwIfAgentTaskAborted` calls
+	// in the caller all propagate straight out of `runResolvedAgentTask`,
+	// and a run that throws returns no outcome at all — so the record is
+	// discarded together with the model result, the checks and the git
+	// verdict it would have sat beside. That fails in the honest direction
+	// (absence, never a false claim) and matches what the platform sees:
+	// no result, not a result missing a field.
+	const containment = await establishModelContainment(execution.provider, scratchDir, scratchFs, io);
 	const bridge = await startBridge(jobId, bridgeSpec, mcpConfigPath, scratchFs, io);
 	try {
 		await scratchFs.writeFile(scratch.instructionsPath, execution.instructions);
@@ -1124,7 +1245,10 @@ async function runModelStep(
 		// could not be even if a payload asked — `EVER_WORKS_` is refused
 		// by `NODE_PLATFORM_OWNED_ENV_PATTERN` whatever a grant says.
 		const step = buildModelCliStep(execution, command, execution.envPassthrough, execution.envGrants);
-		const result = await runNodeCommandStep(step, workspacePath, io, signal);
+		// Slice AK: the ONE call on this node that carries a containment
+		// overlay. The setup phase and the acceptance checks deliberately do
+		// not — see {@link establishModelContainment}.
+		const result = await runNodeCommandStep(step, workspacePath, io, signal, undefined, containment.envOverlay);
 		const rawOutput = await scratchFs.readFile(scratch.resultPath);
 		// `envPassthrough` names the credential env vars this CLI was handed;
 		// their values are scrubbed out of the summary and output tail before
@@ -1141,7 +1265,7 @@ async function runModelStep(
 			io.parentEnv,
 			runSecretValues
 		);
-		return { model, mcp: bridge.result() };
+		return { model, mcp: bridge.result(), containment: containment.record };
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
 		// after the model exited is a live credential path nothing is
@@ -1150,11 +1274,289 @@ async function runModelStep(
 		await bridge.stop();
 		try {
 			await scratchFs.remove(scratchDir);
-		} catch {
+		} catch (error) {
 			// Scratch cleanup is best-effort: a leftover file must never fail
 			// a run whose verdict is already known.
+			//
+			// It is no longer SILENT, though (slice AK). This directory used
+			// to hold three small files; it now also holds the model step's
+			// entire `%TEMP%`, so a failure here can leak gigabytes — and on
+			// Windows `rm -r` throws `EBUSY`/`EPERM` whenever a process the
+			// model spawned still holds a handle, which the normal-exit path
+			// does not tree-kill. Nothing sweeps the scratch root (`gc` is
+			// scoped to the workspace root), so an operator watching a disk
+			// fill up needs this line to know where it went.
+			io.logger?.warn(
+				`[fleet-node] scratch cleanup failed for ${scratchDir} — the model step's temporary home may ` +
+					`still be on disk and nothing else will remove it: ${describeContainmentError(error)}`
+			);
 		}
 	}
+}
+
+/**
+ * What containment this model step will actually get, and the record of
+ * it (self-build slice AK).
+ *
+ * ## Why the model step and not every command
+ *
+ * The isolated home is applied to the MODEL step only, and that is a
+ * decision, not an oversight:
+ *
+ *   - the model step is where the untrusted input is. A Task's title and
+ *     description are user-authored, a mounted repository's files are
+ *     whatever someone pushed, and both become the prompt of a CLI that
+ *     ships a shell tool. That is the injection this control answers.
+ *   - the setup phase and the acceptance checks are the opposite case.
+ *     They exist to drive the machine's real toolchain — `pnpm install`
+ *     resolves its store out of `LOCALAPPDATA` / `XDG_DATA_HOME`, and a
+ *     redirected home would make every run a cold install against a
+ *     directory that is deleted when the run ends. That is not a
+ *     hypothetical cost, it is the setup phase's entire purpose.
+ *
+ * So the safe direction is the default WHERE it is provably safe, and it
+ * is not extended to the two phases where it provably breaks real runs.
+ * The remaining exposure is stated rather than hidden: a check command
+ * still runs with the machine's home, and an operator who lets a
+ * repository author the check commands is trusting that repository.
+ *
+ * ## Why a failed isolation downgrades rather than refuses
+ *
+ * A node whose temp volume hiccups would otherwise refuse every job on
+ * the machine, converting a containment improvement into an availability
+ * outage on a fleet whose point is to keep building. The downgraded run
+ * is no LESS contained than every run before this slice — it is simply
+ * not more — and it says so, on the job row, in a field a dashboard can
+ * group by. Silence is the outcome that is forbidden, not degradation.
+ *
+ * ## The four ways this declines to isolate
+ *
+ * All four record `isolatedHome: false` with an `isolated-home` downgrade
+ * naming the cause, and all four let the run proceed:
+ *
+ *   1. `modelHomeIsolation: 'inherit'` — an embedder switched it off;
+ *   2. the scratch seam cannot create directories;
+ *   3. creating them failed (`ENOSPC`, a read-only volume);
+ *   4. relocating `CLAUDE_CONFIG_DIR` could not be SHOWN to be harmless
+ *      on this machine — see {@link claudeSessionRelocationRisk}. This is
+ *      the one that is not about the filesystem: the mirror preserves the
+ *      credential but moves the CLI's top-level config, and a machine
+ *      whose onboarding lives in the file being moved away from would
+ *      fail every model step on a prompt `-p` cannot answer.
+ */
+async function establishModelContainment(
+	provider: FleetAgentExecutionProvider,
+	scratchDir: string,
+	scratchFs: AgentTaskScratchFs,
+	io: AgentTaskIo
+): Promise<{ envOverlay?: NodeCommandEnvOverlay; record: FleetAgentTaskContainment }> {
+	// Facts that are true of EVERY run on the ordinary path, recorded on
+	// every run rather than left to tribal knowledge. Both are honest
+	// statements of what this node cannot do today; neither is a failure.
+	const downgrades: FleetAgentTaskContainmentDowngrade[] = [
+		{
+			control: 'process-containment',
+			reason:
+				'the model ran through the ordinary command runner, not the hardened executor: no Windows Job ' +
+				'Object, no credential boundary and no executable-identity recheck, because that path fails ' +
+				'closed without a signed helper this build does not ship'
+		},
+		{
+			control: 'network-egress',
+			reason:
+				'nothing on this node restricts outbound network access; a Job Object cannot express it and no ' +
+				'egress subsystem exists, so the model reached the network unfiltered'
+		},
+		{
+			// Standing, and standing on EVERY run including a fully isolated
+			// one. Without it `isolatedHome: true` reads as "nothing of the
+			// real home is left", which is not what the ordinary runner's
+			// allowlist does: it forwards these as absolute paths, and
+			// `NODE_OPTIONS` in particular is code loaded into every `node`
+			// descendant of the model step, not merely a read path.
+			control: 'toolchain-anchors',
+			reason:
+				`the isolated home redirects the home anchors only; the command runner still forwards ` +
+				`${ISOLATED_HOME_RESIDUAL_ENV_NAMES.length} toolchain anchors (PNPM_HOME, NVM_DIR, CARGO_HOME, ` +
+				`GOPATH and the rest) as absolute paths into the machine’s real profile, and NODE_OPTIONS ` +
+				`among them is code loaded into every node descendant, not merely a read path — dropping ` +
+				`them breaks toolchain resolution and buys little, since an absolute read works anyway`
+		}
+	];
+	const downgraded = (reason: string): { record: FleetAgentTaskContainment } => ({
+		record: {
+			executionPath: 'ordinary',
+			isolatedHome: false,
+			localSessionHome: null,
+			downgrades: [...downgrades, { control: 'isolated-home', reason }]
+		}
+	});
+
+	if (io.modelHomeIsolation === 'inherit') {
+		return downgraded(
+			'the per-run isolated home is switched off on this node (modelHomeIsolation=inherit), so the model ' +
+				'step ran with the machine owner’s real home directory'
+		);
+	}
+	const mkdir = scratchFs.mkdir?.bind(scratchFs);
+	if (!mkdir) {
+		return downgraded(
+			'this node’s scratch filesystem cannot create directories, so no per-run home could be built and ' +
+				'the model step ran with the machine owner’s real home directory'
+		);
+	}
+	const localSessionHome = resolveLocalSessionHome(provider, io);
+	// Checked BEFORE anything is built on disk, because the answer can be
+	// "do not isolate at all". See `claudeConfigRelocationLoss`: pointing
+	// `CLAUDE_CONFIG_DIR` at the real `~/.claude` preserves the credential
+	// but RELOCATES the CLI's top-level config from `~/.claude.json` to
+	// `~/.claude/.claude.json`, and a machine whose onboarding lives in the
+	// first file would present to `claude -p` as never onboarded — with no
+	// way to answer the prompt, on a step that already carries
+	// `--dangerously-skip-permissions`. Declining to isolate leaves the run
+	// exactly as contained as every run before this slice, which is the
+	// honest trade against failing every model step on the node.
+	const relocationRisk = await claudeSessionRelocationRisk(provider, localSessionHome, io);
+	if (relocationRisk) return downgraded(relocationRisk);
+
+	const layout = isolatedHomeLayout(join(scratchDir, 'run-home'));
+	try {
+		for (const directory of layout.directories) await mkdir(directory);
+	} catch (error) {
+		io.logger?.warn(
+			`[fleet-node] containment downgraded — the per-run isolated home could not be created: ${describeContainmentError(error)}`
+		);
+		return downgraded(
+			`the per-run home could not be created, so the model step ran with the machine owner’s real home ` +
+				`directory: ${describeContainmentError(error)}`
+		);
+	}
+
+	// Read as: redirect the home, then mirror ONE directory back over it.
+	//
+	// The order is not what protects the login, and an earlier version of this
+	// comment claimed it was — a mutation check reversed the two calls and every
+	// test stayed green, correctly. What protects the login is that the session
+	// home is published under a name `applyIsolatedHomeEnv` does not touch:
+	// it deletes exactly `ISOLATED_HOME_ENV_NAMES` (isolated-home.ts:137-151),
+	// and `CLAUDE_CONFIG_DIR` / `CODEX_HOME` are not in that list. Add either of
+	// them to it and this composition breaks whichever way round it is written.
+	const envOverlay: NodeCommandEnvOverlay = applyLocalSessionHomeEnv(
+		applyIsolatedHomeEnv({} as Record<string, string>, layout),
+		provider,
+		localSessionHome
+	);
+	return {
+		envOverlay,
+		record: { executionPath: 'ordinary', isolatedHome: true, localSessionHome, downgrades }
+	};
+}
+
+/**
+ * Why relocating `CLAUDE_CONFIG_DIR` is unsafe on this machine, or null
+ * when it costs nothing and the run may isolate.
+ *
+ * Codex is exempt by construction, not by omission: `CODEX_HOME` points at
+ * the same `~/.codex` the CLI reads with the variable unset, so there is
+ * no second file to lose. Only Claude Code splits its state across
+ * `~/.claude.json` and `~/.claude/`.
+ *
+ * PROVES, never assumes. Three ways to get a refusal and only one to get a
+ * pass: no reader wired, the read threw, or a gate the machine currently
+ * passes would be lost. "We could not look" is not evidence that looking
+ * would have been fine, and the cost of guessing wrong is every model step
+ * on the node failing with a prompt a `-p` run cannot answer.
+ *
+ * READS ONLY, and only two named files. `~/.claude.json` also holds the
+ * owner's project history; nothing but the boolean gates is looked at, and
+ * only their NAMES ever reach the job row.
+ */
+async function claudeSessionRelocationRisk(
+	provider: FleetAgentExecutionProvider,
+	localSessionHome: string,
+	io: AgentTaskIo
+): Promise<string | null> {
+	if (provider !== 'claude-code') return null;
+	const relocatedPath = join(localSessionHome, CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME);
+	const declined = (because: string): string =>
+		`isolating the home would relocate Claude Code’s top-level config from <real home>/` +
+		`${CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME} to ${relocatedPath}, and ${because}. A headless ` +
+		`\`claude -p\` cannot answer an onboarding or trust prompt, so the model step ran with the machine ` +
+		`owner’s real home directory instead — no less contained than every run before this control, just ` +
+		`not more.`;
+
+	const read = io.sessionConfigFs?.readFile?.bind(io.sessionConfigFs);
+	if (!read) {
+		return declined(
+			'this node has no reader wired for the machine’s CLI config, so the relocation could not be ' +
+				'shown to be harmless'
+		);
+	}
+	let live: Record<string, unknown> | null;
+	let relocated: Record<string, unknown> | null;
+	try {
+		const [liveRaw, relocatedRaw] = await Promise.all([
+			read(join(resolveRealHomeDir(io), CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME)),
+			read(relocatedPath)
+		]);
+		live = parseClaudeConfig(liveRaw);
+		relocated = parseClaudeConfig(relocatedRaw);
+	} catch (error) {
+		io.logger?.warn(
+			`[fleet-node] containment downgraded — the machine’s Claude Code config could not be read, so the ` +
+				`model home was left un-isolated: ${describeContainmentError(error)}`
+		);
+		return declined(`that config could not be read: ${describeContainmentError(error)}`);
+	}
+
+	const lost = claudeConfigRelocationLoss(live, relocated);
+	if (lost.length === 0) return null;
+	return declined(
+		`the machine would lose ${lost.join(', ')} — copy those flags into ${relocatedPath} to let this ` +
+			`node isolate`
+	);
+}
+
+/**
+ * The ONE directory mirrored back in over the isolated home — the
+ * machine's real CLI session home.
+ *
+ * Node-owned by construction: an operator setting, or a path derived from
+ * this process's own home directory. No payload field reaches it, which
+ * is what keeps a wire value from being able to point the CLI's config
+ * (and therefore its credential) anywhere it likes.
+ */
+function resolveLocalSessionHome(provider: FleetAgentExecutionProvider, io: AgentTaskIo): string {
+	const configured = io.modelSessionHome?.[provider];
+	if (typeof configured === 'string' && configured.trim()) return configured.trim();
+	return join(resolveRealHomeDir(io), MODEL_SESSION_HOME_DIR_NAME[provider]);
+}
+
+/**
+ * This machine's real home, read BEFORE the redirect exists.
+ *
+ * `io.parentEnv` is the seam every other env decision on this node goes
+ * through, so it is consulted first; production leaves it unset and gets
+ * `os.homedir()`. Windows is asked for `USERPROFILE` first on purpose —
+ * a Git Bash shell exports a POSIX `HOME` (`/c/Users/...`) that no
+ * Windows CLI can open.
+ */
+function resolveRealHomeDir(io: AgentTaskIo): string {
+	const parentEnv = io.parentEnv;
+	if (parentEnv) {
+		const platform = io.platform ?? process.platform;
+		for (const name of platform === 'win32' ? ['USERPROFILE', 'HOME'] : ['HOME', 'USERPROFILE']) {
+			const upper = name.toUpperCase();
+			const key = Object.keys(parentEnv).find((candidate) => candidate.toUpperCase() === upper);
+			const value = key === undefined ? undefined : parentEnv[key];
+			if (typeof value === 'string' && value.trim()) return value.trim();
+		}
+	}
+	return homedir();
+}
+
+function describeContainmentError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 /** What {@link startBridge} hands back to the model step. */
@@ -1620,6 +2022,12 @@ export const defaultScratchFs: AgentTaskScratchFs = {
 		return fs.mkdtemp(join(privateRoot, `${prefix}-`));
 	},
 	writeFile: (path, content) => fs.writeFile(path, content, { encoding: 'utf8', mode: 0o600 }),
+	// Slice AK: `0700`, matching `ensurePrivateScratchRoot`. The model's
+	// isolated home lives here and a world-readable one would trade a
+	// credential path for a different credential path.
+	mkdir: async (path) => {
+		await fs.mkdir(path, { recursive: true, mode: 0o700 });
+	},
 	readFile: async (path) => {
 		try {
 			// Size the file BEFORE loading it. `buildModelCliCommand`
@@ -1648,6 +2056,25 @@ export const defaultScratchFs: AgentTaskScratchFs = {
 		}
 	},
 	remove: (path) => fs.rm(path, { recursive: true, force: true })
+};
+
+/**
+ * Production reader for the machine's CLI config (self-build slice AK).
+ *
+ * A missing file is `null`, which is the common and uninteresting case.
+ * Every other error PROPAGATES — an unreadable config is not evidence
+ * that relocating it is safe, and `claudeSessionRelocationLoss` turns the
+ * throw into a recorded downgrade rather than an assumption.
+ */
+export const defaultSessionConfigFs: AgentTaskSessionConfigFs = {
+	readFile: async (path) => {
+		try {
+			return await fs.readFile(path, { encoding: 'utf8' });
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+			throw error;
+		}
+	}
 };
 
 /**

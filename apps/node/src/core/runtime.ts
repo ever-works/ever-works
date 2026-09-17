@@ -16,7 +16,7 @@ import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
-import { runAgentTaskJob } from './executors/agent-task';
+import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
 import type { ModelCliPaths } from './executors/model-cli';
@@ -691,6 +691,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 								}
 							: {}),
 						modelCli,
+						// Self-build slice AK — the reader that decides whether
+						// relocating `CLAUDE_CONFIG_DIR` is safe on THIS machine.
+						// Wired here rather than defaulted inside the executor so
+						// the check is a property of a real node and never of a
+						// unit test that happens to run on a developer's PC: an
+						// `io` built by hand gets no reader, and the containment
+						// record then says the isolation was declined rather than
+						// silently claiming one that was never proved.
+						sessionConfigFs: defaultSessionConfigFs,
 						// Self-build slice Z (EW-796) — the platform side of the
 						// MCP bridge, wired through the SAME authenticated job
 						// client the lease protocol uses. No new endpoint, no new
