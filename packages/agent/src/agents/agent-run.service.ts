@@ -46,6 +46,7 @@ import { createAgentRunAbortSource } from './agent-run-abort';
 // pulled into `agents/`.
 import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-grant.enforcer';
 import { filterSkillsByToolGrants } from '../policy/skill-activation';
+import { withRunSuppression } from '../skills/skill-readiness.ladder';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
 // Session detail (Feature K) — timeline capture: redacted, size-capped
@@ -88,6 +89,13 @@ export interface AgentRunContext {
      * this null/undefined.
      */
     taskId?: string | null;
+    /**
+     * AW-17 — the Mission of the originating Task (`tasks.missionId`), read
+     * by the host from the Task row it already loaded. Threaded onto every
+     * facade call so usage rows roll up to the Mission that raised the work.
+     * NEVER `agents.missionId`. Null/undefined for runs with no Task.
+     */
+    missionId?: string | null;
     /**
      * Judgment layer G9 — the effective scope a DELEGATED run was
      * admitted under, read off `agent_runs.delegationScope` by the host
@@ -490,7 +498,15 @@ export class AgentRunService {
                         context.userId,
                         requestedSlug,
                     );
-                    if (invoked && invoked.invocationSlug) {
+                    // Skills shelf — a switched-off Skill, or a drafted one
+                    // nobody accepted, is not injected even when invoked by
+                    // name: the off switch covers every run (FR-16).
+                    if (
+                        invoked &&
+                        invoked.invocationSlug &&
+                        !invoked.disabledAt &&
+                        invoked.reviewState !== 'proposed'
+                    ) {
                         let invokedFiles:
                             | Array<{ filename: string; kind: string; sizeBytes: number }>
                             | undefined;
@@ -802,6 +818,8 @@ export class AgentRunService {
                   context.runId,
                   editsThisRunByFile,
                   context.delegationScope,
+                  context.missionId,
+                  context.taskId,
               )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
@@ -1006,6 +1024,8 @@ export class AgentRunService {
                         // records with the run id so the run-cost
                         // accumulator can sum exactly this run's spend.
                         runId: context.runId,
+                        // AW-17 — and with the Task's Mission.
+                        missionId: context.missionId ?? undefined,
                         providerOverride: agent.aiProviderId ?? undefined,
                     },
                 });
@@ -1996,10 +2016,18 @@ export class AgentRunService {
         runId: string,
         editsThisRunByFile: Set<string>,
         delegationScope?: SubAgentScope | null,
+        missionId?: string | null,
+        taskId?: string | null,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
-        const runContext = { runId, editsThisRunByFile };
+        const runContext = {
+            runId,
+            editsThisRunByFile,
+            missionId: missionId ?? undefined,
+            // AW-17 — the run's Task, so MCP tool calls are attributed to it.
+            taskId: taskId ?? undefined,
+        };
         if (typeof service.resolveGrantedTools !== 'function') {
             return this.applyDelegationScope(
                 await service.resolveAllowedTools(agent, runContext),
@@ -2132,9 +2160,20 @@ export class AgentRunService {
                     metadata: {
                         slug: entry.slug,
                         refusedTools: entry.refusals.map((r) => r.toolName),
+                        // Skills shelf (FR-62) — the run record links to the
+                        // Skill it dropped, not just its slug.
+                        skillId: entry.skill.skillId,
                     },
                 })
                 .catch(() => undefined);
+            // Skills shelf (FR-32) — reflect the suppression onto the Skill's
+            // cached readiness so the shelf badges it. Best-effort, same
+            // posture as the log line above: this must never fail a run.
+            void this.recordSkillSuppression(
+                agent,
+                entry.skill.skillId,
+                entry.refusals.map((r) => r.toolName),
+            ).catch(() => undefined);
         }
 
         // Skill files feature — attach the per-skill companion-file
@@ -2170,6 +2209,27 @@ export class AgentRunService {
         return active.map(({ skillId, slug, body, priority }) => {
             const files = filesBySkillId.get(skillId);
             return files ? { slug, body, priority, files } : { slug, body, priority };
+        });
+    }
+
+    /**
+     * Skills shelf (FR-32) — fold a run-time suppression into the Skill's
+     * cached readiness. No-op when the Skill repository is not wired.
+     */
+    private async recordSkillSuppression(
+        agent: Agent,
+        skillId: string,
+        refusedTools: string[],
+    ): Promise<void> {
+        if (!this.skillRepo) return;
+        const skill = await this.skillRepo.findByIdAndUser(skillId, agent.userId);
+        if (!skill) return;
+        const now = new Date();
+        const next = withRunSuppression(skill, refusedTools, agent.id, now);
+        await this.skillRepo.recordReadiness(skillId, agent.userId, {
+            readiness: next.readiness,
+            readinessDetail: next.detail,
+            readinessCheckedAt: now,
         });
     }
 

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { config } from '../config';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import type { AgentRun } from '../entities/agent-run.entity';
 import {
     AGENT_CHAT_REPLY_DISPATCHER,
     AGENT_TASK_EXECUTE_DISPATCHER,
@@ -8,6 +9,8 @@ import {
     type AgentChatReplyDispatcher,
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
+import { AGENT_RESUME_PROMOTION_BUDGET } from '@ever-works/contracts';
+import { RUN_AGENT_BRAKE, type RunAgentBrake } from './run-agent-brake';
 import { RUN_CREDITS_PRECHECK, type RunCreditsPrecheck } from './run-credits-precheck';
 import {
     KILL_SWITCH_ACTIVE_ERROR_NAME,
@@ -18,6 +21,7 @@ import { RUN_PLAN_LIMITS, type RunPlanLimits } from './run-plan-limits';
 import {
     composeRunAdmission,
     DEFAULT_RUN_ADMISSION_CHAIN,
+    QUEUED_REASON_AGENT_PAUSED,
     QUEUED_REASON_CONCURRENCY,
     QUEUED_REASON_INSUFFICIENT_CREDITS,
     QUEUED_REASON_KILL_SWITCH,
@@ -54,20 +58,53 @@ export { QUEUED_REASON_INSUFFICIENT_CREDITS };
  */
 export { QUEUED_REASON_KILL_SWITCH };
 
+/**
+ * AW-23 — stamped when the AGENT BRAKE parks a run because its Agent is
+ * paused. Drained by {@link RunDispatchGateService.promoteParkedForAgent}
+ * on Resume, and exempt from the stuck-run sweeper for as long as the
+ * agent stays paused: work held by a pause is waiting for a person.
+ */
+export { QUEUED_REASON_AGENT_PAUSED };
+
 /** Upper bound on one `promoteParked` pass, so a clear cannot stampede. */
 export const PROMOTE_PARKED_MAX_PROMOTIONS = 200;
+
+/**
+ * Park reasons whose drain RELABELS a run the chain now refuses for a
+ * different reason.
+ *
+ * Both are "a stop was lifted" drains: the global stop flag was cleared,
+ * or an agent was resumed. In either case a run the chain still refuses —
+ * because its Work is saturated, or credits ran out — must be handed to
+ * the reason that will actually drain it, or it stays parked under a
+ * label nothing is looking for. `concurrency-limit` is deliberately
+ * absent: its own drain re-runs on every terminal transition, so there is
+ * nothing to hand it to.
+ */
+const RELABELLABLE_PARK_REASONS: ReadonlySet<string> = new Set<string>([
+    QUEUED_REASON_KILL_SWITCH,
+    QUEUED_REASON_AGENT_PAUSED,
+]);
 
 export interface RunDispatchAdmitInput {
     userId: string;
     workId?: string | null;
     organizationId?: string | null;
+    /**
+     * AW-23 — the Agent this run belongs to, so the brake middleware can
+     * see it and a paused agent's work parks instead of running.
+     * Optional: every pre-existing caller compiles unchanged, and a run
+     * without an agent simply skips the brake.
+     */
+    agentId?: string | null;
 }
 
 export interface RunDispatchAdmitResult {
     admitted: boolean;
     /**
      * Set only when `admitted === false`: `concurrency-limit`,
-     * `insufficient-credits`, or `kill-switch` (EW-778).
+     * `insufficient-credits`, `kill-switch` (EW-778), or `agent-paused`
+     * (AW-23).
      */
     queuedReason?: string;
 }
@@ -231,6 +268,14 @@ export class RunDispatchGateService {
         @Optional()
         @Inject(RUN_KILL_SWITCH)
         private readonly killSwitch?: RunKillSwitch,
+        // AW-23 — the per-AGENT brake. Bound (to AgentBrakeService) by
+        // the agent-side AgentsModule; absent in unit tests and trimmed
+        // installs, where the brake middleware simply passes every run
+        // through. Same @Optional() + appended-LAST posture as every seam
+        // above (the positional-spec arity rule).
+        @Optional()
+        @Inject(RUN_AGENT_BRAKE)
+        private readonly agentBrake?: RunAgentBrake,
     ) {}
 
     /** Env default today; per-Work override column when it lands. */
@@ -304,6 +349,7 @@ export class RunDispatchGateService {
             ...(this.creditsPrecheck ? { creditsPrecheck: this.creditsPrecheck } : {}),
             ...(this.planLimits ? { planLimits: this.planLimits } : {}),
             ...(this.killSwitch ? { killSwitch: this.killSwitch } : {}),
+            ...(this.agentBrake ? { agentBrake: this.agentBrake } : {}),
         });
     }
 
@@ -335,6 +381,88 @@ export class RunDispatchGateService {
         try {
             const candidate = await this.runs.findOldestQueuedForConcurrency(workId, queuedReason);
             if (!candidate) return { dispatched: false, reason: 'no-candidate' };
+            return await this.promoteCandidate(candidate, queuedReason, `Work ${workId}`);
+        } catch (err) {
+            this.logger.warn(`Dispatch gate: drainForWork(${workId}) failed: ${err}`);
+            return { dispatched: false, reason: 'dispatch-failed' };
+        }
+    }
+
+    /**
+     * AW-23 — release work held because an Agent was paused, oldest
+     * first, up to `budget` runs, and report how many actually went out
+     * so a Resume can say "3 held runs released" instead of hoping.
+     *
+     * Keyed on the AGENT, not on a Work: a chat reply held for a paused
+     * agent may carry no Work at all, and the Work-keyed drain would
+     * never see it. Everything after the candidate lookup is the SAME
+     * claim-CAS / dispatch / rollback path {@link drainForWork} uses —
+     * stated once in {@link promoteCandidate} — so held work is released
+     * through the machinery that already works rather than a second
+     * implementation of it.
+     *
+     * Best-effort by contract and never throws: a resume must succeed
+     * even if the drain hiccups. Runs left behind stay parked and the
+     * next Resume (or the ordinary terminal-transition drain, once they
+     * are relabelled) picks them up. Same posture as
+     * {@link promoteParked} after a stop-flag clear.
+     */
+    async promoteParkedForAgent(
+        agentId: string,
+        budget: number = AGENT_RESUME_PROMOTION_BUDGET,
+    ): Promise<RunDispatchPromoteResult> {
+        const max = Math.max(0, Math.trunc(budget));
+        const result: RunDispatchPromoteResult = { promoted: 0, works: 0, budgetExhausted: false };
+        if (!agentId || max === 0) return result;
+        if (typeof this.runs.findOldestQueuedForAgent !== 'function') return result;
+        try {
+            for (;;) {
+                if (result.promoted >= max) {
+                    result.budgetExhausted = true;
+                    break;
+                }
+                const candidate = await this.runs.findOldestQueuedForAgent(
+                    agentId,
+                    QUEUED_REASON_AGENT_PAUSED,
+                );
+                if (!candidate) break;
+                const drained = await this.promoteCandidate(
+                    candidate,
+                    QUEUED_REASON_AGENT_PAUSED,
+                    `Agent ${agentId}`,
+                );
+                // A candidate that did NOT go out is still parked (or was
+                // relabelled / rolled to failed). Either way asking again
+                // would return the same row forever, so stop here and let
+                // the next Resume try.
+                if (!drained.dispatched) break;
+                result.promoted += 1;
+            }
+            this.logger.log(
+                `Dispatch gate: released ${result.promoted} run(s) held for agent ${agentId}.`,
+            );
+        } catch (err) {
+            this.logger.warn(`Dispatch gate: promoteParkedForAgent(${agentId}) failed: ${err}`);
+        }
+        return result;
+    }
+
+    /**
+     * The shared body of every promotion: re-admit, claim (CAS), dispatch
+     * on the path the run came in on, stamp the runtime handle, and roll
+     * back the way the fan-out path does.
+     *
+     * Extracted from {@link drainForWork} so the Work-keyed drain and the
+     * Agent-keyed resume drain cannot drift apart — the claim CAS is the
+     * correctness floor for BOTH, and two copies of it is exactly how a
+     * run gets double-dispatched.
+     */
+    private async promoteCandidate(
+        candidate: AgentRun,
+        queuedReason: string,
+        subject: string,
+    ): Promise<RunDispatchDrainResult> {
+        try {
             if (!candidate.taskId) {
                 // Every parking path is Task-keyed (task fan-out, board
                 // run, resume, chat reply); a parked run without a Task
@@ -353,23 +481,27 @@ export class RunDispatchGateService {
 
             const admission = await this.admit({
                 userId: candidate.userId,
-                workId,
+                workId: candidate.workId ?? null,
                 organizationId: candidate.organizationId ?? null,
+                // AW-23 — a run whose Agent has been paused since it was
+                // parked must not be released by ANY drain. Passing the
+                // agent is what lets the brake re-park it below.
+                agentId: candidate.agentId ?? null,
             });
             if (!admission.admitted) {
                 if (
-                    queuedReason === QUEUED_REASON_KILL_SWITCH &&
+                    RELABELLABLE_PARK_REASONS.has(queuedReason) &&
                     admission.queuedReason &&
-                    admission.queuedReason !== QUEUED_REASON_KILL_SWITCH &&
+                    admission.queuedReason !== queuedReason &&
                     typeof this.runs.relabelQueuedReason === 'function'
                 ) {
-                    // The flag is off but something else now parks this
+                    // The stop is lifted but something else now parks this
                     // run. Hand it to the reason that will actually drain
                     // it (CAS — a raced promotion is a harmless no-op).
                     try {
                         await this.runs.relabelQueuedReason(
                             candidate.id,
-                            QUEUED_REASON_KILL_SWITCH,
+                            queuedReason,
                             admission.queuedReason,
                         );
                     } catch (relabelErr) {
@@ -430,7 +562,7 @@ export class RunDispatchGateService {
                     }
                 }
                 this.logger.log(
-                    `Dispatch gate: drained run ${candidate.id} for Work ${workId} (task ${candidate.taskId}).`,
+                    `Dispatch gate: drained run ${candidate.id} for ${subject} (task ${candidate.taskId}).`,
                 );
                 return { dispatched: true, runId: candidate.id };
             } catch (err) {
@@ -484,7 +616,7 @@ export class RunDispatchGateService {
                 return { dispatched: false, reason: 'dispatch-failed' };
             }
         } catch (err) {
-            this.logger.warn(`Dispatch gate: drainForWork(${workId}) failed: ${err}`);
+            this.logger.warn(`Dispatch gate: promoting ${subject} failed: ${err}`);
             return { dispatched: false, reason: 'dispatch-failed' };
         }
     }

@@ -47,6 +47,7 @@ import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService, GoalOrchestratorService } from '@ever-works/agent/goals';
 import {
     AgentEscalationService,
+    RosterProvisioningService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
@@ -66,6 +67,7 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { FleetJobService } from '@ever-works/agent/fleet';
+import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
@@ -79,7 +81,12 @@ import {
 } from '@ever-works/agent/plugins';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
-import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
+import {
+    MemoryConsolidationScheduleService,
+    MemoryFactEmbedService,
+    MemoryFactSweepService,
+} from '@ever-works/agent/services';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import {
     CreditLedgerService,
     CreditsSweepService,
@@ -388,12 +395,43 @@ export class TriggerInternalController implements OnModuleInit {
         // channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly paygService?: PaygService,
+        // Model accounts (AW-16) — backs the `model-account-health` cron:
+        // the worker proxy calls `probeDueAccounts()` over the internal RPC
+        // channel, landing here where the AI provider plugins and their
+        // settings are loaded. Appended LAST + @Optional() per the arity rule
+        // above.
+        @Optional()
+        private readonly modelAccountHealthService?: ModelAccountHealthService,
         // Named Conversations — backs the `agent-conversation-reply` task:
         // the worker proxy calls `loadReplyContext`, `agentVisibleBody` and
         // `appendAgentMessage` over the internal RPC channel. Appended LAST +
         // @Optional() per the arity rule above.
         @Optional()
         private readonly conversationMessageService?: ConversationMessageService,
+        // Skills shelf — backs the `skill-readiness-sweep` cron: the worker
+        // proxy calls `sweepStale()` over the internal RPC channel, landing
+        // here where the Skill repositories, the tool-grant matrix and the
+        // credential port are wired. Appended LAST + @Optional() per the
+        // arity rule above.
+        @Optional()
+        private readonly skillReadinessService?: SkillReadinessService,
+        // AW-20 P1 — backs the `roster-provision` one-shot task: the
+        // worker proxy drives `execute()` over the internal RPC channel,
+        // landing here where the Agents, collaborator and checklist
+        // repositories are wired. Appended LAST + @Optional() per the
+        // arity rule above.
+        @Optional()
+        private readonly rosterProvisioningService?: RosterProvisioningService,
+        // Memory facts (AW-07) — backs the `memory-fact-embed` task
+        // (`embedFact(factId)`) and the `memory-fact-gc` cron (`sweep()`),
+        // landing here where the AI provider and vector-store plugins are
+        // loaded. Appended LAST + @Optional() per the arity rule above —
+        // placed after develop's trailing optionals so no existing positional
+        // index shifts.
+        @Optional()
+        private readonly memoryFactEmbedService?: MemoryFactEmbedService,
+        @Optional()
+        private readonly memoryFactSweepService?: MemoryFactSweepService,
     ) {}
 
     onModuleInit() {
@@ -433,6 +471,8 @@ export class TriggerInternalController implements OnModuleInit {
             // Judgment layer G3 — agent-task-execute files escalations here
             // when the gate is exhausted / the budget stopped the loop.
             AgentEscalationService: this.agentEscalationService,
+            // AW-20 P1 — exposed for the `roster-provision` one-shot task.
+            RosterProvisioningService: this.rosterProvisioningService,
             // Orchestration M9 — agent-task-execute persists the machine
             // gate feedback here so a later resume replays it.
             TaskReviewRejectionService: this.taskReviewRejectionService,
@@ -510,6 +550,17 @@ export class TriggerInternalController implements OnModuleInit {
             // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
             // calls `syncDuePrStatuses()` here (allow-list auto-derived).
             TaskPrStatusService: this.taskPrStatusService,
+            // Memory facts (AW-07) — `memory-fact-embed` calls `embedFact()`
+            // and `memory-fact-gc` calls `sweep()` here (allow-list
+            // auto-derived).
+            MemoryFactEmbedService: this.memoryFactEmbedService,
+            MemoryFactSweepService: this.memoryFactSweepService,
+            // Model accounts (AW-16) — `model-account-health` calls
+            // `probeDueAccounts()` here (allow-list auto-derived).
+            ModelAccountHealthService: this.modelAccountHealthService,
+            // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
+            // here (allow-list auto-derived).
+            SkillReadinessService: this.skillReadinessService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

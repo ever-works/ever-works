@@ -1,9 +1,10 @@
 'use client';
 
-import { DragEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import { Mic, SendHorizonal, Square } from 'lucide-react';
+import { AlertTriangle, Info, Mic, Paperclip, SendHorizonal, Square } from 'lucide-react';
+import { MAX_MENTIONS_PER_MESSAGE, conversationBodyBytes } from '@ever-works/contracts';
 import {
     ChatAttachButton,
     ChatAttachmentChips,
@@ -16,14 +17,39 @@ import { useChatContext } from './ChatProvider';
 import { useDictation } from '@/components/common/composer/use-dictation';
 import { VoiceBar } from '@/components/common/composer/VoiceBar';
 import type { ChatAttachmentRef } from '@/lib/ai/attachments';
+import { confirmedMentionCandidates } from '@/lib/hooks/use-mention-candidates';
+import { MentionPicker, useMentionPicker } from './conversations/MentionPicker';
+import {
+    ComposerHighlightLayer,
+    type ComposerHighlightHandle,
+} from './conversations/ComposerHighlightLayer';
+import { formatKilobytes } from './conversations/MessageRetryBar';
 
 interface ChatInputProps {
     isStreaming: boolean;
     onSubmit: (text: string, attachments: ReadonlyArray<ChatAttachmentRef>) => void;
     onStop: () => void;
+    // ── Named Conversations with an Agent. Every prop below is optional and
+    // off by default, so the assistant's composer renders exactly as before.
+    /** Replaces the assistant's placeholder (e.g. "Message Nova…"). */
+    placeholder?: string;
+    /** Opens the `@` mention picker and paints resolved mentions (FR-25..FR-29). */
+    mentions?: boolean;
+    /** Blocks a longer send locally, keeping the text, and offers attaching it instead (FR-37). */
+    maxBodyBytes?: number;
+    /** The per-message model pin applies to the assistant only; an Agent answers on its own model. */
+    showModelSelector?: boolean;
 }
 
-export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
+export function ChatInput({
+    isStreaming,
+    onSubmit,
+    onStop,
+    placeholder,
+    mentions = false,
+    maxBodyBytes,
+    showModelSelector = true,
+}: ChatInputProps) {
     const t = useTranslations('dashboard.aiChat');
     // Read straight from context rather than threading four more props through
     // ChatInterface: the model picker lives here because choosing a model is
@@ -39,6 +65,34 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
     // controlled would re-render the panel on every keystroke — so this
     // tracks emptiness, not the text itself.
     const [hasText, setHasText] = useState(false);
+    // A send the body-size cap refused locally: the text stays in the box and
+    // this says how big it is (FR-37, FR-39). Cleared by the next edit.
+    const [oversize, setOversize] = useState<number | null>(null);
+    // More than ten mentions: the rest stay plain text, and the person is told before sending (FR-31).
+    const [mentionsOverLimit, setMentionsOverLimit] = useState(false);
+
+    const highlightRef = useRef<ComposerHighlightHandle | null>(null);
+    const syncHighlight = useCallback(() => {
+        if (!mentions) return;
+        const el = textareaRef.current;
+        highlightRef.current?.update(inputRef.current, el?.scrollTop ?? 0);
+    }, [mentions]);
+    const picker = useMentionPicker({
+        textareaRef,
+        disabled: !mentions || isStreaming,
+        onInsert: (next) => {
+            inputRef.current = next;
+            setHasText(next.trim().length > 0);
+            setOversize(null);
+            autoResize();
+            syncHighlight();
+        },
+    });
+    const { update: updatePicker, version: candidateVersion } = picker;
+    // Newly confirmed candidates can turn a typed `@Name` into a real mention.
+    useEffect(() => {
+        if (mentions) highlightRef.current?.repaint();
+    }, [mentions, candidateVersion]);
 
     // Auto-focus when AI finishes generating
     useEffect(() => {
@@ -170,6 +224,13 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
         const ready = readyRefs();
         if (isStreaming || uploading) return;
         if (!trimmed && ready.length === 0) return;
+        if (maxBodyBytes !== undefined) {
+            const size = conversationBodyBytes(trimmed);
+            if (size > maxBodyBytes) {
+                setOversize(size);
+                return;
+            }
+        }
         onSubmit(trimmed, ready);
         inputRef.current = '';
         setHasText(false);
@@ -178,7 +239,84 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
             textareaRef.current.value = '';
             textareaRef.current.style.height = 'auto';
         }
+        if (mentions) {
+            updatePicker('', 0);
+            syncHighlight();
+        }
     };
+
+    // "Attach as a file": the refused text becomes an attachment on the same
+    // message, so nothing typed is lost and the body is back under the cap.
+    const attachTextInstead = () => {
+        const text = inputRef.current;
+        if (!text) return;
+        addFiles([new File([text], 'message.txt', { type: 'text/plain' })]);
+        inputRef.current = '';
+        setHasText(false);
+        setOversize(null);
+        if (textareaRef.current) {
+            textareaRef.current.value = '';
+            textareaRef.current.style.height = 'auto';
+        }
+        syncHighlight();
+    };
+
+    const composerTextarea = (
+        <textarea
+            ref={textareaRef}
+            defaultValue=""
+            rows={1}
+            onChange={(e) => {
+                inputRef.current = e.target.value;
+                setHasText(e.target.value.trim().length > 0);
+                autoResize();
+                if (oversize !== null) setOversize(null);
+                if (mentions) {
+                    updatePicker(e.target.value, e.target.selectionStart ?? 0);
+                    syncHighlight();
+                }
+            }}
+            onScroll={mentions ? syncHighlight : undefined}
+            onSelect={
+                mentions
+                    ? (e) =>
+                          updatePicker(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
+                    : undefined
+            }
+            onPaste={(e) => {
+                // Pasting a screenshot is the fastest way to attach
+                // one; without this the clipboard image is dropped
+                // and only its (usually empty) text survives.
+                const files = filesFromDataTransfer(e.clipboardData);
+                if (files.length > 0) {
+                    e.preventDefault();
+                    addFiles(files);
+                }
+            }}
+            onKeyDown={(e) => {
+                // The mention picker owns ↑ ↓ Enter Tab Esc while open.
+                if (mentions && picker.handleKeyDown(e)) return;
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (canSend) {
+                        e.currentTarget.form?.requestSubmit();
+                    }
+                }
+            }}
+            placeholder={placeholder ?? t('inputPlaceholder')}
+            className={cn(
+                'w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm',
+                // Positioned so it paints above the highlight layer behind it.
+                mentions && 'relative',
+                'text-text dark:text-white',
+                'placeholder:text-xs placeholder:text-text-muted dark:placeholder:text-white/25',
+                'focus:outline-none',
+                'max-h-40 overflow-y-auto',
+            )}
+            disabled={isStreaming}
+            autoComplete="off"
+        />
+    );
 
     return (
         <div className="mt-auto px-4 pb-4 pt-2 shrink-0">
@@ -206,44 +344,22 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                     )}
                 >
                     <ChatAttachmentChips items={items} onRemove={remove} />
-                    <textarea
-                        ref={textareaRef}
-                        defaultValue=""
-                        rows={1}
-                        onChange={(e) => {
-                            inputRef.current = e.target.value;
-                            setHasText(e.target.value.trim().length > 0);
-                            autoResize();
-                        }}
-                        onPaste={(e) => {
-                            // Pasting a screenshot is the fastest way to attach
-                            // one; without this the clipboard image is dropped
-                            // and only its (usually empty) text survives.
-                            const files = filesFromDataTransfer(e.clipboardData);
-                            if (files.length > 0) {
-                                e.preventDefault();
-                                addFiles(files);
-                            }
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                if (canSend) {
-                                    e.currentTarget.form?.requestSubmit();
-                                }
-                            }
-                        }}
-                        placeholder={t('inputPlaceholder')}
-                        className={cn(
-                            'w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm',
-                            'text-text dark:text-white',
-                            'placeholder:text-xs placeholder:text-text-muted dark:placeholder:text-white/25',
-                            'focus:outline-none',
-                            'max-h-40 overflow-y-auto',
-                        )}
-                        disabled={isStreaming}
-                        autoComplete="off"
-                    />
+                    {mentions && <MentionPicker state={picker} />}
+                    {mentions ? (
+                        // The highlight layer sits exactly behind the textarea, in
+                        // the same box, so painted mentions line up glyph for glyph.
+                        <div className="relative">
+                            <ComposerHighlightLayer
+                                ref={highlightRef}
+                                getCandidates={confirmedMentionCandidates}
+                                onOverLimitChange={setMentionsOverLimit}
+                                className="px-4 pt-3 pb-1 text-sm"
+                            />
+                            {composerTextarea}
+                        </div>
+                    ) : (
+                        composerTextarea
+                    )}
                     {/* Live dictation is a MODE, not one more lit-up button:
                         the bar takes the toolbar's place for as long as the
                         mic is open, exactly as it does in the /works composer. */}
@@ -296,13 +412,15 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                                     message because it is a per-message choice
                                     — the PROVIDER, which is the thread's
                                     identity, is chosen once in the header. */}
-                                <ChatModelSelector
-                                    providerId={selectedProvider}
-                                    configuredModels={activeProvider?.models}
-                                    value={selectedModel}
-                                    disabled={isStreaming}
-                                    onChange={setSelectedModel}
-                                />
+                                {showModelSelector && (
+                                    <ChatModelSelector
+                                        providerId={selectedProvider}
+                                        configuredModels={activeProvider?.models}
+                                        value={selectedModel}
+                                        disabled={isStreaming}
+                                        onChange={setSelectedModel}
+                                    />
+                                )}
                                 {/* The panel is user-resizable, so this hint is the
                                 one thing here that must give way: truncating it
                                 keeps the controls and the send button in place
@@ -340,6 +458,39 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                         </div>
                     )}
                 </div>
+                {mentions && mentionsOverLimit && (
+                    <p
+                        role="status"
+                        data-testid="chat-composer-mentions-over-limit"
+                        className="mx-auto mt-1.5 flex max-w-200 items-center gap-1.5 text-[11px] text-text-muted dark:text-text-muted-dark"
+                    >
+                        <Info className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {t('mentions.overLimit', { max: MAX_MENTIONS_PER_MESSAGE })}
+                    </p>
+                )}
+                {oversize !== null && maxBodyBytes !== undefined && (
+                    <div
+                        role="alert"
+                        data-testid="chat-composer-too-long"
+                        className="mx-auto mt-1.5 flex max-w-200 flex-wrap items-center justify-between gap-2 text-[11px] text-danger"
+                    >
+                        <span className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {t('sendFailure.tooLong', {
+                                size: formatKilobytes(oversize),
+                                max: formatKilobytes(maxBodyBytes),
+                            })}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={attachTextInstead}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-0.5 font-medium text-text-secondary hover:bg-surface-secondary dark:border-white/15 dark:text-text-secondary-dark dark:hover:bg-white/5"
+                        >
+                            <Paperclip className="h-3 w-3" aria-hidden="true" />
+                            {t('sendFailure.attachInstead')}
+                        </button>
+                    </div>
+                )}
             </form>
         </div>
     );

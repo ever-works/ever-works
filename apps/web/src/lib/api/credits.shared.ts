@@ -1,3 +1,4 @@
+import type { CreditPriceListView, CreditSettlementMode } from '@ever-works/contracts';
 import {
     serializeWorkspaceScope,
     WORKSPACE_SCOPE_QUERY_PARAM,
@@ -70,6 +71,18 @@ export interface CreditsPricing {
         defaultMonthlyCapCredits: number;
         maxMonthlyCapCredits: number;
     };
+    /** AW-17 — the credit price-list version new calls are priced at (optional: older APIs omit it). */
+    pricebookVersion?: number;
+    /** AW-17 — `YYYY-MM-DD` that version took effect. */
+    pricebookEffectiveFrom?: string;
+    /** AW-17 — the published credit price list. */
+    priceList?: CreditPriceListView;
+    /**
+     * AW-17 — how runs are actually debited. `provider_cost` (default): the
+     * price list's per-unit credits are reference prices, not charges.
+     * `price_list`: they are what a call is charged. Optional: older APIs omit it.
+     */
+    settlementMode?: CreditSettlementMode;
 }
 
 /**

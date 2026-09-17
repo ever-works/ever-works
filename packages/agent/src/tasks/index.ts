@@ -15,6 +15,11 @@ export * from './work-generation.types';
 export * from './work-generation-dispatcher';
 export * from './work-import.types';
 export * from './work-import-dispatcher';
+// AW-20 P1 — roster provisioning. Creating four agents is ~30 writes
+// that run sequentially, retry independently and must report per-lane
+// progress; it cannot happen on a request thread.
+export * from './roster-provision.types';
+export * from './roster-provision-dispatcher';
 export * from './template-customization.types';
 export * from './template-customization-dispatcher';
 export * from './webhook-delivery.types';
@@ -27,6 +32,12 @@ export * from './kb-embed-document.types';
 export * from './kb-embed-document-dispatcher';
 export * from './workflow-run.types';
 export * from './workflow-run-dispatcher';
+// AW-07 — embeds one memory fact through the AI facade + vector-store port.
+export * from './memory-fact-embed.types';
+export * from './memory-fact-embed-dispatcher';
+// AW-07 — runtime-neutral handlers + ids for the two memory-fact jobs, so
+// every job-runtime provider registers the same behaviour.
+export * from './memory-fact-jobs';
 export * from './kb-org-overlay-fanout.types';
 export * from './kb-org-overlay-fanout-dispatcher';
 export * from './kb-normalize-media.types';

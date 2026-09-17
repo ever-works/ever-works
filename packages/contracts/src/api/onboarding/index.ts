@@ -53,6 +53,29 @@ export {
 	ONBOARDING_DESKTOP_NEXT_STEPS,
 	desktopNextStep
 } from './wizard-state.js';
+// AW-20 P1 — roster vocabulary (lane keys, blueprint slugs, the two caps).
+export type { RosterLaneKey, RosterBlueprintSlug } from './roster.js';
+export { ROSTER_LANE_KEYS, ROSTER_BLUEPRINT_SLUGS, ROSTER_MAX_LANES, ROSTER_NAME_MAX } from './roster.js';
+// AW-20 — first-hour vocabulary. The milestone enum lands with P1
+// because the provisioning record beside it is written by P1's roster
+// run; the checklist surfaces that read the milestones are P2.
+export type {
+	OnboardingMilestoneKey,
+	MilestoneStatus,
+	MilestoneRecord,
+	RosterProvisionState,
+	LaneOutcome,
+	LaneFailureReason,
+	RosterLaneResult,
+	RosterProvisionRecord
+} from './first-hour.js';
+export {
+	ONBOARDING_MILESTONES,
+	MILESTONE_STATUSES,
+	ROSTER_PROVISION_STATES,
+	LANE_OUTCOMES,
+	LANE_FAILURE_REASONS
+} from './first-hour.js';
 export type {
 	OnboardingSeedAgentSuggestion,
 	OnboardingSeedSkillSuggestion,

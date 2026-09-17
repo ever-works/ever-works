@@ -6,6 +6,9 @@ import {
 } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import type { ISearchPlugin, PluginManifest } from '@ever-works/plugin';
+import { PluginUsageService } from '../../usage/plugin-usage.service';
+import { PublishedCreditPriceList } from '../../usage/credit-price-list';
+import { UsageMeter, UsageOutcome, UsagePayer } from '@src/entities/_types';
 
 describe('SearchFacadeService', () => {
     let service: SearchFacadeService;
@@ -135,6 +138,91 @@ describe('SearchFacadeService', () => {
                 name: 'Exa',
                 enabled: false,
             });
+        });
+    });
+
+    /**
+     * AW-17 — a search is recorded whether it succeeds or fails, carries the
+     * Mission of the run's Task, and a failed search costs 0 credits.
+     */
+    describe('search — usage outcome and Mission attribution (AW-17)', () => {
+        const facadeOptions = {
+            userId: 'user-1',
+            workId: 'work-1',
+            agentId: 'agent-1',
+            taskId: 'task-1',
+            runId: 'run-1',
+            missionId: 'mission-1',
+        };
+
+        function build(
+            plugin: ISearchPlugin,
+            usageRepo = { record: jest.fn().mockResolvedValue({ id: 'e' }) },
+        ) {
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(plugin, { capabilities: ['search'] }),
+            ]);
+            const usage = new PluginUsageService(
+                usageRepo as never,
+                new PublishedCreditPriceList(),
+                {
+                    resolve: jest.fn().mockResolvedValue(UsagePayer.PLATFORM),
+                },
+            );
+            const facade = new SearchFacadeService(registry, settingsService, undefined, usage);
+            return { facade, usageRepo };
+        }
+
+        it('records a successful search at the published price, with the Mission of the Task', async () => {
+            const plugin = createMockSearchPlugin('search-a', 'Search A');
+            const { facade, usageRepo } = build(plugin);
+
+            await facade.search('ever works', undefined, facadeOptions);
+
+            expect(usageRepo.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    pluginId: 'search-a',
+                    runId: 'run-1',
+                    missionId: 'mission-1',
+                    meter: UsageMeter.CREDITS,
+                    outcome: UsageOutcome.OK,
+                    priceKey: 'search.query',
+                    creditsCharged: 2,
+                }),
+            );
+        });
+
+        it('records a failing provider call as failed at 0 credits, then rethrows', async () => {
+            const plugin = createMockSearchPlugin('search-a', 'Search A');
+            (plugin.search as jest.Mock).mockRejectedValue(new Error('upstream 500 key=sk-secret'));
+            const { facade, usageRepo } = build(plugin);
+
+            await expect(facade.search('ever works', undefined, facadeOptions)).rejects.toThrow(
+                'upstream 500',
+            );
+
+            expect(usageRepo.record).toHaveBeenCalledTimes(1);
+            const row = usageRepo.record.mock.calls[0][0];
+            expect(row).toMatchObject({
+                outcome: UsageOutcome.FAILED,
+                creditsCharged: 0,
+                costCents: 0,
+                missionId: 'mission-1',
+            });
+            // The provider's message never reaches the usage row.
+            expect(JSON.stringify(row)).not.toContain('sk-secret');
+        });
+
+        it('still rethrows the provider error when usage recording is not wired', async () => {
+            const plugin = createMockSearchPlugin('search-a', 'Search A');
+            (plugin.search as jest.Mock).mockRejectedValue(new Error('rate limited'));
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(plugin, { capabilities: ['search'] }),
+            ]);
+
+            await expect(service.search('q', undefined, facadeOptions)).rejects.toThrow(
+                'rate limited',
+            );
         });
     });
 });

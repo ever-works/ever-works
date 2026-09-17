@@ -19,6 +19,7 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { PluginUsageService } from '../usage/plugin-usage.service';
 import { BudgetGuardService } from '../budgets/budget-guard.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
+import { UsageOutcome } from '@src/entities/_types';
 import {
     BaseFacadeService,
     FacadeError,
@@ -116,6 +117,10 @@ export class ContentExtractorFacadeService
         }
 
         for (const candidate of candidates) {
+            // AW-17 — set once the provider is actually invoked, so a refusal
+            // BEFORE the call (the budget guard) is never recorded as a
+            // failed extraction.
+            let providerCalled = false;
             try {
                 if (this.budgetGuard && facadeOptions.workId && facadeOptions.userId) {
                     await this.budgetGuard.checkBudget(
@@ -127,6 +132,7 @@ export class ContentExtractorFacadeService
                 }
 
                 const settings = await this.getResolvedSettings(candidate.id, facadeOptions);
+                providerCalled = true;
                 const result = await candidate.plugin.extract({
                     url,
                     settings,
@@ -146,6 +152,7 @@ export class ContentExtractorFacadeService
                     this.logger.warn(
                         `Content extraction returned failure for ${url} (plugin: ${candidate.id}): ${error}`,
                     );
+                    await this.recordFailedExtraction(candidate.id, url, facadeOptions);
                     continue;
                 }
 
@@ -160,6 +167,7 @@ export class ContentExtractorFacadeService
                     this.logger.warn(
                         `Content extraction returned empty content for ${url} (plugin: ${candidate.id})`,
                     );
+                    await this.recordFailedExtraction(candidate.id, url, facadeOptions);
                     continue;
                 }
 
@@ -179,6 +187,8 @@ export class ContentExtractorFacadeService
                     taskId: facadeOptions.taskId,
                     // Wave 9 M2 — per-run cost attribution.
                     runId: facadeOptions.runId,
+                    // AW-17 — the Mission of the run's Task.
+                    missionId: facadeOptions.missionId,
                     pluginId: candidate.id,
                     capability: PluginUsageCapability.EXTRACTOR,
                     units: 1,
@@ -216,6 +226,9 @@ export class ContentExtractorFacadeService
                 this.logger.warn(
                     `Content processing failed for ${url} (plugin: ${candidate.id}): ${message}`,
                 );
+                if (providerCalled) {
+                    await this.recordFailedExtraction(candidate.id, url, facadeOptions);
+                }
             }
         }
 
@@ -229,6 +242,37 @@ export class ContentExtractorFacadeService
             attempts,
             error: `Processing failed for URL: ${url}`,
         };
+    }
+
+    /**
+     * AW-17 — an extraction attempt that reached the provider and produced
+     * nothing usable is still a call on the receipt: outcome `failed`,
+     * zero-rated. The provider's error text is never copied onto the row.
+     * Best-effort like every usage write.
+     */
+    private async recordFailedExtraction(
+        pluginId: string,
+        url: string,
+        facadeOptions: FacadeOptions,
+    ): Promise<void> {
+        try {
+            await this.pluginUsageService?.record({
+                workId: facadeOptions.workId,
+                userId: facadeOptions.userId,
+                agentId: facadeOptions.agentId,
+                taskId: facadeOptions.taskId,
+                runId: facadeOptions.runId,
+                missionId: facadeOptions.missionId,
+                pluginId,
+                capability: PluginUsageCapability.EXTRACTOR,
+                units: 1,
+                costCents: 0,
+                outcome: UsageOutcome.FAILED,
+                metadata: { operation: 'extract', url, failed: true },
+            });
+        } catch {
+            // Usage writes never break the extraction fallback chain.
+        }
     }
 
     override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {

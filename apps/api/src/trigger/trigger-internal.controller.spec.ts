@@ -104,6 +104,9 @@ jest.mock('@ever-works/agent/subscriptions', () => ({
     SubscriptionsModule: class SubscriptionsModule {},
     CreditLedgerService: class CreditLedgerService {},
 }));
+jest.mock('@ever-works/agent/model-routing', () => ({
+    ModelAccountHealthService: class ModelAccountHealthService {},
+}));
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
     ActivityLogModule: class ActivityLogModule {},

@@ -89,6 +89,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.SCHEDULE_UPDATED]: 'system',
     [ActivityActionType.SCHEDULE_DELETED]: 'system',
     [ActivityActionType.SCHEDULE_EXECUTED]: 'work',
+    // Schedules workspace pause / resume — an owner changing a cadence's
+    // control state, the same configuration shape as create/update/delete.
+    [ActivityActionType.SCHEDULE_PAUSED]: 'system',
+    [ActivityActionType.SCHEDULE_RESUMED]: 'system',
 
     // Import / export
     [ActivityActionType.IMPORT]: 'work',
@@ -148,6 +152,21 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.KB_REEMBED_COMPLETED]: 'delivery',
     [ActivityActionType.KB_REEMBED_FAILED]: 'problem',
 
+    // Memory facts + context files (AW-07) — fact edits and context-file
+    // saves are work, a load-mode change is configuration, and a segment
+    // over its budget is a tripped limit.
+    [ActivityActionType.MEMORY_FACT_CREATED]: 'work',
+    [ActivityActionType.MEMORY_FACT_UPDATED]: 'work',
+    [ActivityActionType.MEMORY_FACT_FORGOTTEN]: 'work',
+    [ActivityActionType.MEMORY_FACT_RESTORED]: 'work',
+    [ActivityActionType.MEMORY_FACT_ACCEPTED]: 'work',
+    [ActivityActionType.MEMORY_FACT_DISCARDED]: 'work',
+    [ActivityActionType.MEMORY_FACTS_CLEARED]: 'work',
+    [ActivityActionType.CONTEXT_FILE_UPDATED]: 'work',
+    [ActivityActionType.CONTEXT_FILE_RESTORED]: 'work',
+    [ActivityActionType.CONTEXT_FILE_MODE_CHANGED]: 'system',
+    [ActivityActionType.CONTEXT_BUDGET_EXCEEDED]: 'problem',
+
     // Missions
     [ActivityActionType.MISSION_CREATED]: 'work',
     [ActivityActionType.MISSION_PAUSED]: 'work',
@@ -199,6 +218,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.AGENT_BUDGET_EXCEEDED]: 'problem',
     [ActivityActionType.AGENT_EXPORTED]: 'work',
     [ActivityActionType.AGENT_IMPORTED]: 'work',
+    // AW-23 — a dead credential is a PROBLEM: it is the one halt the
+    // owner has to go and fix, and it stopped the agent after a single
+    // failure rather than three. A held run and a released batch are
+    // ordinary `work`: nothing failed, the brake did exactly its job.
+    [ActivityActionType.AGENT_BLOCKED_ON_CREDENTIAL]: 'problem',
+    [ActivityActionType.AGENT_RUN_HELD]: 'work',
+    [ActivityActionType.AGENT_RUNS_RELEASED]: 'work',
     [ActivityActionType.AGENT_COLLABORATOR_ENABLED]: 'system',
     [ActivityActionType.AGENT_COLLABORATOR_DISABLED]: 'system',
     [ActivityActionType.AGENT_COLLABORATOR_REMOVED]: 'system',
@@ -260,6 +286,20 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // Inbox — the decisions only a person can make
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
+
+    // Model Accounts and model policies — workspace configuration.
+    [ActivityActionType.MODEL_ACCOUNT_ADDED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_UPDATED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_REMOVED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_PAUSED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_RESUMED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_RECONNECTED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_REORDERED]: 'system',
+    [ActivityActionType.MODEL_POLICY_UPDATED]: 'system',
+
+    // Skills shelf — a person switching a Skill on or off.
+    [ActivityActionType.SKILL_ENABLED]: 'system',
+    [ActivityActionType.SKILL_DISABLED]: 'system',
 
     // Shared view (AW-18) — the owner's own sharing configuration changes.
     [ActivityActionType.SHARED_VIEW_ENABLED]: 'system',

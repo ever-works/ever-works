@@ -69,6 +69,11 @@ export interface ListInboxDecisionsOptions {
     missionId?: string;
     /** Case-insensitive contains-match over the title and the body. */
     search?: string;
+    /**
+     * Only decisions raised at or before this instant. Home reads the exact
+     * count of decisions waiting past its overdue threshold through it.
+     */
+    createdAtOrBefore?: Date;
     /** Clamped to 1..{@link INBOX_DECISION_MAX_LIMIT}; defaults to {@link INBOX_DECISION_PAGE_SIZE}. */
     limit?: number;
     /** Rows to skip — counted from {@link after} when both are given. */
@@ -306,6 +311,11 @@ export class InboxItemRepository {
         }
         if (options.missionId) {
             qb.andWhere('task.missionId = :missionId', { missionId: options.missionId });
+        }
+        if (options.createdAtOrBefore) {
+            qb.andWhere('item.createdAt <= :createdAtOrBefore', {
+                createdAtOrBefore: options.createdAtOrBefore,
+            });
         }
         const searchPattern = prepareCaseInsensitiveContainsPattern(options.search);
         if (searchPattern) {

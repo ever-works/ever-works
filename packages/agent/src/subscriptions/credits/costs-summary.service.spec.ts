@@ -139,6 +139,47 @@ describe('CostsSummaryService', () => {
             expect(to.toISOString()).toBe(NOW.toISOString());
         });
 
+        it('without a scope, never reads the scoped run count (the Costs surface is unchanged)', async () => {
+            const runs = agentRunRepositoryMock() as jest.Mocked<AgentRunRepository> & {
+                countCreatedForUserInWindow: jest.Mock;
+            };
+            runs.countCreatedForUserInWindow = jest.fn();
+            const unscoped = new CostsSummaryService(usage, runs);
+
+            await unscoped.getSummary(USER, 7);
+
+            expect(usage.getTotalSpendCentsForUser).toHaveBeenCalledTimes(1);
+            expect(usage.getTotalSpendCentsForUser.mock.calls[0]).toHaveLength(3);
+            expect(runs.countCreatedForUserInWindow).not.toHaveBeenCalled();
+        });
+
+        it('with a scope, narrows both the spend sum and the run count to it (Home)', async () => {
+            const scope = { tenantId: 'tenant-1', organizationId: 'org-a' };
+            const runs = agentRunRepositoryMock() as jest.Mocked<AgentRunRepository> & {
+                countCreatedForUserInWindow: jest.Mock;
+            };
+            runs.countCreatedForUserInWindow = jest.fn().mockResolvedValue(61);
+            usage.getTotalSpendCentsForUser.mockResolvedValue(1842);
+            const scoped = new CostsSummaryService(usage, runs);
+
+            const summary = await scoped.getSummary(USER, 7, scope);
+
+            expect(summary).toMatchObject({
+                totalCostCents: 1842,
+                runsCount: 61,
+                avgPerRunCents: 30,
+            });
+            const [userId, from, to, currency, passedScope] =
+                usage.getTotalSpendCentsForUser.mock.calls[0];
+            expect(userId).toBe(USER);
+            expect(from.toISOString()).toBe('2026-08-08T00:00:00.000Z');
+            expect(to.toISOString()).toBe(NOW.toISOString());
+            expect(currency).toBeUndefined();
+            expect(passedScope).toBe(scope);
+            expect(runs.countCreatedForUserInWindow).toHaveBeenCalledWith(USER, from, to, scope);
+            expect(usage.getUsageCountsForUser).not.toHaveBeenCalled();
+        });
+
         it('propagates a bad window as InvalidCostsWindowError', async () => {
             await expect(service.getSummary(USER, 45)).rejects.toBeInstanceOf(
                 InvalidCostsWindowError,

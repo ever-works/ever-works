@@ -10,7 +10,14 @@ import {
     Not,
     Repository,
 } from 'typeorm';
-import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
+import {
+    Agent,
+    AgentHaltReason,
+    AgentScope,
+    AgentStatus,
+    type AgentHaltDetail,
+    type AgentTarget,
+} from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { ownershipSqlPredicate, ownershipWhere, type OwnershipScope } from '../ownership-scope';
@@ -156,6 +163,35 @@ export class AgentRepository {
             workId: opts.workId ?? IsNull(),
         };
         return this.repository.findOne({ where: { userId, ...common } });
+    }
+
+    /**
+     * AW-20 — the Agents of this user that already hold a lane.
+     *
+     * Roster provisioning asks this before it creates anything: a lane
+     * that is already filled is REUSED, never duplicated, which is what
+     * makes running provisioning twice safe. Archived Agents are excluded
+     * — an archived Agent does not hold its lane any more, and treating
+     * it as the occupant would leave the lane permanently unfillable.
+     *
+     * `lanes` empty returns nothing rather than everything: "no lanes
+     * requested" must never read as "every lane".
+     */
+    async findByUserAndLanes(
+        userId: string,
+        lanes: readonly string[],
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent[]> {
+        if (lanes.length === 0) return [];
+        const branches = ownershipWhere<Agent>(userId, ownershipScope);
+        return this.repository.find({
+            where: branches.map((branch) => ({
+                ...branch,
+                lane: In([...lanes]),
+                status: Not(AgentStatus.ARCHIVED),
+            })),
+            order: { createdAt: 'ASC' },
+        });
     }
 
     async findByUserIdScoped(
@@ -314,16 +350,22 @@ export class AgentRepository {
      * triggered explicitly via `POST /agents/:id/run-now`.
      */
     async findDueForHeartbeat(limit: number, now: Date = new Date()): Promise<Agent[]> {
-        return this.repository
-            .createQueryBuilder('agent')
-            .where('agent.status = :active', { active: AgentStatus.ACTIVE })
-            .andWhere('agent.heartbeatCadence IS NOT NULL')
-            .andWhere("agent.heartbeatCadence != 'manual'")
-            .andWhere('agent.nextHeartbeatAt IS NOT NULL')
-            .andWhere('agent.nextHeartbeatAt <= :now', { now })
-            .orderBy('agent.nextHeartbeatAt', 'ASC')
-            .take(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('agent')
+                .where('agent.status = :active', { active: AgentStatus.ACTIVE })
+                // Schedules — a paused heartbeat keeps its cadence and its
+                // `nextHeartbeatAt` but is not due. The Agent itself stays
+                // ACTIVE for assigned Tasks, chat and manual run-now.
+                .andWhere('agent.heartbeatPausedAt IS NULL')
+                .andWhere('agent.heartbeatCadence IS NOT NULL')
+                .andWhere("agent.heartbeatCadence != 'manual'")
+                .andWhere('agent.nextHeartbeatAt IS NOT NULL')
+                .andWhere('agent.nextHeartbeatAt <= :now', { now })
+                .orderBy('agent.nextHeartbeatAt', 'ASC')
+                .take(limit)
+                .getMany()
+        );
     }
 
     /**
@@ -340,9 +382,13 @@ export class AgentRepository {
     async tryClaimForRun(agentId: string): Promise<Date | null> {
         const agent = await this.repository.findOne({
             where: { id: agentId },
-            select: ['id', 'nextHeartbeatAt', 'status'],
+            select: ['id', 'nextHeartbeatAt', 'status', 'heartbeatPausedAt'],
         });
         if (!agent?.nextHeartbeatAt || agent.status !== AgentStatus.ACTIVE) {
+            return null;
+        }
+        // Schedules — paused between the due-scan read and this claim.
+        if (agent.heartbeatPausedAt) {
             return null;
         }
 
@@ -361,6 +407,7 @@ export class AgentRepository {
             .where('id = :id', { id: agentId })
             .andWhere('status = :active', { active: AgentStatus.ACTIVE })
             .andWhere('nextHeartbeatAt = :originalNext', { originalNext })
+            .andWhere('heartbeatPausedAt IS NULL')
             .execute();
 
         return (result.affected ?? 0) > 0 ? originalNext : null;
@@ -496,6 +543,131 @@ export class AgentRepository {
             .andWhere('status IN (:...from)', { from: fromList })
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    // ── Halt reason (AW-23) ────────────────────────────────────────
+
+    /**
+     * Record WHY this Agent stopped — but only if it is not already
+     * halted for the same reason.
+     *
+     * The guard is what makes pressing Pause twice honest. A stale
+     * browser tab re-posting a pause must not overwrite the first note
+     * with an empty one, must not move the timestamp, and must not
+     * relabel the author: the FIRST halt is the one that tells the story.
+     * Returns whether THIS call wrote, so the caller can skip the second
+     * activity row too.
+     *
+     * The CAS is on `haltReason` rather than the whole row: a halt for a
+     * DIFFERENT reason (a credential rejection landing on an agent a
+     * person had already paused) is genuinely new information and does
+     * overwrite.
+     */
+    async writeHalt(
+        id: string,
+        patch: {
+            haltReason: AgentHaltReason;
+            haltNote?: string | null;
+            haltedAt?: Date;
+            haltedByUserId?: string | null;
+            haltedRunId?: string | null;
+            haltDetail?: AgentHaltDetail | null;
+            /** Consecutive halts for this reason — computed by the caller. */
+            haltRepeatCount: number;
+        },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Agent)
+            .set({
+                haltReason: patch.haltReason,
+                haltNote: patch.haltNote ?? null,
+                haltedAt: patch.haltedAt ?? new Date(),
+                haltedByUserId: patch.haltedByUserId ?? null,
+                haltedRunId: patch.haltedRunId ?? null,
+                haltDetail: patch.haltDetail ?? null,
+                haltRepeatCount: patch.haltRepeatCount,
+                haltRepeatReason: patch.haltReason,
+                updatedAt: new Date(),
+            })
+            .where('id = :id', { id })
+            .andWhere('(haltReason IS NULL OR haltReason != :reason)', {
+                reason: patch.haltReason,
+            })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Clear the halt record. Called on resume, on activation from draft
+     * and on unarchive — and at no other time, so a reason survives for
+     * exactly as long as it is true.
+     *
+     * `haltRepeatCount` and `haltRepeatReason` are deliberately NOT
+     * touched here: together they are what lets the card say "halted for
+     * this reason twice" after a resume that did not fix anything. They
+     * reset when the NEXT halt carries a different reason (see
+     * `AgentHaltService`).
+     */
+    async clearHalt(id: string): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(Agent)
+            .set({
+                haltReason: null,
+                haltNote: null,
+                haltedAt: null,
+                haltedByUserId: null,
+                haltedRunId: null,
+                haltDetail: null,
+                updatedAt: new Date(),
+            })
+            .where('id = :id', { id })
+            .execute();
+    }
+
+    /**
+     * Batched status read for the roster poll (AW-23) — ONE query for up
+     * to `AGENT_STATUS_BATCH_MAX` agents, never one request per card.
+     *
+     * Owner-bounded by `userId` and by the ownership scope, so ids the
+     * caller does not own simply do not come back: a roster poll that
+     * happens to include a foreign id degrades to a shorter list rather
+     * than 404-ing the whole batch.
+     */
+    async findStatusRows(
+        userId: string,
+        ids: readonly string[],
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent[]> {
+        const unique = [...new Set(ids)].filter((id) => typeof id === 'string' && id.length > 0);
+        if (unique.length === 0) return [];
+        const qb = this.repository
+            .createQueryBuilder('agent')
+            .select([
+                'agent.id',
+                'agent.userId',
+                'agent.name',
+                'agent.status',
+                'agent.haltReason',
+                'agent.haltNote',
+                'agent.haltedAt',
+                'agent.haltedRunId',
+                'agent.haltDetail',
+                'agent.haltRepeatCount',
+                'agent.haltRepeatReason',
+                'agent.errorCount',
+                'agent.lastRunAt',
+                'agent.nextHeartbeatAt',
+            ])
+            .where('agent.userId = :userId', { userId })
+            .andWhere('agent.id IN (:...ids)', { ids: unique });
+
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        return qb.getMany();
     }
 
     /**

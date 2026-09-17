@@ -1,4 +1,5 @@
 import {
+    agentBrakeAdmission,
     composeRunAdmission,
     creditsAdmission,
     killSwitchAdmission,
@@ -447,9 +448,10 @@ describe('run admission chain', () => {
     describe('DEFAULT_RUN_ADMISSION_CHAIN', () => {
         // EW-778 — the global stop flag leads the chain (fail-closed, and
         // before any counter is spent); below it the order is unchanged.
-        it('is the shipped order: stop flag, Work valve, org/user valve, credits', () => {
+        it('is the shipped order: stop flag, agent brake, Work valve, org/user valve, credits', () => {
             expect(DEFAULT_RUN_ADMISSION_CHAIN).toEqual([
                 killSwitchAdmission,
+                agentBrakeAdmission,
                 workConcurrencyAdmission,
                 orgConcurrencyAdmission,
                 creditsAdmission,

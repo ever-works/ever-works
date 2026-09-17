@@ -872,6 +872,31 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.billing.credits.getSettlementMode (AW-17)', () => {
+        it('defaults to provider_cost so an install that sets nothing is billed as before', () => {
+            expect(config.billing.credits.getSettlementMode()).toBe('provider_cost');
+        });
+
+        it.each([
+            ['price_list', 'price_list'],
+            ['price-list', 'price_list'],
+            [' PRICE_LIST ', 'price_list'],
+            ['provider_cost', 'provider_cost'],
+            ['Provider-Cost', 'provider_cost'],
+        ])('reads %j as %s', (value, expected) => {
+            process.env.CREDITS_SETTLEMENT_MODE = value;
+            expect(config.billing.credits.getSettlementMode()).toBe(expected);
+        });
+
+        it.each(['', 'fixed', 'list', 'true', '1'])(
+            'refuses %j and keeps the default — an unknown value never starts charging list prices',
+            (value) => {
+                process.env.CREDITS_SETTLEMENT_MODE = value;
+                expect(config.billing.credits.getSettlementMode()).toBe('provider_cost');
+            },
+        );
+    });
+
     describe('config.subscriptions', () => {
         it("isEnabled returns true ONLY for literal 'true'", () => {
             process.env.SUBSCRIPTIONS_ENABLED = 'true';

@@ -24,6 +24,7 @@ describe('ConversationService', () => {
             findByIdForUser: jest.fn(),
             findSummariesByUser: jest.fn().mockResolvedValue({ conversations: [], total: 0 }),
             unreadCountsFor: jest.fn().mockResolvedValue(new Map()),
+            firstMessagePreviews: jest.fn().mockResolvedValue(new Map()),
             setName: jest.fn().mockResolvedValue(true),
             findMessageById: jest.fn(),
         };
@@ -226,6 +227,7 @@ describe('ConversationService', () => {
                 SCOPE,
             );
             expect(conversations.unreadCountsFor).toHaveBeenCalledWith('u1', ['c1', 'c2']);
+            expect(conversations.firstMessagePreviews).toHaveBeenCalledWith(['c1', 'c2']);
             expect(result.total).toBe(2);
             expect(result.conversations.map((row) => [row.id, row.unreadCount, row.title])).toEqual(
                 [

@@ -61,6 +61,29 @@ export class SkillBindingRepository {
         return this.repository.find({ where: userId ? { skillId, userId } : { skillId } });
     }
 
+    /**
+     * Skills shelf — how many bindings each Skill has, for one page of the
+     * shelf in one grouped query. Ownership-scoped; Skills with no binding are
+     * simply absent from the map (read them as 0).
+     */
+    async countBySkillIds(
+        skillIds: readonly string[],
+        userId: string,
+    ): Promise<Map<string, number>> {
+        const out = new Map<string, number>();
+        if (skillIds.length === 0) return out;
+        const rows = await this.repository
+            .createQueryBuilder('binding')
+            .select('binding.skillId', 'skillId')
+            .addSelect('COUNT(*)', 'n')
+            .where('binding.userId = :userId', { userId })
+            .andWhere('binding.skillId IN (:...skillIds)', { skillIds: [...skillIds] })
+            .groupBy('binding.skillId')
+            .getRawMany<{ skillId: string; n: string | number }>();
+        for (const row of rows) out.set(row.skillId, Number(row.n));
+        return out;
+    }
+
     async findByTarget(
         targetType: SkillBindingTargetType,
         targetId: string,
@@ -156,6 +179,13 @@ export class SkillBindingRepository {
 
         if (forAgentRun) qb.andWhere('binding.injectIntoAgent = :inject', { inject: true });
         if (forGeneratorRun) qb.andWhere('binding.injectIntoGenerator = :gen', { gen: true });
+
+        // Skills shelf — the workspace-level off switch and the review gate.
+        // A switched-off Skill, or one an agent drafted that nobody has
+        // accepted yet, reaches no AI call. Bindings are untouched: switching
+        // the Skill back on (or accepting it) restores exactly what they said.
+        qb.andWhere('skill.disabledAt IS NULL');
+        qb.andWhere("(skill.reviewState IS NULL OR skill.reviewState <> 'proposed')");
 
         qb.orderBy('binding.priority', 'ASC').addOrderBy('binding.createdAt', 'ASC');
 

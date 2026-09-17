@@ -35,6 +35,12 @@ Plan codes are identities (`free` / `standard` / `premium`) and never change;
    plugins removed), stamps `agent_runs.costCents`, and converts the billable
    part to credits: `ceil(costCents × (CREDITS_PER_DOLLAR/100) × (1 + margin))`.
    The margin defaults to the catalog's `creditsMarginPercent` (35).
+   That is the default `CREDITS_SETTLEMENT_MODE=provider_cost`. With
+   `price_list`, calls priced by a fixed per-unit entry on the published credit
+   price list (web search, page extraction, screenshot) debit their listed
+   credits instead, and everything else still converts from cost. Usage rows
+   carry the list price in both modes; `GET /api/credits/pricing` reports the
+   active mode as `settlementMode`.
 3. **Ledger** — one `consumption` row per run (`run:{runId}`), allocated
    against credit _buckets_ soonest-expiring first. Balance =
    available sum of the ledger; see
@@ -127,4 +133,5 @@ not be extended.
 | `PAYMENTS_ENABLED` (web)                                               | shows the live purchase surfaces instead of coming-soon               |
 | `CREDITS_ENFORCEMENT`                                                  | on/off; unset = on iff Stripe is configured                           |
 | `CREDITS_PER_DOLLAR` / `CREDITS_MARGIN_PERCENT` / `CREDITS_DAILY_FREE` | conversion knobs; margin defaults to the catalog (35)                 |
+| `CREDITS_SETTLEMENT_MODE`                                              | `provider_cost` (default) or `price_list`; see Credits pipeline       |
 | `PAYG_MAX_MONTHLY_CAP_CREDITS`                                         | ceiling for a self-service pay-as-you-go cap                          |

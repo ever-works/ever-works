@@ -25,6 +25,7 @@ import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { BillingApiModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { NotificationEmailModule } from './notifications/notification-email.module';
 import { ChangelogModule } from './changelog/changelog.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
@@ -51,6 +52,7 @@ import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
 import { RunsModule } from './runs/runs.module';
+import { ModelRoutingApiModule } from './model-routing/model-routing.module';
 import { EnvironmentsApiModule } from './environments/environments.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
@@ -61,10 +63,12 @@ import { TasksModule } from './tasks/tasks.module';
 import { ReleaseModule } from './release/release.module';
 import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { CatalogModule } from './catalog/catalog.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
+import { HomeModule } from './home/home.module';
 import { WorkspaceSearchModule } from './workspace-search/workspace-search.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
@@ -87,6 +91,8 @@ import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
+import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
+import { VectorStoreHostChunkTablesModule } from '@ever-works/agent/services';
 import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
@@ -141,6 +147,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
+        // AW-13 Attention controls — binds the built-in `email` delivery
+        // target (a @Global() port consumed by the channel facade).
+        NotificationEmailModule,
         // AW-14 What's new — in-product product changelog: entries from the
         // build's content source, per-person read state, /api/changelog.
         ChangelogModule,
@@ -201,6 +210,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // calendar-navigated ledger of every Agent run and the itemised
         // receipt of one, over the same run rows the Sessions endpoints read.
         RunsModule,
+        // Model accounts (AW-16) — /api/model-accounts and /api/model-policies:
+        // several credentials per AI provider, in order, and the workspace /
+        // Agent / schedule model ladder. The planner the AI facade consults is
+        // bound through FacadesModule, not here.
+        ModelRoutingApiModule,
         // Environments (Settings → Environments) — named, reusable
         // runtime recipes (packages + networking) assigned per-Agent.
         EnvironmentsApiModule,
@@ -233,6 +247,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // CRUD surface for graphs the executor could already run but
         // nothing could keep.
         WorkflowsModule,
+        // Capability & playbook catalogue (AW-21) — read-only playbook list,
+        // detail and preflight over enabled playbook-provider plugins.
+        CatalogModule,
         // Streaming-terminal M3 — relay registry + WS gateway on this
         // process's HTTP server + attach-token/internal-publish endpoints.
         TerminalModule,
@@ -249,6 +266,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).
         SchedulesModule,
+        // Home (AW-19) — read-only GET /api/home/summary: the morning read
+        // composed from decisions, the Runs ledger, schedules, costs and the
+        // Live Feed, one status per block. Additive; no new schema.
+        HomeModule,
         // Workspace search (AW-01) — read-only GET /api/workspace-search
         // behind the dashboard command palette. Additive; reads existing
         // entity tables (no new schema).
@@ -318,6 +339,16 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
         MemoryFilesApiModule,
+        // Memory facts (AW-07) — /api/memory/facts: the atomic tier of
+        // Memory (list / search by meaning / edit / forget / restore).
+        // The embed dispatcher resolves through the job-runtime provider
+        // registry (TriggerModule), so any configured runtime runs it.
+        MemoryFactsApiModule,
+        // AW-07 — publishes the platform vector chunk tables to the plugin
+        // host, so the bundled pgvector store actually serves the Knowledge
+        // Base (work_knowledge_chunks) and memory facts
+        // (vector_namespace_chunks) instead of failing "not wired".
+        VectorStoreHostChunkTablesModule,
         // Knowledge library — /api/knowledge: the organization shelf over
         // the Knowledge Base (shared folders, filing, archive / restore,
         // Markdown export).

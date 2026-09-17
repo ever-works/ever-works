@@ -38,6 +38,7 @@ const {
     kbTranscribeTriggerMock,
     kbReembedWorkTriggerMock,
     notificationChannelDeliveryTriggerMock,
+    memoryFactEmbedTriggerMock,
 } = vi.hoisted(() => {
     return {
         configureMock: vi.fn(),
@@ -65,6 +66,7 @@ const {
         kbTranscribeTriggerMock: vi.fn().mockResolvedValue({ id: 'run_kbt' }),
         kbReembedWorkTriggerMock: vi.fn().mockResolvedValue({ id: 'run_kbr' }),
         notificationChannelDeliveryTriggerMock: vi.fn().mockResolvedValue({ id: 'run_ncd' }),
+        memoryFactEmbedTriggerMock: vi.fn().mockResolvedValue({ id: 'run_mfe' }),
     };
 });
 
@@ -129,6 +131,9 @@ vi.mock('../../tasks/trigger/kb-reembed-work.task', () => ({
 }));
 vi.mock('../../tasks/trigger/notification-channel-delivery.task', () => ({
     notificationChannelDeliveryTask: { trigger: notificationChannelDeliveryTriggerMock },
+}));
+vi.mock('../../tasks/trigger/memory-fact-embed.task', () => ({
+    memoryFactEmbedTask: { trigger: memoryFactEmbedTriggerMock },
 }));
 
 import { TriggerService } from '../trigger.service';
@@ -332,6 +337,58 @@ describe('TriggerService per-tenant stamping (EW-742 P3.2 T22)', () => {
             // so the whole key is the tenantId.
             expect(opts.concurrencyKey).toBe(TENANT_ID);
             expect((opts.tags as string[])[0]).toBe(`tenant:${TENANT_ID}`);
+        });
+
+        // AW-07 — the memory-fact embed dispatcher is on the same registry
+        // seam, so the tenant overlay's stamping applies to it too.
+        it('dispatchMemoryFactEmbed gets stamped through the Proxy', async () => {
+            const view = provider.bindToTenant(SNAPSHOT);
+            const dispatchers = view.dispatchers as {
+                dispatchMemoryFactEmbed: (p: unknown) => Promise<string | null>;
+            };
+
+            await expect(
+                dispatchers.dispatchMemoryFactEmbed({ factId: 'f1', userId: 'u1' }),
+            ).resolves.toBe('run_mfe');
+
+            const [payload, opts] = memoryFactEmbedTriggerMock.mock.calls[0] as [
+                unknown,
+                Record<string, unknown>,
+            ];
+            expect(payload).toEqual({ factId: 'f1', userId: 'u1' });
+            expect(opts.concurrencyKey).toBe(TENANT_ID);
+            expect(opts.tags).toEqual([`tenant:${TENANT_ID}`, 'memory-fact-embed', 'fact:f1']);
+            // No idempotency key: an edit's embed must not collapse into the
+            // creation's.
+            expect(opts.idempotencyKey).toBeUndefined();
+        });
+    });
+
+    describe('dispatchMemoryFactEmbed on the singleton (AW-07)', () => {
+        it('enqueues unstamped when no tenant view is on the stack', async () => {
+            await expect(
+                service.dispatchMemoryFactEmbed({ factId: 'f1', userId: 'u1' }),
+            ).resolves.toBe('run_mfe');
+            const opts = memoryFactEmbedTriggerMock.mock.calls[0][1] as Record<string, unknown>;
+            expect(opts.tags).toEqual(['memory-fact-embed', 'fact:f1']);
+            expect(opts.concurrencyKey).toBeUndefined();
+        });
+
+        it('returns null quietly when Trigger.dev is disabled — no per-write warning', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            const warn = vi.spyOn((service as any).logger, 'warn');
+            await expect(
+                service.dispatchMemoryFactEmbed({ factId: 'f1', userId: 'u1' }),
+            ).resolves.toBeNull();
+            expect(memoryFactEmbedTriggerMock).not.toHaveBeenCalled();
+            expect(warn).not.toHaveBeenCalled();
+        });
+
+        it('returns null (and logs) when the SDK throws, so the save never fails', async () => {
+            memoryFactEmbedTriggerMock.mockRejectedValueOnce(new Error('network down'));
+            await expect(
+                service.dispatchMemoryFactEmbed({ factId: 'f1', userId: 'u1' }),
+            ).resolves.toBeNull();
         });
     });
 });

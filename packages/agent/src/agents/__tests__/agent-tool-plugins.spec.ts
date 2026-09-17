@@ -247,4 +247,46 @@ describe('AgentToolService plugin pass-through tools (Phase 16.10)', () => {
         const result = await tool.invoke({ url: 'https://a.example/page' } as any);
         expect(result).toEqual({ error: 'extractor timeout' });
     });
+
+    it("AW-17 — threads the run Task's Mission (never the Agent's) onto every pass-through call", async () => {
+        const tools = svc.resolveAllowedTools(
+            makeAgent({
+                missionId: 'agent-own-mission',
+                permissions: makePerms({ canCallExternalTools: true }),
+            }),
+            { runId: 'run-1', editsThisRunByFile: new Set(), missionId: 'task-mission' },
+        );
+
+        await tools.find((t) => t.name === 'searchWeb')!.invoke({ query: 'ever works' } as any);
+        await tools
+            .find((t) => t.name === 'screenshot')!
+            .invoke({ url: 'https://example.com' } as any);
+        await tools
+            .find((t) => t.name === 'extractContent')!
+            .invoke({ url: 'https://example.com/page' } as any);
+
+        for (const mock of [
+            pluginTools.searchWeb,
+            pluginTools.screenshot,
+            pluginTools.extractContent,
+        ]) {
+            expect(mock).toHaveBeenCalledWith(
+                expect.objectContaining({ runId: 'run-1', missionId: 'task-mission' }),
+            );
+        }
+    });
+
+    it('AW-17 — a run with no Task passes no Mission', async () => {
+        const tools = svc.resolveAllowedTools(
+            makeAgent({
+                missionId: 'agent-own-mission',
+                permissions: makePerms({ canCallExternalTools: true }),
+            }),
+            { runId: 'heartbeat-run', editsThisRunByFile: new Set() },
+        );
+
+        await tools.find((t) => t.name === 'searchWeb')!.invoke({ query: 'q' } as any);
+
+        expect(pluginTools.searchWeb.mock.calls[0][0].missionId).toBeUndefined();
+    });
 });

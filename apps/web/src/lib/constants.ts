@@ -112,6 +112,10 @@ export const ROUTES = {
     // each with a receipt. `?g=` granularity, `?d=` anchor date, `?run=` opens
     // a receipt; the filters ride along as `agent` / `kind` / `status` / `q`.
     DASHBOARD_RUNS: '/runs',
+    // Schedules workspace — every recurring definition from every source,
+    // with run-now / pause / resume. The Activity page's Schedules tab keeps
+    // working and links here.
+    DASHBOARD_SCHEDULES: '/schedules',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.
     // `?view=archived` switches tabs; `?id=` deep-links one message (the
@@ -187,6 +191,13 @@ export const ROUTES = {
     DASHBOARD_MEMORY_LIBRARY: '/memory?view=library',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
+    // Capability & playbook catalogue (AW-21) — one index over playbooks,
+    // skills, saved workflows, task templates and starting points, plus the
+    // playbook detail and the saved-workflow list / run pages it links to.
+    DASHBOARD_CATALOG: '/catalog',
+    DASHBOARD_CATALOG_PLAYBOOK: (slug: string) => `/catalog/playbooks/${slug}`,
+    DASHBOARD_CATALOG_WORKFLOWS: '/catalog/workflows',
+    DASHBOARD_CATALOG_WORKFLOW: (id: string) => `/catalog/workflows/${id}`,
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
     DASHBOARD_AGENTS: '/agents',
     DASHBOARD_AGENT_SESSIONS: '/agents/sessions',
@@ -259,6 +270,10 @@ export const ROUTES = {
     // Sits beside Connections: both are about capabilities the platform
     // consumes from outside rather than code it ships.
     DASHBOARD_SETTINGS_AGENT_PLUGINS: '/settings/agent-plugins',
+    // Connections (Settings → Connections) — the MCP server registry. The page
+    // has existed since the MCP slice; the Skills shelf links a Skill's
+    // missing connection here, so it gets a constant instead of a literal.
+    DASHBOARD_SETTINGS_CONNECTIONS: '/settings/connections',
     // Fleet — enrolled local runners. The page has existed since Wave 12;
     // it simply had no route constant, so every link to it was a literal.
     DASHBOARD_SETTINGS_FLEET: '/settings/fleet',
@@ -278,9 +293,17 @@ export const ROUTES = {
     DASHBOARD_NOTIFICATIONS: '/notifications',
     // The page that actually exists — /notifications has no route and soft-404s.
     DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    // AW-13 — the two pages the notification matrix links to: chat channels
+    // (each connected one adds a column) and the digest cadence.
+    DASHBOARD_SETTINGS_CHANNELS: '/settings/integrations/channels',
+    DASHBOARD_SETTINGS_DIGEST: '/settings/digest',
     // Agent email (AW-05) — the tenant email address registry an Agent's
     // addresses are assigned from.
     DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',
+    // Help centre (AW-25) — the in-product manual as a full page. The drawer
+    // opens the same articles in place; these are the shareable addresses.
+    DASHBOARD_HELP: '/help',
+    DASHBOARD_HELP_ARTICLE: (slug: string) => `/help/${slug}`,
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',

@@ -23,6 +23,22 @@
  *   - `namespacePerWork = 'rowFilter'` — chunks live in one shared
  *     table; every retrieval applies `WHERE work_id = $1` (RFC §4
  *     invariant 1).
+ *   - Namespaces that are NOT a Work (AW-07, e.g. a workspace's memory
+ *     facts) cannot live in `work_knowledge_chunks`: its `work_id` and
+ *     `document_id` columns are foreign keys to `works` and
+ *     `work_knowledge_documents`. The host therefore supplies a second
+ *     repository of the SAME port shape over a namespace-keyed table
+ *     (`vector_namespace_chunks`) plus a `workNamespaces.isWork(id)` probe.
+ *     A namespace that names a Work is routed to the Work repository
+ *     exactly as before (same port call, same arguments, same SQL), and
+ *     only a namespace that does not is routed to the namespace table.
+ *     Every retrieval on either table filters by its own leftmost key, so
+ *     one namespace can never read another's vectors.
+ *   - Host wiring goes through the plugin host's existing custom-capability
+ *     channel: the API publishes the bindings under
+ *     `PGVECTOR_HOST_CHUNK_TABLES_CAPABILITY`, and the plugin adopts them
+ *     from its `PluginContext` the first time it needs a repository.
+ *     Explicit construction options / setters still take precedence.
  */
 
 import { BaseVectorStore, type VectorStoreErrorCode } from '@ever-works/plugin/abstract';
@@ -75,6 +91,11 @@ export interface PgVectorChunkRepositoryPort {
 	 * Wipe-then-insert keeps the upsert idempotent (RFC §4 invariant 2)
 	 * without needing index-level UPSERT. Empty `chunks` array → DELETE
 	 * only.
+	 *
+	 * `tenantId` / `organizationId` are only ever set on rows handed to
+	 * the namespace repository (AW-07), whose table records the owning
+	 * workspace; rows for the Work repository carry exactly the fields
+	 * they always did.
 	 */
 	replaceForDocument(
 		workId: string,
@@ -87,6 +108,8 @@ export interface PgVectorChunkRepositoryPort {
 			readonly tokenCount: number;
 			readonly embedding?: number[] | null;
 			readonly metadata?: Record<string, unknown> | null;
+			readonly tenantId?: string | null;
+			readonly organizationId?: string | null;
 		}>
 	): Promise<void>;
 
@@ -124,13 +147,52 @@ export interface PgVectorChunkRepositoryPort {
 }
 
 /**
+ * AW-07 — tells the plugin whether a `workId` on the capability surface
+ * names a real Work (→ `work_knowledge_chunks`) or another namespace
+ * (→ the namespace table). Production answers from the `works` table.
+ */
+export interface PgVectorWorkNamespacePort {
+	isWork(namespaceId: string): Promise<boolean>;
+}
+
+/**
+ * AW-07 — the bundle the host publishes through the plugin host's
+ * custom-capability channel under `PGVECTOR_HOST_CHUNK_TABLES_CAPABILITY`.
+ * The same fields as the matching {@link PgVectorPluginOptions}.
+ */
+export interface PgVectorHostChunkTables {
+	readonly chunkRepository: PgVectorChunkRepositoryPort;
+	readonly namespaceChunkRepository?: PgVectorChunkRepositoryPort;
+	readonly workNamespaces?: PgVectorWorkNamespacePort;
+	readonly pingDatabase?: () => Promise<boolean>;
+}
+
+/**
+ * Name of the custom capability the host registers its chunk tables under
+ * (`PluginContext.getCustomCapability(name)`). A capability name, not a
+ * plugin id: any row-filter vector store over the platform database may
+ * adopt it. Mirrored by the host in `@ever-works/agent`
+ * (`VECTOR_STORE_HOST_CHUNK_TABLES_CAPABILITY`); both sides pin the literal.
+ */
+export const PGVECTOR_HOST_CHUNK_TABLES_CAPABILITY = 'vector-store:host-chunk-tables';
+
+/**
  * Construction-time hook the host uses to supply the repository port
  * (and an optional `pingDatabase` probe for `isAvailable()`). Tests
- * pass an in-memory port; production wires the real repository through
- * `PluginContext.getSettings()`.
+ * pass an in-memory port; production publishes the real repositories
+ * through the plugin host (see `PGVECTOR_HOST_CHUNK_TABLES_CAPABILITY`).
  */
 export interface PgVectorPluginOptions {
 	readonly chunkRepository?: PgVectorChunkRepositoryPort;
+	/**
+	 * AW-07 — repository of the same port shape over a namespace-keyed
+	 * table, for namespaces that are not a Work. Only used together with
+	 * `workNamespaces`; without both, every namespace goes to
+	 * `chunkRepository` exactly as before.
+	 */
+	readonly namespaceChunkRepository?: PgVectorChunkRepositoryPort;
+	/** AW-07 — decides Work vs other namespace. See {@link PgVectorWorkNamespacePort}. */
+	readonly workNamespaces?: PgVectorWorkNamespacePort;
 	/** Optional cheap probe — round-trips to the Postgres instance. */
 	readonly pingDatabase?: () => Promise<boolean>;
 	/**
@@ -310,12 +372,16 @@ export class PgVectorPlugin extends BaseVectorStore {
 	private chunkRepository?: PgVectorChunkRepositoryPort;
 	private pingDatabase?: () => Promise<boolean>;
 	private reembedHook?: PgVectorReembedHook;
+	private namespaceChunkRepository?: PgVectorChunkRepositoryPort;
+	private workNamespaces?: PgVectorWorkNamespacePort;
 
 	constructor(options: PgVectorPluginOptions = {}) {
 		super();
 		this.chunkRepository = options.chunkRepository;
 		this.pingDatabase = options.pingDatabase;
 		this.reembedHook = options.reembedHook;
+		this.namespaceChunkRepository = options.namespaceChunkRepository;
+		this.workNamespaces = options.workNamespaces;
 	}
 
 	/**
@@ -328,6 +394,20 @@ export class PgVectorPlugin extends BaseVectorStore {
 		this.chunkRepository = repository;
 	}
 
+	/**
+	 * AW-07 — setter mirror for the namespace table: bind the repository
+	 * for namespaces that are not a Work together with the probe that tells
+	 * the two apart. Passing `undefined` for either unbinds namespace
+	 * routing, and every namespace goes to the Work repository again.
+	 */
+	setNamespaceChunkRepository(
+		repository: PgVectorChunkRepositoryPort | undefined,
+		workNamespaces: PgVectorWorkNamespacePort | undefined
+	): void {
+		this.namespaceChunkRepository = repository;
+		this.workNamespaces = workNamespaces;
+	}
+
 	async onLoad(context: PluginContext): Promise<void> {
 		await super.onLoad(context);
 		context.logger.log('pgvector plugin loaded');
@@ -336,6 +416,8 @@ export class PgVectorPlugin extends BaseVectorStore {
 	async onUnload(): Promise<void> {
 		this.chunkRepository = undefined;
 		this.reembedHook = undefined;
+		this.namespaceChunkRepository = undefined;
+		this.workNamespaces = undefined;
 		await super.onUnload();
 	}
 
@@ -450,6 +532,7 @@ export class PgVectorPlugin extends BaseVectorStore {
 	}
 
 	async isAvailable(_settings?: PluginSettings): Promise<boolean> {
+		this.adoptHostChunkTables();
 		if (this.pingDatabase) {
 			try {
 				return await this.pingDatabase();
@@ -464,7 +547,7 @@ export class PgVectorPlugin extends BaseVectorStore {
 	}
 
 	async upsertChunks(input: UpsertChunksInput): Promise<UpsertChunksResult> {
-		const repo = this.requireRepository();
+		this.requireRepository();
 		this.assertWorkAndDocumentMatch(input);
 
 		const rows = input.chunks.map((chunk) => {
@@ -486,8 +569,19 @@ export class PgVectorPlugin extends BaseVectorStore {
 			};
 		});
 
+		const target = await this.repositoryFor(input.workId);
+		// Only the namespace table records the owning workspace; Work rows
+		// are handed over with exactly the fields they always had.
+		const targetRows = target.namespaced
+			? input.chunks.map((chunk, index) => ({
+					...rows[index],
+					tenantId: chunk.tenantId ?? null,
+					organizationId: chunk.organizationId ?? null
+				}))
+			: rows;
+
 		try {
-			await repo.replaceForDocument(input.workId, input.documentId, rows);
+			await target.repo.replaceForDocument(input.workId, input.documentId, targetRows);
 		} catch (err) {
 			throw this.normalizeError(err, 'internal', true);
 		}
@@ -496,7 +590,7 @@ export class PgVectorPlugin extends BaseVectorStore {
 	}
 
 	async queryChunks(input: QueryChunksInput): Promise<QueryChunksResult> {
-		const repo = this.requireRepository();
+		this.requireRepository();
 		const embedding = input.queryEmbedding;
 		if (!embedding || embedding.length === 0) {
 			throw this.wrapVendorError(
@@ -509,6 +603,7 @@ export class PgVectorPlugin extends BaseVectorStore {
 			return { hits: [] };
 		}
 
+		const { repo } = await this.repositoryFor(input.workId);
 		let rows;
 		try {
 			rows = await repo.findNearestByEmbedding(input.workId, embedding, input.topK);
@@ -552,7 +647,8 @@ export class PgVectorPlugin extends BaseVectorStore {
 	}
 
 	async deleteByDocument(input: DeleteByDocumentInput): Promise<void> {
-		const repo = this.requireRepository();
+		this.requireRepository();
+		const { repo } = await this.repositoryFor(input.workId);
 		try {
 			await repo.deleteByDocument(input.workId, input.documentId);
 		} catch (err) {
@@ -561,7 +657,8 @@ export class PgVectorPlugin extends BaseVectorStore {
 	}
 
 	async deleteByWork(input: DeleteByWorkInput): Promise<void> {
-		const repo = this.requireRepository();
+		this.requireRepository();
+		const { repo } = await this.repositoryFor(input.workId);
 		try {
 			await repo.deleteByWork(input.workId);
 		} catch (err) {
@@ -611,7 +708,59 @@ export class PgVectorPlugin extends BaseVectorStore {
 		};
 	}
 
+	/**
+	 * AW-07 — adopt the host's chunk tables from the plugin host's
+	 * custom-capability channel when nothing was wired explicitly. Looked
+	 * up lazily (not only in `onLoad`) because the host may publish the
+	 * capability after the plugin loaded; explicit options / setters are
+	 * never overwritten.
+	 */
+	private adoptHostChunkTables(): void {
+		if (this.chunkRepository) return;
+		const context = this.context;
+		if (!context || typeof context.getCustomCapability !== 'function') return;
+		let tables: PgVectorHostChunkTables | undefined;
+		try {
+			tables = context.getCustomCapability<PgVectorHostChunkTables>(PGVECTOR_HOST_CHUNK_TABLES_CAPABILITY);
+		} catch {
+			return;
+		}
+		if (!tables?.chunkRepository) return;
+		this.chunkRepository = tables.chunkRepository;
+		if (!this.pingDatabase && tables.pingDatabase) {
+			this.pingDatabase = tables.pingDatabase;
+		}
+		if (!this.namespaceChunkRepository && !this.workNamespaces) {
+			this.namespaceChunkRepository = tables.namespaceChunkRepository;
+			this.workNamespaces = tables.workNamespaces;
+		}
+	}
+
+	/**
+	 * AW-07 — pick the repository for a namespace. Without namespace routing
+	 * wired, every namespace resolves to the Work repository (the pre-AW-07
+	 * behaviour, unchanged). With it, a namespace that names a Work still
+	 * resolves to the Work repository, and anything else to the namespace
+	 * table.
+	 */
+	private async repositoryFor(workId: string): Promise<{ repo: PgVectorChunkRepositoryPort; namespaced: boolean }> {
+		const workRepo = this.requireRepository();
+		const namespaceRepo = this.namespaceChunkRepository;
+		const probe = this.workNamespaces;
+		if (!namespaceRepo || !probe) {
+			return { repo: workRepo, namespaced: false };
+		}
+		let isWork: boolean;
+		try {
+			isWork = await probe.isWork(workId);
+		} catch (err) {
+			throw this.normalizeError(err, 'internal', true);
+		}
+		return isWork ? { repo: workRepo, namespaced: false } : { repo: namespaceRepo, namespaced: true };
+	}
+
 	private requireRepository(): PgVectorChunkRepositoryPort {
+		this.adoptHostChunkTables();
 		if (!this.chunkRepository) {
 			throw this.wrapVendorError(
 				new Error('pgvector chunk repository not wired in — call setChunkRepository() on the plugin'),
