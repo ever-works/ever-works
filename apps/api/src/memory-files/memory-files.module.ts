@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
-import { KnowledgeBaseModule, MemoryFilesModule } from '@ever-works/agent/services';
+import {
+    KnowledgeBaseModule,
+    KnowledgeLibraryModule,
+    MemoryFilesModule,
+} from '@ever-works/agent/services';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { MemoryFilesController } from './memory-files.controller';
@@ -18,6 +22,9 @@ import { MemoryFilesController } from './memory-files.controller';
  *    ingest + owner-gated byte reads for plain uploads);
  *  - `OrganizationsModule` provides `OrganizationMembershipService` for
  *    the org-original defense-in-depth gate;
+ *  - `KnowledgeLibraryModule` provides `KnowledgeLibraryService` for the
+ *    shared (organization-scope) folder writes the folder routes accept
+ *    with `scope=organization`;
  *  - `ScopeContextService` arrives via the `@Global()` ScopeModule.
  */
 @Module({
@@ -25,6 +32,7 @@ import { MemoryFilesController } from './memory-files.controller';
         DatabaseModule,
         MemoryFilesModule,
         KnowledgeBaseModule,
+        KnowledgeLibraryModule,
         UploadsModule,
         OrganizationsModule,
     ],

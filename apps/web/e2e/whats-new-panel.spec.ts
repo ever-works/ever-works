@@ -139,16 +139,43 @@ test.describe("What's new — panel", () => {
             await expect(control).toHaveAttribute('aria-expanded', 'false');
             await expect(page.getByTestId('whats-new-badge')).toHaveCount(0);
 
-            await control.focus();
-            await page.keyboard.press('Enter');
+            // The shell paints its server markup before React hydrates, and a
+            // keypress that lands first is dropped (stage run 34970057817,
+            // retry #2, opened nothing at all — the dialog never resolved).
+            // Retry the SAME keyboard activation — never a mouse click — so
+            // Enter on the focused control stays the thing under test.
+            //
+            // Scoped to the panel's OWN dialog: `WhatsNewPanel.tsx` puts
+            // `data-testid="whats-new-panel"` on the very element that carries
+            // `role="dialog"` (the stage call log resolved exactly that node).
+            // `/en/works` is also where the first-run onboarding wizard mounts
+            // its own dialog, so an UNSCOPED `getByRole('dialog')` could read
+            // "something is already open", never press Enter, and then
+            // strict-resolve against two elements.
+            const dialog = page.getByRole('dialog').and(page.getByTestId('whats-new-panel'));
+            await expect(async () => {
+                if ((await dialog.count()) === 0) {
+                    await control.focus();
+                    await page.keyboard.press('Enter');
+                }
+                await expect(dialog).toBeAttached({ timeout: 3_000 });
+            }).toPass({ timeout: 30_000 });
 
-            const dialog = page.getByRole('dialog');
-            await expect(dialog).toBeVisible();
+            // Headless UI puts role="dialog" on `<Dialog className="relative z-50">`,
+            // a layout wrapper whose children are all `fixed` — it has a
+            // zero-height box, so Playwright calls it hidden even while the
+            // slide-over is fully painted (the CI call log resolved it 9× as
+            // `data-open="" … data-headlessui-state="open"` and still said
+            // "hidden"). Prove the panel opened from the control's own state
+            // and from the painted surface inside the wrapper instead.
+            await expect(control).toHaveAttribute('aria-expanded', 'true');
             await expect(dialog.getByRole('heading', { name: "What's new" })).toBeVisible();
             await expect(dialog.getByText('All caught up')).toBeVisible();
 
             const entries = dialog.getByTestId('whats-new-entry');
-            await expect(entries.first()).toBeVisible();
+            // The list arrives on open through a server action (Next → API →
+            // DB); the sibling whats-new-degraded.spec.ts allows the same 15s.
+            await expect(entries.first()).toBeVisible({ timeout: 15_000 });
             await expect(entries.first()).toHaveAttribute('data-read', 'true');
             await expect(dialog.getByTestId('whats-new-filter-all')).toHaveAttribute(
                 'aria-checked',

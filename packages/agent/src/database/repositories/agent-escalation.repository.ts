@@ -211,6 +211,17 @@ export class AgentEscalationRepository {
     }
 
     /**
+     * AW-23 — open escalations raised BY one agent, for the identity
+     * card's "Waiting on you" reason.
+     *
+     * Owner-scoped like every other read here: a status surface must not
+     * become an existence oracle for another user's agent.
+     */
+    async countOpenForAgent(agentId: string, userId: string): Promise<number> {
+        return this.repository.count({ where: { agentId, userId, status: 'open' } });
+    }
+
+    /**
      * Close one escalation. Owner-scoped CAS on `status='open'` so a
      * double-click resolves once and a foreign row is untouched (and
      * indistinguishable from a missing one — no existence oracle).

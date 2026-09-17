@@ -23,12 +23,16 @@ import {
 import { getCurrentPeriodStart, getNextPeriodStart } from './budget-period';
 import {
     AGENT_RUN_CHAT_BACK_POSTER,
+    AGENT_RUN_CONVERSATION_REPLY_POSTER,
     AGENT_RUN_TASK_FINISHER,
     type AgentRunChatBackPoster,
+    type AgentRunConversationReplyPoster,
     type AgentRunOutcome,
     type AgentRunTaskFinisher,
 } from './agent-run-post-processor';
 import { AgentToolService, type AgentToolDescriptor } from './agent-tool.service';
+// Safety rails (AW-24) — the leaf port, so this file gains no runtime graph.
+import { SAFETY_GATE, type SafetyGate } from '../safety/safety-gate.port';
 import {
     AGENT_AI_DISPATCH_FACADE,
     type AgentAiDispatchFacade,
@@ -44,6 +48,7 @@ import { createAgentRunAbortSource } from './agent-run-abort';
 // pulled into `agents/`.
 import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-grant.enforcer';
 import { filterSkillsByToolGrants } from '../policy/skill-activation';
+import { withRunSuppression } from '../skills/skill-readiness.ladder';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
 // Session detail (Feature K) — timeline capture: redacted, size-capped
@@ -58,6 +63,13 @@ import {
     type RunCaptureState,
 } from './run-capture';
 import { filterToolNamesBySubAgentScope, type SubAgentScope } from '@ever-works/contracts';
+// Pure leaf (type-only imports of its own) — no runtime graph, no cycle.
+import {
+    AGENT_REVIEW_BRIEF_MISSING,
+    isAgentReviewBriefMessage,
+    isAgentReviewRunScope,
+    SUBMIT_TASK_REVIEW_TOOL,
+} from '../tasks-domain/task-agent-review';
 
 export interface AgentRunContext {
     runId: string;
@@ -80,6 +92,13 @@ export interface AgentRunContext {
      */
     taskId?: string | null;
     /**
+     * AW-17 — the Mission of the originating Task (`tasks.missionId`), read
+     * by the host from the Task row it already loaded. Threaded onto every
+     * facade call so usage rows roll up to the Mission that raised the work.
+     * NEVER `agents.missionId`. Null/undefined for runs with no Task.
+     */
+    missionId?: string | null;
+    /**
      * Judgment layer G9 — the effective scope a DELEGATED run was
      * admitted under, read off `agent_runs.delegationScope` by the host
      * that starts the run.
@@ -99,6 +118,14 @@ export interface AgentRunContext {
      */
     chatMessageId?: string | null;
     /**
+     * Named Conversations — the Conversation message a `chat`-kind run is
+     * replying to when it was started from a Conversation rather than a Task.
+     * Its reply is recorded in the Conversation by the job that started the
+     * run, so finalize neither posts it to a Task nor warns that no Task was
+     * given. Absent for every other run.
+     */
+    conversationMessageId?: string | null;
+    /**
      * Trigger.dev's run AbortSignal, aborted when the run is cancelled. Optional:
      * absent in unit tests and for runs executed outside a Trigger.dev task, in
      * which case cooperative abort falls back to the throttled DB status read.
@@ -112,6 +139,21 @@ export interface AgentRunContext {
      * Absent for non-isolated runs.
      */
     workspaceCwd?: string | null;
+}
+
+/**
+ * Safety rails (AW-24) — what the gate is told about the caller.
+ *
+ * Identifiers only. There is deliberately no field for a tool argument, a
+ * prompt, an instruction or a document: the classification comes from the
+ * platform's own descriptor and the rung comes from a persisted row, so
+ * nothing the model produced is an input to a rail decision (FR-15).
+ */
+export interface AgentRunSafetySubject {
+    userId: string;
+    agentId: string;
+    tenantId: string | null;
+    organizationId: string | null;
 }
 
 export interface AgentRunBudgetCheck {
@@ -242,6 +284,24 @@ export class AgentRunService {
         // `DatabaseModule`. Absent, a capped budget is UNEVALUABLE and the
         // run is refused (see `checkBudget`) — never silently "0 spent".
         @Optional() private readonly pluginUsage?: PluginUsageRepository,
+        // Named Conversations — records a Conversation reply before the run
+        // is marked completed (see `finalize`). Bound by the api-side
+        // @Global() AgentsModule. Trailing + `@Optional()` so every positional
+        // constructor call keeps working; absent, the reply is left to the job
+        // that started the run, exactly as before.
+        @Optional()
+        @Inject(AGENT_RUN_CONVERSATION_REPLY_POSTER)
+        private readonly conversationReplyPoster?: AgentRunConversationReplyPoster,
+        // Safety rails (AW-24) — the one place every tool call converges is
+        // `invokeTool`, which is what makes "every rail is evaluated in the
+        // platform, after the model has produced its intent and before the
+        // side effect happens" a satisfiable claim rather than a hope.
+        // Trailing + `@Optional()` so every existing positional constructor
+        // call keeps working; UNBOUND, every tool call behaves exactly as it
+        // did before this epic landed.
+        @Optional()
+        @Inject(SAFETY_GATE)
+        private readonly safetyGate?: SafetyGate,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -465,7 +525,15 @@ export class AgentRunService {
                         context.userId,
                         requestedSlug,
                     );
-                    if (invoked && invoked.invocationSlug) {
+                    // Skills shelf — a switched-off Skill, or a drafted one
+                    // nobody accepted, is not injected even when invoked by
+                    // name: the off switch covers every run (FR-16).
+                    if (
+                        invoked &&
+                        invoked.invocationSlug &&
+                        !invoked.disabledAt &&
+                        invoked.reviewState !== 'proposed'
+                    ) {
                         let invokedFiles:
                             | Array<{ filename: string; kind: string; sizeBytes: number }>
                             | undefined;
@@ -777,6 +845,8 @@ export class AgentRunService {
                   context.runId,
                   editsThisRunByFile,
                   context.delegationScope,
+                  context.missionId,
+                  context.taskId,
               )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
@@ -786,16 +856,40 @@ export class AgentRunService {
         // state-machine + force semantics).
         let capturedFinishStatus: AgentRunOutcome['taskFinishStatus'] = null;
         let capturedForce = false;
-        const toolDescriptors: AgentToolDescriptor[] =
-            context.kind === 'task'
-                ? [
-                      ...baseDescriptors,
-                      this.buildTransitionTaskTool((status, force) => {
-                          capturedFinishStatus = status;
-                          capturedForce = force;
-                      }),
-                  ]
-                : baseDescriptors;
+        // Reviewer agent stage (slice AD, EW-811) — a review run gets NO
+        // virtual transitionTask. This descriptor is appended AFTER the
+        // delegation-scope filter above, so without this a run admitted
+        // with the review-only scope could still move its own Task (and,
+        // through `finalize`, re-enter review or unblock a merge path) —
+        // the one tool the scope was written to withhold.
+        const reviewRun = isAgentReviewRunScope(context.delegationScope);
+        // …and the verdict tool is offered ONLY to an execution that is
+        // running UNDER the review scope. `submitTaskReview` authorizes on
+        // the run ROW (bound to a review, review-scoped), while everything
+        // this loop restricts — the tool surface, the virtual
+        // `transitionTask`, the brief-in-hand gate below — is decided from
+        // the CONTEXT the worker built. Those two must never disagree: a
+        // worker that claims a review row without carrying its scope (the
+        // heartbeat and chat-reply workers' legacy "any in-flight run for
+        // this agent" fallbacks) would otherwise execute it with the full
+        // tool surface and no brief gate, and its verdict would still be
+        // accepted. Without the scope in hand, no verdict tool — so the
+        // only execution that can answer a review is one that is also
+        // narrowed and gated. Withheld silently: an ordinary run has no
+        // review to answer, and the tool would refuse it anyway.
+        const scopedBaseDescriptors = reviewRun
+            ? baseDescriptors
+            : baseDescriptors.filter((descriptor) => descriptor.name !== SUBMIT_TASK_REVIEW_TOOL);
+        const offerVirtualTransition = context.kind === 'task' && !reviewRun;
+        const toolDescriptors: AgentToolDescriptor[] = offerVirtualTransition
+            ? [
+                  ...scopedBaseDescriptors,
+                  this.buildTransitionTaskTool((status, force) => {
+                      capturedFinishStatus = status;
+                      capturedForce = force;
+                  }),
+              ]
+            : scopedBaseDescriptors;
         const toolDefs = toolDescriptors.map((d) => ({
             name: d.name,
             description: d.description,
@@ -822,6 +916,9 @@ export class AgentRunService {
         // Run steering (Wave 4 M5) — set when a cooperative interrupt landed
         // between iterations; the caller finalizes the run `completed`.
         let interrupted = false;
+        // Reviewer agent stage (slice AD, EW-811) — has THIS execution read
+        // its steering queue yet? See the brief-in-hand gate in the loop.
+        let firstSteeringDrain = true;
 
         // Session detail (Feature K) — per-loop capture window. Message
         // and tool-preview rows count toward CAPTURE_MAX_ENTRIES; every
@@ -866,6 +963,58 @@ export class AgentRunService {
                     iterations -= 1;
                     break;
                 }
+                // Reviewer agent stage (slice AD, EW-811) — a review run may
+                // reach the model ONLY with its brief in hand.
+                //
+                // The brief (the diff + the CI verdict) travels as the first
+                // `pendingInput` entry, and draining the queue CLEARS it. A
+                // job-runtime retry re-executes the same `running` row, so
+                // the retry's first drain comes back without the brief —
+                // while the one-tool verdict surface and the open review
+                // row are both still there. Without this gate that retry
+                // could record an `approve` for a diff it never received.
+                //
+                // So: this execution's FIRST drain must start with a brief
+                // the platform composed, or the model is never called — no
+                // round-trip, therefore no tool call, therefore no verdict
+                // from this execution. The review bound to the run is
+                // settled `failed` too, so the verdict service itself
+                // refuses the run from here on. Independent of any
+                // deployment's retry setting. Fails closed on every
+                // ambiguity: an unreadable queue reads as empty, and any
+                // first message that is not a brief is not a brief. The
+                // brief cannot be forged into the queue: nothing may steer
+                // a review run (`RunSteeringService.steer` and
+                // `AgentRunRepository.appendPendingInput` both refuse one,
+                // and Task chat does not route to one), so the only writer
+                // of a review run's queue is the dispatch's seed.
+                if (firstSteeringDrain) {
+                    firstSteeringDrain = false;
+                    if (reviewRun && !isAgentReviewBriefMessage(steering.pendingInput[0])) {
+                        await this.runLogs
+                            .append({
+                                runId: context.runId,
+                                level: 'ERROR',
+                                step: 'agent-review',
+                                message:
+                                    'Review run started without its brief (already consumed by an earlier execution) — stopped before the first model round-trip; no verdict can be recorded.',
+                                metadata: {
+                                    reason: AGENT_REVIEW_BRIEF_MISSING,
+                                    queuedMessages: steering.pendingInput.length,
+                                },
+                            })
+                            .catch(() => undefined);
+                        await this.abandonAgentReviewRun(context.runId);
+                        // This round-trip never reached the model.
+                        iterations -= 1;
+                        return {
+                            errored: true,
+                            errorMessage: AGENT_REVIEW_BRIEF_MISSING,
+                            outcome: { errored: true, errorMessage: AGENT_REVIEW_BRIEF_MISSING },
+                            iterations,
+                        };
+                    }
+                }
                 for (const injected of steering.pendingInput) {
                     // Security (prompt-injection): a steering message is
                     // authenticated human input from the run's owner, but it
@@ -902,6 +1051,8 @@ export class AgentRunService {
                         // records with the run id so the run-cost
                         // accumulator can sum exactly this run's spend.
                         runId: context.runId,
+                        // AW-17 — and with the Task's Mission.
+                        missionId: context.missionId ?? undefined,
                         providerOverride: agent.aiProviderId ?? undefined,
                     },
                 });
@@ -976,6 +1127,12 @@ export class AgentRunService {
                         descriptorByName,
                         call,
                         capture,
+                        {
+                            userId: context.userId,
+                            agentId: agent.id,
+                            tenantId: agent.tenantId ?? null,
+                            organizationId: agent.organizationId ?? null,
+                        },
                     );
                     // Security (prompt-injection): tool results frequently
                     // carry attacker-controlled text (fetched web pages, repo
@@ -1101,6 +1258,32 @@ export class AgentRunService {
     }
 
     /**
+     * Reviewer agent stage (slice AD, EW-811) — close the review bound to a
+     * review run that started without its brief.
+     *
+     * Feature-detected like {@link takeSteeringSignals}: `this.toolService`
+     * is a partial double in many specs and an older RPC proxy in a rolling
+     * worker. Best-effort by construction — the caller has ALREADY refused
+     * to call the model for this execution, which on its own means no
+     * verdict can come from it; settling the ledger row is the second,
+     * independent closure, not the first.
+     */
+    private async abandonAgentReviewRun(runId: string): Promise<void> {
+        const abandon = (this.toolService as Partial<AgentToolService> | undefined)
+            ?.abandonAgentReviewRun;
+        if (typeof abandon !== 'function') return;
+        try {
+            await abandon.call(this.toolService, runId);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: closing the brief-less review failed (the model was not called): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
+
+    /**
      * Run steering (Wave 4 M5) — read (and consume) this run's cooperative
      * control signals.
      *
@@ -1221,6 +1404,7 @@ export class AgentRunService {
         descriptorByName: Map<string, AgentToolDescriptor>,
         call: AgentAiToolCall,
         capture?: RunCaptureState,
+        safetySubject?: AgentRunSafetySubject,
     ): Promise<unknown> {
         // Session detail (Feature K) — redacted, capped preview of the args
         // the model sent. Built once and attached to whichever log row this
@@ -1241,6 +1425,18 @@ export class AgentRunService {
                 .catch(() => undefined);
             return { error: `tool "${call.name}" is not available to this Agent.` };
         }
+
+        // Safety rails (AW-24) — the single enforcement point. It runs AFTER
+        // the descriptor has been resolved (so the entry point is the
+        // platform's own, never a model-supplied string) and BEFORE the side
+        // effect. A refusal returns a tool result and NEVER throws: FR-30 —
+        // a run whose action was held must not be failed, it must continue
+        // and be able to proceed differently.
+        const verdict = safetySubject
+            ? await this.evaluateSafety(runId, call, safetySubject, argsMeta, capture)
+            : null;
+        if (verdict) return verdict;
+
         const startedAt = Date.now();
         try {
             const result = await descriptor.invoke(call.args as never);
@@ -1295,6 +1491,93 @@ export class AgentRunService {
                 .catch(() => undefined);
             return { error: errorMessage };
         }
+    }
+
+    /**
+     * Safety rails (AW-24) — ask the gate, and turn a non-allow verdict into
+     * a tool result.
+     *
+     * Returns `null` when the action may proceed (including when the gate is
+     * not bound at all), and a result object when it may not. It never
+     * throws: the gate itself converts every internal failure into the
+     * fail-closed verdict, and a rail that somehow threw anyway would
+     * otherwise turn a policy question into a failed run.
+     *
+     * The result the model sees names the rail, the category and the rung —
+     * an agent that is told WHY it was stopped can do something else, while
+     * one that is told only "error" retries.
+     */
+    private async evaluateSafety(
+        runId: string,
+        call: AgentAiToolCall,
+        subject: AgentRunSafetySubject,
+        argsMeta: Record<string, unknown>,
+        capture?: RunCaptureState,
+    ): Promise<Record<string, unknown> | null> {
+        if (!this.safetyGate) return null;
+
+        let verdict: Awaited<ReturnType<SafetyGate['evaluate']>>;
+        try {
+            verdict = await this.safetyGate.evaluate({
+                entryPointId: call.name,
+                toolName: call.name,
+                userId: subject.userId,
+                agentId: subject.agentId,
+                runId,
+                subjectType: 'run',
+                subjectId: runId,
+                tenantId: subject.tenantId,
+                organizationId: subject.organizationId,
+            });
+        } catch (err) {
+            this.logger.error(
+                `Safety gate threw for tool "${call.name}" on run ${runId} — allowing the call ` +
+                    `to proceed to its own enforcement: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+            );
+            return null;
+        }
+        if (verdict.decision === 'allow') return null;
+
+        this.countCaptureEntry(capture);
+        await this.runLogs
+            .append({
+                runId,
+                level: 'WARN',
+                step: 'safety-gate',
+                message: `Tool "${call.name}" was ${verdict.decision} by the ${verdict.railId ?? 'safety'} rail.`,
+                metadata: {
+                    toolName: call.name,
+                    callId: call.id,
+                    railId: verdict.railId,
+                    category: verdict.category,
+                    rung: verdict.rung,
+                    reasonCode: verdict.reasonCode,
+                    ...argsMeta,
+                },
+            })
+            .catch(() => undefined);
+
+        if (verdict.decision === 'held') {
+            return {
+                held: true,
+                reason: verdict.summary,
+                category: verdict.category,
+                rung: verdict.rung,
+                // Said explicitly so the model does not retry a send that is
+                // waiting for a person — a retry loop against a hold is the
+                // failure mode this wording exists to prevent.
+                retryable: false,
+            };
+        }
+        return {
+            error: verdict.summary ?? 'A safety rail refused this action.',
+            refusedBy: verdict.railId,
+            category: verdict.category,
+            rung: verdict.rung,
+            retryable: false,
+        };
     }
 
     // ── Session detail (Feature K) — timeline capture helpers ─────────
@@ -1525,6 +1808,50 @@ export class AgentRunService {
             return { runId: context.runId, status: 'failed' };
         }
 
+        // Named Conversations — a reply to a Conversation message is stored
+        // BEFORE the run is marked completed. Completing first could lose the
+        // reply for good: once the run reads as completed, a failed store is
+        // never retried (a redelivered job skips a finished run). The poster is
+        // idempotent per run, so finalizing the same run again stores nothing
+        // new. A reply that cannot be stored fails the run instead, and the job
+        // that started it marks the person's message failed so it can be retried.
+        let postedMessageId: string | undefined;
+        const conversationMessageId = context.conversationMessageId ?? null;
+        const conversationReply =
+            context.kind === 'chat' && !context.taskId && conversationMessageId
+                ? (outcome.replyBody?.trim() ?? '')
+                : '';
+        if (conversationReply.length > 0 && conversationMessageId && this.conversationReplyPoster) {
+            try {
+                const posted = await this.conversationReplyPoster.postReply({
+                    runId: context.runId,
+                    userId: context.userId,
+                    agentId: context.agentId,
+                    conversationMessageId,
+                    body: outcome.replyBody as string,
+                });
+                postedMessageId = posted.messageId;
+            } catch (err) {
+                const reason = err instanceof Error ? err.message : String(err);
+                this.logger.warn(
+                    `Conversation reply could not be stored for run ${context.runId}: ${reason}`,
+                );
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level: 'ERROR',
+                        step: 'post-process',
+                        message: `Conversation reply could not be stored: ${reason}`,
+                    })
+                    .catch(() => undefined);
+                await this.runs
+                    .markFailed(context.runId, 'The reply could not be stored in the Conversation')
+                    .catch(() => undefined);
+                await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
+                return { runId: context.runId, status: 'failed' };
+            }
+        }
+
         await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
         // Run steering (Wave 4 M5) — a run that finished WITHOUT a definitive
         // outcome because it needs a human is parked here, at the one place
@@ -1551,13 +1878,15 @@ export class AgentRunService {
             });
         }
 
-        let postedMessageId: string | undefined;
         let finishedTaskStatus: string | undefined;
 
         // Kind-specific side effects. Best-effort — a chat-back failure
         // or transition rejection does not unwind the LLM work.
         if (context.kind === 'chat' && outcome.replyBody && outcome.replyBody.trim().length > 0) {
-            postedMessageId = await this.tryPostChatReply(context, outcome.replyBody);
+            // A Conversation reply was stored above; the Task chat-back
+            // returns nothing for it, which must not erase that message id.
+            postedMessageId =
+                (await this.tryPostChatReply(context, outcome.replyBody)) ?? postedMessageId;
         }
         if (context.kind === 'task' && outcome.taskFinishStatus) {
             finishedTaskStatus = await this.tryFinishTask(
@@ -1580,6 +1909,11 @@ export class AgentRunService {
         body: string,
     ): Promise<string | undefined> {
         const taskId = context.taskId ?? undefined;
+        if (!taskId && context.conversationMessageId) {
+            // A Conversation reply: the conversation reply job records it
+            // against the message it answers. Nothing to post to a Task.
+            return undefined;
+        }
         if (!this.chatBackPoster) {
             await this.runLogs
                 .append({
@@ -1815,10 +2149,18 @@ export class AgentRunService {
         runId: string,
         editsThisRunByFile: Set<string>,
         delegationScope?: SubAgentScope | null,
+        missionId?: string | null,
+        taskId?: string | null,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
-        const runContext = { runId, editsThisRunByFile };
+        const runContext = {
+            runId,
+            editsThisRunByFile,
+            missionId: missionId ?? undefined,
+            // AW-17 — the run's Task, so MCP tool calls are attributed to it.
+            taskId: taskId ?? undefined,
+        };
         if (typeof service.resolveGrantedTools !== 'function') {
             return this.applyDelegationScope(
                 await service.resolveAllowedTools(agent, runContext),
@@ -1951,9 +2293,20 @@ export class AgentRunService {
                     metadata: {
                         slug: entry.slug,
                         refusedTools: entry.refusals.map((r) => r.toolName),
+                        // Skills shelf (FR-62) — the run record links to the
+                        // Skill it dropped, not just its slug.
+                        skillId: entry.skill.skillId,
                     },
                 })
                 .catch(() => undefined);
+            // Skills shelf (FR-32) — reflect the suppression onto the Skill's
+            // cached readiness so the shelf badges it. Best-effort, same
+            // posture as the log line above: this must never fail a run.
+            void this.recordSkillSuppression(
+                agent,
+                entry.skill.skillId,
+                entry.refusals.map((r) => r.toolName),
+            ).catch(() => undefined);
         }
 
         // Skill files feature — attach the per-skill companion-file
@@ -1989,6 +2342,27 @@ export class AgentRunService {
         return active.map(({ skillId, slug, body, priority }) => {
             const files = filesBySkillId.get(skillId);
             return files ? { slug, body, priority, files } : { slug, body, priority };
+        });
+    }
+
+    /**
+     * Skills shelf (FR-32) — fold a run-time suppression into the Skill's
+     * cached readiness. No-op when the Skill repository is not wired.
+     */
+    private async recordSkillSuppression(
+        agent: Agent,
+        skillId: string,
+        refusedTools: string[],
+    ): Promise<void> {
+        if (!this.skillRepo) return;
+        const skill = await this.skillRepo.findByIdAndUser(skillId, agent.userId);
+        if (!skill) return;
+        const now = new Date();
+        const next = withRunSuppression(skill, refusedTools, agent.id, now);
+        await this.skillRepo.recordReadiness(skillId, agent.userId, {
+            readiness: next.readiness,
+            readinessDetail: next.detail,
+            readinessCheckedAt: now,
         });
     }
 

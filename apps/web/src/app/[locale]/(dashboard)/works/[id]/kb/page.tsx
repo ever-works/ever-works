@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { HelpLink } from '@/components/help/HelpLink';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { workAPI } from '@/lib/api';
@@ -56,7 +57,13 @@ export default async function WorkKnowledgeBasePage({ params }: Params) {
                         data-testid="kb-workbench-empty"
                         className="flex flex-1 items-center justify-center p-8 text-center text-sm text-text-muted dark:text-text-muted-dark/70"
                     >
-                        <p className="max-w-md">{t('workbench.empty')}</p>
+                        <div className="flex flex-col items-center gap-3">
+                            <p className="max-w-md">{t('workbench.empty')}</p>
+                            <HelpLink
+                                target="knowledge-base#ingest-drop-a-file-get-usable-knowledge"
+                                variant="emptyState"
+                            />
+                        </div>
                     </div>
                 }
             />

@@ -20,7 +20,11 @@ import { agentApprovalsAPI } from '@/lib/api/agent-approvals';
 // Dashboard blocks (spec §3) — Teams count, Soon runs, and the
 // server-composed Attention list. All three degrade gracefully (and log)
 // when their backend call fails.
-import { composeAttentionItems, getSoonRuns, getTeamsTotal } from './dashboard-data';
+import { composeAttentionItems, getTeamsTotal } from './dashboard-data';
+// Home (AW-19) — the composed morning read, plus the job-runtime health flag
+// the dashboard layout already reads (React-cache()d, so no second request).
+import { getHomeSummaryAction } from '@/app/actions/dashboard/home';
+import { healthAPI } from '@/lib/api/health';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -70,8 +74,9 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         erroredAgents,
         blockedTaskRows,
         teamsTotal,
-        soon,
         matchCandidateWorks,
+        homeSummary,
+        jobRuntimeConfigured,
     ] = await Promise.all([
         searchParams,
         getAuthFromCookie(),
@@ -134,11 +139,9 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             .catch(() => ({ data: [], meta: { total: 0, limit: 6, offset: 0 } })),
         // Teams count (9th tile) — `undefined` until Teams (PR #1647) wires it.
         getTeamsTotal().catch(() => undefined),
-        // Soon runs — the soonest upcoming Work-schedule / Mission runs from
-        // the Schedules front's `/api/schedules` aggregation. `getSoonRuns`
-        // already logs and absorbs its own transport failures; this catch is
-        // the outer belt-and-braces so the home page still renders.
-        getSoonRuns().catch(() => ({ items: [], total: 0 })),
+        // The Soon block's upcoming-runs read is superseded by the morning
+        // read's Today block below, which covers every schedule kind for the
+        // local day; the full schedule list stays one link away.
         // Match candidates for the Ideas preview's Built badge. The
         // separate `worksResponse` fetch above is capped at the 6 Works
         // the dashboard RENDERS, so it can't serve here. Degraded to `[]`
@@ -147,6 +150,15 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             .getAll({ limit: MATCH_CANDIDATE_LIMIT })
             .then((r) => r.works)
             .catch(() => []),
+        // Home (AW-19) — every morning block in one read, each with its own
+        // status. A failed read degrades to `null`: the stack says it could
+        // not load, the composer still works and everything below renders
+        // from its own fetches above.
+        getHomeSummaryAction().catch((error: unknown) => {
+            console.error('[dashboard] Home: GET /api/home/summary failed', error);
+            return null;
+        }),
+        healthAPI.getJobRuntimeConfigured().catch(() => null),
     ]);
 
     // Security: defense-in-depth guard — if middleware matcher is misconfigured and
@@ -207,8 +219,10 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             // Dashboard blocks (spec §3/§4) — Teams tile + Attention/Soon.
             teamsTotal={teamsTotal}
             attentionItems={attentionItems}
-            soonItems={soon.items}
-            soonTotal={soon.total}
+            // Home (AW-19) — the morning stack.
+            homeSummary={homeSummary}
+            renderedAt={new Date().toISOString()}
+            jobRuntimeConfigured={jobRuntimeConfigured}
         />
     );
 }

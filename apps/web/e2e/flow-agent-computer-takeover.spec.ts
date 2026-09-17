@@ -32,6 +32,36 @@ async function freshContext(browser: Browser) {
     return context;
 }
 
+/**
+ * A FRESH account whose first-run onboarding wizard is already dismissed.
+ *
+ * A brand-new account has zero Works, so the dashboard auto-opens
+ * `EverWorksOnboardingWizard` (`layout-client.tsx`: `shouldAutoOpenOnboarding =
+ * onboardingTotalWorks === 0 && !isOnboardingDismissed && !isOnboardingCompleted`)
+ * and its `fixed inset-0` backdrop swallows every click on this page. Dismissed
+ * server-side BEFORE the UI login so the post-login server render already reads
+ * `dismissedAt`. Mirrors `flow-fleet-runner-pill.spec.ts`; the 200 is asserted so
+ * a dismissal that stops working names itself here.
+ */
+async function registerUserWithOnboardingDismissed(
+    request: APIRequestContext,
+): Promise<RegisteredUser> {
+    const u = await registerUserViaAPI(request);
+    const dismissed = await request.post(`${API_BASE}/api/onboarding/dismiss`, {
+        headers: authedHeaders(u.access_token),
+    });
+    expect(dismissed.status(), `dismiss body=${await dismissed.text().catch(() => '')}`).toBe(200);
+    return u;
+}
+
+/**
+ * Bound for every click on the computer page. `playwright.config.ts` sets no
+ * `actionTimeout`, so an unbounded click on a covered element retries to the
+ * 150s test timeout and the `finally { context.close() }` error then replaces
+ * its call log. A bounded click fails on its own and names the interceptor.
+ */
+const CLICK_TIMEOUT = 15_000;
+
 async function enrollAttendedNode(
     request: APIRequestContext,
     user: RegisteredUser,
@@ -93,11 +123,22 @@ async function makeLive(
                         },
                     },
                 );
-                return res.status();
+                // Assert what the publish DID, not merely its status: an ended
+                // session ALSO answers 202 with every frame dropped
+                // (`computer-internal.controller.ts` endedAnswer), so a bare
+                // `.toBe(202)` cannot tell a relayed frame from a discarded one.
+                // Note what this does and does not prove: `accepted` counts
+                // frames the relay took (`relay.publish` returned true), NOT
+                // viewers reached — it rules out the ended-session explanation
+                // only. What proves a frame reached the browser is the caller's
+                // own LIVE badge assertion.
+                return res.status() === 202
+                    ? await res.json()
+                    : { status: res.status(), body: await res.text() };
             },
             { timeout: 15_000 },
         )
-        .toBe(202);
+        .toMatchObject({ accepted: 1, ended: false });
 }
 
 test.describe('take over an Agent’s computer — contract', () => {
@@ -207,7 +248,7 @@ test.describe('take over an Agent’s computer — the page', () => {
         browser,
         request,
     }) => {
-        const user = await registerUserViaAPI(request);
+        const user = await registerUserWithOnboardingDismissed(request);
         const agent = await createAgentViaAPI(request, user.access_token, {
             name: `Ops ${uniq()}`,
         });
@@ -264,7 +305,7 @@ test.describe('take over an Agent’s computer — the page', () => {
 
             const takeOver = page.getByTestId('computer-take-over');
             await expect(takeOver).toBeEnabled({ timeout: 15_000 });
-            await takeOver.click();
+            await takeOver.click({ timeout: CLICK_TIMEOUT });
 
             await expect(page.getByTestId('computer-mode-sentence')).toHaveText(
                 `You have control — ${agent.name}'s input is paused.`,
@@ -276,7 +317,7 @@ test.describe('take over an Agent’s computer — the page', () => {
                 'true',
             );
 
-            await page.getByTestId('computer-give-back').click();
+            await page.getByTestId('computer-give-back').click({ timeout: CLICK_TIMEOUT });
             await expect(page.getByTestId('computer-mode-sentence')).toHaveText(
                 `Watching — ${agent.name} keeps working.`,
                 { timeout: 15_000 },

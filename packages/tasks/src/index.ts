@@ -9,6 +9,9 @@ export { TriggerService } from './trigger/trigger.service';
 // fan out platform Task events to the Trigger.dev runtime. API-side
 // TasksModule binds these to the dispatcher tokens.
 export * from './dispatchers/agent-task-dispatchers';
+// Named Conversations — the reply dispatch adapter. API-side TasksModule
+// binds it to the AGENT_CONVERSATION_REPLY_DISPATCHER token.
+export * from './dispatchers/conversation-dispatchers';
 // PR-4 — Idea → Work build executor dispatch adapter. API-side
 // IdeaBuildExecutorDispatchModule binds this to the
 // IDEA_BUILD_EXECUTE_DISPATCHER token.
@@ -16,3 +19,6 @@ export * from './dispatchers/idea-build-execute.dispatcher';
 // Judgment layer G5 — workflow graph run dispatch adapter. API-side
 // WorkflowsModule binds this to the WORKFLOW_RUN_DISPATCHER token.
 export * from './dispatchers/workflow-run.dispatcher';
+// AW-07 - memory fact embed dispatch adapter. API-side MemoryFactsApiModule
+// binds this to the MEMORY_FACT_EMBED_DISPATCHER token.
+export * from './dispatchers/memory-fact-embed.dispatcher';

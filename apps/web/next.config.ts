@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { resolveApiCspHost, resolveApiCspSocketSources } from './src/lib/csp-api-sources';
 
 /**
  * @type any
@@ -37,14 +38,21 @@ const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
     .map((s) => s.trim())
     .filter(Boolean)
     .filter((s) => SAFE_CSP_HOST_SOURCE.test(s));
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
-const apiHost = (() => {
-    try {
-        return new URL(apiUrl).origin;
-    } catch {
-        return 'https://api.ever.works';
-    }
-})();
+const apiHost = resolveApiCspHost();
+// The live-view and streaming-terminal sockets hang off the API origin over
+// ws:/wss:. CSP3 scheme-part matching does NOT let an http(s) source authorise
+// a ws(s) URL, so the socket origin must be listed too — without it every live
+// view is refused with "violates … connect-src".
+//
+// The socket URL the browser is handed is minted from the SERVER-ONLY
+// `API_URL` (`toComputerSocketUrl(API_URL, wsPath)` in the computer
+// attach-token route, and the same origin→ws twist in the terminal one), which
+// is a different host from `NEXT_PUBLIC_API_URL` in every shipped
+// configuration. `resolveApiCspSocketSources()` therefore emits the socket twin
+// of BOTH origins, de-duplicated: one source when they coincide, two exact
+// origins when they differ. Space-joined here so the directive below stays the
+// byte-twin of `src/proxy.ts`'s.
+const apiWsHost = resolveApiCspSocketSources().join(' ');
 const CSP = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -63,7 +71,7 @@ const CSP = [
     // (backup). Both are essential for the on-page Lottie animations that
     // boot on /login and /register; without them the E2E suite trips on
     // console errors. Keep them tightly listed (not wildcard).
-    `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
+    `connect-src 'self' ${apiHost} ${apiWsHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
     "worker-src 'self' blob:",
 ].join('; ');
 

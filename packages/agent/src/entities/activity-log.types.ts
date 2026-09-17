@@ -126,6 +126,18 @@ export enum ActivityActionType {
     MEMORY_FOLDER_CREATED = 'memory_folder_created',
     MEMORY_FOLDER_DELETED = 'memory_folder_deleted',
     MEMORY_FOLDER_SYNCED = 'memory_folder_synced',
+    // Knowledge library — curation of the shared shelf. Read / unread and
+    // pins are personal and high-frequency, so they are never logged.
+    //   ARCHIVED   `{ documentId, workId, organizationId, folderId }`
+    //   UNARCHIVED `{ documentId, workId, organizationId, folderId, restoredToUnfiled }`
+    //   FILED      `{ documentId, workId, organizationId, fromFolderId, toFolderId }`
+    //   EXPORTED   `{ documentIds, format, documentCount, missingCount }`
+    //   MEMORY_FOLDER_RENAMED `{ folderId, oldPath, newPath, scope }`
+    KB_DOCUMENT_ARCHIVED = 'kb_document_archived',
+    KB_DOCUMENT_UNARCHIVED = 'kb_document_unarchived',
+    KB_DOCUMENT_FILED = 'kb_document_filed',
+    KB_DOCUMENT_EXPORTED = 'kb_document_exported',
+    MEMORY_FOLDER_RENAMED = 'memory_folder_renamed',
     // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
     // KB document is renamed and the rewriter sweeps the rest of the
     // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details
@@ -213,6 +225,17 @@ export enum ActivityActionType {
     // pair (details.collaboratorAgentId) alongside the parent agent.
     // Additive members only — `activity_log.actionType` is a plain
     // varchar, so no migration.
+    // AW-23 — the agent brake and the stated halt reason. Additive
+    // members only; `activity_log.actionType` is a plain varchar, so no
+    // migration.
+    //
+    // 🛑 `AGENT_BLOCKED_ON_CREDENTIAL` carries a display name and a
+    // coarse kind and NEVER any part of a credential.
+    AGENT_BLOCKED_ON_CREDENTIAL = 'agent_blocked_on_credential',
+    /** The brake parked a run because the agent is paused. Nothing failed. */
+    AGENT_RUN_HELD = 'agent_run_held',
+    /** A Resume released held work. */
+    AGENT_RUNS_RELEASED = 'agent_runs_released',
     AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
     AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
     AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',
@@ -232,6 +255,10 @@ export enum ActivityActionType {
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
     SKILL_FILE_EDITED = 'skill_file_edited',
+    // Skills shelf — the workspace-level on/off switch. Appended only; the
+    // column is a varchar, so no migration.
+    SKILL_ENABLED = 'skill_enabled',
+    SKILL_DISABLED = 'skill_disabled',
     // Repository registry (Feature G) — Settings → Repositories rows +
     // the Agent ↔ repo grant edge. Additive entries only (NN #20).
     REPO_CONNECTION_CREATED = 'repo_connection_created',
@@ -314,6 +341,44 @@ export enum ActivityActionType {
     // varchar, so no migration is needed.
     INBOX_ITEM_CREATED = 'inbox_item_created',
     INBOX_ITEM_ANSWERED = 'inbox_item_answered',
+    // Memory facts + context files (AW-07). One row per create / edit /
+    // forget / restore / accept / discard of a fact, one when every fact is
+    // forgotten at once, one per context-file save / restore / load-mode
+    // change, and one when a run's instructions exceed a segment budget.
+    // `details` carries ids, counts and hashes — NEVER a fact or file body,
+    // which can hold business-sensitive prose. Additive members — storage is
+    // a plain varchar(50), so no migration is needed.
+    MEMORY_FACT_CREATED = 'memory_fact_created',
+    MEMORY_FACT_UPDATED = 'memory_fact_updated',
+    MEMORY_FACT_FORGOTTEN = 'memory_fact_forgotten',
+    MEMORY_FACT_RESTORED = 'memory_fact_restored',
+    MEMORY_FACT_ACCEPTED = 'memory_fact_accepted',
+    MEMORY_FACT_DISCARDED = 'memory_fact_discarded',
+    MEMORY_FACTS_CLEARED = 'memory_facts_cleared',
+    CONTEXT_FILE_UPDATED = 'context_file_updated',
+    CONTEXT_FILE_RESTORED = 'context_file_restored',
+    CONTEXT_FILE_MODE_CHANGED = 'context_file_mode_changed',
+    CONTEXT_BUDGET_EXCEEDED = 'context_budget_exceeded',
+    // Model accounts (AW-16) — one row per change to a workspace's provider
+    // accounts or model defaults. `details` names the account and the field
+    // that changed ({ accountId, label, providerPluginId, field } or
+    // { fromPosition, toPosition }); a credential VALUE is never included.
+    // Additive members — storage is a plain varchar, so no migration is needed.
+    MODEL_ACCOUNT_ADDED = 'model_account_added',
+    MODEL_ACCOUNT_UPDATED = 'model_account_updated',
+    MODEL_ACCOUNT_REORDERED = 'model_account_reordered',
+    MODEL_ACCOUNT_PAUSED = 'model_account_paused',
+    MODEL_ACCOUNT_RESUMED = 'model_account_resumed',
+    MODEL_ACCOUNT_RECONNECTED = 'model_account_reconnected',
+    MODEL_ACCOUNT_REMOVED = 'model_account_removed',
+    MODEL_POLICY_UPDATED = 'model_policy_updated',
+    // Schedules workspace — one row each time an owner pauses or resumes a
+    // cadence from any source (recurring Task, heartbeat, Mission tick,
+    // inbound Trigger). `details` carries `{ scheduleId, sourceType,
+    // control, before, after }`. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    SCHEDULE_PAUSED = 'schedule_paused',
+    SCHEDULE_RESUMED = 'schedule_resumed',
     // Live Feed — a run starting and a run reaching a terminal state, for
     // every trigger kind other than `heartbeat` (heartbeat runs keep the
     // three `agent_heartbeat_*` members above, unchanged). Declared here so
@@ -323,6 +388,26 @@ export enum ActivityActionType {
     AGENT_RUN_STARTED = 'agent_run_started',
     AGENT_RUN_COMPLETED = 'agent_run_completed',
     AGENT_RUN_FAILED = 'agent_run_failed',
+    // Shared view (AW-18) — the Workspace owner turning sharing on or off,
+    // regenerating the link, and changing what it publishes or whether
+    // crawlers may index it. One row per changed facet. `details` never
+    // carries the share token. Additive members — `activity_log.actionType`
+    // is a plain varchar, so no migration is needed.
+    SHARED_VIEW_ENABLED = 'shared_view_enabled',
+    SHARED_VIEW_DISABLED = 'shared_view_disabled',
+    SHARED_VIEW_REGENERATED = 'shared_view_regenerated',
+    SHARED_VIEW_SECTIONS_CHANGED = 'shared_view_sections_changed',
+    SHARED_VIEW_INDEXING_CHANGED = 'shared_view_indexing_changed',
+    // AW-22 Workspace backup — the whole-workspace archive leaves a trace of
+    // its own, so "when did I last back this up, and did anyone take a copy
+    // off the platform?" is answerable from the workspace's own record
+    // rather than from our logs (spec FR-32). Additive members —
+    // `activity_log.actionType` is a plain varchar, so no migration is
+    // needed. `details` carries `{ backupId, sizeBytes?, domainsCompleted? }`
+    // and never a storage key.
+    WORKSPACE_BACKUP_CREATED = 'workspace_backup_created',
+    WORKSPACE_BACKUP_DOWNLOADED = 'workspace_backup_downloaded',
+    WORKSPACE_BACKUP_DELETED = 'workspace_backup_deleted',
 }
 
 /**
@@ -360,6 +445,14 @@ export interface CreateActivityLogDto {
     actorAgentId?: string | null;
     /** The actor's display name at the moment the record is written. */
     actorLabel?: string | null;
+    /**
+     * Explicit ownership stamp. Optional: when omitted the scope-stamping
+     * subscriber fills both from the request scope, as it always has. A
+     * writer acting on a Workspace named in the route (rather than the
+     * request's active scope) passes it so the row lands in that Workspace.
+     */
+    tenantId?: string | null;
+    organizationId?: string | null;
 }
 
 /**

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { Lightbulb, Settings as SettingsIcon, Search, PenLine } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
@@ -326,6 +327,7 @@ export function IdeasPageClient({
                     <p className="mx-auto mt-1 max-w-xl text-xs text-text-muted dark:text-text-muted-dark">
                         {t('empty.subtitle')}
                     </p>
+                    <HelpLink target="ideas" variant="emptyState" className="mt-3" />
                 </div>
             ) : null}
             {!loadError && ideas.length > 0 ? (

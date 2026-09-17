@@ -51,6 +51,7 @@ A few features share a sidebar entry rather than owning one. **Teams** is the hu
 | [Agent Terminals](./agent-terminals)                   | Attach a real terminal to a live agent run — take the keyboard, watch read-only, replay the transcript             |
 | [Knowledge Base & Memory](./knowledge-base)            | Per-Work, typed, Git-backed institutional context and long-term memory every run reads from                        |
 | [Memory (Org-Wide)](./memory)                          | Every Work's KB plus org-level documents in one place — files, agent memory, review queue, consolidation           |
+| [Knowledge Library](./knowledge-library)               | The Library view of Memory — every KB document on one shelf, in shared folders, with archive, restore and export   |
 | [Meetings](./meetings)                                 | Meeting records with transcripts — entered by hand or synced from Zoom and Google Meet, then summarized            |
 | [Notifications](./notifications)                       | The in-app bell, the Slack / Discord / Telegram / WhatsApp / Novu channels, and event subscriptions                |
 | [Digests](./digests)                                   | Daily and weekly briefings composed from real runs, tasks, pull requests, escalations and goal progress            |
@@ -125,6 +126,7 @@ A Work's **kind** is chosen once, at creation, and decides what that Work has. T
 | [Connectors](./connectors)                | Chat, tracker, docs, CRM, meeting and social connectors — what each one pulls in, and where it lands   |
 | [Storage Backends](./storage-backends)    | Where uploaded bytes land — local disk, AWS S3, MinIO, or a GitHub repository with Git LFS             |
 | [Data Management](./data-management)      | Export, import, and sync account data (works, items, plugins, secrets) with GitHub backup              |
+| [Workspace Backup](./workspace-backup)    | A complete dated archive of one workspace, with a manifest saying what is inside and what restores     |
 
 ## Guides
 

@@ -46,6 +46,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentPluginPackage',
     'AgentPluginPackageAllowlist',
     'ActivityLog',
+    // Safety rails (AW-24) — one stored rung per (scope, kind of work).
+    'AutonomyGrant',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
     'AgentActionProposal',
@@ -77,6 +79,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ComputerSession',
     'Conversation',
     'ConversationMessage',
+    // Named Conversations — a person or an Agent taking part in one
+    'ConversationParticipant',
     // Credits ledger (pricing Wave 9 M1)
     'CreditLedgerEntry',
     // Pay-as-you-go meter events (billing spec §3.5) — the platform-side
@@ -116,6 +120,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'IngestedEvent',
     // Memory eval loop (memory upgrades M10) — append-only retrieval log
     'KbRetrievalLog',
+    // Knowledge library — per-person read state + pins on KB documents
+    'KnowledgeDocumentReaderState',
     // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
     // written only by the signature-verified webhook
     'Invoice',
@@ -125,9 +131,14 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'McpServerConnection',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // AW-07 — Memory facts (atomic tier of Memory)
+    'MemoryFact',
     // Memory Files — user-defined folders organizing uploads on /memory
     'MemoryFolder',
     'Mission',
+    // Model accounts (AW-16) — provider accounts + the model ladder.
+    'ModelAccount',
+    'ModelPolicy',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
     'GoalMetricSample',
@@ -142,6 +153,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'NotificationChannel',
     'NotificationChannelDeliveryLog',
     'NotificationEventType',
+    'OnboardingChecklist',
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
@@ -151,19 +163,26 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'PluginUsageEvent',
     // AW-14 What's new — per-person read state for product changelog entries.
     'ProductChangelogRead',
+    // Safety rails (AW-24) — the durable record of what the rails stopped.
+    'RailRefusal',
     'RefreshToken',
     // Release promotion lane (self-build slice AI, EW-808).
     'ReleasePromotion',
     // Repository registry (Feature G) — account-level repo records.
     'RepoConnection',
+    // AW-18 Shared view — one Workspace's read-only published face.
+    'SharedView',
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',
     'SkillFile',
+    'SkillTag',
     // ───────────────────────────
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──
     'Task',
+    // Reviewer agent stage (slice AD, EW-811) - the review ledger.
+    'TaskAgentReview',
     'TaskApprover',
     'TaskAssignee',
     'TaskAttachment',
@@ -211,6 +230,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'UserTaskCounter',
     'UserTemplatePreference',
     'UserUpload',
+    // AW-07 — pgvector chunks for vector namespaces that are not a Work
+    'VectorNamespaceChunk',
     'WebhookDelivery',
     'WebhookSubscription',
     'Work',
@@ -239,4 +260,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkSchedule',
     'Workflow',
     'WorkflowRun',
+    'WorkspaceBackup',
+    // Safety rails (AW-24) — present only while a workspace is paused.
+    'WorkspacePause',
 ] as const;

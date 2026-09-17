@@ -14,6 +14,8 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import type { AttentionItem, AttentionKind } from './dashboard-signals.types';
+import { HelpLink } from '@/components/help/HelpLink';
+import type { HelpTarget } from '@/lib/help/help-target';
 
 /**
  * Dashboard blocks (spec §4.3, change 3) — the Attention block. Red
@@ -60,7 +62,27 @@ const KIND_COPY: Record<AttentionKind, { titleKey: string; subtitleKey: string }
     },
 };
 
-export function AttentionSection({ items }: { items: AttentionItem[] }) {
+/** Help centre (AW-25) — the manual article that explains each kind of attention item. */
+const KIND_HELP: Record<AttentionKind, HelpTarget> = {
+    'agent-error': 'approvals-and-escalations#auto-pause-after-n-failures',
+    'schedule-failed': 'activity#the-schedules-view',
+    'schedule-paused': 'activity#the-schedules-view',
+    'generation-failed': 'activity#the-log-view',
+    'task-blocked': 'tasks#what-can-refuse-a-transition',
+    'budget-exceeded': 'budgets-and-usage#what-happens-when-a-cap-is-hit',
+};
+
+export function AttentionSection({
+    items,
+    title,
+}: {
+    items: AttentionItem[];
+    /**
+     * Heading override. Home (AW-19) renders this block inside Needs you as
+     * the `Also broken` sub-list; every other caller keeps `Needs attention`.
+     */
+    title?: string;
+}) {
     const t = useTranslations('dashboard.attention');
     // The per-kind copy keys are resolved dynamically, so bypass
     // next-intl's literal-key typing with a loose translator. The runtime
@@ -83,7 +105,7 @@ export function AttentionSection({ items }: { items: AttentionItem[] }) {
                         id="dashboard-attention-heading"
                         className="text-xl font-semibold text-text dark:text-text-dark truncate"
                     >
-                        {t('title')}
+                        {title ?? t('title')}
                     </h2>
                 </div>
             </div>
@@ -94,12 +116,19 @@ export function AttentionSection({ items }: { items: AttentionItem[] }) {
                     // Always pass `name`; messages without the placeholder ignore it.
                     const name = item.label ?? '';
                     return (
-                        <AttentionCard
-                            key={item.id}
-                            item={item}
-                            title={tx(copy.titleKey, { name })}
-                            subtitle={tx(copy.subtitleKey, { name })}
-                        />
+                        <div key={item.id} className="flex flex-col gap-1">
+                            <AttentionCard
+                                item={item}
+                                title={tx(copy.titleKey, { name })}
+                                subtitle={tx(copy.subtitleKey, { name })}
+                            />
+                            <HelpLink
+                                target={KIND_HELP[item.kind]}
+                                variant="error"
+                                surface="attention_item"
+                                className="self-start px-1"
+                            />
+                        </div>
                     );
                 })}
             </div>

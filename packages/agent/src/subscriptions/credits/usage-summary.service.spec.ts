@@ -2,6 +2,7 @@ import {
     InvalidUsagePeriodError,
     resolveUsageSummaryWindow,
     USAGE_EXPORT_COLUMNS,
+    UsageExportTooLargeError,
     UsageSummaryService,
 } from './usage-summary.service';
 import type { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
@@ -56,6 +57,7 @@ describe('UsageSummaryService', () => {
             | 'getAgentNames'
             | 'getWorkNames'
             | 'findPageForUserExport'
+            | 'countForUserExport'
         >
     >;
     let creditLedgerRepository: jest.Mocked<
@@ -89,6 +91,7 @@ describe('UsageSummaryService', () => {
             getAgentNames: jest.fn().mockResolvedValue(new Map([['agent-1', 'Research Agent']])),
             getWorkNames: jest.fn().mockResolvedValue(new Map([['work-1', 'My Directory']])),
             findPageForUserExport: jest.fn().mockResolvedValue([]),
+            countForUserExport: jest.fn().mockResolvedValue(0),
         } as any;
         creditLedgerRepository = {
             getBalance: jest.fn().mockResolvedValue(500),
@@ -346,6 +349,126 @@ describe('UsageSummaryService', () => {
                 InvalidUsagePeriodError,
             );
             expect(pluginUsageRepository.findPageForUserExport).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * AW-17 — the export carries the meter classification and is refused
+     * BEFORE streaming when it would be larger than the published limits.
+     */
+    describe('export meter columns and the size refusal (AW-17)', () => {
+        it('appends the six meter columns after every pre-existing column', () => {
+            expect(USAGE_EXPORT_COLUMNS.slice(0, 12)).toEqual([
+                'occurredAt',
+                'pluginId',
+                'capability',
+                'units',
+                'costCents',
+                'currency',
+                'modelId',
+                'workId',
+                'agentId',
+                'taskId',
+                'runId',
+                'requestId',
+            ]);
+            expect(USAGE_EXPORT_COLUMNS.slice(12)).toEqual([
+                'meter',
+                'priceKey',
+                'outcome',
+                'creditsCharged',
+                'priceVersion',
+                'missionId',
+            ]);
+        });
+
+        it('projects the classification of a row, and nulls for a row recorded before meters', async () => {
+            const base = {
+                id: 'evt-1',
+                occurredAt: new Date('2026-06-04T10:00:00.000Z'),
+                pluginId: 'search-a',
+                capability: 'search',
+                units: 1,
+                costCents: 1,
+                currency: 'usd',
+                userId: 'user-1',
+                workId: 'work-1',
+            };
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([
+                {
+                    ...base,
+                    meter: 'credits',
+                    priceKey: 'search.query',
+                    outcome: 'ok',
+                    creditsCharged: 2,
+                    priceVersion: 1,
+                    missionId: 'mission-1',
+                },
+                { ...base, id: 'evt-2' },
+            ] as never);
+
+            const chunks = service.createExport('user-1', { period: '2026-06' }).chunks;
+            const rows: Array<Record<string, unknown>> = [];
+            for await (const chunk of chunks) rows.push(...(chunk as never[]));
+
+            expect(rows[0]).toMatchObject({
+                meter: 'credits',
+                priceKey: 'search.query',
+                outcome: 'ok',
+                creditsCharged: 2,
+                priceVersion: 1,
+                missionId: 'mission-1',
+            });
+            expect(rows[1]).toMatchObject({
+                meter: null,
+                priceKey: null,
+                outcome: null,
+                creditsCharged: 0,
+                priceVersion: null,
+                missionId: null,
+            });
+        });
+
+        it('passes when the resolved set is within the row limit, counting in the same scope', async () => {
+            pluginUsageRepository.countForUserExport.mockResolvedValue(50_000);
+
+            await expect(
+                service.assertExportWithinLimits('user-1', {
+                    period: '2026-06',
+                    organizationId: 'org-a',
+                }),
+            ).resolves.toBeUndefined();
+            expect(pluginUsageRepository.countForUserExport).toHaveBeenCalledWith(
+                'user-1',
+                new Date('2026-06-01T00:00:00.000Z'),
+                new Date('2026-07-01T00:00:00.000Z'),
+                { organizationId: 'org-a' },
+            );
+        });
+
+        it('refuses more than 50,000 rows with the limit in the message', async () => {
+            pluginUsageRepository.countForUserExport.mockResolvedValue(50_001);
+
+            const refusal = service.assertExportWithinLimits('user-1', { period: '30d' });
+
+            await expect(refusal).rejects.toBeInstanceOf(UsageExportTooLargeError);
+            await expect(refusal).rejects.toThrow('That is more than 50000 rows.');
+            expect(pluginUsageRepository.findPageForUserExport).not.toHaveBeenCalled();
+        });
+
+        it('still rejects a malformed period before counting anything', async () => {
+            await expect(
+                service.assertExportWithinLimits('user-1', { period: 'nope' }),
+            ).rejects.toBeInstanceOf(InvalidUsagePeriodError);
+            expect(pluginUsageRepository.countForUserExport).not.toHaveBeenCalled();
+        });
+
+        it('carries a stable name, reason and limit for the API boundary', () => {
+            const days = new UsageExportTooLargeError('days', 92, 120);
+            expect(days.name).toBe('UsageExportTooLargeError');
+            expect(days.reason).toBe('days');
+            expect(days.limit).toBe(92);
+            expect(days.message).toContain('92 days');
         });
     });
 });

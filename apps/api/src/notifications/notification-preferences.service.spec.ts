@@ -87,6 +87,72 @@ describe('NotificationPreferencesService.setEventSubscription validation', () =>
         expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', atCap);
     });
 
+    // AW-13: email to the account's own address is a built-in target, like
+    // in-app — it is not a channel row and needs no ownership lookup.
+    it('accepts the built-in email target without an ownership lookup', async () => {
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', ['in-app', 'email']);
+        expect(channels.findByIdForUser).not.toHaveBeenCalled();
+        expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', [
+            'in-app',
+            'email',
+        ]);
+    });
+
+    it('still refuses a foreign channel next to the built-in targets, with the same message as an unknown one', async () => {
+        channels.findByIdForUser.mockResolvedValue(null);
+        const foreign = service.setEventSubscription('user-1', 'ai.credits.depleted', [
+            'email',
+            'ch-foreign',
+        ]);
+        await expect(foreign).rejects.toThrow(
+            'Unknown or unauthorized notification channel: ch-foreign',
+        );
+        await expect(
+            service.setEventSubscription('user-1', 'ai.credits.depleted', ['ch-missing']),
+        ).rejects.toThrow('Unknown or unauthorized notification channel: ch-missing');
+        expect(subscriptions.upsert).not.toHaveBeenCalled();
+    });
+
+    it('persists an explicit empty selection', async () => {
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', []);
+        expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', []);
+    });
+
+    // AW-13: only the matrix write path stores the marker; every other caller
+    // stores a row that keeps its pre-AW-13 meaning.
+    it('stores no marker for a write without an origin (API callers, chat assistant)', async () => {
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', ['email']);
+        expect(subscriptions.upsert).toHaveBeenCalledTimes(1);
+        expect(subscriptions.upsert.mock.calls[0]).toEqual([
+            'user-1',
+            'ai.credits.depleted',
+            ['email'],
+        ]);
+    });
+
+    it('stores the matrix marker for a matrix write, after the same validation', async () => {
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', [], 'matrix');
+        expect(subscriptions.upsert).toHaveBeenCalledWith(
+            'user-1',
+            'ai.credits.depleted',
+            [],
+            'matrix',
+        );
+        channels.findByIdForUser.mockResolvedValue(null);
+        subscriptions.upsert.mockClear();
+        await expect(
+            service.setEventSubscription('user-1', 'ai.credits.depleted', ['ch-foreign'], 'matrix'),
+        ).rejects.toThrow('Unknown or unauthorized notification channel: ch-foreign');
+        expect(subscriptions.upsert).not.toHaveBeenCalled();
+    });
+
+    it('states the limit as a number when a 21st target is named', async () => {
+        const tooMany = ['in-app', 'email', ...Array.from({ length: 19 }, (_, i) => `ch-${i}`)];
+        await expect(
+            service.setEventSubscription('user-1', 'ai.credits.depleted', tooMany),
+        ).rejects.toThrow(/maximum 20/);
+    });
+
     it('accepts an owned channel id and dedupes the list', async () => {
         await service.setEventSubscription('user-1', 'ai.credits.depleted', [
             'in-app',
@@ -98,5 +164,53 @@ describe('NotificationPreferencesService.setEventSubscription validation', () =>
             'in-app',
             'ch-1',
         ]);
+    });
+});
+
+describe('NotificationPreferencesService.setQuietHours', () => {
+    function build() {
+        const preferences = {
+            upsert: jest.fn().mockImplementation(async (userId: string, patch: object) => ({
+                userId,
+                ...patch,
+            })),
+        };
+        const service = new NotificationPreferencesService(
+            {} as never,
+            {} as never,
+            preferences as never,
+            {} as never,
+            {} as never,
+        );
+        return { service, preferences };
+    }
+
+    it('leaves the urgent opt-in untouched when the caller does not name it', async () => {
+        const { service, preferences } = build();
+        await service.setQuietHours('user-1', '22:00', '07:00', 'UTC');
+        expect(preferences.upsert).toHaveBeenCalledWith('user-1', {
+            quietHoursStart: '22:00',
+            quietHoursEnd: '07:00',
+            timezone: 'UTC',
+        });
+        expect('urgentBypassesQuietHours' in preferences.upsert.mock.calls[0][1]).toBe(false);
+    });
+
+    it('stores the urgent opt-in when the caller names it', async () => {
+        const { service, preferences } = build();
+        await service.setQuietHours('user-1', '22:00', '07:00', 'UTC', true);
+        expect(preferences.upsert).toHaveBeenCalledWith('user-1', {
+            quietHoursStart: '22:00',
+            quietHoursEnd: '07:00',
+            timezone: 'UTC',
+            urgentBypassesQuietHours: true,
+        });
+        await service.setQuietHours('user-1', null, null, null, false);
+        expect(preferences.upsert).toHaveBeenLastCalledWith('user-1', {
+            quietHoursStart: null,
+            quietHoursEnd: null,
+            timezone: null,
+            urgentBypassesQuietHours: false,
+        });
     });
 });

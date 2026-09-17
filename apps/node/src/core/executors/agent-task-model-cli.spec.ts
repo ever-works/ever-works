@@ -1,15 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView, FleetTaskWorkspaceDescriptor } from '@ever-works/contracts';
 import { mkdtempSync, promises as realFs } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
 	AgentTaskPayloadError,
 	defaultScratchFs,
 	runAgentTaskJob,
 	type AgentTaskIo,
-	type AgentTaskScratchFs
+	type AgentTaskScratchFs,
+	type AgentTaskSessionConfigFs
 } from './agent-task';
+import {
+	CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME,
+	ISOLATED_HOME_ENV_NAMES,
+	ISOLATED_HOME_RESIDUAL_ENV_NAMES
+} from '../model-execution/isolated-home';
 import { ownerQuestionPath, type AgentTaskQuestionFs } from './agent-task-question';
 import { MODEL_CLI_MAX_OUTPUT_BYTES } from './model-cli';
 
@@ -69,13 +75,25 @@ const claudeEnvelope = JSON.stringify({
 	session_id: 'sess-1'
 });
 
-/** In-memory scratch filesystem; records what the model step wrote. */
-function scratchFs(modelOutput: string | null): AgentTaskScratchFs & { files: Map<string, string>; removed: string[] } {
+/**
+ * In-memory scratch filesystem; records what the model step wrote.
+ *
+ * `mkdir` is what lets the model step build its per-run isolated home
+ * (self-build slice AK) without touching the real filesystem. It is
+ * OPTIONAL on the seam, and its absence is a recorded containment
+ * downgrade rather than a silent no-op — see the downgrade tests below,
+ * which drop it on purpose.
+ */
+function scratchFs(
+	modelOutput: string | null
+): AgentTaskScratchFs & { files: Map<string, string>; removed: string[]; dirs: string[] } {
 	const files = new Map<string, string>();
 	const removed: string[] = [];
+	const dirs: string[] = [];
 	return {
 		files,
 		removed,
+		dirs,
 		createScratchDir: async (root, prefix) => join(root, `${prefix}-scratch`),
 		writeFile: async (path, content) => {
 			files.set(path, content);
@@ -83,8 +101,50 @@ function scratchFs(modelOutput: string | null): AgentTaskScratchFs & { files: Ma
 		readFile: async (path) => (path.endsWith('model-output.json') ? modelOutput : (files.get(path) ?? null)),
 		remove: async (path) => {
 			removed.push(path);
+		},
+		mkdir: async (path) => {
+			dirs.push(path);
 		}
 	};
+}
+
+/**
+ * The three downgrades EVERY ordinary run carries, isolated or not.
+ *
+ * `toolchain-anchors` is the one a reader is most likely to be surprised
+ * by and the reason it is standing: the command runner's allowlist still
+ * forwards `PNPM_HOME`, `NVM_DIR`, `NODE_OPTIONS` and a dozen more as
+ * absolute paths into the real profile, so `isolatedHome: true` on its own
+ * would read as "nothing of the real home is left", which is false.
+ */
+const STANDING_DOWNGRADES = [
+	{ control: 'process-containment', reason: expect.stringContaining('hardened executor') },
+	{ control: 'network-egress', reason: expect.stringContaining('outbound network') },
+	{ control: 'toolchain-anchors', reason: expect.stringContaining('toolchain anchors') }
+];
+
+/** The containment every run in this file gets: ordinary path, home isolated. */
+function containedRun(sessionHome: string = join(homedir(), '.claude')) {
+	return {
+		executionPath: 'ordinary',
+		isolatedHome: true,
+		localSessionHome: sessionHome,
+		downgrades: STANDING_DOWNGRADES
+	};
+}
+
+/**
+ * A machine whose Claude Code config relocates harmlessly.
+ *
+ * Deterministic on purpose, and provided by `baseIo` for every test in
+ * this file: the production reader looks at the DEVELOPER's own
+ * `~/.claude.json`, so a default would make `isolatedHome` depend on
+ * whether the person running the suite happens to have onboarded their
+ * CLI. `null` for both files reads as "this machine has no top-level
+ * config", which is the case where relocating costs nothing.
+ */
+function sessionConfigFs(files: Record<string, string> = {}): AgentTaskSessionConfigFs {
+	return { readFile: async (path: string) => files[path] ?? null };
 }
 
 /**
@@ -113,11 +173,23 @@ function questionFs(seed: Record<string, string> = {}, events: string[] = []) {
 }
 
 /** Spawn double that records every command and scripts exit codes by substring. */
-function recordingSpawn(exitCodes: Array<[match: string, code: number | null]>, onCommand?: (command: string) => void) {
+function recordingSpawn(
+	exitCodes: Array<[match: string, code: number | null]>,
+	onCommand?: (command: string) => void,
+	/**
+	 * The ENVIRONMENT each command was actually given. The containment
+	 * record is built from what the node INTENDED; this is the only way a
+	 * test can also see what the child got, which is what makes dropping
+	 * the overlay at the call site fail the exact-shape assertion instead
+	 * of sliding past it.
+	 */
+	onEnv?: (env: Record<string, string>) => void
+) {
 	const commands: string[] = [];
-	const spawnFn = ((command: string) => {
+	const spawnFn = ((command: string, options: { env: Record<string, string> }) => {
 		commands.push(command);
 		onCommand?.(command);
+		onEnv?.(options.env);
 		const handlers = new Map<string, (arg?: unknown) => void>();
 		queueMicrotask(() => {
 			const hit = exitCodes.find(([match]) => command.includes(match));
@@ -148,6 +220,7 @@ function baseIo(over: Partial<AgentTaskIo> = {}): AgentTaskIo {
 		modelCli: { 'claude-code': CLAUDE, codex: null },
 		scratchRoot: SCRATCH,
 		scratchFs: scratchFs(claudeEnvelope),
+		sessionConfigFs: sessionConfigFs(),
 		questionFs: questionFs(),
 		...over
 	};
@@ -175,7 +248,8 @@ const payload = {
 
 describe('runAgentTaskJob — model-cli execution', () => {
 	it('runs the model in the worktree, grades the checks, commits and pushes, and reports success', async () => {
-		const { commands, spawnFn } = recordingSpawn([]);
+		const spawnEnvs: Array<Record<string, string>> = [];
+		const { commands, spawnFn } = recordingSpawn([], undefined, (env) => spawnEnvs.push(env));
 		const fs = scratchFs(claudeEnvelope);
 		const io = baseIo({ spawnFn, scratchFs: fs });
 
@@ -229,8 +303,27 @@ describe('runAgentTaskJob — model-cli execution', () => {
 				empty: false,
 				pushed: true,
 				changedFiles: 3
-			}
+			},
+			// Slice AK: what containment the model step actually got, on
+			// every run that ran one — including this entirely successful
+			// one. A record that only appeared when something went wrong
+			// would teach a reader to read its absence as "fine", and the
+			// absence also means "older node" and "the call was dropped".
+			containment: containedRun()
 		});
+
+		// ...and the record is checked against the ENVIRONMENT the child
+		// actually got, not only against what the node meant to do. The
+		// record is computed from `mkdir` succeeding; the overlay reaches
+		// the child through a separate call argument, and without this
+		// assertion dropping that argument leaves this test green while the
+		// job row still claims `isolatedHome: true`.
+		const isolatedRoot = join(SCRATCH, 'job-77-scratch', 'run-home', 'home');
+		expect(spawnEnvs[0]?.HOME).toBe(isolatedRoot);
+		expect(spawnEnvs[0]?.USERPROFILE).toBe(isolatedRoot);
+		expect(spawnEnvs[0]?.CLAUDE_CONFIG_DIR).toBe(join(homedir(), '.claude'));
+		// The acceptance check is the control: it keeps the machine's home.
+		expect(spawnEnvs[1]?.HOME).not.toBe(isolatedRoot);
 	});
 
 	it('honours the git policy: custom subject, no push', async () => {
@@ -425,6 +518,432 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		});
 		await expect(runAgentTaskJob(job(payload), io, controller.signal)).rejects.toThrowError(/lease lost/);
 		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+	});
+});
+
+/**
+ * Per-run containment of the model step (self-build slice AK).
+ *
+ * The threat this closes: a fleet node runs the model CLI through the
+ * ORDINARY command runner, whose env scrub deliberately keeps and
+ * back-fills `HOME` / `USERPROFILE` / `APPDATA`. One prompt injection in
+ * a mounted repository could therefore read `~/.claude`, `~/.ssh`,
+ * `~/.aws`, the git credential store and every other checkout on the PC.
+ *
+ * What is asserted here, in the order it would hurt to lose:
+ *
+ *   1. the MODEL step's child environment points at a per-run home under
+ *      this run's own scratch directory, and no anchor still names the
+ *      machine owner's home;
+ *   2. the machine's CLI login survives — exactly one directory, the
+ *      provider's config home, is mirrored back in;
+ *   3. the acceptance checks are deliberately NOT isolated, because a
+ *      redirected home makes every `pnpm install` a cold install against
+ *      a directory the run deletes;
+ *   4. every run says what containment it got, and every downgrade says
+ *      why. A run that silently gets less than intended is the failure
+ *      this whole slice exists to make impossible.
+ */
+describe('runAgentTaskJob — model-step containment (self-build slice AK)', () => {
+	const REAL_HOME = process.platform === 'win32' ? 'C:\\Users\\owner' : '/home/owner';
+	/**
+	 * The node's real environment, as the scrub would see it.
+	 *
+	 * Deliberately a FAT fixture. A six-name parent env makes "nothing
+	 * still names the real home" trivially true and proves nothing about a
+	 * fleet PC, where the allowlist forwards a dozen toolchain anchors as
+	 * absolute paths into the profile. Every one of those is here so the
+	 * assertions below are about the real residual rather than about the
+	 * fixture.
+	 */
+	const PARENT_ENV: NodeJS.ProcessEnv = {
+		PATH: process.platform === 'win32' ? 'C:\\Windows\\System32' : '/usr/bin',
+		HOME: REAL_HOME,
+		USERPROFILE: REAL_HOME,
+		APPDATA: join(REAL_HOME, 'AppData', 'Roaming'),
+		LOCALAPPDATA: join(REAL_HOME, 'AppData', 'Local'),
+		TEMP: join(REAL_HOME, 'AppData', 'Local', 'Temp'),
+		LANG: 'en_US.UTF-8',
+		// The residual, as a real Windows fleet node carries it.
+		PNPM_HOME: join(REAL_HOME, 'AppData', 'Local', 'pnpm'),
+		COREPACK_HOME: join(REAL_HOME, 'AppData', 'Local', 'node', 'corepack'),
+		NVM_DIR: join(REAL_HOME, 'AppData', 'Roaming', 'nvm'),
+		VOLTA_HOME: join(REAL_HOME, '.volta'),
+		CARGO_HOME: join(REAL_HOME, '.cargo'),
+		GOPATH: join(REAL_HOME, 'go'),
+		NODE_OPTIONS: `--require ${join(REAL_HOME, 'hook.js')}`
+	};
+
+	/** Spawn double that records the ENVIRONMENT each command was given. */
+	function envRecordingSpawn() {
+		const spawns: Array<{ command: string; env: Record<string, string> }> = [];
+		const spawnFn = ((command: string, options: { env: Record<string, string> }) => {
+			spawns.push({ command, env: options.env });
+			const handlers = new Map<string, (arg?: unknown) => void>();
+			queueMicrotask(() => handlers.get('close')?.(0));
+			return {
+				stdout: { on: () => undefined, destroy: () => undefined },
+				stderr: { on: () => undefined, destroy: () => undefined },
+				on: (event: string, handler: (arg?: unknown) => void) => {
+					handlers.set(event, handler);
+				},
+				kill: () => undefined
+			};
+		}) as never;
+		return { spawns, spawnFn };
+	}
+
+	it('runs the model with a per-run isolated home and reports that it did', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		const fs = scratchFs(claudeEnvelope);
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, scratchFs: fs, parentEnv: PARENT_ENV }));
+
+		const model = spawns[0];
+		const runHome = join(SCRATCH, 'job-77-scratch', 'run-home');
+		expect(model.env.HOME).toBe(join(runHome, 'home'));
+		expect(model.env.USERPROFILE).toBe(join(runHome, 'home'));
+		expect(model.env.APPDATA).toBe(join(runHome, 'home', 'AppData', 'Roaming'));
+		expect(model.env.LOCALAPPDATA).toBe(join(runHome, 'home', 'AppData', 'Local'));
+		expect(model.env.XDG_CONFIG_HOME).toBe(join(runHome, 'home', '.config'));
+		expect(model.env.TEMP).toBe(join(runHome, 'tmp'));
+		expect(model.env.TMP).toBe(join(runHome, 'tmp'));
+
+		// THE property, stated at the width it is actually proved: no
+		// REDIRECTED ANCHOR still resolves into the machine's profile.
+		//
+		// It is not the wider "nothing in this env names the real home" —
+		// that would be false on a fleet PC, where the allowlist forwards
+		// the toolchain anchors as absolute paths, and false in production
+		// for a second reason besides: `defaultScratchRoot()` puts the
+		// isolated home UNDER `%TEMP%`, i.e. inside the real profile, so on
+		// a real node every redirected value starts with the real home too.
+		// What containment rests on is that the redirected anchors point at
+		// a directory this RUN owns, not that the string looks unfamiliar.
+		const anchorLeaks = [...ISOLATED_HOME_ENV_NAMES]
+			// `HOMEDRIVE` / `HOMEPATH` are a split pair, not paths in their
+			// own right; they are asserted by their rejoin just below.
+			.filter((name) => name !== 'HOMEDRIVE' && name !== 'HOMEPATH')
+			.filter((name) => {
+				const value = model.env[name];
+				return typeof value !== 'string' || !value.startsWith(runHome);
+			})
+			.sort();
+		expect(anchorLeaks).toEqual([]);
+		expect(`${model.env.HOMEDRIVE}${model.env.HOMEPATH}`).toBe(join(runHome, 'home'));
+
+		// And the residual is exactly the disclosed one, name for name —
+		// the standing `toolchain-anchors` downgrade is measured here, not
+		// asserted from memory.
+		// `includes`, not `startsWith`: `NODE_OPTIONS` carries the real home
+		// in the MIDDLE of its value (`--require <home>\hook.js`), and it is
+		// the residual that matters most — code loaded into every `node`
+		// descendant of the model step.
+		const stillNamingRealHome = Object.keys(model.env)
+			.filter((name) => model.env[name]!.includes(REAL_HOME) && name !== 'CLAUDE_CONFIG_DIR')
+			.sort();
+		expect(stillNamingRealHome.filter((name) => !ISOLATED_HOME_RESIDUAL_ENV_NAMES.includes(name))).toEqual([]);
+		expect(stillNamingRealHome).toContain('PNPM_HOME');
+		expect(stillNamingRealHome).toContain('NODE_OPTIONS');
+
+		// The home was actually built on disk before the spawn.
+		expect(fs.dirs).toContain(join(runHome, 'tmp'));
+		expect(fs.dirs).toContain(join(runHome, 'home', 'AppData', 'Roaming'));
+
+		expect((outcome as { containment?: unknown }).containment).toEqual(containedRun(join(REAL_HOME, '.claude')));
+	});
+
+	it('mirrors the machine’s CLI session back in, so the login is not severed', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		await runAgentTaskJob(job(payload), baseIo({ spawnFn, parentEnv: PARENT_ENV }));
+		// Exactly one directory of the real home reaches the model, and it
+		// is the one the CLI needs to know who this machine is.
+		expect(spawns[0].env.CLAUDE_CONFIG_DIR).toBe(join(REAL_HOME, '.claude'));
+	});
+
+	it('mirrors the session home from the anchor Windows can actually open', async () => {
+		// The shared PARENT_ENV sets HOME and USERPROFILE to the SAME path, so no
+		// existing test can tell which one `resolveRealHomeDir` preferred — a
+		// mutation that swapped the win32 order stayed green. They DIVERGE on a
+		// real Git Bash node: HOME is a POSIX `/c/Users/...` that no Windows CLI
+		// can open, USERPROFILE is the Windows path. Picking the wrong one
+		// mirrors an unopenable directory into CLAUDE_CONFIG_DIR and makes the
+		// relocation probe read the wrong file, silently inverting the decision.
+		//
+		// Only the win32 side is driven here: forcing `platform: 'linux'` on a
+		// Windows host does not give POSIX `join`/`isAbsolute`, so the payload is
+		// rejected as non-absolute before the branch is reached. The POSIX
+		// ordering is exercised by `isolated-home.spec.ts`, which takes roots as
+		// data rather than resolving them through the host.
+		const { spawns, spawnFn } = envRecordingSpawn();
+		const windowsHome = 'C:\\Users\\owner';
+
+		await runAgentTaskJob(
+			job(payload),
+			baseIo({
+				spawnFn,
+				parentEnv: { ...PARENT_ENV, USERPROFILE: windowsHome, HOME: '/c/Users/owner' },
+				platform: 'win32',
+				sessionConfigFs: sessionConfigFs({ [join(windowsHome, '.claude.json')]: '{}' })
+			})
+		);
+
+		expect(spawns[0].env.CLAUDE_CONFIG_DIR).toBe(join(windowsHome, '.claude'));
+	});
+
+	it('mirrors the Codex session home for a codex run', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		const codexPayload = {
+			...payload,
+			execution: { ...payload.execution, provider: 'codex', envPassthrough: ['CODEX_ACCESS_TOKEN'] }
+		};
+		await runAgentTaskJob(
+			job(codexPayload),
+			baseIo({
+				spawnFn,
+				parentEnv: PARENT_ENV,
+				modelCli: { 'claude-code': null, codex: CLAUDE },
+				scratchFs: scratchFs('{"type":"thread.started","thread_id":"t"}')
+			})
+		);
+		expect(spawns[0].env.CODEX_HOME).toBe(join(REAL_HOME, '.codex'));
+		expect(spawns[0].env.CLAUDE_CONFIG_DIR).toBeUndefined();
+	});
+
+	it('honours an operator-configured session home instead of guessing', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		const moved = join(REAL_HOME, 'cli-config', 'claude');
+		await runAgentTaskJob(
+			job(payload),
+			baseIo({ spawnFn, parentEnv: PARENT_ENV, modelSessionHome: { 'claude-code': moved } })
+		);
+		expect(spawns[0].env.CLAUDE_CONFIG_DIR).toBe(moved);
+	});
+
+	it('leaves the ACCEPTANCE CHECKS on the machine’s real home, on purpose', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		await runAgentTaskJob(job(payload), baseIo({ spawnFn, parentEnv: PARENT_ENV }));
+		const check = spawns[1];
+		expect(check.command).toBe('pnpm test');
+		// A redirected home here would make every `pnpm install` a cold
+		// install against a directory this run deletes.
+		expect(check.env.HOME).toBe(REAL_HOME);
+		expect(check.env.CLAUDE_CONFIG_DIR).toBeUndefined();
+	});
+
+	it('records a downgrade — and keeps running — when the per-run home cannot be created', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		const fs = scratchFs(claudeEnvelope);
+		fs.mkdir = async () => {
+			throw new Error('ENOSPC: no space left on device');
+		};
+		const warnings: string[] = [];
+		const outcome = await runAgentTaskJob(
+			job(payload),
+			baseIo({
+				spawnFn,
+				scratchFs: fs,
+				parentEnv: PARENT_ENV,
+				logger: {
+					info: () => undefined,
+					warn: (message: string) => warnings.push(message),
+					error: () => undefined,
+					protect: () => undefined,
+					unprotect: () => undefined
+				} as unknown as AgentTaskIo['logger']
+			})
+		);
+
+		// The run still produced a verdict...
+		expect(outcome.status).toBe('succeeded');
+		// ...with the machine's real home, and it SAYS so.
+		expect(spawns[0].env.HOME).toBe(REAL_HOME);
+		expect(
+			(
+				outcome as {
+					containment?: { isolatedHome: boolean; downgrades: Array<{ control: string; reason: string }> };
+				}
+			).containment
+		).toEqual({
+			executionPath: 'ordinary',
+			isolatedHome: false,
+			localSessionHome: null,
+			downgrades: [
+				...STANDING_DOWNGRADES,
+				{ control: 'isolated-home', reason: expect.stringContaining('ENOSPC') }
+			]
+		});
+		expect(warnings.some((line) => line.includes('containment downgraded'))).toBe(true);
+	});
+
+	it('records a downgrade when the scratch seam cannot create directories at all', async () => {
+		const { spawnFn } = envRecordingSpawn();
+		const fs = scratchFs(claudeEnvelope);
+		delete (fs as { mkdir?: unknown }).mkdir;
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, scratchFs: fs, parentEnv: PARENT_ENV }));
+		const containment = (
+			outcome as { containment?: { isolatedHome: boolean; downgrades: Array<{ control: string }> } }
+		).containment;
+		expect(containment?.isolatedHome).toBe(false);
+		expect(containment?.downgrades.map((entry) => entry.control)).toContain('isolated-home');
+	});
+
+	it('records a downgrade when an operator switches isolation off', async () => {
+		const { spawns, spawnFn } = envRecordingSpawn();
+		const outcome = await runAgentTaskJob(
+			job(payload),
+			baseIo({ spawnFn, parentEnv: PARENT_ENV, modelHomeIsolation: 'inherit' })
+		);
+		expect(spawns[0].env.HOME).toBe(REAL_HOME);
+		const containment = (
+			outcome as {
+				containment?: { isolatedHome: boolean; downgrades: Array<{ control: string; reason: string }> };
+			}
+		).containment;
+		expect(containment?.isolatedHome).toBe(false);
+		expect(containment?.downgrades.find((entry) => entry.control === 'isolated-home')?.reason).toContain(
+			'modelHomeIsolation=inherit'
+		);
+	});
+
+	it('reports the three controls this node cannot offer at all, on every run', async () => {
+		const { spawnFn } = envRecordingSpawn();
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, parentEnv: PARENT_ENV }));
+		const controls = (
+			outcome as {
+				containment?: { executionPath: string; downgrades: Array<{ control: string; reason: string }> };
+			}
+		).containment;
+		// Egress control is NOT attempted by this slice — a Job Object
+		// cannot express it and no subsystem exists — so it is reported as
+		// a standing downgrade rather than left to tribal knowledge. Same
+		// for the toolchain anchors: they are the difference between what
+		// `isolatedHome: true` says and what it means, and leaving them out
+		// would make a fully isolated run read as having only two holes.
+		expect(controls?.executionPath).toBe('ordinary');
+		expect(controls?.downgrades.map((entry) => entry.control)).toEqual([
+			'process-containment',
+			'network-egress',
+			'toolchain-anchors'
+		]);
+		const anchors = controls?.downgrades.find((entry) => entry.control === 'toolchain-anchors')?.reason ?? '';
+		expect(anchors).toContain('PNPM_HOME');
+	});
+
+	/**
+	 * `CLAUDE_CONFIG_DIR` relocates the CLI's top-level config from
+	 * `~/.claude.json` to `<dir>/.claude.json`, and on a machine whose
+	 * onboarding lives in the first file the relocated one presents to
+	 * `claude -p` as never onboarded — with no way to answer the prompt.
+	 * The node PROVES the relocation is harmless before isolating, and
+	 * declines rather than shipping a run that cannot start.
+	 */
+	describe('the Claude Code config relocation is proved harmless before the home is isolated', () => {
+		const LIVE = join(REAL_HOME, CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME);
+		const RELOCATED = join(REAL_HOME, '.claude', CLAUDE_TOP_LEVEL_CONFIG_FILE_NAME);
+
+		function isolatedHomeDowngrade(outcome: unknown): string | undefined {
+			return (
+				outcome as { containment?: { downgrades: Array<{ control: string; reason: string }> } }
+			).containment?.downgrades.find((entry) => entry.control === 'isolated-home')?.reason;
+		}
+
+		it('declines to isolate when the machine would lose a gate it passes today', async () => {
+			const { spawns, spawnFn } = envRecordingSpawn();
+			const outcome = await runAgentTaskJob(
+				job(payload),
+				baseIo({
+					spawnFn,
+					parentEnv: PARENT_ENV,
+					// The split this machine really has: onboarding in the
+					// live file, machine identity in the relocated one.
+					sessionConfigFs: sessionConfigFs({
+						[LIVE]: JSON.stringify({ hasCompletedOnboarding: true, projects: {} }),
+						[RELOCATED]: JSON.stringify({ machineID: 'abc' })
+					})
+				})
+			);
+
+			// The run went ahead on the machine's real home...
+			expect(spawns[0].env.HOME).toBe(REAL_HOME);
+			expect(outcome.status).toBe('succeeded');
+			// ...and the job row says exactly why, and how to fix it.
+			expect((outcome as { containment?: { isolatedHome: boolean } }).containment?.isolatedHome).toBe(false);
+			const reason = isolatedHomeDowngrade(outcome);
+			expect(reason).toContain('hasCompletedOnboarding');
+			expect(reason).toContain(RELOCATED);
+		});
+
+		it('isolates when the relocated config already carries the gates', async () => {
+			const { spawns, spawnFn } = envRecordingSpawn();
+			const gates = { hasCompletedOnboarding: true, hasTrustDialogHooksAccepted: true };
+			const outcome = await runAgentTaskJob(
+				job(payload),
+				baseIo({
+					spawnFn,
+					parentEnv: PARENT_ENV,
+					sessionConfigFs: sessionConfigFs({
+						[LIVE]: JSON.stringify(gates),
+						[RELOCATED]: JSON.stringify({ ...gates, machineID: 'abc' })
+					})
+				})
+			);
+			expect(spawns[0].env.HOME).not.toBe(REAL_HOME);
+			expect((outcome as { containment?: { isolatedHome: boolean } }).containment?.isolatedHome).toBe(true);
+		});
+
+		it('declines when it cannot read the config at all — "we could not look" is not proof', async () => {
+			const { spawns, spawnFn } = envRecordingSpawn();
+			const outcome = await runAgentTaskJob(
+				job(payload),
+				baseIo({
+					spawnFn,
+					parentEnv: PARENT_ENV,
+					sessionConfigFs: {
+						readFile: async () => {
+							throw new Error('EACCES: permission denied');
+						}
+					}
+				})
+			);
+			expect(spawns[0].env.HOME).toBe(REAL_HOME);
+			expect(isolatedHomeDowngrade(outcome)).toContain('EACCES');
+		});
+
+		it('declines when no reader is wired, rather than assuming the relocation is free', async () => {
+			const { spawns, spawnFn } = envRecordingSpawn();
+			const io = baseIo({ spawnFn, parentEnv: PARENT_ENV });
+			delete (io as { sessionConfigFs?: unknown }).sessionConfigFs;
+			const outcome = await runAgentTaskJob(job(payload), io);
+			expect(spawns[0].env.HOME).toBe(REAL_HOME);
+			expect(isolatedHomeDowngrade(outcome)).toContain('no reader wired');
+		});
+
+		it('does not gate CODEX on it — `CODEX_HOME` moves no second file', async () => {
+			const { spawns, spawnFn } = envRecordingSpawn();
+			const codexPayload = {
+				...payload,
+				execution: { ...payload.execution, provider: 'codex', envPassthrough: ['CODEX_ACCESS_TOKEN'] }
+			};
+			const io = baseIo({
+				spawnFn,
+				parentEnv: PARENT_ENV,
+				modelCli: { 'claude-code': null, codex: CLAUDE },
+				scratchFs: scratchFs('{"type":"thread.started","thread_id":"t"}')
+			});
+			// Even with NO reader at all, Codex isolates: the probe is about
+			// a file only Claude Code has.
+			delete (io as { sessionConfigFs?: unknown }).sessionConfigFs;
+			const outcome = await runAgentTaskJob(job(codexPayload), io);
+			expect(spawns[0].env.HOME).not.toBe(REAL_HOME);
+			expect((outcome as { containment?: { isolatedHome: boolean } }).containment?.isolatedHome).toBe(true);
+		});
+	});
+
+	it('carries no containment block for a run that had no model step', async () => {
+		const { spawnFn } = envRecordingSpawn();
+		const stepsOnly = { ...payload, execution: undefined, steps: [{ id: 's1', command: 'echo hi' }] };
+		const outcome = await runAgentTaskJob(job(stepsOnly), baseIo({ spawnFn, parentEnv: PARENT_ENV }));
+		expect('containment' in outcome).toBe(false);
 	});
 });
 

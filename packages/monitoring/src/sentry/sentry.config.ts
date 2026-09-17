@@ -1,6 +1,35 @@
 import * as Sentry from '@sentry/nestjs';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { SentryConfig } from '../types';
+import { redactSecretUrl } from '../redaction/secret-url';
+
+/**
+ * Remove share tokens and view sessions from everything an event records as
+ * an address: the request URL, the transaction name and breadcrumb URLs.
+ * Mutates and returns the event, as Sentry's hooks expect.
+ */
+export const redactSentryEventUrls = (event: any): any => {
+    if (!event || typeof event !== 'object') {
+        return event;
+    }
+    if (event.request && typeof event.request.url === 'string') {
+        event.request.url = redactSecretUrl(event.request.url);
+    }
+    if (typeof event.transaction === 'string') {
+        event.transaction = redactSecretUrl(event.transaction);
+    }
+    if (Array.isArray(event.breadcrumbs)) {
+        for (const crumb of event.breadcrumbs) {
+            if (crumb && crumb.data && typeof crumb.data.url === 'string') {
+                crumb.data.url = redactSecretUrl(crumb.data.url);
+            }
+            if (crumb && typeof crumb.message === 'string') {
+                crumb.message = redactSecretUrl(crumb.message);
+            }
+        }
+    }
+    return event;
+};
 
 // Path-anchored auth-URL check: only treat URLs whose pathname starts with
 // `/auth` as auth traffic, so unrelated paths like `/authentication` or a
@@ -33,13 +62,13 @@ export const createSentryConfig = (config?: SentryConfig): any => {
             if (isAuthUrl(event.request?.url)) {
                 return null;
             }
-            return event;
+            return redactSentryEventUrls(event);
         },
         beforeSendTransaction(event: any) {
             if (isAuthUrl(event.request?.url)) {
                 return null;
             }
-            return event;
+            return redactSentryEventUrls(event);
         },
     };
 

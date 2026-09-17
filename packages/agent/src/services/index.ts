@@ -51,6 +51,10 @@ export * from './kb-prompt-formatter';
 export * from './kb-context-bundle';
 export * from './kb-mention-parser';
 export * from './kb-mention-resolver.service';
+export * from './kb-content-hash';
+export * from './kb-markdown-export';
+export * from './knowledge-library.service';
+export * from './knowledge-library.module';
 export * from './kb-citation-parser';
 export * from './kb-agent-tools.service';
 export * from './kb-tools-facade.adapter';
@@ -74,5 +78,34 @@ export * from './memory-folders.service';
 export * from './memory-files.service';
 export * from './memory-folder-sync.service';
 export * from './memory-files.module';
+// AW-07 — Memory facts: the atomic, searchable, forgettable tier of Memory.
+export * from './memory-fact.service';
+export * from './memory-fact-search.service';
+export * from './memory-fact-vector-index.service';
+export * from './memory-fact-embed.service';
+export * from './memory-fact-sweep.service';
+export * from './memory-facts.module';
+// `encodeCursor` / `decodeCursor` are declared in BOTH `knowledge-library.service`
+// (base64url of a JSON `{ o }` payload) and `memory-fact.service` (base64url of an
+// `o:<n>` payload). They are different encodings, so neither can be dropped, and a
+// bare `export *` cannot carry two symbols under one name. Re-export both here
+// explicitly: the knowledge-library pair keeps the unqualified names the barrel
+// already published, and the memory-fact pair stays reachable under
+// `*MemoryFactCursor`. Each module still exports its own unprefixed helper to its
+// direct importers (both service specs import them by relative path).
+export { decodeCursor, encodeCursor } from './knowledge-library.service';
+export {
+    decodeCursor as decodeMemoryFactCursor,
+    encodeCursor as encodeMemoryFactCursor,
+} from './memory-fact.service';
+// AW-07 — publishes the platform vector chunk tables (Work KB chunks + non-Work
+// namespaces) to row-filter vector stores through the plugin host.
+export * from './vector-store-host-chunk-tables.service';
+export * from './vector-store-host-chunk-tables.module';
 // Repository registry (Feature G) — registry CRUD + agent grants + resolver.
 export * from './repo-registry.service';
+// Capability & playbook catalogue (AW-21) — per-caller readiness (plugin
+// capability resolution, adoption limits, name collision) and the pure
+// adoption planner shared by the setup sheet and provisioning.
+export * from './playbook-readiness.service';
+export * from './playbook-adoption-plan';

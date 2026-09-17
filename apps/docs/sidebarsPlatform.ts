@@ -142,6 +142,9 @@ const sidebars: SidebarsConfig = {
 				// Reads straight after the KB it generalizes; its two
 				// sources, Decisions and Meetings, are listed above.
 				'features/memory',
+				// The Library view of the Memory page: the same documents on
+				// one shelf with shared folders, archive and export.
+				'features/knowledge-library',
 				'features/autonomous-operation',
 				'features/workers',
 				'features/job-runtimes',
@@ -222,7 +225,12 @@ const sidebars: SidebarsConfig = {
 				'features/storage-backends',
 				'features/mcp-server',
 				'features/agent-plugins',
-				'features/data-management'
+				'features/data-management',
+				// The complete dated archive, beside the JSON export rather
+				// than instead of it: it reads directly after Data
+				// Management because the two answer different questions
+				// about the same data and the pages cross-reference.
+				'features/workspace-backup'
 			]
 		},
 		{

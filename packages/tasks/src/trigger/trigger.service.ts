@@ -9,6 +9,8 @@ import {
     WorkImportDispatcher,
     TemplateCustomizationPayload,
     TemplateCustomizationDispatcher,
+    RosterProvisionPayload,
+    RosterProvisionDispatcher,
     WebhookDeliveryPayload,
     WebhookDeliveryDispatcher,
     KbMirrorDocumentPayload,
@@ -25,6 +27,10 @@ import {
     KbTranscribeDispatcher,
     KbReembedWorkPayload,
     KbReembedWorkDispatcher,
+    WorkspaceBackupPayload,
+    WorkspaceBackupDispatcher,
+    MemoryFactEmbedPayload,
+    MemoryFactEmbedDispatcher,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -37,6 +43,7 @@ import type {
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
 import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
+import { rosterProvisionTask } from '../tasks/trigger/roster-provision.task';
 import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
 import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
 import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
@@ -46,7 +53,9 @@ import { kbNormalizeVideoTask } from '../tasks/trigger/kb-normalize-video.task';
 import { kbNormalizeAudioTask } from '../tasks/trigger/kb-normalize-audio.task';
 import { kbTranscribeTask } from '../tasks/trigger/kb-transcribe.task';
 import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
+import { memoryFactEmbedTask } from '../tasks/trigger/memory-fact-embed.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
+import { workspaceBackupTask } from '../tasks/trigger/workspace-backup.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -94,6 +103,7 @@ export class TriggerService
         WorkGenerationDispatcher,
         WorkImportDispatcher,
         TemplateCustomizationDispatcher,
+        RosterProvisionDispatcher,
         WebhookDeliveryDispatcher,
         KbMirrorDocumentDispatcher,
         KbBackfillSkeletonDispatcher,
@@ -101,7 +111,9 @@ export class TriggerService
         KbOrgOverlayFanoutDispatcher,
         KbNormalizeMediaDispatcher,
         KbTranscribeDispatcher,
-        KbReembedWorkDispatcher
+        KbReembedWorkDispatcher,
+        WorkspaceBackupDispatcher,
+        MemoryFactEmbedDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -466,6 +478,35 @@ export class TriggerService
         }
     }
 
+    /**
+     * AW-20 P1 — enqueue one roster provisioning run.
+     *
+     * `idempotencyKey` is the run id, so a double-fired enqueue collapses
+     * to a single execution instead of two workers racing to create the
+     * same four agents.
+     */
+    async dispatchRosterProvision(payload: RosterProvisionPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await rosterProvisionTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: ['roster-provision', payload.runId],
+                    idempotencyKey: payload.runId,
+                    machine: this.machine() as any,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch roster-provision task', error as Error);
+            return null;
+        }
+    }
+
     async dispatchTemplateCustomization(
         payload: TemplateCustomizationPayload,
     ): Promise<string | null> {
@@ -646,6 +687,45 @@ export class TriggerService
      * (or `null` when Trigger.dev is disabled / disposed — KB retrieval
      * falls back to lexical via row 30 RRF until the dispatch lands).
      */
+    /**
+     * AW-22 — enqueue one complete workspace archive.
+     *
+     * Returns the run handle so a cancel can reach the run, or `null` when
+     * the runtime is not configured. Unlike every other dispatcher here,
+     * `null` is NOT a deferral for the caller: nothing would ever pick a
+     * queued backup up, so `WorkspaceBackupService` fails the row at once
+     * and the card explains that backups are unavailable in this deployment
+     * (spec FR-46) rather than showing a progress bar that never moves.
+     */
+    async dispatchWorkspaceBackup(payload: WorkspaceBackupPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await workspaceBackupTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'workspace-backup',
+                        `user:${payload.userId}`,
+                        `backup:${payload.backupId}`,
+                    ],
+                    machine: this.machine() as any,
+                    // Per-workspace serialisation on top of the partial
+                    // unique index, so a retry storm cannot produce two
+                    // archives of the same workspace at once (spec FR-3).
+                    concurrencyKey: `workspace-backup:${payload.organizationId ?? payload.userId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch workspace-backup task', error as Error);
+            return null;
+        }
+    }
+
     async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
@@ -852,5 +932,47 @@ export class TriggerService
             }),
         );
         return handle.id;
+    }
+
+    /**
+     * AW-07 — enqueue one `memory-fact-embed` run.
+     *
+     * Bound to `MEMORY_FACT_EMBED_DISPATCHER` through the job-runtime
+     * registry like every other dispatcher on this class, so the tenant
+     * overlay's stamping Proxy applies and a different active provider
+     * takes over without touching `MemoryFactService`.
+     *
+     * No `idempotencyKey`, deliberately: the unit of work is "embed whatever
+     * this fact's body is NOW". Keying on the fact id would collapse the
+     * embed an edit enqueues into the one its creation enqueued. The task is
+     * idempotent (an embedded body is skipped, an upsert replaces), so a
+     * double enqueue costs a no-op, never a second vector.
+     *
+     * Returns `null` — quietly — when Trigger.dev is disabled: a runtime that
+     * is not configured is reported ONCE at startup by `MemoryFactService`,
+     * not once per saved fact. A transport failure is logged and also
+     * returns `null`; either way the fact is saved and the nightly sweep
+     * embeds it.
+     */
+    async dispatchMemoryFactEmbed(payload: MemoryFactEmbedPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await memoryFactEmbedTask.trigger(
+                { factId: payload.factId, userId: payload.userId },
+                this.stampTenantOptions({
+                    tags: ['memory-fact-embed', `fact:${payload.factId}`],
+                }),
+            );
+            return handle.id;
+        } catch (error) {
+            this.logger.warn(
+                `memory-fact-embed dispatch failed (factId=${payload.factId}): ` +
+                    (error instanceof Error ? error.message : String(error)),
+            );
+            return null;
+        }
     }
 }

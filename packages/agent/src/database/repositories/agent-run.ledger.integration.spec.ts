@@ -208,6 +208,103 @@ describe('AgentRunRepository — runs ledger reads (integration)', () => {
             expect([...first, ...second].map((row) => row.id)).toEqual(expected);
         });
 
+        /**
+         * A run that never started — still queued, dispatch-failed, or
+         * cancelled before start — has no `startedAt`, so its ledger
+         * instant is `createdAt`, which on the sqlite family is whole-second
+         * `datetime('now')` TEXT. Force exactly that shape (the seeder
+         * stamps an explicit `Date`, which the driver writes with
+         * milliseconds) so the page boundary lands on the row shape the
+         * running system actually stores.
+         */
+        async function seedNeverStarted(second: string, summary: string): Promise<AgentRun> {
+            const run = await seedRun({ status: 'queued', startedAt: null, summary });
+            await dataSource.query('UPDATE agent_runs SET createdAt = ? WHERE id = ?', [
+                second,
+                run.id,
+            ]);
+            return { ...run, createdAt: new Date(`${second.replace(' ', 'T')}Z`) };
+        }
+
+        /** The cursor the ledger hands out for a row: millisecond + id. */
+        const cursorOf = (run: AgentRun) => ({
+            at: new Date(run.startedAt ?? run.createdAt),
+            id: run.id,
+        });
+
+        it('⭐ advances past a page that ends on a run which never started', async () => {
+            // Four queued runs in ONE second, then one in the next.
+            const burst = await Promise.all(
+                ['q1', 'q2', 'q3', 'q4'].map((summary) =>
+                    seedNeverStarted('2026-09-08 12:00:05', summary),
+                ),
+            );
+            const older = await seedNeverStarted('2026-09-08 12:00:04', 'q0');
+            const newestFirst = [
+                ...burst
+                    .map((run) => run.id)
+                    .sort()
+                    .reverse(),
+                older.id,
+            ];
+
+            const first = await page({}, 2);
+            const second = await page({}, 2, cursorOf(first[first.length - 1]));
+            const third = await page({}, 2, cursorOf(second[second.length - 1]));
+
+            // Before the fix the cursor rendered as `'… 12:00:05.000'` while
+            // the rows are stored `'… 12:00:05'`, which sorts EARLIER, so the
+            // `<` predicate was true for the cursor row and all its siblings
+            // and page 2 restarted at the top of the second.
+            expect([...first, ...second, ...third].map((row) => row.id)).toEqual(newestFirst);
+        });
+
+        it('⭐ never loops when a full page of runs was enqueued in one second', async () => {
+            // A fan-out dispatch or a schedule sweep: more runs in one second
+            // than a page holds, plus one below them that must stay reachable.
+            const LIMIT = 4;
+            const burst = await Promise.all(
+                Array.from({ length: LIMIT + 2 }, (_, index) =>
+                    seedNeverStarted('2026-09-08 12:00:05', `sweep-${index}`),
+                ),
+            );
+            const below = await seedNeverStarted('2026-09-08 12:00:04', 'below');
+
+            const seen: string[] = [];
+            let cursor: { at: Date; id: string } | undefined;
+            // Bounded, so the infinite-loop regression fails instead of hanging.
+            for (let guard = 0; guard < 10; guard += 1) {
+                const rows = await page({}, LIMIT, cursor);
+                seen.push(...rows.map((row) => row.id));
+                if (rows.length < LIMIT) break;
+                cursor = cursorOf(rows[rows.length - 1]);
+            }
+
+            const expected = [
+                ...burst
+                    .map((run) => run.id)
+                    .sort()
+                    .reverse(),
+                below.id,
+            ];
+            // Before the fix page 2 was byte-identical to page 1 and the rows
+            // below that second were unreachable for good.
+            expect(seen).toEqual(expected);
+            expect(new Set(seen).size).toBe(seen.length);
+        });
+
+        it('keeps a run whose instant lands on the window boundary second', async () => {
+            // `WINDOW.from` is midnight exactly; a whole-second row there
+            // used to fall outside `>= :ledgerFrom`, which compared it
+            // against `'… 00:00:00.000'`.
+            const boundary = await seedNeverStarted('2026-09-08 00:00:00', 'boundary');
+
+            const rows = await page();
+
+            expect(rows.map((row) => row.id)).toEqual([boundary.id]);
+            await expect(runs.countLedger(USER, WINDOW, {})).resolves.toBe(1);
+        });
+
         it('matches the search against summary and error, case-insensitively, with LIKE characters escaped', async () => {
             const bySummary = await seedRun({
                 summary: 'Merged the Release branch',

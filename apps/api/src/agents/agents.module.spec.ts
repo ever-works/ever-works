@@ -29,6 +29,7 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
     AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_RUN_CHAT_BACK_POSTER: 'AGENT_RUN_CHAT_BACK_POSTER',
+    AGENT_RUN_CONVERSATION_REPLY_POSTER: 'AGENT_RUN_CONVERSATION_REPLY_POSTER',
     AGENT_RUN_TASK_FINISHER: 'AGENT_RUN_TASK_FINISHER',
     AGENT_PLUGIN_TOOLS_FACADE: 'AGENT_PLUGIN_TOOLS_FACADE',
     AGENT_AI_DISPATCH_FACADE: 'AGENT_AI_DISPATCH_FACADE',
@@ -42,6 +43,10 @@ jest.mock('@ever-works/agent/agents', () => ({
     SKILL_FILE_CONTENT_READER: 'SKILL_FILE_CONTENT_READER',
     // Panic controls (EW-778) — the global stop flag seam.
     RUN_KILL_SWITCH: 'RUN_KILL_SWITCH',
+}));
+jest.mock('@ever-works/agent/conversations', () => ({
+    ConversationsModule: class ConversationsModule {},
+    ConversationMessageService: class ConversationMessageService {},
 }));
 jest.mock('@ever-works/agent/mcp', () => ({
     McpModule: class McpModule {},
@@ -74,6 +79,8 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskAssigneeRepository: class TaskAssigneeRepository {},
     TaskReviewerRepository: class TaskReviewerRepository {},
     TaskApproverRepository: class TaskApproverRepository {},
+    // Reviewer agent stage (slice AD, EW-811).
+    TaskAgentReviewService: class TaskAgentReviewService {},
     TaskStatus: {},
     RUN_STEERING_PORT: 'RUN_STEERING_PORT',
 }));
@@ -107,6 +114,14 @@ jest.mock('@ever-works/agent/policy', () => ({
 }));
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
+}));
+// Safety rails (AW-24) — the one gate every side-effectful action passes
+// through. Stubbed at module scope like every sibling barrel so the
+// decorator-metadata assertions never drag the entity graph in.
+jest.mock('@ever-works/agent/safety', () => ({
+    SafetyModule: class SafetyModule {},
+    SafetyGateService: class SafetyGateService {},
+    SAFETY_GATE: 'SAFETY_GATE',
 }));
 jest.mock('@ever-works/agent/skills', () => ({
     SkillsModule: class SkillsModule {},
@@ -159,6 +174,7 @@ import {
     TaskAssigneeRepository,
     TaskReviewerRepository,
     TaskApproverRepository,
+    TaskAgentReviewService,
 } from '@ever-works/agent/tasks-domain';
 import {
     AgentRepository,
@@ -170,10 +186,12 @@ import {
     AGENT_RUN_CANCELLER,
 } from '@ever-works/agent/agents';
 import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
+import { ConversationsModule, ConversationMessageService } from '@ever-works/agent/conversations';
 import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
+import { SafetyGateService, SafetyModule } from '@ever-works/agent/safety';
 
 type FactoryProvider = {
     provide?: unknown;
@@ -230,6 +248,13 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             WorkflowGraphExecutorService,
             // Inbox (operator message center) — the `ask_human` tool.
             InboxService,
+            // Reviewer agent stage (slice AD, EW-811) — backs
+            // `submitTaskReview`, the ONE way a review run records a
+            // verdict. Appended LAST: this array is positional and the
+            // container passes it positionally to `useFactory`, so this
+            // assertion is what stops a future slice inserting in the
+            // middle and silently rebinding every service after it.
+            TaskAgentReviewService,
         ]);
     });
 
@@ -271,6 +296,41 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(meta('exports')).toContain(AGENT_RUN_CANCELLER);
     });
 
+    /**
+     * Named Conversations — `AgentRunService.finalize()` stores a Conversation
+     * reply through this port before it marks the run completed. Unbound (or
+     * not exported from this @Global() module), the @Optional() injection
+     * resolves to `undefined` and the run completes before its reply is
+     * stored — a failed store would then lose the reply for good.
+     */
+    it('binds + exports AGENT_RUN_CONVERSATION_REPLY_POSTER to the Conversation reply record', async () => {
+        expect(meta('imports')).toContain(ConversationsModule);
+        const factory = findProvider('AGENT_RUN_CONVERSATION_REPLY_POSTER');
+        expect(factory?.inject).toEqual([ConversationMessageService]);
+        expect(meta('exports')).toContain('AGENT_RUN_CONVERSATION_REPLY_POSTER');
+
+        const messages = { recordAgentReply: jest.fn().mockResolvedValue({ id: 'reply-1' }) };
+        const poster = factory?.useFactory?.(messages) as {
+            postReply: (input: Record<string, string>) => Promise<{ messageId: string }>;
+        };
+        await expect(
+            poster.postReply({
+                runId: 'r1',
+                userId: 'u1',
+                agentId: 'a1',
+                conversationMessageId: 'm1',
+                body: 'Here you go.',
+            }),
+        ).resolves.toEqual({ messageId: 'reply-1' });
+        expect(messages.recordAgentReply).toHaveBeenCalledWith({
+            runId: 'r1',
+            userId: 'u1',
+            agentId: 'a1',
+            replyToMessageId: 'm1',
+            body: 'Here you go.',
+        });
+    });
+
     it('binds + exports SKILL_FILE_CONTENT_READER — without it getSkillFile refuses every read', () => {
         const provider = (meta('providers') as Array<{ provide?: unknown }>).find(
             (p) => p && typeof p === 'object' && p.provide === 'SKILL_FILE_CONTENT_READER',
@@ -295,6 +355,25 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(meta('exports')).toContain('RUN_KILL_SWITCH');
     });
 
+    /**
+     * Safety rails (AW-24) — `AgentRunService.invokeTool` is the one place
+     * every tool call converges, and it reads the gate through
+     * `@Optional() @Inject(SAFETY_GATE)`. `@Global()` publishes only
+     * EXPORTED providers, so a binding left out of `exports` resolves to
+     * `undefined` and every rail goes dark: the trust ladder would be
+     * stored, rendered and audited, and would stop nothing. This is the
+     * same failure RUN_KILL_SWITCH's pin above exists to catch.
+     */
+    it('binds + exports SAFETY_GATE to the safety gate service', () => {
+        expect(meta('imports')).toContain(SafetyModule);
+        const provider = (
+            meta('providers') as Array<{ provide?: unknown; useExisting?: unknown }>
+        ).find((p) => p && typeof p === 'object' && p.provide === 'SAFETY_GATE');
+        expect(provider).toBeDefined();
+        expect(provider?.useExisting).toBe(SafetyGateService);
+        expect(meta('exports')).toContain('SAFETY_GATE');
+    });
+
     it('binds all three Task membership repositories (the commentOnTask gate is fail-closed)', () => {
         const factory = findProvider(AGENT_DOMAIN_TOOL_SOURCES);
         const bundle = factory?.useFactory?.(
@@ -303,6 +382,24 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(bundle?.tasks?.assignees).toBeDefined();
         expect(bundle?.tasks?.reviewers).toBeDefined();
         expect(bundle?.tasks?.approvers).toBeDefined();
+    });
+
+    it('binds the reviewer-agent verdict service (unbound, submitTaskReview is not offered)', () => {
+        // Reviewer agent stage (slice AD, EW-811). Without this binding
+        // `buildAgentTaskTools` omits `submitTaskReview` entirely, every
+        // dispatched review run has no way to record a verdict, and the
+        // approver rows this slice exists to write stay `pending`
+        // forever — a dead seam that costs a model run per review.
+        const factory = findProvider(AGENT_DOMAIN_TOOL_SOURCES);
+        const bundle = factory?.useFactory?.(
+            ...(factory.inject ?? []).map((_, index) => ({ stub: index })),
+        ) as { tasks?: Record<string, unknown> };
+        expect(bundle?.tasks?.agentReviews).toBeDefined();
+        // Positional proof: the LAST injected service is the one that
+        // lands here, so an insertion anywhere earlier is caught.
+        expect(bundle?.tasks?.agentReviews).toEqual({
+            stub: (factory?.inject ?? []).length - 1,
+        });
     });
 
     it('carries every domain in the assembled bundle', () => {

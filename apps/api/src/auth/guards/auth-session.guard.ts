@@ -141,6 +141,11 @@ export class AuthSessionGuard {
                 iat: Math.floor(Date.now() / 1000),
                 iss: 'ever-works',
                 aud: 'ever-works',
+                // Safety rails (AW-24) — a machine credential, whether a
+                // personal API key or a fleet-run token. `HumanActorGuard`
+                // refuses the controls that may only ever be operated by a
+                // person in an interactive session.
+                authMethod: 'api-key',
             };
 
             request.user = authenticatedUser;
@@ -149,7 +154,9 @@ export class AuthSessionGuard {
 
         const providerUser = await this.authProvider.authenticate(toHeaders(request.headers || {}));
         if (providerUser) {
-            request.user = providerUser;
+            // The interactive path. Stamped by copy rather than mutation so a
+            // provider that returns a cached or frozen object is unaffected.
+            request.user = { ...providerUser, authMethod: 'session' };
             return true;
         }
 
