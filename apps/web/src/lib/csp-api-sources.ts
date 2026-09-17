@@ -21,27 +21,31 @@
  * 1. `NEXT_PUBLIC_API_URL` — the browser-facing API origin. `lib/fleet-flags.ts`
  *    `resolvePublicApiBaseUrl()` documents why it wins where it is set: `API_URL`
  *    is often an in-cluster address a laptop cannot resolve.
- * 2. `API_URL` — the server-only origin the BFF talks to, and, crucially, the
- *    ONLY value the live-view and streaming-terminal attach-token routes use to
- *    mint the socket URL they hand the browser:
- *      - `app/api/agents/[id]/computer/sessions/[sessionId]/attach-token/route.ts`
- *        → `toComputerSocketUrl(API_URL, wsPath)`
- *      - `app/api/agents/[id]/runs/[runId]/terminal/attach-token/route.ts`
- *        → `API_URL` origin, `http` → `ws`
- *    with `API_URL` itself built from `process.env.API_URL || 'http://localhost:3100'`
- *    in `lib/constants.ts`.
+ * 2. `API_URL` — the server-only origin the BFF talks to, with `API_URL` itself
+ *    built from `process.env.API_URL || 'http://localhost:3100'` in
+ *    `lib/constants.ts`.
+ *
+ * The live-view and streaming-terminal attach-token routes mint the socket URL
+ * they hand the browser from ONE of those two origins, through
+ * `lib/api/attach-socket-origin.ts` `toAttachSocketUrl()`:
+ *   - `app/api/agents/[id]/computer/sessions/[sessionId]/attach-token/route.ts`
+ *   - `app/api/agents/[id]/runs/[runId]/terminal/attach-token/route.ts`
+ * The `NEXT_PUBLIC_API_URL` origin when it is set, and the `API_URL` origin
+ * otherwise — so a deployment that sets only `API_URL` keeps minting on it.
  *
  * `use-computer-attach.ts` opens `new WebSocket(body.wsUrl)` on exactly the URL
- * the BFF returned — the browser never gets to substitute the public origin. So
- * a policy that names only the `NEXT_PUBLIC_API_URL` socket twin authorises the
- * wrong host in every deployment where the two differ, which is every shipped
- * one: `docker-compose.yml`, all `.deploy/k8s` manifests and `apps/web/.env.example`
- * set `API_URL` and never set `NEXT_PUBLIC_API_URL`.
+ * the BFF returned — the browser never gets to substitute another origin. So a
+ * policy that names only ONE socket twin authorises the wrong host in some
+ * deployment: only the public twin, and every install that sets `API_URL`
+ * alone is refused; only the `API_URL` twin, and every install that points a
+ * browser at a separately-ingressed API is refused.
  *
  * Hence `resolveApiCspSocketSources()` emits the socket twin of BOTH origins,
  * de-duplicated — one source when they coincide (the common case, and the only
  * case the CI e2e job exercises), two exact origins when they differ. No
- * wildcard, no bare `ws:` scheme: only the app's own API hosts.
+ * wildcard, no bare `ws:` scheme: only the app's own API hosts. That the minted
+ * URL always lands inside this set is pinned per deployment shape by
+ * `lib/api/attach-socket-origin.csp.unit.spec.ts`.
  */
 
 /** Fallback for the browser-facing origin — the public production API. */
@@ -50,7 +54,8 @@ const DEFAULT_PUBLIC_API_URL = 'https://api.ever.works';
 /**
  * Fallback for the server-only origin. MUST stay in lock-step with
  * `lib/constants.ts` (`process.env.API_URL || 'http://localhost:3100'`),
- * because that is the value the attach-token routes mint `wsUrl` from.
+ * because that is the value the attach-token routes mint `wsUrl` from
+ * whenever `NEXT_PUBLIC_API_URL` is unset.
  */
 const DEFAULT_SERVER_API_URL = 'http://localhost:3100';
 
@@ -90,9 +95,9 @@ export function resolveApiCspHost(): string {
 }
 
 /**
- * The origin the attach-token routes actually mint socket URLs from — the
- * server-only `API_URL`, reduced to its origin exactly as
- * `toComputerSocketUrl` does (`lib/api/computer-bff.ts`).
+ * The origin the attach-token routes mint socket URLs from whenever
+ * `NEXT_PUBLIC_API_URL` is unset — the server-only `API_URL`, reduced to its
+ * origin exactly as `toComputerSocketUrl` does (`lib/api/computer-bff.ts`).
  *
  * Returns `null` for a value that is not an http(s) URL, so nothing outside
  * the two supported schemes can reach the policy.
