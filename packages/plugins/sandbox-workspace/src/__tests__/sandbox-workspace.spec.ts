@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { SandboxWorkspacePlugin } from '../sandbox-workspace.plugin.js';
+import { SandboxWorkspacePlugin, assertRemoteCloneUrl } from '../sandbox-workspace.plugin.js';
 
 /**
  * Hermetic loopback suite: a real local BARE repo plays "origin"
@@ -228,5 +228,51 @@ describe('gc', () => {
 		} finally {
 			delete process.env.EW_WORKSPACES_DIR;
 		}
+	});
+});
+
+describe('clone URL refusal', () => {
+	// These reach `git` as an ARGUMENT, and on a Fleet node that machine is
+	// somebody's PC. A repository connection is tenant-configurable and can
+	// point anywhere, so this is refused at the point of use rather than
+	// trusted from the caller — this package is standalone and its primary
+	// `repoUrl` is not validated upstream.
+	it('refuses a hostile URL at provision, before any git call or directory write', async () => {
+		// The function being right is not the same as it being CALLED. This drives
+		// the real entry point, so a future refactor that drops the guard fails
+		// here rather than silently handing the value to git.
+		await expect(
+			plugin.provision({
+				repoUrl: 'ext::sh -c id',
+				baseRef: 'main',
+				branch: 'task/hostile-url-aaaa1111',
+				bindingKey: 'task-hostile',
+				settings: settings()
+			})
+		).rejects.toThrow(/option or a transport helper/);
+	});
+
+	it.each([
+		['a transport helper whose address ext:: runs as a command', 'ext::sh -c id'],
+		['a bare transport-helper prefix', '::whoami'],
+		['a value git reads as an option', '--upload-pack=calc.exe'],
+		['a short option', '-u'],
+		['an ssh option in the scp-like host position', 'git@-oProxyCommand=calc:x'],
+		['an ssh option in the URL host position', 'ssh://-oProxyCommand=calc/x.git']
+	])('refuses %s', (_label, repoUrl) => {
+		expect(() => assertRemoteCloneUrl(repoUrl)).toThrow(/option or a transport helper/);
+	});
+
+	// The refusal is deliberately narrow: WHICH remotes are acceptable is the
+	// host's policy (the platform's mount rules refuse `file:` and local paths),
+	// and this harness itself clones a `file://` origin.
+	it.each([
+		['https', 'https://github.com/ever-works/ever-works.git'],
+		['ssh://', 'ssh://git@github.com/ever-works/ever-works.git'],
+		['scp-like ssh', 'git@github.com:ever-works/ever-works.git'],
+		['an IPv6 host', 'https://[::1]/x.git'],
+		['the file:// origin this suite uses', 'file:///tmp/origin.git']
+	])('accepts %s', (_label, repoUrl) => {
+		expect(() => assertRemoteCloneUrl(repoUrl)).not.toThrow();
 	});
 });

@@ -147,7 +147,7 @@ export function normalizeFleetTaskWorkspaceMounts(
 			throw new FleetTaskWorkspaceMountError(`${at}.repositoryId is not a valid repository identity`);
 		}
 		const repoUrl = requireString(mount.repoUrl, `${at}.repoUrl`);
-		if (repoUrl.length > 2048 || /[\0\r\n]/.test(repoUrl) || isLocalUrl(repoUrl)) {
+		if (repoUrl.length > 2048 || /[\0\r\n]/.test(repoUrl) || !isRemoteCloneUrl(repoUrl)) {
 			throw new FleetTaskWorkspaceMountError(`${at}.repoUrl must be a remote, token-free clone URL`);
 		}
 		const baseRef = requireString(mount.baseRef, `${at}.baseRef`);
@@ -215,8 +215,51 @@ function hasTraversal(identity: string): boolean {
 	return identity.split(/[/:]/).some((segment) => !segment || segment === '.' || segment === '..');
 }
 
-function isLocalUrl(url: string): boolean {
-	return /^file:/i.test(url) || /^[a-zA-Z]:[\\/]/.test(url) || url.startsWith('/') || url.startsWith('\\');
+/**
+ * A clone URL a Fleet node may hand to `git`.
+ *
+ * This is an ALLOW-LIST, and it replaced a deny-list (`file:`, drive letters,
+ * leading slashes) that stopped a node reading its own disk but let two
+ * argument-injection vectors through to `git fetch`:
+ *
+ *   - **a value starting with `-`**, which `git` parses as an OPTION rather
+ *     than a repository — `--upload-pack=<cmd>` runs `<cmd>`. The branch and
+ *     baseRef checks on this same mount already reject a leading `-` for
+ *     exactly this reason; the URL was simply missed.
+ *   - **`ext::<command>`**, git's ext transport, which executes the command
+ *     verbatim. It is not a local URL, so the deny-list did not see it.
+ *
+ * A mount URL is tenant-configurable — a repo connection "can point anywhere",
+ * as the planner's own push-credential comment says — and a Fleet node is
+ * somebody's actual PC, so either vector is remote code execution on it.
+ *
+ * Only `http(s)` is usable in any case: credentials reach `git` as URL
+ * userinfo, which no other scheme carries.
+ */
+function isRemoteCloneUrl(url: string): boolean {
+	// A leading `-` is the option vector, and `git` would never read it as a
+	// repository. The sibling branch/baseRef checks reject the same shape.
+	if (url.startsWith('-')) return false;
+	// `<helper>::<address>` is git's transport-helper syntax, and `ext::` runs
+	// its address as a command. Anchored to the front so an IPv6 host such as
+	// `https://[::1]/x.git` is unaffected.
+	if (/^[A-Za-z0-9+.-]*::/.test(url)) return false;
+	// scp-like SSH (`git@host:owner/repo.git`) is not a parseable URL but is a
+	// real, used form — the mount fixtures use it. The host must begin
+	// alphanumerically, so `git@-oProxyCommand=…:x` cannot sneak an ssh option
+	// through in the host position.
+	if (/^[A-Za-z0-9._-]+@[A-Za-z0-9][A-Za-z0-9._-]*:(?![\\/])/.test(url)) return true;
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return false;
+	}
+	// http(s) carries the userinfo that node-side credential injection needs;
+	// ssh is the documented alternative. Everything else — `file:`, `git:`,
+	// drive letters, bare paths — is either local (a node reading its own
+	// disk) or unauthenticated plaintext.
+	return parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'ssh:';
 }
 
 /**
