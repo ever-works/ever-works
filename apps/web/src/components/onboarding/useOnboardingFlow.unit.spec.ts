@@ -19,7 +19,7 @@ function initialReducerState() {
 }
 
 describe('computeStepList', () => {
-    it('returns the minimal 10-step list when every choice is the Ever Works default', () => {
+    it('returns the minimal 11-step list when every choice is the Ever Works default', () => {
         const list = computeStepList(ONBOARDING_DEFAULT_STATE);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
@@ -29,6 +29,9 @@ describe('computeStepList', () => {
             'deploy-choice',
             'desktop-choice',
             'profile',
+            // AW-20 — "Your agents", derived from the answers the profile
+            // step just collected. Grew the default flow from 10 to 11.
+            'roster',
             'communication',
             'plugins-catalog',
             'create-work',
@@ -64,7 +67,7 @@ describe('computeStepList', () => {
         );
     });
 
-    it('builds the full 12-step list when every BYOK is chosen', () => {
+    it('builds the full 14-step list when every BYOK is chosen', () => {
         const list = computeStepList(
             defaultsWith({
                 ai: { choice: 'claude-code' },
@@ -72,7 +75,7 @@ describe('computeStepList', () => {
                 deploy: { choice: 'vercel' },
             }),
         );
-        expect(list).toHaveLength(13);
+        expect(list).toHaveLength(14);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
             'ai-choice',
@@ -84,6 +87,7 @@ describe('computeStepList', () => {
             'deploy-config',
             'desktop-choice',
             'profile',
+            'roster',
             'communication',
             'plugins-catalog',
             'create-work',
@@ -98,21 +102,69 @@ describe('computeStepList', () => {
 
     // Wave 11 — the "What do you do" step is always present, after the
     // provider choice/config steps and immediately before Communication.
-    it('always inserts the profile step immediately before Communication', () => {
+    it('always inserts the profile step after the provider steps and ahead of Communication', () => {
         const minimal = computeStepList(ONBOARDING_DEFAULT_STATE).map((s) => s.kind);
         expect(minimal.indexOf('profile')).toBeGreaterThan(minimal.indexOf('deploy-choice'));
-        expect(minimal.indexOf('profile')).toBe(minimal.indexOf('communication') - 1);
+        expect(minimal.indexOf('profile')).toBeLessThan(minimal.indexOf('communication'));
 
         const full = computeStepList(defaultsWith({ deploy: { choice: 'vercel' } })).map(
             (s) => s.kind,
         );
         // A8 — `desktop-choice` now sits between the provider steps and
-        // profile, so profile trails IT rather than deploy-config. The
-        // "immediately before Communication" half of the contract is what
-        // this test is really about and is unchanged.
+        // profile, so profile trails IT rather than deploy-config. AW-20
+        // then slotted `roster` between profile and communication, so the
+        // contract this test is really about is the ORDER, not adjacency
+        // to communication.
         expect(full.indexOf('desktop-choice')).toBe(full.indexOf('deploy-config') + 1);
         expect(full.indexOf('profile')).toBe(full.indexOf('desktop-choice') + 1);
-        expect(full.indexOf('profile')).toBe(full.indexOf('communication') - 1);
+        expect(full.indexOf('profile')).toBeLessThan(full.indexOf('communication'));
+    });
+
+    // AW-20 — "Your agents". It reads the roles and team size the profile
+    // step collects, so it must sit immediately after profile in EVERY
+    // permutation; and it must appear exactly once, because a second
+    // instance would offer to provision a roster twice.
+    it('inserts the roster step exactly once, immediately after profile, in every permutation', () => {
+        const permutations = [
+            ONBOARDING_DEFAULT_STATE,
+            defaultsWith({ ai: { choice: 'openrouter' } }),
+            defaultsWith({ storage: { choice: 'user-github' } }),
+            defaultsWith({ deploy: { choice: 'k8s' } }),
+            defaultsWith({
+                ai: { choice: 'claude-code' },
+                storage: { choice: 'user-github' },
+                deploy: { choice: 'k8s' },
+            }),
+        ];
+
+        for (const state of permutations) {
+            const kinds = computeStepList(state).map((s) => s.kind);
+            expect(kinds.filter((kind) => kind === 'roster')).toHaveLength(1);
+            expect(kinds.indexOf('roster')).toBe(kinds.indexOf('profile') + 1);
+            expect(kinds.indexOf('roster')).toBe(kinds.indexOf('communication') - 1);
+        }
+    });
+
+    it('places the roster step at position 8 by default and at 11 with every config sub-step', () => {
+        const minimal = computeStepList(ONBOARDING_DEFAULT_STATE);
+        expect(minimal).toHaveLength(11);
+        // 1-based, as the wizard footer renders it ("Step 8 of 11").
+        expect(minimal.findIndex((s) => s.kind === 'roster') + 1).toBe(8);
+
+        const full = computeStepList(
+            defaultsWith({
+                ai: { choice: 'claude-code' },
+                storage: { choice: 'user-github' },
+                deploy: { choice: 'k8s' },
+            }),
+        );
+        expect(full).toHaveLength(14);
+        expect(full.findIndex((s) => s.kind === 'roster') + 1).toBe(11);
+    });
+
+    it('gives the roster step a stable id so React keys survive a rechoose', () => {
+        const roster = computeStepList(ONBOARDING_DEFAULT_STATE).find((s) => s.kind === 'roster');
+        expect(roster?.id).toBe('roster');
     });
 
     it('encodes the chosen vendor into the step id so React keys stay stable across rechooses', () => {

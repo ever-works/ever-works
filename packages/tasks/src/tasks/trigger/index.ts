@@ -37,6 +37,9 @@ export * from './agent-chat-reply.task';
 // Named Conversations — an Agent answers a message in a Conversation.
 export * from './agent-conversation-reply.task';
 export * from './task-recurrence-dispatcher.task';
+// AW-20 P1 — provisions a wired roster (coordinator + lane owners) for
+// the setup wizard's "Your agents" step.
+export * from './roster-provision.task';
 export * from './template-customization.task';
 export * from './work-generation.task';
 export * from './work-import.task';

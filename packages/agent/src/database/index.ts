@@ -37,6 +37,7 @@ export * from './repositories/conversation-participant.repository';
 export * from './repositories/github-app-installation.repository';
 export * from './repositories/github-app-installation-repository.repository';
 export * from './repositories/github-app-user-link.repository';
+export * from './repositories/onboarding-checklist.repository';
 export * from './repositories/onboarding-request.repository';
 export * from './repositories/template.repository';
 export * from './repositories/template-customization.repository';

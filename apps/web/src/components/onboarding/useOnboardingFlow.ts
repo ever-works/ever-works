@@ -27,6 +27,7 @@ export type WizardStepKind =
     | 'deploy-config'
     | 'desktop-choice'
     | 'profile'
+    | 'roster'
     | 'communication'
     | 'plugins-catalog'
     | 'create-work';
@@ -68,6 +69,12 @@ export function computeStepList(state: OnboardingWizardStateV2): WizardStep[] {
     // after the provider choices and before Communication; always
     // shown, always skippable — selections are suggestion hints only.
     steps.push({ kind: 'profile', id: 'profile' });
+    // AW-20 — "Your agents". Immediately after Profile because the
+    // roster it proposes is DERIVED from the roles and team size that
+    // step just collected, and before Communication because a roster is
+    // about who does the work, not about where the org talks. Always
+    // shown, always skippable: skipping creates nothing.
+    steps.push({ kind: 'roster', id: 'roster' });
     // Communication — connect the chat workspaces the org lives in
     // (Slack now, Discord next). Always shown, always skippable.
     steps.push({ kind: 'communication', id: 'communication' });

@@ -265,6 +265,59 @@ export const AGENT_TEMPLATES: readonly AgentTemplate[] = [
         defaultGuardrails: REQUIRE_APPROVAL,
         suggestedRoles: ['Marketing', 'Product', 'Founder/CEO'],
     },
+    {
+        // AW-20 P1 — the coordination lane's template.
+        //
+        // Every other entry in this catalog is a specialist, which means a
+        // new owner has to know WHICH specialist to address before they can
+        // delegate at all. This one exists to remove that precondition: it
+        // receives whatever gets handed over, works out which lane owns it,
+        // and asks when that is not obvious. It is also the only template
+        // that gets `canAssignTasks` — delegation is impossible without it,
+        // and provisioning points every other roster agent's reporting line
+        // at whichever Agent this template produced.
+        slug: 'workspace-coordinator',
+        name: 'Ada',
+        title: 'Routing and coordination',
+        category: 'ops',
+        description:
+            'Takes whatever you hand over, works out which part of the team owns it, and hands it ' +
+            'on — asking you first whenever the answer is not obvious. Does none of the specialist ' +
+            'work itself.',
+        systemPrompt: [
+            '# Workspace Coordinator',
+            '',
+            'You are the workspace coordinator. Work arrives here first: a request, a question, a',
+            'half-formed idea. Your job is to turn it into work someone owns, or into a question for',
+            'the owner. You never do the specialist work yourself.',
+            '',
+            '## Operating rules',
+            '- For every incoming request, decide which lane owns it — research, content, outreach,',
+            '  search visibility, social, or market watch — and delegate to the agent that holds that',
+            '  lane.',
+            '- When two lanes could own it, or none clearly does, RAISE AN ESCALATION and ask the',
+            '  owner. Guessing is worse than asking: a wrong routing costs a whole run.',
+            '- Restate what "finished" means before delegating. A brief without a definition of done',
+            '  is the brief that comes back to ask.',
+            '- Never draft, research, publish, or send on behalf of a lane. If no agent holds the lane',
+            '  a request needs, say so and propose adding one.',
+            '- Keep a short, honest account of what you routed where, so the owner can follow the',
+            '  chain without reading every run.',
+        ].join('\n'),
+        capabilities:
+            'Request intake and triage; lane routing; delegation to lane-owning agents; escalation ' +
+            'when ownership is ambiguous; progress round-ups for the owner.',
+        suggestedSkills: ['digest-compilation'],
+        suggestedPipeline: null,
+        // The only permission any provisioned roster agent gets, and the one
+        // that makes the reporting line worth anything.
+        defaultPermissions: { canAssignTasks: true },
+        defaultGuardrails: REQUIRE_APPROVAL,
+        // Hints only — the onboarding suggestion block is driven by the
+        // explicit `ROLE_SEED_KITS` map in `role-seeding.ts`, never by this
+        // field, so naming roles here cannot change what that step offers.
+        suggestedRoles: ['Operations', 'Founder/CEO'],
+    },
 ] as const;
 
 /** List the full template catalog (stable order: as declared). */

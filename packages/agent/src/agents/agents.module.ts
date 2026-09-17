@@ -16,6 +16,7 @@ import { AgentMembership } from '../entities/agent-membership.entity';
 import { AgentCollaborator } from '../entities/agent-collaborator.entity';
 import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
+import { OnboardingChecklist } from '../entities/onboarding-checklist.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
@@ -25,9 +26,11 @@ import { AgentCollaboratorRepository } from '../database/repositories/agent-coll
 import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { AgentEscalationRepository } from '../database/repositories/agent-escalation.repository';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
+import { OnboardingChecklistRepository } from '../database/repositories/onboarding-checklist.repository';
 import { AgentsService } from './agents.service';
 import { AgentTemplatesService } from './agent-templates.service';
 import { OnboardingRoleSeedingService } from './role-seeding.service';
+import { RosterProvisioningService } from './roster-provisioning.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
 import { AgentRunSweeperService } from './agent-run-sweeper.service';
@@ -82,6 +85,10 @@ import { FacadesModule } from '../facades/facades.module';
             // autoLoadEntities, so a forFeature'd-but-unregistered entity
             // throws EntityMetadataNotFoundError on first query.
             TaskReviewRejection,
+            // AW-20 — the roster provisioning record lives on the
+            // onboarding checklist row, which this module's provisioning
+            // service writes progress to after every lane.
+            OnboardingChecklist,
             // Parent-existence validation for scoped Agents (IDOR fix): raw
             // repositories for the work/mission/idea a scoped Agent references.
             Work,
@@ -132,6 +139,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentAttachmentRepository,
         AgentEscalationRepository,
         TaskReviewRejectionRepository,
+        OnboardingChecklistRepository,
         AgentsService,
         // Wave 10 — prebuilt agent-template activation (catalog data +
         // ordinary Agent rows; no new persistence concepts).
@@ -139,6 +147,10 @@ import { FacadesModule } from '../facades/facades.module';
         // A55 — server-side, role-driven starter seeding for onboarding
         // (all 14 roles, agents AND skills; was a 3-role client filter).
         OnboardingRoleSeedingService,
+        // AW-20 P1 — provisions a wired roster (a coordinator plus
+        // lane-owning specialists) for the onboarding step. Lives with the
+        // templates it activates, exactly as the role-seeding service does.
+        RosterProvisioningService,
         AgentFileService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
@@ -192,9 +204,11 @@ import { FacadesModule } from '../facades/facades.module';
         AgentAttachmentRepository,
         AgentEscalationRepository,
         TaskReviewRejectionRepository,
+        OnboardingChecklistRepository,
         AgentsService,
         AgentTemplatesService,
         OnboardingRoleSeedingService,
+        RosterProvisioningService,
         AgentFileService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
