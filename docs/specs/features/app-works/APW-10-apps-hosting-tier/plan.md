@@ -567,9 +567,7 @@ export interface IAppsTierProvider extends IPlugin {
 		workId: string,
 		opts: { deleteData: boolean }
 	): Promise<{ remaining: Array<{ kind: string; ref: string }> }>;
-	getDependencies(
-		workId: string
-	): Promise<
+	getDependencies(workId: string): Promise<
 		Array<{
 			kind: string;
 			ref: string;

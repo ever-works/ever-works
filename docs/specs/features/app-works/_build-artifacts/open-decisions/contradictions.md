@@ -301,9 +301,9 @@ These are not owner decisions. They are build-order facts that must be written d
 - **Owner's answer:** _"provider plugins are named per provider (`zitadel`, `keycloak`, `supertokens`, `auth0`),
   and **Keycloak's existing core code must be moved into a plugin**."_
 - **Why it contradicts:** a move is not "stays exactly as it is".
-- **Mechanical fix:** re-word both to _"Keycloak's existing core code is **moved into the `keycloak` plugin
-  package, behaviour unchanged**: the `KEYCLOAK\__`environment keys, the`'disabled'`fallback and the`parseKeycloakConfig`warning are preserved verbatim (NN #20 — nothing is removed or renamed)."* Then confirm
-the same text appears in`cross-platform.md` §7's plugin-family bullet.
+- **Mechanical fix:** re-word both to \_"Keycloak's existing core code is **moved into the `keycloak` plugin
+  package, behaviour unchanged**: the `KEYCLOAK\__`environment keys, the`'disabled'`fallback and the`parseKeycloakConfig`warning are preserved verbatim (NN #20 — nothing is removed or renamed)."\* Then confirm
+  the same text appears in`cross-platform.md` §7's plugin-family bullet.
 
 ### D-6 · Wave 1 has a declared circular dependency
 

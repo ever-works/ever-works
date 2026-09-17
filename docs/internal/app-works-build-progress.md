@@ -13,13 +13,13 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done and verified · `[!
 
 ## 0. Where the work comes from
 
-| Source | What it gives | Location |
-| --- | --- | --- |
-| Programme spec | 13 epics `APW-01`…`APW-13` + README, CONTRACTS (R-1…R-27), ACCEPTANCE (445 ids), TRACKER, EXISTING-SUBSTRATE, BUILD-READINESS | `docs/specs/features/app-works/` |
-| Implementation plan | Wave 0…3 order, the eight decisions, operator notes | `docs/internal/app-works-implementation-plan.md` |
-| **Gap register** | **455 rows** — 24 blockers, 158 high, 200 medium, 73 low; **119 adversarially confirmed**, 2 refuted, 334 unverified | copy in the branch root: `.app-works-gaps.json`; blockers also as `.app-works-blockers.json` (source: `ever-works/workspace` `knowledge/notes/2026-09-17-app-works/completeness/`) |
-| Build artifacts | schema + validator + 42 fixtures, catalog design, fixture app, golden manifests, decision artifacts | `docs/specs/features/app-works/_build-artifacts/` |
-| The spec tree's own checker | links + acceptance ids | `node docs/specs/features/app-works/tools/verify-spec-tree.mjs` |
+| Source                      | What it gives                                                                                                                 | Location                                                                                                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Programme spec              | 13 epics `APW-01`…`APW-13` + README, CONTRACTS (R-1…R-27), ACCEPTANCE (445 ids), TRACKER, EXISTING-SUBSTRATE, BUILD-READINESS | `docs/specs/features/app-works/`                                                                                                                                                   |
+| Implementation plan         | Wave 0…3 order, the eight decisions, operator notes                                                                           | `docs/internal/app-works-implementation-plan.md`                                                                                                                                   |
+| **Gap register**            | **455 rows** — 24 blockers, 158 high, 200 medium, 73 low; **119 adversarially confirmed**, 2 refuted, 334 unverified          | copy in the branch root: `.app-works-gaps.json`; blockers also as `.app-works-blockers.json` (source: `ever-works/workspace` `knowledge/notes/2026-09-17-app-works/completeness/`) |
+| Build artifacts             | schema + validator + 42 fixtures, catalog design, fixture app, golden manifests, decision artifacts                           | `docs/specs/features/app-works/_build-artifacts/`                                                                                                                                  |
+| The spec tree's own checker | links + acceptance ids                                                                                                        | `node docs/specs/features/app-works/tools/verify-spec-tree.mjs`                                                                                                                    |
 
 **Baseline at branch creation:** spec tree **CLEAN** — 84 files, 935 relative links, 0 broken; **445 acceptance ids
 defined, 445 indexed, 0 orphaned**, exit 0.
@@ -29,19 +29,19 @@ broken; 548 acceptance ids defined, 548 indexed, 0 orphaned**, exit 0. The check
 finding list to `tools/verify-spec-tree.report.txt`, because the console only prints the first 40 and that hid 60
 findings once.
 
-| Deliverable | State |
-| --- | --- |
-| Gap register | 24 blockers: **20 fixed, 4 confirmed already discharged**. All high rows in APW-01/02/03/04/05/06/07/10/13 addressed. ~50 medium/low rows in APW-01/02/03 remain untouched and are listed per epic. |
-| Spec tree | `CLEAN`, 548/548 ids, 0 broken links |
-| Wave 0 | **both PRs implemented, tested and pushed** |
-| Ever ID | DNS live; manifests in `k8s-gitops` PR #56; deployment blocked by the backups-first gate |
-| Test estate | created (two Organizations), isolation proven |
-| Implementation (Waves 1–3) | **not started** — the specs are now buildable, the code is not written |
+| Deliverable                | State                                                                                                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gap register               | 24 blockers: **20 fixed, 4 confirmed already discharged**. All high rows in APW-01/02/03/04/05/06/07/10/13 addressed. ~50 medium/low rows in APW-01/02/03 remain untouched and are listed per epic. |
+| Spec tree                  | `CLEAN`, 548/548 ids, 0 broken links                                                                                                                                                                |
+| Wave 0                     | **both PRs implemented, tested and pushed**                                                                                                                                                         |
+| Ever ID                    | DNS live; manifests in `k8s-gitops` PR #56; deployment blocked by the backups-first gate                                                                                                            |
+| Test estate                | created (two Organizations), isolation proven                                                                                                                                                       |
+| Implementation (Waves 1–3) | **not started** — the specs are now buildable, the code is not written                                                                                                                              |
 
 ### ✅ SPEC FREEZE — the acceptance lanes pin this revision
 
 **The specs are frozen as of `9a379106b`** (2026-09-17). The golden-outputs work proved why this matters: every spec
-file changed *while that work was in flight* (APW-05 `plan.md` 1173→1763 lines, APW-06 1195→1852, APW-10 1033→1127,
+file changed _while that work was in flight_ (APW-05 `plan.md` 1173→1763 lines, APW-06 1195→1852, APW-10 1033→1127,
 and two changes altered golden output mid-task — APW-10 gained `authScheme` and `smtp` in `dependencies`, APW-05
 gained the `verify` job).
 
@@ -49,24 +49,24 @@ gained the `verify` job).
 goldens were derived from. **Any acceptance lane that compares real platform output against these goldens must pin
 that revision**, or it will fail on drift rather than on a defect. Freeze revision:
 
-| Item | Value |
-| --- | --- |
-| Branch | `feat/app-works-implementation` |
-| Commit | `9a379106b` (see the log below for later commits) |
-| Spec tree | 124 files, 1830 relative links, **0 broken**; **548 acceptance ids defined / 548 indexed** |
-| Golden checker | `node check.mjs` → **All 2064 golden assertions passed**, exit 0 |
+| Item                   | Value                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| Branch                 | `feat/app-works-implementation`                                                            |
+| Commit                 | `9a379106b` (see the log below for later commits)                                          |
+| Spec tree              | 124 files, 1830 relative links, **0 broken**; **548 acceptance ids defined / 548 indexed** |
+| Golden checker         | `node check.mjs` → **All 2064 golden assertions passed**, exit 0                           |
 | Blueprint specs (live) | `cal-diy-template` 22238 B · `umami-template` 9304 B · `app-fixture-hello-template` 6770 B |
 
 ### Known baseline conditions (recorded, deliberately NOT "fixed")
 
 - **Prettier drift is pre-existing.** `npx prettier --check` fails on ~57 app-works markdown files, including all
   four programme-level files. Proven pre-existing: `git show HEAD:<file> | npx prettier --check --stdin-filepath
-  <file>` fails on the HEAD revision too. Nobody ran `--write`, because reformatting aligned tables and prose in
+<file>` fails on the HEAD revision too. Nobody ran `--write`, because reformatting aligned tables and prose in
   files other agents are editing would be a large, unwanted diff. **`pnpm format:check` is therefore NOT clean on
   this branch** and the programme's Definition of Done still lists it — this needs one deliberate pass.
 - **Five Blueprint ✗ spec findings are recorded, not fixed** (golden `README.md` §5): two of three Blueprints declare
   a cron that the managed tier refuses (`CRON_TOO_FREQUENT`); the fixture and Cal.diy declare `smtp`, which a
-  *verification* Build cannot start (`verificationDependencyUnsupported`) so only Umami is runner-verifiable as
+  _verification_ Build cannot start (`verificationDependencyUnsupported`) so only Umami is runner-verifiable as
   written; the App spec's component/cron/volume caps (10/20/5) exceed the Work CRD's (8/10/4) so
   `SPEC_LIMIT_EXCEEDED` can refuse a spec APW-03 accepted; Umami's image switches user by NAME and nothing renders
   `runAsUser`; and `EW_VERIFY_BUILD` has no derivable value.
@@ -80,32 +80,32 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
 
 ### A1. Blockers (24)
 
-| # | Gap | Area | Confirmed | Status |
-| --- | --- | --- | --- | --- |
-| 1 | `APW01-G01` prerequisites/merge order omit tasks APW-01 P1 compiles against | APW-01 | yes | `[ ]` |
-| 2 | `XC-02` new upstream workflows run before Actions hygiene, can read `EW_` secrets | APW-02 | unverified | `[ ]` |
-| 3 | `APW03-G01` APW-03 P2 ↔ APW-01/APW-06 dependency loop | APW-03 | yes | `[ ]` |
-| 4 | `EXT-01` `ever-works/apps` catalog repository does not exist | APW-03 | unverified | `[x]` **resolved** — `ever-works/templates` created and seeded 2026-09-17 |
-| 5 | `APW04-G01` no execution path puts a provisioning run in the restricted sandbox | APW-04 | yes | `[ ]` |
-| 6 | `APW05-G01` push/PR runs never discovered without a webhook | APW-05 | yes | `[ ]` |
-| 7 | `APW05-G02` verification Build cannot run — no workflow, verify mode builds no image | APW-05 | yes | `[ ]` |
-| 8 | `APW05-G03` push-started Builds can never be deployable; no preparation state | APW-05 | yes | `[ ]` |
-| 9 | `XC-01` PR and verification builds hand every `EW_` secret to unreviewed code | APW-05 | unverified | `[ ]` |
-| 10 | `GAP-07` push/PR Builds discovered only from webhooks; no epic installs one | APW-05 | unverified | `[ ]` |
-| 11 | `APW06-G01` kubeconfig save path dials the user cluster from the API process | APW-06 | yes | `[ ]` |
-| 12 | `APW06-G02` the Trigger worker cannot host `app-deploy` as planned | APW-06 | yes | `[ ]` |
-| 13 | `GAP-06` namespace policies ↔ dependency ordering circularity | APW-06 | unverified | `[ ]` |
-| 14 | `APW07-G01` first-Deployment deadlock between providers and namespace | APW-07 | yes | `[ ]` |
-| 15 | `APW10-G01` in-zone dependency provisioning contracted to APW-10, no task builds it | APW-10 | unverified | `[ ]` |
-| 16 | `GAP-22` no SMTP dependency can work on the tier; both Blueprints need one | APW-10 | unverified | `[ ]` |
-| 17 | `APW13-G01` no working mechanism gives a throwaway test user a GitHub connection | APW-13 | unverified | `[ ]` |
-| 18 | `APW13-G02` PR lanes start no background job runtime | APW-13 | unverified | `[ ]` |
-| 19 | `GAP-01` all three Blueprint drafts fail blueprint-mode validation | APW-13 | unverified | `[x]` **resolved** — drafts fixed and validator green on 42 fixtures (`_build-artifacts/apw-03-schema/`) |
-| 20 | `EXT-02` Blueprint drafts are not valid Blueprint repositories (catalog C4) | APW-13 | unverified | `[x]` **resolved** — repos created with `ever-works-app-blueprint` topic + valid specs |
-| 21 | `EXT-03` fixture application has no source, image or CI | APW-13 | unverified | `[x]` **resolved** — `ever-works/app-fixture-hello` created and seeded (54 files) |
-| 22 | `EXT-04` test estate does not exist | APW-13 | unverified | `[~]` owner decided: **an Ever Works tenant**, not a GitHub test org; repos exist, tenant remaining |
-| 23 | `APW13-UF-01` Umami image switches to a user by NAME; refused under `runAsNonRoot` | APW-13 | unverified | `[ ]` |
-| 24 | `APW13-UF-02` Cal.diy image runs as root and writes into its own files at boot | APW-13 | unverified | `[ ]` |
+| #   | Gap                                                                                  | Area   | Confirmed  | Status                                                                                                   |
+| --- | ------------------------------------------------------------------------------------ | ------ | ---------- | -------------------------------------------------------------------------------------------------------- |
+| 1   | `APW01-G01` prerequisites/merge order omit tasks APW-01 P1 compiles against          | APW-01 | yes        | `[ ]`                                                                                                    |
+| 2   | `XC-02` new upstream workflows run before Actions hygiene, can read `EW_` secrets    | APW-02 | unverified | `[ ]`                                                                                                    |
+| 3   | `APW03-G01` APW-03 P2 ↔ APW-01/APW-06 dependency loop                                | APW-03 | yes        | `[ ]`                                                                                                    |
+| 4   | `EXT-01` `ever-works/apps` catalog repository does not exist                         | APW-03 | unverified | `[x]` **resolved** — `ever-works/templates` created and seeded 2026-09-17                                |
+| 5   | `APW04-G01` no execution path puts a provisioning run in the restricted sandbox      | APW-04 | yes        | `[ ]`                                                                                                    |
+| 6   | `APW05-G01` push/PR runs never discovered without a webhook                          | APW-05 | yes        | `[ ]`                                                                                                    |
+| 7   | `APW05-G02` verification Build cannot run — no workflow, verify mode builds no image | APW-05 | yes        | `[ ]`                                                                                                    |
+| 8   | `APW05-G03` push-started Builds can never be deployable; no preparation state        | APW-05 | yes        | `[ ]`                                                                                                    |
+| 9   | `XC-01` PR and verification builds hand every `EW_` secret to unreviewed code        | APW-05 | unverified | `[ ]`                                                                                                    |
+| 10  | `GAP-07` push/PR Builds discovered only from webhooks; no epic installs one          | APW-05 | unverified | `[ ]`                                                                                                    |
+| 11  | `APW06-G01` kubeconfig save path dials the user cluster from the API process         | APW-06 | yes        | `[ ]`                                                                                                    |
+| 12  | `APW06-G02` the Trigger worker cannot host `app-deploy` as planned                   | APW-06 | yes        | `[ ]`                                                                                                    |
+| 13  | `GAP-06` namespace policies ↔ dependency ordering circularity                        | APW-06 | unverified | `[ ]`                                                                                                    |
+| 14  | `APW07-G01` first-Deployment deadlock between providers and namespace                | APW-07 | yes        | `[ ]`                                                                                                    |
+| 15  | `APW10-G01` in-zone dependency provisioning contracted to APW-10, no task builds it  | APW-10 | unverified | `[ ]`                                                                                                    |
+| 16  | `GAP-22` no SMTP dependency can work on the tier; both Blueprints need one           | APW-10 | unverified | `[ ]`                                                                                                    |
+| 17  | `APW13-G01` no working mechanism gives a throwaway test user a GitHub connection     | APW-13 | unverified | `[ ]`                                                                                                    |
+| 18  | `APW13-G02` PR lanes start no background job runtime                                 | APW-13 | unverified | `[ ]`                                                                                                    |
+| 19  | `GAP-01` all three Blueprint drafts fail blueprint-mode validation                   | APW-13 | unverified | `[x]` **resolved** — drafts fixed and validator green on 42 fixtures (`_build-artifacts/apw-03-schema/`) |
+| 20  | `EXT-02` Blueprint drafts are not valid Blueprint repositories (catalog C4)          | APW-13 | unverified | `[x]` **resolved** — repos created with `ever-works-app-blueprint` topic + valid specs                   |
+| 21  | `EXT-03` fixture application has no source, image or CI                              | APW-13 | unverified | `[x]` **resolved** — `ever-works/app-fixture-hello` created and seeded (54 files)                        |
+| 22  | `EXT-04` test estate does not exist                                                  | APW-13 | unverified | `[~]` owner decided: **an Ever Works tenant**, not a GitHub test org; repos exist, tenant remaining      |
+| 23  | `APW13-UF-01` Umami image switches to a user by NAME; refused under `runAsNonRoot`   | APW-13 | unverified | `[ ]`                                                                                                    |
+| 24  | `APW13-UF-02` Cal.diy image runs as root and writes into its own files at boot       | APW-13 | unverified | `[ ]`                                                                                                    |
 
 ### A2. Confirmed non-blocker gaps (110)
 
@@ -123,10 +123,10 @@ Per `docs/internal/app-works-implementation-plan.md` §3–§6.
 
 ### Wave 0 — independent fixes (ship first)
 
-| PR | Scope | Status |
-| --- | --- | --- |
-| 0.1 | Agent git tools resolve provider/owner/repo from the Work's repository, honour `branch`, refuse protected branches — **tests first** | `[ ]` |
-| 0.2 | Checkout directory keys unique/case-preserving/provider-scoped; no silent `git init`; non-blocking fork request with existing-fork lookup | `[ ]` |
+| PR  | Scope                                                                                                                                     | Status |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 0.1 | Agent git tools resolve provider/owner/repo from the Work's repository, honour `branch`, refuse protected branches — **tests first**      | `[ ]`  |
+| 0.2 | Checkout directory keys unique/case-preserving/provider-scoped; no silent `git init`; non-blocking fork request with existing-fork lookup | `[ ]`  |
 
 Verified defect premises at `origin/develop @ 653449ad3`:
 `apps/api/src/agents/agents.module.ts:685` and `:706` hard-code `providerId = 'github'`; `:700` returns
@@ -142,34 +142,34 @@ Mirrors the plan's step tables. Tracked per epic in §3.
 
 ## 3. Track C — per-epic status
 
-| Epic | Spec | Gaps closed | Implemented | Tested | Notes |
-| --- | --- | --- | --- | --- | --- |
-| APW-01 app Work kind | ready | | | | |
-| APW-02 fork lifecycle | ready | | | | |
-| APW-03 App spec + catalog | ready | | | | |
-| APW-04 App Provisioner | ready | | | | |
-| APW-05 builds | ready | | | | |
-| APW-06 app runtime | ready | | | | |
-| APW-07 app env + dependencies | ready | | | | |
-| APW-08 evolve loop | ready | | | | |
-| APW-09 upstream pull requests | ready | | | | |
-| APW-10 apps hosting tier | ready | | | | |
-| APW-11 app launcher | ready | | | | |
-| APW-12 Ever ID | ready | | | | |
-| APW-13 golden paths | ready | | | | |
+| Epic                          | Spec  | Gaps closed | Implemented | Tested | Notes |
+| ----------------------------- | ----- | ----------- | ----------- | ------ | ----- |
+| APW-01 app Work kind          | ready |             |             |        |       |
+| APW-02 fork lifecycle         | ready |             |             |        |       |
+| APW-03 App spec + catalog     | ready |             |             |        |       |
+| APW-04 App Provisioner        | ready |             |             |        |       |
+| APW-05 builds                 | ready |             |             |        |       |
+| APW-06 app runtime            | ready |             |             |        |       |
+| APW-07 app env + dependencies | ready |             |             |        |       |
+| APW-08 evolve loop            | ready |             |             |        |       |
+| APW-09 upstream pull requests | ready |             |             |        |       |
+| APW-10 apps hosting tier      | ready |             |             |        |       |
+| APW-11 app launcher           | ready |             |             |        |       |
+| APW-12 Ever ID                | ready |             |             |        |       |
+| APW-13 golden paths           | ready |             |             |        |       |
 
 ---
 
 ## 4. Track D — external / operator work
 
-| Item | Status | Evidence |
-| --- | --- | --- |
-| `ever-works/templates` (public), `app-fixture-hello`, `app-fixture-hello-template`, `cal-diy-template`, `umami-template`, `platforms` | `[x]` created + seeded 2026-09-17 | `gh api repos/ever-works/<r>` |
-| **`auth.ever.co` DNS** | `[x]` **live** — proxied `CNAME` → `5a1c27a6-…cfargotunnel.com` in the `ever.co` zone, record id `506584f8c80e91b9f5f589109b46afbf`. Resolves through Cloudflare and answers **404 from nginx**, which is the correct pre-deploy state (the tunnel reaches the cluster; nothing claims the host yet). | `Invoke-RestMethod` create + `Resolve-DnsName` + `HEAD https://auth.ever.co/` |
-| **`auth.ever.co` — ZITADEL stand-up** | `[~]` **manifests done and in review**; **not deployed**. New `ever-id-prod` app in `ever-co/k8s-gitops` on branch `feat/ever-id-zitadel` → **PR [#56](https://github.com/ever-co/k8s-gitops/pull/56)**. Also a new `Database/zitadel` on the shared CNPG cluster. Verified: all JSON parses, `kubectl kustomize` builds, `--dry-run=client --validate=strict` creates all 7 objects. Secrets come from OpenBao at `ever/id/prod/zitadel` and are **not** provisioned yet, so the pod cannot start. | `gh pr view 56 --repo ever-co/k8s-gitops` |
-| Ever Works test tenant for the acceptance lanes | `[x]` **done** — see the box below. | `docs/internal/app-works-test-estate.md` |
-| PR to `ever-co/ever-teams` / `ever-co/ever-gauzy` for Ever ID | `[ ]` | owner authorised |
-| Existing `repo`-kind regression suites stay green | `[ ]` | every change is additive |
+| Item                                                                                                                                  | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Evidence                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ever-works/templates` (public), `app-fixture-hello`, `app-fixture-hello-template`, `cal-diy-template`, `umami-template`, `platforms` | `[x]` created + seeded 2026-09-17                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `gh api repos/ever-works/<r>`                                                 |
+| **`auth.ever.co` DNS**                                                                                                                | `[x]` **live** — proxied `CNAME` → `5a1c27a6-…cfargotunnel.com` in the `ever.co` zone, record id `506584f8c80e91b9f5f589109b46afbf`. Resolves through Cloudflare and answers **404 from nginx**, which is the correct pre-deploy state (the tunnel reaches the cluster; nothing claims the host yet).                                                                                                                                                                                               | `Invoke-RestMethod` create + `Resolve-DnsName` + `HEAD https://auth.ever.co/` |
+| **`auth.ever.co` — ZITADEL stand-up**                                                                                                 | `[~]` **manifests done and in review**; **not deployed**. New `ever-id-prod` app in `ever-co/k8s-gitops` on branch `feat/ever-id-zitadel` → **PR [#56](https://github.com/ever-co/k8s-gitops/pull/56)**. Also a new `Database/zitadel` on the shared CNPG cluster. Verified: all JSON parses, `kubectl kustomize` builds, `--dry-run=client --validate=strict` creates all 7 objects. Secrets come from OpenBao at `ever/id/prod/zitadel` and are **not** provisioned yet, so the pod cannot start. | `gh pr view 56 --repo ever-co/k8s-gitops`                                     |
+| Ever Works test tenant for the acceptance lanes                                                                                       | `[x]` **done** — see the box below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `docs/internal/app-works-test-estate.md`                                      |
+| PR to `ever-co/ever-teams` / `ever-co/ever-gauzy` for Ever ID                                                                         | `[ ]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | owner authorised                                                              |
+| Existing `repo`-kind regression suites stay green                                                                                     | `[ ]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | every change is additive                                                      |
 
 ### Track D — the test estate (done 2026-09-17)
 
@@ -179,9 +179,9 @@ The **creatable, user-facing scope is an Organization** (1 Tenant : 0..N Organiz
 `organizations/organization.service.ts:506`, `POST /api/organizations`), selected per request with the
 `x-scope-slug` header. So the lanes get **organizations**, not a second tenant:
 
-| Object | Slug | id |
-| --- | --- | --- |
-| Organization | `app-works-dev` | `cf89c6bb-3cbd-46d9-b73e-db57466c804e` |
+| Object       | Slug              | id                                     |
+| ------------ | ----------------- | -------------------------------------- |
+| Organization | `app-works-dev`   | `cf89c6bb-3cbd-46d9-b73e-db57466c804e` |
 | Organization | `app-works-stage` | `ef834760-935c-44f0-921f-103959f2644e` |
 
 Isolation is **proven with a negative control**: `GET /api/schedules` → `count=29` unscoped, `count=0` for each new
@@ -195,14 +195,14 @@ the **git connection is per-User, not per-Organization**, so both scopes share o
 ### Track D blocker — 🛑 **the backups-first gate is TRIPPED cluster-wide (not an App Works defect)**
 
 **On-site Ceph RGW is unreachable, so WAL archiving to `s3://pg-backups` has failed since 13:50Z on 2026-09-17.**
-All three gateways and the MetalLB VIP are dark, from the local machine *and* from inside the cluster. `rgw-lb/rgw-s3-lb`
+All three gateways and the MetalLB VIP are dark, from the local machine _and_ from inside the cluster. `rgw-lb/rgw-s3-lb`
 is `0/5` ready and its log is a continuous `rgw_nodes/<NOSRV> … SC` stream. `pg_stat_archiver` on primary `pg-2`:
 `last_archived_time 13:50:32Z`, `last_failed_time 21:30:58Z`, `failed_count 1084`; ~110 WAL segments queued. Also
 failing on the same endpoint: `pg-logical-dump`, `pve-config`, `offsite-sync`, `openbao-raft-snapshot`,
 `openbao-auto-unseal`.
 
 **No data is lost and nothing was changed** — this was diagnosed read-only and recorded on the fleet board
-(`ever-co/homelab` `MAINTENANCE.md`, commit `2f06199`). The consequence for *this* programme: **the Ever ID database
+(`ever-co/homelab` `MAINTENANCE.md`, commit `2f06199`). The consequence for _this_ programme: **the Ever ID database
 cannot be added to the shared cluster until archiving is healthy**, which is exactly what the fleet's backups-first
 rule requires. The remaining restore point is the `pg-nightly-20260917020000` base backup plus WAL to 13:50Z.
 

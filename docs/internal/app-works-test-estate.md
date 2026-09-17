@@ -1,7 +1,7 @@
 # App Works — test estate (the Ever Works-side tenancy)
 
 **Status:** `Created` · **Date:** 2026-09-17 · **Program:** [App Works](../specs/features/app-works/README.md)
-**Implements:** the owner decision of 2026-09-17 recorded in [ACCEPTANCE.md §0.3](../specs/features/app-works/ACCEPTANCE.md) (*"WTF, you can just create a tenant in Ever Works and use it for testing etc etc."*)
+**Implements:** the owner decision of 2026-09-17 recorded in [ACCEPTANCE.md §0.3](../specs/features/app-works/ACCEPTANCE.md) (_"WTF, you can just create a tenant in Ever Works and use it for testing etc etc."_)
 **Companion documents:** [ACCEPTANCE.md §0](../specs/features/app-works/ACCEPTANCE.md) (lanes, secrets by name) · [CONFIGURATION.md](../specs/features/app-works/CONFIGURATION.md) (configuration inventory) · [GITHUB-PERMISSIONS.md](../specs/features/app-works/GITHUB-PERMISSIONS.md) (tokens and scopes)
 
 > **Names only, never values.** Every identifier below is a UUID, a slug or a variable **name**. No token, key,
@@ -16,52 +16,52 @@
 
 ## 1. What a "tenant" actually is here
 
-The owner's phrase — *"create a tenant in Ever Works"* — does **not** map onto a creatable object called a
+The owner's phrase — _"create a tenant in Ever Works"_ — does **not** map onto a creatable object called a
 `Tenant`. The platform separates an internal, non-creatable container from the user-facing scope the owner
 means. Read together:
 
-| # | Fact | Evidence |
-| - | ---- | -------- |
-| 1 | A **Tenant** is a table-backed internal entity: `@Entity({ name: 'tenants' })`. | [`packages/agent/src/entities/tenant.entity.ts:33`](../../packages/agent/src/entities/tenant.entity.ts) |
-| 2 | **Cardinality is 1 User : 1 Tenant**, and the row is created **lazily**, never at signup. | [`packages/agent/src/entities/tenant.entity.ts:22-25`](../../packages/agent/src/entities/tenant.entity.ts) — *"Cardinality: 1 User : 1 Tenant. The Tenant row is created lazily the first time the user creates an Organization"* |
-| 3 | One Tenant per user is enforced at the DB level: `ownerUserId` is `UNIQUE`. | [`packages/agent/src/entities/tenant.entity.ts:52-53`](../../packages/agent/src/entities/tenant.entity.ts) |
-| 4 | A Tenant **never appears in the UI**. The user-facing concepts are `Organization` and `Company` — both are the *same* `organizations` row. | [`packages/agent/src/entities/tenant.entity.ts:17-20`](../../packages/agent/src/entities/tenant.entity.ts) |
-| 5 | "Every user has at most one Tenant (1:1 via `tenants.ownerUserId UNIQUE`). Tenants are NOT created at user signup — they're created on demand the first time the user does something that requires one (today: creating their first Organization…)". | [`apps/api/src/scope/tenant-bootstrap.service.ts:10-14`](../../apps/api/src/scope/tenant-bootstrap.service.ts) |
-| 6 | The bootstrap is reached **from Organization create**: `const tenant = await this.tenantBootstrap.ensureTenant(userId);` | [`apps/api/src/organizations/organization.service.ts:506`](../../apps/api/src/organizations/organization.service.ts) |
-| 7 | An **Organization** is the user-facing scope: `@Entity({ name: 'organizations' })`, `tenantId` FK, globally-unique `slug`. | [`packages/agent/src/entities/organization.entity.ts:76-78`](../../packages/agent/src/entities/organization.entity.ts), `:94-95`, `:104-105` |
-| 8 | **Cardinality 1 Tenant : 0..N Organizations.** | [`packages/agent/src/entities/organization.entity.ts:58`](../../packages/agent/src/entities/organization.entity.ts) — *"Cardinality: 1 Tenant : 0..N Organizations."* |
-| 9 | The HTTP surface is `POST /api/organizations` — *"create + lazy Tenant bootstrap"*. | [`apps/api/src/organizations/organizations.controller.ts:51`](../../apps/api/src/organizations/organizations.controller.ts), `:63-84` |
-| 10 | Programme-level: *"EW-658 (Tenants & Organizations Phase 6) — Organization CRUD + lazy Tenant bootstrap + upgrade-from-account flow."* | [`apps/api/src/api.module.ts:369-370`](../../apps/api/src/api.module.ts) |
-| 11 | Spec: *"**Tenant** — fully internal concept. Never appears in the UI. One per user, created on demand the first time the user creates an Organization."* | [`docs/specs/features/tenants-and-organizations/spec.md:30`](../specs/features/tenants-and-organizations/spec.md) |
-| 12 | Spec: *"**Organization** — user-facing. UI label varies by context … A Tenant can have zero, one, or many Organizations."* | [`docs/specs/features/tenants-and-organizations/spec.md:31`](../specs/features/tenants-and-organizations/spec.md) |
+| #   | Fact                                                                                                                                                                                                                                                 | Evidence                                                                                                                                                                                                                          |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | A **Tenant** is a table-backed internal entity: `@Entity({ name: 'tenants' })`.                                                                                                                                                                      | [`packages/agent/src/entities/tenant.entity.ts:33`](../../packages/agent/src/entities/tenant.entity.ts)                                                                                                                           |
+| 2   | **Cardinality is 1 User : 1 Tenant**, and the row is created **lazily**, never at signup.                                                                                                                                                            | [`packages/agent/src/entities/tenant.entity.ts:22-25`](../../packages/agent/src/entities/tenant.entity.ts) — _"Cardinality: 1 User : 1 Tenant. The Tenant row is created lazily the first time the user creates an Organization"_ |
+| 3   | One Tenant per user is enforced at the DB level: `ownerUserId` is `UNIQUE`.                                                                                                                                                                          | [`packages/agent/src/entities/tenant.entity.ts:52-53`](../../packages/agent/src/entities/tenant.entity.ts)                                                                                                                        |
+| 4   | A Tenant **never appears in the UI**. The user-facing concepts are `Organization` and `Company` — both are the _same_ `organizations` row.                                                                                                           | [`packages/agent/src/entities/tenant.entity.ts:17-20`](../../packages/agent/src/entities/tenant.entity.ts)                                                                                                                        |
+| 5   | "Every user has at most one Tenant (1:1 via `tenants.ownerUserId UNIQUE`). Tenants are NOT created at user signup — they're created on demand the first time the user does something that requires one (today: creating their first Organization…)". | [`apps/api/src/scope/tenant-bootstrap.service.ts:10-14`](../../apps/api/src/scope/tenant-bootstrap.service.ts)                                                                                                                    |
+| 6   | The bootstrap is reached **from Organization create**: `const tenant = await this.tenantBootstrap.ensureTenant(userId);`                                                                                                                             | [`apps/api/src/organizations/organization.service.ts:506`](../../apps/api/src/organizations/organization.service.ts)                                                                                                              |
+| 7   | An **Organization** is the user-facing scope: `@Entity({ name: 'organizations' })`, `tenantId` FK, globally-unique `slug`.                                                                                                                           | [`packages/agent/src/entities/organization.entity.ts:76-78`](../../packages/agent/src/entities/organization.entity.ts), `:94-95`, `:104-105`                                                                                      |
+| 8   | **Cardinality 1 Tenant : 0..N Organizations.**                                                                                                                                                                                                       | [`packages/agent/src/entities/organization.entity.ts:58`](../../packages/agent/src/entities/organization.entity.ts) — _"Cardinality: 1 Tenant : 0..N Organizations."_                                                             |
+| 9   | The HTTP surface is `POST /api/organizations` — _"create + lazy Tenant bootstrap"_.                                                                                                                                                                  | [`apps/api/src/organizations/organizations.controller.ts:51`](../../apps/api/src/organizations/organizations.controller.ts), `:63-84`                                                                                             |
+| 10  | Programme-level: _"EW-658 (Tenants & Organizations Phase 6) — Organization CRUD + lazy Tenant bootstrap + upgrade-from-account flow."_                                                                                                               | [`apps/api/src/api.module.ts:369-370`](../../apps/api/src/api.module.ts)                                                                                                                                                          |
+| 11  | Spec: _"**Tenant** — fully internal concept. Never appears in the UI. One per user, created on demand the first time the user creates an Organization."_                                                                                             | [`docs/specs/features/tenants-and-organizations/spec.md:30`](../specs/features/tenants-and-organizations/spec.md)                                                                                                                 |
+| 12  | Spec: _"**Organization** — user-facing. UI label varies by context … A Tenant can have zero, one, or many Organizations."_                                                                                                                           | [`docs/specs/features/tenants-and-organizations/spec.md:31`](../specs/features/tenants-and-organizations/spec.md)                                                                                                                 |
 
 ### 1.1 The consequence for "one test tenant per environment"
 
-* **A second Tenant cannot be created inside an existing account.** `tenants.ownerUserId` is `UNIQUE`
+- **A second Tenant cannot be created inside an existing account.** `tenants.ownerUserId` is `UNIQUE`
   (`tenant.entity.ts:52-53`) and there is **no tenant-create endpoint** anywhere in the API. The only routes that
   touch `tenants` are operator-scoped reads/writes under an existing tenant id:
   `apps/api/src/operator/tenant-runtime-allowlist/operator-tenant-runtime-allowlist.controller.ts:59`
   (`api/operator/tenants/:tenantId/runtime-allowlist`) and
   `apps/api/src/operator/tenant-merge-policy/operator-tenant-merge-policy.controller.ts:53`
   (`api/operator/tenants/:tenantId/merge-policy`). Neither creates a Tenant.
-* **The platform's own model for "a scope per environment" is one Organization per environment**, inside the one
+- **The platform's own model for "a scope per environment" is one Organization per environment**, inside the one
   Tenant that the existing account already owns. That is what this estate creates.
-* A genuinely separate Tenant would require a **separate user account** (`POST /api/auth/register`, `@Public()`,
+- A genuinely separate Tenant would require a **separate user account** (`POST /api/auth/register`, `@Public()`,
   [`apps/api/src/auth/controllers/auth.controller.ts:107-108`](../../apps/api/src/auth/controllers/auth.controller.ts),
   DTO at [`apps/api/src/auth/dto/auth.dto.ts:54`](../../apps/api/src/auth/dto/auth.dto.ts)). **That was not done,
   and it would not work for this programme anyway** — see §4: the GitHub connection that owns the fork space is
-  attached to the *user*, so a fresh account would have no GitHub connection without an interactive OAuth consent
+  attached to the _user_, so a fresh account would have no GitHub connection without an interactive OAuth consent
   round-trip (which is exactly the "hand-made PAT" workaround the task forbids).
 
 ### 1.2 How a scope is selected at request time — `X-Scope-Slug`
 
 The lanes pin their environment with a header, not with a path:
 
-* `packages/contracts/src/api/active-scope.ts:9` — `export const ACTIVE_SCOPE_API_HEADER = 'x-scope-slug' as const;`
+- `packages/contracts/src/api/active-scope.ts:9` — `export const ACTIVE_SCOPE_API_HEADER = 'x-scope-slug' as const;`
   (`:8` defines the reserved `@personal` sentinel; `:10` the browser-side `x-ever-workspace`).
-* `apps/api/src/scope/scope-resolver.middleware.ts:98-121` — the slug is taken from the URL `:slug` param first,
+- `apps/api/src/scope/scope-resolver.middleware.ts:98-121` — the slug is taken from the URL `:slug` param first,
   then from the `X-Scope-Slug` header; no hit is mapped to **404**.
-* The MCP server's equivalent is its `EVER_WORKS_SCOPE_SLUG` setting, forwarded as the same header
+- The MCP server's equivalent is its `EVER_WORKS_SCOPE_SLUG` setting, forwarded as the same header
   (`apps/mcp/README.md:32`, `apps/mcp/src/api-client/api-client.service.ts:63`).
 
 ---
@@ -71,32 +71,64 @@ The lanes pin their environment with a header, not with a path:
 All objects were created through `POST /api/organizations` on `api.ever.works`, authenticated with the host API
 key from `.config/ever-works/ever-works-tenant.env` (variable `EVER_WORKS_API_KEY`, sent as `x-api-key`).
 
-| Object | Name | Slug | id | How it was created | Read-back proof |
-| ------ | ---- | ---- | -- | ------------------ | --------------- |
-| Organization | `App Works Test Dev` | `app-works-dev` | `cf89c6bb-3cbd-46d9-b73e-db57466c804e` | `POST /api/organizations` → **201** | `GET /api/organizations/app-works-dev` → **200** |
+| Object       | Name                   | Slug              | id                                     | How it was created                  | Read-back proof                                    |
+| ------------ | ---------------------- | ----------------- | -------------------------------------- | ----------------------------------- | -------------------------------------------------- |
+| Organization | `App Works Test Dev`   | `app-works-dev`   | `cf89c6bb-3cbd-46d9-b73e-db57466c804e` | `POST /api/organizations` → **201** | `GET /api/organizations/app-works-dev` → **200**   |
 | Organization | `App Works Test Stage` | `app-works-stage` | `ef834760-935c-44f0-921f-103959f2644e` | `POST /api/organizations` → **201** | `GET /api/organizations/app-works-stage` → **200** |
 
 **Pre-existing and deliberately untouched** (listed so the reader can tell created from inherited):
 
-| Object | Name | Slug | id |
-| ------ | ---- | ---- | -- |
+| Object                                 | Name                            | Slug     | id                                     |
+| -------------------------------------- | ------------------------------- | -------- | -------------------------------------- |
 | Tenant (owner's, **not** created here) | — (internal; never shown in UI) | `evereq` | `ba15122d-216b-4357-92a3-90b755efe8c8` |
-| User (the tenant owner) | `evereq` | `evereq` | `08a9e304-9f5c-4824-9dff-5695da59019f` |
-| Organization | `Ever` | `ever` | `d479e9c2-ffc0-4fc7-b548-3697c8792051` |
-| Organization | `Yo, Inc.` | `yo-inc` | `87427a16-f09d-4b5c-a79d-b178a776ed87` |
+| User (the tenant owner)                | `evereq`                        | `evereq` | `08a9e304-9f5c-4824-9dff-5695da59019f` |
+| Organization                           | `Ever`                          | `ever`   | `d479e9c2-ffc0-4fc7-b548-3697c8792051` |
+| Organization                           | `Yo, Inc.`                      | `yo-inc` | `87427a16-f09d-4b5c-a79d-b178a776ed87` |
 
 ### 2.1 Read-back output (real, identifiers kept, nothing else to redact)
 
 `GET /api/organizations/app-works-dev` → **HTTP 200**:
 
 ```json
-{"id":"cf89c6bb-3cbd-46d9-b73e-db57466c804e","tenantId":"ba15122d-216b-4357-92a3-90b755efe8c8","slug":"app-works-dev","legalName":null,"displayName":"App Works Test Dev","countryCode":null,"registrationProvider":null,"registrationStatus":"draft","linkedWorkId":null,"vision":"Non-production test estate for the App Works acceptance lanes (DEV). Fixture-only. No real customer data.","visionUpdatedAt":"2026-09-17T21:22:41.613Z","mergePolicy":null,"connectionPolicy":null,"createdAt":"2026-09-17T21:22:41.611Z","updatedAt":"2026-09-17T21:22:41.611Z"}
+{
+	"id": "cf89c6bb-3cbd-46d9-b73e-db57466c804e",
+	"tenantId": "ba15122d-216b-4357-92a3-90b755efe8c8",
+	"slug": "app-works-dev",
+	"legalName": null,
+	"displayName": "App Works Test Dev",
+	"countryCode": null,
+	"registrationProvider": null,
+	"registrationStatus": "draft",
+	"linkedWorkId": null,
+	"vision": "Non-production test estate for the App Works acceptance lanes (DEV). Fixture-only. No real customer data.",
+	"visionUpdatedAt": "2026-09-17T21:22:41.613Z",
+	"mergePolicy": null,
+	"connectionPolicy": null,
+	"createdAt": "2026-09-17T21:22:41.611Z",
+	"updatedAt": "2026-09-17T21:22:41.611Z"
+}
 ```
 
 `GET /api/organizations/app-works-stage` → **HTTP 200**:
 
 ```json
-{"id":"ef834760-935c-44f0-921f-103959f2644e","tenantId":"ba15122d-216b-4357-92a3-90b755efe8c8","slug":"app-works-stage","legalName":null,"displayName":"App Works Test Stage","countryCode":null,"registrationProvider":null,"registrationStatus":"draft","linkedWorkId":null,"vision":"Non-production test estate for the App Works acceptance lanes (STAGE). Fixture-only. No real customer data.","visionUpdatedAt":"2026-09-17T21:22:41.925Z","mergePolicy":null,"connectionPolicy":null,"createdAt":"2026-09-17T21:22:41.939Z","updatedAt":"2026-09-17T21:22:41.939Z"}
+{
+	"id": "ef834760-935c-44f0-921f-103959f2644e",
+	"tenantId": "ba15122d-216b-4357-92a3-90b755efe8c8",
+	"slug": "app-works-stage",
+	"legalName": null,
+	"displayName": "App Works Test Stage",
+	"countryCode": null,
+	"registrationProvider": null,
+	"registrationStatus": "draft",
+	"linkedWorkId": null,
+	"vision": "Non-production test estate for the App Works acceptance lanes (STAGE). Fixture-only. No real customer data.",
+	"visionUpdatedAt": "2026-09-17T21:22:41.925Z",
+	"mergePolicy": null,
+	"connectionPolicy": null,
+	"createdAt": "2026-09-17T21:22:41.939Z",
+	"updatedAt": "2026-09-17T21:22:41.939Z"
+}
 ```
 
 `GET /api/organizations` → **HTTP 200**, `4` rows in total (`app-works-stage`, `app-works-dev`, `ever`,
@@ -107,12 +139,12 @@ key from `.config/ever-works/ever-works-tenant.env` (variable `EVER_WORKS_API_KE
 A scope that resolves but is not actually a distinct partition would be worthless, so the header was tested
 against a genuinely organization-scoped read, with a negative control. `GET /api/schedules`:
 
-| `X-Scope-Slug` | Result |
-| -------------- | ------ |
-| *(header absent — the caller's own default scope)* | **HTTP 200**, `count=29` |
-| `app-works-dev` | **HTTP 200**, `count=0` |
-| `app-works-stage` | **HTTP 200**, `count=0` |
-| `ghost-not-real` (control) | **HTTP 404** |
+| `X-Scope-Slug`                                     | Result                   |
+| -------------------------------------------------- | ------------------------ |
+| _(header absent — the caller's own default scope)_ | **HTTP 200**, `count=29` |
+| `app-works-dev`                                    | **HTTP 200**, `count=0`  |
+| `app-works-stage`                                  | **HTTP 200**, `count=0`  |
+| `ghost-not-real` (control)                         | **HTTP 404**             |
 
 The 404 on the control is the important half: it proves the header is really being resolved rather than
 ignored, so the two `200 / count=0` answers mean "an existing, empty partition", not "a header nobody read".
@@ -123,7 +155,11 @@ The two new scopes carry **no data at all** — no customer rows were copied, bo
 `GET /api/users/me/scope` was read before and after the creates and is byte-identical both times:
 
 ```json
-{"tenantId":"ba15122d-216b-4357-92a3-90b755efe8c8","organizationId":"d479e9c2-ffc0-4fc7-b548-3697c8792051","organizationSlug":"ever"}
+{
+	"tenantId": "ba15122d-216b-4357-92a3-90b755efe8c8",
+	"organizationId": "d479e9c2-ffc0-4fc7-b548-3697c8792051",
+	"organizationSlug": "ever"
+}
 ```
 
 `createOrganization` only re-points `users.lastScopeOrganizationId` when it is still `null`
@@ -131,7 +167,7 @@ The two new scopes carry **no data at all** — no customer rows were copied, bo
 set, so the branch did not fire and the owner's (and every other agent's) active scope is still `ever`.
 
 **One side effect worth knowing about, reported rather than hidden.** `createOrganization` runs an
-*unconditional, NULL-only* `tenantId` backfill across every user-owned table as step (e) of the documented flow
+_unconditional, NULL-only_ `tenantId` backfill across every user-owned table as step (e) of the documented flow
 ([`organization.service.ts:412-415`](../../apps/api/src/organizations/organization.service.ts) and
 `:573-592`). It is idempotent — `UPDATE … SET "tenantId" = $1 WHERE … AND "tenantId" IS NULL` — and for this
 account it is a no-op, because the user already had a Tenant and a first Organization since 2026-07-20. It is
@@ -143,14 +179,14 @@ outside; it is inferred from the code path plus the pre-existing `tenantId` valu
 
 ## 3. The GitHub account that owns the fork space
 
-| Question | Answer | Evidence |
-| -------- | ------ | -------- |
-| Is a GitHub account connected? | **Yes.** | `GET /api/git-providers/github/connection` → `"connected":true` |
-| Which account? | **`evereq`** (GitHub user id `118497`), connected by **OAuth**, not by a PAT. | `GET /api/oauth/github/connection` → `{"id":"github","connected":true,"username":"evereq","connectionSource":"plugin"}` ; `GET /api/git-providers/github/user` → `{"id":"118497","login":"evereq", …}` |
-| What fork space does it own? | The `evereq` personal account, plus the organizations that account can reach. | `GET /api/git-providers/github/organizations` → `success=true`, **2** organizations: `ever-works`, `ever-works-cloud` |
-| Is a GitHub **App** installed? | **No.** | `GET /api/github-app/installations` → `[]` |
-| Does the fork flow need the App? | **No.** Token resolution is explicit token → managed PAT → App installation → **the user's OAuth account** → plugin-settings PAT. OAuth is present at step 4. | [`packages/agent/src/facades/git.facade.ts:1644-1647`](../../packages/agent/src/facades/git.facade.ts); [GITHUB-PERMISSIONS.md:33-36](../specs/features/app-works/GITHUB-PERMISSIONS.md) |
-| So what does `<e2e-fork-org>` resolve to? | **`evereq`** — the connected account's own space. `<e2e-upstream-org>` resolves to **`ever-works`** as [ACCEPTANCE.md §0.3](../specs/features/app-works/ACCEPTANCE.md) already records. | this read-back + `ACCEPTANCE.md:94-95` |
+| Question                                  | Answer                                                                                                                                                                                  | Evidence                                                                                                                                                                                               |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Is a GitHub account connected?            | **Yes.**                                                                                                                                                                                | `GET /api/git-providers/github/connection` → `"connected":true`                                                                                                                                        |
+| Which account?                            | **`evereq`** (GitHub user id `118497`), connected by **OAuth**, not by a PAT.                                                                                                           | `GET /api/oauth/github/connection` → `{"id":"github","connected":true,"username":"evereq","connectionSource":"plugin"}` ; `GET /api/git-providers/github/user` → `{"id":"118497","login":"evereq", …}` |
+| What fork space does it own?              | The `evereq` personal account, plus the organizations that account can reach.                                                                                                           | `GET /api/git-providers/github/organizations` → `success=true`, **2** organizations: `ever-works`, `ever-works-cloud`                                                                                  |
+| Is a GitHub **App** installed?            | **No.**                                                                                                                                                                                 | `GET /api/github-app/installations` → `[]`                                                                                                                                                             |
+| Does the fork flow need the App?          | **No.** Token resolution is explicit token → managed PAT → App installation → **the user's OAuth account** → plugin-settings PAT. OAuth is present at step 4.                           | [`packages/agent/src/facades/git.facade.ts:1644-1647`](../../packages/agent/src/facades/git.facade.ts); [GITHUB-PERMISSIONS.md:33-36](../specs/features/app-works/GITHUB-PERMISSIONS.md)               |
+| So what does `<e2e-fork-org>` resolve to? | **`evereq`** — the connected account's own space. `<e2e-upstream-org>` resolves to **`ever-works`** as [ACCEPTANCE.md §0.3](../specs/features/app-works/ACCEPTANCE.md) already records. | this read-back + `ACCEPTANCE.md:94-95`                                                                                                                                                                 |
 
 **Nothing was connected or disconnected.** The connection already existed; the `connect` endpoint is
 `GET /api/oauth/:providerId/connect/url`
@@ -162,19 +198,19 @@ and completing it requires an interactive browser consent plus the server-minted
 
 This is the single most important caveat in this document for the programme:
 
-* `git-provider.service.ts` takes a **`userId`** for every connection question —
+- `git-provider.service.ts` takes a **`userId`** for every connection question —
   [`apps/api/src/plugins-capabilities/git-provider/git-provider.service.ts:33`](../../apps/api/src/plugins-capabilities/git-provider/git-provider.service.ts)
   (`checkConnection(userId, providerId)`), `:53`
   (`!!oauthAccount || hasValidCredentials({ userId, providerId })`), `:79-93` (`getUser`/`getOrganizations`/`getRepositories`, all `(userId, …)`).
-* The OAuth connection endpoint is the same:
+- The OAuth connection endpoint is the same:
   [`oauth.controller.ts:102-104`](../../apps/api/src/plugins-capabilities/oauth/oauth.controller.ts) (`req.user.userId`).
-* Token resolution resolves against `options.userId`:
+- Token resolution resolves against `options.userId`:
   [`git.facade.ts:1644-1690`](../../packages/agent/src/facades/git.facade.ts).
 
-**Consequence:** `app-works-dev` and `app-works-stage` are two isolated *data* scopes, but they share **one**
+**Consequence:** `app-works-dev` and `app-works-stage` are two isolated _data_ scopes, but they share **one**
 GitHub identity — `evereq`. They are not two independent GitHub accounts, and `ACC-E2E-02`'s assertion that
 the fork "was created with the user's connection" holds for both lanes with the same actor. If the programme
-needs `<e2e-user>` to be a *different* identity per environment, or an identity that is "never an administrator
+needs `<e2e-user>` to be a _different_ identity per environment, or an identity that is "never an administrator
 of the upstream owner" ([ACCEPTANCE.md:96](../specs/features/app-works/ACCEPTANCE.md)), **the platform cannot
 express that today** — see §6.
 
@@ -186,49 +222,49 @@ Nothing here is a value. `.config` paths are on the operator workstation (`E:\Co
 
 ### 4.1 Which scope a lane runs in (the new estate)
 
-| Name | Value to use | Source |
-| ---- | ------------ | ------ |
-| `X-Scope-Slug` (HTTP header, **not** an env var) | `app-works-dev` on the nightly/dev lane · `app-works-stage` on the golden-path/stage lane | created here, §2 |
-| `EVER_WORKS_SCOPE_SLUG` (MCP server only) | same slugs | `apps/mcp/README.md:32` |
+| Name                                              | Value to use                                                                                                                    | Source                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `X-Scope-Slug` (HTTP header, **not** an env var)  | `app-works-dev` on the nightly/dev lane · `app-works-stage` on the golden-path/stage lane                                       | created here, §2                                                                    |
+| `EVER_WORKS_SCOPE_SLUG` (MCP server only)         | same slugs                                                                                                                      | `apps/mcp/README.md:32`                                                             |
 | `EVER_WORKS_ORGANIZATION_SLUG` (operator tooling) | currently `ever` in `.config/ever-works/ever-works-tenant.env`; point it at `app-works-dev` / `app-works-stage` for estate work | `.config/ever-works/ever-works-tenant.env`, variable `EVER_WORKS_ORGANIZATION_SLUG` |
 
 ### 4.2 Existing platform credentials the lanes reuse
 
-| Name | Where the value comes from |
-| ---- | -------------------------- |
-| `API_URL` | `.config/ever-works/ever-works-tenant.env` → `EVER_WORKS_API_URL` (host `api.ever.works`; `/api/health` → 200) |
-| `EVER_WORKS_API_KEY` (if a lane talks to the API as this account) | `.config/ever-works/ever-works-tenant.env` → `EVER_WORKS_API_KEY` (`ew_live_…`, 72 chars) |
-| `PLAYWRIGHT_BASE_URL` | the dev / stage web origin (an operator fact; not present in `.config`) |
-| `APW_E2E_ALLOWED_BASE_URLS` | must list that same dev/stage origin (ACC-NEG-16) — **not present in `.config`**, compose it from the two origins above |
+| Name                                                              | Where the value comes from                                                                                              |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `API_URL`                                                         | `.config/ever-works/ever-works-tenant.env` → `EVER_WORKS_API_URL` (host `api.ever.works`; `/api/health` → 200)          |
+| `EVER_WORKS_API_KEY` (if a lane talks to the API as this account) | `.config/ever-works/ever-works-tenant.env` → `EVER_WORKS_API_KEY` (`ew_live_…`, 72 chars)                               |
+| `PLAYWRIGHT_BASE_URL`                                             | the dev / stage web origin (an operator fact; not present in `.config`)                                                 |
+| `APW_E2E_ALLOWED_BASE_URLS`                                       | must list that same dev/stage origin (ACC-NEG-16) — **not present in `.config`**, compose it from the two origins above |
 
 ### 4.3 Lane secrets and variables that must be **created** (no source exists yet)
 
 These are the names [ACCEPTANCE.md §0.4](../specs/features/app-works/ACCEPTANCE.md) (lines 109-133) and
 [CONFIGURATION.md §4.5](../specs/features/app-works/CONFIGURATION.md) (lines 224-246) already fix. The right-hand
-column is what this survey actually found — where it says *none*, the value has to be minted, and the row is a
+column is what this survey actually found — where it says _none_, the value has to be minted, and the row is a
 real open item, not a formatting gap.
 
-| Name | Secret | What this survey found as a source |
-| ---- | ------ | ---------------------------------- |
-| `APW_E2E_LIVE`, `APW_E2E_LANE`, `APW_E2E_RUN_ID` | no | none — harness-generated per run |
-| `APW_E2E_GITHUB_USER` | no | **`evereq`** (the connected account, §3) |
-| `APW_E2E_UPSTREAM_ORG` | no | **`ever-works`** (fixtures verified present, §6.4) |
-| `APW_E2E_FORK_ORG` | no | **`evereq`** (the connected account, §3) — see the §3.1 caveat |
-| `APW_E2E_GITHUB_USER_TOKEN` | **yes** | **no `.config` variable currently holds a token with the required scope set.** Closest candidates: (a) `.config/ever-works/ever-works.env` → `EVER_WORKS_GITHUB_PAT_CLASSIC`, verified as classic PAT for user `evereq` with scopes `repo, workflow, write:packages` — **missing `read:org`**, which APW-01's fork-target picker needs ([GITHUB-PERMISSIONS.md](../specs/features/app-works/GITHUB-PERMISSIONS.md) row 3); (b) the local `gh` CLI keyring token for `evereq`, verified scopes `admin:org, gist, repo, workflow, write:packages` |
-| `APW_E2E_GITHUB_ESTATE_TOKEN` | **yes** | same two candidates as above; harness-only, must never be given to the platform |
-| `APW_E2E_UMAMI_REPO`, `APW_E2E_CALDIY_REPO` | no | the repositories do **not** exist yet in the fork space. Only the *Blueprints* exist (`ever-works/umami-template`, `ever-works/cal-diy-template`, both private, default branch `main`). ACCEPTANCE.md:101 requires them to be created **once by a person** — not a machine |
-| `APW_E2E_USER_CLUSTER_KUBECONFIG` | **yes** | `.config/kubeconfig` — verified: `kubectl config get-contexts -o name` with `KUBECONFIG` pointed at it returns exactly **`ever-k8s`** |
-| `APW_E2E_USER_CLUSTER_CONTEXT` | no | **`ever-k8s`** (same file) |
-| `APW_E2E_USER_CLUSTER_DOMAIN` | no | none in `.config` — the wildcard ingress domain must be chosen and its DNS record created |
-| `APW_E2E_DNS_ZONE`, `APW_E2E_DNS_API_TOKEN` | no / **yes** | `.config/ever-works/cloudflare.env` → `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID`); `.config/ever/cloudflare.env` also carries `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_TOKEN` / `CLOUDFLARE_API_KEY` / `CLOUDFLARE_EMAIL` |
-| `MAILHOG_URL` | no | **none — `grep` for `MAILHOG`/`mailhog` across the whole of `.config/` returns zero matches.** The sink itself would have to be deployed; note the kubeconfig above is the `ever-k8s` cluster, so a sink in a test namespace is reachable |
-| `APW_E2E_APPS_TIER_READ_KUBECONFIG`, `APW_E2E_APPS_TIER_CONTEXT` | **yes** / no | none — Wave 2, and `<e2e-apps-tier>` does not exist yet (APW-10 is not shipped) |
-| `APW_E2E_CANARY_SINK_URL`, `APW_E2E_CANARY_SINK_READ_TOKEN` | no / **yes** | none — needs a deployed HTTPS sink |
-| `APW_E2E_HONEYTOKEN` | **yes** | synthetic — generate a unique credential-shaped string per run; must not match any real credential |
-| `APW_E2E_MANAGED_AGENT_API_KEY` | **yes** | none in `.config` — APW-04 T4's sandbox-isolation live spec credential |
-| `APW_E2E_TOKEN_BUDGET`, `APW_E2E_ACTIONS_MINUTES_BUDGET` | no | policy values from ACCEPTANCE.md §0.1 (`1 200 000` / lane budgets) |
-| `EVER_WORKS_E2E_FAKES`, `APW_E2E_GITHUB_FAKE_URL` | no | PR lanes only — no external value needed |
-| `APW_E2E_KIND_KUBECONFIG_PATH` | no | PR-cluster lane only — generated locally, mirrors `KUBECONFIG_E2E_PATH` |
+| Name                                                             | Secret       | What this survey found as a source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APW_E2E_LIVE`, `APW_E2E_LANE`, `APW_E2E_RUN_ID`                 | no           | none — harness-generated per run                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `APW_E2E_GITHUB_USER`                                            | no           | **`evereq`** (the connected account, §3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `APW_E2E_UPSTREAM_ORG`                                           | no           | **`ever-works`** (fixtures verified present, §6.4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `APW_E2E_FORK_ORG`                                               | no           | **`evereq`** (the connected account, §3) — see the §3.1 caveat                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `APW_E2E_GITHUB_USER_TOKEN`                                      | **yes**      | **no `.config` variable currently holds a token with the required scope set.** Closest candidates: (a) `.config/ever-works/ever-works.env` → `EVER_WORKS_GITHUB_PAT_CLASSIC`, verified as classic PAT for user `evereq` with scopes `repo, workflow, write:packages` — **missing `read:org`**, which APW-01's fork-target picker needs ([GITHUB-PERMISSIONS.md](../specs/features/app-works/GITHUB-PERMISSIONS.md) row 3); (b) the local `gh` CLI keyring token for `evereq`, verified scopes `admin:org, gist, repo, workflow, write:packages` |
+| `APW_E2E_GITHUB_ESTATE_TOKEN`                                    | **yes**      | same two candidates as above; harness-only, must never be given to the platform                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `APW_E2E_UMAMI_REPO`, `APW_E2E_CALDIY_REPO`                      | no           | the repositories do **not** exist yet in the fork space. Only the _Blueprints_ exist (`ever-works/umami-template`, `ever-works/cal-diy-template`, both private, default branch `main`). ACCEPTANCE.md:101 requires them to be created **once by a person** — not a machine                                                                                                                                                                                                                                                                      |
+| `APW_E2E_USER_CLUSTER_KUBECONFIG`                                | **yes**      | `.config/kubeconfig` — verified: `kubectl config get-contexts -o name` with `KUBECONFIG` pointed at it returns exactly **`ever-k8s`**                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `APW_E2E_USER_CLUSTER_CONTEXT`                                   | no           | **`ever-k8s`** (same file)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `APW_E2E_USER_CLUSTER_DOMAIN`                                    | no           | none in `.config` — the wildcard ingress domain must be chosen and its DNS record created                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `APW_E2E_DNS_ZONE`, `APW_E2E_DNS_API_TOKEN`                      | no / **yes** | `.config/ever-works/cloudflare.env` → `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID`); `.config/ever/cloudflare.env` also carries `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_TOKEN` / `CLOUDFLARE_API_KEY` / `CLOUDFLARE_EMAIL`                                                                                                                                                                                                                                                                                                            |
+| `MAILHOG_URL`                                                    | no           | **none — `grep` for `MAILHOG`/`mailhog` across the whole of `.config/` returns zero matches.** The sink itself would have to be deployed; note the kubeconfig above is the `ever-k8s` cluster, so a sink in a test namespace is reachable                                                                                                                                                                                                                                                                                                       |
+| `APW_E2E_APPS_TIER_READ_KUBECONFIG`, `APW_E2E_APPS_TIER_CONTEXT` | **yes** / no | none — Wave 2, and `<e2e-apps-tier>` does not exist yet (APW-10 is not shipped)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `APW_E2E_CANARY_SINK_URL`, `APW_E2E_CANARY_SINK_READ_TOKEN`      | no / **yes** | none — needs a deployed HTTPS sink                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `APW_E2E_HONEYTOKEN`                                             | **yes**      | synthetic — generate a unique credential-shaped string per run; must not match any real credential                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `APW_E2E_MANAGED_AGENT_API_KEY`                                  | **yes**      | none in `.config` — APW-04 T4's sandbox-isolation live spec credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `APW_E2E_TOKEN_BUDGET`, `APW_E2E_ACTIONS_MINUTES_BUDGET`         | no           | policy values from ACCEPTANCE.md §0.1 (`1 200 000` / lane budgets)                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `EVER_WORKS_E2E_FAKES`, `APW_E2E_GITHUB_FAKE_URL`                | no           | PR lanes only — no external value needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `APW_E2E_KIND_KUBECONFIG_PATH`                                   | no           | PR-cluster lane only — generated locally, mirrors `KUBECONFIG_E2E_PATH`                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### 4.4 Platform-side switches the lanes depend on (deployment configuration, not lane secrets)
 
@@ -249,14 +285,14 @@ PostHog flags, not GitHub Actions secrets — listed here so nobody looks for th
 Every documented discovery path was tried before any write. All four returned a real 404 whose body is quoted
 verbatim:
 
-| Request | Result |
-| ------- | ------ |
-| `GET /api-json` | HTTP 404 |
-| `GET /api/docs` | HTTP 404 |
-| `GET /openapi.json` | HTTP 404 |
-| `GET /api/openapi.json` | HTTP 404 — `{"message":"Cannot GET /api/openapi.json","error":"Not Found","statusCode":404}` |
-| `GET /api/swagger` | HTTP 404 |
-| `GET /api/docs-json`, `GET /api`, `GET /api/v1` | HTTP 404 |
+| Request                                         | Result                                                                                       |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET /api-json`                                 | HTTP 404                                                                                     |
+| `GET /api/docs`                                 | HTTP 404                                                                                     |
+| `GET /openapi.json`                             | HTTP 404                                                                                     |
+| `GET /api/openapi.json`                         | HTTP 404 — `{"message":"Cannot GET /api/openapi.json","error":"Not Found","statusCode":404}` |
+| `GET /api/swagger`                              | HTTP 404                                                                                     |
+| `GET /api/docs-json`, `GET /api`, `GET /api/v1` | HTTP 404                                                                                     |
 
 **This is by design, not a fault.** The document is served only outside production:
 
@@ -279,13 +315,22 @@ if (docsEnabled) { … }
 `GET /api/organizations/check-slug?slug=app-works-dev` → **HTTP 400**, verbatim:
 
 ```json
-{"message":["property slug should not exist","value contains unsupported characters; allowed: letters, digits, dot, underscore, at-sign, apostrophe, hyphen, space","value must be longer than or equal to 1 characters","value must be a string"],"error":"Bad Request","statusCode":400}
+{
+	"message": [
+		"property slug should not exist",
+		"value contains unsupported characters; allowed: letters, digits, dot, underscore, at-sign, apostrophe, hyphen, space",
+		"value must be longer than or equal to 1 characters",
+		"value must be a string"
+	],
+	"error": "Bad Request",
+	"statusCode": 400
+}
 ```
 
 The DTO names the parameter `value`, not `slug`
 ([`apps/api/src/organizations/dto/check-slug.dto.ts:23`](../../apps/api/src/organizations/dto/check-slug.dto.ts)),
 and `forbidNonWhitelisted` turns the unknown parameter into a hard 400 rather than ignoring it. Recorded because
-the message is genuinely confusing (it complains about a *missing* `value` with four errors while naming
+the message is genuinely confusing (it complains about a _missing_ `value` with four errors while naming
 `slug`), and the next person will hit it. Correct call:
 `GET /api/organizations/check-slug?value=app-works-dev` → **200**
 `{"available":true,"normalized":"app-works-dev"}`.
@@ -301,7 +346,7 @@ It is not currently blocking: the fork path resolves the user's OAuth connection
 ### 5.4 The `e2e` catalog branch does not exist
 
 [ACCEPTANCE.md §0.3](../specs/features/app-works/ACCEPTANCE.md) line 102 requires
-`EVER_WORKS_APPS_CATALOG_REF` on dev/stage to *"pin a commit on the `e2e` branch of `ever-works/templates`"*.
+`EVER_WORKS_APPS_CATALOG_REF` on dev/stage to _"pin a commit on the `e2e` branch of `ever-works/templates`"_.
 Observed:
 
 ```text
@@ -321,10 +366,10 @@ Only `main` exists. The dev and stage catalog pin therefore has nothing to point
 Two credentials were inspected read-only against `https://api.github.com/user` and the `x-oauth-scopes`
 response header (values never printed):
 
-| Credential | Identity | Scopes observed | Steps it cannot do |
-| ---------- | -------- | --------------- | ------------------ |
-| `.config/ever-works/ever-works.env` → `EVER_WORKS_GITHUB_PAT_CLASSIC` | `evereq` (id `118497`) | `repo, workflow, write:packages` | `read:org` → the fork-target organization picker (matrix row 3); `write:repo_hook` → installing the `workflow_run` webhook (row 20); `delete_repo` → deleting a fork/private copy on request (row 26) |
-| local `gh` CLI keyring (an OAuth token, shown redacted by `gh auth status`) | `evereq` | `admin:org, gist, repo, workflow, write:packages` | `delete_repo` (row 26) |
+| Credential                                                                  | Identity               | Scopes observed                                   | Steps it cannot do                                                                                                                                                                                    |
+| --------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.config/ever-works/ever-works.env` → `EVER_WORKS_GITHUB_PAT_CLASSIC`       | `evereq` (id `118497`) | `repo, workflow, write:packages`                  | `read:org` → the fork-target organization picker (matrix row 3); `write:repo_hook` → installing the `workflow_run` webhook (row 20); `delete_repo` → deleting a fork/private copy on request (row 26) |
+| local `gh` CLI keyring (an OAuth token, shown redacted by `gh auth status`) | `evereq`               | `admin:org, gist, repo, workflow, write:packages` | `delete_repo` (row 26)                                                                                                                                                                                |
 
 This is a **gap to close before the nightly lane can run**, and it is deliberately not closed here — minting a
 broader token is an owner decision, and the platform's own connected OAuth account (which does list
@@ -332,10 +377,10 @@ broader token is an owner decision, and the platform's own connected OAuth accou
 
 ### 5.6 Not attempted, on purpose
 
-* No user account was registered (`POST /api/auth/register`), so no second Tenant exists — §1.1 explains why.
-* No repository, branch, tag, webhook, secret, workflow or DNS record was created anywhere on GitHub or
+- No user account was registered (`POST /api/auth/register`), so no second Tenant exists — §1.1 explains why.
+- No repository, branch, tag, webhook, secret, workflow or DNS record was created anywhere on GitHub or
   Cloudflare. This task is Ever Works-side tenancy only.
-* Nothing was deleted, renamed, disabled or edited. The two pre-existing Organizations and the pre-existing
+- Nothing was deleted, renamed, disabled or edited. The two pre-existing Organizations and the pre-existing
   Tenant were only read.
 
 ---
@@ -542,7 +587,7 @@ $r = Invoke-WebRequest 'https://api.github.com/user' -Headers @{ Authorization =
 6. **`MAILHOG_URL` has no source anywhere in `.config`** (§4.3) — the mail sink APW-07 depends on does not
    appear to be deployed.
 7. **`EVER_WORKS_GITHUB_PAT_CLASSIC` lacks `read:org`**, which GITHUB-PERMISSIONS row 3 needs for the
-   fork-target picker (§5.5). The platform's connected OAuth account *does* list organizations successfully, so
+   fork-target picker (§5.5). The platform's connected OAuth account _does_ list organizations successfully, so
    the live lane is fine — but the PAT is not a drop-in substitute for `APW_E2E_GITHUB_USER_TOKEN`.
 8. **`createOrganization` writes outside `organizations`.** Step (e) of the documented flow runs an
    unconditional NULL-only `tenantId` backfill over every user-owned table (`organization.service.ts:412-415`,
@@ -553,6 +598,6 @@ $r = Invoke-WebRequest 'https://api.github.com/user' -Headers @{ Authorization =
 
 ## 9. Changelog
 
-| Date | Change |
-| ---- | ------ |
+| Date       | Change                                                                                                                                                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-17 | Created. Two Organizations (`app-works-dev`, `app-works-stage`) provisioned under the pre-existing Tenant; GitHub fork space identified as the connected `evereq` OAuth account; gaps recorded in §5. Not committed, not pushed. |

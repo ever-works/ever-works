@@ -291,7 +291,7 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       **Modify** `ever-works/app-fixture-hello:Dockerfile` — the `runtime` stage ends with a **numeric** `USER 1000`, never
       `USER node` (plan §4.1): kubelet refuses a non-numeric image user under the platform's `runAsNonRoot` default with
       `image has non-numeric user`, which APW-06 classifies `image_user_unverifiable` and refuses before apply on
-      `ever-works/apps`. The shipped repository currently says `USER node`; the App's own README records the numeric uid.
+      `ever-works/templates`. The shipped repository currently says `USER node`; the App's own README records the numeric uid.
       **Create** `ever-works/app-fixture-hello:.github/workflows/image.yml` — builds and publishes
       `ghcr.io/ever-works/app-fixture-hello:<sha>` and fails when `docker build` exceeds 120 s.
       **Test**: `ever-works/app-fixture-hello:test/routes.test.mjs`, `test/migrate.test.mjs`, `test/bootstrap.test.mjs`

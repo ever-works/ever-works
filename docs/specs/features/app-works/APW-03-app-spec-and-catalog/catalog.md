@@ -1,7 +1,8 @@
 # Apps catalog and Blueprint repositories — format reference
 
 > **Normative** for the two repository shapes outside this monorepo that APW-03 reads: the **Apps
-> catalog** `ever-works/apps` and each **Blueprint repository** `ever-works/<app>-template`
+> catalog** `ever-works/templates` (`EVER_WORKS_APPS_CATALOG_REPO`; the drafts called it `ever-works/apps`, which is
+> still accepted) and each **Blueprint repository** `ever-works/<app>-template`
 > ([CONTRACTS.md §8](../CONTRACTS.md#8-catalog-repositories-outside-this-monorepo)). How the platform reads
 > them is in [`plan.md` §2.4–§2.6](./plan.md); the App spec itself is [`schema.md`](./schema.md).
 
@@ -13,7 +14,7 @@
 ## 1. Principles
 
 1. **Catalog data, not platform code** (ADR-014, D4). Adding an App Blueprint is a pull request to
-   `ever-works/apps` and to its Blueprint repository — never a platform release.
+   `ever-works/templates` and to its Blueprint repository — never a platform release.
 2. **Never a copy of the upstream source.** A Blueprint repository holds an App spec, a few overlay files
    the upstream lacks, tests and documentation. CI enforces it (§6, C9).
 3. **Pinned, not floating.** Every manifest entry pins its Blueprint to a tag **and** a 40-character
@@ -29,15 +30,15 @@
    records an upstream agreement (§3.1, R-3); without one it runs on **Your cluster** only, after the owner's
    attestation.
 
-## 2. `ever-works/apps` layout
+## 2. `ever-works/templates` layout
 
-> **Repository name (2026-09-17).** The listing repository exists as **`ever-works/templates`**; the drafts called
-> it `ever-works/apps`, and `EVER_WORKS_APPS_CATALOG_REPO` accepts either value, so an installation carrying the
-> older name keeps working. Every `ever-works/apps` below means "the repository `EVER_WORKS_APPS_CATALOG_REPO`
-> points at".
+> **Repository name (2026-09-17).** The listing repository exists as **`ever-works/templates`** and that is what
+> `EVER_WORKS_APPS_CATALOG_REPO` defaults to (CONTRACTS §7 and Resolution **R-29**). The drafts called it
+> `ever-works/apps`; that name is **still accepted**, so an installation carrying it keeps working — see the note
+> below on how to read the rest of this document.
 
 ```
-ever-works/apps/
+ever-works/templates/
 ├── manifest.json                   # the App Blueprint index (§3)
 ├── licenses.yml                    # the license registry (§4)
 ├── schema/
@@ -353,7 +354,7 @@ listed, because `verification.evidence` is produced by them.
 
 ## 7. Contribution rules
 
-1. **One Blueprint per pull request** in `ever-works/apps`, linked to the Blueprint repository's release.
+1. **One Blueprint per pull request** in `ever-works/templates`, linked to the Blueprint repository's release.
 2. **New entries start as `beta`.** `production` requires `verified: true`.
 3. **Two maintainer approvals** for a new entry; **one legal-reviewer approval** for any change to
    `licenses.yml` or to an entry's `license`, `trademark` or `managedHosting.upstreamAgreement` block. The agreement
