@@ -155,6 +155,9 @@ import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
+import { AutonomyGrant } from '../entities/autonomy-grant.entity';
+import { RailRefusal } from '../entities/rail-refusal.entity';
+import { WorkspacePause } from '../entities/workspace-pause.entity';
 import { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
 import { Workflow } from '../entities/workflow.entity';
@@ -400,6 +403,11 @@ export const ENTITIES = [
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,
+    // Safety rails (AW-24) — the rung per (scope, category), the durable
+    // record of every refusal and hold, and the owner's workspace stop.
+    AutonomyGrant,
+    RailRefusal,
+    WorkspacePause,
     // Agent Plugins MCP slice — manual external MCP server registry +
     // per-agent/tenant bindings (plan §2.4/§2.5).
     McpServerConnection,
