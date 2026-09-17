@@ -3296,6 +3296,56 @@
                 "retry": "Try again"
             }
         },
+        "helpCenter": {
+            "title": "Help",
+            "tabLabel": "Manual",
+            "openTooltip": "Help — press ?",
+            "close": "Close help",
+            "searchLabel": "Search the manual",
+            "searchPlaceholder": "Search the manual…",
+            "clearSearch": "Clear search",
+            "onThisScreen": "On this screen",
+            "browse": "Browse",
+            "articleCount": "{count, plural, one {1 article} other {# articles}}",
+            "resultCount": "{count, plural, one {1 result} other {# results}}",
+            "noResults": "No results for “{query}”.",
+            "back": "Back to Help",
+            "reviewedOn": "Reviewed {date}",
+            "onThisPage": "On this page",
+            "related": "Related",
+            "openScreen": "Open {screen}",
+            "needsOwnerAccess": "Needs owner access",
+            "buildStamp": "Manual for build {version} · {commit}",
+            "openFullPage": "Open full page",
+            "pageSubtitle": "The manual for the build you’re running.",
+            "englishOnly": "This article is available in English only.",
+            "headingMoved": "That section has moved. Here’s the whole article.",
+            "dismiss": "Dismiss",
+            "externalLink": "Opens outside the app",
+            "loadingArticle": "Loading the article…",
+            "bodyUnavailable": "The full text of this article isn’t available right now.",
+            "readOnDocsSite": "Read it on the documentation site",
+            "retry": "Try again",
+            "sections": {
+                "startHere": "Start here",
+                "runningTheLoop": "Running the loop",
+                "yourAgents": "Your agents",
+                "setupAndConnections": "Set-up and connections",
+                "moneyAndLimits": "Money and limits",
+                "whenSomethingGoesWrong": "When something goes wrong"
+            },
+            "notInBuild": {
+                "title": "That article isn’t in this build.",
+                "body": "This deployment is running {version}. The article you followed may have been added later, or removed.",
+                "bodyUnknownVersion": "The article you followed may have been added later, or removed.",
+                "suggestions": "Did you mean?",
+                "browseAll": "Browse all articles"
+            },
+            "link": {
+                "howThisWorks": "How this works",
+                "whyAmISeeingThis": "Why am I seeing this?"
+            }
+        },
         "commandPalette": {
             "trigger": "Search…",
             "triggerHintMac": "⌘K",
@@ -8837,6 +8887,7 @@
             "profileMenu": {
                 "accountSettings": "Account Settings",
                 "helpDocs": "Help & Docs",
+                "docsSite": "Documentation site",
                 "support": "Support",
                 "keyboardShortcuts": "Keyboard Shortcuts",
                 "billing": "Billing",
@@ -9937,6 +9988,7 @@
             "billing": "Billing",
             "usage": "Usage & Credits",
             "resendVerification": "Resend Verification Email",
+            "help": "Help",
             "schedules": "Schedules"
         }
     },

@@ -41,6 +41,7 @@ import {
     Video,
     Inbox,
     Receipt,
+    BookOpen,
     type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -62,6 +63,7 @@ import { SidebarActivityIndicator } from './SidebarActivityIndicator';
 import { SidebarInboxBadge } from './SidebarInboxBadge';
 import { RunnerStatusPill } from './RunnerStatusPill';
 import { useMounted } from '@/lib/hooks/use-mounted';
+import type { HelpDrawerTab } from './HelpDrawer';
 
 interface DashboardSidebarProps {
     user: AuthUser;
@@ -70,6 +72,12 @@ interface DashboardSidebarProps {
     isCollapsed?: boolean;
     onCollapsedChange?: (v: boolean) => void;
     onOpenHelp?: () => void;
+    /**
+     * Help centre (AW-25) — open the Help drawer on one tab. When provided,
+     * "Help & Docs" opens the in-product manual and "Keyboard Shortcuts" opens
+     * the Shortcuts tab; without it both keep their earlier behaviour.
+     */
+    onOpenHelpTab?: (tab: HelpDrawerTab) => void;
     chatOpen?: boolean;
     onOpenChat?: () => void;
     onInteraction?: () => void;
@@ -99,6 +107,7 @@ export function DashboardSidebar({
     isCollapsed = false,
     onCollapsedChange,
     onOpenHelp,
+    onOpenHelpTab,
     chatOpen,
     onOpenChat,
     onInteraction,
@@ -503,8 +512,13 @@ export function DashboardSidebar({
                                         {t('profileMenu.accountSettings')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
+                                        data-testid="profile-menu-help-docs"
                                         onClick={() => {
                                             onInteraction?.();
+                                            if (onOpenHelpTab) {
+                                                onOpenHelpTab('manual');
+                                                return;
+                                            }
                                             window.open('https://docs.ever.works', '_blank');
                                         }}
                                         className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
@@ -515,6 +529,24 @@ export function DashboardSidebar({
                                         />
                                         {t('profileMenu.helpDocs')}
                                     </DropdownMenuItem>
+                                    {/* The published documentation site stays one click
+                                        away beside the in-product manual (AW-25). */}
+                                    {onOpenHelpTab && (
+                                        <DropdownMenuItem
+                                            data-testid="profile-menu-docs-site"
+                                            onClick={() => {
+                                                onInteraction?.();
+                                                window.open('https://docs.ever.works', '_blank');
+                                            }}
+                                            className="cursor-pointer px-3 rounded-sm hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
+                                        >
+                                            <BookOpen
+                                                className="w-4 h-4 mr-2 shrink-0"
+                                                strokeWidth={1.5}
+                                            />
+                                            {t('profileMenu.docsSite')}
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem
                                         onClick={() => {
                                             onInteraction?.();
@@ -534,9 +566,10 @@ export function DashboardSidebar({
                                     <DropdownMenuItem
                                         onClick={() => {
                                             onInteraction?.();
-                                            onOpenHelp?.();
+                                            if (onOpenHelpTab) onOpenHelpTab('shortcuts');
+                                            else onOpenHelp?.();
                                         }}
-                                        disabled={!onOpenHelp}
+                                        disabled={!onOpenHelp && !onOpenHelpTab}
                                         className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
                                     >
                                         <Keyboard

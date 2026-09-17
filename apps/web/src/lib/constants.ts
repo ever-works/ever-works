@@ -289,6 +289,10 @@ export const ROUTES = {
     // Agent email (AW-05) — the tenant email address registry an Agent's
     // addresses are assigned from.
     DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',
+    // Help centre (AW-25) — the in-product manual as a full page. The drawer
+    // opens the same articles in place; these are the shareable addresses.
+    DASHBOARD_HELP: '/help',
+    DASHBOARD_HELP_ARTICLE: (slug: string) => `/help/${slug}`,
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',

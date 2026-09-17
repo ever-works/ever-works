@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, type ComponentType } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import {
     Loader2,
@@ -155,6 +156,11 @@ export function SchedulesList() {
                 <p className="text-sm text-text-muted dark:text-text-muted-dark max-w-sm">
                     {t('empty.description')}
                 </p>
+                <HelpLink
+                    target="activity#the-schedules-view"
+                    variant="emptyState"
+                    className="mt-3"
+                />
             </div>
         );
     }
