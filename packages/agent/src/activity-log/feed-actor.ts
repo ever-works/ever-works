@@ -120,6 +120,8 @@ export const FEED_USER_ACTION_TYPES: ReadonlySet<string> = new Set<string>([
     ActivityActionType.SCHEDULE_CREATED,
     ActivityActionType.SCHEDULE_UPDATED,
     ActivityActionType.SCHEDULE_DELETED,
+    ActivityActionType.SCHEDULE_PAUSED,
+    ActivityActionType.SCHEDULE_RESUMED,
     ActivityActionType.IMPORT,
     ActivityActionType.EXPORT,
     ActivityActionType.SETTINGS_UPDATED,

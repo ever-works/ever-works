@@ -58,8 +58,22 @@ describe('AgentTemplatesService', () => {
             name: template.name,
             title: template.title,
             capabilities: template.capabilities,
+            // AW-20 — a template activation carries no lane unless the
+            // caller asks for one, so an ordinary create is unchanged.
+            lane: null,
             permissions: template.defaultPermissions,
         });
+    });
+
+    it('passes a requested lane through to the create input (AW-20)', async () => {
+        const { service, agents } = makeService();
+
+        await service.createFromTemplate('user-1', 'lead-researcher', { lane: 'research' });
+
+        expect(agents.create).toHaveBeenCalledWith(
+            'user-1',
+            expect.objectContaining({ lane: 'research' }),
+        );
     });
 
     it('writes the template system prompt as SOUL.md for the created Agent', async () => {

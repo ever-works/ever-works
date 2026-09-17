@@ -18,6 +18,7 @@ import {
 } from '@ever-works/agent/agents';
 import { config } from '@ever-works/agent/config';
 import {
+    isAgentReviewRunScope,
     resolveAcceptanceChecks,
     resolveAcceptanceCriteria,
     resolveChecksPolicy,
@@ -475,18 +476,32 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             let workspaceCwd: string | null = null;
             const taskWorkspace = appContext.get(TaskWorkspaceService);
             let provisioned: Awaited<ReturnType<TaskWorkspaceService['provisionForRun']>> = null;
+            // Reviewer agent stage (slice AD, EW-811) — a REVIEW run gets no
+            // workspace. Read from the run row's own admission scope
+            // (platform state written at dispatch), never from the payload.
+            //
+            // Everything after this that writes code keys on `provisioned`:
+            // the L0 pre-check, the quality-gate iterate loop (which would
+            // re-run the model up to maxGateAttempts times on ONE review
+            // claim) and `finalizeRun` (which commits and pushes the working
+            // tree to the Task's branch). A review run must do none of it —
+            // it reads the diff it was handed and records one verdict, and
+            // the self-review refusal relies on it never authoring a commit.
+            const reviewRun = isAgentReviewRunScope(run.delegationScope);
             try {
-                provisioned = await taskWorkspace.provisionForRun({
-                    task: taskRow,
-                    userId: payload.userId,
-                    runId: run.id,
-                    agentCanCommit:
-                        (agent as { permissions?: { canCommitToRepo?: boolean } }).permissions
-                            ?.canCommitToRepo !== false,
-                    // Repository registry (Feature G) — lets the provision
-                    // spec carry the agent's attached repos (advisory).
-                    agentId: payload.agentId,
-                });
+                provisioned = reviewRun
+                    ? null
+                    : await taskWorkspace.provisionForRun({
+                          task: taskRow,
+                          userId: payload.userId,
+                          runId: run.id,
+                          agentCanCommit:
+                              (agent as { permissions?: { canCommitToRepo?: boolean } }).permissions
+                                  ?.canCommitToRepo !== false,
+                          // Repository registry (Feature G) — lets the provision
+                          // spec carry the agent's attached repos (advisory).
+                          agentId: payload.agentId,
+                      });
                 workspaceCwd = provisioned?.cwd ?? null;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -571,7 +586,20 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // agent should know what it was asked to do before it reads
             // what is already broken. When the pass did not run (the
             // default), `immediateInput` is byte-identical to before.
-            const immediateInput = preCheckBlock ? `${taskBrief}\n\n${preCheckBlock}` : taskBrief;
+            //
+            // A REVIEW run is not asked to do the Task. Its brief — the pull
+            // request diff and the CI verdict — is already seeded on the run
+            // row as its first steering message; this line only tells the
+            // model which role it is in before that message arrives.
+            const immediateInput = reviewRun
+                ? [
+                      `Task ${taskRow.slug ?? taskRow.id}: ${neutralizeControlTokens(taskRow.title)}`,
+                      'You were dispatched as a CODE REVIEWER for this Task, not as its implementer. Do not change anything.',
+                      'Your review assignment — the pull request diff and the CI verdict — follows as the next message. Record your verdict with the one tool this run has.',
+                  ].join('\n')
+                : preCheckBlock
+                  ? `${taskBrief}\n\n${preCheckBlock}`
+                  : taskBrief;
 
             const scopeContext = taskRow
                 ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
@@ -583,6 +611,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 kind: 'task',
                 // No `signal` — see the note on the `run` params above.
                 taskId: payload.taskId,
+                // AW-17 — the Task's own Mission, from the row already loaded
+                // (never the Agent's): usage rows roll up to it.
+                missionId: taskRow?.missionId ?? undefined,
                 immediateInput,
                 workspaceCwd,
                 scopeContext,
@@ -819,6 +850,8 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                                 kind: 'task',
                                 // No `signal` — see the note on the `run` params above.
                                 taskId: payload.taskId,
+                                // AW-17 — same Mission attribution on the retry.
+                                missionId: taskRow?.missionId ?? undefined,
                                 immediateInput: iterateMessage,
                                 workspaceCwd,
                                 scopeContext,

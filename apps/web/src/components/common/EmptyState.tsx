@@ -1,5 +1,8 @@
 'use client';
 
+import { HelpLink } from '@/components/help/HelpLink';
+import type { HelpTarget } from '@/lib/help/help-target';
+
 interface EmptyStateProps {
     title: string;
     description?: string;
@@ -8,9 +11,14 @@ interface EmptyStateProps {
         onClick: () => void;
     };
     icon?: React.ReactNode;
+    /**
+     * Help centre (AW-25) — an article of the manual that explains this
+     * screen. Renders a secondary "How this works" link after the action.
+     */
+    helpTarget?: HelpTarget;
 }
 
-export function EmptyState({ title, description, action, icon }: EmptyStateProps) {
+export function EmptyState({ title, description, action, icon, helpTarget }: EmptyStateProps) {
     return (
         <div className="flex flex-col items-center justify-center py-12 px-4">
             {icon || (
@@ -44,6 +52,7 @@ export function EmptyState({ title, description, action, icon }: EmptyStateProps
                     {action.label}
                 </button>
             )}
+            {helpTarget && <HelpLink target={helpTarget} variant="emptyState" className="mt-3" />}
         </div>
     );
 }

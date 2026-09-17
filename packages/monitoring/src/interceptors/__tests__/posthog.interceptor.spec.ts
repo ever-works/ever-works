@@ -251,4 +251,14 @@ describe('PostHogInterceptor — machine-traffic suppression', () => {
         await run('/api/versions-of-my-doc');
         expect(captureMock).toHaveBeenCalledTimes(1);
     });
+
+    it('drops a share token from the endpoint property', async () => {
+        initPostHog({ apiKey: 'k' });
+        const token = 'Zb3kQ9x_T1-vYwP0aLmN8cR4sD6fG2hJ5kL7qW9eR1t';
+        await run(`/share/${token}`);
+        expect(captureMock).toHaveBeenCalledTimes(1);
+        const event = captureMock.mock.calls[0][0];
+        expect(event.properties.endpoint).toBe('/share/[redacted]');
+        expect(JSON.stringify(event)).not.toContain(token);
+    });
 });

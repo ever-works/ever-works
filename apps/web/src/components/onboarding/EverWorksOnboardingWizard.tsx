@@ -14,6 +14,7 @@ import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { ProfileStep } from './steps/ProfileStep';
+import { RosterStep } from './steps/RosterStep';
 import { CommunicationStep, SLACK_CONNECTOR_PLUGIN_ID } from './steps/CommunicationStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
@@ -523,6 +524,12 @@ function StepBody({
                     onSelectTeamSize={flow.setTeamSize}
                 />
             );
+        case 'roster':
+            // AW-20 — the one step that hands the user a team rather than
+            // more plumbing. It owns its own primary action ("Create my
+            // agents") the same way ProfileStep owns its seeding block;
+            // the footer's Skip is what makes it skippable.
+            return <RosterStep />;
         case 'communication':
             // Audit item (b) — connect in place. The connector plugin is
             // passed in so the card can render its settings panel + enable
@@ -696,6 +703,8 @@ function labelForStep(step: WizardStep): string {
             return 'Where it runs';
         case 'profile':
             return 'What do you do';
+        case 'roster':
+            return 'Your agents';
         case 'communication':
             return 'Communication';
         case 'plugins-catalog':

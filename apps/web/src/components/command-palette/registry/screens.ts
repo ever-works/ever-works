@@ -3,6 +3,7 @@ import {
     Bot,
     Brain,
     Calendar,
+    CalendarClock,
     Compass,
     CreditCard,
     FileText,
@@ -135,6 +136,12 @@ export const DASHBOARD_SCREENS: readonly PaletteScreen[] = [
         href: ROUTES.DASHBOARD_PLUGINS,
         icon: Plug,
         title: (t) => t('dashboard.sidebar.navigation.plugins'),
+    },
+    {
+        id: 'schedules',
+        href: ROUTES.DASHBOARD_SCHEDULES,
+        icon: CalendarClock,
+        title: (t) => t('dashboard.sidebar.navigation.schedules'),
     },
     {
         id: 'activity',

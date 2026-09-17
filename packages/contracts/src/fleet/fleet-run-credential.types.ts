@@ -263,6 +263,54 @@ const FLEET_RUN_TOKEN_DENIED_SEGMENTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Human-in-the-loop GATE routes, refused for a run token whatever family
+ * admits them. Matched by exact shape, one `*` per id segment.
+ *
+ * These are the routes the MCP whitelist withholds on purpose
+ * (`apps/mcp/src/openapi-tools/whitelist.ts`, "Human-in-the-loop gates are
+ * deliberately NOT exposed"), because the API cannot tell a caller holding
+ * the owner's credential from the owner — so any verb that ANSWERS a gate
+ * lets the agent answer its own. A fleet-run token resolves `request.user`
+ * to the OWNER, which makes that literal:
+ *
+ *   - `…/inbox/{id}/reply` — reaches `AgentApprovalsService.decide`,
+ *     which stamps `decidedVia: 'user'` and the owner as `decidedById`. On
+ *     a `merge_pull_request` proposal that is EXACTLY what
+ *     `MergeApprovalService.verifyMergeApproval` accepts as the human
+ *     merge approval, so a model on a fleet node could approve its own
+ *     merge with no human ever deciding.
+ *   - `…/tasks/{id}/escalations/{escalationId}/resolve` — resolve its own
+ *     escalation.
+ *   - `…/me/goals/{id}/dod/approve` — sign off its own definition of done.
+ *
+ * (`force` on `POST /api/tasks/{id}/transition`, the approver-gate
+ * override, and `requireAllApprovers` on `POST /api/tasks` /
+ * `PATCH /api/tasks/{id}`, the approver POLICY, are BODY fields this path
+ * check cannot see; the tasks controller refuses both for a run token.)
+ *
+ * The prefix families were described as "the MCP whitelist, minus
+ * anything that could be turned against the run itself", but the coarse
+ * `/api/inbox`, `/api/tasks` and `/api/me` families admitted all three —
+ * strictly broader than the whitelist, on the routes that matter most.
+ * Refused for EVERY method: the gate is the path, and no safe verb lives
+ * at any of these shapes.
+ */
+const FLEET_RUN_TOKEN_DENIED_GATE_ROUTES: readonly (readonly string[])[] = [
+	['api', 'inbox', '*', 'reply'],
+	['api', 'tasks', '*', 'escalations', '*', 'resolve'],
+	['api', 'me', 'goals', '*', 'dod', 'approve']
+];
+
+function isDeniedGateRoute(normalizedPath: string): boolean {
+	const segments = normalizedPath.split('/').filter((segment) => segment.length > 0);
+	return FLEET_RUN_TOKEN_DENIED_GATE_ROUTES.some(
+		(shape) =>
+			shape.length === segments.length &&
+			shape.every((part, index) => part === '*' || part === segments[index]?.toLowerCase())
+	);
+}
+
+/**
  * Whether a fleet-run token may be used on this request.
  *
  * Fail-closed on every axis: a malformed method or path is refused, a
@@ -295,6 +343,8 @@ export function isFleetRunTokenRouteAllowed(method: unknown, path: unknown): boo
 	for (const segment of normalized.split('/')) {
 		if (segment && FLEET_RUN_TOKEN_DENIED_SEGMENTS.has(segment.toLowerCase())) return false;
 	}
+	// The gate routes, likewise BEFORE any family can admit them.
+	if (isDeniedGateRoute(normalized)) return false;
 
 	if (FLEET_RUN_TOKEN_ALLOWED_PREFIXES.some((prefix) => underPrefix(normalized, prefix))) {
 		return true;

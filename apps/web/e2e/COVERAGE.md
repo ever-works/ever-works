@@ -81,6 +81,8 @@
 | `/[locale]/(dashboard)/plugins/[pluginId]`          | [x]    | plugin-detail-ui.spec.ts, plugins.spec.ts          |
 | `/[locale]/(dashboard)/profile`                     | [x]    | profile.spec.ts                                    |
 | `/[locale]/(dashboard)/runs`                        | [x]    | runs-ledger.spec.ts                                |
+| `/[locale]/(dashboard)/help`                        | [x]    | help-center.spec.ts, help-deep-links.spec.ts       |
+| `/[locale]/(dashboard)/help/[slug]`                 | [x]    | help-center.spec.ts                                |
 | `/[locale]/(dashboard)/templates`                   | [x]    | website-templates.spec.ts                          |
 | `/[locale]/(dashboard)/settings`                    | [x]    | settings.spec.ts                                   |
 | `/[locale]/(dashboard)/settings/api-keys`           | [x]    | api-keys.spec.ts                                   |

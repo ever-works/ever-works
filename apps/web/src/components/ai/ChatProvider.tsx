@@ -27,6 +27,7 @@ import { useLocalStorage } from '@/lib/hooks/use-local-storage';
 import { applyBrowserWorkspaceScope } from '@/lib/api/browser-api';
 
 import type { ConversationSummary } from '@/lib/api/conversations';
+import type { ConversationContextType } from '@ever-works/contracts';
 import {
     listConversations,
     getConversation,
@@ -36,6 +37,109 @@ import {
 } from '@/app/actions/dashboard/conversations';
 
 const ACTIVE_CONVERSATION_KEY = 'chat-active-conversation';
+/** Where the docked panel remembers who it was talking to and what was open (FR-20). */
+export const CHAT_PANEL_STATE_KEY = 'chat-panel-state';
+
+/**
+ * The three views of the docked panel (FR-14): one Conversation, one
+ * participant's Conversation list, and the participant switcher. Back walks
+ * Conversation → list → switcher.
+ */
+export type ChatPanelView = 'conversation' | 'list' | 'switcher';
+
+/** Who the panel is talking to: the AI assistant (today's thread) or one Agent. */
+export type ChatParticipant =
+    | { kind: 'assistant' }
+    | { kind: 'agent'; agentId: string; name: string; status?: string | null };
+
+/** The one object a new Conversation will be about, fixed at creation (FR-9). */
+export interface ChatConversationContext {
+    contextType: ConversationContextType;
+    contextId: string;
+    /** What to call it in the header chip, when the opener knows. */
+    label?: string | null;
+}
+
+/** The named Conversation open with an Agent; `id: null` until its first message creates it. */
+export interface ChatNamedConversation {
+    id: string | null;
+    title: string | null;
+    context: ChatConversationContext | null;
+}
+
+export interface OpenAgentConversationInput {
+    agentId: string;
+    agentName: string;
+    agentStatus?: string | null;
+    /** An existing Conversation to open; omitted opens a fresh one (FR-3). */
+    conversationId?: string | null;
+    title?: string | null;
+    context?: ChatConversationContext | null;
+}
+
+export interface ChatPanelState {
+    view: ChatPanelView;
+    participant: ChatParticipant;
+    conversation: ChatNamedConversation;
+    /** A context an entry point asked for before an Agent was chosen. */
+    pendingContext: ChatConversationContext | null;
+}
+
+const ASSISTANT: ChatParticipant = { kind: 'assistant' };
+const NO_CONVERSATION: ChatNamedConversation = { id: null, title: null, context: null };
+export const INITIAL_CHAT_PANEL_STATE: ChatPanelState = {
+    view: 'conversation',
+    participant: ASSISTANT,
+    conversation: NO_CONVERSATION,
+    pendingContext: null,
+};
+
+/** Where Back goes from each view (FR-14). The assistant has no per-participant list. */
+export function panelBackTarget(state: ChatPanelState): ChatPanelView | null {
+    if (state.view === 'conversation') {
+        return state.participant.kind === 'agent' ? 'list' : 'switcher';
+    }
+    if (state.view === 'list') return 'switcher';
+    return null;
+}
+
+/** Parse the persisted panel state; anything unreadable is the assistant, as today. */
+export function parseChatPanelState(raw: string | null): ChatPanelState {
+    if (!raw) return INITIAL_CHAT_PANEL_STATE;
+    try {
+        const parsed = JSON.parse(raw) as Partial<ChatPanelState>;
+        const participant = parsed.participant;
+        if (
+            !participant ||
+            participant.kind !== 'agent' ||
+            typeof participant.agentId !== 'string' ||
+            typeof participant.name !== 'string'
+        ) {
+            return INITIAL_CHAT_PANEL_STATE;
+        }
+        const conversation = parsed.conversation;
+        const view: ChatPanelView =
+            parsed.view === 'list' || parsed.view === 'switcher' ? parsed.view : 'conversation';
+        return {
+            view,
+            participant: {
+                kind: 'agent',
+                agentId: participant.agentId,
+                name: participant.name,
+                status: participant.status ?? null,
+            },
+            conversation: {
+                id: typeof conversation?.id === 'string' ? conversation.id : null,
+                title: typeof conversation?.title === 'string' ? conversation.title : null,
+                context: conversation?.context ?? null,
+            },
+            pendingContext: null,
+        };
+    } catch {
+        return INITIAL_CHAT_PANEL_STATE;
+    }
+}
+
 interface ChatContextValue {
     messages: UIMessage[];
     setMessages: (messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void;
@@ -62,6 +166,21 @@ interface ChatContextValue {
     loadConversation: (id: string) => Promise<void>;
     deleteConv: (id: string) => Promise<void>;
     refreshConversations: () => Promise<void>;
+    // ── The docked panel's navigation (named Conversations with Agents).
+    // Additive: a panel that never leaves the assistant behaves as before.
+    panel: ChatPanelState;
+    /** Go one view back (FR-14); a no-op on the switcher. */
+    panelBack: () => void;
+    /** Open the participant switcher. */
+    openSwitcher: (pendingContext?: ChatConversationContext | null) => void;
+    /** Talk to the AI assistant again — today's thread, exactly as it was. */
+    openAssistant: () => void;
+    /** Show one Agent's Conversation list. */
+    openAgentList: (agent: { agentId: string; name: string; status?: string | null }) => void;
+    /** Open (or start) a Conversation with an Agent, in place (FR-21). */
+    openAgentConversation: (input: OpenAgentConversationInput) => void;
+    /** Record what the open Conversation became: created by its first message, or renamed. */
+    updateNamedConversation: (patch: Partial<ChatNamedConversation>) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -155,6 +274,98 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const selectedModelRef = useRef(selectedModel);
 
     const chat = useChat({ id: 'ever-works-chat', transport });
+
+    // The panel's view stack and participant. Persisted so a reload restores
+    // the last open Conversation (FR-20); read before paint by the same
+    // layout effect `useLocalStorage` uses, so the assistant never flashes in
+    // first for someone who was talking to an Agent.
+    const [panel, setPanelState] = useLocalStorage<ChatPanelState>(
+        CHAT_PANEL_STATE_KEY,
+        INITIAL_CHAT_PANEL_STATE,
+        { serialize: JSON.stringify, deserialize: parseChatPanelState },
+    );
+    const panelRef = useRef(panel);
+    useEffect(() => {
+        panelRef.current = panel;
+    }, [panel]);
+    const setPanel = useCallback(
+        (update: (prev: ChatPanelState) => ChatPanelState) => {
+            const next = update(panelRef.current);
+            panelRef.current = next;
+            setPanelState(next);
+        },
+        [setPanelState],
+    );
+
+    const panelBack = useCallback(() => {
+        setPanel((prev) => {
+            const target = panelBackTarget(prev);
+            return target ? { ...prev, view: target } : prev;
+        });
+    }, [setPanel]);
+
+    const openSwitcher = useCallback(
+        (pendingContext: ChatConversationContext | null = null) => {
+            setPanel((prev) => ({ ...prev, view: 'switcher', pendingContext }));
+        },
+        [setPanel],
+    );
+
+    const openAssistant = useCallback(() => {
+        setPanel(() => INITIAL_CHAT_PANEL_STATE);
+    }, [setPanel]);
+
+    const openAgentList = useCallback(
+        (agent: { agentId: string; name: string; status?: string | null }) => {
+            setPanel((prev) => ({
+                view: 'list',
+                participant: {
+                    kind: 'agent',
+                    agentId: agent.agentId,
+                    name: agent.name,
+                    status: agent.status ?? null,
+                },
+                conversation:
+                    prev.participant.kind === 'agent' && prev.participant.agentId === agent.agentId
+                        ? prev.conversation
+                        : NO_CONVERSATION,
+                pendingContext: prev.pendingContext,
+            }));
+        },
+        [setPanel],
+    );
+
+    const openAgentConversation = useCallback(
+        (input: OpenAgentConversationInput) => {
+            setPanel((prev) => ({
+                view: 'conversation',
+                participant: {
+                    kind: 'agent',
+                    agentId: input.agentId,
+                    name: input.agentName,
+                    status: input.agentStatus ?? null,
+                },
+                conversation: {
+                    id: input.conversationId ?? null,
+                    title: input.title ?? null,
+                    // A fresh Conversation picks up a context an entry point
+                    // asked for before the Agent was chosen.
+                    context:
+                        input.context ??
+                        (input.conversationId ? null : (prev.pendingContext ?? null)),
+                },
+                pendingContext: null,
+            }));
+        },
+        [setPanel],
+    );
+
+    const updateNamedConversation = useCallback(
+        (patch: Partial<ChatNamedConversation>) => {
+            setPanel((prev) => ({ ...prev, conversation: { ...prev.conversation, ...patch } }));
+        },
+        [setPanel],
+    );
 
     const chatRef = useRef(chat);
 
@@ -458,6 +669,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             loadConversation,
             deleteConv,
             refreshConversations,
+            panel,
+            panelBack,
+            openSwitcher,
+            openAssistant,
+            openAgentList,
+            openAgentConversation,
+            updateNamedConversation,
         }),
         [
             chat.messages,
@@ -479,6 +697,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             loadConversation,
             deleteConv,
             refreshConversations,
+            panel,
+            panelBack,
+            openSwitcher,
+            openAssistant,
+            openAgentList,
+            openAgentConversation,
+            updateNamedConversation,
         ],
     );
 

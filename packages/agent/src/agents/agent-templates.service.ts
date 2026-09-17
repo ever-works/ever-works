@@ -18,6 +18,11 @@ export interface CreateAgentFromTemplateInput {
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
+    /**
+     * AW-20 — the area of work the created Agent owns. Optional, so every
+     * existing call site compiles and creates a laneless Agent unchanged.
+     */
+    lane?: string | null;
 }
 
 /**
@@ -79,6 +84,7 @@ export class AgentTemplatesService {
             name: input.name?.trim() || template.name,
             title: template.title,
             capabilities: template.capabilities,
+            lane: input.lane ?? null,
             permissions: template.defaultPermissions,
         };
         const created = ownershipScope

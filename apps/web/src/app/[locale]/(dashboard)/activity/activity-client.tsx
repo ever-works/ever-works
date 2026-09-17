@@ -22,6 +22,7 @@ import type { FeedActorSummaryDto, FeedPageDto } from '@ever-works/contracts';
 import { toast } from 'sonner';
 import {
     Activity as ActivityIcon,
+    ArrowUpRight,
     Download,
     Loader2,
     List,
@@ -29,6 +30,8 @@ import {
     Radio,
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 // `feed` is the Live Feed: the narrated, filterable view of the same
 // activity records the Log lists. Log stays the default.
@@ -57,6 +60,7 @@ export function ActivityClient({
     initialFeedActors = null,
 }: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
+    const tSchedules = useTranslations('dashboard.schedules');
     const searchParams = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
@@ -518,6 +522,19 @@ export function ActivityClient({
 
             {isSchedulesTab && (
                 <>
+                    {/* Schedules workspace — the same projection with run-now,
+                        pause and resume. Kept OUTSIDE the `schedules-list`
+                        container so the list below is untouched. */}
+                    <div className="flex justify-end">
+                        <Link
+                            href={ROUTES.DASHBOARD_SCHEDULES}
+                            data-testid="activity-open-schedules"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                            {tSchedules('openWorkspace')}
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                    </div>
                     <SchedulesList />
                     <TriggersManager />
                 </>

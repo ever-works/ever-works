@@ -620,14 +620,22 @@ export class TaskRepository {
      * method rather than adding optional params here.
      */
     async findDueRecurringTemplates(limit: number, now: Date = new Date()): Promise<Task[]> {
-        return this.repository
-            .createQueryBuilder('task')
-            .where('task.isRecurring = :rec', { rec: true })
-            .andWhere('task.nextOccurrenceAt IS NOT NULL')
-            .andWhere('task.nextOccurrenceAt <= :now', { now })
-            .orderBy('task.nextOccurrenceAt', 'ASC')
-            .take(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('task')
+                .where('task.isRecurring = :rec', { rec: true })
+                // Schedules — a paused template keeps its cadence and its
+                // `nextOccurrenceAt`; it is simply not due while paused. Every
+                // job runtime reaches this scan through
+                // `TaskRecurrenceDispatcherService.dispatchDue`, so the pause is
+                // honoured wherever the cron is hosted.
+                .andWhere('task.recurrencePausedAt IS NULL')
+                .andWhere('task.nextOccurrenceAt IS NOT NULL')
+                .andWhere('task.nextOccurrenceAt <= :now', { now })
+                .orderBy('task.nextOccurrenceAt', 'ASC')
+                .take(limit)
+                .getMany()
+        );
     }
 
     /**
@@ -653,8 +661,27 @@ export class TaskRepository {
             .where('id = :id', { id: taskId })
             .andWhere('isRecurring = :rec', { rec: true })
             .andWhere('nextOccurrenceAt = :expected', { expected })
+            // Schedules — closes the window between the due-scan read and
+            // this claim: a template paused in between is not spawned.
+            .andWhere('recurrencePausedAt IS NULL')
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Schedules — the most recently spawned instance of a recurring
+     * template, or null when it has never fired. Run-now reads it to refuse
+     * a second out-of-band fire while the previous one is still in flight.
+     *
+     * @internal Unscoped — callers must have resolved the template through
+     * an owner-scoped read first (`TasksService.getOne`).
+     */
+    async findLatestRecurrenceInstance(templateId: string): Promise<Task | null> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.parentRecurringTaskId = :templateId', { templateId })
+            .orderBy('task.createdAt', 'DESC')
+            .getOne();
     }
 
     /**
@@ -844,6 +871,136 @@ export class TaskRepository {
             .set({ ciAutoResumeNoticedAt: at })
             .where('id = :taskId', { taskId })
             .andWhere('ciAutoResumeNoticedAt IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Reviewer agent stage (slice AD, CodeRabbit CR-2) — take the planning
+     * lease for one attempt at the agent reviews this Task is owed.
+     *
+     * Compare-and-set in ONE statement on two things:
+     *
+     *  - the lease token the caller READ (`expectedLease`, `NULL` included):
+     *    the caller decided from that snapshot that an attempt is allowed
+     *    (`decideAgentReviewPlanAttempt`), so if any other planner took the
+     *    lease since — another replica's poll, an entry hook — the snapshot
+     *    is stale and this caller loses. Two replicas polling one Task
+     *    therefore plan it once;
+     *  - the Task still being `in_review`, so a Task that left review is
+     *    never planned from a stale in-memory copy;
+     *  - `when` — the time condition, compared HERE against `now` rather
+     *    than in JavaScript against a timestamp read back from the row, so it
+     *    holds whatever time zone a driver hydrates dates in (`due`: the
+     *    backoff elapsed or the lease expired; `no-live-lease`: nobody holds
+     *    an unexpired lease).
+     *
+     * Query-builder update like the other poll bookkeeping here: must not
+     * bump `updatedAt` and reshuffle the board.
+     */
+    async claimAgentReviewPlan(input: {
+        taskId: string;
+        expectedLease: string | null;
+        now: Date;
+        when: 'always' | 'due' | 'no-live-lease';
+        patch: {
+            agentReviewPlanKey: string;
+            agentReviewPlanState: 'in-flight';
+            agentReviewPlanAttempts: number;
+            agentReviewPlanNextAt: Date;
+            agentReviewPlanLease: string;
+            agentReviewPlanReason?: string | null;
+            agentReviewPlanStarted?: number;
+        };
+    }): Promise<boolean> {
+        const qb = this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(input.patch)
+            .where('id = :taskId', { taskId: input.taskId })
+            .andWhere('status = :status', { status: TaskStatus.IN_REVIEW });
+        if (input.expectedLease === null) {
+            qb.andWhere('agentReviewPlanLease IS NULL');
+        } else {
+            qb.andWhere('agentReviewPlanLease = :expectedLease', {
+                expectedLease: input.expectedLease,
+            });
+        }
+        if (input.when === 'due') {
+            qb.andWhere('(agentReviewPlanNextAt IS NULL OR agentReviewPlanNextAt <= :now)', {
+                now: input.now,
+            });
+        } else if (input.when === 'no-live-lease') {
+            qb.andWhere(
+                "(agentReviewPlanState IS NULL OR agentReviewPlanState <> 'in-flight' OR agentReviewPlanNextAt IS NULL OR agentReviewPlanNextAt <= :now)",
+                { now: input.now },
+            );
+        }
+        const result = await qb.execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Record, while the attempt holding `lease` still runs, how many reviews
+     * it has claimed for dispatch so far (`agentReviewPlanStarted`). Written
+     * right after planning returns and BEFORE the runs are dispatched, so an
+     * attempt killed during dispatch still leaves its starts counted against
+     * the per-entry approver cap when its lease is taken over. Does not touch
+     * the lease: the attempt still has to settle with it.
+     */
+    async recordAgentReviewPlanProgress(input: {
+        taskId: string;
+        lease: string;
+        started: number;
+    }): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ agentReviewPlanStarted: input.started })
+            .where('id = :taskId', { taskId: input.taskId })
+            .andWhere('agentReviewPlanLease = :lease', { lease: input.lease })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Record how the attempt holding `lease` ended. Lands only while the row
+     * still carries that lease: an attempt that outlived its lease and was
+     * taken over must not overwrite its successor's memory.
+     *
+     * ROTATES the lease (adversarial review of CR-2): `patch.agentReviewPlanLease`
+     * must be a fresh token. The token is the whole compare-and-set, and a
+     * settled / refused / exhausted row has `agentReviewPlanNextAt` NULL, which
+     * satisfies the `due` time condition — so a caller holding a copy of the
+     * row read WHILE this attempt was in flight (state `in-flight`, this
+     * lease) used to pass both checks after this settle and plan a key that
+     * had just been refused, settled with cap leftovers, or exhausted. A fresh
+     * token (never NULL — a copy read before any lease would match NULL) makes
+     * every such copy stale.
+     */
+    async settleAgentReviewPlan(input: {
+        taskId: string;
+        lease: string;
+        patch: {
+            agentReviewPlanKey: string;
+            agentReviewPlanState: 'settled' | 'refused' | 'retry' | 'exhausted';
+            agentReviewPlanReason: string | null;
+            agentReviewPlanNextAt: Date | null;
+            agentReviewPlanLease: string;
+            agentReviewPlanStarted?: number;
+        };
+    }): Promise<boolean> {
+        if (!input.patch.agentReviewPlanLease || input.patch.agentReviewPlanLease === input.lease) {
+            throw new Error(
+                `settleAgentReviewPlan: task ${input.taskId} must rotate its planning lease on settle`,
+            );
+        }
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(input.patch)
+            .where('id = :taskId', { taskId: input.taskId })
+            .andWhere('agentReviewPlanLease = :lease', { lease: input.lease })
             .execute();
         return (result.affected ?? 0) > 0;
     }

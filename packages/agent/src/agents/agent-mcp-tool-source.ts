@@ -21,12 +21,31 @@ import type { AgentToolDescriptor } from './agent-tool.service';
 export const AGENT_MCP_TOOL_SOURCE = 'AGENT_MCP_TOOL_SOURCE' as const;
 
 /**
+ * The run id `AgentToolService` hands a source when tools are resolved
+ * OUTSIDE a real run (its default run context). It still keys per-run
+ * resources, but it is not a run: usage must never be attributed to it.
+ */
+export const AGENT_MCP_NO_RUN_ID = 'no-run' as const;
+
+/**
  * The run the tools are being built FOR. Everything a source acquires on
  * the run's behalf — a launched stdio server, an open client — is held under
  * this id and let go by `releaseRun(runId)`.
  */
 export interface AgentMcpRunHandle {
     readonly runId: string;
+    /**
+     * AW-17 — the run's Task, when it has one. Stamped on every usage row a
+     * tool call records so the call rolls up to the Task like the run's model
+     * and plugin usage does.
+     */
+    readonly taskId?: string;
+    /**
+     * AW-17 — the Mission of the run's Task (`tasks.missionId`), never the
+     * Agent's own Mission. Stamped on every usage row a tool call records so
+     * Mission totals include the call.
+     */
+    readonly missionId?: string;
 }
 
 export interface AgentMcpToolSource {

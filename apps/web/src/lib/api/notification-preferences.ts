@@ -1,4 +1,8 @@
 import 'server-only';
+import type {
+    NotificationMatrixDto,
+    NotificationMatrixResetResultDto,
+} from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -21,6 +25,11 @@ export interface NotificationSubscription {
     userId: string;
     eventTypeKey: string;
     channelIds: string[];
+    /**
+     * AW-13 — `'matrix'` when the choice was saved from the notification
+     * matrix; null for choices stored any other way.
+     */
+    origin?: string | null;
 }
 
 export interface NotificationPreference {
@@ -28,6 +37,8 @@ export interface NotificationPreference {
     quietHoursStart: string | null;
     quietHoursEnd: string | null;
     timezone: string | null;
+    /** AW-13 — the person's opt-in to let every urgent event through quiet hours. */
+    urgentBypassesQuietHours?: boolean;
 }
 
 export interface PreferencesView {
@@ -46,6 +57,35 @@ export const notificationPreferencesAPI = {
     getPreferences: async () => {
         return serverFetch<PreferencesView>('/notifications/preferences');
     },
+    /**
+     * AW-13 — the whole notification matrix (events, delivery targets, quiet
+     * hours, mutes) in one read.
+     */
+    getMatrix: async () => {
+        return serverFetch<NotificationMatrixDto>('/notifications/matrix');
+    },
+    /** AW-13 — drop stored choices (for `eventKeys`, or all) so rows follow their defaults. */
+    resetMatrix: async (eventKeys?: string[]) => {
+        return serverMutation<NotificationMatrixResetResultDto>({
+            method: 'POST',
+            endpoint: '/notifications/matrix/reset',
+            data: eventKeys ? { eventKeys } : {},
+            wrapInData: false,
+        });
+    },
+    /**
+     * AW-13 — save one matrix row: the complete target list for one event,
+     * stored with the matrix marker (an empty list means nothing; a list
+     * without in-app keeps the notification out of the bell).
+     */
+    setMatrixEventTargets: async (eventKey: string, channelIds: string[]) => {
+        return serverMutation<{ subscription: NotificationSubscription }>({
+            method: 'PUT',
+            endpoint: `/notifications/matrix/event/${encodeURIComponent(eventKey)}`,
+            data: { channelIds },
+            wrapInData: false,
+        });
+    },
     setEventSubscription: async (eventKey: string, channelIds: string[]) => {
         return serverMutation<{ subscription: NotificationSubscription }>({
             method: 'PUT',
@@ -58,6 +98,8 @@ export const notificationPreferencesAPI = {
         quietHoursStart: string | null;
         quietHoursEnd: string | null;
         timezone: string | null;
+        /** AW-13 — omit to keep the stored opt-in. */
+        urgentBypassesQuietHours?: boolean;
     }) => {
         return serverMutation<{ preference: NotificationPreference }>({
             method: 'PUT',

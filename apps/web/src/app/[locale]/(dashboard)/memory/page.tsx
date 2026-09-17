@@ -1,6 +1,17 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { memoryAPI, EMPTY_MEMORY_RESPONSE, type MemoryResponse } from '@/lib/api/memory';
+import {
+    memoryFactsAPI,
+    settleInitialMemoryFacts,
+    type InitialMemoryFacts,
+} from '@/lib/api/memory-facts';
+import {
+    knowledgeLibraryAPI,
+    EMPTY_LIBRARY_LIST,
+    EMPTY_LIBRARY_TREE,
+} from '@/lib/api/knowledge-library';
+import type { KnowledgeLibraryInitialData } from '@/lib/api/knowledge-library-types';
 import { meetingsAPI, type Meeting } from '@/lib/api/meetings';
 import {
     MEETINGS_PAGE_SIZE,
@@ -39,17 +50,31 @@ const WORK_OPTIONS_LIMIT = 100;
  * works failure just costs the "routed to" filter its options. Neither
  * can take the Memory page down.
  *
+ * The page also server-fetches the first page of **memory facts** (AW-07)
+ * for the Facts block at the top of the shell; its search, views and writes
+ * re-query the `/api/memory/facts` BFF from the client.
+ *
  * All interactivity (search, filter chips, view toggle) lives in the
  * client `MemoryShell`, which re-queries the same-origin BFF proxy
  * (`/api/memory`).
+ *
+ * **Library view** (`?view=library`): the Knowledge library is a second
+ * view of this same page, not a route of its own. On that deep link the
+ * page also pre-fetches the library's folder rail and first page so the
+ * view paints without a loading flash; both reads are defensive, and a
+ * failure hands the panel an empty shelf flagged for a retry. Without
+ * `?view=library` nothing extra is fetched — the overview costs what it
+ * always did.
  */
 export default async function MemoryPage({
     searchParams,
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const query = parseMeetingsSearchParams(await searchParams);
+    const rawSearchParams = await searchParams;
+    const query = parseMeetingsSearchParams(rawSearchParams);
     const { source, workId, offset } = query;
+    const initialView = rawSearchParams.view === 'library' ? 'library' : undefined;
 
     const initialPromise: Promise<MemoryResponse> = memoryAPI
         .get({ limit: 200 })
@@ -72,10 +97,38 @@ export default async function MemoryPage({
             error: err instanceof Error ? err.message : 'Failed to load meetings.',
         }));
 
-    const [initial, works, meetingsResult] = await Promise.all([
+    // Memory facts (AW-07) — first page of the "All" view. Defensive like the
+    // two fetches above: a failure never takes the page down. It is not passed
+    // off as an empty workspace either — the Facts block says the load failed
+    // and offers Retry, and every write still works.
+    const factsPromise: Promise<InitialMemoryFacts> = settleInitialMemoryFacts(
+        memoryFactsAPI.list({ view: 'all' }),
+    );
+
+    const libraryPromise: Promise<KnowledgeLibraryInitialData | undefined> =
+        initialView === 'library'
+            ? Promise.all([
+                  knowledgeLibraryAPI.tree().then(
+                      (tree) => ({ tree, failed: false }),
+                      () => ({ tree: EMPTY_LIBRARY_TREE, failed: true }),
+                  ),
+                  knowledgeLibraryAPI.list().then(
+                      (list) => ({ list, failed: false }),
+                      () => ({ list: EMPTY_LIBRARY_LIST, failed: true }),
+                  ),
+              ]).then(([tree, list]) => ({
+                  tree: tree.tree,
+                  list: list.list,
+                  loadFailed: tree.failed || list.failed,
+              }))
+            : Promise.resolve(undefined);
+
+    const [initial, works, meetingsResult, facts, library] = await Promise.all([
         initialPromise,
         worksPromise,
         meetingsPromise,
+        factsPromise,
+        libraryPromise,
     ]);
 
     const hasNext = meetingsResult.rows.length > MEETINGS_PAGE_SIZE;
@@ -105,5 +158,14 @@ export default async function MemoryPage({
         },
     };
 
-    return <MemoryShell initial={initial} meetings={meetings} />;
+    return (
+        <MemoryShell
+            initial={initial}
+            meetings={meetings}
+            facts={facts.facts}
+            factsLoadFailed={facts.loadFailed}
+            initialView={initialView}
+            library={library}
+        />
+    );
 }

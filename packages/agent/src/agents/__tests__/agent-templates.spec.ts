@@ -85,6 +85,30 @@ describe('agent-templates catalog integrity', () => {
         }
     });
 
+    // AW-20 P1 — the coordination lane's template. Pinned separately from
+    // the six go-to-market presets above because its whole point is what
+    // makes it different: it is the only template that may assign work,
+    // and loosening its guardrails would give a brand-new account an agent
+    // that acts without being asked.
+    it('ships the workspace coordinator, in ops, able to assign work and nothing else', () => {
+        const coordinator = getAgentTemplate('workspace-coordinator');
+
+        expect(coordinator).toBeDefined();
+        expect(coordinator?.category).toBe('ops');
+        expect(coordinator?.defaultPermissions.canAssignTasks).toBe(true);
+        expect(Object.keys(coordinator?.defaultPermissions ?? {})).toEqual(['canAssignTasks']);
+        expect(coordinator?.defaultGuardrails.mode).toBe('require_approval');
+        expect(coordinator?.suggestedPipeline).toBeNull();
+    });
+
+    it("resolves every one of the coordinator's suggested skills in the catalog", () => {
+        const coordinator = getAgentTemplate('workspace-coordinator');
+        expect(coordinator?.suggestedSkills.length).toBeGreaterThan(0);
+        for (const slug of coordinator?.suggestedSkills ?? []) {
+            expect(GTM_SKILL_SLUGS).toContain(slug);
+        }
+    });
+
     it('lookup helpers return catalog entries by slug and undefined for unknowns', () => {
         expect(listAgentTemplates()).toBe(AGENT_TEMPLATES);
         expect(getAgentTemplate('outreach-drafter')?.name).toBe('Outreach Drafter');

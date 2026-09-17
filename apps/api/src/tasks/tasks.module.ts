@@ -5,6 +5,7 @@ import {
     AGENT_CHAT_REPLY_DISPATCHER,
 } from '@ever-works/agent/tasks-domain';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { AGENT_CONVERSATION_REPLY_DISPATCHER } from '@ever-works/agent/conversations';
 import { UsageModule } from '@ever-works/agent/usage';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
 // AgentRepository so the TasksController + TaskChatController can
@@ -57,6 +58,7 @@ import { NotificationService } from '@ever-works/agent/notifications';
 import {
     agentTaskExecuteTriggerAdapter,
     agentChatReplyTriggerAdapter,
+    agentConversationReplyTriggerAdapter,
 } from '@ever-works/trigger-tasks';
 // AUDIT A46/A24 — the fleet producer. `FleetApiModule` constructs the
 // `job-runtime-node` dispatcher factory over the real `fleet_jobs`
@@ -160,6 +162,15 @@ import { TaskChatController } from './task-chat.controller';
             ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
+        // Named Conversations — a person's message in a Conversation with
+        // an Agent fans out to `agent-conversation-reply`. A separate token
+        // from the Task chat one: that payload is keyed on a Task. @Global()
+        // is what lets the agent-side ConversationsModule's @Optional()
+        // injection see it, exactly as for the chat token above.
+        {
+            provide: AGENT_CONVERSATION_REPLY_DISPATCHER,
+            useValue: agentConversationReplyTriggerAdapter,
+        },
         // Judgment layers G5 + G9 — the two runner seams the agents module
         // declares @Optional() and documents as "bound by the api-side
         // @Global() module". Nothing ever bound them, so
@@ -187,6 +198,7 @@ import { TaskChatController } from './task-chat.controller';
     exports: [
         AGENT_TASK_EXECUTE_DISPATCHER,
         AGENT_CHAT_REPLY_DISPATCHER,
+        AGENT_CONVERSATION_REPLY_DISPATCHER,
         SUB_AGENT_DELEGATION_RUNNER,
         SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
         WORKFLOW_NODE_RUNNER,

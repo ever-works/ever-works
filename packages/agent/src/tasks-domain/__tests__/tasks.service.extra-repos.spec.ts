@@ -8,9 +8,12 @@ import { TasksService } from '../tasks.service';
  * URL, the EFFECTIVE mount directory (explicit or derived from the
  * connection) must pass the fleet gate and be unique, two connections may
  * not point at one repository, at most eight entries. The service is built
- * positionally with the repository-registry double in the LAST constructor
- * slot (the arity rule every TasksService spec follows).
+ * positionally with the repository-registry double in its own constructor
+ * slot. New collaborators are appended AFTER it (the arity rule every
+ * TasksService spec follows), so the slot is addressed by index, not as
+ * "the last one".
  */
+const REPO_CONNECTIONS_SLOT = 22;
 function makeService(
     repoConnections: { findByIdAndUser: jest.Mock } | undefined,
     taskRow: Record<string, unknown> = { id: 'task-1', title: 'T', userId: 'user-1' },
@@ -43,7 +46,7 @@ function makeService(
     args[5] = { removeForTask: jest.fn(), listForTask: jest.fn().mockResolvedValue([]) };
     args[6] = counter;
     args[7] = { transition: jest.fn() };
-    args[args.length - 1] = repoConnections;
+    args[REPO_CONNECTIONS_SLOT] = repoConnections;
     const service = new (TasksService as unknown as new (...a: unknown[]) => TasksService)(...args);
     return { service, tasks, created, patches };
 }

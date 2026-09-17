@@ -7,6 +7,11 @@ export * from './billing/billing.provider';
 export * from './billing/credit-packs';
 // Credits pricing view (billing spec FR-13) + the pay-as-you-go catalog helpers the API/UI need.
 export * from './billing/credits-pricing';
+// The published credit price list (AW-17) — versioned, keyed on capability + operation.
+export * from './billing/credit-pricebook';
+// The price-list PORT the pricing view reads (bound once in UsageModule).
+export { CREDIT_PRICE_LIST, PublishedCreditPriceList } from '../usage/credit-price-list';
+export type { CreditPriceList } from '../usage/credit-price-list';
 export { estimatePaygCents, getPaygCatalog, paygLookupKey } from './billing/stripe-catalog';
 export type { CatalogPayg, CatalogPaygTier } from './billing/stripe-catalog';
 export * from './billing/stripe-billing.provider';
@@ -32,6 +37,8 @@ export * from './credits/plan-credit-grant.service';
 export * from './credits/credits-sweep.service';
 // Run-cost settlement + dispatch-gate credits precheck (pricing Wave 9 M2)
 export * from './credits/run-cost-settlement.service';
+// Who paid the provider for a usage row — the one shared rule (AW-16)
+export * from './credits/owner-paid-usage';
 // Account-wide usage aggregations for the Billing/Usage pages (Wave 13)
 export * from './credits/usage-summary.service';
 // Costs dashboard aggregations (Settings → Usage & Credits → Costs)
