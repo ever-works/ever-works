@@ -427,11 +427,26 @@ export class WorkspaceBackupRunner {
         const outcomes: BackupDomainOutcome[] = [];
         const total = BACKUP_DOMAINS.length;
 
+        /**
+         * Stop here if the row is no longer `running`, discarding everything
+         * written so far. Asked at every domain boundary and once more after
+         * the attachment copy, so the two phases that can run for a long time
+         * both end at the first probe after a cancel rather than at the end of
+         * the archive.
+         */
+        const stopIfNotRunning = async (): Promise<WorkspaceBackupRunResult | null> => {
+            if (!cancelled.value && !(await this.isCancelled(row.id))) {
+                return null;
+            }
+            cancelled.value = true;
+            writer.abort('the backup is no longer running');
+            return this.outcomeOfStoppedRun(row.id);
+        };
+
         for (const [index, descriptor] of BACKUP_DOMAINS.entries()) {
-            if (await this.isCancelled(row.id)) {
-                cancelled.value = true;
-                writer.abort('cancelled by the owner');
-                return { status: 'cancelled', backupId: row.id };
+            const stopped = await stopIfNotRunning();
+            if (stopped) {
+                return stopped;
             }
 
             await this.backups.heartbeat(row.id, {
@@ -452,7 +467,23 @@ export class WorkspaceBackupRunner {
             );
         }
 
-        const omissions = await this.copyFiles(queuedFiles, writer, storage, heartbeat);
+        const omissions = await this.copyFiles(
+            queuedFiles,
+            writer,
+            storage,
+            heartbeat,
+            context.shouldStop,
+        );
+
+        // The copy phase is the longest one on a workspace with files — up to
+        // the whole attachment budget read from storage — and nothing after it
+        // looks at the row until the final compare-and-set. Without this probe
+        // a backup cancelled while its last attachments copied still finished
+        // the zip and the whole upload, and only then threw the object away.
+        const stoppedAfterCopy = await stopIfNotRunning();
+        if (stoppedAfterCopy) {
+            return stoppedAfterCopy;
+        }
 
         const manifest = buildManifest({
             producedAt: startedAt,
@@ -532,20 +563,34 @@ export class WorkspaceBackupRunner {
             // permanent, billable orphan on an object store, so the object
             // goes with the outcome that won.
             await this.discardOrphan(stored.key, storage);
-            const current = await this.dataSource
-                .getRepository<WorkspaceBackup>('WorkspaceBackup')
-                .findOne({ where: { id: row.id }, select: { id: true, status: true } });
+            const outcome = await this.outcomeOfStoppedRun(row.id);
             this.logger.warn(
-                `Workspace backup ${row.id} settled elsewhere as ${current?.status ?? 'unknown'}; discarded the archive it had already produced`,
+                `Workspace backup ${row.id} settled elsewhere as ${outcome.reason}; discarded the archive it had already produced`,
             );
-            return {
-                status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
-                reason: current?.status ?? 'settled-elsewhere',
-                backupId: row.id,
-            };
+            return outcome;
         }
 
         return { status: gaps ? 'ready_with_gaps' : 'ready', backupId: row.id };
+    }
+
+    /**
+     * What a run that stopped because its row left `running` reports.
+     *
+     * The row says who stopped it. The owner's cancel is `cancelled`, and the
+     * task stays silent about it because the owner already knows. Anything
+     * else that settled the row — the sweeper's stall or timeout rule — is a
+     * `failed` backup the owner is still owed a notification for, which is why
+     * this reads the row instead of assuming a cancel.
+     */
+    private async outcomeOfStoppedRun(backupId: string): Promise<WorkspaceBackupRunResult> {
+        const current = await this.dataSource
+            .getRepository<WorkspaceBackup>('WorkspaceBackup')
+            .findOne({ where: { id: backupId }, select: { id: true, status: true } });
+        return {
+            status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
+            reason: current?.status ?? 'settled-elsewhere',
+            backupId,
+        };
     }
 
     /** Remove an archive no row will ever reference. Best effort by design. */
@@ -868,6 +913,7 @@ export class WorkspaceBackupRunner {
         writer: BackupArchiveWriter,
         storage: BackupStorage,
         heartbeat: () => Promise<void>,
+        shouldStop: () => boolean,
     ): Promise<BackupOmission[]> {
         const omissions: BackupOmission[] = [];
 
@@ -879,6 +925,15 @@ export class WorkspaceBackupRunner {
             // archive they went on to produce became an orphan nothing could
             // reach or delete. `heartbeat` throttles itself to 25 s.
             await heartbeat();
+
+            // The heartbeat is also the live stop signal: it matches no row
+            // once the backup has left `running`. It used to be written here
+            // and never read, so a cancelled backup went on reading every
+            // remaining attachment out of storage before anything noticed.
+            // The caller decides what the stop means; this only stops reading.
+            if (shouldStop()) {
+                break;
+            }
 
             const verdict = writer.canAcceptFile(file.sizeBytes);
             if (!verdict.accepted) {

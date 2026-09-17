@@ -3,6 +3,7 @@ import type { DataSource } from 'typeorm';
 import { BACKUP_DOMAINS } from '@ever-works/contracts';
 import { referencedEntities } from './collectors/domain-specs';
 import type { WorkspaceBackupRepository } from '../../database/repositories/workspace-backup.repository';
+import { BackupArchiveWriter } from './backup-archive-writer';
 import type { BackupStorage } from './backup-storage';
 import {
     EMPTY_BACKUP_WORK_CONTENT,
@@ -48,6 +49,10 @@ interface Harness {
     storage: jest.Mocked<BackupStorage>;
     dataSource: DataSource;
     terminal: () => Record<string, unknown> | undefined;
+    /** What `requestCancel` does to the row: a compare-and-set to `cancelled`. */
+    cancel: () => void;
+    /** Another writer's compare-and-set out of `running`, e.g. the sweeper's. */
+    settleElsewhere: (status: string) => void;
 }
 
 function harness(
@@ -198,6 +203,12 @@ function harness(
         storage,
         dataSource,
         terminal: () => terminalCalls[terminalCalls.length - 1],
+        cancel: () => {
+            state.status = 'cancelled';
+        },
+        settleElsewhere: (status: string) => {
+            state.status = status;
+        },
     };
 }
 
@@ -694,6 +705,123 @@ describe('WorkspaceBackupRunner', () => {
 
             expect(result.status).toBe('failed');
             expect(result.reason).toBe('failed');
+        });
+
+        describe('a cancel that lands while attachments are being copied', () => {
+            // The heartbeat in the copy loop matched no row once the backup
+            // left `running` and set the stop flag — which nothing in the copy
+            // loop read. So a cancelled backup read every remaining attachment
+            // out of storage, closed the zip, finished the whole upload, and
+            // only then found its compare-and-set missing and deleted what it
+            // had just written. In the job runtime that is up to 2 GiB read
+            // and 5 GiB written for an archive nobody will ever see, holding
+            // one of the two queue slots the whole time.
+            let close: jest.SpyInstance;
+
+            beforeEach(() => {
+                close = jest.spyOn(BackupArchiveWriter.prototype, 'close');
+            });
+
+            afterEach(() => {
+                close.mockRestore();
+            });
+
+            /** Storage that cancels the backup while the FIRST attachment is being read. */
+            function cancellingOnFirstRead(h: Harness): void {
+                (h.storage.readObject as jest.Mock).mockImplementationOnce(async () => {
+                    h.cancel();
+                    return {
+                        stream: Readable.from([Buffer.from('bytes')]),
+                        mimeType: 'application/pdf',
+                        size: 5,
+                    };
+                });
+            }
+
+            function uploadRecorder(): {
+                putArchive: BackupStorage['putArchive'];
+                finished: () => boolean;
+            } {
+                let finished = false;
+                return {
+                    putArchive: jest.fn().mockImplementation(async (source: Readable) => {
+                        for await (const chunk of source) void chunk;
+                        finished = true;
+                        return { key: 'u1/archive.zip', backend: 'fixture-backend' };
+                    }) as unknown as BackupStorage['putArchive'],
+                    finished: () => finished,
+                };
+            }
+
+            it('stops reading attachments at the next heartbeat, and never closes or uploads the zip', async () => {
+                // The heartbeat throttles itself to 25 s; advance the clock past
+                // that on every read so the copy loop's heartbeat really asks.
+                let clock = Date.now();
+                const now = jest.spyOn(Date, 'now').mockImplementation(() => {
+                    clock += 26_000;
+                    return clock;
+                });
+                try {
+                    const upload = uploadRecorder();
+                    const h = harness({ rows: ROWS, putArchive: upload.putArchive });
+                    cancellingOnFirstRead(h);
+
+                    const result = await h.runner.run('b1', OPTIONS);
+
+                    expect(result.status).toBe('cancelled');
+                    // The second attachment was never read.
+                    expect(h.storage.readObject).toHaveBeenCalledTimes(1);
+                    expect(close).not.toHaveBeenCalled();
+                    expect(upload.finished()).toBe(false);
+                    // Nothing was settled over the owner's cancel, and there is
+                    // no uploaded object left to clean up.
+                    expect(h.repository.markTerminal).not.toHaveBeenCalled();
+                    expect(h.storage.deleteArchive).not.toHaveBeenCalled();
+                } finally {
+                    now.mockRestore();
+                }
+            });
+
+            it('stops before the manifest when the cancel lands during the LAST attachment', async () => {
+                // No heartbeat follows the last file, so only a probe after the
+                // copy loop can see this one.
+                const upload = uploadRecorder();
+                const h = harness({
+                    rows: { ...ROWS, UserUpload: ROWS.UserUpload.slice(0, 1) },
+                    putArchive: upload.putArchive,
+                });
+                cancellingOnFirstRead(h);
+
+                const result = await h.runner.run('b1', OPTIONS);
+
+                expect(result.status).toBe('cancelled');
+                expect(close).not.toHaveBeenCalled();
+                expect(upload.finished()).toBe(false);
+                expect(h.repository.markTerminal).not.toHaveBeenCalled();
+            });
+
+            it('reports a row the sweeper failed as failed, so the owner is still told', async () => {
+                const upload = uploadRecorder();
+                const h = harness({
+                    rows: { ...ROWS, UserUpload: ROWS.UserUpload.slice(0, 1) },
+                    putArchive: upload.putArchive,
+                });
+                (h.storage.readObject as jest.Mock).mockImplementationOnce(async () => {
+                    // The hourly sweep's compare-and-set, not the owner's.
+                    h.settleElsewhere('failed');
+                    return {
+                        stream: Readable.from([Buffer.from('bytes')]),
+                        mimeType: 'application/pdf',
+                        size: 5,
+                    };
+                });
+
+                const result = await h.runner.run('b1', OPTIONS);
+
+                expect(result).toEqual({ status: 'failed', reason: 'failed', backupId: 'b1' });
+                expect(close).not.toHaveBeenCalled();
+                expect(upload.finished()).toBe(false);
+            });
         });
     });
 
