@@ -244,6 +244,32 @@ describe('web CSP connect-src names the socket origin the BFF mints', () => {
         expect(socketSourcesOf(connect)).toEqual(['wss://api.ever.works']);
     });
 
+    it('authorises a bracketed IPv6 API origin instead of dropping it', async () => {
+        // Review finding on #2455. `new URL('http://[::1]:3100').origin` keeps
+        // the brackets, and the attach-token routes mint `ws://[::1]:3100/…`
+        // from that same origin — so a host pattern that admits only
+        // `[a-zA-Z0-9.-]` silently drops the source and CSP blocks the very
+        // socket this module exists to authorise. Failing closed here is not
+        // safe, it is a dead live view on an IPv6 deployment.
+        const connect = await connectSrcForEnv({
+            NEXT_PUBLIC_API_URL: 'http://[::1]:3100',
+            API_URL: 'http://[::1]:3100',
+        });
+
+        expect(socketSourcesOf(connect)).toEqual(['ws://[::1]:3100']);
+    });
+
+    it('still refuses a bracketed host that is not an IPv6 literal', async () => {
+        // The brackets are not a bypass: the inner class admits hex digits,
+        // `:` and `.` only, which is narrower than the named-host class.
+        const connect = await connectSrcForEnv({
+            NEXT_PUBLIC_API_URL: 'https://api.ever.works',
+            API_URL: 'http://[evil; default-src *]:3100',
+        });
+
+        expect(socketSourcesOf(connect)).toEqual(['wss://api.ever.works']);
+    });
+
     it('never widens the policy — every socket source is a bare scheme+host[:port]', async () => {
         const connect = await connectSrcForEnv({
             NEXT_PUBLIC_API_URL: 'https://api.ever.works',

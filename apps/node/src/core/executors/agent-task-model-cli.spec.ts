@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import {
 	AgentTaskPayloadError,
 	defaultScratchFs,
+	resolveRealHomeDir,
 	runAgentTaskJob,
 	type AgentTaskIo,
 	type AgentTaskScratchFs,
@@ -660,34 +661,38 @@ describe('runAgentTaskJob — model-step containment (self-build slice AK)', () 
 		expect(spawns[0].env.CLAUDE_CONFIG_DIR).toBe(join(REAL_HOME, '.claude'));
 	});
 
-	it('mirrors the session home from the anchor Windows can actually open', async () => {
+	it.each([
+		// On a real Git Bash node HOME is a POSIX `/c/Users/...` that no Windows
+		// CLI can open while USERPROFILE is the Windows path, so win32 must ask for
+		// USERPROFILE first; everywhere else HOME is the native answer.
+		['win32', 'USERPROFILE'],
+		['linux', 'HOME'],
+		['darwin', 'HOME']
+	] as const)('on %s, reads the real home from %s first', (platform, winner) => {
 		// The shared PARENT_ENV sets HOME and USERPROFILE to the SAME path, so no
-		// existing test can tell which one `resolveRealHomeDir` preferred — a
-		// mutation that swapped the win32 order stayed green. They DIVERGE on a
-		// real Git Bash node: HOME is a POSIX `/c/Users/...` that no Windows CLI
-		// can open, USERPROFILE is the Windows path. Picking the wrong one
-		// mirrors an unopenable directory into CLAUDE_CONFIG_DIR and makes the
-		// relocation probe read the wrong file, silently inverting the decision.
+		// run-level test can tell which one was preferred — a mutation that
+		// swapped the win32 order stayed green. This asserts the ordering directly,
+		// with the two anchors deliberately different.
 		//
-		// Only the win32 side is driven here: forcing `platform: 'linux'` on a
-		// Windows host does not give POSIX `join`/`isAbsolute`, so the payload is
-		// rejected as non-absolute before the branch is reached. The POSIX
-		// ordering is exercised by `isolated-home.spec.ts`, which takes roots as
-		// data rather than resolving them through the host.
-		const { spawns, spawnFn } = envRecordingSpawn();
-		const windowsHome = 'C:\\Users\\owner';
+		// It is a pure (platform, env) check on purpose. An earlier version drove a
+		// full `runAgentTaskJob` with `platform: 'win32'` forced, which passed on a
+		// Windows machine and failed on the Linux CI runner: `quoteShellPath`'s
+		// win32 branch rightly demands a drive-letter path, and the node-owned
+		// scratch and workspace paths come from the HOST. The wiring from this
+		// value into CLAUDE_CONFIG_DIR is covered separately, by "mirrors the
+		// machine's CLI session back in".
+		const anchors = { USERPROFILE: join(REAL_HOME, 'profile-anchor'), HOME: join(REAL_HOME, 'home-anchor') };
 
-		await runAgentTaskJob(
-			job(payload),
-			baseIo({
-				spawnFn,
-				parentEnv: { ...PARENT_ENV, USERPROFILE: windowsHome, HOME: '/c/Users/owner' },
-				platform: 'win32',
-				sessionConfigFs: sessionConfigFs({ [join(windowsHome, '.claude.json')]: '{}' })
-			})
-		);
+		expect(resolveRealHomeDir({ platform, parentEnv: { ...PARENT_ENV, ...anchors } })).toBe(anchors[winner]);
+	});
 
-		expect(spawns[0].env.CLAUDE_CONFIG_DIR).toBe(join(windowsHome, '.claude'));
+	it('falls back to the other anchor when the preferred one is blank', () => {
+		// A blank USERPROFILE on win32 must not be returned as the home: an empty
+		// string would mirror `.claude` relative to the node's working directory.
+		const home = join(REAL_HOME, 'home-anchor');
+		expect(
+			resolveRealHomeDir({ platform: 'win32', parentEnv: { ...PARENT_ENV, USERPROFILE: '  ', HOME: home } })
+		).toBe(home);
 	});
 
 	it('mirrors the Codex session home for a codex run', async () => {

@@ -58,6 +58,21 @@ function selectionFor(target: string | null | undefined): SelectedArticle | null
     return parsed && article ? { article, headingId: parsed.headingId } : null;
 }
 
+/**
+ * Whether an Esc is Help's to take: aimed inside the dialog that hosts the
+ * panel (the drawer's close button and tabs sit outside the panel itself), or
+ * at no element in particular — the page body, document or window, where the
+ * key lands once the focused row was removed. A key aimed at anything else,
+ * such as the command palette opened on top of the drawer, is that overlay's.
+ */
+function isEscapeForPanel(target: EventTarget | null, panel: HTMLElement | null): boolean {
+    if (!panel) return false;
+    if (!(target instanceof Node)) return true;
+    const doc = panel.ownerDocument;
+    if (target === doc || target === doc.body || target === doc.documentElement) return true;
+    return (panel.closest('[role="dialog"]') ?? panel).contains(target);
+}
+
 const ROW_BUTTON =
     'flex w-full min-h-11 items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors md:min-h-0 hover:bg-surface dark:hover:bg-surface-secondary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 const GROUP_HEADING =
@@ -79,6 +94,7 @@ export function HelpCenterPanel({ initialTarget, lead, onClose }: HelpCenterPane
     const baseId = useId();
     const listboxId = `${baseId}-results`;
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const panelRef = useRef<HTMLDivElement | null>(null);
 
     const [selected, setSelected] = useState<SelectedArticle | null>(() =>
         selectionFor(initialTarget),
@@ -151,23 +167,39 @@ export function HelpCenterPanel({ initialTarget, lead, onClose }: HelpCenterPane
     const openResult = (result: HelpSearchResult) =>
         openArticle(formatHelpTarget(result.article.id, result.heading?.id), 'search');
 
-    const backFromArticle = () => {
+    const backFromArticle = useCallback(() => {
         setSelected(null);
         requestAnimationFrame(() => inputRef.current?.focus());
-    };
+    }, []);
 
-    const onPanelKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        if (event.key === 'Escape') {
+    // Esc steps back (article → results → browse) before the drawer may close.
+    // This listens on the window in the CAPTURE phase, not on the panel: focus
+    // is often outside the panel — opened from a help link, the drawer's
+    // Headless UI Dialog puts initial focus on its close button — so a panel
+    // keydown handler never sees the key while the Dialog's own window-level
+    // (bubble-phase) Esc handler closes the whole drawer. Capture runs first,
+    // and preventDefault tells the Dialog to leave the key alone. With nothing
+    // to step back from, no listener is attached and Esc closes the drawer.
+    // Being on the window, it must skip an Esc aimed at another overlay — the
+    // command palette opens above the drawer and closes on its own Esc.
+    useEffect(() => {
+        if (!selected && !query) return;
+        const onEscape = (event: globalThis.KeyboardEvent) => {
+            if (event.key !== 'Escape' || event.defaultPrevented) return;
+            if (!isEscapeForPanel(event.target, panelRef.current)) return;
+            event.preventDefault();
             if (selected) {
-                event.preventDefault();
                 backFromArticle();
-            } else if (query) {
-                event.preventDefault();
+            } else {
                 setQuery('');
                 setSettledQuery('');
             }
-            return;
-        }
+        };
+        window.addEventListener('keydown', onEscape, true);
+        return () => window.removeEventListener('keydown', onEscape, true);
+    }, [backFromArticle, query, selected]);
+
+    const onPanelKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey) {
             const target = event.target as HTMLElement;
             const editable =
@@ -245,7 +277,12 @@ export function HelpCenterPanel({ initialTarget, lead, onClose }: HelpCenterPane
     const resultIndex = new Map(outcome.results.map((result, index) => [result.article.id, index]));
 
     return (
-        <div data-testid="help-center-panel" onKeyDown={onPanelKeyDown} className="space-y-5">
+        <div
+            ref={panelRef}
+            data-testid="help-center-panel"
+            onKeyDown={onPanelKeyDown}
+            className="space-y-5"
+        >
             {view !== 'article' && (
                 <div className="relative">
                     <Search
