@@ -1,4 +1,4 @@
-import type { ComputerFrameMime } from '@ever-works/contracts';
+import type { ComputerFrameMime, ComputerInputFrame } from '@ever-works/contracts';
 import type { CapabilityEnvironment } from '../capabilities';
 
 /**
@@ -24,7 +24,11 @@ import type { CapabilityEnvironment } from '../capabilities';
  *   - `capture` returns one FULL picture (a keyframe) at the requested width
  *     and encoder quality, or rejects — the pump counts rejections and
  *     restarts the source, it never ends a view over a bad picture;
- *   - `stop` releases everything `start` created and is idempotent.
+ *   - `stop` releases everything `start` created and is idempotent;
+ *   - `dispatchInput` (optional) drives the SAME surface with a person's
+ *     pointer, wheel, keys and text while they hold control. A backend that
+ *     cannot drive its surface leaves it out, and control there injects
+ *     nothing. Only `input-injector.ts` calls it, after its own checks.
  */
 
 /** The host facts a backend's availability may depend on. */
@@ -65,6 +69,12 @@ export interface CaptureSource {
 	 * profile to read.
 	 */
 	countSignedInSites?(): Promise<number | null>;
+	/**
+	 * Drive the surface with one input frame whose coordinates are in PICTURE
+	 * pixels (the last picture this source took). Rejects when the surface
+	 * refused it. Optional: see the header.
+	 */
+	dispatchInput?(input: ComputerInputFrame): Promise<void>;
 	/** Release the surface. Idempotent; never rejects. */
 	stop(): Promise<void>;
 }

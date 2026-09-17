@@ -310,7 +310,9 @@ pnpm format:check
 
 ### Commit Conventions
 
-Commits are enforced by **commitlint** with the Conventional Commits standard via Husky git hooks:
+Commits follow the Conventional Commits standard. This is a convention held by hand —
+`.husky/commit-msg` has been commented out since 2026-02-11 (`ee573da0d`) and no hook
+checks it:
 
 ```
 feat: add new work template engine

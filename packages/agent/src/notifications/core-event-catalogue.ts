@@ -282,6 +282,17 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         urgent: false,
         defaultChannels: IN_APP_AND_EMAIL,
     },
+    // Shared view (AW-18). Registered so the first-view notice can be routed
+    // to a channel from the preference matrix; an unregistered key would stay
+    // in-app forever.
+    {
+        key: 'shared_view_first_view',
+        category: 'system',
+        title: 'Shared view opened',
+        description: 'A share link you published was opened for the first time.',
+        urgent: false,
+        defaultChannels: IN_APP,
+    },
 ];
 
 const CORE_EVENTS_BY_KEY: ReadonlyMap<string, CoreNotificationEvent> = new Map(

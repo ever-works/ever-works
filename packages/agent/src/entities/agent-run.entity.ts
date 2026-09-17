@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { PortableDateColumn } from './_types';
 import type {
+    AgentRunModelRouting,
     GateStatus,
     SubAgentScope,
     TaskAcceptanceCheck,
@@ -14,8 +15,17 @@ import type {
  * - `task`      — Task transitioned to `in_progress` with this Agent as assignee.
  * - `chat`      — `@<agent>` mention in a `task_chat_messages` row.
  * - `event`     — future use (webhook / external event hook; v2).
+ * - `conversation` — a person's message in a named Conversation with the
+ *                 Agent (a `conversation_messages` row; see
+ *                 `conversationMessageId`).
  */
-export type AgentRunTriggerKind = 'heartbeat' | 'manual' | 'task' | 'chat' | 'event';
+export type AgentRunTriggerKind =
+    | 'heartbeat'
+    | 'manual'
+    | 'task'
+    | 'chat'
+    | 'event'
+    | 'conversation';
 
 /**
  * Run lifecycle. Mirrors `WorkGenerationHistory` semantics:
@@ -43,6 +53,8 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 @Index('idx_agent_runs_status', ['status'])
 @Index('idx_agent_runs_task', ['taskId'])
 @Index('idx_agent_runs_chat_message', ['chatMessageId'])
+// Named Conversations — the reply run behind one Conversation message.
+@Index('idx_agent_runs_conversation_message', ['conversationMessageId'])
 // Run orchestration (Wave 4 M1) — cheap per-Work concurrency counts +
 // Sessions-view grouping both scan (workId, status).
 @Index('idx_agent_runs_work_status', ['workId', 'status'])
@@ -95,6 +107,21 @@ export class AgentRun {
     /** Populated only when `triggerKind = 'chat'`. FK to `task_chat_messages.id`. */
     @Column('uuid', { nullable: true })
     chatMessageId?: string | null;
+
+    /**
+     * Populated only when `triggerKind = 'conversation'`: the Conversation
+     * message this run replies to. FK to `conversation_messages.id`,
+     * `ON DELETE SET NULL` — deleting a Conversation keeps the run and its
+     * cost receipt.
+     *
+     * Its own column rather than a reuse of `chatMessageId`: that column is a
+     * key into `task_chat_messages` with its own index, and both the Task-chat
+     * in-flight lookup and the dispatch-gate drain read it as such.
+     * Overloading it would point one index at two tables. The `varchar(16)`
+     * `triggerKind` already fits `'conversation'`, so only this column is new.
+     */
+    @Column('uuid', { nullable: true })
+    conversationMessageId?: string | null;
 
     // ── Quality gates ──────────────────────────────────────────────
     /**
@@ -313,6 +340,20 @@ export class AgentRun {
     @Column({ type: 'int', nullable: true })
     costCents?: number | null;
 
+    /**
+     * Model accounts (AW-16) — what actually answered this run: the provider
+     * plugin, the model id the provider reported, the Model Account (id and
+     * name) when one was used, the requested reasoning effort and the run
+     * timeout in force. Written by the AI facade from the provider's own
+     * response, never from configuration, and never carrying a credential
+     * value. NULL on every run that made no model call and on every run that
+     * predates the column — a routing record is never invented. Sibling of
+     * `totalTokens` / `costCents`; the per-call ledger stays
+     * `plugin_usage_events`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    modelRouting?: AgentRunModelRouting | null;
+
     // ── Run steering (Wave 4 M5). Both additive; NULL/false on every
     // pre-existing row. The steering service writes them, the executing
     // run's tool loop reads them between iterations.
@@ -342,6 +383,62 @@ export class AgentRun {
      */
     @Column({ type: 'boolean', default: false })
     interruptRequested: boolean;
+
+    // ── Resume single-flight. All three additive; NULL on every
+    // pre-existing row. Written only by `RunSteeringService.resume` through
+    // the repository's claim / link / release / consume writes, and only
+    // ever on the SOURCE run — the successor a resume creates never carries
+    // them. Migration: `1791110030000-AddAgentRunResumeClaim`.
+
+    /**
+     * Fencing token of the most recent resume claim taken on this run.
+     *
+     * `resume` compare-and-sets it against the value it READ when it
+     * loaded the run, so two requests that both saw the same parked run
+     * cannot both win — the first claim changes the token under the
+     * second. It is deliberately KEPT when a resume succeeds (only
+     * {@link resumeClaimedAt} clears): a request that read the run before
+     * that resume must still lose, while a request that loads the run
+     * afterwards reads the new token and is judged on the run's state
+     * exactly as before. A failed resume puts back the token it replaced.
+     *
+     * An opaque random id, not a user id and not a foreign key.
+     */
+    @Column({ type: 'varchar', length: 36, nullable: true })
+    resumeClaimToken?: string | null;
+
+    /**
+     * When the in-flight resume claim was taken. NULL = no resume in
+     * flight. A claim older than the stuck-run sweeper cutoff is treated
+     * as abandoned (its process died between claim and release) and may
+     * be taken over, so a crash can never park a run as "resuming" forever.
+     * Whether it was NULL is part of what a claimant compare-and-sets
+     * against, so a request that read the run while a resume was in flight
+     * loses once that resume has finished.
+     */
+    @PortableDateColumn({ nullable: true })
+    resumeClaimedAt?: Date | null;
+
+    /**
+     * The successor created under a resume claim that has not been
+     * CONSUMED yet — the durable source-to-successor link.
+     *
+     * Written in the same transaction that inserts the successor, and only
+     * while the claim that created it is still held, so a successor can
+     * never exist without this row knowing about it. Consuming the claim
+     * clears it; releasing one keeps it. Every later claim reads it before
+     * creating anything: a successor the earlier attempt left behind — its
+     * process died, or its bookkeeping write failed after the enqueue — is
+     * reconciled (still live ⇒ refuse; already ran ⇒ finish that attempt's
+     * bookkeeping and refuse; never ran ⇒ go ahead) instead of being
+     * silently joined by a second one.
+     *
+     * An `agent_runs.id`, deliberately not a foreign key: a successor row
+     * is never deleted by the resume path, and a dangling id simply reads
+     * as "no successor".
+     */
+    @Column({ type: 'varchar', length: 36, nullable: true })
+    resumeSuccessorRunId?: string | null;
 
     /**
      * The effective scope a DELEGATED run executes under (judgment layer

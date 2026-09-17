@@ -9,7 +9,7 @@ import { NotificationEventTypeBootstrap } from './notification-event-type-bootst
 /**
  * The registry is seeded from the shared core catalogue on every boot, so
  * every environment — including CI and e2e, where migrations do not run —
- * ends up with the same 23 core rows, and a plugin's own events beside them.
+ * ends up with the same 24 core rows, and a plugin's own events beside them.
  */
 describe('NotificationEventTypeBootstrap', () => {
     function quiet(service: NotificationEventTypeBootstrap) {
@@ -18,7 +18,7 @@ describe('NotificationEventTypeBootstrap', () => {
         return service;
     }
 
-    it('upserts all 23 core events as core rows, idempotently', async () => {
+    it('upserts all 24 core events as core rows, idempotently', async () => {
         const rows = new Map<string, Record<string, unknown>>();
         const eventTypes = {
             upsert: jest.fn(async (row: Record<string, unknown>) => {
@@ -30,7 +30,7 @@ describe('NotificationEventTypeBootstrap', () => {
         await service.onApplicationBootstrap();
         await service.onApplicationBootstrap();
 
-        expect(rows.size).toBe(23);
+        expect(rows.size).toBe(24);
         expect(rows.get('digest_ready')).toMatchObject({
             source: 'core',
             pluginId: null,
@@ -56,7 +56,7 @@ describe('NotificationEventTypeBootstrap', () => {
         };
         const service = quiet(new NotificationEventTypeBootstrap(undefined, eventTypes as never));
         await service.onApplicationBootstrap();
-        expect(eventTypes.upsert).toHaveBeenCalledTimes(23);
+        expect(eventTypes.upsert).toHaveBeenCalledTimes(24);
     });
 
     it('namespaces plugin-contributed events and leaves their defaults to the manifest', async () => {
@@ -93,5 +93,35 @@ describe('NotificationEventTypeBootstrap', () => {
             source: 'plugin',
             pluginId: 'acme-plugin',
         });
+    });
+});
+
+describe('NotificationEventTypeBootstrap — core events', () => {
+    async function seededKeys(): Promise<Map<string, Record<string, unknown>>> {
+        const upsert = jest.fn().mockResolvedValue(undefined);
+        const bootstrap = new NotificationEventTypeBootstrap(undefined, { upsert } as never);
+        await bootstrap.onApplicationBootstrap();
+        return new Map(upsert.mock.calls.map(([row]) => [row.key as string, row]));
+    }
+
+    it('registers the shared view first-view notice so it can reach a channel', async () => {
+        const rows = await seededKeys();
+        expect(rows.get('shared_view_first_view')).toEqual({
+            key: 'shared_view_first_view',
+            category: 'system',
+            title: 'Shared view opened',
+            description: 'A share link you published was opened for the first time.',
+            urgent: false,
+            defaultChannels: ['in-app'],
+            source: 'core',
+            pluginId: null,
+        });
+    });
+
+    it('still registers the existing core events', async () => {
+        const rows = await seededKeys();
+        for (const key of ['ai_credits_depleted', 'inbox_question', 'fleet_runner_fallback']) {
+            expect(rows.has(key)).toBe(true);
+        }
     });
 });

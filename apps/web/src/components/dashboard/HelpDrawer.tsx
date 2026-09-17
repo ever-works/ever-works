@@ -13,6 +13,7 @@ import {
 } from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
+import { HelpCenterPanel } from '@/components/help/HelpCenterPanel';
 import {
     X,
     ExternalLink,
@@ -38,12 +39,18 @@ interface HelpDrawerProps {
     };
     /**
      * Tab to show each time the drawer opens. Omitted keeps the drawer on the
-     * tab the operator last chose (Tips on first open).
+     * tab the operator last chose (the Manual on first open).
      */
     initialTab?: HelpDrawerTab;
+    /**
+     * Help centre (AW-25) — an article of the manual to open at,
+     * `<article>` or `<article>#<heading>`. When set, the drawer opens on the
+     * Manual tab at that article; it wins over `initialTab`.
+     */
+    initialTarget?: string | null;
 }
 
-export type HelpDrawerTab = 'tips' | 'shortcuts' | 'faq' | 'resources';
+export type HelpDrawerTab = 'manual' | 'tips' | 'shortcuts' | 'faq' | 'resources';
 
 const DOCS_URL = 'https://docs.ever.works/docs';
 const GITHUB_URL = 'https://github.com/ever-works/ever-works';
@@ -82,15 +89,71 @@ function SectionHeading({
     );
 }
 
-export function HelpDrawer({ open, onClose, onboarding, initialTab }: HelpDrawerProps) {
+/**
+ * "Open onboarding (x/N)" — reopens the guided setup. Shown on the Tips tab
+ * and at the top of the Manual's browse view, so it is one keystroke away
+ * whichever tab the drawer opens on.
+ */
+function OnboardingEntry({
+    onboarding,
+    onClose,
+}: {
+    onboarding: NonNullable<HelpDrawerProps['onboarding']>;
+    onClose: () => void;
+}) {
+    const t = useTranslations('dashboard.header.help');
+    return (
+        <section>
+            <SectionHeading>{t('onboarding.title')}</SectionHeading>
+            <button
+                type="button"
+                onClick={() => {
+                    onboarding.onOpen();
+                    onClose();
+                }}
+                className={cn(
+                    CARD,
+                    'w-full p-4 text-left transition-colors',
+                    'bg-surface dark:bg-surface-secondary-dark',
+                    'hover:border-primary/50',
+                )}
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                        <p className="text-xs font-medium text-text dark:text-text-dark">
+                            {t('onboarding.action', {
+                                currentStep: onboarding.currentStep,
+                                totalSteps: onboarding.totalSteps,
+                            })}
+                        </p>
+                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                            {t('onboarding.description')}
+                        </p>
+                    </div>
+                    <BookOpen className="h-5 w-5 flex-shrink-0 text-text-secondary dark:text-text-secondary-dark" />
+                </div>
+            </button>
+        </section>
+    );
+}
+
+export function HelpDrawer({
+    open,
+    onClose,
+    onboarding,
+    initialTab,
+    initialTarget,
+}: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
     const tCommon = useTranslations('common.ui');
+    const tManual = useTranslations('dashboard.helpCenter');
 
-    const [activeTab, setActiveTab] = useState<HelpDrawerTab>(initialTab ?? 'tips');
+    const [activeTab, setActiveTab] = useState<HelpDrawerTab>(initialTab ?? 'manual');
 
     useEffect(() => {
-        if (open && initialTab) setActiveTab(initialTab);
-    }, [open, initialTab]);
+        if (open && initialTarget) setActiveTab('manual');
+        else if (open && initialTab) setActiveTab(initialTab);
+    }, [open, initialTab, initialTarget]);
 
     const quickTips = [
         { icon: '1', text: t('quickTips.tip1') },
@@ -137,6 +200,7 @@ export function HelpDrawer({ open, onClose, onboarding, initialTab }: HelpDrawer
     ];
 
     const tabs = [
+        { id: 'manual' as const, label: tManual('tabLabel') },
         { id: 'tips' as const, label: t('tabs.tips') },
         { id: 'shortcuts' as const, label: t('tabs.shortcuts') },
         { id: 'faq' as const, label: t('tabs.faq') },
@@ -248,49 +312,28 @@ export function HelpDrawer({ open, onClose, onboarding, initialTab }: HelpDrawer
 
                                         {/* Content */}
                                         <div className="flex-1 px-6 py-6 space-y-7">
+                                            {activeTab === 'manual' && (
+                                                <HelpCenterPanel
+                                                    initialTarget={initialTarget}
+                                                    onClose={onClose}
+                                                    lead={
+                                                        onboarding ? (
+                                                            <OnboardingEntry
+                                                                onboarding={onboarding}
+                                                                onClose={onClose}
+                                                            />
+                                                        ) : null
+                                                    }
+                                                />
+                                            )}
+
                                             {activeTab === 'tips' && (
                                                 <>
                                                     {onboarding && (
-                                                        <section>
-                                                            <SectionHeading>
-                                                                {t('onboarding.title')}
-                                                            </SectionHeading>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    onboarding.onOpen();
-                                                                    onClose();
-                                                                }}
-                                                                className={cn(
-                                                                    CARD,
-                                                                    'w-full p-4 text-left transition-colors',
-                                                                    'bg-surface dark:bg-surface-secondary-dark',
-                                                                    'hover:border-primary/50',
-                                                                )}
-                                                            >
-                                                                <div className="flex items-start justify-between gap-3">
-                                                                    <div className="space-y-1">
-                                                                        <p className="text-xs font-medium text-text dark:text-text-dark">
-                                                                            {t(
-                                                                                'onboarding.action',
-                                                                                {
-                                                                                    currentStep:
-                                                                                        onboarding.currentStep,
-                                                                                    totalSteps:
-                                                                                        onboarding.totalSteps,
-                                                                                },
-                                                                            )}
-                                                                        </p>
-                                                                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                            {t(
-                                                                                'onboarding.description',
-                                                                            )}
-                                                                        </p>
-                                                                    </div>
-                                                                    <BookOpen className="h-5 w-5 flex-shrink-0 text-text-secondary dark:text-text-secondary-dark" />
-                                                                </div>
-                                                            </button>
-                                                        </section>
+                                                        <OnboardingEntry
+                                                            onboarding={onboarding}
+                                                            onClose={onClose}
+                                                        />
                                                     )}
 
                                                     {/* Quick Tips */}

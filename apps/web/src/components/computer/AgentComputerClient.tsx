@@ -14,6 +14,11 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { ComputerBriefOverlay, type ComputerWorkingBrief } from './ComputerBriefOverlay';
 import { ComputerControls } from './ComputerControls';
+import {
+    ComputerHeldElsewherePrompt,
+    ComputerIdleWarningPrompt,
+    ComputerIncomingRequestPrompt,
+} from './ComputerControlRequestDialog';
 import { ComputerIdentityStrip } from './ComputerIdentityStrip';
 import { ComputerNodePicker, type ComputerNodePickerHandle } from './ComputerNodePicker';
 import { ComputerProfilePanel } from './ComputerProfilePanel';
@@ -36,6 +41,13 @@ import {
     buildComputerViewHref,
     closeReasonKey,
     computerStallAgeMs,
+    controlRefusalKey,
+    formatClockTime,
+    formatCountdown,
+    idleWarningMs,
+    msUntil,
+    takeOverAvailability,
+    wasReleasedAutomatically,
     computerStallStateForAge,
     connectingPhase,
     formatBandwidth,
@@ -50,6 +62,7 @@ import {
     writeStoredQuality,
 } from './computer-session.shared';
 import { useComputerAttach, type ComputerAttachDeps } from './use-computer-attach';
+import { useComputerControl } from './use-computer-control';
 
 export interface AgentComputerClientProps {
     agentId: string;
@@ -81,7 +94,15 @@ function safeStorage(): Storage | null {
  *
  * Opening this page never pauses, steers or cancels a Run: a live view only
  * reads what the Agent's browser (or shell) shows on the chosen computer.
- * Watching only — take-over and teach are not offered here.
+ *
+ * Taking over is offered once the platform confirms it for this view (the
+ * control state read through the BFF): Take over (or `T`) asks the platform
+ * for control, and only its answer changes the mode — the stage then wears
+ * an amber border and forwards the person's input, the status line says the
+ * Agent's input is paused, and Give back control (or Escape twice) hands it
+ * back. Requests from another view, the idle countdown and an automatic
+ * give-back are all shown from the same control state. Teach is not offered
+ * here.
  */
 export function AgentComputerClient({
     agentId,
@@ -107,6 +128,8 @@ export function AgentComputerClient({
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const [now, setNow] = useState(() => Date.now());
+    const [heldPromptOpen, setHeldPromptOpen] = useState(false);
+    const [requestDeclined, setRequestDeclined] = useState(false);
     const stageRef = useRef<ComputerStageHandle | null>(null);
     const pickerRef = useRef<ComputerNodePickerHandle | null>(null);
 
@@ -143,6 +166,46 @@ export function AgentComputerClient({
         },
         attachDeps,
     );
+
+    const control = useComputerControl(
+        { agentId, sessionId: attach.sessionId, enabled: attach.state === 'live' },
+        attachDeps?.fetchImpl ? { fetchImpl: attachDeps.fetchImpl } : {},
+    );
+    const controlState = control.state;
+    const controlling = controlState?.mode === 'controlling';
+    const {
+        refresh: refreshControl,
+        takeOver,
+        requestControl,
+        giveBack,
+        answer: answerRequest,
+        keep: keepControl,
+        extend: extendControl,
+    } = control;
+    const { upgradeToController, driving, mode: relayMode } = attach;
+
+    // The relay says the mode changed: read control now rather than at the next poll.
+    useEffect(() => {
+        refreshControl();
+    }, [relayMode, refreshControl]);
+
+    // Holding control: drive through a driving socket (the platform mints one only to the holder).
+    useEffect(() => {
+        if (controlling && !driving) upgradeToController();
+    }, [controlling, driving, controlState, upgradeToController]);
+
+    // A request this view made that vanished without a hand-over was not answered.
+    const myRequestPending = controlState?.request?.sessionId === attach.sessionId;
+    const hadRequestRef = useRef(false);
+    useEffect(() => {
+        if (myRequestPending) {
+            hadRequestRef.current = true;
+            setRequestDeclined(false);
+        } else if (hadRequestRef.current) {
+            hadRequestRef.current = false;
+            if (!controlling) setRequestDeclined(true);
+        }
+    }, [myRequestPending, controlling]);
 
     // A one-second tick for the stall ladder, the machine's clock staleness and "has not answered yet".
     const ticking =
@@ -227,10 +290,23 @@ export function AgentComputerClient({
         );
     }, [agentId, node, channel]);
 
-    // Keyboard: R refresh, Q quality, C channel, N computers, ? this sheet. Never while typing.
+    const availability = takeOverAvailability({
+        state: controlState,
+        channel,
+        live: attach.state === 'live',
+    });
+    const startTakeOver = useCallback(() => {
+        setRequestDeclined(false);
+        setHeldPromptOpen(true);
+        void takeOver();
+    }, [takeOver]);
+
+    // Keyboard: T take over, R refresh, Q quality, C channel, N computers, ? this sheet. Never while
+    // typing, and never while in control — then every key but Escape Escape belongs to the computer.
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement | null;
+            if (controlling) return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
             if (
                 target &&
@@ -244,6 +320,9 @@ export function AgentComputerClient({
                 pickerRef.current?.open();
             } else if (!node || preOpen.kind !== 'ready') {
                 return;
+            } else if (event.key === 't' || event.key === 'T') {
+                if (availability !== 'available' && availability !== 'held-elsewhere') return;
+                startTakeOver();
             } else if (event.key === 'r' || event.key === 'R') {
                 refreshView();
             } else if ((event.key === 'q' || event.key === 'Q') && channel === 'screen') {
@@ -258,7 +337,18 @@ export function AgentComputerClient({
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [refreshView, channel, changeQuality, node, preOpen.kind, quality, switchChannel]);
+    }, [
+        refreshView,
+        channel,
+        changeQuality,
+        node,
+        preOpen.kind,
+        quality,
+        switchChannel,
+        controlling,
+        availability,
+        startTakeOver,
+    ]);
 
     // The live surface carries the picker in its identity strip; every other state carries it in the header.
     const surfaceShown =
@@ -503,6 +593,37 @@ export function AgentComputerClient({
         const waiting =
             attach.state === 'opening' || attach.state === 'connecting' || attach.state === 'idle';
         const lowered = isQualityLowered(attach.stats);
+        const offset = control.serverOffsetMs;
+        const holder = controlState?.holder ?? null;
+        const request = controlState?.request ?? null;
+        const endsInMs = controlling ? msUntil(holder?.expiresAt, now, offset) : null;
+        const idleMs = idleWarningMs(controlState, now, offset);
+        const releasedAt = controlState?.lastRelease?.at
+            ? new Date(controlState.lastRelease.at).getTime()
+            : NaN;
+        const recentlyReleased =
+            !controlling &&
+            wasReleasedAutomatically(controlState) &&
+            Number.isFinite(releasedAt) &&
+            now + offset - releasedAt < 60_000;
+        const controlNote =
+            endsInMs !== null
+                ? t('control.endsIn', { countdown: formatCountdown(endsInMs) })
+                : recentlyReleased
+                  ? t('control.releasedAutomatically')
+                  : null;
+        const incoming =
+            controlling && request && request.sessionId !== attach.sessionId ? request : null;
+        const heldElsewhere = holder && !holder.thisView ? holder : null;
+        const showHeldPrompt =
+            !controlling &&
+            heldElsewhere !== null &&
+            (heldPromptOpen || myRequestPending || requestDeclined);
+        const refusalReason = control.refusal?.reason;
+        const refusalShown =
+            refusalReason && refusalReason !== 'held' && refusalReason !== 'already-requested'
+                ? refusalReason
+                : null;
         return (
             <div
                 data-testid="computer-surface"
@@ -518,15 +639,26 @@ export function AgentComputerClient({
                     quality={attach.stats?.effectiveQuality ?? quality}
                     lowered={lowered}
                     live={waiting ? 'connecting' : 'live'}
+                    controlling={controlling}
                 />
                 <div className="flex p-3">
                     <ComputerStage
                         ref={stageRef}
                         channel={currentChannel}
-                        label={t('a11y.stageLabelWatching', {
-                            agent: agentName,
-                            node: current.name,
-                        })}
+                        label={
+                            controlling
+                                ? t('a11y.stageLabelControlling', {
+                                      agent: agentName,
+                                      node: current.name,
+                                  })
+                                : t('a11y.stageLabelWatching', {
+                                      agent: agentName,
+                                      node: current.name,
+                                  })
+                        }
+                        controlling={controlling}
+                        onInput={attach.sendInput}
+                        onEscapeTwice={() => void giveBack()}
                         stall={stall}
                         staleSeconds={frameAge === null ? 0 : Math.floor(frameAge / 1000)}
                         onRefresh={attach.refresh}
@@ -550,6 +682,47 @@ export function AgentComputerClient({
                             <ComputerBriefOverlay brief={brief} />
                         ) : null}
                         <ComputerWatermark agentName={agentName} nodeName={current.name} />
+                        {incoming && request?.expiresAt ? (
+                            <ComputerIncomingRequestPrompt
+                                nodeName={current.name}
+                                requesterIsYou={incoming.you}
+                                msLeft={Math.max(0, msUntil(request.expiresAt, now, offset) ?? 0)}
+                                busy={control.busy}
+                                onHandOver={() => void answerRequest('hand-over')}
+                                onKeepControl={() => void answerRequest('keep')}
+                            />
+                        ) : idleMs !== null ? (
+                            <ComputerIdleWarningPrompt
+                                nodeName={current.name}
+                                agentName={agentName}
+                                msLeft={idleMs}
+                                waitingSince={formatClockTime(holder?.since)}
+                                busy={control.busy}
+                                onKeepControl={() => void keepControl()}
+                                onGiveBack={() => void giveBack()}
+                            />
+                        ) : showHeldPrompt && heldElsewhere ? (
+                            <ComputerHeldElsewherePrompt
+                                nodeName={current.name}
+                                holderIsYou={heldElsewhere.you}
+                                since={formatClockTime(heldElsewhere.since)}
+                                requestMsLeft={
+                                    myRequestPending
+                                        ? Math.max(0, msUntil(request?.expiresAt, now, offset) ?? 0)
+                                        : null
+                                }
+                                declined={requestDeclined}
+                                busy={control.busy}
+                                onRequest={() => {
+                                    setRequestDeclined(false);
+                                    void requestControl();
+                                }}
+                                onKeepWatching={() => {
+                                    setHeldPromptOpen(false);
+                                    setRequestDeclined(false);
+                                }}
+                            />
+                        ) : null}
                     </ComputerStage>
                 </div>
                 {attach.banners.length > 0 ? (
@@ -575,7 +748,14 @@ export function AgentComputerClient({
                                   }
                                 : null
                         }
+                        controlling={controlling}
+                        controlNote={controlNote}
                     />
+                    {refusalShown ? (
+                        <p data-testid="computer-control-refusal" className="text-xs text-warning">
+                            {t(`control.refusals.${controlRefusalKey(refusalShown)}`)}
+                        </p>
+                    ) : null}
                     <ComputerControls
                         channel={currentChannel}
                         servableChannels={current.servableChannels}
@@ -590,6 +770,20 @@ export function AgentComputerClient({
                         onEndSession={attach.endSession}
                         onOpenShortcuts={() => setShortcutsOpen(true)}
                         linkCopied={linkCopied}
+                        control={
+                            controlState
+                                ? {
+                                      availability,
+                                      busy: control.busy,
+                                      onTakeOver: startTakeOver,
+                                      onGiveBack: () => void giveBack(),
+                                      onExtend:
+                                          controlling && holder && !holder.extended
+                                              ? () => void extendControl()
+                                              : null,
+                                  }
+                                : undefined
+                        }
                     />
                 </div>
             </div>

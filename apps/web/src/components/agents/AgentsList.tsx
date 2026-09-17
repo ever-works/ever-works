@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { Bot, Network, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -196,6 +197,11 @@ export function AgentsList({ agents, templates = [], userTemplates = [] }: Agent
                     <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 max-w-2xl">
                         {t('empty.subtitle')}
                     </p>
+                    <HelpLink
+                        target="agents#creating-an-agent"
+                        variant="emptyState"
+                        className="mt-3"
+                    />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">

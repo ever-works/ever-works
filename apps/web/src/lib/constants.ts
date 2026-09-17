@@ -112,6 +112,10 @@ export const ROUTES = {
     // each with a receipt. `?g=` granularity, `?d=` anchor date, `?run=` opens
     // a receipt; the filters ride along as `agent` / `kind` / `status` / `q`.
     DASHBOARD_RUNS: '/runs',
+    // Schedules workspace — every recurring definition from every source,
+    // with run-now / pause / resume. The Activity page's Schedules tab keeps
+    // working and links here.
+    DASHBOARD_SCHEDULES: '/schedules',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.
     // `?view=archived` switches tabs; `?id=` deep-links one message (the
@@ -182,6 +186,9 @@ export const ROUTES = {
     // `/meetings` (index only) redirects here. `/meetings/new` and
     // `/meetings/[id]` are unchanged.
     DASHBOARD_MEMORY_MEETINGS: '/memory#meetings',
+    // Knowledge library — the organization shelf over the Knowledge Base,
+    // a view of the Memory page rather than a route of its own.
+    DASHBOARD_MEMORY_LIBRARY: '/memory?view=library',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
@@ -256,6 +263,10 @@ export const ROUTES = {
     // Sits beside Connections: both are about capabilities the platform
     // consumes from outside rather than code it ships.
     DASHBOARD_SETTINGS_AGENT_PLUGINS: '/settings/agent-plugins',
+    // Connections (Settings → Connections) — the MCP server registry. The page
+    // has existed since the MCP slice; the Skills shelf links a Skill's
+    // missing connection here, so it gets a constant instead of a literal.
+    DASHBOARD_SETTINGS_CONNECTIONS: '/settings/connections',
     // Fleet — enrolled local runners. The page has existed since Wave 12;
     // it simply had no route constant, so every link to it was a literal.
     DASHBOARD_SETTINGS_FLEET: '/settings/fleet',
@@ -282,6 +293,10 @@ export const ROUTES = {
     // Agent email (AW-05) — the tenant email address registry an Agent's
     // addresses are assigned from.
     DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',
+    // Help centre (AW-25) — the in-product manual as a full page. The drawer
+    // opens the same articles in place; these are the shareable addresses.
+    DASHBOARD_HELP: '/help',
+    DASHBOARD_HELP_ARTICLE: (slug: string) => `/help/${slug}`,
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',

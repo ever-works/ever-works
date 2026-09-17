@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { SkillsController } from './skills.controller';
 import { SkillBindingsController } from './skill-bindings.controller';
 import { SkillFileContentReaderService } from './skill-file-content-reader.service';
+import { SkillReadinessSweepCronService } from './skill-readiness-sweep-cron.service';
 import { UploadsModule } from '../uploads/uploads.module';
 
 /**
@@ -23,11 +25,20 @@ import { UploadsModule } from '../uploads/uploads.module';
  * agent-side `getSkillFile` tool (the @Global api AgentsModule binds
  * it to the SKILL_FILE_CONTENT_READER token — exported here so that
  * `useExisting` can resolve it).
+ *
+ * Skills shelf: `SkillReadinessSweepCronService` runs the hourly readiness
+ * sweep in-process when Trigger.dev is not the job runtime (gated and
+ * distributed-locked, the `WorkScheduleDispatcherCronService` shape), so
+ * cached verdicts converge on every install.
  */
 @Module({
     imports: [AgentSkillsModule, FacadesModule, DatabaseModule, UploadsModule],
     controllers: [SkillsController, SkillBindingsController],
-    providers: [SkillFileContentReaderService],
+    providers: [
+        SkillFileContentReaderService,
+        SkillReadinessSweepCronService,
+        DistributedTaskLockService,
+    ],
     exports: [SkillFileContentReaderService],
 })
 export class SkillsModule {}

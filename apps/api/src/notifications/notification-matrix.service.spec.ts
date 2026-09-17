@@ -96,9 +96,9 @@ describe('NotificationMatrixService', () => {
         expect(eventTypes.findAll).toHaveBeenCalledTimes(1);
     });
 
-    it('returns all 23 core events grouped in page order, with the shipped defaults selected', async () => {
+    it('returns all 24 core events grouped in page order, with the shipped defaults selected', async () => {
         const matrix = await build().getMatrix('u1');
-        expect(matrix.events).toHaveLength(23);
+        expect(matrix.events).toHaveLength(24);
         const groups = matrix.events.map((e) => e.group);
         expect(groups.indexOf('signals')).toBeGreaterThan(groups.lastIndexOf('needsYou'));
         expect(groups.indexOf('routine')).toBeGreaterThan(groups.lastIndexOf('signals'));
@@ -178,7 +178,7 @@ describe('NotificationMatrixService', () => {
     it('still renders when the organisation default lookup fails', async () => {
         resolver.loadOrgDefaultMap.mockRejectedValue(new Error('db'));
         const matrix = await build().getMatrix('u1');
-        expect(matrix.events).toHaveLength(23);
+        expect(matrix.events).toHaveLength(24);
     });
 
     it('lists in-app, email, then the user’s channels newest first — disabled ones greyed, labels from the registry', async () => {

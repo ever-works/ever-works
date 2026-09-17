@@ -112,6 +112,37 @@ export interface FleetAgentTaskPlanner {
      * stamped with) and the queue SLA bounds a wrong "placed".
      */
     requirements?(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskRequirements>;
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — THROWS when the
+     * run is an agent REVIEW run, which must never execute on the fleet.
+     *
+     * A fleet node has no tool channel through which a verdict could be
+     * recorded (`submitTaskReview` lives only in the platform's in-process
+     * tool loop; the node's MCP bridge is off by default and exposes no
+     * verdict route), so a fleet review would be a paid model run with a
+     * structurally impossible outcome — and its brief would be rendered as
+     * an `# OWNER ANSWER`, i.e. the pull request author's diff presented to
+     * the model as the owner's own words. Called for every fleet-bound
+     * dispatch the delegation-scope guard admitted, in both execution modes,
+     * BEFORE {@link plan}; its throw propagates like a planning failure, so
+     * the run is marked `dispatch-failed` with the reason and the review
+     * ledger settles the claim `failed`. Fails closed: a run row it cannot
+     * read refuses too.
+     *
+     * The SECOND refusal a review run meets, not the first. The G9 guard
+     * ({@link refuseUnenforceableDelegationScope}) runs before it, and the
+     * review-only scope always narrows, so with production wiring (the
+     * planner is the guard) a review run is refused by G9 as
+     * `fleet-delegation-scope-unenforceable` and this method is never asked.
+     * It is reachable only behind an explicit `delegationScopeGuard` that
+     * admits the run, and it is the rule that still matters if G9 is ever
+     * relaxed for nodes that can enforce a scope: a verdict still cannot be
+     * recorded on a node.
+     *
+     * Optional so a planner double without it keeps working; the api-side
+     * `FleetAgentTaskPlannerService` always implements it.
+     */
+    refuseAgentReviewRun?(payload: AgentTaskExecuteDispatchPayload): Promise<void>;
 }
 
 /**
@@ -322,6 +353,16 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                 // is NOT swallowed: a fleet run that cannot be planned has
                 // no honest fallback, so the transition service records
                 // the reason on the run row.
+                //
+                // Reviewer agent stage (slice AD): the SECOND refusal a
+                // review run meets, before either execution mode builds a
+                // job for it. The G9 guard above already refuses every
+                // review run (its scope always narrows), so this is reached
+                // only behind an explicit guard that admitted the run — see
+                // `FleetAgentTaskPlanner.refuseAgentReviewRun`.
+                if (deps.planner?.refuseAgentReviewRun) {
+                    await deps.planner.refuseAgentReviewRun(payload);
+                }
                 const plan = deps.planner ? await deps.planner.plan(payload) : null;
                 markDelegationScopeCleared(payload);
                 return router.enqueueAgentTask(payload, decision.queuedReason ?? null, plan);

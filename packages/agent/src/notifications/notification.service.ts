@@ -119,8 +119,16 @@ export class NotificationService {
     }
 
     /**
-     * {@link create}, also reporting whether a new row was written (`false`
-     * when a live row with the same deduplication key was returned instead).
+     * {@link create} plus the one fact its return value hides: whether THIS
+     * call inserted the row, or handed back one an earlier call had already
+     * written under the same deduplication key.
+     *
+     * A producer that also fans the notification out to email/push needs the
+     * difference. `create()` is retry-safe by design — the second call is a
+     * no-op that returns the first row — but an unconditional fanout after it
+     * is not: the retry would ring the owner a second time for a single
+     * event. Producers whose fanout must happen exactly once per
+     * deduplication key branch on `created`.
      *
      * Attention controls (AW-13): when `dto.eventKey` is set and the user's
      * own choice for that event leaves in-app out, the row is written with
@@ -998,6 +1006,52 @@ export class NotificationService {
             actionUrl,
             actionLabel: 'Open inbox',
             urgent,
+        });
+    }
+
+    /**
+     * Shared view (AW-18) — the first time a freshly generated share link is
+     * opened, tell the Workspace owner once. The caller has already claimed
+     * the first view atomically, and the deduplication key carries the link's
+     * rotation count, so a retried producer cannot ring twice for one link
+     * while a regenerated link still notifies once more. "Once" covers the
+     * fanout too: a retry that finds the row already filed emits no second
+     * event, so the owner cannot be mailed twice for one opening.
+     *
+     * Registered as `shared_view_first_view` (in-app by default) so the
+     * owner can route it to a channel from the preference matrix. The share
+     * token is never part of the payload.
+     */
+    async notifySharedViewFirstView(args: {
+        userId: string;
+        sharedViewId: string;
+        rotationCount: number;
+    }): Promise<void> {
+        const title = 'Shared view opened';
+        const message = 'Your shared view was opened for the first time.';
+        const actionUrl = '/settings/sharing';
+        const { created } = await this.writeInApp({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.SYSTEM,
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'Open sharing',
+            metadata: { sharedViewId: args.sharedViewId },
+            deduplicationKey: `shared_view_first_view_${args.sharedViewId}_${args.rotationCount}`,
+        });
+        // The row was already filed by an earlier call for this link and
+        // rotation: this is a retry, and the fanout has already gone out.
+        if (!created) return;
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'shared_view_first_view',
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'Open sharing',
+            urgent: false,
         });
     }
 

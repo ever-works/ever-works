@@ -47,3 +47,9 @@ packages/agent-plugins/fixtures
 # always means the upstream artifact changed. Reformatting them would make
 # that comparison lie.
 packages/agent-plugins/src/schemas
+
+# In-product manual catalog (AW-25), generated from docs/ by
+# `apps/web/scripts/build-help-catalog.mjs`. Its formatting is owned by the
+# generator — `help-catalog.unit.spec.ts` asserts the file is byte-identical to
+# a fresh generation, so letting Prettier reformat it would fail that test.
+apps/web/src/lib/help/help-catalog.generated.ts

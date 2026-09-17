@@ -192,7 +192,7 @@ describe('core notification event catalogue', () => {
             'work_generation_finished',
         ]);
         expect(byGroup.get('digest')).toEqual(['digest_ready']);
-        expect(byGroup.get('signals')).toHaveLength(9);
+        expect(byGroup.get('signals')).toHaveLength(10);
     });
 
     it('derives groups by rule, so plugin events land somewhere sensible', () => {

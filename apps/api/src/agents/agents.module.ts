@@ -5,6 +5,7 @@ import {
     AGENT_HEARTBEAT_TRIGGER,
     AGENT_RUN_CANCELLER,
     AGENT_RUN_CHAT_BACK_POSTER,
+    AGENT_RUN_CONVERSATION_REPLY_POSTER,
     AGENT_RUN_TASK_FINISHER,
     AGENT_PLUGIN_TOOLS_FACADE,
     AGENT_AI_DISPATCH_FACADE,
@@ -22,6 +23,7 @@ import {
     TERMINAL_SESSION_DISPATCHER,
     TerminalSessionLauncher,
     type AgentRunChatBackPoster,
+    type AgentRunConversationReplyPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
     type AgentAiDispatchFacade,
@@ -67,6 +69,7 @@ import {
     TaskAssigneeRepository,
     TaskReviewerRepository,
     TaskApproverRepository,
+    TaskAgentReviewService,
     RUN_STEERING_PORT,
     TERMINAL_SESSION_STARTER,
 } from '@ever-works/agent/tasks-domain';
@@ -120,6 +123,11 @@ import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
 // agent-side AgentsModule / AgentApprovalsModule / NotificationsModule
 // (never anything api-side), so no cycle is introduced.
 import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
+// Named Conversations — ConversationMessageService backs the
+// AGENT_RUN_CONVERSATION_REPLY_POSTER binding below. The agent-side
+// ConversationsModule imports only DatabaseModule and the agent-side
+// AgentsModule (never anything api-side), so no cycle is introduced.
+import { ConversationsModule, ConversationMessageService } from '@ever-works/agent/conversations';
 // ActivityLogService is injected @Optional() into AgentsController for
 // the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
 // run-cancelled / task-assigned) and the GET :id/events feed. Without
@@ -214,6 +222,9 @@ const HELD_FOR_APPROVAL_NOTE =
         // imports nothing api-side beyond UploadsModule/AuthModule, so
         // no cycle is introduced.
         ApiSkillsModule,
+        // Named Conversations — supplies ConversationMessageService for the
+        // AGENT_RUN_CONVERSATION_REPLY_POSTER binding below.
+        ConversationsModule,
     ],
     controllers: [AgentsController, AgentCollaboratorsController, AgentTemplatesController],
     providers: [
@@ -247,6 +258,28 @@ const HELD_FOR_APPROVAL_NOTE =
                         taskId,
                         authorType: 'agent',
                         authorId: agentId,
+                        body,
+                    });
+                    return { messageId: row.id };
+                },
+            }),
+        },
+        // Named Conversations — `AgentRunService.finalize()` stores a
+        // Conversation reply through this port BEFORE it marks the run
+        // completed, so a completed run can never have lost its reply. Keyed
+        // by run id, so finalizing the same run again stores nothing new.
+        {
+            provide: AGENT_RUN_CONVERSATION_REPLY_POSTER,
+            inject: [ConversationMessageService],
+            useFactory: (
+                messages: ConversationMessageService,
+            ): AgentRunConversationReplyPoster => ({
+                async postReply({ runId, userId, agentId, conversationMessageId, body }) {
+                    const row = await messages.recordAgentReply({
+                        runId,
+                        userId,
+                        agentId,
+                        replyToMessageId: conversationMessageId,
                         body,
                     });
                     return { messageId: row.id };
@@ -845,6 +878,13 @@ const HELD_FOR_APPROVAL_NOTE =
                 ToolGrantService,
                 WorkflowGraphExecutorService,
                 InboxService,
+                // Reviewer agent stage (slice AD, EW-811) — backs
+                // `submitTaskReview`. APPENDED LAST, and matched by the
+                // last parameter of `useFactory` below: this list is
+                // positional and the container passes it positionally, so
+                // inserting anywhere else silently rebinds every service
+                // after the insertion point.
+                TaskAgentReviewService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -865,11 +905,24 @@ const HELD_FOR_APPROVAL_NOTE =
                 toolGrants: ToolGrantService,
                 workflowExecutor: WorkflowGraphExecutorService,
                 inboxService: InboxService,
+                agentReviews: TaskAgentReviewService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
                 // when any of them is missing.
-                tasks: { tasksService, chatService, assignees, reviewers, approvers },
+                tasks: {
+                    tasksService,
+                    chatService,
+                    assignees,
+                    reviewers,
+                    approvers,
+                    // Reviewer agent stage (slice AD, EW-811). Unbound,
+                    // `submitTaskReview` is not offered at all and no
+                    // agent approval can be recorded — the same
+                    // fail-closed posture as the membership repositories
+                    // above.
+                    agentReviews,
+                },
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
@@ -980,6 +1033,7 @@ const HELD_FOR_APPROVAL_NOTE =
         // docblock was written about).
         AGENT_RUN_CANCELLER,
         AGENT_RUN_CHAT_BACK_POSTER,
+        AGENT_RUN_CONVERSATION_REPLY_POSTER,
         AGENT_RUN_TASK_FINISHER,
         AGENT_PLUGIN_TOOLS_FACADE,
         AGENT_AI_DISPATCH_FACADE,

@@ -149,6 +149,10 @@ export {
 // Read-only metric reads through enabled providers (custom-http,
 // Stripe); Goal evaluation (PR-8) consumes this.
 export { MetricsFacadeService, MetricsFacadeError } from './metrics.facade';
+
+// Connection Scopes Facade — AW-15. Which plain-English access levels a
+// provider plugin declares; the tool-grant lattice stores the chosen level.
+export { ConnectionScopesFacadeService } from './connection-scopes.facade';
 export type {
     IMetricsProviderPlugin,
     MetricDescriptor,
