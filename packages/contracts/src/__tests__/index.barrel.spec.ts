@@ -137,7 +137,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// merged array gives 34. `src/index.ts` has 35 `export *` lines but only
 		// 34 AREAS: `./fleet/fleet-task-workspace.types.js` is a second sub-path
 		// of the existing `fleet` area, not a new area. Note `apps` is a PLAIN
-		// `export *`, not `export type *`, on purpose — it carries 433 runtime
+		// `export *`, not `export type *`, on purpose — it carries 524 runtime
 		// exports (closed-union arrays, limits, pure resolvers) that a type-only
 		// re-export would drop from the package root without any error here.
 		expect(exportLines).toBe(34);
@@ -174,7 +174,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// this wrong is invisible: its modules are mostly types, so changing
 		// `export *` to `export type *` in `src/index.ts` would keep every
 		// `tsc --noEmit` in this package green (the types still resolve) while
-		// silently dropping all 433 runtime names from the package root — the
+		// silently dropping all 524 runtime names from the package root — the
 		// closed-union arrays behind `X = (typeof X)[number]`, the limits, and
 		// the pure resolvers consumers actually call. The generic
 		// `it.each(AREAS)` case above would catch it too; this one says why.

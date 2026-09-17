@@ -24,6 +24,11 @@
  * | `tenant-postgres-ddl`  | APW-07, 10   | the tenant DDL payload the provisioners render                     |
  * | `apps-tier`            | APW-10       | the managed tier's desired state, quota profiles, refusal codes and the pricebook |
  * | `ever-id`              | APW-12       | Ever ID constants, limits, relying-party config and the error vocabulary |
+ * | `app-runtime`          | APW-06       | deploy targets/phases/states, the 38 precondition and 18 failure codes, the 52 runtime numbers, and the code→state and code→i18n-leaf totality maps |
+ * | `app-launcher`         | APW-11       | launcher unions, item and response shapes, the pin/response/panel/catalog caps and two fail-closed predicates |
+ *
+ * (The table lists ten modules; `git ls-files` on this folder is the authority if the two ever disagree — two
+ * modules were added without a row here once already, which is exactly how a table like this goes stale.)
  *
  * NOTHING here may be removed, narrowed or marked obsolete (CONTRACTS R-26,
  * the owner's additive-only rule): a closed union gains members, a limit is
