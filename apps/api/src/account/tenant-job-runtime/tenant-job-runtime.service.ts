@@ -6,7 +6,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import {
     TenantJobRuntimeAudit,
     TenantJobRuntimeConfig,
@@ -23,6 +23,36 @@ import {
     TenantJobRuntimeProviderId,
     UpsertTenantJobRuntimeConfigDto,
 } from './dto/upsert-tenant-job-runtime.dto';
+
+type AuditSnapshotFields = {
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+    credentialVersion: number | null;
+};
+
+/**
+ * A `tenant_job_runtime_audit` row that belongs to one tenant: every
+ * overlay mutation and every per-tenant operator allow-list change.
+ */
+export type TenantScopedAuditWrite = AuditSnapshotFields & {
+    tenantId: string;
+    actorUserId: string | null;
+    action: string;
+};
+
+/**
+ * The instance-level `operator_allowlist_boot` row. It is the only row
+ * written with `tenantId = NULL` (no tenant may exist at bootstrap, and
+ * platform-wide state must not appear in any tenant's trail).
+ */
+export type InstanceAuditWrite = AuditSnapshotFields & {
+    tenantId: null;
+    actorUserId: null;
+    action: 'operator_allowlist_boot';
+};
+
+/** Payload accepted by the raw audit writers. */
+export type TenantJobRuntimeAuditWrite = TenantScopedAuditWrite | InstanceAuditWrite;
 
 /**
  * EW-742 / EW-746 (P2.0 — tenant-job-runtime overlay admin API) —
@@ -672,14 +702,14 @@ export class TenantJobRuntimeService {
     // ─── EW-752 P5.1 (T35b) — boot-time audit row helpers ──────────────
 
     /**
-     * Return the most recent `operator_allowlist_boot` audit row
-     * regardless of tenantId (boot rows always carry `tenantId = NULL`
-     * but the query is intentionally tenant-agnostic — the boot audit
-     * is global state).
+     * Return the most recent instance-level `operator_allowlist_boot`
+     * audit row. Every boot row carries `tenantId = NULL`, and the query
+     * filters on that explicitly, so it never returns a tenant-scoped row
+     * even if one were written with the same action.
      */
     async findLatestBootAudit(): Promise<TenantJobRuntimeAudit | null> {
         const row = await this.auditRepository.findOne({
-            where: { action: 'operator_allowlist_boot' },
+            where: { action: 'operator_allowlist_boot', tenantId: IsNull() },
             order: { occurredAt: 'DESC' },
         });
         return row ?? null;
@@ -710,9 +740,9 @@ export class TenantJobRuntimeService {
     }
 
     /**
-     * Append an audit row with full control over the payload (incl. a
-     * NULL `tenantId` for the boot-time row). Used by the boot writer
-     * and the per-tenant allow-list mutations. Skips the
+     * Append an audit row with full control over the payload (`tenantId`
+     * is NULL only for the instance-level boot action). Used by the boot
+     * writer and the per-tenant allow-list mutations. Skips the
      * `operatorAllowedProviders` decoration that `emitAudit` applies
      * to per-tenant mutations — the snapshots passed in here already
      * capture exactly the state the caller wants persisted.
@@ -722,33 +752,20 @@ export class TenantJobRuntimeService {
      * delegates via `appendAuditRow` rather than reaching into the
      * audit repo so the test surface stays at the service boundary.
      */
-    async appendAuditRow(payload: {
-        tenantId: string | null;
-        actorUserId: string | null;
-        action: string;
-        before: Record<string, unknown> | null;
-        after: Record<string, unknown> | null;
-        credentialVersion: number | null;
-    }): Promise<void> {
+    async appendAuditRow(payload: TenantJobRuntimeAuditWrite): Promise<void> {
         await this.emitAuditRaw(payload);
     }
 
     /**
      * Internal raw audit insert — no `operatorAllowedProviders`
-     * decoration, supports nullable `tenantId`. Used by every code path
-     * that wants to write a row without the per-mutation snapshot
-     * decoration (boot row + per-tenant allow-list mutations whose
-     * before/after blobs are already the canonical state).
+     * decoration; `tenantId` is NULL only for the instance-level boot
+     * action. Used by every code path that wants to write a row without
+     * the per-mutation snapshot decoration (boot row + per-tenant
+     * allow-list mutations whose before/after blobs are already the
+     * canonical state).
      */
-    private async emitAuditRaw(payload: {
-        tenantId: string | null;
-        actorUserId: string | null;
-        action: string;
-        before: Record<string, unknown> | null;
-        after: Record<string, unknown> | null;
-        credentialVersion: number | null;
-    }): Promise<void> {
-        const audit = this.auditRepository.create(payload as Partial<TenantJobRuntimeAudit>);
+    private async emitAuditRaw(payload: TenantJobRuntimeAuditWrite): Promise<void> {
+        const audit = this.auditRepository.create(payload);
         await this.auditRepository.save(audit);
         this.logger.debug(
             `Audit: tenant=${payload.tenantId ?? 'NULL'} action=${payload.action} ` +
