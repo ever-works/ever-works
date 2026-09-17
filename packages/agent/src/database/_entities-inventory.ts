@@ -152,6 +152,8 @@ import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 import { FleetAudit } from '../entities/fleet-audit.entity';
 import { ComputerSession } from '../entities/computer-session.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
+import { ModelAccount } from '../entities/model-account.entity';
+import { ModelPolicy } from '../entities/model-policy.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
@@ -388,6 +390,10 @@ export const ENTITIES = [
     FleetAudit,
     ComputerSession,
     NodeAgentProfile,
+    // Model accounts (AW-16) — several credentials per AI provider, in
+    // order, and the workspace / Agent / schedule model ladder.
+    ModelAccount,
+    ModelPolicy,
     // Inbox (operator message center) — messages addressed to the human:
     // blocking questions, approval requests, escalation mirrors, notices.
     InboxItem,

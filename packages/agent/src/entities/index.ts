@@ -176,6 +176,9 @@ export * from './fleet-execution-preference.entity';
 // profile (logins and files) on each Node.
 export * from './computer-session.entity';
 export * from './node-agent-profile.entity';
+// Model accounts (AW-16) — provider accounts + the model ladder
+export * from './model-account.entity';
+export * from './model-policy.entity';
 // Fleet cost accounting (EW-777) — the owner's fleet-wide daily
 // model-spend ceiling and its one-notice trip marker.
 export * from './fleet-cost-policy.entity';

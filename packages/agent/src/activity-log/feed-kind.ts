@@ -265,6 +265,16 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
 
+    // Model Accounts and model policies — workspace configuration.
+    [ActivityActionType.MODEL_ACCOUNT_ADDED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_UPDATED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_REMOVED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_PAUSED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_RESUMED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_RECONNECTED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_REORDERED]: 'system',
+    [ActivityActionType.MODEL_POLICY_UPDATED]: 'system',
+
     // Skills shelf — a person switching a Skill on or off.
     [ActivityActionType.SKILL_ENABLED]: 'system',
     [ActivityActionType.SKILL_DISABLED]: 'system',

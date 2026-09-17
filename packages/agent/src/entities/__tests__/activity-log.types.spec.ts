@@ -86,6 +86,15 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Model accounts (AW-16) — provider account + model default changes.
+            ['MODEL_ACCOUNT_ADDED', 'model_account_added'],
+            ['MODEL_ACCOUNT_UPDATED', 'model_account_updated'],
+            ['MODEL_ACCOUNT_REORDERED', 'model_account_reordered'],
+            ['MODEL_ACCOUNT_PAUSED', 'model_account_paused'],
+            ['MODEL_ACCOUNT_RESUMED', 'model_account_resumed'],
+            ['MODEL_ACCOUNT_RECONNECTED', 'model_account_reconnected'],
+            ['MODEL_ACCOUNT_REMOVED', 'model_account_removed'],
+            ['MODEL_POLICY_UPDATED', 'model_policy_updated'],
             // Skills shelf — the workspace-level on/off switch.
             ['SKILL_ENABLED', 'skill_enabled'],
             ['SKILL_DISABLED', 'skill_disabled'],
@@ -201,8 +210,22 @@ describe('activity-log.types', () => {
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
             //
+            // +8 model_account_added / _updated / _reordered / _paused /
+            //    _resumed / _reconnected / _removed and model_policy_updated
+            //    (model accounts, AW-16) -> 165 on this branch's base.
             // +3 agent_run_started / agent_run_completed / agent_run_failed
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop's base.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop's base.
+            // 169 after the model-accounts branch merged develop's Live Feed
+            //    and Agent-computers work — COUNTED from the merged enum
+            //    (160 shared base + 8 model_* from this branch + 3
+            //    agent_run_* + 1 agent_computer_controlled from develop), not
+            //    taken from either side's total.
+            //
+            // develop's own ledger for the same stretch, kept so neither side's
+            // bookkeeping is lost. Its "+3 agent_run_*" line above continues:
             //    on this branch's own base; the same +3 reached develop together
             //    with the +5 knowledge library literals, which develop counted
             //    as -> 165 there.
@@ -255,7 +278,25 @@ describe('activity-log.types', () => {
             // two literals develop does not carry, and skill_enabled /
             // skill_disabled the only two this branch did not. Neither side's
             // 173 is the answer and the two must never be added together.
-            expect(literals).toHaveLength(175);
+            //
+            // Merging that develop (175) into this model-accounts branch (169)
+            // COUNTS 183 from the merged enum: the eight model_account_* /
+            // model_policy_updated literals are the only ones develop does not
+            // carry, and the fourteen literals develop grew while this branch
+            // was open (skill_*, kb_document_*, memory_folder_renamed,
+            // shared_view_*, schedule_*) the only ones this branch lacked.
+            // Neither 169 nor 175 is the answer, and 169 + 175 is nonsense —
+            // the number below was COUNTED off the merged enum.
+            expect(literals).toHaveLength(183);
+        });
+
+        it('every literal fits the varchar(50) action_type column', () => {
+            const literals = Object.values(ActivityActionType).filter(
+                (v) => typeof v === 'string',
+            ) as string[];
+            for (const v of literals) {
+                expect(v.length).toBeLessThanOrEqual(50);
+            }
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -132,6 +132,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Memory Files — user-defined folders organizing uploads on /memory
     'MemoryFolder',
     'Mission',
+    // Model accounts (AW-16) — provider accounts + the model ladder.
+    'ModelAccount',
+    'ModelPolicy',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
     'GoalMetricSample',

@@ -66,6 +66,7 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { FleetJobService } from '@ever-works/agent/fleet';
+import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
@@ -389,6 +390,13 @@ export class TriggerInternalController implements OnModuleInit {
         // channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly paygService?: PaygService,
+        // Model accounts (AW-16) — backs the `model-account-health` cron:
+        // the worker proxy calls `probeDueAccounts()` over the internal RPC
+        // channel, landing here where the AI provider plugins and their
+        // settings are loaded. Appended LAST + @Optional() per the arity rule
+        // above.
+        @Optional()
+        private readonly modelAccountHealthService?: ModelAccountHealthService,
         // Named Conversations — backs the `agent-conversation-reply` task:
         // the worker proxy calls `loadReplyContext`, `agentVisibleBody` and
         // `appendAgentMessage` over the internal RPC channel. Appended LAST +
@@ -518,6 +526,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
             // calls `syncDuePrStatuses()` here (allow-list auto-derived).
             TaskPrStatusService: this.taskPrStatusService,
+            // Model accounts (AW-16) — `model-account-health` calls
+            // `probeDueAccounts()` here (allow-list auto-derived).
+            ModelAccountHealthService: this.modelAccountHealthService,
             // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
             // here (allow-list auto-derived).
             SkillReadinessService: this.skillReadinessService,

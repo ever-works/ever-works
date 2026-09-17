@@ -240,6 +240,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'PlanRunLimitsService',
                     // Run-cost settlement (pricing Wave 9 M2)
                     'RunCostSettlementService',
+                    // Who paid the provider for a usage row (AW-16)
+                    'isOwnerPaidUsage',
                     // Usage-summary aggregations (Wave 13 Billing/Usage UI)
                     'UsageSummaryService',
                     'addMonthsClamped',

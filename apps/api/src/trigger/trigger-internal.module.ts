@@ -15,6 +15,7 @@ import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
+import { ModelRoutingModule } from '@ever-works/agent/model-routing';
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
@@ -105,6 +106,11 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // runs inline on every node lease poll; the cron is what makes a
         // fleet whose nodes ALL died still converge.
         AgentFleetModule,
+        // Model accounts (AW-16) — exposes ModelAccountHealthService through
+        // the remote-proxy controller so the model-account-health cron task
+        // (in packages/tasks) can drive `probeDueAccounts()` over the
+        // internal RPC channel, where the AI provider plugins are loaded.
+        ModelRoutingModule,
         // Skills shelf — exposes SkillReadinessService through the
         // remote-proxy controller so the skill-readiness-sweep cron task (in
         // packages/tasks) can drive `sweepStale()` over the internal RPC
