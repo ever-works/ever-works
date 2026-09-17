@@ -778,4 +778,4 @@ deployments: [{ state, environment, website? }], customDomain?: { domain, verifi
 - No string anywhere in the launcher claims single sign-on before APW-12 is live.
 - No suite for this epic lives under `apps/api/test/` (Resolution R-22).
 - Nothing this epic added earlier has been withdrawn: every FR, scenario, ACC id, task and default from the
-  original draft is still present, and the audit round's changes are additions (Resolution R-26)
+  original draft is still present, and the audit round's changes are additions (Resolution R-26).
