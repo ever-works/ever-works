@@ -95,46 +95,60 @@ export class EntityBackupCollector implements BackupCollector {
         const collected: string[] = [];
         const idColumn = plan.spec.idColumn ?? 'id';
         let offset = 0;
+        // Registration happens in the `finally` below, so it happens whether
+        // this walk ran out of rows, was cancelled, or threw. Only the
+        // first of those three means the id list is whole.
+        let complete = false;
 
-        for (;;) {
-            if (context.shouldStop()) {
-                return;
-            }
-            const page = await withRetries(() =>
-                context.source.page(plan.query, offset, context.pageSize),
-            );
-            if (page.length === 0) {
-                break;
-            }
-
-            for (const raw of page) {
-                const row = redactRow(plan.spec.entity, raw);
-                if (!row) {
-                    continue;
+        try {
+            for (;;) {
+                if (context.shouldStop()) {
+                    return;
                 }
-                if (plan.spec.registerIdsAs) {
-                    const id = raw[idColumn];
-                    if (typeof id === 'string') {
-                        collected.push(id);
+                const page = await withRetries(() =>
+                    context.source.page(plan.query, offset, context.pageSize),
+                );
+                if (page.length === 0) {
+                    break;
+                }
+
+                for (const raw of page) {
+                    const row = redactRow(plan.spec.entity, raw);
+                    if (!row) {
+                        continue;
                     }
+                    if (plan.spec.registerIdsAs) {
+                        const id = raw[idColumn];
+                        if (typeof id === 'string') {
+                            collected.push(id);
+                        }
+                    }
+                    if (plan.spec.bytes) {
+                        this.queueBytes(context, plan.spec, raw);
+                    }
+                    yield row;
                 }
-                if (plan.spec.bytes) {
-                    this.queueBytes(context, plan.spec, raw);
+
+                offset += page.length;
+                if (page.length < context.pageSize) {
+                    break;
                 }
-                yield row;
+                // One heartbeat per page keeps a domain with a million rows from
+                // looking stalled to the sweeper (spec FR-5).
+                await context.heartbeat();
             }
-
-            offset += page.length;
-            if (page.length < context.pageSize) {
-                break;
+            complete = true;
+        } finally {
+            // Registration used to sit AFTER the loop, so a page query that
+            // spent its retries left the name unregistered entirely. A file
+            // in a LATER domain scoped by that name then resolved an empty
+            // id list, wrote zero records with no error, and the manifest
+            // reported the section `empty` — "you have none of these" for a
+            // workspace whose knowledge base was simply never read. Whatever
+            // was collected is registered, and the shortfall travels with it.
+            if (plan.spec.registerIdsAs) {
+                context.registerIds(plan.spec.registerIdsAs, collected, complete);
             }
-            // One heartbeat per page keeps a domain with a million rows from
-            // looking stalled to the sweeper (spec FR-5).
-            await context.heartbeat();
-        }
-
-        if (plan.spec.registerIdsAs) {
-            context.registerIds(plan.spec.registerIdsAs, collected);
         }
     }
 
@@ -184,6 +198,9 @@ export class EntityBackupCollector implements BackupCollector {
         // Set when the rule needs an organization this workspace does not
         // have. The file is written empty; see BackupEntityQuery.matchesNothing.
         let matchesNothing = false;
+        // Set to the registration name when this file's parent did not
+        // finish producing its ids.
+        let incompleteParent: string | undefined;
 
         switch (file.scope.by) {
             case 'owner':
@@ -233,6 +250,11 @@ export class EntityBackupCollector implements BackupCollector {
                 break;
             case 'parent':
                 within = { column: file.scope.column, ids: context.idsFor(file.scope.from) };
+                // An id list its producer never finished is a gap, not an
+                // absence. Recorded on the plan so the domain reports it.
+                if (context.idsComplete?.(file.scope.from) === false) {
+                    incompleteParent = file.scope.from;
+                }
                 break;
         }
 
@@ -248,6 +270,7 @@ export class EntityBackupCollector implements BackupCollector {
                 ...(trim ? { trim } : {}),
                 ...(matchesNothing ? { matchesNothing: true } : {}),
             },
+            ...(incompleteParent ? { errorCode: 'parent_ids_incomplete' } : {}),
         };
     }
 

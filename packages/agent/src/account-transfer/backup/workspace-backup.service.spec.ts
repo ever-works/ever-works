@@ -41,6 +41,7 @@ function build(
         dispatchReturns?: string | null;
         withStorage?: boolean;
         listRows?: unknown[];
+        oldestReady?: Date | null;
     } = {},
 ) {
     const repository = {
@@ -51,6 +52,9 @@ function build(
             .fn()
             .mockResolvedValue({ rows: options.listRows ?? [], nextCursor: null }),
         countReadyInWindow: jest.fn().mockResolvedValue(options.readyInWindow ?? 0),
+        // The allowance count and the retry time are now answered over the
+        // same filtered set, so the double carries both.
+        oldestReadyInWindow: jest.fn().mockResolvedValue(options.oldestReady ?? null),
         createQueued: jest.fn().mockImplementation(async () => {
             if (options.createThrows) throw options.createThrows;
             return row({ id: 'new-1', status: 'queued' });
@@ -132,8 +136,10 @@ describe('WorkspaceBackupService — one at a time (spec FR-3, S-9)', () => {
 
 describe('WorkspaceBackupService — the daily allowance (spec FR-4, S-10)', () => {
     it('refuses the fourth ready backup in a day and says when the window reopens', async () => {
+        const oldest = new Date(Date.now() - 13 * 60 * 60 * 1000);
         const { service, repository } = build({
             readyInWindow: 3,
+            oldestReady: oldest,
             listRows: [
                 row({ id: 'b1', requestedAt: new Date(Date.now() - 60 * 60 * 1000) }),
                 row({ id: 'b2', requestedAt: new Date(Date.now() - 30 * 60 * 1000) }),
@@ -146,7 +152,53 @@ describe('WorkspaceBackupService — the daily allowance (spec FR-4, S-10)', () 
         expect(outcome.limit).toBe(3);
         // One day after the OLDEST ready outcome still inside the window.
         expect(outcome.retryAt.getTime()).toBeGreaterThan(Date.now());
+        // And EXACTLY that, not merely later than now: the number is shown
+        // to the owner as "try again at", so a value that is only
+        // directionally right is a wrong answer with a plausible shape.
+        expect(outcome.retryAt.getTime()).toBe(oldest.getTime() + 24 * 60 * 60 * 1000);
         expect(repository.createQueued).not.toHaveBeenCalled();
+    });
+
+    it('measures the retry time over the same rows the refusal counted', async () => {
+        // The defect: the count came from a filtered SQL query and the retry
+        // time came from a page of the newest six rows of ANY status.
+        // Cancelled and failed attempts do not charge the allowance and
+        // nothing stops an owner accumulating them, so four of them between
+        // the oldest ready backup and the newer ones pushed it off that page
+        // and the answer was computed from a later row — a wait reported as
+        // hours longer than it is.
+        const oldest = new Date(Date.now() - 23 * 60 * 60 * 1000);
+        const { service, repository } = build({
+            readyInWindow: 3,
+            oldestReady: oldest,
+            // A history page that does NOT contain the oldest ready row.
+            // Deriving the answer from this is what produced the wrong one.
+            listRows: [
+                row({ id: 'c1', status: 'cancelled', requestedAt: new Date(Date.now() - 6e4) }),
+                row({ id: 'c2', status: 'cancelled', requestedAt: new Date(Date.now() - 12e4) }),
+                row({ id: 'c3', status: 'failed', requestedAt: new Date(Date.now() - 18e4) }),
+                row({ id: 'c4', status: 'failed', requestedAt: new Date(Date.now() - 24e4) }),
+                row({ id: 'b3', requestedAt: new Date(Date.now() - 60 * 60 * 1000) }),
+                row({ id: 'b2', requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000) }),
+            ],
+        });
+
+        const outcome = await service.create(SCOPE);
+        if (outcome.kind !== 'rate_limited') throw new Error('expected a rate-limited outcome');
+
+        expect(outcome.retryAt.getTime()).toBe(oldest.getTime() + 24 * 60 * 60 * 1000);
+        // Asked over the window, not over a page of history.
+        expect(repository.oldestReadyInWindow).toHaveBeenCalledWith(SCOPE, expect.any(Date));
+    });
+
+    it('falls back to a full day only when nothing is in the window at all', async () => {
+        const { service } = build({ readyInWindow: 3, oldestReady: null });
+        const before = Date.now();
+
+        const outcome = await service.create(SCOPE);
+        if (outcome.kind !== 'rate_limited') throw new Error('expected a rate-limited outcome');
+
+        expect(outcome.retryAt.getTime()).toBeGreaterThanOrEqual(before + 24 * 60 * 60 * 1000);
     });
 
     it('counts only outcomes that produced something — failures cost nothing', async () => {
@@ -390,6 +442,90 @@ describe('WorkspaceBackupService — the sweeper passes', () => {
 
         expect(await service.pruneOldRecords(new Date())).toBe(1);
         expect(repository.deleteByIds).toHaveBeenCalledWith(['ancient-1']);
+    });
+
+    describe('runSweep — the hourly cron’s single call', () => {
+        // The cron used to take the three locks itself, from the Trigger
+        // worker, which cannot construct `DistributedTaskLockService` at all:
+        // it injects `@InjectRepository(CacheEntry)` and the worker process
+        // has no DataSource. So the cron died before any pass ran — retention
+        // was never enforced, and because `create()` adopts an active row an
+        // owner whose worker died could never start another backup.
+        function locked() {
+            return {
+                runExclusive: jest
+                    .fn()
+                    .mockImplementation(async (_key: string, pass: () => Promise<number>) => ({
+                        acquired: true,
+                        result: await pass(),
+                    })),
+            };
+        }
+
+        function withLocks(locks: { runExclusive: jest.Mock } | undefined) {
+            const { service, repository, storage } = build();
+            const composed = new WorkspaceBackupService(
+                repository as unknown as WorkspaceBackupRepository,
+                storage,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                locks as never,
+            );
+            void service;
+            return { service: composed, repository, storage };
+        }
+
+        it('runs all three passes and reports what each one did', async () => {
+            const locks = locked();
+            const { service, repository } = withLocks(locks);
+            repository.findExpirable.mockResolvedValue([row({ id: 'old-1' })]);
+            repository.findStalled.mockResolvedValue([row({ id: 'stuck-1', status: 'running' })]);
+            repository.findPrunable.mockResolvedValue([row({ id: 'ancient-1' })]);
+            repository.deleteByIds.mockResolvedValue(1);
+
+            await expect(service.runSweep(new Date())).resolves.toEqual({
+                expired: 1,
+                stalled: 1,
+                pruned: 1,
+            });
+        });
+
+        it('takes one lock per pass, so two replicas cannot both delete', async () => {
+            const locks = locked();
+            const { service } = withLocks(locks);
+
+            await service.runSweep(new Date());
+
+            expect(locks.runExclusive.mock.calls.map((call) => call[0])).toEqual([
+                'workspace-backup:expire',
+                'workspace-backup:stalls',
+                'workspace-backup:prune',
+            ]);
+        });
+
+        it('reports zero for a pass whose lock another replica holds', async () => {
+            const locks = {
+                runExclusive: jest.fn().mockResolvedValue({ acquired: false }),
+            };
+            const { service, repository } = withLocks(locks);
+            repository.findExpirable.mockResolvedValue([row({ id: 'old-1' })]);
+
+            await expect(service.runSweep(new Date())).resolves.toEqual({
+                expired: 0,
+                stalled: 0,
+                pruned: 0,
+            });
+            expect(repository.findExpirable).not.toHaveBeenCalled();
+        });
+
+        it('still sweeps with no lock service bound, because every pass is idempotent', async () => {
+            const { service, repository } = withLocks(undefined);
+            repository.findExpirable.mockResolvedValue([row({ id: 'old-1' })]);
+
+            await expect(service.runSweep(new Date())).resolves.toMatchObject({ expired: 1 });
+        });
     });
 });
 

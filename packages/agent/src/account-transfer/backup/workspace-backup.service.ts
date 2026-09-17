@@ -225,7 +225,7 @@ export class WorkspaceBackupService {
         if (used >= limits.dailyAllowance) {
             return {
                 kind: 'rate_limited',
-                retryAt: await this.nextAllowanceAt(scope, limits.dailyAllowance),
+                retryAt: await this.nextAllowanceAt(scope),
                 limit: limits.dailyAllowance,
             };
         }
@@ -568,19 +568,20 @@ export class WorkspaceBackupService {
     /**
      * When the daily allowance reopens: one day after the OLDEST ready
      * outcome still inside the window, which is the moment it leaves it.
+     *
+     * Asked of the database over exactly the set the refusal counted. It
+     * used to page the newest `allowance * 2` rows of ANY status and filter
+     * client-side, so the refusal and the retry time were measured over
+     * different row sets: four cancelled or failed attempts — which
+     * deliberately do not charge the allowance, so nothing stops an owner
+     * accumulating them — between the oldest ready backup and the newer ones
+     * pushed it off the page, and the 429 reported a wait later than the
+     * truth by the gap between the two, up to nearly a full day.
      */
-    private async nextAllowanceAt(scope: WorkspaceBackupScope, allowance: number): Promise<Date> {
-        const { rows } = await this.backups.listForScope(scope, { limit: allowance * 2 });
-        const readyStatuses = new Set(['ready', 'ready_with_gaps', 'expired', 'deleted']);
-        const inWindow = rows
-            .filter((row) => readyStatuses.has(row.status))
-            .filter((row) => new Date(row.requestedAt).getTime() >= Date.now() - MS_PER_DAY)
-            .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
-
-        const oldest = inWindow[0];
-        return new Date(
-            (oldest ? new Date(oldest.requestedAt).getTime() : Date.now()) + MS_PER_DAY,
-        );
+    private async nextAllowanceAt(scope: WorkspaceBackupScope): Promise<Date> {
+        const since = new Date(Date.now() - MS_PER_DAY);
+        const oldest = await this.backups.oldestReadyInWindow(scope, since);
+        return new Date((oldest ? oldest.getTime() : Date.now()) + MS_PER_DAY);
     }
 
     private tokenPayload(scope: WorkspaceBackupScope, backupId: string, expiry: number): string {

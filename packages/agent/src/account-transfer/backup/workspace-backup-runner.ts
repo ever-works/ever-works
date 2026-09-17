@@ -265,8 +265,28 @@ export class WorkspaceBackupRunner {
 
         const cancelled = { value: false };
         const queuedFiles: QueuedBackupFile[] = [];
-        const registeredIds = new Map<string, readonly string[]>();
+        const registeredIds = new Map<string, { ids: readonly string[]; complete: boolean }>();
         let lastHeartbeat = Date.now();
+
+        /**
+         * The throttled progress report, and the live cancellation signal.
+         *
+         * `heartbeat()` is bounded to `status = 'running'` and returns
+         * whether it matched a row, so a `false` is exactly "this backup is
+         * no longer running" — which after `requestCancel` means the owner
+         * cancelled. Reading that return is what makes `shouldStop()` true
+         * between pages; without it the only cancel probe was at a domain
+         * boundary, so a cancel issued while `activity` paged a
+         * multi-million-row table bought nothing until that whole domain
+         * finished, contradicting both doc comments that promise otherwise.
+         */
+        const heartbeat = async (): Promise<void> => {
+            if (Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+            lastHeartbeat = Date.now();
+            if (!(await this.backups.heartbeat(row.id, {}))) {
+                cancelled.value = true;
+            }
+        };
 
         const context: BackupCollectContext = {
             scope,
@@ -275,14 +295,12 @@ export class WorkspaceBackupRunner {
             source: new TypeOrmBackupRowSource(this.dataSource),
             pageSize: DEFAULT_PAGE_SIZE,
             enqueueFile: (file) => queuedFiles.push(file),
-            registerIds: (name, ids) => registeredIds.set(name, ids),
-            idsFor: (name) => registeredIds.get(name) ?? [],
+            registerIds: (name, ids, complete = true) => registeredIds.set(name, { ids, complete }),
+            idsFor: (name) => registeredIds.get(name)?.ids ?? [],
+            // An unregistered name is the "no rows" case, which is honest.
+            idsComplete: (name) => registeredIds.get(name)?.complete ?? true,
             shouldStop: () => cancelled.value,
-            heartbeat: async () => {
-                if (Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
-                lastHeartbeat = Date.now();
-                await this.backups.heartbeat(row.id, {});
-            },
+            heartbeat,
         };
 
         const outcomes: BackupDomainOutcome[] = [];
@@ -313,7 +331,7 @@ export class WorkspaceBackupRunner {
             );
         }
 
-        const omissions = await this.copyFiles(queuedFiles, writer, storage);
+        const omissions = await this.copyFiles(queuedFiles, writer, storage, heartbeat);
 
         const manifest = buildManifest({
             producedAt: startedAt,
@@ -340,6 +358,11 @@ export class WorkspaceBackupRunner {
         );
         await writer.addChecksums();
 
+        // The last report before the two operations that can take longest —
+        // flushing the zip and finishing the upload — so a large archive
+        // does not look stalled to the sweeper at the very end.
+        await heartbeat();
+
         const archive = await writer.close();
         const stored = await upload;
         if ('error' in stored) {
@@ -355,7 +378,7 @@ export class WorkspaceBackupRunner {
         const retentionDays = options.retentionDays ?? limits.retentionDays;
         const gaps = hasGaps(manifest);
 
-        await this.backups.markTerminal(
+        const settled = await this.backups.markTerminal(
             row.id,
             {
                 status: gaps ? 'ready_with_gaps' : 'ready',
@@ -377,7 +400,42 @@ export class WorkspaceBackupRunner {
             ['running'],
         );
 
+        if (!settled) {
+            // The row left `running` while the archive was being written —
+            // an owner cancelled during the copy phase, or the stall sweep
+            // landed in it. The compare-and-set matched nothing, so
+            // `storageKey` was never recorded, and the object that WAS
+            // uploaded is now unreachable: expiry only visits ready rows,
+            // "delete now" needs a storage key, and the prune pass removes
+            // the record precisely BECAUSE the key is null. That is a
+            // permanent, billable orphan on an object store, so the object
+            // goes with the outcome that won.
+            await this.discardOrphan(stored.key, storage);
+            const current = await this.dataSource
+                .getRepository<WorkspaceBackup>('WorkspaceBackup')
+                .findOne({ where: { id: row.id }, select: { id: true, status: true } });
+            this.logger.warn(
+                `Workspace backup ${row.id} settled elsewhere as ${current?.status ?? 'unknown'}; discarded the archive it had already produced`,
+            );
+            return {
+                status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
+                reason: current?.status ?? 'settled-elsewhere',
+                backupId: row.id,
+            };
+        }
+
         return { status: gaps ? 'ready_with_gaps' : 'ready', backupId: row.id };
+    }
+
+    /** Remove an archive no row will ever reference. Best effort by design. */
+    private async discardOrphan(key: string, storage: BackupStorage): Promise<void> {
+        await storage.deleteArchive(key).catch((error: unknown) => {
+            this.logger.warn(
+                `Could not delete the orphaned archive ${key}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        });
     }
 
     /**
@@ -420,6 +478,12 @@ export class WorkspaceBackupRunner {
             let records = 0;
             let unavailable = 0;
             let failure: unknown;
+            // A plan that named its own shortfall before a single row was
+            // read — today, a `parent` file whose id list came from a
+            // registration that did not finish. Without this the file is
+            // written with zero records and no error, and the coverage table
+            // says the section is EMPTY for data that was never read.
+            let planCode: string | undefined;
 
             for (const plan of plans) {
                 const entry = await writer.addJsonlEntry(
@@ -429,9 +493,25 @@ export class WorkspaceBackupRunner {
                 files.push({ name: entry.name, records: entry.records, sha256: entry.sha256 });
                 records += entry.records;
                 if (plan.unavailable) unavailable += 1;
+                if (plan.errorCode !== undefined && planCode === undefined) {
+                    planCode = plan.errorCode;
+                }
                 if (entry.error !== undefined && failure === undefined) {
                     failure = entry.error;
                 }
+            }
+
+            if (failure === undefined && planCode !== undefined) {
+                return {
+                    outcome: {
+                        key,
+                        status: records > 0 ? 'partial' : 'failed',
+                        records,
+                        files,
+                        errorCode: planCode,
+                    },
+                    plans: planned,
+                };
             }
 
             if (failure !== undefined) {
@@ -643,10 +723,19 @@ export class WorkspaceBackupRunner {
         queued: readonly QueuedBackupFile[],
         writer: BackupArchiveWriter,
         storage: BackupStorage,
+        heartbeat: () => Promise<void>,
     ): Promise<BackupOmission[]> {
         const omissions: BackupOmission[] = [];
 
         for (const file of queued) {
+            // One report per file. With a 2 GiB attachment budget over a
+            // remote object store this phase can run far past the ten-minute
+            // stall window, and it used to be completely silent — so the
+            // sweeper failed backups that were working perfectly, and the
+            // archive they went on to produce became an orphan nothing could
+            // reach or delete. `heartbeat` throttles itself to 25 s.
+            await heartbeat();
+
             const verdict = writer.canAcceptFile(file.sizeBytes);
             if (!verdict.accepted) {
                 omissions.push({

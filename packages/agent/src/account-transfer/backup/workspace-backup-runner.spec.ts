@@ -58,6 +58,12 @@ function harness(
         cancelAfterDomains?: number;
         storage?: BackupStorage | undefined;
         workContent?: BackupWorkContentSource;
+        /** Entity whose page query throws, to exercise a domain that fails mid-walk. */
+        failPageFor?: string;
+        /** Make the final compare-and-set miss, as a cancel during the copy phase does. */
+        settleReturns?: boolean;
+        /** The status the row is left at when the final settle misses. */
+        settledElsewhereAs?: string;
     } = {},
 ): Harness {
     const rows = options.rows ?? {};
@@ -87,6 +93,14 @@ function harness(
             .fn()
             .mockImplementation(async (_id: string, patch: Record<string, unknown>) => {
                 terminalCalls.push(patch);
+                if (options.settleReturns === false) {
+                    // The real compare-and-set is bounded by the row's
+                    // current status, so a row settled elsewhere is not
+                    // updated and the status stays where the other writer
+                    // left it.
+                    state.status = options.settledElsewhereAs ?? 'cancelled';
+                    return false;
+                }
                 state.status = String(patch.status);
                 return true;
             }),
@@ -132,11 +146,16 @@ function harness(
                 take: () => builder,
                 getCount: async () => (rows[target] ?? []).length,
                 getRawMany: async () =>
-                    (rows[target] ?? []).map((row) =>
-                        Object.fromEntries(
-                            Object.entries(row).map(([key, value]) => [`entity_${key}`, value]),
-                        ),
-                    ),
+                    target === options.failPageFor
+                        ? Promise.reject(new Error(`page query for ${target} failed`))
+                        : (rows[target] ?? []).map((row) =>
+                              Object.fromEntries(
+                                  Object.entries(row).map(([key, value]) => [
+                                      `entity_${key}`,
+                                      value,
+                                  ]),
+                              ),
+                          ),
             };
             return builder;
         },
@@ -292,6 +311,164 @@ describe('WorkspaceBackupRunner', () => {
         expect(h.repository.markTerminal).not.toHaveBeenCalled();
         // And fewer than fifteen domains were walked.
         expect(h.repository.heartbeat.mock.calls.length).toBeLessThan(15);
+    });
+
+    describe('a domain that depends on another domain’s ids', () => {
+        // `knowledge` reaches five of its seven files through `workIds`,
+        // which the `works` domain registers. Registration used to happen
+        // AFTER the paging loop, so a Work page query that spent its retries
+        // left the name unregistered entirely — and an unregistered name is
+        // indistinguishable from "this workspace has no Works". The five
+        // knowledge files were then written with zero records and NO error,
+        // and the coverage table reported the section `empty`: "you have
+        // none of these" for a knowledge base that was simply never read.
+        const ROWS: Record<string, Record<string, unknown>[]> = {
+            ...Object.fromEntries(
+                referencedEntities().map((entity) => [entity, [] as Record<string, unknown>[]]),
+            ),
+            Work: [{ id: 'w1', slug: 'acme-tools', userId: 'u1', organizationId: 'org-1' }],
+            WorkKnowledgeDocument: [
+                { id: 'd1', workId: 'w1', title: 'A document', createdAt: '2026-01-01' },
+            ],
+        };
+
+        function domain(terminal: Record<string, unknown> | undefined, key: string) {
+            const summary = terminal?.manifestSummary as {
+                domains: { key: string; status: string; records: number; error?: unknown }[];
+            };
+            return summary.domains.find((entry) => entry.key === key)!;
+        }
+
+        it('never reports a dependent domain as empty when its parent did not finish', async () => {
+            const h = harness({ rows: ROWS, failPageFor: 'Work' });
+            await h.runner.run('b1', OPTIONS);
+
+            // The `works` domain says so for itself, as it always did.
+            expect(domain(h.terminal(), 'works').status).toBe('failed');
+            // And the domain that depended on it no longer claims emptiness
+            // over data it never read.
+            const knowledge = domain(h.terminal(), 'knowledge');
+            expect(knowledge.status).not.toBe('empty');
+            expect(knowledge.status).not.toBe('complete');
+        });
+
+        it('names the shortfall so a reader can tell it from an absence', async () => {
+            const h = harness({ rows: ROWS, failPageFor: 'Work' });
+            await h.runner.run('b1', OPTIONS);
+
+            expect(domain(h.terminal(), 'knowledge').error).toEqual(
+                expect.objectContaining({ code: 'parent_ids_incomplete' }),
+            );
+        });
+
+        it('still reports a dependent domain normally when the parent finished', async () => {
+            const h = harness({ rows: ROWS });
+            await h.runner.run('b1', OPTIONS);
+
+            const knowledge = domain(h.terminal(), 'knowledge');
+            expect(knowledge.error).toBeUndefined();
+            expect(knowledge.records).toBeGreaterThan(0);
+        });
+    });
+
+    describe('the copy and settle phase, which used to be silent', () => {
+        // Two attachment rows, so `copyFiles` has work to do.
+        const ROWS: Record<string, Record<string, unknown>[]> = {
+            ...Object.fromEntries(
+                referencedEntities().map((entity) => [entity, [] as Record<string, unknown>[]]),
+            ),
+            UserUpload: [
+                {
+                    id: 'up1',
+                    userId: 'u1',
+                    organizationId: 'org-1',
+                    storagePath: 'u1/a.pdf',
+                    originalFilename: 'a.pdf',
+                    fileSize: 5,
+                },
+                {
+                    id: 'up2',
+                    userId: 'u1',
+                    organizationId: 'org-1',
+                    storagePath: 'u1/b.pdf',
+                    originalFilename: 'b.pdf',
+                    fileSize: 5,
+                },
+            ],
+        };
+
+        it('heartbeats while copying attachment bytes and before the final flush', async () => {
+            // The whole copy phase reported nothing. With a 2 GiB attachment
+            // budget over a remote object store it can run far past the
+            // ten-minute stall window, so the sweeper failed backups that
+            // were working — and the archive they then produced became an
+            // orphan nothing could reach or delete.
+            //
+            // The heartbeat throttles itself to 25 s, which no unit test can
+            // wait out, so the clock is advanced past the interval on every
+            // read. What is asserted is the number of PROGRESS-less
+            // heartbeats — the shape only the copy and finalise phases emit;
+            // the per-domain ones all carry a `currentDomain`.
+            let clock = Date.now();
+            const now = jest.spyOn(Date, 'now').mockImplementation(() => {
+                clock += 26_000;
+                return clock;
+            });
+            try {
+                const h = harness({ rows: ROWS });
+                await h.runner.run('b1', OPTIONS);
+
+                const bare = h.repository.heartbeat.mock.calls.filter(
+                    (call) => Object.keys(call[1] as object).length === 0,
+                );
+                // Two attachments plus the report before `close()`/upload.
+                expect(bare.length).toBeGreaterThanOrEqual(3);
+            } finally {
+                now.mockRestore();
+            }
+        });
+
+        it('deletes the archive it produced when the row was settled elsewhere', async () => {
+            // The compare-and-set is bounded to `running`, so a cancel during
+            // the copy phase leaves it matching zero rows — and `storageKey`
+            // never recorded. Expiry only visits ready rows, "delete now"
+            // needs a key, and the prune pass removes the record BECAUSE the
+            // key is null: a permanent, billable object nothing references.
+            const h = harness({
+                rows: ROWS,
+                settleReturns: false,
+                settledElsewhereAs: 'cancelled',
+            });
+            const result = await h.runner.run('b1', OPTIONS);
+
+            expect(h.storage.deleteArchive).toHaveBeenCalledWith('u1/archive.zip');
+            expect(result.status).toBe('cancelled');
+        });
+
+        it('reports the outcome that won, not the one it was about to write', async () => {
+            const h = harness({ rows: ROWS, settleReturns: false, settledElsewhereAs: 'failed' });
+            const result = await h.runner.run('b1', OPTIONS);
+
+            expect(result.status).toBe('failed');
+            expect(result.reason).toBe('failed');
+        });
+    });
+
+    it('stops between pages, not only between domains, once the row leaves running', async () => {
+        // `shouldStop()` was dead code: `cancelled.value` was written at
+        // exactly one place, a domain boundary, immediately before the
+        // runner returned — so no collector was ever suspended when it
+        // flipped. The heartbeat's return value is the live signal: its
+        // UPDATE is bounded to `status = 'running'`, so `false` is exactly
+        // "this backup is no longer running".
+        const h = harness({ cancelAfterDomains: 2 });
+        const result = await h.runner.run('b1', OPTIONS);
+
+        expect(result.status).toBe('cancelled');
+        // The context's own stop signal is what a collector consults between
+        // pages; it has to be reachable from the heartbeat, not only from
+        // the domain-boundary probe.
+        expect(h.repository.heartbeat).toHaveBeenCalled();
     });
 
     describe('Work content, read out of each Work’s own data repo', () => {

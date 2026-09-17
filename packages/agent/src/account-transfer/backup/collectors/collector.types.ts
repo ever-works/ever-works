@@ -102,9 +102,29 @@ export interface BackupCollectContext {
     readonly pageSize: number;
     /** Queue an uploaded file's bytes for `files/`. */
     enqueueFile(file: QueuedBackupFile): void;
-    /** Ids registered by an earlier file, for `parent` scoping. */
-    registerIds(name: string, ids: readonly string[]): void;
+    /**
+     * Ids registered by an earlier file, for `parent` scoping.
+     *
+     * `complete` is `false` when the file that produced them did not finish
+     * — a page query that spent its retries, or a cancelled run. The ids
+     * collected so far are still registered, because a partial list is the
+     * best any dependent file can do, but the SHORTFALL has to travel with
+     * them: a `parent` file planned off an incomplete list would otherwise
+     * be indistinguishable from one whose parent genuinely had no rows, and
+     * the manifest would report "you have none of these" for a section that
+     * was never read. Defaults to `true`.
+     */
+    registerIds(name: string, ids: readonly string[], complete?: boolean): void;
     idsFor(name: string): readonly string[];
+    /**
+     * Did the file that registered `name` finish? `true` when nothing was
+     * registered under that name at all — an absent registration is the
+     * "no rows" case, which is already honest.
+     *
+     * Optional so an existing hand-built context keeps compiling; a context
+     * that does not implement it is treated as complete.
+     */
+    idsComplete?(name: string): boolean;
     /** Cooperative cancellation, checked between pages (spec FR-8). */
     shouldStop(): boolean;
     /** Progress report, at least every 30 s inside a long domain (spec FR-5). */
@@ -169,6 +189,13 @@ export interface BackupFilePlan {
     readonly query: BackupEntityQuery;
     /** Set when the entity is not in this build; the file is written empty. */
     readonly unavailable?: boolean;
+    /**
+     * Set when the file can be written but the reader must not read it as
+     * whole — today, a `parent` file whose id list came from a registration
+     * that did not finish. The runner turns this into the domain's error
+     * code, so the coverage table says so rather than reporting `empty`.
+     */
+    readonly errorCode?: string;
 }
 
 /**

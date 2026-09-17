@@ -252,6 +252,34 @@ describe('the coverage table', () => {
         }
     });
 
+    it('names a trim field that is a real column of the entity it trims', () => {
+        // The trim resolver fails OPEN: an unknown column means NO trim, no
+        // error and no trim record in the manifest. So a policy pointed at a
+        // column that does not exist is a window that silently never
+        // applies, and both `pluginUsageEvents` and `triggerFires` said
+        // `createdAt` on entities that name their creation timestamp
+        // `occurredAt` and `firedAt`. `plugin_usage_events` is the archive's
+        // largest history table, and the docs page publishes the 180-day
+        // window it was not applying.
+        const wrong: string[] = [];
+        for (const spec of BACKUP_DOMAIN_SPECS) {
+            for (const file of spec.files) {
+                if (!file.trim) continue;
+                const policy = BACKUP_TRIM_POLICIES[file.trim];
+                expect(policy).toBeDefined();
+                const columns = columnsOf(file.entity);
+                // An entity this build does not carry has no columns to
+                // check; `collectors.spec.ts` asserts entity existence
+                // separately.
+                if (columns.size === 0) continue;
+                if (!columns.has(policy.field)) {
+                    wrong.push(`${file.entity}.${policy.field} (policy ${file.trim})`);
+                }
+            }
+        }
+        expect(wrong).toEqual([]);
+    });
+
     it('carries the uploads that actually have bytes, and only those', () => {
         const withBytes = BACKUP_DOMAIN_SPECS.flatMap((spec) =>
             spec.files.filter((file) => file.bytes).map((file) => file.entity),
@@ -318,6 +346,88 @@ describe('EntityBackupCollector', () => {
             column: 'agentId',
             ids: ['a1'],
         });
+    });
+
+    it('registers the ids it did collect when the walk does not finish, and says so', async () => {
+        // Registration used to sit AFTER the paging loop, so a page query
+        // that spent its retries left the name unregistered ENTIRELY — which
+        // is indistinguishable from "this workspace has no agents". A later
+        // file scoped by that name then wrote zero records with no error and
+        // the coverage table reported the section `empty`.
+        const failing: BackupRowSource = {
+            hasEntity: () => true,
+            hasColumn: () => true,
+            page: async (query, offset) => {
+                if (query.entity !== 'Agent') return [];
+                if (offset === 0) {
+                    return [
+                        { id: 'a1', userId: 'u1', organizationId: 'org-1' },
+                        { id: 'a2', userId: 'u1', organizationId: 'org-1' },
+                    ];
+                }
+                throw new Error('page query failed');
+            },
+            countTrimmed: async () => 0,
+        };
+
+        const registrations = new Map<string, { ids: readonly string[]; complete: boolean }>();
+        const context = contextFor(failing, {
+            // A page size of 2 makes the first page full, so the loop asks
+            // for a second one — which throws.
+            pageSize: 2,
+            registerIds: (name, ids, complete = true) => registrations.set(name, { ids, complete }),
+            idsFor: (name) => registrations.get(name)?.ids ?? [],
+            idsComplete: (name) => registrations.get(name)?.complete ?? true,
+        });
+        const collector = new EntityBackupCollector(spec);
+
+        const first = await collector.plan(context);
+        const agents = first.find((plan) => plan.file === 'agents.jsonl')!;
+        await expect(
+            (async () => {
+                for await (const _row of collector.rows(context, agents)) void _row;
+            })(),
+        ).rejects.toThrow('page query failed');
+
+        // What it managed to read is registered — a partial list is the best
+        // any dependent file can do.
+        expect(registrations.get('agentIds')?.ids).toEqual(['a1', 'a2']);
+        // And the shortfall travels with it.
+        expect(registrations.get('agentIds')?.complete).toBe(false);
+
+        // So a file scoped by that name is planned as a gap, not an absence.
+        const second = await collector.plan(context);
+        expect(second.find((plan) => plan.file === 'memberships.jsonl')?.errorCode).toBe(
+            'parent_ids_incomplete',
+        );
+    });
+
+    it('marks a dependent plan clean when its parent finished', async () => {
+        const source = new FixtureRowSource(
+            {
+                Agent: [{ id: 'a1', userId: 'u1', organizationId: 'org-1' }],
+                AgentMembership: [{ id: 'm1', agentId: 'a1' }],
+            },
+            { Agent: ['id', 'userId', 'organizationId'], AgentMembership: ['id', 'agentId'] },
+        );
+        const registrations = new Map<string, { ids: readonly string[]; complete: boolean }>();
+        const context = contextFor(source, {
+            registerIds: (name, ids, complete = true) => registrations.set(name, { ids, complete }),
+            idsFor: (name) => registrations.get(name)?.ids ?? [],
+            idsComplete: (name) => registrations.get(name)?.complete ?? true,
+        });
+        const collector = new EntityBackupCollector(spec);
+
+        const first = await collector.plan(context);
+        for await (const _row of collector.rows(
+            context,
+            first.find((p) => p.file === 'agents.jsonl')!,
+        )) {
+            void _row;
+        }
+
+        const second = await collector.plan(context);
+        expect(second.find((plan) => plan.file === 'memberships.jsonl')?.errorCode).toBeUndefined();
     });
 
     it('yields nothing for a child whose parent registered no ids, rather than everything', async () => {
