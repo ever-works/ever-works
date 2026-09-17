@@ -34,9 +34,10 @@ findings once.
 | Gap register               | 24 blockers: **20 fixed, 4 confirmed already discharged**. All high rows in APW-01/02/03/04/05/06/07/10/13 addressed. ~50 medium/low rows in APW-01/02/03 remain untouched and are listed per epic. |
 | Spec tree                  | `CLEAN`, 548/548 ids, 0 broken links                                                                                                                                                                |
 | Wave 0                     | **both PRs implemented, tested and pushed**                                                                                                                                                         |
+| **Shared contracts**       | **landed** — `packages/contracts/src/apps/`, 9 modules + 2 specs, 665 exported names (433 runtime), **0 collisions**, wired into the package root                                                   |
 | Ever ID                    | DNS live; manifests in `k8s-gitops` PR #56; deployment blocked by the backups-first gate                                                                                                            |
 | Test estate                | created (two Organizations), isolation proven                                                                                                                                                       |
-| Implementation (Waves 1–3) | **not started** — the specs are now buildable, the code is not written                                                                                                                              |
+| Implementation (Waves 1–3) | **foundation laid, features not written** — the contracts every epic compiles against exist and are tested; the epics themselves are not implemented                                                |
 
 ### ✅ SPEC FREEZE — the acceptance lanes pin this revision
 
@@ -232,6 +233,28 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 ## 5. Log
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
+
+- **2026-09-18 · `77aed370c` + `02b17691f` — the shared contract surface lands.** `packages/contracts/src/apps/`
+  goes in: nine modules (app-source, apps-limits, app-upstream, builds, app-env, app-dependencies,
+  tenant-postgres-ddl, apps-tier, ever-id) plus two specs, **665 exported names of which 433 are runtime values,
+  with zero collisions**. `apps` is wired into the package root and into the barrel-collision test.
+  **A real bug was caught in review**: `export type *` looked right for these mostly-type modules and kept
+  `tsc --noEmit` green, while silently dropping all 433 runtime exports from the package root — the break would
+  only have surfaced at a consumer as "X is not exported". Verified the plain form is safe by scanning for
+  collisions, and added a **named** guard to the barrel spec so it cannot recur silently.
+  Also `'hosting'` appended to `CREDIT_PRICE_GROUPS`, which APW-10 T50 and ACC-10-55 need.
+  Verified: contracts **3221 tests passed / 79 files**, `Type Errors no errors`, type-check exit 0, prettier clean,
+  and `@ever-works/agent` type-check still exit 0 with the new barrel.
+- **2026-09-18 · `f38d62deb` — the checks job gains its tracked-branch leg.** APW-08 FR-76 requires the
+  `Ever Works check: {name}` legs on a same-repository pull request **and** on the tracked branch, so a change that
+  lands by merge commit without an intervening pull request is still checked; APW-05's job was pull-request-only.
+  The pinned golden workflow is updated to match, including its concurrency group.
+- **2026-09-18 · `3cd65ef0c` — the tool description no longer lies to the model.** Both the `commitToRepo`
+  JSON-schema description and the facade contract still said the branch "Defaults to the Work's main branch".
+  After Wave 0 that default is _protected_, so omitting the branch now resolves it and then **refuses** — a model
+  following the old text walks into a refusal every time. Both now say: pass a feature branch.
+- **2026-09-18 · `af599d792` — the catalog-repo contradiction is resolved** (`ever-works/templates` is the default,
+  `ever-works/apps` stays accepted) and `docs/**` passes `prettier --check` wholesale.
 
 - **2026-09-17 · `85fef39ed` — Wave 0 landed, and the spec tree is CLEAN at 548/548.** Both Wave 0 PRs are
   implemented, tested and pushed; the 100 missing acceptance ids were indexed; five new programme documents arrived
