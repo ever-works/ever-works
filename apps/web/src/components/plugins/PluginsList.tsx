@@ -11,6 +11,11 @@ interface PluginsListProps {
     plugins: UserPlugin[];
     categories?: PluginCategory[];
     capabilities?: string[];
+    /**
+     * Pre-fills the search, so a link can open this page already narrowed —
+     * e.g. the capability catalogue's "Connect" link for a missing capability.
+     */
+    initialQuery?: string;
 }
 
 function sortPlugins(a: UserPlugin, b: UserPlugin): number {
@@ -31,10 +36,10 @@ function matchesSearch(plugin: UserPlugin, query: string): boolean {
     return haystack.includes(query);
 }
 
-export function PluginsList({ plugins, categories = [] }: PluginsListProps) {
+export function PluginsList({ plugins, categories = [], initialQuery = '' }: PluginsListProps) {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [showEnabledOnly, setShowEnabledOnly] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
 
     // Capture initial sort order once — prevents cards jumping when toggling a plugin.
     // Order refreshes on full page navigation.

@@ -191,6 +191,13 @@ export const ROUTES = {
     DASHBOARD_MEMORY_LIBRARY: '/memory?view=library',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
+    // Capability & playbook catalogue (AW-21) — one index over playbooks,
+    // skills, saved workflows, task templates and starting points, plus the
+    // playbook detail and the saved-workflow list / run pages it links to.
+    DASHBOARD_CATALOG: '/catalog',
+    DASHBOARD_CATALOG_PLAYBOOK: (slug: string) => `/catalog/playbooks/${slug}`,
+    DASHBOARD_CATALOG_WORKFLOWS: '/catalog/workflows',
+    DASHBOARD_CATALOG_WORKFLOW: (id: string) => `/catalog/workflows/${id}`,
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
     DASHBOARD_AGENTS: '/agents',
     DASHBOARD_AGENT_SESSIONS: '/agents/sessions',

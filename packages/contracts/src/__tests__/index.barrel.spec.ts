@@ -23,6 +23,7 @@ import * as kb from '../kb/index.js';
 import * as memory from '../memory/index.js';
 import * as modelRouting from '../model-routing/index.js';
 import * as notifications from '../notifications/index.js';
+import * as playbook from '../playbook/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
@@ -71,6 +72,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['memory', memory],
 	['model-routing', modelRouting],
 	['notifications', notifications],
+	['playbook', playbook],
 	['policy', policy],
 	['release', release],
 	['runs', runs],
@@ -91,15 +93,16 @@ describe('src/index.ts — the package root barrel', () => {
 		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
 		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		// 29 is COUNTED from the AREAS array above after merging develop, not
-		// added up from either side's number: this branch stood at 24 (its own
-		// `billing` area) and develop at 28 (its `model-routing`,
-		// `notifications`, `connections`, `conversations` and `feed` areas), and
-		// the merged barrel carries all of them. Note `src/index.ts` has 30
-		// `export *` lines but only 29 AREAS: `./fleet/fleet-task-workspace.types.js`
+		// 30 is COUNTED from the AREAS array above after merging develop, not
+		// added up from either side's number: this branch stood at 24 (with its
+		// own `playbook` area) and develop at 29 (its `model-routing`,
+		// `notifications`, `memory`, `connections`, `conversations`, `feed` and
+		// `billing` areas), and the merged barrel carries all of them — 29 + the
+		// one `playbook` area develop lacked = 30. Note `src/index.ts` has 31
+		// `export *` lines but only 30 AREAS: `./fleet/fleet-task-workspace.types.js`
 		// is a second sub-path of the existing `fleet` area, not a new area.
 		// Recount the array after every merge instead of trusting either side.
-		expect(exportLines).toBe(29);
+		expect(exportLines).toBe(30);
 	});
 
 	it('has no name exported by two different areas', () => {

@@ -63,6 +63,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { ReleaseModule } from './release/release.module';
 import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
+import { CatalogModule } from './catalog/catalog.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { TeamsModule } from './teams/teams.module';
@@ -245,6 +246,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // CRUD surface for graphs the executor could already run but
         // nothing could keep.
         WorkflowsModule,
+        // Capability & playbook catalogue (AW-21) — read-only playbook list,
+        // detail and preflight over enabled playbook-provider plugins.
+        CatalogModule,
         // Streaming-terminal M3 — relay registry + WS gateway on this
         // process's HTTP server + attach-token/internal-publish endpoints.
         TerminalModule,

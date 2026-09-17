@@ -104,3 +104,8 @@ export * from './vector-store-host-chunk-tables.service';
 export * from './vector-store-host-chunk-tables.module';
 // Repository registry (Feature G) — registry CRUD + agent grants + resolver.
 export * from './repo-registry.service';
+// Capability & playbook catalogue (AW-21) — per-caller readiness (plugin
+// capability resolution, adoption limits, name collision) and the pure
+// adoption planner shared by the setup sheet and provisioning.
+export * from './playbook-readiness.service';
+export * from './playbook-adoption-plan';
