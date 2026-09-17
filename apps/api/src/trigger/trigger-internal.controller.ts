@@ -435,8 +435,10 @@ export class TriggerInternalController implements OnModuleInit {
         @Optional()
         private readonly memoryFactSweepService?: MemoryFactSweepService,
         // AW-22 Workspace backup — backs the `workspace-backup` task
-        // (`runFromPayload`, then `notifyFinished` on the settled row) and
-        // the `workspace-backup-sweeper` cron (`runSweep`). The archive is
+        // (`startFromPayload`, then `observeRun` until the row settles, then
+        // `notifyFinished` on it — every call short, so none outlives the
+        // RPC deadline) and the `workspace-backup-sweeper` cron
+        // (`runSweep`). The archive is
         // produced HERE and not in the worker because the runner needs the
         // DataSource, the active storage backend and each Work's data-repo
         // walk, none of which exist in worker scope. Appended LAST +
@@ -576,8 +578,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
             // here (allow-list auto-derived).
             SkillReadinessService: this.skillReadinessService,
-            // AW-22 — `workspace-backup` calls `runFromPayload()` on the
-            // runner and `notifyFinished()` on the service; the
+            // AW-22 — `workspace-backup` calls `startFromPayload()` on the
+            // runner, then `observeRun()` and `notifyFinished()` on the
+            // service; the
             // `workspace-backup-sweeper` cron calls `runSweep()`
             // (allow-list auto-derived).
             WorkspaceBackupRunner: this.workspaceBackupRunner,

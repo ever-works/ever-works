@@ -467,8 +467,9 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             inject: [TriggerInternalApiClient],
         },
         // AW-22 Workspace backup — the `workspace-backup` task calls
-        // `runFromPayload()` on the runner and `notifyFinished()` on the
-        // service; the `workspace-backup-sweeper` cron calls `runSweep()`.
+        // `startFromPayload()` on the runner, then `observeRun()` and
+        // `notifyFinished()` on the service; the `workspace-backup-sweeper`
+        // cron calls `runSweep()`.
         //
         // Both tasks resolved these three classes from a module that never
         // provided them — the sweeper from this module, the archive task

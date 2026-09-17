@@ -373,6 +373,91 @@ describe('WorkspaceBackupRunner', () => {
         });
     });
 
+    describe('startFromPayload — start the archive, do not wait for it', () => {
+        // The archive task reaches this over an RPC channel with a 45 s
+        // per-request deadline. `runFromPayload` holds that request open for
+        // the whole archive, so any real backup failed the task and lost its
+        // notification. This returns once the claim is decided and leaves
+        // the archive running — tracked, and settled on every failure.
+        const PAYLOAD = { backupId: 'b1', userId: 'u1', organizationId: 'org-1' };
+
+        function inFlight(runner: WorkspaceBackupRunner) {
+            return (runner as unknown as { inFlight: Map<string, Promise<{ status: string }>> })
+                .inFlight;
+        }
+
+        it('returns started while the archive is still being produced, then settles it', async () => {
+            let release!: () => void;
+            const gate = new Promise<void>((resolve) => (release = resolve));
+            const h = harness({
+                putArchive: jest.fn().mockImplementation(async (source: Readable) => {
+                    await gate;
+                    for await (const chunk of source) void chunk;
+                    return { key: 'u1/archive.zip', backend: 'fixture-backend' };
+                }) as unknown as BackupStorage['putArchive'],
+            });
+
+            const started = await h.runner.startFromPayload(PAYLOAD);
+
+            expect(started).toEqual({ status: 'started', backupId: 'b1' });
+            expect(h.repository.claimForRun).toHaveBeenCalledTimes(1);
+            // Nothing is settled yet: the upload has not even been allowed to read.
+            expect(h.repository.markTerminal).not.toHaveBeenCalled();
+            expect(inFlight(h.runner).has('b1')).toBe(true);
+
+            release();
+            const outcome = await inFlight(h.runner).get('b1');
+
+            expect(outcome?.status).toBe('ready');
+            expect(h.terminal()?.status).toBe('ready');
+            expect(inFlight(h.runner).has('b1')).toBe(false);
+        });
+
+        it('settles the row failed when the archive throws, even if the first settle throws too', async () => {
+            const h = harness();
+            (h.storage.warmUp as jest.Mock).mockRejectedValue(new Error('bucket gone'));
+            h.repository.markTerminal.mockRejectedValueOnce(new Error('database went away'));
+
+            const started = await h.runner.startFromPayload(PAYLOAD);
+            expect(started.status).toBe('started');
+            const outcome = await inFlight(h.runner).get('b1');
+
+            expect(outcome).toEqual({ status: 'failed', reason: 'internal', backupId: 'b1' });
+            // The failed attempt, then the one that landed.
+            expect(h.repository.markTerminal).toHaveBeenCalledTimes(2);
+            expect(h.terminal()).toEqual(expect.objectContaining({ status: 'failed' }));
+            expect(inFlight(h.runner).has('b1')).toBe(false);
+        });
+
+        it('hands back a skip decided before any work started, and tracks nothing', async () => {
+            const h = harness();
+            h.repository.claimForRun.mockResolvedValue(false);
+
+            await expect(h.runner.startFromPayload(PAYLOAD)).resolves.toEqual({
+                status: 'skipped',
+                reason: 'already-claimed',
+                backupId: 'b1',
+            });
+            expect(inFlight(h.runner).size).toBe(0);
+        });
+
+        it('fails at once, like run, when no storage backend is configured', async () => {
+            const h = harness();
+            const runner = new WorkspaceBackupRunner(
+                h.repository as unknown as WorkspaceBackupRepository,
+                h.dataSource,
+                undefined,
+            );
+
+            await expect(runner.startFromPayload(PAYLOAD)).resolves.toEqual({
+                status: 'failed',
+                reason: 'internal',
+                backupId: 'b1',
+            });
+            expect(h.terminal()?.failureReason).toBe('internal');
+        });
+    });
+
     describe('a child file whose parent is in the SAME domain', () => {
         // `runDomain` planned a whole domain before reading any of its files,
         // and a `parent` file resolves its id list at plan time — so a child

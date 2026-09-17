@@ -89,6 +89,15 @@ export interface WorkspaceBackupRunResult {
     readonly backupId: string;
 }
 
+/**
+ * What starting a backup produced. `started` means the row is claimed and
+ * its archive is being produced in the background; every other status is an
+ * outcome decided before any work began, exactly as {@link WorkspaceBackupRunResult}.
+ */
+export type WorkspaceBackupStartResult =
+    | WorkspaceBackupRunResult
+    | { readonly status: 'started'; readonly backupId: string; readonly reason?: undefined };
+
 /** Everything the runner needs that is not on the row. */
 export interface WorkspaceBackupRunOptions {
     /** Workspace identity written into the manifest (spec FR-11). */
@@ -112,6 +121,9 @@ const DEFAULT_FORMAT_REFERENCE = 'https://docs.ever.works/features/workspace-bac
 @Injectable()
 export class WorkspaceBackupRunner {
     private readonly logger = new Logger(WorkspaceBackupRunner.name);
+
+    /** Runs {@link startFromPayload} started in this process that have not settled yet. */
+    private readonly inFlight = new Map<string, Promise<WorkspaceBackupRunResult>>();
 
     constructor(
         private readonly backups: WorkspaceBackupRepository,
@@ -137,29 +149,146 @@ export class WorkspaceBackupRunner {
         backupId: string,
         options: WorkspaceBackupRunOptions,
     ): Promise<WorkspaceBackupRunResult> {
+        const claim = await this.claim(backupId);
+        if ('outcome' in claim) {
+            return claim.outcome;
+        }
+        return this.execute(claim.row, claim.startedAt, options, claim.storage);
+    }
+
+    /**
+     * Resolve who and what this archive is for, then run it.
+     *
+     * The identity is read HERE rather than carried in the job payload: a
+     * runtime replays the original payload on a retry, so a workspace
+     * renamed between enqueue and run would otherwise be archived under its
+     * old name and the manifest would quietly disagree with the product
+     * (spec FR-11).
+     *
+     * This waits for the whole archive. Called across the worker's internal
+     * RPC channel it outlives that channel's per-request deadline on any
+     * real workspace, which is why the archive task calls
+     * {@link startFromPayload} instead.
+     */
+    async runFromPayload(payload: {
+        backupId: string;
+        userId: string;
+        organizationId?: string | null;
+    }): Promise<WorkspaceBackupRunResult> {
+        return this.run(payload.backupId, await this.optionsFromPayload(payload));
+    }
+
+    /**
+     * Claim the row and START producing its archive, returning as soon as
+     * the claim is decided — never after the archive.
+     *
+     * Why this exists: the archive task reaches the runner over the
+     * worker's internal RPC channel, which gives up on a request after a
+     * short deadline (45 s by default, below the ingress timeouts in front
+     * of the API). {@link runFromPayload} holds that request open for the
+     * whole archive, so every backup longer than the deadline failed the
+     * task — and with it the one notification the owner is owed (spec
+     * FR-33) — while the archive carried on here regardless.
+     *
+     * The runner already owns the row: it claims it with a compare-and-set,
+     * heartbeats it, and settles it itself. So the RPC only has to start the
+     * work, and the task watches the ROW until it settles (see
+     * `WorkspaceBackupService.observeRun`). Every outcome decided before any
+     * work starts — a vanished row, one already claimed, no storage backend
+     * — is returned exactly as {@link run} returns it.
+     *
+     * The run it starts is tracked, not dropped: everything `run` settles on
+     * failure is settled here too, and a failure of that settling itself is
+     * caught, retried once and logged, so it can neither crash the process
+     * with an unhandled rejection nor leave the row `running` with nobody
+     * reporting on it. If the process itself dies, the heartbeats stop and
+     * the row is failed as `stalled` — by the task watching it, or by the
+     * sweeper.
+     */
+    async startFromPayload(payload: {
+        backupId: string;
+        userId: string;
+        organizationId?: string | null;
+    }): Promise<WorkspaceBackupStartResult> {
+        const options = await this.optionsFromPayload(payload);
+        const claim = await this.claim(payload.backupId);
+        if ('outcome' in claim) {
+            return claim.outcome;
+        }
+
+        const backupId = payload.backupId;
+        const execution = this.execute(claim.row, claim.startedAt, options, claim.storage)
+            .catch(async (error: unknown): Promise<WorkspaceBackupRunResult> => {
+                // `execute` settles every failure it can see, so reaching
+                // here means settling the row itself threw — most plausibly
+                // the database went away mid-run. One more attempt; if that
+                // fails too, the stopped heartbeats let the stall rule
+                // settle it.
+                const detail = error instanceof Error ? error.message : String(error);
+                this.logger.error(`Workspace backup ${backupId} could not be settled: ${detail}`);
+                await this.fail(backupId, 'internal', detail).catch((retryError: unknown) => {
+                    this.logger.error(
+                        `Workspace backup ${backupId} is left for the stall rule: ${
+                            retryError instanceof Error ? retryError.message : String(retryError)
+                        }`,
+                    );
+                });
+                return { status: 'failed', reason: 'internal', backupId };
+            })
+            .finally(() => {
+                this.inFlight.delete(backupId);
+            });
+        this.inFlight.set(backupId, execution);
+
+        return { status: 'started', backupId };
+    }
+
+    /**
+     * Everything {@link run} decides before any work starts: whether the row
+     * is there, whether it is still waiting, whether there is anywhere to
+     * put an archive, and whether THIS caller won the claim.
+     */
+    private async claim(backupId: string): Promise<
+        | { readonly outcome: WorkspaceBackupRunResult }
+        | {
+              readonly row: WorkspaceBackup;
+              readonly startedAt: Date;
+              readonly storage: BackupStorage;
+          }
+    > {
         const row = await this.dataSource
             .getRepository<WorkspaceBackup>('WorkspaceBackup')
             .findOne({
                 where: { id: backupId },
             });
         if (!row) {
-            return { status: 'skipped', reason: 'backup-not-found', backupId };
+            return { outcome: { status: 'skipped', reason: 'backup-not-found', backupId } };
         }
         if (row.status !== 'queued') {
-            return { status: 'skipped', reason: 'already-terminal', backupId };
+            return { outcome: { status: 'skipped', reason: 'already-terminal', backupId } };
         }
         if (!this.storage) {
             await this.fail(backupId, 'internal', 'No storage backend is configured for archives');
-            return { status: 'failed', reason: 'internal', backupId };
+            return { outcome: { status: 'failed', reason: 'internal', backupId } };
         }
 
         const startedAt = new Date();
         if (!(await this.backups.claimForRun(backupId, startedAt))) {
-            return { status: 'skipped', reason: 'already-claimed', backupId };
+            return { outcome: { status: 'skipped', reason: 'already-claimed', backupId } };
         }
+        return { row, startedAt, storage: this.storage };
+    }
 
+    /** Produce a claimed row's archive, settling the row on every failure it can name. */
+    private async execute(
+        row: WorkspaceBackup,
+        startedAt: Date,
+        options: WorkspaceBackupRunOptions,
+        storage: BackupStorage,
+    ): Promise<WorkspaceBackupRunResult> {
+        const backupId = row.id;
         try {
-            return await this.produce(row, startedAt, options, this.storage);
+            return await this.produce(row, startedAt, options, storage);
         } catch (error) {
             if (error instanceof BackupArchiveTooLargeError) {
                 await this.fail(backupId, 'too_large', error.message);
@@ -172,20 +301,12 @@ export class WorkspaceBackupRunner {
         }
     }
 
-    /**
-     * Resolve who and what this archive is for, then run it.
-     *
-     * The identity is read HERE rather than carried in the job payload: a
-     * runtime replays the original payload on a retry, so a workspace
-     * renamed between enqueue and run would otherwise be archived under its
-     * old name and the manifest would quietly disagree with the product
-     * (spec FR-11).
-     */
-    async runFromPayload(payload: {
+    /** The manifest identity for a payload, read fresh (spec FR-11). */
+    private async optionsFromPayload(payload: {
         backupId: string;
         userId: string;
         organizationId?: string | null;
-    }): Promise<WorkspaceBackupRunResult> {
+    }): Promise<WorkspaceBackupRunOptions> {
         const user = await this.dataSource
             .getRepository<{ id: string; name?: string | null; email: string }>('User')
             .findOne({ where: { id: payload.userId } });
@@ -214,7 +335,7 @@ export class WorkspaceBackupRunner {
                   kind: 'personal' as const,
               };
 
-        return this.run(payload.backupId, {
+        return {
             workspace,
             account: {
                 id: payload.userId,
@@ -222,7 +343,7 @@ export class WorkspaceBackupRunner {
                 email: user?.email ?? '',
             },
             build: process.env.EVER_WORKS_BUILD ?? 'development',
-        });
+        };
     }
 
     private async produce(

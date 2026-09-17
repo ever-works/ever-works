@@ -494,20 +494,100 @@ export class WorkspaceBackupService {
 
         let failed = 0;
         for (const backup of stalled) {
-            if (backup.storageKey && this.storage) {
-                await this.storage.deleteArchive(backup.storageKey).catch(() => undefined);
-            }
-            const moved = await this.backups.markTerminal(backup.id, {
-                status: 'failed',
-                failureReason: 'stalled',
-                failureDetail: 'The backup stopped reporting progress',
-                finishedAt: now,
-                storageKey: null,
-                currentDomain: null,
-            });
-            if (moved) failed += 1;
+            if (await this.settleStalled(backup, now)) failed += 1;
         }
         return failed;
+    }
+
+    /**
+     * One backup, as the archive task watching it sees it — settled first
+     * if it has stopped reporting or run past its ceiling.
+     *
+     * The archive task starts the run and then watches the row, rather than
+     * holding an RPC open for the whole archive (see
+     * `WorkspaceBackupRunner.startFromPayload`). Watching is also what makes
+     * the task's notification reliable, so the two rules that end a run from
+     * the OUTSIDE are applied here, on every look, with the same thresholds
+     * the hourly sweeper uses:
+     *
+     *  - **stalled** (spec FR-5) — no heartbeat for `stallMinutes`, or still
+     *    queued after `queuedStallMinutes`. The API process that was
+     *    producing it died; nothing else will ever settle it, and the
+     *    sweeper only looks once an hour.
+     *  - **timeout** (spec FR-6) — running for `timeoutMinutes`, or the
+     *    watcher says it cannot wait any longer (`stop: 'timeout'`: its own
+     *    run is about to reach the job runtime's ceiling, and a watcher
+     *    that is killed raises no notification).
+     *
+     * Both are compare-and-sets out of an active status, so a run that
+     * settled a moment earlier keeps its own outcome, and the runner — whose
+     * heartbeat is bounded to `running` — sees the row leave `running`, stops
+     * between pages and discards anything it had already uploaded.
+     *
+     * Every time is read here, from this process's clock, so the watcher's
+     * clock never has to agree with it. Returns the row as it now stands, or
+     * `null` when it is not in this workspace.
+     */
+    async observeRun(
+        scope: WorkspaceBackupScope,
+        backupId: string,
+        options: { readonly stop?: 'timeout' } = {},
+    ): Promise<WorkspaceBackup | null> {
+        const backup = await this.backups.findInScope(scope, backupId);
+        if (!backup || (backup.status !== 'running' && backup.status !== 'queued')) {
+            return backup;
+        }
+
+        const now = new Date();
+        const limits = BACKUP_DEFAULT_LIMITS;
+        const minutesAgo = (minutes: number) => now.getTime() - minutes * 60 * 1000;
+        const time = (value: Date | string | null | undefined) =>
+            value ? new Date(value).getTime() : Number.NaN;
+
+        let moved = false;
+        if (backup.status === 'queued') {
+            if (time(backup.requestedAt) < minutesAgo(limits.queuedStallMinutes)) {
+                moved = await this.settleStalled(backup, now);
+            }
+        } else if (
+            options.stop === 'timeout' ||
+            time(backup.startedAt) <= minutesAgo(limits.timeoutMinutes)
+        ) {
+            moved = await this.backups.markTerminal(
+                backup.id,
+                {
+                    status: 'failed',
+                    failureReason: 'timeout',
+                    failureDetail: `The backup did not finish within ${limits.timeoutMinutes} minutes and was stopped`,
+                    finishedAt: now,
+                    currentDomain: null,
+                },
+                ['running'],
+            );
+        } else if (
+            // A row claimed without a heartbeat yet is measured from its claim.
+            (time(backup.lastHeartbeatAt) || time(backup.startedAt)) <
+            minutesAgo(limits.stallMinutes)
+        ) {
+            moved = await this.settleStalled(backup, now);
+        }
+
+        return moved ? this.backups.findInScope(scope, backupId) : backup;
+    }
+
+    /** Fail one backup as `stalled` and delete whatever partial object it left. */
+    private async settleStalled(backup: WorkspaceBackup, now: Date): Promise<boolean> {
+        if (backup.storageKey && this.storage) {
+            await this.storage.deleteArchive(backup.storageKey).catch(() => undefined);
+        }
+        return this.backups.markTerminal(backup.id, {
+            status: 'failed',
+            failureReason: 'stalled',
+            failureDetail: 'The backup stopped reporting progress',
+            finishedAt: now,
+            storageKey: null,
+            currentDomain: null,
+        });
     }
 
     /** Sweeper pass 3 — remove records whose bytes went long ago (spec FR-29). */

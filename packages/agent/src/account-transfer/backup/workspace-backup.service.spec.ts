@@ -409,6 +409,129 @@ describe('WorkspaceBackupService — one notification per finished backup (spec 
     });
 });
 
+describe('WorkspaceBackupService — observeRun, what the archive task watches', () => {
+    // The task no longer holds an RPC open for the whole archive; it starts
+    // the run and asks this, every few seconds, until the row settles. Each
+    // look also ends a run that can no longer end itself.
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
+
+    function watching(current: Record<string, unknown>, after?: Record<string, unknown>) {
+        const built = build();
+        let settled = false;
+        built.repository.findInScope.mockImplementation(async (_scope, id: string) =>
+            row({ id, ...(settled && after ? after : current) }),
+        );
+        built.repository.markTerminal.mockImplementation(async () => {
+            settled = true;
+            return true;
+        });
+        return built;
+    }
+
+    it('hands back a settled row untouched', async () => {
+        const { service, repository } = watching({ status: 'ready' });
+        const observed = (await service.observeRun(SCOPE, 'b1')) as unknown as { status: string };
+
+        expect(observed.status).toBe('ready');
+        expect(repository.markTerminal).not.toHaveBeenCalled();
+    });
+
+    it('leaves a running backup that is still reporting alone', async () => {
+        const { service, repository } = watching({
+            status: 'running',
+            startedAt: minutesAgo(20),
+            lastHeartbeatAt: minutesAgo(1),
+        });
+        const observed = (await service.observeRun(SCOPE, 'b1')) as unknown as { status: string };
+
+        expect(observed.status).toBe('running');
+        expect(repository.markTerminal).not.toHaveBeenCalled();
+    });
+
+    it('fails a running backup that stopped reporting, with the sweeper’s own rule (spec FR-5)', async () => {
+        const { service, repository } = watching(
+            { status: 'running', startedAt: minutesAgo(30), lastHeartbeatAt: minutesAgo(11) },
+            { status: 'failed', failureReason: 'stalled' },
+        );
+        const observed = (await service.observeRun(SCOPE, 'b1')) as unknown as {
+            status: string;
+            failureReason: string;
+        };
+
+        expect(repository.markTerminal).toHaveBeenCalledWith(
+            'b1',
+            expect.objectContaining({ status: 'failed', failureReason: 'stalled' }),
+        );
+        expect(observed).toEqual(
+            expect.objectContaining({ status: 'failed', failureReason: 'stalled' }),
+        );
+    });
+
+    it('stops a backup that ran past the hour and says timeout (spec FR-6)', async () => {
+        const { service, repository } = watching(
+            { status: 'running', startedAt: minutesAgo(61), lastHeartbeatAt: minutesAgo(0) },
+            { status: 'failed', failureReason: 'timeout' },
+        );
+        await service.observeRun(SCOPE, 'b1');
+
+        expect(repository.markTerminal).toHaveBeenCalledWith(
+            'b1',
+            expect.objectContaining({ status: 'failed', failureReason: 'timeout' }),
+            ['running'],
+        );
+    });
+
+    it('stops a backup when its watcher cannot wait any longer', async () => {
+        const { service, repository } = watching({
+            status: 'running',
+            startedAt: minutesAgo(58),
+            lastHeartbeatAt: minutesAgo(0),
+        });
+        await service.observeRun(SCOPE, 'b1', { stop: 'timeout' });
+
+        expect(repository.markTerminal).toHaveBeenCalledWith(
+            'b1',
+            expect.objectContaining({ status: 'failed', failureReason: 'timeout' }),
+            ['running'],
+        );
+    });
+
+    it('never overwrites an outcome that landed first — the stop is a compare-and-set', async () => {
+        const { service, repository } = watching({
+            status: 'running',
+            startedAt: minutesAgo(61),
+            lastHeartbeatAt: minutesAgo(0),
+        });
+        repository.markTerminal.mockResolvedValue(false);
+
+        const observed = (await service.observeRun(SCOPE, 'b1')) as unknown as { status: string };
+        // Nothing moved, so the next look reads whatever did settle it.
+        expect(observed.status).toBe('running');
+        expect(repository.markTerminal.mock.calls[0][2]).toEqual(['running']);
+    });
+
+    it('fails a backup that was never picked up, like the sweeper does', async () => {
+        const { service, repository } = watching({
+            status: 'queued',
+            requestedAt: minutesAgo(16),
+        });
+        await service.observeRun(SCOPE, 'b1');
+
+        expect(repository.markTerminal).toHaveBeenCalledWith(
+            'b1',
+            expect.objectContaining({ status: 'failed', failureReason: 'stalled' }),
+        );
+    });
+
+    it('answers null for a backup outside this workspace', async () => {
+        const { service, repository } = build();
+        repository.findInScope.mockResolvedValue(null);
+
+        await expect(service.observeRun(SCOPE, 'elsewhere')).resolves.toBeNull();
+        expect(repository.markTerminal).not.toHaveBeenCalled();
+    });
+});
+
 describe('WorkspaceBackupService — the sweeper passes', () => {
     it('deletes the bytes of an expired archive and keeps the row (spec FR-28, S-16)', async () => {
         const { service, repository, storage } = build();
