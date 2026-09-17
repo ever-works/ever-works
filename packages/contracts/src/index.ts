@@ -36,6 +36,9 @@ export * from './model-routing/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Memory facts + context-file vocabulary (AW-07) — the atomic tier of Memory
+// and the shared limits every surface validates against.
+export * from './memory/index.js';
 // Conversations — kinds, participants, send status and delivery outcomes for
 // named conversations with Agents.
 export * from './conversations/index.js';

@@ -55,6 +55,8 @@ export * from './work-knowledge-tag.entity';
 export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './work-knowledge-chunk-coordinate.entity';
+// AW-07 — pgvector chunks for vector namespaces that are not a Work.
+export * from './vector-namespace-chunk.entity';
 export * from './kb-retrieval-log.entity';
 export * from './kb-types';
 export * from './types';
@@ -198,6 +200,10 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+// AW-07 — Memory facts (the atomic tier of Memory) + the shared
+// context-file / fact vocabulary re-exported from contracts.
+export * from './memory-fact.entity';
+export * from './context-file-types';
 export * from './knowledge-document-reader-state.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';

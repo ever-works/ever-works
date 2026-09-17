@@ -89,6 +89,8 @@ import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
+import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
+import { VectorStoreHostChunkTablesModule } from '@ever-works/agent/services';
 import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
@@ -328,6 +330,16 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
         MemoryFilesApiModule,
+        // Memory facts (AW-07) — /api/memory/facts: the atomic tier of
+        // Memory (list / search by meaning / edit / forget / restore).
+        // The embed dispatcher resolves through the job-runtime provider
+        // registry (TriggerModule), so any configured runtime runs it.
+        MemoryFactsApiModule,
+        // AW-07 — publishes the platform vector chunk tables to the plugin
+        // host, so the bundled pgvector store actually serves the Knowledge
+        // Base (work_knowledge_chunks) and memory facts
+        // (vector_namespace_chunks) instead of failing "not wired".
+        VectorStoreHostChunkTablesModule,
         // Knowledge library — /api/knowledge: the organization shelf over
         // the Knowledge Base (shared folders, filing, archive / restore,
         // Markdown export).

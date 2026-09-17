@@ -137,6 +137,21 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
         'claim',
     ],
     utils: ['screenshot', 'search', 'memory'],
+    // Memory facts (AW-07) — keyword slots ship WITH the tools (program DoD
+    // rule). People capture facts with "remember…" phrasings that share no
+    // stem with `memory`, so without these slots `remember_fact` would be
+    // gated out of exactly the turn that needs it.
+    memoryfacts: [
+        'remember',
+        'memorize',
+        'memorise',
+        'keep in mind',
+        "don't forget",
+        'do not forget',
+        'note that',
+        'what do you know about',
+        'facts',
+    ],
 };
 
 /** Map a controller path to a coarse domain key. */
@@ -153,6 +168,7 @@ function deriveDomain(path: string): string {
     if (p.includes('/notification')) return 'notifications';
     if (p.includes('/api/email')) return 'email';
     if (p.includes('/api/meetings')) return 'meetings';
+    if (p.includes('/api/memory/facts')) return 'memoryfacts';
     if (p.includes('/api/ingest')) return 'events';
     if (p.includes('/api/digest')) return 'digest';
     if (p.includes('/api/pr-review')) return 'prreview';

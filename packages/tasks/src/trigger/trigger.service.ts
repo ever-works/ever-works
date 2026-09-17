@@ -27,6 +27,8 @@ import {
     KbTranscribeDispatcher,
     KbReembedWorkPayload,
     KbReembedWorkDispatcher,
+    MemoryFactEmbedPayload,
+    MemoryFactEmbedDispatcher,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -49,6 +51,7 @@ import { kbNormalizeVideoTask } from '../tasks/trigger/kb-normalize-video.task';
 import { kbNormalizeAudioTask } from '../tasks/trigger/kb-normalize-audio.task';
 import { kbTranscribeTask } from '../tasks/trigger/kb-transcribe.task';
 import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
+import { memoryFactEmbedTask } from '../tasks/trigger/memory-fact-embed.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -105,7 +108,8 @@ export class TriggerService
         KbOrgOverlayFanoutDispatcher,
         KbNormalizeMediaDispatcher,
         KbTranscribeDispatcher,
-        KbReembedWorkDispatcher
+        KbReembedWorkDispatcher,
+        MemoryFactEmbedDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -885,5 +889,47 @@ export class TriggerService
             }),
         );
         return handle.id;
+    }
+
+    /**
+     * AW-07 — enqueue one `memory-fact-embed` run.
+     *
+     * Bound to `MEMORY_FACT_EMBED_DISPATCHER` through the job-runtime
+     * registry like every other dispatcher on this class, so the tenant
+     * overlay's stamping Proxy applies and a different active provider
+     * takes over without touching `MemoryFactService`.
+     *
+     * No `idempotencyKey`, deliberately: the unit of work is "embed whatever
+     * this fact's body is NOW". Keying on the fact id would collapse the
+     * embed an edit enqueues into the one its creation enqueued. The task is
+     * idempotent (an embedded body is skipped, an upsert replaces), so a
+     * double enqueue costs a no-op, never a second vector.
+     *
+     * Returns `null` — quietly — when Trigger.dev is disabled: a runtime that
+     * is not configured is reported ONCE at startup by `MemoryFactService`,
+     * not once per saved fact. A transport failure is logged and also
+     * returns `null`; either way the fact is saved and the nightly sweep
+     * embeds it.
+     */
+    async dispatchMemoryFactEmbed(payload: MemoryFactEmbedPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await memoryFactEmbedTask.trigger(
+                { factId: payload.factId, userId: payload.userId },
+                this.stampTenantOptions({
+                    tags: ['memory-fact-embed', `fact:${payload.factId}`],
+                }),
+            );
+            return handle.id;
+        } catch (error) {
+            this.logger.warn(
+                `memory-fact-embed dispatch failed (factId=${payload.factId}): ` +
+                    (error instanceof Error ? error.message : String(error)),
+            );
+            return null;
+        }
     }
 }

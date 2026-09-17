@@ -6,6 +6,7 @@ import { KB_NORMALIZE_MEDIA_DISPATCHER } from '../kb-normalize-media-dispatcher'
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../kb-org-overlay-fanout-dispatcher';
 import { KB_REEMBED_WORK_DISPATCHER } from '../kb-reembed-work-dispatcher';
 import { KB_TRANSCRIBE_DISPATCHER } from '../kb-transcribe-dispatcher';
+import { MEMORY_FACT_EMBED_DISPATCHER } from '../memory-fact-embed-dispatcher';
 import { ROSTER_PROVISION_DISPATCHER } from '../roster-provision-dispatcher';
 import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from '../template-customization-dispatcher';
 import { WEBHOOK_DELIVERY_DISPATCHER } from '../webhook-delivery-dispatcher';
@@ -129,9 +130,12 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
     });
 
     describe('buildJobRuntimeProviders()', () => {
-        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 12)', () => {
+        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 13)', () => {
             const providers = buildJobRuntimeProviders();
-            expect(providers).toHaveLength(12);
+            // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER +
+            // develop's ROSTER_PROVISION_DISPATCHER. COUNTED off the merged
+            // DISPATCHER_SYMBOLS list, not added up from either branch.
+            expect(providers).toHaveLength(13);
         });
 
         it('binds every *_DISPATCHER symbol exported from @ever-works/agent/tasks', () => {
@@ -143,7 +147,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 12-symbol list is the actual invariant we care about.
+            // 13-symbol list is the actual invariant we care about.
             const expected = new Set<symbol>([
                 KB_BACKFILL_SKELETON_DISPATCHER,
                 KB_EMBED_DOCUMENT_DISPATCHER,
@@ -152,6 +156,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
                 KB_ORG_OVERLAY_FANOUT_DISPATCHER,
                 KB_REEMBED_WORK_DISPATCHER,
                 KB_TRANSCRIBE_DISPATCHER,
+                MEMORY_FACT_EMBED_DISPATCHER,
                 ROSTER_PROVISION_DISPATCHER,
                 TEMPLATE_CUSTOMIZATION_DISPATCHER,
                 WEBHOOK_DELIVERY_DISPATCHER,

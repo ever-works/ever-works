@@ -9,6 +9,7 @@ import * as conversations from '../conversations/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
+import * as email from '../email/index.js';
 import * as feed from '../feed/index.js';
 import * as fleet from '../fleet/index.js';
 import * as form from '../form/index.js';
@@ -18,6 +19,7 @@ import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
+import * as memory from '../memory/index.js';
 import * as modelRouting from '../model-routing/index.js';
 import * as notifications from '../notifications/index.js';
 import * as policy from '../policy/index.js';
@@ -54,6 +56,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
+	['email', email],
 	['feed', feed],
 	['fleet', fleet],
 	['form', form],
@@ -63,6 +66,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['ingest', ingest],
 	['item', item],
 	['kb', kb],
+	['memory', memory],
 	['model-routing', modelRouting],
 	['notifications', notifications],
 	['policy', policy],
@@ -85,7 +89,12 @@ describe('src/index.ts — the package root barrel', () => {
 		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
 		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(26);
+		// 28 is COUNTED from the AREAS array above after merging develop, not
+		// added up from either side's number: this branch stood at 26 (its own
+		// `memory` area) and develop at 27 (its `model-routing` and
+		// `notifications` areas), and the merged barrel carries all three.
+		// Recount the array after every merge instead of trusting either side.
+		expect(exportLines).toBe(28);
 	});
 
 	it('has no name exported by two different areas', () => {

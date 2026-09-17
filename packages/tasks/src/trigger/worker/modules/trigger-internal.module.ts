@@ -4,6 +4,8 @@ import {
     DeployReadyPollerService,
     KnowledgeBaseReconcileService,
     MemoryConsolidationScheduleService,
+    MemoryFactEmbedService,
+    MemoryFactSweepService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
@@ -420,6 +422,23 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TerminalTranscriptService'),
             inject: [TriggerInternalApiClient],
         },
+        // Memory facts (AW-07) — the memory-fact-embed task calls
+        // `embedFact(factId)` and the memory-fact-gc cron calls `sweep()` on
+        // these proxies, which RPC to the live API where the AI provider and
+        // vector-store plugins are loaded. Same shape as
+        // TerminalTranscriptService above.
+        {
+            provide: MemoryFactEmbedService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'MemoryFactEmbedService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: MemoryFactSweepService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'MemoryFactSweepService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Model accounts (AW-16) — the model-account-health cron resolves
         // ModelAccountHealthService via this proxy. The real service lives in
         // the API, where the AI provider plugins and their settings are
@@ -482,6 +501,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         PaygService,
         MemoryConsolidationScheduleService,
         TerminalTranscriptService,
+        MemoryFactEmbedService,
+        MemoryFactSweepService,
         ModelAccountHealthService,
         SkillReadinessService,
     ],
