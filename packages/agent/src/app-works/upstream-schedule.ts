@@ -232,7 +232,7 @@ export function nextUpstreamSyncAt(
     from: Date,
     workId: string,
 ): Date | null {
-    if (!settings || settings.modeHonoured !== true) {
+    if (!settings || settings.enabled !== true || settings.modeHonoured !== true) {
         return null;
     }
     return computeNextUpstreamSync(settings.schedule, from, workId);
