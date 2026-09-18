@@ -110,3 +110,16 @@ export * from './build.interface.js';
 // with it (@see plugin-manifest.types.ts) lands in the same change; a plugin that
 // never declares `identity-provider` compiles and behaves exactly as before.
 export * from './identity-provider.interface.js';
+// App Works (APW-10 T2) — the `apps-tier` capability: `IAppsTierProvider` (the
+// eighteen required members a hosting-zone provider implements — zone info, the
+// one desired-state write, quarantine, throttle, removal, dependencies,
+// self-check, the credential review, heartbeat, metering, signals and owner
+// logs — plus the two P3 build members) and every plugin-facing shape it names
+// (`apps-tier.types.ts`). The wire-level model of the `Work` object itself is
+// re-exported from `@ever-works/contracts` (APW-10 T1) rather than redeclared
+// (Resolution R-1). Additive: no existing capability, category or contract
+// changes, and T2 appends no category — the implementing plugin declares the
+// existing `deployment` one (plan §5.2:602) — so a plugin that never declares
+// `apps-tier` compiles and behaves exactly as before.
+export * from './apps-tier.interface.js';
+export * from './apps-tier.types.js';

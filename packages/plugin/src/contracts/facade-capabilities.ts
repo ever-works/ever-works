@@ -128,7 +128,19 @@ export const PLUGIN_CAPABILITIES = {
 	// landed in the same change as the `identity` category in
 	// `plugin-manifest.types.ts` — a plugin contract with no category to be
 	// discovered under is a manifest the loader rejects.
-	IDENTITY_PROVIDER: 'identity-provider'
+	IDENTITY_PROVIDER: 'identity-provider',
+	// App Works (APW-10 T2) — the managed hosting tier's zone capability. The
+	// `ever-works-apps` plugin declares it together with `deployment`
+	// (plan §5.2:602) and is consumed only through `AppsTierFacadeService`
+	// (APW-10 plan §5.3:655); see `capabilities/apps-tier.interface.ts`.
+	// Appended after `identity-provider`, and appended **last** on purpose:
+	// every existing constant keeps its value and its position, because the
+	// capability list is an append-only surface — a member that moves silently
+	// changes what a persisted manifest means. Deliberately NOT paired with a
+	// new category: the tier's plugin is a `deployment` plugin, so
+	// `PLUGIN_CATEGORIES` is untouched and every exhaustive map over it in
+	// `apps/web` stays total.
+	APPS_TIER: 'apps-tier'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

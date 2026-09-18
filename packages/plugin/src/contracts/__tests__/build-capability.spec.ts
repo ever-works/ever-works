@@ -152,7 +152,8 @@ const EXISTING_CATEGORIES = [
 
 /**
  * Every capability and category a LATER epic appended behind `build`, in the
- * map's / tuple's own order — APW-12 T4 added `identity-provider` and `identity`.
+ * map's / tuple's own order — APW-12 T4 added `identity-provider` and `identity`,
+ * and APW-10 T2 added `apps-tier` (which appends no category).
  *
  * This spec owns `build`; these two lists exist so its append-only assertions stay
  * statements about *this* change rather than about the tuple's current tail. An
@@ -161,7 +162,7 @@ const EXISTING_CATEGORIES = [
  * the assertions weaker, it makes them FAIL on a legitimate append — which is
  * exactly how the "last category is `build`" pin here was found.
  */
-const LATER_CAPABILITIES: readonly string[] = ['identity-provider'];
+const LATER_CAPABILITIES: readonly string[] = ['identity-provider', 'apps-tier'];
 const LATER_CATEGORIES: readonly PluginCategory[] = ['identity'];
 
 /** The four strategies of Resolution R-13, in the plan's order (plan §4.1:585–589). */

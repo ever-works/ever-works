@@ -144,6 +144,22 @@ const PRE_IDENTITY_CATEGORIES = [
 	'build'
 ] as const;
 
+/**
+ * Every capability a LATER epic appended behind `identity-provider`, in the
+ * map's own order — APW-10 T2 added `apps-tier` (which appends no category).
+ *
+ * This spec owns `identity-provider`; the list exists so the append-only
+ * assertion below stays a statement about *this* change rather than about the
+ * map's current tail — the same extension point `build-capability.spec.ts:164`
+ * carries. An epic that appends behind `identity-provider` extends it in the
+ * same change, so the total stays exact instead of drifting, and the next append
+ * is one token here rather than a red suite. Nothing is weakened:
+ * `EXISTING_CAPABILITIES` is still compared member by member, `identity-provider`
+ * is still counted exactly once, and a member that disappears or is renamed
+ * still fails the total.
+ */
+const LATER_CAPABILITIES: readonly string[] = ['apps-tier'];
+
 /** The seven **Test connection** ids of FR-3, in its order (plan §4.1:340–351). */
 const EVERY_CHECK_ID: readonly IdentityProviderCheck['id'][] = [
 	'discovery',
@@ -265,7 +281,13 @@ describe('the identity-provider capability (APW-12 T4)', () => {
 		}
 		// Exactly one member was added, and it is this one.
 		expect(values.filter((entry) => entry === 'identity-provider')).toHaveLength(1);
-		expect(values).toHaveLength(EXISTING_CAPABILITIES.length + 1);
+		// …and everything a later epic appended behind it is present and valid, so the
+		// count below stays an exact total rather than a number that drifts.
+		for (const capability of LATER_CAPABILITIES) {
+			expect(values, capability).toContain(capability);
+			expect(isValidPluginCapability(capability), capability).toBe(true);
+		}
+		expect(values).toHaveLength(EXISTING_CAPABILITIES.length + 1 + LATER_CAPABILITIES.length);
 	});
 
 	it('appends the category without removing, reordering or duplicating a member', () => {
