@@ -116,6 +116,17 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
 
 ### Known baseline conditions (recorded, deliberately NOT "fixed")
 
+- **`.github/workflows/e2e.yml` is NOT prettier-clean at HEAD — 38 lines of pre-existing drift.** `prettier` wants to
+  expand one 32-element matrix array onto its own lines, so `prettier --write` on that file rewrites a region nobody
+  touched. When adding the launcher's seed switch the file was restored to its committed bytes and the ten lines were
+  inserted **textually**, leaving a 10-insertion / 0-deletion diff. Anyone editing that workflow should do the same:
+  reformatting another task's CI file inside a feature change hides the real diff. (Whether CI gates on
+  `prettier --check` for `.github/**` is worth knowing; it evidently does not today.)
+- **`apps/web`'s `API_URL` is resolved at MODULE IMPORT time** (`lib/constants.ts` computes
+  `process.env.API_URL || 'http://localhost:3100'` once), so a spec that sets `process.env.API_URL` in a `beforeEach`
+  has no effect on it — assert against the exported constant, or re-import the module. This cost one iteration while
+  writing APW-11 T13's spec.
+
 - **A full agent-package sweep is not a clean gate in this worktree, for two unrelated reasons.** Running all 820
   suites (`pnpm --filter @ever-works/agent test`, `--maxWorkers=2`) reported **4 failed suites / 2 failed tests**, and
   the split matters:
