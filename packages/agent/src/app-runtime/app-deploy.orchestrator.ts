@@ -1091,11 +1091,8 @@ export class AppDeployOrchestrator {
         const fingerprint = text(
             (ref as { clusterFingerprint?: string | null }).clusterFingerprint,
         );
-        const isFirstDeploymentOnCluster = true;
-        // PERTURBATION P2 — the fingerprint captured on the runtime state is ignored, so every
-        // Deployment (a rollback included) is treated as the first one on the cluster.
-        void fingerprint;
-        void state;
+        const isFirstDeploymentOnCluster =
+            !text(state?.clusterFingerprint) || state?.clusterFingerprint !== fingerprint;
 
         try {
             const answer = await this.renderer.build({
