@@ -18,9 +18,16 @@
  *   T22's render-input builder and APW-07 T16's `provisionEphemeral`, and **reuses**
  *   `APP_DEPENDENCIES_SERVICE`, `APP_RUNTIME_ENV_SOURCE` and `APP_VERIFICATION_SINK` rather than
  *   declaring parallel tokens (R-26; a second `Symbol` of the same name is a different token).
+ * - `./worker-context` — `markAppClusterWorkerContext()` / `isAppClusterWorkerContext()` and the
+ *   `APP_CLUSTER_IO_IN_API` refusal (T20, plan §6.2). A **process-level flag, not an env var**.
+ *   Exported here because the one caller that arms it is T71's bootstrap provider in
+ *   `packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts`: a cross-package
+ *   import can only reach the built `@ever-works/agent/app-runtime` subpath, so the marker has to
+ *   be on this barrel.
  */
 
 export * from './ports';
 export * from './default-ports';
+export * from './worker-context';
 export * from './app-runtime-deletion.service';
 export * from './app-verification-target.service';
