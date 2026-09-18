@@ -81,12 +81,15 @@ describe('SkillsSection', () => {
         ).toHaveAttribute('href', '/skills/new');
     });
 
-    it('hosts the catalog client on /agents with the #skills anchor', async () => {
+    it('hosts the catalog client on the Skills sub-tab’s own path, with no anchor', async () => {
         render(await SkillsSection({ data: DATA, filters: FILTERS }));
 
         const client = screen.getByTestId('skills-page-client');
-        expect(client.getAttribute('data-base-path')).toBe('/agents');
-        expect(client.getAttribute('data-hash')).toBe('#skills');
+        // Skills has a real route now (`/agents/skills`), so the client's
+        // `router.replace` keeps the reader on this page instead of scrolling
+        // back to an `#skills` anchor on the Agents catalog.
+        expect(client.getAttribute('data-base-path')).toBe('/agents/skills');
+        expect(client.getAttribute('data-hash')).toBeFalsy();
         expect(client.getAttribute('data-section')).toBe('custom');
     });
 });

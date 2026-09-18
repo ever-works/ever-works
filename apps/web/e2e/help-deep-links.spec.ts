@@ -59,9 +59,17 @@ test.describe('Help centre — help links on empty states', () => {
                     if (frame === page.mainFrame() && frame.url() !== before) navigated = true;
                 });
 
-                await link.click();
+                // Click until the drawer opens — a click that lands before the
+                // button hydrates does nothing (it is a plain `type="button"`, so
+                // it cannot navigate either). A short click timeout keeps a click
+                // that the open drawer's backdrop blocks from stalling the retry.
                 const panel = page.getByTestId('help-center-panel');
-                await expect(panel).toBeVisible();
+                await expect(async () => {
+                    if (!(await panel.isVisible().catch(() => false))) {
+                        await link.click({ timeout: 3_000 });
+                    }
+                    await expect(panel).toBeVisible({ timeout: 3_000 });
+                }).toPass({ timeout: 45_000 });
                 await expect(panel.getByTestId('help-article')).toHaveAttribute(
                     'data-article-id',
                     article,

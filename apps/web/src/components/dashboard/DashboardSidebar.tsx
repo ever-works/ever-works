@@ -40,7 +40,6 @@ import {
     BarChart3,
     Video,
     Inbox,
-    Receipt,
     BookOpen,
     type LucideIcon,
 } from 'lucide-react';
@@ -212,11 +211,23 @@ export function DashboardSidebar({
         // keeps its slot directly after Tasks and Runs stays right above
         // Activity.
         { name: t('navigation.schedules'), href: ROUTES.DASHBOARD_SCHEDULES, icon: CalendarClock },
-        // Runs ledger (AW-09) — "what did my agents execute, and what did it
-        // cost", placed right above Activity ("what changed in my workspace")
-        // so the two neighbouring questions are learnt side by side.
-        { name: t('navigation.runs'), href: ROUTES.DASHBOARD_RUNS, icon: Receipt },
-        { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
+        // Activity — ONE entry for "what happened in my workspace", which is
+        // where the Runs ledger went. Runs used to sit directly above it as its
+        // own page ("what did my agents execute, and what did it cost" beside
+        // "what changed in my workspace"), but the two were the same question
+        // asked of the same rows, so Runs is now the activity page's `Runs` view
+        // (`?view=runs`, with the Day/Week/Month calendar, filters and receipts
+        // it always had).
+        //
+        // `matchPrefixes` keeps this entry lit on the retired `/runs` path, which
+        // still exists as a redirect — so an old bookmark highlights the item it
+        // now belongs to instead of nothing.
+        {
+            name: t('navigation.activity'),
+            href: ROUTES.DASHBOARD_ACTIVITY,
+            icon: Activity,
+            matchPrefixes: [ROUTES.DASHBOARD_ACTIVITY, ROUTES.DASHBOARD_RUNS],
+        },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
 

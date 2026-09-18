@@ -142,12 +142,27 @@ describe('DashboardSidebar — navigation consolidation', () => {
         expect(labels.indexOf('navigation.memory')).toBe(labels.indexOf('navigation.teams') + 1);
     });
 
-    it('lists Runs (AW-09) directly above Activity, linking to /runs', () => {
+    it('lists Activity once, and no Runs entry — the ledger is its Runs view now', () => {
         const { container } = renderSidebar();
         const labels = navLinks(container).map((a) => a.textContent?.trim());
 
-        expect(labels.indexOf('navigation.runs')).toBe(labels.indexOf('navigation.activity') - 1);
-        expect(linkFor(container, 'navigation.runs')?.getAttribute('href')).toBe('/runs');
+        expect(labels.filter((l) => l === 'navigation.activity')).toHaveLength(1);
+        // Runs (AW-09) was its own page above Activity; the Activity merge made
+        // it the Activity page's `Runs` view, so the sidebar entry is gone.
+        expect(labels).not.toContain('navigation.runs');
+        expect(linkFor(container, 'navigation.activity')?.getAttribute('href')).toBe('/activity');
+    });
+
+    it('keeps Activity lit on the retired /runs path, which still redirects', () => {
+        for (const path of ['/activity', '/runs']) {
+            nav.pathname = path;
+            const { container, unmount } = renderSidebar();
+            expect(
+                isActive(linkFor(container, 'navigation.activity')),
+                `Activity should be active on ${path}`,
+            ).toBe(true);
+            unmount();
+        }
     });
 });
 

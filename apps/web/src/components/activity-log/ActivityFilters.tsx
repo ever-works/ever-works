@@ -38,6 +38,12 @@ interface ActivityFiltersProps {
     onStatusChange: (value: string) => void;
     search: string;
     onSearchChange: (value: string) => void;
+    /**
+     * The Activity page's `/` shortcut focuses this box. A prop rather than a
+     * `forwardRef` so the component keeps its existing call sites and its plain
+     * function signature.
+     */
+    searchInputRef?: React.RefObject<HTMLInputElement | null>;
     loading?: boolean;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
@@ -50,6 +56,7 @@ export function ActivityFilters({
     onStatusChange,
     search,
     onSearchChange,
+    searchInputRef,
     loading = false,
     hasActiveFilters,
     onClearFilters,
@@ -63,6 +70,7 @@ export function ActivityFilters({
             <div className="relative flex-1 min-w-[450px] w-3/4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark" />
                 <input
+                    ref={searchInputRef}
                     type="text"
                     value={search}
                     onChange={(e) => onSearchChange(e.target.value)}

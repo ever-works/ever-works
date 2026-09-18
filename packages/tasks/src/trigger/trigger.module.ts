@@ -14,6 +14,8 @@ import {
     KB_TRANSCRIBE_DISPATCHER,
     KB_REEMBED_WORK_DISPATCHER,
     MEMORY_FACT_EMBED_DISPATCHER,
+    ROSTER_PROVISION_DISPATCHER,
+    WORKSPACE_BACKUP_DISPATCHER,
     JOB_RUNTIME_PROVIDER_REGISTRY,
     InMemoryJobRuntimeProviderRegistry,
     buildJobRuntimeProviders,
@@ -162,6 +164,25 @@ import {
         // this @Global() module so `MemoryFactService`, declared in the
         // agent-side `MemoryFactsModule`, can see it.
         MEMORY_FACT_EMBED_DISPATCHER,
+        // A token bound in `providers` and absent from `exports` is not
+        // shared by a @Global() module: it resolves to `undefined` at every
+        // `@Optional() @Inject()` site in another module, silently, and the
+        // app still boots. These two were in that state.
+        //
+        // AW-20's `ROSTER_PROVISION_DISPATCHER` (injected by
+        // `onboarding-roster.controller.ts`) and AW-22's
+        // `WORKSPACE_BACKUP_DISPATCHER` (injected by
+        // `WorkspaceBackupService`, declared in the agent-side
+        // `AccountTransferModule`). Without the backup entry every
+        // `POST /api/account/backups` answered 202 with a row that was
+        // already `failed` / 'Could not enqueue the backup: no job runtime
+        // is configured', because `create()` saw `dispatcher?.…` resolve to
+        // undefined — on a deployment with the job runtime fully
+        // configured. `trigger.module.spec.ts` now asserts every symbol
+        // `buildJobRuntimeProviders()` binds is also exported, so the next
+        // dispatcher cannot land half-wired.
+        ROSTER_PROVISION_DISPATCHER,
+        WORKSPACE_BACKUP_DISPATCHER,
         NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
     ],
 })

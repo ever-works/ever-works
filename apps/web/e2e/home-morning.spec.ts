@@ -191,7 +191,12 @@ test.describe('Home — the morning stack', () => {
         }
         const failedToday = page.getByTestId('home-glance-failedToday');
         if ((await failedToday.count()) > 0) {
-            await expect(failedToday).toHaveAttribute('href', /\/runs\?g=day&status=failed$/);
+            // The runs counter links straight at the Activity page's Runs view —
+            // the ledger is not a page of its own any more.
+            await expect(failedToday).toHaveAttribute(
+                'href',
+                /\/activity\?view=runs&g=day&status=failed$/,
+            );
         }
     });
 });

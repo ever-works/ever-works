@@ -5,10 +5,8 @@ import type { AstTemplateEntry } from '@/lib/api/agent-templates';
 import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
 import { AgentsList } from '@/components/agents';
 import { AgentsPageTabs } from '@/components/agents/AgentsPageTabs';
-import { SkillsSection } from '@/components/skills/SkillsSection';
-import { loadSkillsPageData, parseSkillsSearchParams } from '@/lib/skills-page-data';
-
-type SearchParams = Record<string, string | string[] | undefined>;
+import { AgentsHubTabs } from '@/components/agents/AgentsHubTabs';
+import { AgentsHashRedirect } from '@/components/agents/AgentsHashRedirect';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.agentsPage');
@@ -27,42 +25,20 @@ export async function generateMetadata(): Promise<Metadata> {
  * Agents are surfaced as "Your templates" (spec FR-29, Q2 default).
  *
  * Navigation consolidation (`docs/specs/features/navigation-consolidation`
- * §3.5): this page is tab 2 of the Teams hub and now also hosts the **Skills
- * catalog** as a block below the Agent grid (anchor `#skills`; `/skills`
- * redirects here). It therefore reads the four Skills query params the old
- * `/skills` page owned — parsing and fetching both live in
- * `lib/skills-page-data.ts` so the two surfaces cannot drift — and adds that
- * fetch to the same `Promise.all`, keeping the page one round of waterfall.
- *
- * Known and accepted cost of hosting Skills here: `SkillsPageClient.updateUrl`
- * does a `router.replace` on this route, so every Skills tab/search/page click
- * re-runs THIS server component — `agentsAPI.list` and
- * `fetchAgentTemplateCatalog` are re-issued alongside `loadSkillsPageData`,
- * where the old standalone `/skills` page re-fetched skills only. They stay in
- * one `Promise.all`, so the click costs one extra *parallel* upstream call, not
- * extra serial latency, and `fetchAgentTemplateCatalog` degrades to the
- * built-in `listAstTemplates` list rather than failing. Deliberately NOT fixed
- * by caching: both fetches are per-user/cookie-scoped, and an `unstable_cache`
- * keyed wrongly would serve one tenant's Agents to another. If this ever shows
- * up in traces, the safe lever is a `<Suspense>` boundary around the Skills
- * block (stream it) — not a shared cache.
+ * §3.5) once hosted the **Skills catalog** here as a `#skills` block below the
+ * Agent grid, which is why this page used to read the four Skills query
+ * params. The Activity merge moved Skills to a sub-tab of its own
+ * (`/agents/skills`, `AgentsHubTabs`), so this page is back to ONE job and one
+ * round of fetches — and `AgentsHashRedirect` still catches the old
+ * `/agents#skills` links.
  */
-export default async function AgentsPage({
-    searchParams,
-}: {
-    searchParams?: Promise<SearchParams>;
-}) {
-    const skillsFilters = parseSkillsSearchParams((await searchParams) ?? {});
-
-    const [result, templates, skills] = await Promise.all([
+export default async function AgentsPage() {
+    const [result, templates] = await Promise.all([
         agentsAPI.list({ limit: 50 }).catch(() => ({
             data: [] as Agent[],
             meta: { total: 0, limit: 50, offset: 0 },
         })),
         fetchAgentTemplateCatalog('agent').catch(() => [] as AstTemplateEntry[]),
-        // Already defensive internally: a failing side reports through
-        // `loadErrors` instead of throwing the Agents page into the boundary.
-        loadSkillsPageData(skillsFilters),
     ]);
 
     // "Your templates" — the user's existing Agents as reusable
@@ -75,13 +51,14 @@ export default async function AgentsPage({
         iconName: a.avatarIcon ?? undefined,
     }));
 
-    // Run orchestration (Wave 4 M4) — Agents | Sessions tab strip above
-    // the catalog; the Sessions tab is the org-wide fleet view.
+    // Agents hub: the top strip (Teams | Agents | Archived) plus this tab's own
+    // sub-strip (Agents | Skills | Activity) above the catalog.
     return (
         <div className="w-full">
             <AgentsPageTabs active="agents" />
+            <AgentsHubTabs active="agents" />
+            <AgentsHashRedirect />
             <AgentsList agents={result.data} templates={templates} userTemplates={userTemplates} />
-            <SkillsSection data={skills} filters={skillsFilters} />
         </div>
     );
 }
