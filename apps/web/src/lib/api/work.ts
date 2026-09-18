@@ -28,6 +28,7 @@ import {
     type WorkLastRunDto,
 } from '@ever-works/contracts/api';
 import type {
+    AppUpstreamStateResponse,
     MergePolicyOverride,
     TaskAcceptanceCheck,
     WorkChecksPolicy,
@@ -708,6 +709,33 @@ export interface ComparisonResult {
     message: string;
 }
 
+/**
+ * APW-02 T29 — the Upstream routes' answer shapes (`plan.md:487-516`).
+ *
+ * `AppUpstreamStateResponse` is the whole Upstream card in one answer and is
+ * imported from the shared contracts folder rather than restated here: the card,
+ * the API controller and the state service must agree on it by construction
+ * (`packages/contracts/src/apps/app-upstream.ts:267-277`, Resolution R-1).
+ */
+export type {
+    AppUpstreamStateResponse,
+    AppUpstreamWarning,
+    AppUpstreamWarningCode,
+} from '@ever-works/contracts';
+
+/**
+ * What `POST /api/works/:id/upstream/sync` and
+ * `POST /api/works/:id/upstream/readiness/retry` answer — `202
+ * { queued: true, runId }` (`plan.md:495-496`, `plan.md:106-107`).
+ *
+ * `runId` is `null` when the job was queued without a provider run id, which is
+ * a success: the request never waits for the run (FR-33, ACC-02-14).
+ */
+export interface AppUpstreamDispatchResult {
+    queued: true;
+    runId: string | null;
+}
+
 export const workAPI = {
     // Get all works with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -891,6 +919,51 @@ export const workAPI = {
     updateReadme: async (id: string) => {
         return serverMutation<UpdateReadmeResponse>({
             endpoint: `/works/${id}/update-readme`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // ── Upstream (APW-02 T29, Resolution R-8) ────────────────────────────────
+    //
+    // The three routes of `plan.md:492-496`, mirroring
+    // `apps/api/src/app-works/app-upstream.controller.ts` exactly:
+    // `GET  /api/works/:id/upstream`                  → the whole card
+    // `POST /api/works/:id/upstream/sync`             → 202, never awaited
+    // `POST /api/works/:id/upstream/readiness/retry`  → 202, never awaited
+    //
+    // The GET is deliberately **not** wrapped in React `cache()` the way `get`
+    // is: the Upstream tab polls it while a sync runs (plan §5.2), and a
+    // per-request memo would hand every poll the first answer of that render,
+    // which is the one thing a poll must never do.
+
+    /** Read one App Work's upstream state (`plan.md:494`, FR-46/FR-56). */
+    getUpstream: async (id: string): Promise<AppUpstreamStateResponse> => {
+        return serverFetch<AppUpstreamStateResponse>(`/works/${id}/upstream`);
+    },
+
+    /**
+     * **Sync now** (FR-33). Answers as soon as the job is queued; a refusal is
+     * an `ApiResponseError` whose `code` is one of `no_upstream`, `not_ready`,
+     * `sync_in_progress`, `sync_paused`, `sync_limit_reached` (`plan.md:504-516`).
+     */
+    syncUpstream: async (id: string): Promise<AppUpstreamDispatchResult> => {
+        return serverMutation<AppUpstreamDispatchResult>({
+            endpoint: `/works/${id}/upstream/sync`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * **Try again** for a readiness that timed out or failed (FR-19). Refusals:
+     * `not_retryable` and `retry_limit_reached` (`plan.md:514-515`).
+     */
+    retryUpstreamReadiness: async (id: string): Promise<AppUpstreamDispatchResult> => {
+        return serverMutation<AppUpstreamDispatchResult>({
+            endpoint: `/works/${id}/upstream/readiness/retry`,
             data: {},
             method: 'POST',
             wrapInData: false,

@@ -8,6 +8,10 @@ import { WorkStats } from '@/components/works/detail/overview/WorkStats';
 import { WorkConfig } from '@/components/works/detail/overview/WorkConfig';
 import { WorkMissions } from '@/components/works/detail/overview/WorkMissions';
 import { AppLauncherExposureCard } from '@/components/works/detail/overview/AppLauncherExposureCard';
+import {
+    AppUpstreamCard,
+    showUpstreamCardOnOverview,
+} from '@/components/works/app/AppUpstreamCard';
 import { BudgetSummarySection } from '@/components/dashboard/BudgetSummarySection';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { getAuthFromRequest } from '@/lib/auth';
@@ -61,6 +65,20 @@ export default async function WorkOverviewPage({ params }: Params) {
     const auth = await getAuthFromRequest();
     const appLauncherEnabled = await isAppLauncherEnabled(auth.user?.sub);
 
+    // APW-02 T30 (Resolution R-8, plan §5.1) — the Upstream card's SECOND
+    // surface. It sits directly below APW-01's App source card and renders only
+    // for a fork or a private copy whose readiness is settled (`ready` or
+    // `waiting_for_setup_pr`); every other readiness state belongs to APW-01's
+    // card, which is the one that explains it. `showUpstreamCardOnOverview` is
+    // the single place that rule lives.
+    //
+    // Only App Works are asked: `GET /api/works/:id/upstream` answers `404
+    // not_found` for every other kind (ACC-02-21), which is a correct answer and
+    // a wasted round trip. A failed read hides the card — the Overview must
+    // never turn an unreadable upstream into a 404 page.
+    const upstreamState =
+        work.kind === 'app' ? await workAPI.getUpstream(id).catch(() => null) : null;
+
     const showStatusCard =
         !work.generateStatus?.status ||
         work.generateStatus?.status === GenerateStatusType.ERROR ||
@@ -90,6 +108,13 @@ export default async function WorkOverviewPage({ params }: Params) {
             {/* APW-11 T17 — Show in App Launcher, for every role that can reach
                 the Overview (the settings-page equivalent is MANAGER+ only). */}
             {appLauncherEnabled && <AppLauncherExposureCard work={work} />}
+
+            {/* APW-02 T30 (R-8) — the Upstream card, Overview variant: the same
+                component as the Upstream tab, without the readiness row (the
+                Overview is not where readiness is acted on). */}
+            {showUpstreamCardOnOverview(upstreamState) && upstreamState && (
+                <AppUpstreamCard workId={id} variant="overview" initialState={upstreamState} />
+            )}
 
             {/* Work Info and Config side by side */}
             <div className="grid @3xl/main:grid-cols-2 gap-6">

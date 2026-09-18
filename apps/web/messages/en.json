@@ -4036,6 +4036,9 @@
                     "comparison": "Comparison",
                     "deployment": "Deployment",
                     "appLauncher": "App Launcher",
+                    "appFork": "Fork",
+                    "appActions": "Inherited workflows",
+                    "appUpstream": "Upstream",
                     "workCreated": "Work Created",
                     "workUpdated": "Work Updated",
                     "workDeleted": "Work Deleted",
@@ -6895,6 +6898,9 @@
                 "stopRequested": "Generation cancellation requested",
                 "stopFailed": "Failed to cancel generation"
             },
+            "upstream": {
+                "tabName": "Upstream"
+            },
             "appEnv": {
                 "errors": {
                     "invalidName": "Names start with a letter or an underscore and use A–Z, 0–9 and _ only.",
@@ -6913,6 +6919,64 @@
                     "valuesTooLarge": "An app's values can total at most 1 MiB.",
                     "malformedLine": "Not a valid NAME=value line.",
                     "rotateRateLimited": "Too many rotations. Try again later."
+                }
+            },
+            "appUpstream": {
+                "title": "Upstream",
+                "relationFork": "Fork of {upstream}",
+                "relationPrivateCopy": "Private copy of {upstream}",
+                "syncNow": "Sync now",
+                "syncing": "Syncing…",
+                "syncLimitReached": "You've synced 6 times this hour. Try again at {time}.",
+                "alreadyRunning": "A sync is already running.",
+                "upToDate": "Up to date with upstream",
+                "behind": "{count, plural, =1 {1 commit behind upstream} other {# commits behind upstream}}",
+                "aheadAndBehind": "{ahead} ahead, {behind} behind upstream",
+                "ahead": "{count, plural, =1 {1 commit ahead of upstream} other {# commits ahead of upstream}}",
+                "unknown": "Divergence unknown",
+                "checkedAgo": "Checked {ago}",
+                "lastSynced": "Last synced {ago}",
+                "notSyncedYet": "Not synced yet",
+                "nextSync": "Next sync {when}",
+                "resultUpToDate": "Already up to date",
+                "resultFastForwarded": "{count, plural, =1 {Synced 1 commit from upstream} other {Synced # commits from upstream}}",
+                "resultPullRequestOpened": "Opened a pull request to sync {count} commits",
+                "resultPullRequestUpdated": "Updated the sync pull request ({count} commits)",
+                "resultLicenseChanged": "Upstream changed its license to {spdx}. Review the pull request before merging.",
+                "resultLicenseChangedNoSpdx": "Upstream changed its license. Review the pull request before merging.",
+                "resultConflict": "Conflicts need resolving — a Task was created.",
+                "openTheTask": "Open the Task",
+                "resultFailed": "Sync failed: {reason}",
+                "openPullRequest": "Open pull request",
+                "workflowsDisabled": "{count, plural, =1 {1 inherited workflow disabled} other {# inherited workflows disabled}}",
+                "workflowsShow": "Show",
+                "workflowsHide": "Hide",
+                "workflowsNote": "Workflows added later — by an upstream sync or a pull request — are switched off after each sync. Turn one on in GitHub only if you trust it.",
+                "readiness": {
+                    "preparing": "Preparing",
+                    "ready": "Ready",
+                    "waitingForSetupPr": "Waiting for the setup pull request",
+                    "timedOut": "Timed out",
+                    "failed": "Failed",
+                    "tryAgain": "Try again"
+                },
+                "warnings": {
+                    "upstreamArchived": "Upstream is archived — sync is paused.",
+                    "upstreamUnavailable": "Upstream {repo} is no longer reachable. Sync is paused.",
+                    "forkMissing": "Your fork {repo} no longer exists on GitHub.",
+                    "privateCopyMissing": "Your private copy {repo} no longer exists on GitHub.",
+                    "rateLimited": "GitHub rate limit reached — sync will retry at {time}.",
+                    "defaultBranchRenamed": "Upstream's default branch changed from {old} to {new}.",
+                    "privateCopyTooLarge": "Upstream is now too large to sync into a private copy.",
+                    "historyRewritten": "Upstream rewrote its history. Close the sync pull request, then sync again.",
+                    "needsAdmin": "You need admin access to {repo} to switch off its workflows.",
+                    "appPermissionMissing": "The Ever Works GitHub App needs the {permission} permission on {repo}.",
+                    "notReady": "The repository isn't ready yet.",
+                    "workflowsGated": "GitHub hasn't run workflows in this fork yet.",
+                    "checkAgain": "Check again",
+                    "reviewGitHubAppAccess": "Review GitHub App access",
+                    "openOnGitHub": "Open on GitHub",
+                    "enableBuildWorkflow": "Enable the build workflow"
                 }
             },
             "appDependencies": {

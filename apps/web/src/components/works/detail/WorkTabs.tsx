@@ -7,14 +7,30 @@ import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { Work } from '@/lib/api';
 import { useWorkDetail, useWorkPermissions } from './WorkDetailContext';
-import { getWorkCapabilities, isRepositoryWorkKind } from '@ever-works/contracts';
+import {
+    getWorkCapabilities,
+    isRepositoryWorkKind,
+    type AppRepositoryMode,
+} from '@ever-works/contracts';
 
 interface WorkTabsProps {
     work: Work;
+    /**
+     * APW-02 T30 (Resolution R-8) — how this App Work's repository relates to
+     * upstream: `fork`, `private-copy` or `link`.
+     *
+     * The relation lives in the Upstream state row, not on the Work
+     * (`packages/agent/src/entities/work-upstream-state.entity.ts:98-102`;
+     * `GET /api/works/:id/upstream` is its only reader), so the Work detail
+     * layout reads it once for kind `app` and passes it down. `undefined` means
+     * "not read" — a non-`app` Work is never asked — and withholds the tab.
+     */
+    appRelation?: AppRepositoryMode | null;
 }
 
-export function WorkTabs({ work }: WorkTabsProps) {
+export function WorkTabs({ work, appRelation }: WorkTabsProps) {
     const t = useTranslations('dashboard.workDetail.tabs');
+    const tUpstream = useTranslations('dashboard.workDetail.upstream');
     const tTooltip = useTranslations('dashboard.workDetail.tabs.tooltips');
     const pathname = usePathname();
     const { config } = useWorkDetail();
@@ -184,6 +200,34 @@ export function WorkTabs({ work }: WorkTabsProps) {
                 </svg>
             ),
             isActive: pathname.includes('/generator'),
+        },
+        {
+            // APW-02 T30 (Resolution R-8, FR-59) — the ONE Upstream tab. It is
+            // offered to an App Work whose repository has an upstream at all
+            // (`fork` or `private-copy`); a linked App Work has none (FR-44), and
+            // no other kind has the state row. APW-09 adds its "Upstream pull
+            // requests" section *inside* this tab, never as a second tab.
+            name: tUpstream('tabName'),
+            tooltip: undefined as string | undefined,
+            href: ROUTES.DASHBOARD_WORK_UPSTREAM(work.id),
+            visible:
+                work.kind === 'app' && (appRelation === 'fork' || appRelation === 'private-copy'),
+            icon: (
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16V4m0 0L4 7m3-3l3 3m7 4v12m0 0l3-3m-3 3l-3-3"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/upstream'),
         },
         {
             name: t('plugins'),

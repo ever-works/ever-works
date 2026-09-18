@@ -3,6 +3,7 @@ import { Work, workAPI, gitProvidersAPI, GitProviderConnectionInfo } from '@/lib
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { notFound } from 'next/navigation';
 import { WorkLayoutClient } from '@/components/works/detail/WorkLayoutClient';
+import type { AppRepositoryMode } from '@ever-works/contracts';
 import { getTranslations } from 'next-intl/server';
 import { APP_NAME } from '@/lib/constants';
 
@@ -40,6 +41,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     let agents: Agent[] = [];
     let agentsTotal = 0;
     let assignedAgentIds: string[] = [];
+    let appRelation: AppRepositoryMode | null = null;
 
     try {
         const res = await workAPI.get(id);
@@ -87,6 +89,22 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
                     oauthConnection = { ...provider, connected: false };
                 }
             }
+
+            // APW-02 T30 (Resolution R-8) — only an App Work can have an Upstream
+            // tab, and only a fork or a private copy has an upstream at all. The
+            // relation lives in the upstream state row and nowhere on the Work,
+            // so it is read here — once, for kind `app` only — and the tab strip
+            // is told about it. Every other kind is never asked, and a failed
+            // read withholds the tab rather than the page.
+            //
+            // `appRelation` is `link` for a linked App Work, which is exactly
+            // what keeps the tab off that Work (FR-44, FR-59).
+            if (work.kind === 'app') {
+                appRelation = await workAPI
+                    .getUpstream(id)
+                    .then((state) => state.relation)
+                    .catch(() => null);
+            }
         }
     } catch (error) {
         console.error('Failed to fetch Work:', error);
@@ -101,6 +119,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             agents={agents}
             agentsTotal={agentsTotal}
             assignedAgentIds={assignedAgentIds}
+            appRelation={appRelation}
         >
             {children}
         </WorkLayoutClient>

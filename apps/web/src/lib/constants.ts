@@ -145,6 +145,10 @@ export const ROUTES = {
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
     DASHBOARD_WORK_ACTIVITY: (id: string) => `/works/${id}/activity`,
+    // APW-02 T30 (Resolution R-8) — the ONE Upstream tab: relation, readiness,
+    // divergence, sync and inherited workflows, with the slot APW-09 mounts its
+    // "Upstream pull requests" section into. Never a second tab or route.
+    DASHBOARD_WORK_UPSTREAM: (id: string) => `/works/${id}/upstream`,
     // Wave 7 feature h — the in-platform PR review surface.
     DASHBOARD_WORK_PULL_REQUESTS: (id: string) => `/works/${id}/pull-requests`,
     DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { GitProviderConnectionInfo, Work, WorkConfig } from '@/lib/api/types-only';
 import type { Agent } from '@/lib/api/agents';
+import type { AppRepositoryMode } from '@ever-works/contracts';
 import { WorkHeader } from './WorkHeader';
 import { WorkTabs } from './WorkTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -28,6 +29,14 @@ interface WorkLayoutClientProps {
     agentsTotal?: number;
     /** Which of `agents` are ASSIGNED (detachable) rather than pinned. */
     assignedAgentIds?: string[];
+    /**
+     * APW-02 T30 (Resolution R-8) — `fork`, `private-copy` or `link` for an App
+     * Work, `null` when the relation was not read (every other kind). Read once
+     * by the layout from `GET /api/works/:id/upstream` and passed straight to
+     * `WorkTabs`, which offers the Upstream tab only for a repository that has
+     * an upstream at all.
+     */
+    appRelation?: AppRepositoryMode | null;
 }
 
 export function WorkLayoutClient({
@@ -37,6 +46,7 @@ export function WorkLayoutClient({
     agents = [],
     agentsTotal,
     assignedAgentIds = [],
+    appRelation = null,
     children,
 }: WorkLayoutClientProps) {
     const router = useRouter();
@@ -176,7 +186,7 @@ export function WorkLayoutClient({
                     agentsTotal={agentsTotal}
                     assignedAgentIds={assignedAgentIds}
                 />
-                <WorkTabs work={syncedWork} />
+                <WorkTabs work={syncedWork} appRelation={appRelation} />
 
                 <div className="mt-6">{children}</div>
             </div>
