@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+import { AppUpstreamStateService } from './app-upstream-state.service';
 
 /**
  * APW-02 App Works (Fork lifecycle) — the agent-side module.
@@ -34,6 +35,17 @@ import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
  * `app_upstream`) are **not** module concerns: they are enum members in
  * `entities/activity-log.types.ts` with their `FEED_KIND_RULES` rows in
  * `activity-log/feed-kind.ts`.
+ *
+ * ## T23 — the state service joins the repository (additive)
+ *
+ * `AppUpstreamStateService` (T23) is provided and exported beside the repository, so
+ * `apps/api`'s App Works module (T27) and the remote-proxy map (T28) can resolve it by
+ * importing this one module. It is the ONLY entry T23 adds here: the tokens it injects
+ * (`APP_WORK_AGENT_RESOLVER` — APW-08 T25; the two dispatchers — T31) are still
+ * deliberately unbound, because binding a placeholder would make an unconfigured
+ * installation look configured (see above), and every collaborator it reads through is
+ * `@Optional()` so this module still compiles on its own — which is what
+ * `__tests__/app-works.module.spec.ts` asserts.
  */
 @Module({
     imports: [
@@ -43,7 +55,7 @@ import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
         // the API fails at boot.
         TypeOrmModule.forFeature([WorkUpstreamState]),
     ],
-    providers: [WorkUpstreamStateRepository],
-    exports: [WorkUpstreamStateRepository],
+    providers: [WorkUpstreamStateRepository, AppUpstreamStateService],
+    exports: [WorkUpstreamStateRepository, AppUpstreamStateService],
 })
 export class AppWorksModule {}

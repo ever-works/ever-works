@@ -14,6 +14,15 @@
  *   imports: `TypeOrmModule.forFeature([WorkUpstreamState])` plus
  *   `WorkUpstreamStateRepository` (the fourth registration point of the entity,
  *   plan §3.1).
+ * - `./app-upstream-state.service` — `AppUpstreamStateService` (T23), the one writer of
+ *   the state row, its refusal error and the result shapes the two jobs read, plus the
+ *   three **provisional** tokens its collaborators own elsewhere
+ *   (`APP_WORK_AGENT_RESOLVER` — APW-08 T25; `APP_FORK_READINESS_DISPATCHER` and
+ *   `APP_UPSTREAM_SYNC_DISPATCHER` — T31). Each carries the swap note on its declaration.
+ * - `./app-fork-ready-handler.port` — `APP_FORK_READY_HANDLER` and the outcome APW-01's
+ *   handler answers with (plan §6.2, Resolution R-4).
  */
 
 export * from './app-works.module';
+export * from './app-upstream-state.service';
+export * from './app-fork-ready-handler.port';
