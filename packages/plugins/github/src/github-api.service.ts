@@ -31,6 +31,7 @@ import type {
 } from '@ever-works/plugin/git';
 import { capChecks, capDiffFiles, deriveCiState, resolveDiffCaps } from '@ever-works/plugin/git';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
+import { toGitProviderError } from './github-errors.js';
 
 /**
  * PR insights (kanban run cockpit M5/M6) — GitHub's check vocabulary
@@ -290,6 +291,52 @@ export class GitHubApiService {
 		try {
 			const { data } = await octokit.rest.repos.get({ owner, repo });
 
+			// ── Repository facts (APW-02 T16, plan §4.3) ────────────────────────
+			// Every member below is OPTIONAL on `GitRepository`, and a payload that
+			// does not carry one leaves the field ABSENT — never `false` / `0` /
+			// "none". "The provider did not report it" and "the provider reported
+			// no" are different facts, and only the second may be acted on.
+			//
+			// `empty` is the one fact GitHub does not report at all: `size` is 0
+			// both for a repository that was created and never pushed to and for
+			// one that is transiently reporting 0 while a fork bakes. `size === 0`
+			// is therefore the ONLY trigger for the probe, and an absent (unknown)
+			// size is left unreported rather than guessed at.
+			const emptyDefaultBranch = async (): Promise<boolean | undefined> => {
+				try {
+					await octokit.rest.repos.getBranch({
+						owner: data.owner.login,
+						repo: data.name,
+						branch: data.default_branch
+					});
+					// The default branch answers, so there is at least one commit.
+					return false;
+				} catch (err) {
+					// A 404 on the default branch is GitHub's own "there is no commit
+					// here", and that IS the fact. Anything else (403, 5xx, a
+					// transport failure) means we could not find out: `empty` stays
+					// unreported instead of asserting a state nobody reported.
+					return err instanceof RequestError && err.status === 404 ? true : undefined;
+				}
+			};
+
+			const empty = data.size === 0 ? await emptyDefaultBranch() : undefined;
+			const requested = `${owner}/${repo}`;
+			// §4.3 maps `license?.spdx_id`. `NOASSERTION` is GitHub saying "this is
+			// a licence file I cannot name": reported, and not nameable, which the
+			// contract spells `null` — NOT the `undefined` of "not reported". A
+			// repository with no licence file at all reports `license: null`, and
+			// §4.3's `?.` leaves it unreported rather than claiming `null`.
+			const spdxId = data.license ? data.license.spdx_id : undefined;
+			const named = typeof spdxId === 'string' && spdxId.trim() !== '' && spdxId.toUpperCase() !== 'NOASSERTION';
+			const licenseSpdx = data.license ? (named ? spdxId : null) : undefined;
+			// GitHub Enterprise's third value; anything unrecognised is left
+			// unreported rather than cast into the contract's union.
+			const visibility =
+				data.visibility === 'public' || data.visibility === 'private' || data.visibility === 'internal'
+					? data.visibility
+					: undefined;
+
 			return {
 				owner: data.owner.login,
 				name: data.name,
@@ -313,13 +360,40 @@ export class GitHubApiService {
 							push: data.permissions.push ?? false,
 							pull: data.permissions.pull ?? false
 						}
-					: undefined
+					: undefined,
+				// The network root a fork came from — read before `parent`, which is
+				// only the immediate ancestor (a fork of a fork shares `source`).
+				...(data.source
+					? {
+							source: {
+								owner: data.source.owner.login,
+								name: data.source.name,
+								fullName: data.source.full_name
+							}
+						}
+					: {}),
+				...(typeof data.allow_forking === 'boolean' ? { allowForking: data.allow_forking } : {}),
+				...(typeof data.archived === 'boolean' ? { archived: data.archived } : {}),
+				...(visibility ? { visibility } : {}),
+				...(typeof data.stargazers_count === 'number' ? { stars: data.stargazers_count } : {}),
+				...(typeof data.size === 'number' ? { sizeKb: data.size } : {}),
+				...(licenseSpdx === undefined ? {} : { licenseSpdx }),
+				...(empty === undefined ? {} : { empty }),
+				// Octokit follows GitHub's 301 for a renamed repository, so the
+				// payload's `full_name` is the RESOLVED name and the requested
+				// coordinates are the only trace of the redirect. Case-insensitive
+				// because GitHub treats owner/repository casing as cosmetic — a
+				// difference in case alone is not a move.
+				...(requested.toLowerCase() === data.full_name.toLowerCase() ? {} : { movedFrom: requested })
 			};
 		} catch (err) {
 			if (err instanceof RequestError && err.status === 404) {
 				return null;
 			}
-			throw err;
+			// `repos.get` needs the Metadata permission (mandatory for a GitHub App
+			// installation), so that is the permission a refusal names. Every other
+			// reason comes straight from plan §4.2's table.
+			throw toGitProviderError(err, 'metadata');
 		}
 	}
 
