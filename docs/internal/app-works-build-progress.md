@@ -476,7 +476,7 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   the call is idempotent by contract) or the spec does **not** actually pin the call count at this layer, in which case
   the ACC-06-54/GAP-05 claim of "asks once" is asserted somewhere else — or not at all. **Routed, not resolved**: the
   next round anchors the count perturbation on the seam's _recording_ double rather than a duplicated statement, and if
-  the count genuinely is unpinned, that is a gap in T14''s spec worth a test rather than a claim. I would rather report a
+  the count genuinely is unpinned, that is a gap in T14's spec worth a test rather than a claim. I would rather report a
   negative I ran than a positive I assumed.
   **T14 perturbation tally: 1 of 4 proven** (the depth guard, `7355816E…A6F9F`, one test red / 36 green). **T26: 6 of 6
   proven by its author**, with the additivity and format evidence above.
