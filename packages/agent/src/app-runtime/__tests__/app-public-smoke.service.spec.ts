@@ -306,7 +306,9 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             expect(script).toContain('var FOUND_CHARS = 200;');
             expect(script).toContain('var DEFAULT_STATUS = [200, 201, 204];');
             expect(script).toContain('var DEFAULT_LATENCY_MS = 10000;');
-            expect(script).toContain("var init = { method: String((request && request.method) || 'POST'), redirect: 'manual'");
+            expect(script).toContain(
+                "var init = { method: String((request && request.method) || 'POST'), redirect: 'manual'",
+            );
         });
 
         it('names the four classifications and marks exactly one of them health-relevant', () => {
@@ -610,7 +612,10 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             const run = await smoke.run(
                 request({
                     urls: ['http://app.example.com/'],
-                    checks: [check({ name: 'home' }), check({ name: 'login', http: { path: '/login' } })],
+                    checks: [
+                        check({ name: 'home' }),
+                        check({ name: 'login', http: { path: '/login' } }),
+                    ],
                     ingressAddresses: ['198.51.100.4'],
                 }),
             );
@@ -682,7 +687,11 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             expect(named.resolved).toEqual(['app.example.com']);
             expect(byName.dns?.pointing).toBe(true);
             expect(byName.passed).toBe(true);
-            expect(byName.checks[0]).toMatchObject({ name: 'home', status: 'passed', httpStatus: 200 });
+            expect(byName.checks[0]).toMatchObject({
+                name: 'home',
+                status: 'passed',
+                httpStatus: 200,
+            });
         });
 
         it('treats "the name does not resolve at all" as not pointing', async () => {
@@ -782,7 +791,9 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
         /** A service whose clock only moves when it sleeps, and a check that fails until told not to. */
         function clocked(outcomes: boolean[]): {
             smoke: TestSmoke;
-            run: (overrides?: Partial<AppPublicSmokeRequest>) => Promise<Awaited<ReturnType<TestSmoke['run']>>>;
+            run: (
+                overrides?: Partial<AppPublicSmokeRequest>,
+            ) => Promise<Awaited<ReturnType<TestSmoke['run']>>>;
         } {
             const smoke = new TestSmoke();
             smoke.clock = 1_000_000;
@@ -829,7 +840,10 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
 
         it('uses 600 s on the first publish: 60 attempts, 59 waits of 10 s', async () => {
             const { smoke, run } = clocked([false]);
-            const result = await run({ windowSeconds: undefined, isFirstDeploymentOnCluster: true });
+            const result = await run({
+                windowSeconds: undefined,
+                isFirstDeploymentOnCluster: true,
+            });
 
             expect(result.windowSeconds).toBe(600);
             expect(result.attempts).toBe(60);
@@ -841,7 +855,10 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
 
         it('uses 180 s on every later publish: 18 attempts', async () => {
             const { smoke, run } = clocked([false]);
-            const result = await run({ windowSeconds: undefined, isFirstDeploymentOnCluster: false });
+            const result = await run({
+                windowSeconds: undefined,
+                isFirstDeploymentOnCluster: false,
+            });
 
             expect(result.windowSeconds).toBe(180);
             expect(result.attempts).toBe(18);
@@ -871,7 +888,9 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             expect(smokeChecksFor(false, [always, first])).toEqual([always]);
             expect(smokeChecksFor(undefined, [always, first])).toEqual([always]);
             expect(smokeChecksFor(true, [always, first])).toEqual([always, first]);
-            expect(smokeChecksFor(true, [check({ name: 'plain', when: 'always' })])).toHaveLength(1);
+            expect(smokeChecksFor(true, [check({ name: 'plain', when: 'always' })])).toHaveLength(
+                1,
+            );
         });
 
         it('leaves a `first-deploy` check out of a later Deployment’s public run', async () => {
@@ -881,7 +900,10 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             const run = await smoke.run(
                 request({
                     urls: [server.url],
-                    checks: [check({ name: 'always' }), check({ name: 'first', when: 'first-deploy' })],
+                    checks: [
+                        check({ name: 'always' }),
+                        check({ name: 'first', when: 'first-deploy' }),
+                    ],
                     isFirstDeploymentOnCluster: false,
                 }),
             );

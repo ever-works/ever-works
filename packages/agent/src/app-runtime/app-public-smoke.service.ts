@@ -403,7 +403,11 @@ export class AppPublicSmokeService {
         checks: readonly AppSmokeInput[],
         request: AppPublicSmokeRequest,
         secrets: readonly string[],
-    ): Promise<{ checks: CheckResult[]; dns: AppPublicSmokeDnsVerdict | null; allPassed: boolean }> {
+    ): Promise<{
+        checks: CheckResult[];
+        dns: AppPublicSmokeDnsVerdict | null;
+        allPassed: boolean;
+    }> {
         const dns = await this.dnsVerdict(base, request?.ingressAddresses ?? []);
 
         if (dns && dns.pointing === false) {
@@ -440,7 +444,9 @@ export class AppPublicSmokeService {
         base: URL,
         ingressAddresses: readonly string[],
     ): Promise<AppPublicSmokeDnsVerdict | null> {
-        const expected = (ingressAddresses ?? []).map((value) => String(value).trim()).filter(Boolean);
+        const expected = (ingressAddresses ?? [])
+            .map((value) => String(value).trim())
+            .filter(Boolean);
         if (expected.length === 0) return null;
 
         const host = base.hostname;
@@ -559,8 +565,11 @@ export class AppPublicSmokeService {
                 failures.push({
                     code: 'check_failed',
                     check: check.name,
-                    message: check.failedExpectation ?? `Public smoke check '${check.name}' failed.`,
-                    ...(check.failedExpectation ? { failedExpectation: check.failedExpectation } : {}),
+                    message:
+                        check.failedExpectation ?? `Public smoke check '${check.name}' failed.`,
+                    ...(check.failedExpectation
+                        ? { failedExpectation: check.failedExpectation }
+                        : {}),
                     ...(check.found ? { found: check.found } : {}),
                     // FR-37: "only check failed while in-cluster passed counts toward health". A
                     // peer that already failed in-cluster is the in-cluster half's business (it
@@ -582,7 +591,8 @@ export class AppPublicSmokeService {
             });
         }
 
-        const outcome = failures.length > 0 ? 'failed' : warnings.length > 0 ? 'warnings' : 'passed';
+        const outcome =
+            failures.length > 0 ? 'failed' : warnings.length > 0 ? 'warnings' : 'passed';
 
         return {
             checks,
@@ -633,28 +643,32 @@ export class AppPublicSmokeService {
      */
     protected async resolveHostAddresses(host: string): Promise<string[]> {
         return await new Promise<string[]>((resolve) => {
-            dns.lookup(host, { all: true }, (error: NodeJS.ErrnoException | null, records: unknown) => {
-                if (error) {
-                    this.logger.debug(
-                        `Resolving ${host} for the public smoke check failed (${String(
-                            error.code ?? error.message,
-                        )}).`,
-                    );
-                    resolve([]);
-                    return;
-                }
+            dns.lookup(
+                host,
+                { all: true },
+                (error: NodeJS.ErrnoException | null, records: unknown) => {
+                    if (error) {
+                        this.logger.debug(
+                            `Resolving ${host} for the public smoke check failed (${String(
+                                error.code ?? error.message,
+                            )}).`,
+                        );
+                        resolve([]);
+                        return;
+                    }
 
-                const list = Array.isArray(records) ? records : [records];
-                resolve(
-                    list
-                        .map((record) =>
-                            typeof record === 'string'
-                                ? record
-                                : String((record as { address?: unknown })?.address ?? ''),
-                        )
-                        .filter((address) => address.length > 0),
-                );
-            });
+                    const list = Array.isArray(records) ? records : [records];
+                    resolve(
+                        list
+                            .map((record) =>
+                                typeof record === 'string'
+                                    ? record
+                                    : String((record as { address?: unknown })?.address ?? ''),
+                            )
+                            .filter((address) => address.length > 0),
+                    );
+                },
+            );
         });
     }
 }

@@ -51,7 +51,7 @@ const EXPECTED_VARIABLES = [LAUNCHER_FLAG, ...CATALOG_VARIABLES];
 const MANIFESTS: Array<{ file: string; environment: string }> = [
     { file: 'k8s-manifest.dev.yaml', environment: 'develop' },
     { file: 'k8s-manifest.stage.yaml', environment: 'stage' },
-    { file: 'k8s-manifest.prod.yaml', environment: 'production' }
+    { file: 'k8s-manifest.prod.yaml', environment: 'production' },
 ];
 
 interface Container {
@@ -124,14 +124,14 @@ describe('APW-11 T31 — the launcher switches in the deploy manifests', () => {
         }
     });
 
-    it.each(MANIFESTS)('sets $environment as the catalog environment of $file', ({
-        file,
-        environment
-    }) => {
-        const api = apiContainer(deploymentsIn(file));
+    it.each(MANIFESTS)(
+        'sets $environment as the catalog environment of $file',
+        ({ file, environment }) => {
+            const api = apiContainer(deploymentsIn(file));
 
-        expect(envValue(api, 'EVER_WORKS_PLATFORM_CATALOG_ENV')).toBe(environment);
-    });
+            expect(envValue(api, 'EVER_WORKS_PLATFORM_CATALOG_ENV')).toBe(environment);
+        },
+    );
 
     it.each(MANIFESTS)('leaves the catalog read to the API in $file', ({ file }) => {
         // Plan §5.2 / APW11-G06: the fetch happens in the API process. A copy of
@@ -141,7 +141,9 @@ describe('APW-11 T31 — the launcher switches in the deploy manifests', () => {
         const containers = deployments.flatMap(
             (deployment) => deployment.spec?.template?.spec?.containers ?? [],
         );
-        const others = containers.filter((container) => !container.name.startsWith('ever-works-api'));
+        const others = containers.filter(
+            (container) => !container.name.startsWith('ever-works-api'),
+        );
 
         expect(others.length).toBeGreaterThan(0);
         for (const container of others) {
@@ -151,17 +153,18 @@ describe('APW-11 T31 — the launcher switches in the deploy manifests', () => {
         }
     });
 
-    it.each(MANIFESTS)('gives the launcher switch of $file a value the guard can read', ({
-        file
-    }) => {
-        const api = apiContainer(deploymentsIn(file));
-        const value = envValue(api, LAUNCHER_FLAG);
+    it.each(MANIFESTS)(
+        'gives the launcher switch of $file a value the guard can read',
+        ({ file }) => {
+            const api = apiContainer(deploymentsIn(file));
+            const value = envValue(api, LAUNCHER_FLAG);
 
-        // `'true'` exactly, or `'false'`: the guard answers 404 unless the value
-        // is the string `'true'`, so anything else is OFF to the code while
-        // looking ON to a person editing the file.
-        expect(['true', 'false']).toContain(value);
-    });
+            // `'true'` exactly, or `'false'`: the guard answers 404 unless the value
+            // is the string `'true'`, so anything else is OFF to the code while
+            // looking ON to a person editing the file.
+            expect(['true', 'false']).toContain(value);
+        },
+    );
 
     it('documents the same five variables, with their defaults, in apps/api/.env.example', () => {
         const text = readFileSync(join(repoRoot(), 'apps', 'api', '.env.example'), 'utf8');
