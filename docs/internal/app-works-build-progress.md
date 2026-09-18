@@ -365,6 +365,27 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · The first full-package integration run on this branch, and the security guard that fired on it.** Every
+  round so far verified _filtered_ suites (`-- app-env`, `-- app-dependencies`, `-- app-works` …), which cannot see a
+  repo-wide invariant. `pnpm --filter @ever-works/agent test` → **850 suites / 16,844 tests: 848 passed, 3 skipped, 3
+  failed**. Two of the failures are one pre-existing environmental defect and one is ours:
+  🌟 **The backup redaction guard fired on APW-03 T9's new table** (`4746063c6`) — `account-transfer/backup/redaction.spec.ts`
+  walks every entity column matching the secret-shaped pattern and refuses to let one through without either a
+  redaction rule or a **reviewed** exemption in `BACKUP_BENIGN_COLUMNS`. `WorkAppSpecState.headSpecHash`,
+  `.effectiveSpecHash` and `.licenseRegistryHash` had neither. That is precisely the test working as designed: a new
+  `*Hash` column has to be _decided_, not inherited, and no filtered run would ever have shown it. Resolved by writing
+  the decision down — three exemptions, each with the reason it carries no secret (a sha256 of a spec that lives in the
+  member's own repository, a digest of the running spec used for change detection, and a digest of the public license
+  registry) — never by loosening the guard. `redaction.spec` **49/49** green; the change is `+9/−0`.
+  **The other failure is not ours, and the evidence says so**: `agent-plugins/mcp-server-config.service.spec.ts` fails
+  two cases on `E:\temp\…` vs `E:\Temp\…` — a Windows-only case mismatch between a hard-coded path in the test and this
+  machine's `TEMP` — and `git log a183ecd70..HEAD -- packages/agent/src/agent-plugins/` returns **0 commits**, so this
+  branch has never touched that area. Recorded rather than edited: it is another area's test, it cannot fail on the
+  Linux CI runners, and "fix someone else's red" is how a branch acquires collateral changes it cannot justify.
+  **The integration number to carry forward: 16,838 of 16,844 tests pass on this branch, and the 3 failures + 3 skips
+  are fully accounted for (1 ours, now fixed and re-run green; 2 environmental).** This is the first time the branch has
+  been measured as a whole rather than in slices, and it is the number a reviewer should ask for.
+
 - **2026-09-18 · Eight landings across four epics, and three findings worth more than the code they came with.**
   **APW-07 T13 — `AppEnvService`** (`83ff27690`; `app-env.service.spec.ts` **53 tests**; epic selection **7 suites / 281
   tests green on my own run**). `list`, `ensureGenerated`, `apply` (set/unset/reset/import), `rotate`,
