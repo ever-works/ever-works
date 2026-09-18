@@ -365,6 +365,29 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · The goal was re-armed to 256 rounds, and four slices went into flight at once (T18 already landed).**
+  The goal had stopped at its own 60-round cap — `blockedReason { code: "round-limit" }`, activation disarmed — which the owner
+  raised to **256** on request; that was my conservatism at creation, not a system limit (the harness default is 256). With the
+  budget restored the working pattern changed from one slice at a time to four or five in parallel, each on a **disjoint file
+  set**: APW-03 T12/T13 (`app-spec.service.ts`, the `app-spec-evaluate` dispatcher/job and the canonical
+  `events/app-spec-applied.event.ts`), APW-07 T19 (the `k8s-inline-postgres` provider inside
+  `plugins/k8s/src/app-dependencies/**`), APW-02 T27/T28 (the upstream routes, the dispatcher service and the worker bindings),
+  and APW-06 T22 (the render-input builder).
+  **APW-07 T18 landed and verified first** (`86fd06d78`): `crdServed(kubeconfig, name, version, ctx?)` and
+  `defaultStorageClass(kubeconfig, ctx?)` — the two helpers T19's provider calls — measured on my own run at **24 files / 777
+  tests against the recorded 762/23 baseline**, so +15 tests and nothing existing disturbed, `type-check` exit 0, Prettier
+  clean, diff **97/0**. 🌟 **The design decision worth keeping**: a **403 is not "not installed"**. A 404 (or a version the CRD
+  does not serve) answers `false`, while a _denial_ throws a scrubbed `K8sPluginError` (`UNAUTHORIZED`) — which is what lets
+  the provider take the plain path when CNPG is genuinely absent and record `operatorSkipped = 'noPermission'` when it merely
+  may not look. The agent proved it by perturbing that branch and watching `promise resolved "false" instead of rejecting`.
+  Four more perturbations (404-as-served, version-mismatch-as-served, the default-class selector — which reddened five tests
+  including "not the first class listed" — and the legacy beta annotation) each restored byte-identically.
+  **A coordination error of mine, caught by the agent it was sent to**: I warned APW-02 T27/T28 about a four-file barrel
+  collision in `packages/agent/src/tasks/**`; it replied that none of those files are in its write set, and the tree agrees —
+  they belong to APW-03 T13 alone. Corrected and acknowledged rather than left to make that agent hedge. **And one baseline I
+  still cannot give**: the `apps/api` suite has never been measured on this branch, because the full run exceeds the 600 s
+  executor cap — worth knowing before T27/T28's routes make it larger still.
+
 - **2026-09-18 · APW-07''s recipe stops being narrower than the contract it feeds** (`fbb9eb61f`), and the port-alignment
   agent turned out to be working rather than stalled. The last port-coupling artifact in APW-07 is gone —
   `readonly source: Exclude<AppEnvRecipeEntry['source'], 'derived'>` plus the two comment lines whose premise it voided —
