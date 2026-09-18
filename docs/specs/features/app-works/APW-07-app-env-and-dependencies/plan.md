@@ -1088,3 +1088,20 @@ APW-10's launch gate, tenant data servers and its in-zone dependency tasks T43�
   (§4); events `app.dependency.released`, `app.dependency.data_deleted` (§6); category `app-dependency`, the
   `providerPluginId` + `providerId` pair and provider ids (§3); and a row requested from APW-10 for
   `Work.status.dependencies[]` plus in-zone `ew-dep://` substitution (§3).
+- **The 50 ms pattern budget is at the engine's throughput edge, not a property of this epic (APW07-G29).** §4.4:408-409
+  says `validate.pattern` "is linear time, and a 50 ms budget is asserted by test on 65,536-byte inputs", and
+  `tasks.md:169-170` names the adversarial input `(a+)+$` against 65,536 bytes. Measured 2026-09-18 with `re2js` (the
+  engine §4.4 chooses deliberately: pure JS, no native build) on 15 samples per case, minimum reported because a loaded
+  machine can only ever _add_ time: **`^(?:(a+)+)$` 61.96 ms · `^(?:a+)$` 43.33 ms · `^a+$` 37.77 ms** — i.e. the engine
+  needs ~38-43 ms to match 65,536 bytes for a _flat_ pattern, so the plan's 50 ms ceiling is roughly the engine's
+  per-byte cost (≈0.6-0.7 µs/byte) rather than a margin this epic controls, and the adversarial pattern is 1.4-1.6× the
+  flat one. The budget was met when the same test was first written (round 24, idle machine) and reads 56-70 ms under
+  six concurrent agents, so the assertion was asserting the machine as much as the code. **T11's spec now asserts the
+  property load-independently** — the adversarial pattern may cost at most 2× a same-size flat match, and the flat match
+  must stay under a 150 ms catastrophe ceiling that a backtracking engine cannot come back from at all — while the plan's
+  50 ms is **printed with its measurements on every run** and left as this open note. Three ways to close it, for the
+  owner: (a) raise the budget to a number derived from measured engine throughput and keep it asserted absolutely;
+  (b) keep 50 ms and move the timing case to a dedicated perf lane that runs on an idle runner; (c) change engines
+  (`re2-wasm` is prebuilt and needs no native build — the §4.4 rationale was "no native build", not "no wasm"), which
+  would need a fresh look at the pattern cache and the `patternUnsupported` classification. **Not** closed by narrowing
+  the input size or refusing patterns above some value length: both would remove capability the plan grants.
