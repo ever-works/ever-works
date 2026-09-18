@@ -350,6 +350,42 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the launcher becomes a real element: the package, its strings in 21 locales, its palette entry, and the
+  mirror that keeps the element independent of the monorepo.**
+  **APW-11 T10-T12 — `@ever-works/app-launcher`** (`65a5adfef`; 17 files, 2,666 lines; **126 tests** + a size check).
+  One self-contained ESM element with Lit **inlined** (`noExternal: ['lit']`, the load-bearing detail), a 30,720-byte
+  gzip budget enforced by `scripts/check-size.mjs`, 100 % branch coverage on the two pure modules (grid navigation and
+  the URL guard), and the §6.2 surface: trigger, `role="menu"` panel, roving tabindex, focus trap, `ResizeObserver`
+  columns, skeletons, chips, `show()`/`hide()`, the `ever-app-launcher:*` events (one of them cancellable), no global
+  styles, a guarded `customElements.define`. 🌟 **The best perturbation of the round is the `noExternal` one**: removing
+  it leaves **all 126 tests green** and produces an 8,514-byte bundle that "passes" the budget, and only the size check
+  fails — on the bare `lit` import. A size budget on a bundle that excluded its own dependency measures the wrong
+  artifact, which is exactly what APW11-G15 predicted. The coordinator re-ran one perturbation the agent had not
+  covered (FR-64's property override → the `empty-action` button flips wrong), and both files it reported are
+  byte-identical to its verified revision.
+  **The 24 launcher strings in all 21 bundles** (`bda4a2ea1`) — plan §8's copy verbatim in `en.json`, real translations
+  in the 20 siblings, **additions only** (`26 0` numstat per file, zero `-` lines, and a leaf-by-leaf comparison against
+  `HEAD` reporting `added=24 removed=0 changed=0` for every bundle). 🌟 **The name changed once during the round, and
+  that is the interesting part**: keeping "App Launcher" verbatim in the siblings contradicted the ALREADY LANDED T32
+  `activity.filters.types.appLauncher` (de "App-Starter", fr "Lanceur d'applis", ja "アプリランチャー"), so a German
+  member would have read two names for one control. Both leaves now take that locale's own shipped string — reusing the
+  existing translation rather than authoring a second one, so the two surfaces cannot drift.
+  **APW-11 T15 (registry half)** (`caeaeb0e8`) — the palette command `openAppLauncher`, offered **exactly** when the
+  shell supplied an opener (`!== undefined`, not truthiness: an installation without the launcher must not show a
+  command that opens nothing), findable by `launcher`, `apps` and `switch app`, with a control query that must NOT find
+  it. Two perturbations red; the 20 siblings are deliberately untouched — they have no `commandPalette` group at all,
+  a pre-existing gap covering every existing command, and seeding it would be ~400 English placeholders per bundle.
+  **APW-11 T10 follow-up — the type mirror** (`3b393225b`). My own brief told the agent to import the contracts types;
+  plan §6.1 says the opposite and the plan is the spec of record, so `src/types.ts` now declares the registry
+  vocabulary itself (unions plus both object shapes) and `@ever-works/contracts` moves to `devDependencies`, leaving
+  the extracted package's `dist/index.d.ts` monorepo-free for T28. 🛑 **The drift guard was vacuous twice over, and
+  both holes were found by trying to break it**: the compile-time proof took an OPTIONAL `never` parameter, so every
+  call site omitted it and a mismatch compiled clean; and the package's `tsconfig.json` excludes specs while vitest
+  strips types, so a type-level assertion in a spec ran **nowhere**. Now the parameter is required (call sites pass
+  `true`), `tsconfig.specs.json` type-checks the specs, and the perturbation — one extra field on the mirrored
+  `AppLauncherItem` — produces **47 errors**, four in the guard and the rest in the element spec where the host's
+  contract-typed payload stops satisfying the element.
+
 - **2026-09-18 · two routed bugs closed and the launcher's telemetry landed, while the element package and the 21 locale
   bundles are built in parallel.**
   **T6 follow-up — `kind_mismatch` could not fire through the object entry point** (`ff3877a94`). The document form of
