@@ -134,8 +134,9 @@ name, and branding files are protected from agent changes.
 
 ## The App Launcher
 
-Turn on **Show in App Launcher** in an App Work's settings to add its live URL to the launcher in the top
-bar, next to the other Ever platforms. You can pin, hide and reorder items for yourself.
+An App Work appears in the launcher in the top bar as soon as it is live — you do not have to switch anything on.
+Another kind of Work appears when its owner turns on **Show in App Launcher** in the Work's settings. Either way
+you can pin, hide and reorder items for yourself; the launcher opens addresses and never signs you in.
 
 ## Safety
 

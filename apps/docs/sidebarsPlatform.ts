@@ -218,6 +218,12 @@ const sidebars: SidebarsConfig = {
 				'features/work-blueprints',
 				'features/k8s-deployment',
 				'features/managed-hosting',
+				// What the top bar does with those hosted addresses: the
+				// launcher lists Ever apps and live Works, and everything on it
+				// is a link out. Reads straight after hosting because it shows
+				// the result of it, and before the storage pages because it is
+				// the last thing a Work's owner meets after a deploy.
+				'features/app-launcher',
 				// Where uploaded bytes land (local-fs / S3 / MinIO / GitHub
 				// + LFS). An operator-level STORAGE_BACKEND choice, so it
 				// reads with the deployment pages rather than with the

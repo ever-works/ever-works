@@ -370,10 +370,20 @@ is: those outputs are still the outputs of that revision. The spec tree has move
 added resolutions R-28…R-41, the quota/notification/threat/signal registers, and the acceptance-id reconciliation
 in `ACCEPTANCE.md`), so a comparison lane that reads a spec file today will see a newer revision than the pin:
 
-| Spec file                                | sha256 (first 16) — current | Lines | Relationship to the §8 pin                                                                       |
-| ---------------------------------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------------ |
-| `CONTRACTS.md`                           | `8dbae7149b4b7e9f`          | 726   | newer revision; the §8 pin (`5141efa2806702ad`, 702 lines) still names the golden set's revision |
-| `APW-09-upstream-pull-requests/tasks.md` | `2b1bbf4c1e543e75`          | 786   | not in the §8 table (T3 now records that APW-02 T9/T10 landed the interface half first)          |
+| Spec file                                | sha256 (first 16) — current | Lines | Relationship to the §8 pin                                                                                      |
+| ---------------------------------------- | --------------------------- | ----- | --------------------------------------------------------------------------------------------------------------- |
+| `CONTRACTS.md`                           | `8dbae7149b4b7e9f`          | 726   | newer revision; the §8 pin (`5141efa2806702ad`, 702 lines) still names the golden set's revision                |
+| `APW-09-upstream-pull-requests/tasks.md` | `2b1bbf4c1e543e75`          | 786   | not in the §8 table (T3 now records that APW-02 T9/T10 landed the interface half first)                         |
+| `CONTRACTS.md` (next revision)           | `82209d3a97cde264`          | 729   | newer again — three lines of YAML front matter added 2026-09-18 (see below); §8 and the row above stay readable |
+
+**2026-09-18 — why `CONTRACTS.md` gained a `slug:` and nothing else.** The documentation site could not build at
+all, for a reason unrelated to this programme's content: `app-works/CONTRACTS.md` and
+`app-works/contracts/README.md` resolve to the **same route**, so Docusaurus tried to write a redirect over an
+existing `contracts/index.html` and aborted with `EEXIST` — which is why `pnpm --filter ever-works-docs build`
+failed. Neither file is new. The fix is additive: three lines of YAML front matter giving `CONTRACTS.md` its own
+slug (`/specs/features/app-works/programme-contracts`), so the `contracts/` directory keeps its landing page and no
+file is renamed, moved or shortened. The build then succeeded end to end. The hash moved because the file gained
+those three lines; the table's other rows are untouched, per the rule above.
 
 **How to read this:** the §8 hash is provenance — "what the golden outputs were generated from" — and the §8.1
 hash is a freshness check for a lane about to compare. A mismatch against §8.1 means the specs moved, **not** that

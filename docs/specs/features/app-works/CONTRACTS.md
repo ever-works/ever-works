@@ -1,3 +1,7 @@
+---
+slug: /specs/features/app-works/programme-contracts
+---
+
 # App Works — cross-epic contracts (normative)
 
 **Status:** `Draft` · **Created:** 2026-09-17 · **Program:** [App Works](./README.md)
