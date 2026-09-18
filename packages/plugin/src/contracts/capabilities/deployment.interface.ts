@@ -390,6 +390,28 @@ export interface IDeploymentPlugin extends IPlugin {
 			issuer: string | null;
 		}
 	): Promise<{ ingressAddress: { ip?: string; hostname?: string } | null }>;
+
+	/**
+	 * The expiry instant a **verification** namespace carries, as an ISO-8601
+	 * string, or `null` when the namespace declares none.
+	 *
+	 * APW-06 §4.12:646-647 stamps a verification namespace with the purpose label
+	 * and an expiry annotation (`now + ttlMinutes`), and §4.12:659-660 says that
+	 * annotation is what lets APW-04's `app-provision-sweep` destroy leftovers a
+	 * crashed run never cleaned up. Reading it back is therefore part of the
+	 * verification contract, not a convenience — without it a `verification-status`
+	 * answer cannot say when the namespace stops being valid.
+	 *
+	 * **Added by the coordinator (2026-09-18).** APW-06 T20's facade reported the
+	 * gap: no member of this interface exposed the read, so the verification seam's
+	 * optional `readNamespaceExpiry` could not be bound and a verification reported
+	 * an EMPTY `expiresAt`. Additive and optional like every App member above, so no
+	 * existing plugin changes. The `k8s` plugin implements it from the namespace's
+	 * own annotations; a plugin that cannot answer omits it and the caller reports
+	 * no expiry, which is the fail-open-for-reporting, never-fail-silently direction
+	 * the seam already documents.
+	 */
+	readNamespaceExpiry?(ref: AppTargetRef, credential: string): Promise<string | null>;
 }
 
 /**

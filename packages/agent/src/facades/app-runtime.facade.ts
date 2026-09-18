@@ -101,10 +101,12 @@
  *    assembly is a read, and preparing a namespace is cluster I/O with side effects that belongs to
  *    the deploy path (T22/T23) and to T69.
  * 3. **`readNamespaceExpiry`** — `AppVerificationAccess` declares it (the namespace's
- *    `ever-works.io/expires-at` annotation, `plan.md:512-519`). No member of `IDeploymentPlugin`
- *    exposes such a read as of T2, so this facade leaves the optional member unbound rather than
- *    inventing one; T60's service reports an empty expiry and logs it. Adding the member to the
- *    plugin contract is a T2/T14 change, not a T20 one.
+ *    `ever-works.io/expires-at` annotation, `plan.md:512-519`). This file originally left the
+ *    optional member unbound because no member of `IDeploymentPlugin` exposed such a read;
+ *    the contract gained `readNamespaceExpiry?` on 2026-09-18 and the facade now binds it,
+ *    with `bindAppMember` keeping the "the plugin really implements it" discipline. A plugin
+ *    that cannot answer still leaves the member `undefined`, which is T60's documented
+ *    "no expiry known" path (a warning and an empty value), never a thrown status call.
  */
 
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
@@ -550,7 +552,21 @@ export class AppRuntimeFacadeService
                     opts: { deleteVolumes: boolean },
                 ) => Promise<AppDestroyResult>
             >(access.plugin, 'destroyApp'),
-            // `readNamespaceExpiry` is deliberately absent — see this file's header, note 3.
+            // §4.12:646-647's expiry annotation, read back from the namespace. The seam's shape is
+            // `(namespace) => …` while the plugin's member is `(ref, credential) => …`, so the
+            // binding closes over this Work's ref and credential — the caller supplies only the
+            // handle it was given, and can never point the read at another namespace or another
+            // credential. `bindAppMember` still decides presence on the MATERIALISED plugin, so a
+            // plugin that does not implement the member leaves this `undefined`, which is T60's
+            // documented "no expiry known" path (a warning and an empty value).
+            readNamespaceExpiry: (() => {
+                const read = bindAppMember<
+                    (ref: AppTargetRef, credential: string) => Promise<string | null>
+                >(access.plugin, 'readNamespaceExpiry');
+                if (!read) return undefined;
+                return (namespace: string): Promise<string | null> =>
+                    read({ ...access.ref, namespace }, access.credential);
+            })(),
         };
     }
 

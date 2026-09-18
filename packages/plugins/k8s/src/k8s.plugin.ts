@@ -63,6 +63,9 @@ import { AppClusterChecker } from './app/app-cluster-check.js';
 import { AppDeployer } from './app/app-deployer.js';
 import { AppLifecycle } from './app/app-lifecycle.js';
 import { AppStatusReader } from './app/app-status.reader.js';
+// §4.12's verification expiry annotation — the one name, taken from `app-names.ts` rather
+// than restated here.
+import { APP_ANNOTATION_EXPIRES_AT } from './app/app-names.js';
 import {
 	assertSupportedKubeconfig,
 	CLUSTER_PRIVATE_ALLOWLIST_ENV,
@@ -1193,6 +1196,48 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		this.assertThisPluginServes(ref);
 		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
 		return this.appLifecycle.destroyApp(ref, pinned, opts);
+	}
+
+	/**
+	 * The expiry a **verification** namespace declares, or `null` — the read APW-06
+	 * T20's facade reported missing from the contract.
+	 *
+	 * §4.12:646-647 has the namespace carry `ever-works.io/expires-at`
+	 * (`now + ttlMinutes`), and §4.12:659-660 says that annotation is what lets
+	 * APW-04's `app-provision-sweep` clean up a namespace a crashed run left behind.
+	 * So this answers the annotation verbatim, and `null` when there is none — never a
+	 * computed TTL: the caller compares the instant, and inventing one here would make
+	 * a namespace look alive or expired for a reason nobody can see.
+	 *
+	 * The same discipline as every other App member: the target must be one this plugin
+	 * serves, and the credential is asserted AND pinned before the call. A namespace
+	 * that cannot be read answers `null` rather than throwing — a status report is not
+	 * the place to fail a sweep, and `null` is already the documented "no expiry known"
+	 * answer (T20's seam logs a warning and reports an empty value).
+	 */
+	async readNamespaceExpiry(ref: AppTargetRef, credential: string): Promise<string | null> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		const namespace = String(ref?.namespace ?? '');
+		if (!namespace) return null;
+
+		try {
+			// The same read the status reader uses for a namespace (`readObject` is the
+			// `KubernetesApiService` member that takes a credential and a context; the
+			// `readNamespace` helper is not on this class). `''` is the cluster-scoped
+			// namespace argument a Namespace read needs — `app-status.reader.ts:648-655`
+			// is the precedent, and it is deliberately not re-derived here.
+			const live = await this.api.readObject<{
+				metadata?: { annotations?: Record<string, string> };
+			}>(pinned, 'v1', 'Namespace', '', namespace, ref?.kubeContext ?? undefined);
+			const value = live?.metadata?.annotations?.[APP_ANNOTATION_EXPIRES_AT];
+			return typeof value === 'string' && value.trim() ? value.trim() : null;
+		} catch (error) {
+			this.context?.logger?.warn?.(
+				`App runtime: reading the expiry of namespace '${namespace}' failed (${scrubError(error).message}).`
+			);
+			return null;
+		}
 	}
 
 	/** Pause or resume the App Work's components (FR-49) — `AppLifecycle.scaleApp`. */

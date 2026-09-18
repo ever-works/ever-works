@@ -1034,8 +1034,8 @@ const clusterAddressResolver: KubeconfigDnsResolver = async (hostname) => {
 	return [{ address: clusterAddress, family: 4 }];
 };
 
-function appPlugin(): KubernetesPlugin {
-	return new KubernetesPlugin({ api: makeMockApi(), clusterAddressResolver });
+function appPlugin(overrides: Partial<KubernetesApiService> = {}): KubernetesPlugin {
+	return new KubernetesPlugin({ api: makeMockApi(overrides), clusterAddressResolver });
 }
 
 const APP_REF: AppTargetRef = {
@@ -1418,6 +1418,61 @@ describe('KubernetesPlugin App members (APW-06 T14)', () => {
 
 		await expect(plugin.getAppStatus(APP_REF, VALID, APP_STATUS_SPEC)).resolves.toBe(APP_STATUS_SNAPSHOT);
 		expect(spy).toHaveBeenCalledTimes(1);
+	});
+
+	/**
+	 * The verification expiry (added 2026-09-18 with the contract member). §4.12:646-647 puts
+	 * `ever-works.io/expires-at` on a verification namespace, and §4.12:659-660 says APW-04's
+	 * sweep reads it to clean up leftovers — so the read must answer the ANNOTATION, and must
+	 * answer `null` rather than guessing when there is none or when the namespace is unreadable.
+	 */
+	it('reads the verification expiry annotation from the namespace, verbatim', async () => {
+		const readObject = vi.fn(async () => ({
+			metadata: { annotations: { 'ever-works.io/expires-at': '2026-09-19T10:00:00Z' } }
+		}));
+		const plugin = appPlugin({ readObject } as Partial<KubernetesApiService>);
+
+		await expect(plugin.readNamespaceExpiry(APP_REF, VALID)).resolves.toBe('2026-09-19T10:00:00Z');
+		expect(readObject).toHaveBeenCalledTimes(1);
+		// The read is the cluster-scoped one (`''` namespace argument), the same call shape the
+		// status reader uses, and it is handed the PINNED credential — not the raw one.
+		const [credential, apiVersion, kind, namespaceArg, name] = readObject.mock.calls[0] as unknown as string[];
+		expect(credential).toContain('server: https://93.184.216.34:6443');
+		expect(apiVersion).toBe('v1');
+		expect(kind).toBe('Namespace');
+		expect(namespaceArg).toBe('');
+		expect(name).toBe(APP_REF.namespace);
+	});
+
+	it('answers null — never a computed instant — when the namespace declares no expiry', async () => {
+		const plugin = appPlugin({
+			readObject: vi.fn(async () => ({ metadata: { annotations: {} } }))
+		} as Partial<KubernetesApiService>);
+
+		await expect(plugin.readNamespaceExpiry(APP_REF, VALID)).resolves.toBeNull();
+	});
+
+	it('answers null rather than throwing when the namespace cannot be read', async () => {
+		// A status report is not the place to fail a sweep: the caller's documented answer for
+		// "no expiry known" is a warning plus an empty value, so an unreadable namespace must not
+		// turn a verification-status call into an exception.
+		const plugin = appPlugin({
+			readObject: vi.fn(async () => {
+				throw new Error('namespace read failed');
+			})
+		} as Partial<KubernetesApiService>);
+
+		await expect(plugin.readNamespaceExpiry(APP_REF, VALID)).resolves.toBeNull();
+	});
+
+	it('refuses an ever-works-apps ref for the expiry read too (R-5, every App method)', async () => {
+		const plugin = appPlugin();
+		const readObject = vi.fn();
+
+		await expect(
+			plugin.readNamespaceExpiry({ ...APP_REF, target: 'ever-works-apps' }, VALID)
+		).rejects.toMatchObject({ code: 'NOT_CONFIGURED' });
+		expect(readObject).not.toHaveBeenCalled();
 	});
 });
 
