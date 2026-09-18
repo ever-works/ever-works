@@ -160,6 +160,10 @@ jest.mock('./agent-template-catalog.service', () => ({
 }));
 
 import 'reflect-metadata';
+// APW-08 P0 (T1 case 7) — the adapter's SOURCE is asserted, not only its
+// runtime calls: a hardcoded provider id is invisible to a stub.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AgentsModule } from './agents.module';
 import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
@@ -471,7 +475,11 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
     };
 
     const makeGit = () => ({
+        // APW-08 P0 — the gate's working copy is now a `cloneOrPull` of the
+        // Work's own repository base branch; `getRepoDir` (which clones the
+        // Work's IMPORT source) is kept only as a never-called spy.
         getRepoDir: jest.fn().mockResolvedValue('/tmp/work-1'),
+        cloneOrPull: jest.fn().mockResolvedValue('/tmp/work-1'),
         // APW-08 P0 — `openPullRequest` now resolves the base branch from the
         // Work's repository when the caller omits it, so the facade it calls
         // has to answer that question. An explicit `base` still bypasses both.
@@ -677,6 +685,10 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         owner?: string;
         websiteRepo?: string;
         dataRepo?: string;
+        /** The Work's IMPORT source (`sourceRepository`) — never the repo the tools act on. */
+        sourceRepository?: { owner: string; repo: string } | null;
+        /** Where Task branches fork from; NULL means the repository's own default. */
+        taskIsolationBaseBranch?: string | null;
     }
 
     interface Harness {
@@ -699,11 +711,26 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             getRepoOwner: jest.fn(() => owner),
             getWebsiteRepo: jest.fn(() => overrides.websiteRepo ?? 'acme-website'),
             getDataRepo: jest.fn(() => overrides.dataRepo ?? 'acme-data'),
+            // APW-08 P0 (T1 case 2) — a Work's `sourceRepository` is where the
+            // Work was IMPORTED from, and `getRepoDir` clones exactly that. It
+            // is deliberately set to coordinates no assertion should ever see:
+            // the tools act on the Work's OWN repository record.
+            sourceRepository:
+                overrides.sourceRepository === undefined
+                    ? { owner: 'import-source', repo: 'imported-thing' }
+                    : overrides.sourceRepository,
+            taskIsolationBaseBranch: overrides.taskIsolationBaseBranch ?? null,
         };
     };
 
     const makeGit = () => ({
+        // APW-08 P0 (T3) — kept ONLY as a spy. `getRepoDir` resolves the Work's
+        // IMPORT source, so the adapter must no longer call it at all; every
+        // caller now goes through `cloneOrPull` with explicit coordinates.
         getRepoDir: jest.fn().mockResolvedValue(WORK_DIR),
+        // The call that replaced it: the Work's OWN repository, based on the
+        // resolved base branch, in a per-Work working copy (`checkoutKey`).
+        cloneOrPull: jest.fn().mockResolvedValue(WORK_DIR),
         getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
         getMainBranch: jest.fn().mockResolvedValue(null),
         switchBranch: jest.fn().mockResolvedValue('feature/x'),
@@ -766,6 +793,26 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         ...extra,
     });
 
+    /** Let every microtask and macrotask queued so far run. */
+    const settle = async (): Promise<void> => {
+        for (let i = 0; i < 6; i += 1) {
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+    };
+
+    /**
+     * "BEFORE any git operation runs" — one assertion for EVERY read and write
+     * the adapter could reach, so a git call added to this path later is caught
+     * here rather than only where somebody remembered to look.
+     */
+    const expectNoGitWork = (git: ReturnType<typeof makeGit>): void => {
+        expect(git.getRepoDir).not.toHaveBeenCalled();
+        expect(git.cloneOrPull).not.toHaveBeenCalled();
+        expect(git.switchBranch).not.toHaveBeenCalled();
+        expect(git.commit).not.toHaveBeenCalled();
+        expect(git.push).not.toHaveBeenCalled();
+    };
+
     describe('commitToRepo', () => {
         it("uses the Work's OWN provider id — never the 'github' literal", async () => {
             const { facade, git } = build();
@@ -776,18 +823,50 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             // The literal is gone from the whole call chain, not just one hop.
             expect(JSON.stringify(git.commit.mock.calls)).not.toContain('github');
 
-            expect(git.getRepoDir).toHaveBeenCalledWith(
-                'work',
-                WORK_ID,
-                expect.objectContaining({ providerId: WORK_PROVIDER }),
+            // APW-08 P0 (T3) — the working copy is the Work's OWN repository,
+            // cloned per Work, based on the resolved base branch. `getRepoDir`
+            // resolved the Work's IMPORT source and is gone from the adapter.
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    owner: 'acme',
+                    repo: 'acme-website',
+                    branch: 'main',
+                    autoSwitchToMainBranch: false,
+                    checkoutKey: `work:${WORK_ID}:agent-commit`,
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
             );
-            // …and the empty provider that used to reach `getRepoDir` is gone too.
-            expect(git.getRepoDir.mock.calls[0][2].providerId).not.toBe('');
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+            // …and no git call is reached with the empty provider id that used
+            // to be handed to `getRepoDir`.
+            expect(git.cloneOrPull.mock.calls[0][1].providerId).not.toBe('');
 
             expect(git.push).toHaveBeenCalledWith(
-                { dir: WORK_DIR, force: false },
+                expect.objectContaining({
+                    dir: WORK_DIR,
+                    force: false,
+                    ref: 'feature/pricing',
+                    remoteRef: 'feature/pricing',
+                }),
                 expect.objectContaining({ providerId: WORK_PROVIDER }),
             );
+        });
+
+        it("clones the Work's OWN repository — never its `sourceRepository` import source", async () => {
+            const { facade, git } = build();
+
+            await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            // Every git call the adapter made is searched, not just the clone:
+            // an import-source coordinate must appear nowhere in the chain.
+            const everyCall = JSON.stringify([
+                ...git.cloneOrPull.mock.calls,
+                ...git.switchBranch.mock.calls,
+                ...git.commit.mock.calls,
+                ...git.push.mock.calls,
+            ]);
+            expect(everyCall).not.toContain('import-source');
+            expect(everyCall).not.toContain('imported-thing');
         });
 
         it('threads the branch into the commit AND returns that same branch', async () => {
@@ -812,7 +891,61 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 git.commit.mock.invocationCallOrder[0],
             );
             expect(result.branch).toBe('feature/pricing');
-            // An explicit branch needs no default-branch lookup.
+            // The push NAMES the branch it pushes (`ref`/`remoteRef`), so the
+            // remote receives the branch we committed to — never "whatever HEAD
+            // happened to be", which is how the commit used to go missing.
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dir: WORK_DIR,
+                    ref: 'feature/pricing',
+                    remoteRef: 'feature/pricing',
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER }),
+            );
+        });
+
+        it('bases the clone on that same branch when the caller names one', async () => {
+            const { facade, git } = build();
+            await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            // The resolved repository default is the CLONE's base — never a
+            // substitute for the branch the caller named, which is what the
+            // switch, the commit, the push and the result all carry.
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({ branch: 'main' }),
+                expect.anything(),
+            );
+            expect(git.switchBranch.mock.calls[0][2]).toBe('feature/pricing');
+        });
+
+        it("bases the clone on the Work's task-isolation base branch when it declares one", async () => {
+            const git = makeGit();
+            // The repository default is deliberately different, so "the Work's
+            // own base won" is observable rather than coincidental.
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({
+                git,
+                work: makeWork({ taskIsolationBaseBranch: 'integration' }),
+            });
+
+            const result = await facade.commitToRepo(commitInput());
+
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({ branch: 'integration' }),
+                expect.anything(),
+            );
+            expect(git.switchBranch).toHaveBeenCalledWith(
+                WORK_PROVIDER,
+                WORK_DIR,
+                'integration',
+                true,
+            );
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({ ref: 'integration', remoteRef: 'integration' }),
+                expect.anything(),
+            );
+            expect(result.branch).toBe('integration');
+            // A Work that declares its own base needs no provider lookup at all.
             expect(git.getRepository).not.toHaveBeenCalled();
         });
 
@@ -828,7 +961,15 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 'acme-website',
                 expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
             );
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({ owner: 'acme', repo: 'acme-website', branch: 'trunk' }),
+                expect.anything(),
+            );
             expect(git.switchBranch).toHaveBeenCalledWith(WORK_PROVIDER, WORK_DIR, 'trunk', true);
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({ ref: 'trunk', remoteRef: 'trunk' }),
+                expect.anything(),
+            );
             expect(result.branch).toBe('trunk');
         });
 
@@ -841,12 +982,25 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 await expect(attempt).rejects.toThrow(/protected/i);
                 await expect(attempt).rejects.toThrow(branch);
 
-                expect(git.getRepoDir).not.toHaveBeenCalled();
-                expect(git.switchBranch).not.toHaveBeenCalled();
-                expect(git.commit).not.toHaveBeenCalled();
-                expect(git.push).not.toHaveBeenCalled();
+                expectNoGitWork(git);
             },
         );
+
+        it('refuses a protected BASE branch too — with files to write and no branch named (T1 case 4)', async () => {
+            const { facade, git } = build({
+                work: makeWork({ taskIsolationBaseBranch: 'main' }),
+            });
+
+            const attempt = facade.commitToRepo(
+                commitInput({ files: [{ path: 'index.html', body: '<h1>pricing</h1>' }] }),
+            );
+            await expect(attempt).rejects.toThrow(/protected/i);
+            await expect(attempt).rejects.toThrow('main');
+
+            // No clone means no directory the inline file writes could land in,
+            // and no switch / commit / push to carry them anywhere.
+            expectNoGitWork(git);
+        });
 
         it("honours the platform's modelled protectedBranches, not just the built-in list", async () => {
             const { facade, git, mergePolicy } = build({
@@ -874,9 +1028,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(attempt).rejects.toThrow('develop');
 
             // The refusal still lands before anything is staged, committed or pushed.
-            expect(git.switchBranch).not.toHaveBeenCalled();
-            expect(git.commit).not.toHaveBeenCalled();
-            expect(git.push).not.toHaveBeenCalled();
+            expectNoGitWork(git);
         });
 
         it('fails closed when the Work has no git provider configured', async () => {
@@ -885,8 +1037,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
                 /git provider/i,
             );
-            expect(git.getRepoDir).not.toHaveBeenCalled();
-            expect(git.commit).not.toHaveBeenCalled();
+            expectNoGitWork(git);
         });
 
         it('fails closed when the Work cannot be found', async () => {
@@ -895,8 +1046,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
                 WORK_ID,
             );
-            expect(git.getRepoDir).not.toHaveBeenCalled();
-            expect(git.commit).not.toHaveBeenCalled();
+            expectNoGitWork(git);
         });
 
         it('fails closed when owner/repo cannot be resolved — never an empty-string target', async () => {
@@ -905,8 +1055,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
                 /owner|repositor/i,
             );
-            expect(git.getRepoDir).not.toHaveBeenCalled();
-            expect(git.commit).not.toHaveBeenCalled();
+            expectNoGitWork(git);
         });
 
         it("fails closed when the Work's default branch cannot be resolved", async () => {
@@ -928,6 +1077,51 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
                 /push failed/,
             );
+        });
+
+        it('serializes two commits to ONE Work — the second switch starts after the first push resolves (T1 case 6)', async () => {
+            const git = makeGit();
+            const order: string[] = [];
+            let releaseFirstPush!: () => void;
+            const firstPush = new Promise<void>((resolve) => {
+                releaseFirstPush = resolve;
+            });
+            let pushes = 0;
+            git.push.mockImplementation(async () => {
+                pushes += 1;
+                const attempt = pushes;
+                order.push(`push:${attempt}:start`);
+                if (attempt === 1) await firstPush;
+                order.push(`push:${attempt}:end`);
+            });
+            git.switchBranch.mockImplementation(async (_provider, _dir, branch) => {
+                order.push(`switch:${branch}`);
+                return branch;
+            });
+            const { facade } = build({ git });
+
+            const first = facade.commitToRepo(commitInput({ branch: 'feature/one' }));
+            await settle();
+            const second = facade.commitToRepo(commitInput({ branch: 'feature/two' }));
+            await settle();
+
+            // The Work's slot is held: the second commit has not reached the
+            // working copy at all, so nothing it does can move the checkout
+            // under the first commit's push.
+            expect(order).toEqual(['switch:feature/one', 'push:1:start']);
+            expect(git.cloneOrPull).toHaveBeenCalledTimes(1);
+
+            releaseFirstPush();
+            await Promise.all([first, second]);
+
+            expect(order).toEqual([
+                'switch:feature/one',
+                'push:1:start',
+                'push:1:end',
+                'switch:feature/two',
+                'push:2:start',
+                'push:2:end',
+            ]);
         });
     });
 
@@ -972,6 +1166,30 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await expect(facade.openPullRequest(prInput())).rejects.toThrow(/git provider/i);
             expect(git.createPullRequest).not.toHaveBeenCalled();
         });
+
+        it('runs the gate against a REAL working copy of the base branch — never `getRepoDir` (T3 Done-when)', async () => {
+            const { facade, git, prGate } = build();
+
+            await facade.openPullRequest(prInput());
+
+            // The gate still runs, and it is still handed a checkout — but the
+            // checkout is the Work's OWN repository, based on the resolved base
+            // branch, in the same per-Work working copy `commitToRepo` uses.
+            expect(prGate.assertAllowed).toHaveBeenCalledWith(
+                expect.objectContaining({ cwd: WORK_DIR }),
+            );
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    owner: 'acme',
+                    repo: 'acme-website',
+                    branch: 'main',
+                    autoSwitchToMainBranch: false,
+                    checkoutKey: `work:${WORK_ID}:agent-commit`,
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+        });
     });
 
     describe('regression guards', () => {
@@ -995,6 +1213,48 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             await facade.openPullRequest(prInput());
 
             expect(git.createPullRequest.mock.calls[0][0].repo).toBe('acme-data');
+        });
+    });
+
+    /**
+     * T1 case 7 — the provider id is RESOLVED, so the source must not carry a
+     * hardcoded provider anywhere in the adapter. Reading the file is
+     * deliberate: a runtime stub cannot see a literal that only a future edit
+     * would reintroduce.
+     */
+    describe('adapter source', () => {
+        const adapterSource = (): string =>
+            readFileSync(join(__dirname, 'agents.module.ts'), 'utf8');
+
+        /** The AGENT_GIT_FACADE provider block, from its token to the next binding. */
+        const factoryBody = (): string => {
+            const source = adapterSource();
+            const start = source.indexOf('provide: AGENT_GIT_FACADE,');
+            const end = source.indexOf('provide: AGENT_EMAIL_FACADE,');
+            expect(start).toBeGreaterThan(-1);
+            expect(end).toBeGreaterThan(start);
+            return source.slice(start, end);
+        };
+
+        it("contains no 'github' literal — the provider is never hardcoded", () => {
+            const body = factoryBody();
+
+            expect(body).not.toContain("'github'");
+            expect(body).not.toContain('"github"');
+            // …and the property is satisfied by RESOLUTION, not by an empty
+            // body: the Work's own provider column is what feeds it.
+            expect(body).toContain('work.gitProvider');
+        });
+
+        it('reaches every git call with coordinates the Work resolved, not an empty target', () => {
+            const body = factoryBody();
+
+            expect(body).toContain('getRepoOwner');
+            // `getRepoDir` cloned the Work's import source — it is gone.
+            expect(body).not.toContain('getRepoDir');
+            // The per-Work working copy key (APW08-G24) is what keeps another
+            // caller of the same repository from moving the checkout.
+            expect(body).toContain('checkoutKey');
         });
     });
 });

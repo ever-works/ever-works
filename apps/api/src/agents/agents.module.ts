@@ -159,6 +159,12 @@ import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
 // AW-20 P1 — backs the ROSTER_SKILL_BINDER binding below so a provisioned
 // roster agent arrives with its lane's suggested Skills already attached.
 import { RosterSkillBinderAdapter } from './roster-skill-binder.adapter';
+// APW-08 P0 (T2, plan §2.2) — ONE commit per Work at a time. The two Agent git
+// tools work in the same working copy of a Work's repository, so two commits
+// for one Work would interleave: the second `switchBranch` can move the
+// checkout under the first `push`, and the first commit then lands on the
+// wrong branch, or nowhere at all.
+import { withWorkCommitLock } from './work-commit-lock';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
 import { AgentIdentityService } from './agent-identity.service';
@@ -210,6 +216,23 @@ const HELD_FOR_APPROVAL_NOTE =
  * an operator can protect MORE branches at any scope — never fewer.
  */
 const PROTECTED_RELEASE_BRANCHES: readonly string[] = ['main', 'master', 'stage'];
+
+/**
+ * APW-08 P0 (T3, APW08-G24) — the working copy a Work's Agent git operations
+ * use, named by the convention `work:<workId>:<role>` (APW-02 P0,
+ * `GitCloneOptions.checkoutKey`).
+ *
+ * `cloneOrPull` keys its in-flight operations by plugin/owner/repo/branch/switch
+ * and the DIRECTORY by owner+repo alone (`packages/agent/src/facades/git.facade.ts`),
+ * so without a key another caller of the same data repository — a generator that
+ * switches to `main`, the provisioner — can move the checkout under a commit.
+ * {@link withWorkCommitLock} serializes only this adapter's own calls on one
+ * Work; the checkout key is what separates this Work's operations from every
+ * other caller's.
+ */
+function workCheckoutKey(workId: string): string {
+    return `work:${workId}:agent-commit`;
+}
 
 /**
  * `refs/heads/x` and `X` name the same branch as `x`.
@@ -674,7 +697,7 @@ function normalizeBranchRef(ref: string): string {
                  * owner/repo from its repository record — the same source the rest
                  * of the platform reads (`work.gitProvider`,
                  * `work.getRepoOwner('website')`, `work.getWebsiteRepo()`; see
-                 * `deploy.service.ts` §createDeployContext). A literal `'github'`
+                 * `deploy.service.ts` §createDeployContext). A hardcoded provider
                  * and an empty owner/repo are both refusals now, not fallbacks.
                  *
                  * The ROLE is kind-aware on purpose. Every App Work persists its
@@ -807,6 +830,61 @@ function normalizeBranchRef(ref: string): string {
                     return typeof local === 'string' && local.trim() ? local.trim() : null;
                 };
 
+                /**
+                 * The branch the working copy is BASED on (plan §2.2): the Work's
+                 * declared `taskIsolationBaseBranch` when it has one — the column
+                 * whose own contract is "where Task branches fork from; NULL = the
+                 * repo's default branch" — else the repository's ACTUAL default
+                 * branch. `''` means "not resolvable"; the caller then falls back to
+                 * the fresh clone's own default, and refuses if that is silent too.
+                 *
+                 * Never a hardcoded `main`: a repository that has no `main` would be
+                 * cloned from a branch that does not exist.
+                 */
+                const resolveBaseBranch = async (
+                    target: {
+                        work?: { taskIsolationBaseBranch?: string | null } | null;
+                        providerId: string;
+                        owner: string;
+                        repo: string;
+                    },
+                    userId: string,
+                    workId: string,
+                ): Promise<string> => {
+                    const declared = (target.work?.taskIsolationBaseBranch ?? '').trim();
+                    if (declared) return declared;
+                    return (await readProviderDefaultBranch(target, userId, workId)) ?? '';
+                };
+
+                /**
+                 * The working copy for one Work: the Work's OWN repository — never
+                 * the Work's import source, which is what the old repo-directory
+                 * lookup cloned — in
+                 * a directory of its own ({@link workCheckoutKey}), based on the
+                 * resolved base branch and left ON that branch
+                 * (`autoSwitchToMainBranch: false`), because the caller decides the
+                 * branch it commits to.
+                 */
+                const openWorkCheckout = (
+                    target: { owner: string; repo: string },
+                    base: string,
+                    providerId: string,
+                    userId: string,
+                    workId: string,
+                ): Promise<string> =>
+                    git.cloneOrPull(
+                        {
+                            owner: target.owner,
+                            repo: target.repo,
+                            // Absent means "whatever the repository's default is":
+                            // the plugin clones with no `ref` rather than guessing.
+                            ...(base ? { branch: base } : {}),
+                            autoSwitchToMainBranch: false,
+                            checkoutKey: workCheckoutKey(workId),
+                        },
+                        { providerId, userId, workId } as any,
+                    );
+
                 return {
                     async commitToRepo(input) {
                         const { userId, agentId, workId, message, files } = input;
@@ -815,134 +893,140 @@ function normalizeBranchRef(ref: string): string {
                             throw new Error(`commitToRepo: agent ${agentId} not found.`);
                         }
                         // Resolve the Work's provider/owner/repo from the Work
-                        // itself — the hardcoded `'github'` this replaces made every
+                        // itself — the hardcoded provider this replaces made every
                         // non-GitHub Work unreachable, and the empty provider id that
-                        // used to reach `getRepoDir` made the lookup below throw, so
-                        // the tool never got past its own guard.
+                        // used to reach the old repo-directory lookup made that
+                        // lookup throw, so the tool never got past its own guard.
                         const target = await resolveWorkGitTarget('commitToRepo', workId);
                         const providerId = explicitProviderIdOf(input) || target.providerId;
 
-                        // APW-08 P0 — a protected branch is refused BEFORE any git
+                        // APW-08 P0 — the branch the working copy is based on, then
+                        // the branch the commit is TARGETED at: what the caller named,
+                        // else that base. Both come from the Work, never from a
+                        // literal — and a protected branch is refused BEFORE any git
                         // operation runs: nothing is cloned, switched, staged,
                         // committed or pushed.
+                        const base = await resolveBaseBranch(target, userId, workId);
                         let branch = typeof input.branch === 'string' ? input.branch.trim() : '';
-                        if (branch) {
+                        const namedTarget = branch || base;
+                        if (namedTarget) {
                             assertNotProtectedBranch(
                                 'commitToRepo',
-                                branch,
+                                namedTarget,
                                 await resolveProtectedBranches(workId),
                             );
-                        } else {
-                            // No branch supplied: the Work's DEFAULT branch, never a
-                            // hardcoded 'main' — and refused here, before the clone,
-                            // when the default is protected (the normal case).
-                            branch =
-                                (await readProviderDefaultBranch(target, userId, workId)) ?? '';
-                            if (branch) {
+                        }
+
+                        // APW-08 P0 (T2/T3) — everything that touches the working
+                        // copy runs under the Work's commit slot, so a second commit
+                        // for this Work cannot switch the checkout under the first
+                        // one's push. The policy refusal above deliberately stays
+                        // OUTSIDE: a refusal holds no slot and costs no wait.
+                        return withWorkCommitLock(workId, async () => {
+                            const dir = await openWorkCheckout(
+                                target,
+                                base,
+                                providerId,
+                                userId,
+                                workId,
+                            );
+                            if (!branch) {
+                                branch =
+                                    base || ((await readLocalDefaultBranch(providerId, dir)) ?? '');
+                                if (!branch) {
+                                    throw new Error(
+                                        `commitToRepo: could not resolve the default branch of ` +
+                                            `${target.owner}/${target.repo} — pass an explicit \`branch\` instead.`,
+                                    );
+                                }
                                 assertNotProtectedBranch(
                                     'commitToRepo',
                                     branch,
                                     await resolveProtectedBranches(workId),
                                 );
                             }
-                        }
-
-                        const dir = await git.getRepoDir('work', workId, {
-                            userId,
-                            workId,
-                            providerId,
-                        } as any);
-                        if (!dir) {
-                            throw new Error(
-                                'commitToRepo: could not resolve Work repo directory (Work missing or git provider unconfigured).',
-                            );
-                        }
-                        if (!branch) {
-                            branch = (await readLocalDefaultBranch(providerId, dir)) ?? '';
-                            if (!branch) {
-                                throw new Error(
-                                    `commitToRepo: could not resolve the default branch of ` +
-                                        `${target.owner}/${target.repo} — pass an explicit \`branch\` instead.`,
-                                );
+                            // Stage any file edits provided inline. Empty `files`
+                            // means "commit whatever earlier tool calls staged".
+                            if (files && files.length > 0) {
+                                const fsp = await import('node:fs/promises');
+                                const path = await import('node:path');
+                                // SECURITY: `f.path` is supplied verbatim by the LLM
+                                // tool call (potentially prompt-injected via hostile
+                                // repo/web content) and is NOT validated upstream.
+                                // Confine every write to the cloned repo `dir` —
+                                // mirroring `resolveSandboxPath`
+                                // (packages/plugins/agent-pipeline/src/tools/file-tools.ts):
+                                // reject absolute paths and reject any relative path
+                                // whose resolved target escapes `dir` (e.g.
+                                // `../../.ssh/authorized_keys`). Without this, the
+                                // recursive mkdir + writeFile below would create and
+                                // overwrite arbitrary files outside the repo on the
+                                // shared worker filesystem (path traversal / zip-slip).
+                                const repoRoot = path.resolve(dir);
+                                for (const f of files) {
+                                    if (
+                                        typeof f.path !== 'string' ||
+                                        f.path.length === 0 ||
+                                        path.isAbsolute(f.path)
+                                    ) {
+                                        throw new Error(
+                                            `commitToRepo: invalid file path ${JSON.stringify(
+                                                f.path,
+                                            )} — must be a non-empty path relative to the repo root.`,
+                                        );
+                                    }
+                                    const abs = path.resolve(repoRoot, f.path);
+                                    if (abs !== repoRoot && !abs.startsWith(repoRoot + path.sep)) {
+                                        throw new Error(
+                                            `commitToRepo: file path ${JSON.stringify(
+                                                f.path,
+                                            )} resolves outside the repo directory — refusing to write.`,
+                                        );
+                                    }
+                                    await fsp.mkdir(path.dirname(abs), { recursive: true });
+                                    await fsp.writeFile(abs, f.body, 'utf8');
+                                }
                             }
-                            assertNotProtectedBranch(
-                                'commitToRepo',
+                            const committerName = agent.committerName ?? agent.name;
+                            const committerEmail =
+                                agent.committerEmail ?? `${agent.slug}@agents.ever.works`;
+                            // APW-08 P0 — the branch is threaded into the commit itself.
+                            // The commit used to land on whatever branch the clone
+                            // happened to be on while the tool RETURNED `branch ?? 'main'`
+                            // — a branch it had never committed to. Check the branch out
+                            // (creating it if the Agent is starting a new one) so the
+                            // committed branch and the returned branch are the same
+                            // branch, by construction.
+                            await git.switchBranch(providerId, dir, branch, true);
+                            const sha = await git.commit(providerId, dir, message, {
+                                name: committerName,
+                                email: committerEmail,
+                            } as any);
+                            // APW-08 P0 — the push NAMES the branch (`ref` /
+                            // `remoteRef`), so the remote receives the branch we
+                            // committed to instead of "whatever HEAD is at push
+                            // time", which is how a commit could silently go
+                            // nowhere while the tool reported success.
+                            await git
+                                .push({ dir, force: false, ref: branch, remoteRef: branch }, {
+                                    providerId,
+                                    userId,
+                                    workId,
+                                } as any)
+                                .catch((err: Error) => {
+                                    // Don't swallow push failures silently — the
+                                    // model needs to know its commit didn't reach
+                                    // the remote so it can retry or escalate.
+                                    throw new Error(
+                                        `commitToRepo: push failed (${err.message ?? err}).`,
+                                    );
+                                });
+                            return {
+                                sha: sha ?? null,
                                 branch,
-                                await resolveProtectedBranches(workId),
-                            );
-                        }
-                        // Stage any file edits provided inline. Empty `files`
-                        // means "commit whatever earlier tool calls staged".
-                        if (files && files.length > 0) {
-                            const fsp = await import('node:fs/promises');
-                            const path = await import('node:path');
-                            // SECURITY: `f.path` is supplied verbatim by the LLM
-                            // tool call (potentially prompt-injected via hostile
-                            // repo/web content) and is NOT validated upstream.
-                            // Confine every write to the cloned repo `dir` —
-                            // mirroring `resolveSandboxPath`
-                            // (packages/plugins/agent-pipeline/src/tools/file-tools.ts):
-                            // reject absolute paths and reject any relative path
-                            // whose resolved target escapes `dir` (e.g.
-                            // `../../.ssh/authorized_keys`). Without this, the
-                            // recursive mkdir + writeFile below would create and
-                            // overwrite arbitrary files outside the repo on the
-                            // shared worker filesystem (path traversal / zip-slip).
-                            const repoRoot = path.resolve(dir);
-                            for (const f of files) {
-                                if (
-                                    typeof f.path !== 'string' ||
-                                    f.path.length === 0 ||
-                                    path.isAbsolute(f.path)
-                                ) {
-                                    throw new Error(
-                                        `commitToRepo: invalid file path ${JSON.stringify(
-                                            f.path,
-                                        )} — must be a non-empty path relative to the repo root.`,
-                                    );
-                                }
-                                const abs = path.resolve(repoRoot, f.path);
-                                if (abs !== repoRoot && !abs.startsWith(repoRoot + path.sep)) {
-                                    throw new Error(
-                                        `commitToRepo: file path ${JSON.stringify(
-                                            f.path,
-                                        )} resolves outside the repo directory — refusing to write.`,
-                                    );
-                                }
-                                await fsp.mkdir(path.dirname(abs), { recursive: true });
-                                await fsp.writeFile(abs, f.body, 'utf8');
-                            }
-                        }
-                        const committerName = agent.committerName ?? agent.name;
-                        const committerEmail =
-                            agent.committerEmail ?? `${agent.slug}@agents.ever.works`;
-                        // APW-08 P0 — the branch is threaded into the commit itself.
-                        // The commit used to land on whatever branch the clone
-                        // happened to be on while the tool RETURNED `branch ?? 'main'`
-                        // — a branch it had never committed to. Check the branch out
-                        // (creating it if the Agent is starting a new one) so the
-                        // committed branch and the returned branch are the same
-                        // branch, by construction.
-                        await git.switchBranch(providerId, dir, branch, true);
-                        const sha = await git.commit(providerId, dir, message, {
-                            name: committerName,
-                            email: committerEmail,
-                        } as any);
-                        await git
-                            .push({ dir, force: false }, { providerId, userId, workId } as any)
-                            .catch((err: Error) => {
-                                // Don't swallow push failures silently — the
-                                // model needs to know its commit didn't reach
-                                // the remote so it can retry or escalate.
-                                throw new Error(
-                                    `commitToRepo: push failed (${err.message ?? err}).`,
-                                );
-                            });
-                        return {
-                            sha: sha ?? null,
-                            branch,
-                            filesChanged: files?.length ?? 0,
-                        };
+                                filesChanged: files?.length ?? 0,
+                            };
+                        });
                     },
                     async openPullRequest(input) {
                         const { userId, workId, title, body, head, draft } = input;
@@ -957,6 +1041,15 @@ function normalizeBranchRef(ref: string): string {
                         // The push is the thing that is refused — in `commitToRepo`.
                         const target = await resolveWorkGitTarget('openPullRequest', workId);
                         const providerId = explicitProviderIdOf(input) || target.providerId;
+                        // APW-08 P0 — `base` defaults to the Work's base branch (its
+                        // declared `taskIsolationBaseBranch`, else the repository's
+                        // default), instead of the hardcoded 'main' a repository may
+                        // not even have. An explicit base still wins, unchanged. It is
+                        // resolved BEFORE the checkout below because the checkout is
+                        // the gate's `cwd`: the gate has to run against the branch the
+                        // pull request is actually based on.
+                        let base = typeof input.base === 'string' ? input.base.trim() : '';
+                        if (!base) base = await resolveBaseBranch(target, userId, workId);
                         // Quality gates (audit W3 M3) — "a red check opens no PR"
                         // holds for the Agent tool too. `assertAllowed` THROWS on
                         // a refusal, which is the right shape here: the tool's
@@ -965,30 +1058,29 @@ function normalizeBranchRef(ref: string): string {
                         // fabricated success. A Work with the default
                         // `checksPolicy: 'off'` short-circuits before any
                         // subprocess or checkout resolution.
-                        const gateCwd = await git
-                            .getRepoDir('work', workId, {
-                                userId,
-                                workId,
-                                providerId,
-                            } as any)
-                            .catch(() => null);
+                        //
+                        // APW-08 P0 (T3) — the checkout is the Work's OWN repository,
+                        // in the same per-Work working copy `commitToRepo` uses
+                        // ({@link workCheckoutKey}); the old repo-directory lookup
+                        // cloned the Work's IMPORT source and is gone from this
+                        // adapter — no git call in it resolves a directory any more.
+                        const gateCwd = await openWorkCheckout(
+                            target,
+                            base,
+                            providerId,
+                            userId,
+                            workId,
+                        ).catch(() => null);
                         await prGate.assertAllowed({
                             work: target.work,
                             cwd: gateCwd,
                             context: `agent-tool openPullRequest work=${workId}`,
                         });
-                        // `base` defaults to the Work's default branch — which is what
-                        // this tool's own schema has always DOCUMENTED — instead of
-                        // the hardcoded 'main' a repository may not even have. An
-                        // explicit base still wins, unchanged.
-                        let base = typeof input.base === 'string' ? input.base.trim() : '';
                         if (!base) {
                             base =
-                                (await readProviderDefaultBranch(target, userId, workId)) ??
                                 (gateCwd
                                     ? await readLocalDefaultBranch(providerId, gateCwd)
-                                    : null) ??
-                                '';
+                                    : null) ?? '';
                         }
                         if (!base) {
                             throw new Error(
