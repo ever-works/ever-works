@@ -32,8 +32,11 @@ import { config } from '@ever-works/agent/config';
  * the guard and `api.controller.ts`'s `features.appLauncherEnabled` can never
  * disagree (APW11-G12, plan §7). That accessor lives in
  * `packages/agent/src/config/index.ts` and is owned by the same task's other
- * half; until it lands this reads the variable itself, through the seam below,
- * so wiring the accessor later is a one-file change rather than two.
+ * half; that accessor now exists (`packages/agent/src/config/index.ts`), and the
+ * seam below calls it — so the two readers agree by construction rather than by
+ * convention: `apps/api/src/config/constants.ts` delegates its own
+ * `appLauncher.isEnabled()` to the same function instead of re-reading the
+ * variable.
  */
 
 /** The variable behind FR-54's switch. Named once, so nothing re-states it. */

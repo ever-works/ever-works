@@ -1283,6 +1283,48 @@ describe('agent/config', () => {
         });
     });
 
+    describe('appLauncher (APW-11)', () => {
+        const KEY = 'EVER_WORKS_APP_LAUNCHER_ENABLED';
+        let saved: string | undefined;
+
+        beforeEach(() => {
+            saved = process.env[KEY];
+            delete process.env[KEY];
+        });
+
+        afterEach(() => {
+            if (saved === undefined) delete process.env[KEY];
+            else process.env[KEY] = saved;
+        });
+
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['', false],
+            ['true ', false],
+        ])('reads %p as %p — only the exact string "true" is on', (value, expected) => {
+            process.env[KEY] = value;
+            expect(config.appLauncher.isEnabled()).toBe(expected);
+        });
+
+        it('is off when the variable is unset', () => {
+            expect(config.appLauncher.isEnabled()).toBe(false);
+        });
+
+        it('is the ONE reader the API guard and the public config share', () => {
+            // The guard delegates through this accessor
+            // (`apps/api/src/app-launcher/guards/app-launcher-enabled.guard.ts`)
+            // and `apps/api/src/config/constants.ts` delegates to it too, so a
+            // change of semantics here moves both readers together. This test
+            // exists so that the semantics themselves are pinned in the package
+            // that owns them, not only in the API's specs.
+            process.env[KEY] = 'true';
+            expect(config.appLauncher.isEnabled()).toBe(true);
+        });
+    });
+
     describe('top-level shape (regression guard)', () => {
         it('exposes the full set of config groups', () => {
             const keys = Object.keys(config).sort();
@@ -1292,6 +1334,14 @@ describe('agent/config', () => {
                 // max batch size, etc.). Pinned alphabetically here.
                 'agentPlugins',
                 'agents',
+                // APW-11 (App Launcher) — `appLauncher.*` is the ONE accessor
+                // behind FR-54's installation switch. It is deliberately
+                // stricter than the other public feature flags (only the exact
+                // string `'true'` is on) so the API guard and
+                // `features.appLauncherEnabled` read one implementation and
+                // cannot disagree. Sorted here between `agents` and `billing`
+                // because `Object.keys().sort()` is case-sensitive.
+                'appLauncher',
                 'billing',
                 'branding',
                 'database',

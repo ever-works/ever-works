@@ -103,6 +103,12 @@ export class APIController {
                 magicLinkEnabled: truthy(process.env.MAGIC_LINK_ENABLED),
                 anonymousAuthEnabled: truthy(process.env.ANONYMOUS_AUTH_ENABLED),
                 emailVerificationRequired: process.env.REQUIRE_EMAIL_VERIFICATION !== 'false',
+                // APW-11 — read through the agent's accessor rather than
+                // `truthy()` here, so this list and the API's own guard can
+                // never disagree about whether the launcher is on (APW11-G12).
+                // That accessor is deliberately stricter than `truthy()`; the
+                // reasoning is in `config.appLauncher.isEnabled()`.
+                appLauncherEnabled: config.appLauncher.isEnabled(),
             },
             auth: {
                 providers: {

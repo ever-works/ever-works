@@ -1,3 +1,5 @@
+import { config as agentConfig } from '@ever-works/agent/config';
+
 export const authConstants = {
     bcryptSaltRounds: 10,
     refreshTokenLength: 32,
@@ -509,5 +511,25 @@ export const config = {
                 );
             }
         },
+    },
+
+    /**
+     * APW-11 (App Launcher) — FR-54's installation switch, as this public list
+     * reads it.
+     *
+     * **It delegates; it does not re-read the variable.** The semantics live in
+     * one place, `config.appLauncher.isEnabled()` in
+     * `@ever-works/agent/config`, so this list and the API's own
+     * `AppLauncherEnabledGuard` cannot disagree about whether the launcher
+     * exists (APW11-G12, plan §7) — which is the only thing that makes
+     * publishing the flag useful: a web UI that hid the surface while the API
+     * served it, or the reverse, is worse than not publishing it at all.
+     *
+     * That accessor is deliberately stricter than this file's other feature
+     * flags: only the exact string `'true'` is on (see its docstring for why a
+     * surface-wide gate fails closed instead of accepting `1`/`yes`).
+     */
+    appLauncher: {
+        isEnabled: () => agentConfig.appLauncher.isEnabled(),
     },
 };

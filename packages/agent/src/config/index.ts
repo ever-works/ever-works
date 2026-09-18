@@ -2062,6 +2062,47 @@ export const config = {
             return raw === 'draft-review' ? 'draft-review' : 'auto-send';
         },
     },
+
+    /**
+     * APW-11 (App Launcher) — the installation switch of FR-54/FR-65, read by
+     * **both** the API guard and the public feature list, so the web UI and the
+     * API can never disagree about whether the launcher exists (APW11-G12,
+     * plan §7).
+     *
+     * ## Why exactly `'true'`, and not the platform's `truthy()` set
+     *
+     * T9's task text asks for the accessor on one line to accept the
+     * `'true' | '1' | 'yes'` set that `apps/api/src/api.controller.ts` uses for
+     * the other public flags, while the line above it specifies the guard as
+     * "404 unless `EVER_WORKS_APP_LAUNCHER_ENABLED === 'true'`". Those two
+     * cannot both hold, and this is the resolution — taken deliberately, and
+     * recorded here rather than left for the next reader to discover:
+     *
+     *   - The guard's contract is the explicit one, and it is what the
+     *     launcher's own controller spec pins today: `'1'`, `'yes'`, `'TRUE'`,
+     *     `''` and `'true '` are all **OFF** (`app-launcher.controller.spec.ts`,
+     *     "treats %p as OFF — only the exact string 'true' switches it on").
+     *   - The rationale offered for the wider set — "no installation that works
+     *     today stops working" — cannot apply to a variable this epic
+     *     introduces: nothing reads `EVER_WORKS_APP_LAUNCHER_ENABLED` outside
+     *     the launcher, and all three deploy manifests ship `'false'` (T31,
+     *     `apps/api/src/app-launcher/__tests__/launcher-deploy-switches.spec.ts`).
+     *   - A surface-wide feature gate fails **closed**: a stray `1` in an
+     *     environment file is far more likely to be a mistake than an
+     *     intentional launch, and this switch is what keeps an unfinished
+     *     feature invisible (404, never 403).
+     *
+     * If the wider set is ever wanted, it is this one function that changes —
+     * the guard, the controller and the public config all read it through here,
+     * which is the whole reason the accessor exists.
+     *
+     * An unset, empty or unrecognised value is OFF.
+     */
+    appLauncher: {
+        isEnabled(): boolean {
+            return process.env.EVER_WORKS_APP_LAUNCHER_ENABLED === 'true';
+        },
+    },
 };
 
 /** AW-05 — the operator env var that turns on each send ceiling platform-wide. */
