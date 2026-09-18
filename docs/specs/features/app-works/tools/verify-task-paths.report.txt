@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1406 · absent: 1261 · of the absent, another task says it creates them: 848
+present: 1419 · absent: 1248 · of the absent, another task says it creates them: 835
 
-## LANDED SURFACE — marked "new", already in the repository (136)
+## LANDED SURFACE — marked "new", already in the repository (142)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -74,6 +74,12 @@ present: 1406 · absent: 1261 · of the absent, another task says it creates the
 - APW-06-app-runtime T23 — `packages/agent/src/app-runtime/__tests__/app-public-smoke.service.spec.ts`
 - APW-06-app-runtime T24 — `packages/agent/src/app-runtime/app-deploy-request.service.ts`
 - APW-06-app-runtime T24 — `packages/agent/src/app-runtime/__tests__/app-deploy-request.service.spec.ts`
+- APW-06-app-runtime T25 — `packages/agent/src/app-runtime/app-deploy.orchestrator.ts`
+- APW-06-app-runtime T25 — `packages/agent/src/app-runtime/__tests__/app-deploy.orchestrator.spec.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/app-hosts.service.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/app-domains.service.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/__tests__/app-hosts.service.spec.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/__tests__/app-domains.service.spec.ts`
 - APW-06-app-runtime T28 — `packages/agent/src/events/index.ts`
 - APW-06-app-runtime T58 — `packages/agent/src/app-runtime/app-runtime-deletion.service.ts`
 - APW-06-app-runtime T58 — `packages/agent/src/app-runtime/__tests__/app-runtime-deletion.service.spec.ts`
@@ -157,7 +163,7 @@ present: 1406 · absent: 1261 · of the absent, another task says it creates the
 | APW-03-app-spec-and-catalog | 140 | 13 |
 | APW-04-app-provisioner | 124 | 0 |
 | APW-05-builds | 122 | 2 |
-| APW-06-app-runtime | 155 | 32 |
+| APW-06-app-runtime | 148 | 38 |
 | APW-07-app-env-and-dependencies | 67 | 21 |
 | APW-08-evolve-loop | 125 | 0 |
 | APW-09-upstream-pull-requests | 91 | 2 |
@@ -166,7 +172,7 @@ present: 1406 · absent: 1261 · of the absent, another task says it creates the
 | APW-12-ever-id | 123 | 1 |
 | APW-13-golden-paths | 111 | 0 |
 
-## ABSENT PATHS (1261) — grouped by epic
+## ABSENT PATHS (1248) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
@@ -175,10 +181,10 @@ in the repository would be noise. Pass `--full` to print every path to stdout in
 - APW-03-app-spec-and-catalog: 127
 - APW-08-evolve-loop: 125
 - APW-04-app-provisioner: 124
-- APW-06-app-runtime: 123
 - APW-12-ever-id: 122
 - APW-05-builds: 120
 - APW-13-golden-paths: 111
+- APW-06-app-runtime: 110
 - APW-09-upstream-pull-requests: 89
 - APW-01-app-work-kind: 68
 - APW-07-app-env-and-dependencies: 46
