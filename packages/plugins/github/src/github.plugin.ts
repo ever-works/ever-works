@@ -63,6 +63,10 @@ import { GITHUB_SCOPES } from '@ever-works/plugin';
 import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { GitOperations } from '@ever-works/plugin/git';
 import { GitHubApiService } from './github-api.service.js';
+// APW-13 T5: the non-production acceptance switch (CONTRACTS §7 row
+// `EVER_WORKS_E2E_FAKES`). Kept in its own module so `github-api.service.ts` can
+// import the same resolver without importing this plugin back (a cycle).
+import { resolveGitHubE2eFakeOrigin } from './e2e-fakes.js';
 import { GitHubActionsService } from './github-actions.service.js';
 import type { GitHubSettings, GitHubPublicKey } from './types.js';
 import { GITHUB_CONNECTION_SCOPE_PRESETS } from './github.connection-scopes.js';
@@ -166,10 +170,25 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 	}
 
 	getCloneUrl(owner: string, repo: string): string {
+		// APW-13 T5 (additive): honour the non-production acceptance switch. This
+		// method is the clone-URL factory `ensureGitOps` injects into
+		// `GitOperations`, which hands its result straight to isomorphic-git — so
+		// without this case a fork checkout, private copy or template fork would
+		// still clone real GitHub while every API call went to the fake.
+		const e2eFakeOrigin = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeOrigin) {
+			return `${e2eFakeOrigin}/${owner}/${repo}.git`;
+		}
 		return `https://github.com/${owner}/${repo}.git`;
 	}
 
 	getWebUrl(owner: string, repo: string): string {
+		// APW-13 T5 (additive): the same switch for the clickable URLs carried in
+		// Activity and PR payloads.
+		const e2eFakeOrigin = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeOrigin) {
+			return `${e2eFakeOrigin}/${owner}/${repo}`;
+		}
 		return `https://github.com/${owner}/${repo}`;
 	}
 
@@ -900,6 +919,23 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		// documented default instead of throwing so a bad value degrades safely.
 		// (Lexical only: DNS-rebinding of a hostname is not covered here.)
 		const apiBaseUrl = isSafeWebhookUrl(configuredApiBaseUrl) ? configuredApiBaseUrl : DEFAULT_API_BASE_URL;
+		// APW-13 T5 (additive): the non-production acceptance switch overrides the
+		// RESOLVED value only. The guard above has already judged the configured
+		// admin setting and its arguments are unchanged, so a loopback `apiBaseUrl`
+		// setting is still refused when the switch is off — and the switch is not a
+		// way around the guard, because it never feeds an unchecked admin value into
+		// `isSafeWebhookUrl`; it replaces what the guard produced. The environment is
+		// read at call time, so a lane (and a unit test) can flip it between calls.
+		// The early return keeps the literal below byte-identical to the pre-APW-13
+		// shape, which is what "otherwise exactly as today" means.
+		const e2eFakeApiBaseUrl = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeApiBaseUrl) {
+			return {
+				clientId: settings?.clientId as string | undefined,
+				clientSecret: settings?.clientSecret as string | undefined,
+				apiBaseUrl: e2eFakeApiBaseUrl
+			};
+		}
 		return {
 			clientId: settings?.clientId as string | undefined,
 			clientSecret: settings?.clientSecret as string | undefined,

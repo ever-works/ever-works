@@ -1,0 +1,27 @@
+{
+    "total_count": 2,
+    "workflows": [
+        {
+            "id": 900001,
+            "name": "ever-works-build",
+            "path": ".github/workflows/ever-works-build.yml",
+            "state": "active",
+            "created_at": "2026-09-18T09:12:04Z",
+            "updated_at": "2026-09-18T09:31:47Z",
+            "url": "https://api.github.com/repos/ever-works/templates/actions/workflows/900001",
+            "html_url": "https://github.com/ever-works/templates/blob/main/.github/workflows/ever-works-build.yml",
+            "badge_url": "https://github.com/ever-works/templates/workflows/ever-works-build/badge.svg"
+        },
+        {
+            "id": 900002,
+            "name": "upstream-ci",
+            "path": ".github/workflows/upstream-ci.yml",
+            "state": "active",
+            "created_at": "2026-09-18T09:12:04Z",
+            "updated_at": "2026-09-18T09:31:47Z",
+            "url": "https://api.github.com/repos/ever-works/templates/actions/workflows/900002",
+            "html_url": "https://github.com/ever-works/templates/blob/main/.github/workflows/upstream-ci.yml",
+            "badge_url": "https://github.com/ever-works/templates/workflows/upstream-ci/badge.svg"
+        }
+    ]
+}

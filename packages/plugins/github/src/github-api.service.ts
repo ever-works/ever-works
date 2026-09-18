@@ -64,6 +64,11 @@ import {
 import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
 import { toGitProviderError } from './github-errors.js';
+// APW-13 T5: the non-production acceptance switch (CONTRACTS §7 row
+// `EVER_WORKS_E2E_FAKES`). Imported from the leaf module rather than from
+// `github.plugin.ts`, which imports this service — importing the plugin here
+// would close a cycle.
+import { resolveGitHubE2eFakeOrigin } from './e2e-fakes.js';
 
 /**
  * PR insights (kanban run cockpit M5/M6) — GitHub's check vocabulary
@@ -916,6 +921,23 @@ export class GitHubApiService {
 				sort: 'updated'
 			});
 			data = response.data;
+		}
+
+		// APW-13 T5 (additive): the non-production acceptance switch. The mapping
+		// below builds exactly one clone URL itself — the `full_name` fallback — so
+		// that is the one place a fake lane has to redirect; a payload that reports
+		// its own `clone_url` keeps GitHub's value, unchanged. The condition mirrors
+		// `??` exactly (null or undefined, never an empty string), so the fallback
+		// fires on the same payloads it fires on today. The rewrite is a copy, never
+		// in place: the response object belongs to the provider and to every other
+		// reader of it, and a fake URL must not leak into either.
+		const e2eFakeOrigin = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeOrigin) {
+			data = data.map((repo) =>
+				repo.clone_url === undefined || repo.clone_url === null
+					? { ...repo, clone_url: `${e2eFakeOrigin}/${repo.full_name}.git` }
+					: repo
+			);
 		}
 
 		return data.map((repo) => ({
@@ -2632,6 +2654,16 @@ export class GitHubApiService {
 		rejectSegment(repo, false);
 		rejectSegment(branch, false);
 		rejectSegment(path, true);
+
+		// APW-13 T5 (additive): the non-production acceptance switch. Every
+		// validation above has already run, unchanged and before anything is built —
+		// the switch changes the host only, never what is accepted as a segment. The
+		// fake serves raw content under the same owner/repo/branch/path shape, so a
+		// traversal is refused here exactly as it is on the real host.
+		const e2eFakeOrigin = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeOrigin) {
+			return `${e2eFakeOrigin}/${owner}/${repo}/${branch}/${path}`;
+		}
 
 		return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
 	}

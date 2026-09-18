@@ -1,0 +1,19 @@
+{
+    "sha": "c3d4e5f60718293a4b5c6d7e8f90123456789012",
+    "url": "https://api.github.com/repos/ever-works/templates/git/commits/c3d4e5f60718293a4b5c6d7e8f90123456789012",
+    "html_url": "https://github.com/ever-works/templates/commit/c3d4e5f60718293a4b5c6d7e8f90123456789012",
+    "author": {
+        "name": "Ever Works",
+        "date": "2026-09-18T09:12:04Z"
+    },
+    "committer": {
+        "name": "Ever Works",
+        "date": "2026-09-18T09:12:04Z"
+    },
+    "message": "Add the App spec",
+    "tree": {
+        "sha": "b2c3d4e5f60718293a4b5c6d7e8f901234567890",
+        "url": "https://api.github.com/repos/ever-works/templates/git/trees/b2c3d4e5f60718293a4b5c6d7e8f901234567890"
+    },
+    "parents": []
+}

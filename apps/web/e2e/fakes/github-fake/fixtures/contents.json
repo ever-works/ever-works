@@ -1,0 +1,18 @@
+{
+    "type": "file",
+    "encoding": "base64",
+    "size": 21,
+    "name": "works.yml",
+    "path": ".works/works.yml",
+    "content": "dmVyc2lvbjogMQpraW5kOiBhcHAK",
+    "sha": "d4e5f60718293a4b5c6d7e8f9012345678901234",
+    "url": "https://api.github.com/repos/ever-works/templates/contents/.works/works.yml",
+    "git_url": "https://api.github.com/repos/ever-works/templates/git/blobs/d4e5f60718293a4b5c6d7e8f9012345678901234",
+    "html_url": "https://github.com/ever-works/templates/blob/main/.works/works.yml",
+    "download_url": "https://raw.githubusercontent.com/ever-works/templates/main/.works/works.yml",
+    "_links": {
+        "self": "https://api.github.com/repos/ever-works/templates/contents/.works/works.yml",
+        "git": "https://api.github.com/repos/ever-works/templates/git/blobs/d4e5f60718293a4b5c6d7e8f9012345678901234",
+        "html": "https://github.com/ever-works/templates/blob/main/.works/works.yml"
+    }
+}

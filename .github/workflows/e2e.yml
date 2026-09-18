@@ -181,6 +181,61 @@ jobs:
         run: |
           set -e
 
+          echo "::group::Starting the fake GitHub on :3900 (APW-13 P0, plan §9.1)"
+          # The PR lane's Git provider is the APW-13 fake
+          # (`apps/web/e2e/fakes/github-fake/server.mjs`), started HERE, before
+          # the API, because the API's very first GitHub call must already reach
+          # it. `EVER_WORKS_E2E_FAKES=1` + `APW_E2E_GITHUB_FAKE_URL` (env block
+          # below) point the GitHub plugin at it; both are honoured only when
+          # `NODE_ENV !== 'production'`, and this API runs without NODE_ENV set
+          # (the inline `NODE_ENV=production` on the web start below applies to
+          # `next start` only), so the switch is live for the API and refused for
+          # the prod-built web — which is what keeps it non-production by
+          # construction rather than by convention.
+          #
+          # `git http-backend` (the fake's smart-HTTP backend) needs `git` on
+          # PATH; the runner has it, and the fake starts in well under a second
+          # (asserted in `e2e/fakes/github-fake/__tests__/server.unit.spec.ts`).
+          nohup node e2e/fakes/github-fake/server.mjs > /tmp/github-fake.log 2>&1 &
+          FAKE_PID=$!
+          disown $FAKE_PID
+          echo "fake GitHub pid=$FAKE_PID"
+          timeout 30 bash -c 'until curl -sSf http://127.0.0.1:3900/_control/state > /dev/null; do sleep 1; done' \
+            || { echo "fake GitHub never came up — last 80 lines:"; tail -n 80 /tmp/github-fake.log || true; exit 1; }
+          echo "fake GitHub ready."
+          echo "::endgroup::"
+
+          echo "::group::Starting the App runtime worker (APW-13 FR-55, plan §9.1)"
+          # `EVER_WORKS_APPS_LOCAL_WORKER=true` is APW-06's hook: outside
+          # production it switches App cluster dispatch to a local worker
+          # process running the same exported task functions, and production
+          # refuses to boot with it set — so this step cannot become a
+          # production path. Without the worker, fork readiness reports
+          # `dispatch_unavailable` and every App cluster call is refused, which
+          # is why ACC-E2E-02's PR twin, ACC-NEG-09 and T30/T31 could never pass.
+          #
+          # GATED on the script existing, not omitted. `app-runtime:local-worker`
+          # belongs to APW-06 (`EVER_WORKS_APPS_LOCAL_WORKER` is that epic's row
+          # in CONTRACTS §7) and has not landed in `packages/tasks/package.json`
+          # yet, so an ungated step would fail every shard today and break the
+          # existing workflow — which T19's "existing workflows keep passing"
+          # forbids. The moment APW-06 lands the script this starts working with
+          # no further workflow edit, and the annotation below says so in the
+          # run log rather than failing silently.
+          if node -e "process.exit(require('../../packages/tasks/package.json').scripts['app-runtime:local-worker'] ? 0 : 1)"; then
+            EVER_WORKS_APPS_LOCAL_WORKER=true nohup pnpm --filter @ever-works/trigger-tasks app-runtime:local-worker \
+              > /tmp/local-worker.log 2>&1 &
+            WORKER_PID=$!
+            disown $WORKER_PID
+            echo "App runtime worker pid=$WORKER_PID"
+            timeout 60 bash -c 'until curl -sSf http://127.0.0.1:3101/health > /dev/null; do sleep 2; done' \
+              || { echo "App runtime worker never came up — last 80 lines:"; tail -n 80 /tmp/local-worker.log || true; exit 1; }
+            echo "App runtime worker ready."
+          else
+            echo "::warning title=App runtime worker absent::packages/tasks has no 'app-runtime:local-worker' script yet (APW-06 owns it, CONTRACTS §7 EVER_WORKS_APPS_LOCAL_WORKER). The worker step is skipped, so fork readiness will report dispatch_unavailable and the App cluster specs cannot pass until APW-06 lands it."
+          fi
+          echo "::endgroup::"
+
           echo "::group::Starting API on :3100 (prebuilt dist â€” no watch/typecheck)"
           # Run the API from the prebuilt `dist/` (the "Build all packages"
           # step above already compiled apps/api) via `start:prod`
@@ -244,12 +299,22 @@ jobs:
           # Received: 401`) and not why the API was rejecting. The dev-server
           # stdout is the authoritative source for NestJS exceptions and
           # Better Auth's request-flow logging.
+          # The fake GitHub and the App runtime worker join it (APW-13 T13): a
+          # lane that fails because the fake never answered, or because the
+          # worker never came up, is otherwise indistinguishable from a product
+          # failure.
           trap '{
             echo "::group::API log (last 200 lines)"
             tail -n 200 /tmp/api.log || true
             echo "::endgroup::"
             echo "::group::Web log (last 200 lines)"
             tail -n 200 /tmp/web.log || true
+            echo "::endgroup::"
+            echo "::group::fake GitHub log (last 200 lines)"
+            tail -n 200 /tmp/github-fake.log 2>/dev/null || true
+            echo "::endgroup::"
+            echo "::group::App runtime worker log (last 200 lines)"
+            tail -n 200 /tmp/local-worker.log 2>/dev/null || true
             echo "::endgroup::"
           }' EXIT
           # --shard=N/M splits the test suite across M machines, deterministic.
@@ -364,6 +429,33 @@ jobs:
           # variable unset and proves every launcher route answers 404, which it
           # could not do if seeding were gated on the same switch.
           E2E_APP_LAUNCHER_SEED: 'true'
+          # APW-13 (Golden paths) — the PR lane's Git provider is the fake
+          # GitHub started above (`apps/web/e2e/fakes/github-fake/server.mjs`).
+          # Plan §9.1/T13: both variables reach the API and Playwright from
+          # this one step env, which is what "the API and Playwright
+          # environments" means here — they are the same shell.
+          #
+          # `NODE_ENV` is deliberately NOT set in this block: the GitHub
+          # plugin's switch (packages/plugins/github/src/e2e-fakes.ts) and
+          # `EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS` are both honoured only
+          # outside production, so setting NODE_ENV=production here would
+          # silently disarm every one of them. The web process gets its own
+          # inline `NODE_ENV=production` on the start line, which is why the
+          # `works-app` chip needs the explicit override below rather than the
+          # flag service.
+          EVER_WORKS_E2E_FAKES: '1'
+          APW_E2E_GITHUB_FAKE_URL: http://127.0.0.1:3900
+          # Resolution R-6: the API-side twin of the `works-app` chip flag.
+          # The web reads the SAME variable at request time
+          # (apps/web/src/lib/feature-flags/work-kinds.ts, `readAppWorksInstanceSetting`)
+          # because the prod-built web cannot consult PostHog for a fail-closed
+          # kind — so one value turns the chip on for the API and the web alike.
+          EVER_WORKS_APP_WORKS_ENABLED: 'true'
+          # APW-13 FR-65 / ACC-NEG-09: the shortened readiness window the lane
+          # needs so a "fork never becomes ready" case fails in seconds rather
+          # than in the default minutes. Honoured only outside production
+          # (CONTRACTS §7, clamped 5 000–900 000).
+          EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS: '15000'
           # E2E-only escape hatch (hard-gated off in production â€” ignored
           # unless NODE_ENV !== 'production'). Without a real billing
           # integration wired in, the only path to a PAID plan is the
