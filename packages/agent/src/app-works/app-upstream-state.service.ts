@@ -22,6 +22,7 @@ import {
     type AppUpstreamWarningCode,
 } from '@ever-works/contracts';
 import { GitProviderRequestError } from '@ever-works/plugin';
+import type { GitPullRequestStatus } from '@ever-works/plugin';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { TaskRepository } from '../database/repositories/task.repository';
@@ -116,6 +117,29 @@ export const APP_WORK_GIT_PROVIDER_ID = 'github';
 
 /** The lock key a sync run holds for an App Work (`plan.md:720`). */
 export const UPSTREAM_SYNC_LOCK_KEY_PREFIX = 'app-upstream-sync:';
+
+/**
+ * How long a setup pull request check is trusted before the sweeper may claim the row again
+ * (`tasks.md:562`: `claimSetupPullRequestChecks(now, 600_000, 50)`, plan §6.6's fourth leg).
+ *
+ * Ten minutes is the plan's number and it is a *provider* budget rather than a UI one: the
+ * setup pull request is opened by the platform and merged by the member, so polling it faster
+ * buys nothing and spends the installation's rate limit against the two legs that matter more
+ * (the fork readiness probes and the sync dispatch).
+ */
+export const APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS = 600_000;
+
+/**
+ * How stale `setupCheckedAt` may be before **opening the Upstream card** is allowed to trigger
+ * another check (`tasks.md:564-565`, plan §4.1's on-view half).
+ *
+ * Sixty seconds, not the ten minutes above, because the two doors answer different questions:
+ * the sweeper is asking "has anything changed in the last ten minutes", while the member who
+ * just merged the setup pull request and reloaded the page is asking "is it ready **now**".
+ * The row is the gate for both, so a burst of reloads still produces at most one read a minute
+ * (ACC-02-22's "at most once per 60 s").
+ */
+export const APP_SETUP_PULL_REQUEST_ON_VIEW_MS = 60_000;
 
 /** The lock key of one App Work's sync — what `requestSync` asks about. */
 export function upstreamSyncLockKey(workId: string): string {
@@ -409,6 +433,26 @@ export interface AppUpstreamSyncDispatcher {
 
 /** DI token for {@link AppUpstreamSyncDispatcher} — owned by APW-02 T31. */
 export const APP_UPSTREAM_SYNC_DISPATCHER = Symbol('APP_UPSTREAM_SYNC_DISPATCHER');
+
+/**
+ * What one setup-pull-request check did (FR-24a, APW-02 T43).
+ *
+ * `status` is the *outcome of the transition*, not the provider's raw state, because that is
+ * what the caller (a tick, or the on-view dispatch) can act on: `not_waiting` means there was
+ * nothing to follow up, `open` means the check ran and the pull request is still open,
+ * `merged` and `closed` are the two transitions, and `unknown` means the provider would not
+ * answer — which is deliberately **not** a transition.
+ *
+ * `checked` distinguishes "we read the provider" from "we had nothing to read", so an
+ * unreadable row is never mistaken for a checked one.
+ */
+export interface AppSetupPullRequestCheck {
+    readonly found: boolean;
+    readonly checked: boolean;
+    readonly status: 'open' | 'merged' | 'closed' | 'unknown' | 'not_waiting';
+    /** The readiness run id, when this check dispatched one (`merged` only). */
+    readonly runId?: string | null;
+}
 
 @Injectable()
 export class AppUpstreamStateService {
@@ -722,6 +766,124 @@ export class AppUpstreamStateService {
         });
 
         return { found: true, state: nextState, emitted: true };
+    }
+
+    /**
+     * **FR-24a — the setup pull request follow-through** (`plan.md:707`, §6.6's fourth leg,
+     * APW-02 T43).
+     *
+     * A `waiting_for_setup_pr` App Work rests on a pull request the platform opened in the
+     * member's own repository (the setup PR that makes the fork's default branch publishable).
+     * Nothing was watching it: this method is the watcher, and it is called from two doors —
+     * the dispatcher's tick (`claimSetupPullRequestChecks`, at most one check per row per
+     * {@link APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS}) and the on-view read
+     * (`app-upstream.controller.ts`, when the card is opened and the last check is older than
+     * {@link APP_SETUP_PULL_REQUEST_ON_VIEW_MS}).
+     *
+     * **Three transitions, and a fourth answer that is not one:**
+     *
+     *   - `merged` ⇒ queue `app-fork-readiness` with `reason: 'setup_merged'` (attempt 1) and
+     *     put the row back to `preparing` first, exactly as {@link retryReadiness} does, so the
+     *     work the dispatch represents is visible in the row before the queue is asked. The
+     *     readiness run then **skips copy, polling and hygiene** and calls the setup handler
+     *     once (`app-fork-readiness.service.ts`), because the source is on the default branch
+     *     already.
+     *   - `closed` **and not merged** ⇒ `failed` / `setup_pull_request_closed`. The member
+     *     closed the setup PR without merging, so there is nothing to wait for and saying so is
+     *     the honest resting state — the card then offers **Try again** like any other failure.
+     *   - still `open` (or `draft`) ⇒ **no state change at all**. The check's only trace is
+     *     `setupCheckedAt`, which is what keeps the on-view door from checking on every poll.
+     *   - **the provider would not answer** (`null`, or a thrown read: no credential, the scope
+     *     withdrawn, the capability unsupported) ⇒ `unknown`, and again no state change. This is
+     *     the deliberate one: a credential problem is transient and belongs to the credential
+     *     path (FR-43's pause), and failing the Work here would turn "we could not read GitHub
+     *     this minute" into a lost setup that the member never asked for.
+     *
+     * **The read uses the member's own credential** — `work.userId`, and `workId` is
+     * deliberately **not** passed in the facade options, so nothing here can reach for a
+     * platform token or an installation token. The setup pull request is in the member's
+     * repository and is theirs to read; the background job's credential question is FR-43's and
+     * is answered elsewhere.
+     */
+    async checkSetupPullRequest(workId: string): Promise<AppSetupPullRequestCheck> {
+        const state = await this.states.findByWorkId(workId);
+        if (!state) {
+            return { found: false, checked: false, status: 'not_waiting' };
+        }
+
+        const number = state.setupPullRequestNumber;
+        const waiting =
+            state.readinessState === 'waiting_for_setup_pr' &&
+            typeof number === 'number' &&
+            Boolean(state.dataOwner) &&
+            Boolean(state.dataRepo);
+
+        if (!waiting) {
+            // Nothing to follow up: not waiting on a setup pull request, no number recorded, or
+            // no coordinates to read. Deliberately **no** `setupCheckedAt` stamp either — a check
+            // that did not happen must not make the row look freshly checked and thereby suppress
+            // the next real one.
+            return { found: true, checked: false, status: 'not_waiting' };
+        }
+
+        // `loadWork` rather than a repository call of my own: it is this service's one accessor
+        // for the Work row (it fails closed and logs), so a second way to read the same row here
+        // would be a second answer to "which Work is this" — the same reasoning the class applies
+        // to its other reads.
+        const work = await this.loadWork(workId);
+        if (!this.git || !work) {
+            // No facade bound, or the Work row is gone: answer `unknown` rather than pretending
+            // the pull request is still open.
+            return { found: true, checked: false, status: 'unknown' };
+        }
+
+        let status: GitPullRequestStatus | null = null;
+        try {
+            status = await this.git.getPullRequestStatus(state.dataOwner, state.dataRepo, number, {
+                userId: work.userId,
+                providerId: APP_WORK_GIT_PROVIDER_ID,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `App upstream: the setup pull request check for work ${workId} could not read the provider (${errorText(error)}); it stays waiting.`,
+            );
+            await this.states.update(workId, { setupCheckedAt: new Date() });
+            return { found: true, checked: true, status: 'unknown' };
+        }
+
+        await this.states.update(workId, { setupCheckedAt: new Date() });
+
+        if (!status) {
+            // The provider answered "no such pull request" (deleted, transferred, or a token that
+            // cannot see it). Not a merge, not a close — see the docstring's fourth answer.
+            return { found: true, checked: true, status: 'unknown' };
+        }
+
+        if (status.merged || status.state === 'merged') {
+            const now = new Date();
+            await this.states.update(workId, {
+                readinessState: 'preparing',
+                readinessReason: null,
+                readinessStartedAt: now,
+                readinessHeartbeatAt: now,
+                readinessDispatches: 0,
+            });
+
+            const runId = await this.dispatchReadiness(workId, {
+                workId,
+                attempt: 1,
+                reason: 'setup_merged',
+            });
+
+            return { found: true, checked: true, status: 'merged', runId };
+        }
+
+        if (status.state === 'closed') {
+            await this.fail(workId, 'setup_pull_request_closed');
+            return { found: true, checked: true, status: 'closed' };
+        }
+
+        return { found: true, checked: true, status: 'open' };
     }
 
     /**

@@ -10,9 +10,12 @@ import type { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import {
     AppUpstreamStateService,
     APP_FORK_READINESS_DISPATCHER,
+    APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS,
+    APP_SETUP_PULL_REQUEST_ON_VIEW_MS,
     APP_UPSTREAM_SYNC_DISPATCHER,
     type AppForkReadinessDispatcher,
     type AppForkReadinessJobPayload,
+    type AppSetupPullRequestCheck,
     type AppUpstreamSyncDispatcher,
     type AppUpstreamSyncJobPayload,
 } from './app-upstream-state.service';
@@ -66,10 +69,10 @@ import { computeNextUpstreamSync } from './upstream-schedule';
  * ## What is deliberately *not* here
  *
  *   - **The setup pull request check** (FR-24a, §6.6's fourth leg, and the on-view half of
- *     §4.1). `AppUpstreamStateService.checkSetupPullRequest(workId)` does not exist in this
- *     tree: T43 adds it and wires `claimSetupPullRequestChecks` here
- *     (`tasks.md:562`, `tasks.md:721`). The counter is returned as `0` so that the shape
- *     §6.6 fixes is already the final one and T43 adds a value, not a field.
+ *     §4.1) **landed with T43**: `AppUpstreamStateService.checkSetupPullRequest(workId)` exists
+ *     and the leg below (plus the API's on-view dispatch) calls it. What is still *not* here is
+ *     re-deriving the claim predicate: `claimSetupPullRequestChecks` is the repository's, and
+ *     the batch ceiling is the shared one, exactly as for the other three legs.
  *   - **Reading the App spec.** The row's `syncSchedule` column *is* the effective cron
  *     ("the App spec's value, else the platform default — FR-32", `work-upstream-state.entity.ts:199-201`),
  *     and the sync run re-reads the spec fresh on every run (FR-64). A second spec read here
@@ -97,7 +100,7 @@ export interface AppUpstreamDispatchCounters {
     timedOut: number;
     /** `unavailable` upstreams whose 24-hour re-check was queued (FR-41). */
     rechecked: number;
-    /** Setup pull request checks — **always `0` until T43**; see the class docstring. */
+    /** Setup pull request checks (T43) — a check whose provider read refused counts in `failed`. */
     setupChecked: number;
     /** Dispatch attempts that produced no run id, plus legs whose own read threw. */
     failed: number;
@@ -177,12 +180,16 @@ export class AppUpstreamSyncDispatcherService {
         await this.guard(counters, 'the unavailable re-check', () =>
             this.recheckUnavailable(now, counters),
         );
+        await this.guard(counters, 'the setup pull request check', () =>
+            this.checkSetupPullRequests(now, counters),
+        );
 
         this.pruneDivergenceWindow(now);
         this.logger.debug(
             `App upstream dispatcher: ${counters.dueCount} due, ${counters.dispatched} dispatched, ` +
                 `${counters.redispatchedReadiness} readiness re-dispatched, ${counters.timedOut} timed out, ` +
-                `${counters.rechecked} re-checked, ${counters.skipped} skipped, ${counters.failed} failed.`,
+                `${counters.rechecked} re-checked, ${counters.setupChecked} setup pull requests checked, ` +
+                `${counters.skipped} skipped, ${counters.failed} failed.`,
         );
 
         return counters;
@@ -306,8 +313,50 @@ export class AppUpstreamSyncDispatcherService {
         }
     }
 
-    // ── §4.1 — the on-view divergence compare ────────────────────────────────
+    /**
+     * §6.6's **fourth leg** (FR-24a, plan §6.2, APW-02 T43): follow up the setup pull requests
+     * the platform opened in the members' repositories.
+     *
+     * A `waiting_for_setup_pr` row rests on a pull request nobody was watching, because
+     * `AppUpstreamStateService.checkSetupPullRequest(workId)` did not exist when the other three
+     * legs landed. This leg is the sweeper half of it: `claimSetupPullRequestChecks` hands over
+     * the rows whose `setupCheckedAt` is missing or older than
+     * {@link APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS} **and stamps them in the same statement**
+     * (the same conditional-claim shape `claimDue` uses, so two dispatchers cannot check one row
+     * twice), and each claimed row is then read once through the state service.
+     *
+     * **The counters, and why an unreadable provider is `failed` rather than `setupChecked`:**
+     * the class docstring fixes `failed` as "a leg did not do what it was asked". A check whose
+     * provider read refused (no credential, scope withdrawn, capability unsupported) did **not**
+     * answer the question this leg exists to answer, so counting it as a successful check would
+     * hide exactly the condition an operator needs to see. The state service already leaves the
+     * row untouched in that case, so the Work is never harmed by the distinction — only the
+     * counter is honest about it.
+     *
+     * A `link` row is never claimed by the query (it has no upstream to have a setup pull request
+     * on), so unlike the other legs there is no `link` skip to write here.
+     */
+    private async checkSetupPullRequests(
+        now: number,
+        counters: AppUpstreamDispatchCounters,
+    ): Promise<void> {
+        const due = await this.rows.claimSetupPullRequestChecks(
+            now,
+            APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS,
+            APP_UPSTREAM_SYNC_DISPATCH_BATCH,
+        );
 
+        for (const row of due) {
+            const check = await this.states.checkSetupPullRequest(row.workId);
+            if (check.status === 'unknown') {
+                counters.failed++;
+                continue;
+            }
+            counters.setupChecked++;
+        }
+    }
+
+    // ── §4.1 — the on-view divergence compare ────────────────────────────────
     /**
      * `GET /api/works/:id/upstream`'s background compare (FR-46, ACC-02-13): queue
      * `trigger: 'divergence'` when the stored reading is **older than 600 000 ms**, at most
@@ -368,6 +417,62 @@ export class AppUpstreamSyncDispatcherService {
         }
 
         return runId;
+    }
+
+    // ── §4.1 — the on-view setup pull request check (T43) ────────────────────
+
+    /**
+     * `GET /api/works/:id/upstream`'s background setup pull request check (FR-24a, plan §4.1):
+     * read the pull request when the row is **waiting** on one and the recorded check is older
+     * than {@link APP_SETUP_PULL_REQUEST_ON_VIEW_MS} (60 000 ms).
+     *
+     * This is the second door onto the same service call the sweeper's fourth leg makes, and it
+     * exists for the one moment the sweeper is too slow for: the member merges the setup pull
+     * request, reloads the card, and expects to see it ready. Ten minutes of "nothing changed"
+     * is invisible on a cron log and infuriating in a browser tab.
+     *
+     * **The row's `setupCheckedAt` is the whole rate limit** — there is no in-process window to
+     * add here, unlike {@link requestDivergenceCompare}: the check stamps `setupCheckedAt`
+     * itself, in every branch that actually read the provider, so a burst of reloads produces at
+     * most one provider read a minute (ACC-02-22) without a second, weaker gate that could drift
+     * from the first.
+     *
+     * Returns the check's outcome, or `null` when there was nothing to do (not waiting, no
+     * number, `link`, no row, checked recently). **Never throws** for the caller's sake: this
+     * runs behind a read, and a card that rendered must not become an error because a background
+     * check could not be made.
+     */
+    async requestSetupPullRequestCheck(
+        workId: string,
+        now: number = Date.now(),
+    ): Promise<AppSetupPullRequestCheck | null> {
+        const id = typeof workId === 'string' ? workId.trim() : '';
+        if (!id) {
+            return null;
+        }
+
+        const row = await this.readRow(id);
+        if (!row || row.relation === 'link') {
+            return null;
+        }
+
+        if (
+            row.readinessState !== 'waiting_for_setup_pr' ||
+            typeof row.setupPullRequestNumber !== 'number'
+        ) {
+            return null;
+        }
+
+        const checkedAt = row.setupCheckedAt ? new Date(row.setupCheckedAt).getTime() : null;
+        if (
+            checkedAt !== null &&
+            Number.isFinite(checkedAt) &&
+            now - checkedAt <= APP_SETUP_PULL_REQUEST_ON_VIEW_MS
+        ) {
+            return null;
+        }
+
+        return this.states.checkSetupPullRequest(id);
     }
 
     // ── the two ports, with the fail-closed answer ───────────────────────────

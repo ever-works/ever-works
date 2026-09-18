@@ -9,6 +9,10 @@ import {
     APP_UPSTREAM_DIVERGENCE_WINDOW_MS,
     type AppUpstreamDispatchCounters,
 } from '../app-upstream-sync-dispatcher.service';
+import {
+    APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS,
+    APP_SETUP_PULL_REQUEST_ON_VIEW_MS,
+} from '../app-upstream-state.service';
 import { computeNextUpstreamSync } from '../upstream-schedule';
 
 /**
@@ -58,6 +62,9 @@ function makeRow(overrides: Record<string, unknown> = {}): Record<string, unknow
         divergenceComputedAt: null,
         upstreamStatus: 'available',
         upstreamCheckedAt: null,
+        // T43's three columns — the on-view door reads exactly these.
+        setupPullRequestNumber: null,
+        setupCheckedAt: null,
         ...overrides,
     };
 }
@@ -68,10 +75,12 @@ interface Harness {
         claimDue: jest.Mock;
         findStalePreparing: jest.Mock;
         findUnavailableDueForRecheck: jest.Mock;
+        /** T43's claim — the fourth leg reads it, so every harness models it. */
+        claimSetupPullRequestChecks: jest.Mock;
         update: jest.Mock;
         findByWorkId: jest.Mock;
     };
-    states: { timeout: jest.Mock };
+    states: { timeout: jest.Mock; checkSetupPullRequest: jest.Mock };
     sync: { dispatch: jest.Mock };
     readiness: { dispatch: jest.Mock };
     /** Every repository write and every dispatch, in the order they happened. */
@@ -83,9 +92,13 @@ function build(
         due?: Record<string, unknown>[];
         stale?: Record<string, unknown>[];
         unavailable?: Record<string, unknown>[];
+        /** Rows the setup-pull-request claim hands over (T43's fourth leg). */
+        setupChecks?: Record<string, unknown>[];
         row?: Record<string, unknown> | null;
         bindSync?: boolean;
         bindReadiness?: boolean;
+        /** Overrides the outcome `checkSetupPullRequest` answers with. */
+        setupCheckResult?: Record<string, unknown>;
     } = {},
 ): Harness {
     const order: string[] = [];
@@ -94,6 +107,12 @@ function build(
         claimDue: jest.fn().mockResolvedValue(options.due ?? []),
         findStalePreparing: jest.fn().mockResolvedValue(options.stale ?? []),
         findUnavailableDueForRecheck: jest.fn().mockResolvedValue(options.unavailable ?? []),
+        claimSetupPullRequestChecks: jest.fn(
+            async (nowMs: number, minIntervalMs: number, limit: number) => {
+                order.push(`claimSetupPullRequestChecks:${minIntervalMs}:${limit}`);
+                return options.setupChecks ?? [];
+            },
+        ),
         update: jest.fn(async (workId: string, patch: Record<string, unknown>) => {
             order.push(`update:${workId}:${Object.keys(patch).sort().join(',')}`);
             return true;
@@ -103,6 +122,10 @@ function build(
 
     const states = {
         timeout: jest.fn().mockResolvedValue({ found: true, state: 'timed_out', emitted: true }),
+        checkSetupPullRequest: jest.fn(async (workId: string): Promise<Record<string, unknown>> => {
+            order.push(`checkSetupPullRequest:${workId}`);
+            return options.setupCheckResult ?? { found: true, checked: true, status: 'open' };
+        }),
     };
 
     const sync = {
@@ -162,10 +185,13 @@ describe('AppUpstreamSyncDispatcherService', () => {
             const slot = DEFAULT_SLOT(WORK_ID);
             expect(h.rows.update).toHaveBeenCalledWith(WORK_ID, { nextSyncAt: slot });
             // The order is the claim: `stamp-before-dispatch` is what stops a Work whose
-            // every run dies from being re-claimed on the very next tick.
+            // every run dies from being re-claimed on the very next tick. The third entry is
+            // T43's fourth leg, which claims after the other three — a tick's writes are one
+            // sequence, so the assertion stays exact rather than filtered.
             expect(h.order).toEqual([
                 `update:${WORK_ID}:nextSyncAt`,
                 `dispatch:${WORK_ID}:schedule`,
+                `claimSetupPullRequestChecks:${APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS}:${APP_UPSTREAM_SYNC_DISPATCH_BATCH}`,
             ]);
             // …and the stamped slot is a real future instant, not the +10 min lease.
             expect(slot.getTime()).toBeGreaterThan(NOW);
@@ -285,6 +311,7 @@ describe('AppUpstreamSyncDispatcherService', () => {
             expect(h.order).toEqual([
                 `update:${WORK_ID}:readinessDispatches,readinessHeartbeatAt`,
                 `readiness:${WORK_ID}:1`,
+                `claimSetupPullRequestChecks:${APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS}:${APP_UPSTREAM_SYNC_DISPATCH_BATCH}`,
             ]);
             expect(counters.redispatchedReadiness).toBe(1);
             expect(counters.timedOut).toBe(0);
@@ -521,12 +548,17 @@ describe('AppUpstreamSyncDispatcherService', () => {
             expect(counters.failed).toBe(1);
         });
 
-        it('reports the setup pull request counter as 0 — that leg is T43’s', async () => {
+        it('reports the setup pull request counter as 0 when nothing is waiting — that leg is T43’s', async () => {
             const h = build();
 
             const counters: AppUpstreamDispatchCounters = await h.service.dispatchDue(NOW);
 
             expect(counters.setupChecked).toBe(0);
+            expect(h.rows.claimSetupPullRequestChecks).toHaveBeenCalledWith(
+                NOW,
+                APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS,
+                APP_UPSTREAM_SYNC_DISPATCH_BATCH,
+            );
             expect(Object.keys(counters).sort()).toEqual(
                 [
                     'dispatched',
@@ -539,6 +571,130 @@ describe('AppUpstreamSyncDispatcherService', () => {
                     'timedOut',
                 ].sort(),
             );
+        });
+    });
+
+    /**
+     * §6.6's fourth leg (FR-24a, APW-02 T43) — the half that did not exist when the other three
+     * landed, and therefore the half nothing was testing.
+     */
+    describe('the setup pull request check — §6.6 leg 4 (FR-24a, ACC-02-22)', () => {
+        it('claims with the plan’s interval and batch, and reads every claimed row once', async () => {
+            const waiting = [makeRow({ workId: 'work-a' }), makeRow({ workId: 'work-b' })];
+            const h = build({ setupChecks: waiting });
+
+            const counters = await h.service.dispatchDue(NOW);
+
+            // The interval is the plan's 600 000 ms (`tasks.md:562`) and the batch is the same
+            // ceiling the other three legs use — one shared number, not a fourth opinion.
+            expect(h.rows.claimSetupPullRequestChecks).toHaveBeenCalledTimes(1);
+            expect(h.rows.claimSetupPullRequestChecks).toHaveBeenCalledWith(
+                NOW,
+                APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS,
+                APP_UPSTREAM_SYNC_DISPATCH_BATCH,
+            );
+            expect(APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS).toBe(600_000);
+
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledTimes(2);
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledWith('work-a');
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledWith('work-b');
+            expect(counters.setupChecked).toBe(2);
+            expect(counters.failed).toBe(0);
+        });
+
+        it('counts an unreadable provider as failed, not as a check that answered', async () => {
+            // The distinction the counter exists for: "we asked and could not read" is the
+            // condition an operator needs to see, and it must not be laundered into a success.
+            const h = build({
+                setupChecks: [makeRow({ workId: 'work-unreadable' })],
+                setupCheckResult: { found: true, checked: true, status: 'unknown' },
+            });
+
+            const counters = await h.service.dispatchDue(NOW);
+
+            expect(counters.setupChecked).toBe(0);
+            expect(counters.failed).toBe(1);
+        });
+
+        it('still runs when an earlier leg threw — a broken sweep must not silence the check', async () => {
+            const h = build({ setupChecks: [makeRow({ workId: 'work-c' })] });
+            h.rows.findStalePreparing.mockRejectedValueOnce(new Error('database is down'));
+
+            const counters = await h.service.dispatchDue(NOW);
+
+            expect(counters.failed).toBe(1); // the sweep leg
+            expect(counters.setupChecked).toBe(1); // and the check still happened
+        });
+    });
+
+    /**
+     * §4.1's on-view half of the same check (ACC-02-22): the member merges the setup pull
+     * request, reloads the card, and must not have to wait for the next tick — but a burst of
+     * reloads must still produce at most one provider read a minute.
+     */
+    describe('the on-view setup pull request check (ACC-02-22)', () => {
+        const waitingRow = (setupCheckedAt: Date | null) =>
+            makeRow({
+                readinessState: 'waiting_for_setup_pr',
+                setupPullRequestNumber: 12,
+                setupCheckedAt,
+            });
+
+        it('checks a waiting row whose last check is older than 60 000 ms', async () => {
+            const h = build({
+                row: waitingRow(new Date(NOW - APP_SETUP_PULL_REQUEST_ON_VIEW_MS - 1)),
+            });
+
+            const result = await h.service.requestSetupPullRequestCheck(WORK_ID, NOW);
+
+            expect(APP_SETUP_PULL_REQUEST_ON_VIEW_MS).toBe(60_000);
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledTimes(1);
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledWith(WORK_ID);
+            expect(result?.status).toBe('open');
+        });
+
+        it('checks a waiting row that has never been checked', async () => {
+            const h = build({ row: waitingRow(null) });
+
+            await h.service.requestSetupPullRequestCheck(WORK_ID, NOW);
+
+            expect(h.states.checkSetupPullRequest).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not check again inside the 60 000 ms window', async () => {
+            const h = build({
+                row: waitingRow(new Date(NOW - APP_SETUP_PULL_REQUEST_ON_VIEW_MS + 1)),
+            });
+
+            const result = await h.service.requestSetupPullRequestCheck(WORK_ID, NOW);
+
+            expect(result).toBeNull();
+            expect(h.states.checkSetupPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('does not check a row that is not waiting on a setup pull request', async () => {
+            for (const row of [
+                makeRow({ readinessState: 'ready', setupPullRequestNumber: 12 }),
+                makeRow({ readinessState: 'waiting_for_setup_pr', setupPullRequestNumber: null }),
+                makeRow({
+                    readinessState: 'waiting_for_setup_pr',
+                    setupPullRequestNumber: 12,
+                    relation: 'link',
+                }),
+            ]) {
+                const h = build({ row });
+                const result = await h.service.requestSetupPullRequestCheck(WORK_ID, NOW);
+                expect(result).toBeNull();
+                expect(h.states.checkSetupPullRequest).not.toHaveBeenCalled();
+            }
+        });
+
+        it('answers null for a blank id and never reaches the repository', async () => {
+            const h = build({ row: waitingRow(null) });
+
+            expect(await h.service.requestSetupPullRequestCheck('   ', NOW)).toBeNull();
+            expect(h.rows.findByWorkId).not.toHaveBeenCalled();
+            expect(h.states.checkSetupPullRequest).not.toHaveBeenCalled();
         });
     });
 });

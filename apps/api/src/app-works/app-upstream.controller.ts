@@ -96,6 +96,11 @@ export class AppUpstreamController {
         const state = await this.translate(() => this.upstream.get(id, auth.userId));
 
         await this.refreshDivergence(id);
+        // The second background half of §4.1 (FR-24a, T43): a Work waiting on its setup pull
+        // request is re-checked when the card is opened, at most once a minute — the row's own
+        // `setupCheckedAt` is the gate. Same posture as the divergence refresh above: it can
+        // never turn a rendered card into an error.
+        await this.refreshSetupPullRequest(id);
 
         return state;
     }
@@ -197,6 +202,22 @@ export class AppUpstreamController {
         } catch {
             // Deliberately swallowed: the reading and its `stale` flag are already in the
             // response above. The dispatcher logs its own failures.
+        }
+    }
+
+    /**
+     * The background setup pull request check (§4.1, FR-24a — the on-view half of T43).
+     *
+     * Best-effort for the same reason {@link refreshDivergence} is: the card has already been
+     * read, and a check that cannot run must not turn it into a `500`. The dispatcher owns the
+     * 60 000 ms gate (the row's `setupCheckedAt`) and the service owns the transition, so this
+     * wrapper adds nothing but the swallow — which is exactly what it should add.
+     */
+    private async refreshSetupPullRequest(workId: string): Promise<void> {
+        try {
+            await this.dispatcher.requestSetupPullRequestCheck(workId);
+        } catch {
+            // Deliberately swallowed: see the docstring.
         }
     }
 }

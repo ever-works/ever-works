@@ -76,7 +76,12 @@ describe('AppUpstreamStateService', () => {
 
     /** The faked collaborators, re-created for every test. */
     interface Doubles {
-        git: { getRepository: jest.Mock; getPullRequestFiles: jest.Mock };
+        git: {
+            getRepository: jest.Mock;
+            getPullRequestFiles: jest.Mock;
+            /** T43's read — the setup pull request follow-through. */
+            getPullRequestStatus: jest.Mock;
+        };
         tasks: { create: jest.Mock };
         taskChat: { post: jest.Mock };
         activity: { log: jest.Mock };
@@ -123,6 +128,10 @@ describe('AppUpstreamStateService', () => {
             git: {
                 getRepository: jest.fn().mockResolvedValue({ empty: false, defaultBranch: 'main' }),
                 getPullRequestFiles: jest.fn().mockResolvedValue([]),
+                // Default: still open. Each test overrides what it is about.
+                getPullRequestStatus: jest
+                    .fn()
+                    .mockResolvedValue({ number: 5, state: 'open', merged: false }),
             },
             tasks: {
                 create: jest
@@ -735,6 +744,181 @@ describe('AppUpstreamStateService', () => {
     });
 
     // ── §4.1 — Try again (FR-19) ─────────────────────────────────────────────
+
+    /**
+     * FR-24a — the setup pull request follow-through (APW-02 T43).
+     *
+     * The row this is about rests in `waiting_for_setup_pr` on a pull request the platform
+     * opened in the member's own repository. Before T43 nothing watched it, so a member who
+     * merged (or closed) the setup pull request left the Work waiting for ever.
+     */
+    describe('checkSetupPullRequest (FR-24a, T43)', () => {
+        /** A row exactly as the readiness handler's `waiting_for_setup_pr` outcome leaves it. */
+        const seedWaiting = async (overrides: Record<string, unknown> = {}) => {
+            await seedWork();
+            await seedState(WORK_ID, {
+                readinessState: 'waiting_for_setup_pr',
+                setupPullRequestNumber: 5,
+                setupPullRequestUrl: 'https://github.com/ever-works/cloc/pull/5',
+                setupCheckedAt: null,
+                readyAt: new Date(),
+                ...overrides,
+            });
+        };
+
+        it('leaves an open pull request waiting, and records only that it checked', async () => {
+            await seedWaiting();
+            doubles.git.getPullRequestStatus.mockResolvedValue({
+                number: 5,
+                state: 'open',
+                merged: false,
+            });
+
+            const result = await service().checkSetupPullRequest(WORK_ID);
+
+            expect(result).toMatchObject({ found: true, checked: true, status: 'open' });
+            const row = await stored();
+            expect(row.readinessState).toBe('waiting_for_setup_pr');
+            expect(row.setupCheckedAt).toBeInstanceOf(Date);
+            expect(doubles.readinessDispatcher?.dispatch).not.toHaveBeenCalled();
+        });
+
+        it('dispatches readiness once with reason setup_merged when the pull request merged', async () => {
+            await seedWaiting();
+            doubles.git.getPullRequestStatus.mockResolvedValue({
+                number: 5,
+                state: 'merged',
+                merged: true,
+            });
+
+            const result = await service().checkSetupPullRequest(WORK_ID);
+
+            expect(result).toMatchObject({ found: true, checked: true, status: 'merged' });
+            expect(doubles.readinessDispatcher?.dispatch).toHaveBeenCalledTimes(1);
+            expect(doubles.readinessDispatcher?.dispatch).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                attempt: 1,
+                reason: 'setup_merged',
+            });
+            // The row is put back to `preparing` *before* the queue is asked, exactly as
+            // `retryReadiness` does, so the dispatched work is visible in the row.
+            expect(await stored()).toMatchObject({
+                readinessState: 'preparing',
+                readinessReason: null,
+                readinessDispatches: 0,
+            });
+        });
+
+        it('fails the Work as setup_pull_request_closed when it was closed unmerged', async () => {
+            await seedWaiting();
+            doubles.git.getPullRequestStatus.mockResolvedValue({
+                number: 5,
+                state: 'closed',
+                merged: false,
+            });
+
+            const result = await service().checkSetupPullRequest(WORK_ID);
+
+            expect(result).toMatchObject({ checked: true, status: 'closed' });
+            expect(await stored()).toMatchObject({
+                readinessState: 'failed',
+                readinessReason: 'setup_pull_request_closed',
+            });
+            expect(doubles.readinessDispatcher?.dispatch).not.toHaveBeenCalled();
+        });
+
+        it('leaves the row alone when the provider will not answer — never a lost setup', async () => {
+            await seedWaiting();
+            doubles.git.getPullRequestStatus.mockRejectedValue(new Error('scope withdrawn'));
+
+            const result = await service().checkSetupPullRequest(WORK_ID);
+
+            // `unknown` is a fifth answer and deliberately not a transition: a credential
+            // problem is transient, and failing the Work here would turn "we could not read
+            // GitHub this minute" into a setup the member never asked to abandon.
+            expect(result).toMatchObject({ checked: true, status: 'unknown' });
+            expect(await stored()).toMatchObject({
+                readinessState: 'waiting_for_setup_pr',
+                readinessReason: null,
+            });
+            expect(doubles.readinessDispatcher?.dispatch).not.toHaveBeenCalled();
+        });
+
+        it('treats a null status the same way — a pull request the provider cannot see', async () => {
+            await seedWaiting();
+            doubles.git.getPullRequestStatus.mockResolvedValue(null);
+
+            expect(await service().checkSetupPullRequest(WORK_ID)).toMatchObject({
+                checked: true,
+                status: 'unknown',
+            });
+            expect(await stored()).toMatchObject({ readinessState: 'waiting_for_setup_pr' });
+        });
+
+        it('does nothing at all — not even a stamp — when the row is not waiting', async () => {
+            await seedWork();
+            await seedState(WORK_ID, { readinessState: 'ready', setupPullRequestNumber: 5 });
+
+            const result = await service().checkSetupPullRequest(WORK_ID);
+
+            expect(result).toMatchObject({ found: true, checked: false, status: 'not_waiting' });
+            // A check that did not happen must not make the row look freshly checked: that
+            // stamp is the rate limit for the on-view door.
+            expect((await stored()).setupCheckedAt).toBeNull();
+            expect(doubles.git.getPullRequestStatus).not.toHaveBeenCalled();
+        });
+
+        it('does nothing when there is no number to read', async () => {
+            await seedWork();
+            await seedState(WORK_ID, {
+                readinessState: 'waiting_for_setup_pr',
+                setupPullRequestNumber: null,
+            });
+
+            expect(await service().checkSetupPullRequest(WORK_ID)).toMatchObject({
+                checked: false,
+                status: 'not_waiting',
+            });
+            expect(doubles.git.getPullRequestStatus).not.toHaveBeenCalled();
+        });
+
+        it('reports not found for a Work with no state row', async () => {
+            await seedWork();
+
+            expect(await service().checkSetupPullRequest(MISSING_WORK_ID)).toEqual({
+                found: false,
+                checked: false,
+                status: 'not_waiting',
+            });
+        });
+
+        it('reads the member’s own credential and never passes workId to the facade (FR-43)', async () => {
+            await seedWaiting();
+            doubles.git.getPullRequestStatus.mockResolvedValue({
+                number: 5,
+                state: 'open',
+                merged: false,
+            });
+
+            await service().checkSetupPullRequest(WORK_ID);
+
+            // The setup pull request is in the member's repository and is theirs to read. Passing
+            // `workId` in the facade options is what lets a platform or installation token answer
+            // instead — the routed FR-43 finding — so this asserts its absence, not just the user.
+            expect(doubles.git.getPullRequestStatus).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                5,
+                { userId: OWNER, providerId: 'github' },
+            );
+            const options = doubles.git.getPullRequestStatus.mock.calls[0][3] as Record<
+                string,
+                unknown
+            >;
+            expect(Object.keys(options).sort()).toEqual(['providerId', 'userId']);
+            expect(options.workId).toBeUndefined();
+        });
+    });
 
     describe('retryReadiness', () => {
         it('refuses a Work that is preparing or ready with not_retryable', async () => {

@@ -309,6 +309,15 @@ describe('AppUpstreamController', () => {
     let members: FakeMembers;
     let syncQueue: FakeQueue;
     let readinessQueue: FakeQueue;
+    /**
+     * The Git facade (§4.1's on-view reads).
+     *
+     * It was `undefined` until T43 under the comment "no route here reads a provider" — that
+     * comment is now false: the setup pull request check reads one whenever the card is opened
+     * on a Work that is waiting, so the double belongs in the fixture rather than being an
+     * omission the routes happen not to reach.
+     */
+    let git: { getPullRequestStatus: jest.Mock };
     let stateService: AppUpstreamStateService;
 
     /**
@@ -345,7 +354,7 @@ describe('AppUpstreamController', () => {
             rows as never, // WorkUpstreamStateRepository
             works as never, // WorkRepository
             members as never, // WorkMemberRepository
-            undefined, // GitFacadeService — no route here reads a provider
+            git as never, // GitFacadeService — §4.1's on-view provider reads (T43)
             undefined, // TaskRepository
             undefined, // TasksService
             undefined, // TaskChatService
@@ -373,6 +382,12 @@ describe('AppUpstreamController', () => {
         members = new FakeMembers();
         syncQueue = new FakeQueue();
         readinessQueue = new FakeQueue();
+        git = {
+            // Default: the setup pull request is still open. Each test says otherwise.
+            getPullRequestStatus: jest
+                .fn()
+                .mockResolvedValue({ number: 5, state: 'open', merged: false }),
+        };
     });
 
     /**
@@ -411,6 +426,7 @@ describe('AppUpstreamController', () => {
         works.reset();
         syncQueue.payloads.length = 0;
         readinessQueue.payloads.length = 0;
+        git.getPullRequestStatus.mockClear();
 
         works.seed({ id: WORK_ID, kind: 'app', userId: OWNER });
         works.seed({ id: LINK_WORK_ID, kind: 'app', userId: OWNER });
@@ -519,7 +535,6 @@ describe('AppUpstreamController', () => {
 
         it('never queues a compare for a link relation — it has no upstream (FR-44)', async () => {
             const response = await auth(suite().get(`/api/works/${LINK_WORK_ID}/upstream`));
-
             expect(response.status).toBe(200);
             expect(response.body.relation).toBe('link');
             expect(response.body.sync).toBeNull();
@@ -533,6 +548,86 @@ describe('AppUpstreamController', () => {
             // `undefined`. The real stack refuses this in `AuthSessionGuard` before the
             // handler runs; this spec keeps the fact visible rather than asserting a 200.
             expect(response.status).not.toBe(200);
+        });
+
+        // -------------------------------------------------------------------
+        // FR-24a's on-view half (APW-02 T43, ACC-02-22): opening the card on a
+        // Work that is waiting on its setup pull request re-checks it — at most
+        // once a minute, and never for a Work that is not waiting.
+        // -------------------------------------------------------------------
+
+        it('re-checks the setup pull request when the card is opened on a waiting Work', async () => {
+            rows.reset();
+            works.seed({ id: WORK_ID, kind: 'app', userId: OWNER });
+            rows.seed(
+                forkRow({
+                    readinessState: 'waiting_for_setup_pr',
+                    setupPullRequestNumber: 5,
+                    setupCheckedAt: new Date(NOW - HOUR),
+                }),
+            );
+
+            const response = await auth(suite().get(`/api/works/${WORK_ID}/upstream`));
+
+            expect(response.status).toBe(200);
+            expect(git.getPullRequestStatus).toHaveBeenCalledTimes(1);
+            expect(git.getPullRequestStatus).toHaveBeenCalledWith(
+                'me',
+                'widgets',
+                5,
+                expect.objectContaining({ userId: OWNER }),
+            );
+            // The check stamps the row, which is what makes the next read a no-op.
+            expect(rows.updates.some((entry) => 'setupCheckedAt' in entry.patch)).toBe(true);
+        });
+
+        it('does not re-check inside the 60 000 ms window (ACC-02-22)', async () => {
+            rows.reset();
+            works.seed({ id: WORK_ID, kind: 'app', userId: OWNER });
+            rows.seed(
+                forkRow({
+                    readinessState: 'waiting_for_setup_pr',
+                    setupPullRequestNumber: 5,
+                    setupCheckedAt: new Date(NOW - HOUR),
+                }),
+            );
+
+            const first = await auth(suite().get(`/api/works/${WORK_ID}/upstream`));
+            const second = await auth(suite().get(`/api/works/${WORK_ID}/upstream`));
+            const third = await auth(suite().get(`/api/works/${WORK_ID}/upstream`));
+
+            expect([first.status, second.status, third.status]).toEqual([200, 200, 200]);
+            // Three reads, one provider read: the row's `setupCheckedAt` is the gate, and every
+            // answer still carries the state the service has (only the *check* is throttled).
+            expect(git.getPullRequestStatus).toHaveBeenCalledTimes(1);
+        });
+
+        it('never checks a Work that is not waiting on a setup pull request', async () => {
+            // The default fixture row is `ready` with a setup PR recorded from an earlier state.
+            const response = await auth(suite().get(`/api/works/${WORK_ID}/upstream`));
+
+            expect(response.status).toBe(200);
+            expect(git.getPullRequestStatus).not.toHaveBeenCalled();
+        });
+
+        it('still renders the card when the check itself blows up', async () => {
+            rows.reset();
+            works.seed({ id: WORK_ID, kind: 'app', userId: OWNER });
+            rows.seed(
+                forkRow({
+                    readinessState: 'waiting_for_setup_pr',
+                    setupPullRequestNumber: 5,
+                    setupCheckedAt: new Date(NOW - HOUR),
+                }),
+            );
+            git.getPullRequestStatus.mockRejectedValue(new Error('provider is down'));
+
+            const response = await auth(suite().get(`/api/works/${WORK_ID}/upstream`));
+
+            // The background check is best-effort by construction: a readable card must not
+            // become a 500 because a provider refused a read the member never asked for.
+            expect(response.status).toBe(200);
+            expect(response.body.workId).toBe(WORK_ID);
         });
     });
 
