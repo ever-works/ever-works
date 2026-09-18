@@ -270,6 +270,107 @@ export interface AgentMergeActor {
 
 export type { GitProviderInfo };
 
+/**
+ * The member's OWN git credentials — APW-09 FR-24 / plan §2.3.
+ *
+ * There is deliberately no `workId` on this input, and that is the whole
+ * point of the type: a Work-scoped token (the `ever-works-git` platform PAT
+ * or a GitHub App installation token) is a *platform* credential, while an
+ * upstream pull request must be opened, prepared and fast-forwarded with the
+ * member's own credential — the one the upstream project sees, and the one
+ * whose fork push permission FR-3 depends on. Making `workId` unexpressible
+ * means the two Work-scoped short-circuits cannot be reached from here even
+ * by accident, which is what the spec asserts by spy.
+ */
+export interface MemberAccountTokenOptions {
+    readonly userId: string;
+    readonly providerId: string;
+}
+
+/**
+ * ── APW-09 T1/T2 provisional shapes (temporary seam) ──────────────────────
+ *
+ * `listPullRequestReviews?`, `listPullRequestReviewComments?` and
+ * `getInteractionLimit?` are APW-09 T2's additions to `IGitProviderPlugin`,
+ * with their element types declared by T1/T2 in
+ * `packages/plugin/src/contracts/capabilities/git-provider.interface.ts`.
+ * Neither had landed when these pass-throughs were written, and
+ * `packages/plugin` belongs to those tasks — so the three shapes below are
+ * declared here for this facade's own signatures, and the methods are read
+ * off the materialised plugin through
+ * {@link GitProviderOptionalUpstreamCapability}.
+ *
+ * Provisional means exactly this: when T2 lands, import the real
+ * `GitPullRequestReview` / `GitPullRequestReviewComment` / interaction-limit
+ * types from `@ever-works/plugin`, delete this block and delete the
+ * `asUpstreamCapabilities` cast. No call site changes, because the runtime
+ * contract — positional arguments, `typeof impl === 'function'` presence —
+ * is already the one below.
+ */
+export type UpstreamReviewState =
+    | 'approved'
+    | 'changes_requested'
+    | 'commented'
+    | 'dismissed'
+    | 'pending';
+
+export interface UpstreamPullRequestReview {
+    readonly id: number;
+    readonly author: string | null;
+    readonly state: UpstreamReviewState;
+    readonly body: string;
+    readonly submittedAt: string | null;
+}
+
+export interface UpstreamPullRequestReviewComment {
+    readonly id: number;
+    readonly author: string | null;
+    readonly body: string;
+    readonly path: string | null;
+    readonly line: number | null;
+    readonly createdAt: string | null;
+}
+
+/** The four temporary interaction limits, plus the `null` "cannot tell". */
+export type UpstreamInteractionLimit =
+    | 'none'
+    | 'existing_users'
+    | 'contributors_only'
+    | 'collaborators_only';
+
+/**
+ * The three optional methods of the seam above, as this facade calls them.
+ *
+ * The view is cast with `as unknown as` on purpose: it has to compile both
+ * BEFORE T2 declares these methods (today) and AFTER (when the real
+ * declarations exist and this block is deleted) without either side's shape
+ * becoming a build break for the other.
+ */
+interface GitProviderOptionalUpstreamCapability {
+    listPullRequestReviews?(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        token: string,
+    ): Promise<UpstreamPullRequestReview[]>;
+    listPullRequestReviewComments?(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        token: string,
+    ): Promise<UpstreamPullRequestReviewComment[]>;
+    getInteractionLimit?(
+        owner: string,
+        repo: string,
+        token: string,
+    ): Promise<UpstreamInteractionLimit | null>;
+}
+
+/** See {@link GitProviderOptionalUpstreamCapability} — the temporary T2 seam. */
+function asUpstreamCapabilities(plugin: IGitProviderPlugin): GitProviderOptionalUpstreamCapability {
+    return plugin as unknown as GitProviderOptionalUpstreamCapability;
+}
+
 @Injectable()
 export class GitFacadeService implements IGitFacade {
     private readonly CAPABILITY = PLUGIN_CAPABILITIES.GIT_PROVIDER;
@@ -457,6 +558,38 @@ export class GitFacadeService implements IGitFacade {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * The member's own git token — APW-09 FR-24, plan §2.3.
+     *
+     * Resolves the connected provider account first (the GitHub integration
+     * OAuth account, the credential that can push to the member's fork and
+     * open the upstream pull request), then the member's own plugin-settings
+     * PAT. `workId` is passed as `undefined` to that settings read on
+     * purpose: there is no Work scope in this credential, so a Work-level
+     * setting can never answer for it.
+     *
+     * What is deliberately NOT here, and is the reason this method exists
+     * instead of a flag on `getAccessToken`: the two Work-scoped
+     * short-circuits of `resolvePluginAndToken` — the `ever-works-git`
+     * platform PAT (`tryResolveEverWorksGitPlatformToken`) and the GitHub App
+     * installation token (`getInstallationTokenForWork`). Both need a
+     * `workId`, this method has no way to receive one, and
+     * `git.facade.member-token.spec.ts` spies on both to prove they are never
+     * called — an upstream pull request opened with a platform credential
+     * would be attributed to the platform, not to the member who authored it.
+     *
+     * Returns `null` when the member has neither, so the caller refuses with
+     * `connectionScope` rather than falling back to a credential the member
+     * does not own.
+     */
+    async getMemberAccountToken(options: MemberAccountTokenOptions): Promise<string | null> {
+        const account = await this.findUsableGitProviderAccount(options.userId, options.providerId);
+        if (account?.accessToken) {
+            return account.accessToken;
+        }
+        return this.getPatFromSettings(options.providerId, options.userId, undefined);
     }
 
     async getCommitter(options: GitFacadeOptions): Promise<GitCommitter | null> {
@@ -1347,6 +1480,142 @@ export class GitFacadeService implements IGitFacade {
             throw new GitOperationNotSupportedError('getCompareDiff', plugin.id);
         }
         return impl.call(plugin, owner, repo, base, head, diffOptions, token);
+    }
+
+    // ── APW-09 upstream pull requests (cross-repository) ──────────────
+    //
+    // T1's cross-repository fields need no code here, and that is worth
+    // stating rather than assuming: `headOwner` / `headRepo` /
+    // `maintainerCanModify` ride on the `CreatePROptions` object that
+    // `createPullRequest` forwards verbatim, `head` on the
+    // `ListPullRequestsOptions` object `listPullRequests` forwards verbatim,
+    // and `totalCommits` is mapped inside the provider's own diff reads. A
+    // field that lands on the plugin contract therefore reaches the provider
+    // through the existing pass-throughs unchanged — `git.facade.spec.ts`
+    // asserts the object identity, so a field this facade has never heard of
+    // still arrives.
+    //
+    // Every method below is OPTIONAL on `IGitProviderPlugin`, so the absence
+    // path is explicit: the method is materialised off the resolved plugin
+    // (the lazy-plugin proxy over-reports optional methods) and a missing one
+    // raises `GitOperationNotSupportedError` (→ 409, mapped by `name`) rather
+    // than a bare `GitFacadeError` (→ 500) or a TypeError. Plan §11: "provider
+    // lacks any optional method used" is a refusal, never a crash.
+
+    /**
+     * Create a branch ref at an exact commit sha (APW-09 T3) — the
+     * preparation branch `upstream-pr/{slug}-{4 hex}` cut in the FORK at the
+     * upstream head (plan §2.5), and the `--update-<n>` branch of the review
+     * follow-up (plan §2.6 step 1).
+     *
+     * `createBranch` cannot stand in for it: its `fromRef` is a branch NAME,
+     * so pointing the new ref at an upstream-only sha would need a delete +
+     * recreate, and that closes any pull request already open on the branch.
+     */
+    async createBranchFromSha(
+        owner: string,
+        repo: string,
+        name: string,
+        sha: string,
+        options: GitFacadeOptions,
+    ): Promise<GitBranch> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.createBranchFromSha;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('createBranchFromSha', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, name, sha, token);
+    }
+
+    /**
+     * Move an existing branch ref to a commit sha — fast-forward only
+     * (APW-09 T3, plan §2.6 step 4). `force: false` is typed, not merely
+     * defaulted: no force-move exists anywhere in this epic, so the facade
+     * cannot be talked into one, and a provider that answers "not a fast
+     * forward" reports it as `unprocessable` — the caller re-prepares the
+     * update approval instead of rewriting the pull request branch.
+     */
+    async updateBranchRef(
+        owner: string,
+        repo: string,
+        name: string,
+        sha: string,
+        refOptions: { force: false },
+        options: GitFacadeOptions,
+    ): Promise<GitBranch> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.updateBranchRef;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('updateBranchRef', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, name, sha, refOptions, token);
+    }
+
+    /**
+     * Reviews on one pull request (APW-09 T2) — the read behind the review
+     * summary FR-30 derives and the "changes requested" trigger FR-31 acts
+     * on.
+     *
+     * Absence THROWS rather than answering `[]`: an empty list means "nobody
+     * reviewed", which is a different fact from "this provider cannot list
+     * reviews", and only the second one is true here. Plan §11 maps the throw
+     * to the `providerUnsupported` refusal.
+     */
+    async listPullRequestReviews(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<UpstreamPullRequestReview[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = asUpstreamCapabilities(plugin).listPullRequestReviews;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('listPullRequestReviews', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, token);
+    }
+
+    /**
+     * Inline review comments on one pull request (APW-09 T2) — the brief a
+     * review follow-up Task is seeded with (plan §2.6 step 2). Absence
+     * throws, for the same reason as the review list above.
+     */
+    async listPullRequestReviewComments(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<UpstreamPullRequestReviewComment[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = asUpstreamCapabilities(plugin).listPullRequestReviewComments;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('listPullRequestReviewComments', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, token);
+    }
+
+    /**
+     * The repository's TEMPORARY interaction limit (APW-09 T2, G16) —
+     * `'none' | 'existing_users' | 'contributors_only' | 'collaborators_only'`.
+     *
+     * The one read in this section whose absence path is `null` and not a
+     * throw, because `null` is already this read's honest answer for "cannot
+     * tell": the provider answers `null` on a 403/404 (G16 — a caller must
+     * never read a failed lookup as "unrestricted"), and a provider with no
+     * such capability is in exactly that position. `'none'` is only ever the
+     * provider's own explicit answer; this pass-through never fabricates it.
+     */
+    async getInteractionLimit(
+        owner: string,
+        repo: string,
+        options: GitFacadeOptions,
+    ): Promise<UpstreamInteractionLimit | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = asUpstreamCapabilities(plugin).getInteractionLimit;
+        if (typeof impl !== 'function') {
+            return null;
+        }
+        return impl.call(plugin, owner, repo, token);
     }
 
     async createPullRequestComment(
