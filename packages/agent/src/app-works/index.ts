@@ -21,8 +21,17 @@
  *   `APP_UPSTREAM_SYNC_DISPATCHER` — T31). Each carries the swap note on its declaration.
  * - `./app-fork-ready-handler.port` — `APP_FORK_READY_HANDLER` and the outcome APW-01's
  *   handler answers with (plan §6.2, Resolution R-4).
+ * - `./app-actions-hygiene.service` — `AppActionsHygieneService` (T25), the Actions
+ *   permission hygiene of plan §6.7: it disables only what §6.7 names, and answers
+ *   `not_applicable` without touching the provider when the repository is a link (FR-31).
+ * - `./app-fork-readiness.service` — `AppForkReadinessService` (T24), the readiness poll
+ *   of plan §6.2 and its recorded sleep ladder. Its `APP_PROVISION_EVENTS_PORT` consumer
+ *   half is **provisional** until APW-04 lands, and carries the mandatory-swap note on
+ *   its declaration.
  */
 
 export * from './app-works.module';
 export * from './app-upstream-state.service';
 export * from './app-fork-ready-handler.port';
+export * from './app-actions-hygiene.service';
+export * from './app-fork-readiness.service';

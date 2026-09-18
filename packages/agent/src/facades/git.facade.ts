@@ -43,6 +43,17 @@ import type {
     GitInteractionLimit,
     // APW-09 T1's review-state union, for the deprecated aliases below.
     GitPullRequestReviewState,
+    // Fork lifecycle (APW-02 plan §3.3, §4.2) — the plugin contract's
+    // provider-neutral types for the seven optional capabilities below.
+    // Declared in `packages/plugin`'s `git-provider.app-forks.ts`; this
+    // facade owns no copy (Resolution R-1).
+    GitForkSyncResult,
+    GitForkDivergence,
+    GitRepositoryCopyInput,
+    GitRepositoryCopyResult,
+    GitActionsPermissionsInput,
+    GitActionsPermissionsResult,
+    GitWebhookInput,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -1612,6 +1623,192 @@ export class GitFacadeService implements IGitFacade {
         );
     }
 
+    // ── APW-02 fork lifecycle (plan §4.2) ─────────────────────────────
+    //
+    // One method per new capability of the fork-lifecycle contract:
+    // `findExistingFork`, `syncForkBranch`, `getForkDivergence`,
+    // `createRepositoryCopy`, `setActionsPermissions`, `createWebhook` and
+    // `deleteWebhook`. The other two names plan §4.2 lists —
+    // `createBranchFromSha` and `updateBranchRef` — are APW-09's and are already
+    // above; they follow the same guard, so all nine are reachable here through
+    // one shape.
+    //
+    // Every one of the seven is OPTIONAL on `IGitProviderPlugin`, so the absence
+    // path is explicit and identical each time: the method is materialised off
+    // the RESOLVED plugin (the lazy-plugin proxy over-reports optional methods —
+    // see the class doc) and a missing one raises
+    // `GitOperationNotSupportedError`, which `FacadeExceptionFilter` maps to
+    // HTTP 409 by that exact `name`. A provider that cannot do this is a
+    // refusal the caller resolves by switching provider, never a 500 from a
+    // TypeError and never a silent `undefined`.
+    //
+    // Plan §7 is why these live here and nowhere else: the agent package sees
+    // only the capability methods through this facade, all provider behaviour
+    // stays inside `packages/plugins/github`, and absence degrades to a typed
+    // refusal the services map to `failed/provider_unsupported`.
+
+    /**
+     * The member's existing fork of an upstream, found by the provider's
+     * three-step lookup (APW-02 T17/T52, FR-10).
+     *
+     * `null` is the provider's honest "no fork of this upstream by this
+     * account", which is what makes a fork request safe to issue — a fork the
+     * member renamed answers to its current name, so a name check alone cannot
+     * answer this question.
+     */
+    async findExistingFork(
+        upstreamOwner: string,
+        upstreamRepo: string,
+        targetOwner: string,
+        options: GitFacadeOptions,
+    ): Promise<GitRepository | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.findExistingFork;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('findExistingFork', plugin.id);
+        }
+        return impl.call(plugin, upstreamOwner, upstreamRepo, targetOwner, token);
+    }
+
+    /**
+     * Bring a fork's branch up to date with the upstream branch it was forked
+     * from (APW-02 FR-35). The outcome is an answer, not an exception:
+     * `conflict` and `unprocessable` are the two the sync run turns into a pull
+     * request, and nothing here ever force-moves a ref.
+     */
+    async syncForkBranch(
+        forkOwner: string,
+        forkRepo: string,
+        branch: string,
+        options: GitFacadeOptions,
+    ): Promise<GitForkSyncResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.syncForkBranch;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('syncForkBranch', plugin.id);
+        }
+        return impl.call(plugin, forkOwner, forkRepo, branch, token);
+    }
+
+    /**
+     * How far a fork has drifted from its upstream (APW-02 FR-46): the counts
+     * the Upstream card renders and the upstream head a sync acts on.
+     *
+     * The upstream is named by OWNER and branch — the whole point of the
+     * cross-owner `basehead` compare — so the signature carries both sides
+     * rather than assuming one repository.
+     */
+    async getForkDivergence(
+        forkOwner: string,
+        forkRepo: string,
+        forkBranch: string,
+        upstreamOwner: string,
+        upstreamBranch: string,
+        options: GitFacadeOptions,
+    ): Promise<GitForkDivergence> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getForkDivergence;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getForkDivergence', plugin.id);
+        }
+        return impl.call(
+            plugin,
+            forkOwner,
+            forkRepo,
+            forkBranch,
+            upstreamOwner,
+            upstreamBranch,
+            token,
+        );
+    }
+
+    /**
+     * Push one branch of a source repository, with its full history, into a
+     * repository the platform owns (APW-02 FR-21) — the private copy's initial
+     * content.
+     *
+     * The ceiling travels in the input rather than being read here: it is the
+     * caller's authorisation, and the provider refuses a source it cannot show
+     * to be within it (`unprocessable` + `too_large`) before any git work. Safe
+     * to repeat — a copy already holding the same head is not pushed again.
+     */
+    async createRepositoryCopy(
+        input: GitRepositoryCopyInput,
+        options: GitFacadeOptions,
+    ): Promise<GitRepositoryCopyResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.createRepositoryCopy;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('createRepositoryCopy', plugin.id);
+        }
+        return impl.call(plugin, input, token);
+    }
+
+    /**
+     * Actions hygiene and the build preparation's Actions switch (APW-02
+     * FR-25…FR-31, APW-05): the one call that lists a repository's workflows
+     * and disables/enables the ones the input names.
+     *
+     * The input is forwarded verbatim, `enabled` included — and hygiene
+     * deliberately never sets that field, because switching Actions off for a
+     * whole repository is the one thing FR-26 forbids. A 403 comes back as
+     * `GitProviderRequestError` (`permission_missing` + the permission) rather
+     * than a bare failure, so the caller can name what is missing.
+     */
+    async setActionsPermissions(
+        owner: string,
+        repo: string,
+        input: GitActionsPermissionsInput,
+        options: GitFacadeOptions,
+    ): Promise<GitActionsPermissionsResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.setActionsPermissions;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('setActionsPermissions', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, input, token);
+    }
+
+    /**
+     * Install the platform's webhook on a repository, idempotently by URL
+     * (APW-02 FR-55): an existing hook at the same `config.url` is updated and
+     * answers `created: false`.
+     *
+     * The signing secret is an input owned by the consumer; it is never logged
+     * here, never cached, and never returned (plan §12.VII).
+     */
+    async createWebhook(
+        owner: string,
+        repo: string,
+        input: GitWebhookInput,
+        options: GitFacadeOptions,
+    ): Promise<{ id: number; created: boolean }> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.createWebhook;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('createWebhook', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, input, token);
+    }
+
+    /**
+     * Remove one webhook. A hook that is already gone is a success, which the
+     * provider decides (404 ⇒ resolved), not this facade.
+     */
+    async deleteWebhook(
+        owner: string,
+        repo: string,
+        hookId: number,
+        options: GitFacadeOptions,
+    ): Promise<void> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.deleteWebhook;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('deleteWebhook', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, hookId, token);
+    }
+
     async cloneOrPull(
         cloneOptions: FacadeCloneOptions,
         options: GitFacadeOptions,
@@ -1634,6 +1831,13 @@ export class GitFacadeService implements IGitFacade {
             cloneOptions.branch ?? '',
             cloneOptions.autoSwitchToMainBranch === false ? 'no-switch' : 'switch',
             cloneOptions.checkoutKey ?? '',
+            // `expectExisting` is part of the key too (APW-02 FR-8, plan §4.2):
+            // a plain clone that finds an empty repository legitimately leaves
+            // an initialised directory behind, and handing THAT to an
+            // `expectExisting` caller would answer success for a repository
+            // that does not exist yet. Two calls with the same coordinates and
+            // opposite expectations therefore never share one in-flight clone.
+            cloneOptions.expectExisting === true,
         ].join('\0');
 
         const inFlight = this.cloneOrPullRequests.get(key);
