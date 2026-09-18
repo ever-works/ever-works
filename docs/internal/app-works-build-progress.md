@@ -365,6 +365,47 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · APW-07's env crypto/generators/validator and its dependency service — plus the verification expiry read that
+  no contract member exposed.** **APW-07 T9-T11** (`69b3abb3b`; app-env-crypto 30, generators 58, validation 57 tests — the
+  `app-env-crypto generators` pattern is **17 suites / 335** with pre-existing suites). The `enc::v1::` envelope over
+  `PluginSecretEncService` (wrapped, never reimplemented), the five generators on `node:crypto` with **rejection
+  sampling**, and the pattern validator on `re2js` — a linear-time engine, which is the point: a hostile pattern must not
+  be able to hang the API. 🌟 **The best perturbation of the round is the `Math.random` swap**: every 1,000-sample
+  assertion AND the chi-square leg still passed — a distribution test cannot see `Math.random` — and only the source
+  guard caught it, which is the whole argument for having one. The chi-square test is deterministic by construction: the
+  99.9% critical value **100.8879** (df=61, derived and cross-checked) is applied to a stubbed `sha256(counter)` stream
+  whose statistic is a **constant 57.2235**, while the live-entropy leg (measured 50-81) carries a stated 0.1%
+  theoretical false-failure rate because the plan names that threshold. 🌟 **And an evidence defect in the plan's own
+  test was fixed in the spec**: `tasks.md:169-170` asks for "65,536 × `a` + `!`", which is 65,537 bytes and therefore
+  refused as `valueTooLarge` BEFORE the matcher runs — a vacuous test; the spec uses exactly 65,536 bytes and asserts
+  `patternMismatch` as proof the matcher ran.
+  **APW-07 T16 — the dependency facade and service** (`e9426d647`; app-dependencies 51 tests, `app-runtime` still 137).
+  `AppDependenciesService` is what the last two rounds' `APP_DEPENDENCIES_SERVICE` seams were waiting for, and the spec
+  asserts the match at **compile time** against the imported declarations, so a signature drift on either side is now a
+  build error. Row creation lives **in the service** via `@InjectRepository` because T8's docstring reserves it for
+  `reconcile`, with first-writer-wins asserted at all three layers (in-process coalescing, unique-violation detection
+  across three driver spellings, loser re-reads and dispatches nothing).
+  **The verification expiry read** (`174f8a479`; k8s **758 → 762**). T20's facade reported that no `IDeploymentPlugin`
+  member exposed a namespace-annotation read, so a verification's `expiresAt` came back empty — and §4.12:659-660 makes
+  that annotation exactly what APW-04's sweep uses to destroy leftovers. The member was added to the contract,
+  implemented in the k8s plugin (answering the annotation **verbatim**, never a computed TTL, and `null` rather than
+  throwing when the namespace is unreadable), and bound in the facade with the caller supplying only the handle it was
+  given — so it cannot read another namespace or another credential. The perturbation (returning `now + 1h`) reddens
+  both cases, which is the point of the test names: a plausible-looking instant is worse than none, because the sweep
+  would trust it.
+  **The lockfile was stale and is fixed**: `re2js` was newly declared in `packages/agent` while already present
+  transitively via `just-bash`, so CI's `pnpm install --frozen-lockfile` would have failed. Refreshed (+6/−3, the three
+  deletions being the lockfile catching up with my own earlier move of `@ever-works/contracts` to devDependencies in
+  `packages/app-launcher`), and verified the way CI does it — _"Lockfile is up to date"_, exit 0.
+  **Reported for their owners:** T3 is still open (its `APP_DEPENDENCY` capability and provider contract landed because
+  the facade cannot compile without them, but `'app-dependency'` was deliberately NOT added to `PLUGIN_CATEGORIES` —
+  that breaks two total `Record<PluginCategory, …>` maps in a web file and needs a same-change edit there); two reason
+  strings the task text names are not members of the contracts' closed `APP_DEPENDENCY_REASONS`, so those two states
+  render no copy until someone widens the union or maps them; `PluginSecretEncService` cannot read back an empty
+  plaintext (28-byte body against a 29-byte floor), so a cleared field should mean **unset** — T13's call;
+  `appEnvGeneratorFingerprint` defaults an omitted size to 16 where the schema defaults to 32; and no task adds
+  `./app-env` to `packages/agent`'s `exports` map, so `@ever-works/agent/app-env` will not resolve until T13 adds it.
+
 - **2026-09-18 · APW-07's persistence layer and APW-06's cluster-access facade — the two seams the last rounds left open
   are now satisfied by real services.** **APW-07 T5-T8 — the App env and dependency tables** (`e5d1b5cb2`; agent 114 tests - drift 54 + api migration 28). `work_app_env_values` (**15 columns**) and `work_app_dependencies` (**29 columns**),
   both diffed column-by-column against plan §3.1/§3.2 and matching exactly, with the indexes the plan names — including
