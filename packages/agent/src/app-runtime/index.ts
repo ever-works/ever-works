@@ -55,6 +55,21 @@
  *   `work_deployments` store T16 will provide, and the runtime-state *view* that reuses
  *   `WORK_APP_RUNTIME_STATES`). The API's route and `DeployService` both live outside this package,
  *   which is why it has to be on the barrel.
+ * - `./app-hosts.service` — `AppHostsService` (T26, plan §8.1/§8.2/§8.4/§4.11) and the pure
+ *   `appUrlScheme` / `appHostUrl` / `sameHost` helpers. It implements T22's `resolveHosts` view on
+ *   T21's existing `APP_DEPLOY_HOST_SOURCE` token — which is what removes T22's `hosts_incomplete`
+ *   warning — and APW-11's `APP_PUBLISHED_HOSTS`; both bindings are `useExisting`, so the one class
+ *   answers every host question. It also **re-exports** `APP_CLUSTER_OP_DISPATCHER` (T58's token)
+ *   rather than declaring a second one for §8.2's `ingress-reconcile` op.
+ * - `./app-domains.service` — `AppDomainsService` (T26, plan §8.4), `verifyDomainResolution` and
+ *   `buildDnsGuidance` — the App branch `DeployFacadeService`'s four domain methods delegate to.
+ * - `./app-deploy.orchestrator` — `AppDeployOrchestrator` (T25, plan §5.6 steps 1–10): the one class
+ *   that calls `deployApp`, with its outcome→state table (`mapOutcome`, `terminalEventName`,
+ *   `isTerminalState`, `cancelReasonOf`) and its provisional seams (`APP_DEPLOY_TARGET_RESOLVER`
+ *   bound to T20's facade, `APP_IMAGE_REFERENCE_RESOLVER` for T72, `APP_UPSTREAM_STATE_READER` /
+ *   `APP_COMMIT_ANCESTRY` for APW-02, `APP_RUNTIME_NOTIFICATIONS` for T29's producers). It lives
+ *   here because the `app-deploy` task in `packages/tasks` — the only caller — can reach this folder
+ *   through the subpath barrel alone, and the API must never construct a working one.
  */
 
 export * from './ports';
@@ -67,3 +82,6 @@ export * from './app-deploy-preconditions.service';
 export * from './app-render-input.builder';
 export * from './app-public-smoke.service';
 export * from './app-deploy-request.service';
+export * from './app-hosts.service';
+export * from './app-domains.service';
+export * from './app-deploy.orchestrator';
