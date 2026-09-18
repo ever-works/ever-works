@@ -1029,7 +1029,7 @@ function normalizeBranchRef(ref: string): string {
                         });
                     },
                     async openPullRequest(input) {
-                        const { userId, workId, title, body, head, draft } = input;
+                        const { userId, workId, title, body, draft } = input;
                         void input.agentId;
                         // APW-08 P0 — the pull request names a REAL target. It used to
                         // pass `owner: ''` / `repo: ''`, which is not a repository:
@@ -1088,12 +1088,44 @@ function normalizeBranchRef(ref: string): string {
                                     `${target.owner}/${target.repo} — pass an explicit \`base\`.`,
                             );
                         }
+                        // APW-08 P0 (T4) — the head branch must EXIST before a pull
+                        // request names it (FR-5, ACC-08-04). A head the repository
+                        // does not have is a promise the platform cannot keep: the
+                        // provider refuses the call, or — worse — someone opens a
+                        // pull request nobody asked for from a branch the Agent
+                        // never pushed. `listBranches` is the provider's OWN answer,
+                        // the same REQUIRED capability `release-promotion.service.ts`
+                        // verifies both of its branches against, and a branch list
+                        // that cannot be read is a refusal too — never a silent
+                        // "assume it exists".
+                        const head = (input.head ?? '').trim();
+                        const branches = await git
+                            .listBranches(target.owner, target.repo, {
+                                providerId,
+                                userId,
+                                workId,
+                            } as any)
+                            .catch((err: Error) => {
+                                throw new Error(
+                                    `openPullRequest: could not read the branches of ` +
+                                        `${target.owner}/${target.repo} to verify the head branch ` +
+                                        `'${head}' (${err?.message ?? err}).`,
+                                );
+                            });
+                        if (!branches.some((branch) => branch?.name === head)) {
+                            throw new Error(
+                                `openPullRequest: head branch '${head}' does not exist in ` +
+                                    `${target.owner}/${target.repo}. Push the branch before opening a pull request.`,
+                            );
+                        }
                         const pr = await git.createPullRequest(
                             {
                                 owner: target.owner,
                                 repo: target.repo,
                                 title,
                                 body,
+                                // The head that was VERIFIED is the head that is
+                                // opened — one value, resolved once.
                                 head,
                                 base,
                                 draft: draft ?? false,

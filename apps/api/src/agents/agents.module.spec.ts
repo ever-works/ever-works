@@ -485,6 +485,11 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
         // has to answer that question. An explicit `base` still bypasses both.
         getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
         getMainBranch: jest.fn().mockResolvedValue('main'),
+        // APW-08 P0 (T4) — `openPullRequest` verifies the head branch against the
+        // provider's own branch list before it names it (FR-5), so the facade it
+        // calls has to answer that question too. The list contains the head the
+        // cases below open with; a case that wants a missing head overrides it.
+        listBranches: jest.fn().mockResolvedValue([{ name: 'feature' }, { name: 'main' }]),
         createPullRequest: jest.fn().mockResolvedValue({ number: 12, url: 'https://pr/12' }),
     });
 
@@ -733,6 +738,11 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         cloneOrPull: jest.fn().mockResolvedValue(WORK_DIR),
         getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
         getMainBranch: jest.fn().mockResolvedValue(null),
+        // APW-08 P0 (T4) — the head branch is verified against the provider's
+        // own branch list before a pull request names it (FR-5). The default
+        // list carries the head every PR case opens with; the missing-head case
+        // overrides it with a list the head is genuinely absent from.
+        listBranches: jest.fn().mockResolvedValue([{ name: 'feature/pricing' }, { name: 'main' }]),
         switchBranch: jest.fn().mockResolvedValue('feature/x'),
         commit: jest.fn().mockResolvedValue('sha-1'),
         push: jest.fn().mockResolvedValue(undefined),
@@ -811,6 +821,10 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         expect(git.switchBranch).not.toHaveBeenCalled();
         expect(git.commit).not.toHaveBeenCalled();
         expect(git.push).not.toHaveBeenCalled();
+        // APW-08 P0 (T4) — `openPullRequest` reads the provider's branch list
+        // (FR-5). It is a git read like any other: a refusal that should land
+        // before any git operation must not reach for it either.
+        expect(git.listBranches).not.toHaveBeenCalled();
     };
 
     describe('commitToRepo', () => {
@@ -1189,6 +1203,88 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
             );
             expect(git.getRepoDir).not.toHaveBeenCalled();
+        });
+
+        // APW-08 P0 (T1 case 5, second half) — the OTHER side of the base rule:
+        // a Work that declares where Task branches fork from uses THAT branch as
+        // the pull request's base, not the repository default it also has.
+        it("bases the pull request on the Work's task-isolation branch when it declares one", async () => {
+            const git = makeGit();
+            // The repository default is deliberately different, so "the Work's
+            // own base won" is observable rather than coincidental.
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({
+                git,
+                work: makeWork({ taskIsolationBaseBranch: 'integration' }),
+            });
+
+            await facade.openPullRequest(prInput());
+
+            expect(git.createPullRequest.mock.calls[0][0].base).toBe('integration');
+            // A Work that declares its own base needs no provider lookup at all.
+            expect(git.getRepository).not.toHaveBeenCalled();
+        });
+
+        // APW-08 P0 (T4, ACC-08-04) — FR-5. A head branch the repository does
+        // not have is refused with a copy that NAMES what is missing, and the
+        // pull request is never opened: `createPullRequest` is the one call this
+        // case exists to prove does not happen.
+        it('refuses a head branch the repository does not have — the FR-5 copy, and NO createPullRequest', async () => {
+            const git = makeGit();
+            // The repository HAS `main` (so the base resolves) and does NOT have
+            // the head: precisely "the branch the Agent believes it pushed".
+            git.listBranches.mockResolvedValue([{ name: 'main' }]);
+            const { facade } = build({ git });
+
+            await expect(
+                facade.openPullRequest(prInput({ head: 'feature/never-pushed' })),
+            ).rejects.toThrow(
+                "openPullRequest: head branch 'feature/never-pushed' does not exist in " +
+                    'acme/acme-website. Push the branch before opening a pull request.',
+            );
+
+            // The refusal is the whole story — no pull request was opened with it.
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+            // …and the question was asked of the Work's OWN repository, with the
+            // Work's own provider, rather than of an empty target.
+            expect(git.listBranches).toHaveBeenCalledWith(
+                'acme',
+                'acme-website',
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+        });
+
+        it('opens the head branch it VERIFIED — one value, resolved once', async () => {
+            const git = makeGit();
+            const { facade } = build({ git });
+
+            await facade.openPullRequest(prInput({ head: '  feature/pricing  ' }));
+
+            expect(git.listBranches).toHaveBeenCalledTimes(1);
+            // The verified (trimmed) head is the head the provider is handed: a
+            // check whose answer is thrown away is not a check.
+            expect(git.createPullRequest.mock.calls[0][0].head).toBe('feature/pricing');
+        });
+
+        it('fails closed when the branch list cannot be read — never "assume the head exists"', async () => {
+            const git = makeGit();
+            git.listBranches.mockRejectedValue(new Error('listing forbidden'));
+            const { facade } = build({ git });
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow(
+                'openPullRequest: could not read the branches of acme/acme-website to verify ' +
+                    "the head branch 'feature/pricing' (listing forbidden).",
+            );
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('keeps the quality gate FIRST — a refused gate never reaches the branch read', async () => {
+            const { facade, git, prGate } = build({});
+            prGate.assertAllowed.mockRejectedValue(new Error('Quality gate red — build (red).'));
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow('Quality gate red');
+            expect(git.listBranches).not.toHaveBeenCalled();
+            expect(git.createPullRequest).not.toHaveBeenCalled();
         });
     });
 
