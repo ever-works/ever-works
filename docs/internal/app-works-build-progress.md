@@ -322,6 +322,35 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the App Works switch becomes operable end to end, and the facade grows its cross-repo surface.**
+  **APW-01 T20 + T7 + the deployment half — one switch, three places, one convention.**
+  `HIDDEN_WHEN_DISABLED_WORK_KINDS` moves to `apps/web/src/lib/work-kinds/flag-gated-kinds.ts` (deliberately NOT
+  `server-only`, because a client chip needs it while the flag helper must never reach a browser bundle) and the
+  helper's `FAIL_CLOSED_WORK_KINDS` re-points at it. The no-PostHog case now has a source: the runtime instance
+  setting, read **inside the call** — not a build-time `NEXT_PUBLIC_*` value, not a module constant — with a caller's
+  `gate.appWorksEnabled` winning over it. The API half is `config.everWorks.apps.worksEnabled()`, and
+  `EVER_WORKS_APP_WORKS_ENABLED` now reaches the **API and the web** container of all three manifests (13 insertions /
+  0 deletions each) — deliberately unlike the launcher's API-only catalog variables, because this gate is read on
+  both sides and a **half-flipped instance is the bug**. Proven by **eight perturbations**: ignoring the instance
+  setting (4 red), accepting `1`/`yes` (8 red), emptying the shared list (**red in both specs** — the point of the
+  move), the config accessor accepting any non-`false` (6 red), defaulting it ON (6 red), removing the switch from the
+  stage web container (2 red), flipping the dev web value while the API stayed false (1 red), and setting prod to
+  `"1"` (1 red). Every restore byte-identical. Tests: web `work-kinds` 39, agent `config.spec` 325, apps/api
+  `app-launcher` pattern **143**.
+  **APW-09 T4 — the facade's cross-repo pass-throughs and the member token** (+269/−0; `git.facade` 180 → **199**).
+  `getMemberAccountToken({ userId, providerId })` has no `workId` **by type**, and the two Work-scoped resolvers are
+  asserted never-called with a **positive control that drives them** — a negative assertion is worth what its control
+  is worth, and the first control was wrong (it drove a path that never reaches the resolver), which is exactly how
+  that was caught. 🛑 **The task text asks for an unsatisfiable assertion:** "not `GitFacadeError`" cannot hold,
+  because `GitOperationNotSupportedError` **extends** it; what `FacadeExceptionFilter` reads is the NAME (409 vs 500),
+  so the spec pins the constructor, the name and `name !== 'GitFacadeError'`. Reachable today:
+  `createBranchFromSha`/`updateBranchRef`. Dark, behind a clearly-marked seam that goes live with **zero facade
+  edits** once APW-09 T2 lands: the two review lists and the interaction limit (absent from both `packages/plugin`
+  and the GitHub plugin). T1 needs no facade work at all — the existing methods forward options and returns by
+  identity, asserted with `toBe`.
+  **APW-06 barrel follow-up** — the deployer and the kubeconfig guard are now reachable from the k8s package root
+  (11 additive lines), which T12's own report flagged.
+
 - **2026-09-18 · four slices land: the `app` kind, the validator, the deployer, and three GitHub capabilities.**
   **APW-01 T1/T3/T7b — the `app` Work kind** (contracts **3457 → 3482 tests**). `'app'` is appended after `'repo'` —
   the kind it is most often confused with, because that one _mirrors_ a repository and this one _runs_ it — with
