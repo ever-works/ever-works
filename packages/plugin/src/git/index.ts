@@ -50,7 +50,13 @@ export type {
 	GitDiffResult,
 	// Release promotion lane (self-build slice AI) — one named workflow's
 	// verdict for one commit.
-	GitWorkflowRun
+	GitWorkflowRun,
+	// Upstream pull requests (APW-09 T2) — the two review reads and the
+	// temporary interaction limit, with their element types.
+	GitPullRequestReviewState,
+	GitPullRequestReview,
+	GitPullRequestReviewComment,
+	GitInteractionLimit
 } from '../contracts/capabilities/git-provider.interface.js';
 
 export { isGitProviderPlugin } from '../contracts/capabilities/git-provider.interface.js';

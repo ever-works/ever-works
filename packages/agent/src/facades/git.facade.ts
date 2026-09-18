@@ -35,6 +35,14 @@ import type {
     GitPullRequestStatus,
     // Release promotion lane (self-build slice AI, EW-808).
     GitWorkflowRun,
+    // Upstream pull requests (APW-09 T2) — the two review reads and the
+    // temporary interaction limit, with their element types. Declared in
+    // `packages/plugin`'s git-provider contract; this facade owns no copy.
+    GitPullRequestReview,
+    GitPullRequestReviewComment,
+    GitInteractionLimit,
+    // APW-09 T1's review-state union, for the deprecated aliases below.
+    GitPullRequestReviewState,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -288,88 +296,39 @@ export interface MemberAccountTokenOptions {
 }
 
 /**
- * ── APW-09 T1/T2 provisional shapes (temporary seam) ──────────────────────
+ * ── APW-09 reviews, review comments and interaction limits ────────────────
  *
  * `listPullRequestReviews?`, `listPullRequestReviewComments?` and
  * `getInteractionLimit?` are APW-09 T2's additions to `IGitProviderPlugin`,
- * with their element types declared by T1/T2 in
- * `packages/plugin/src/contracts/capabilities/git-provider.interface.ts`.
- * Neither had landed when these pass-throughs were written, and
- * `packages/plugin` belongs to those tasks — so the three shapes below are
- * declared here for this facade's own signatures, and the methods are read
- * off the materialised plugin through
- * {@link GitProviderOptionalUpstreamCapability}.
+ * declared with their element types in
+ * `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` and
+ * imported above — there is no local shape here any more. Every optional
+ * method is read off the MATERIALISED plugin (`typeof impl === 'function'`)
+ * because the lazy-plugin proxy over-reports optional methods.
  *
- * Provisional means exactly this: when T2 lands, import the real
- * `GitPullRequestReview` / `GitPullRequestReviewComment` / interaction-limit
- * types from `@ever-works/plugin`, delete this block and delete the
- * `asUpstreamCapabilities` cast. No call site changes, because the runtime
- * contract — positional arguments, `typeof impl === 'function'` presence —
- * is already the one below.
- */
-export type UpstreamReviewState =
-    | 'approved'
-    | 'changes_requested'
-    | 'commented'
-    | 'dismissed'
-    | 'pending';
-
-export interface UpstreamPullRequestReview {
-    readonly id: number;
-    readonly author: string | null;
-    readonly state: UpstreamReviewState;
-    readonly body: string;
-    readonly submittedAt: string | null;
-}
-
-export interface UpstreamPullRequestReviewComment {
-    readonly id: number;
-    readonly author: string | null;
-    readonly body: string;
-    readonly path: string | null;
-    readonly line: number | null;
-    readonly createdAt: string | null;
-}
-
-/** The four temporary interaction limits, plus the `null` "cannot tell". */
-export type UpstreamInteractionLimit =
-    | 'none'
-    | 'existing_users'
-    | 'contributors_only'
-    | 'collaborators_only';
-
-/**
- * The three optional methods of the seam above, as this facade calls them.
+ * ## The four former local types are still exported, as aliases
  *
- * The view is cast with `as unknown as` on purpose: it has to compile both
- * BEFORE T2 declares these methods (today) and AFTER (when the real
- * declarations exist and this block is deleted) without either side's shape
- * becoming a build break for the other.
+ * The temporary seam declared `UpstreamReviewState`,
+ * `UpstreamPullRequestReview`, `UpstreamPullRequestReviewComment` and
+ * `UpstreamInteractionLimit` here, and T2's arrival made them redundant. They
+ * were **aliased rather than deleted**: this module is re-exported from the
+ * package root, so those four names are somebody's import today, and a rename
+ * that breaks a consumer to save twelve lines is not a trade worth making.
+ * Each alias is the contract type, so a consumer still on the old name keeps
+ * compiling and keeps getting the canonical shape.
  */
-interface GitProviderOptionalUpstreamCapability {
-    listPullRequestReviews?(
-        owner: string,
-        repo: string,
-        prNumber: number,
-        token: string,
-    ): Promise<UpstreamPullRequestReview[]>;
-    listPullRequestReviewComments?(
-        owner: string,
-        repo: string,
-        prNumber: number,
-        token: string,
-    ): Promise<UpstreamPullRequestReviewComment[]>;
-    getInteractionLimit?(
-        owner: string,
-        repo: string,
-        token: string,
-    ): Promise<UpstreamInteractionLimit | null>;
-}
 
-/** See {@link GitProviderOptionalUpstreamCapability} — the temporary T2 seam. */
-function asUpstreamCapabilities(plugin: IGitProviderPlugin): GitProviderOptionalUpstreamCapability {
-    return plugin as unknown as GitProviderOptionalUpstreamCapability;
-}
+/** @deprecated Import `GitPullRequestReviewState` from `@ever-works/plugin`. */
+export type UpstreamReviewState = GitPullRequestReviewState;
+
+/** @deprecated Import `GitPullRequestReview` from `@ever-works/plugin`. */
+export type UpstreamPullRequestReview = GitPullRequestReview;
+
+/** @deprecated Import `GitPullRequestReviewComment` from `@ever-works/plugin`. */
+export type UpstreamPullRequestReviewComment = GitPullRequestReviewComment;
+
+/** @deprecated Import `GitInteractionLimit` from `@ever-works/plugin`. */
+export type UpstreamInteractionLimit = GitInteractionLimit;
 
 @Injectable()
 export class GitFacadeService implements IGitFacade {
@@ -1566,9 +1525,9 @@ export class GitFacadeService implements IGitFacade {
         repo: string,
         prNumber: number,
         options: GitFacadeOptions,
-    ): Promise<UpstreamPullRequestReview[]> {
+    ): Promise<GitPullRequestReview[]> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        const impl = asUpstreamCapabilities(plugin).listPullRequestReviews;
+        const impl = plugin.listPullRequestReviews;
         if (typeof impl !== 'function') {
             throw new GitOperationNotSupportedError('listPullRequestReviews', plugin.id);
         }
@@ -1585,9 +1544,9 @@ export class GitFacadeService implements IGitFacade {
         repo: string,
         prNumber: number,
         options: GitFacadeOptions,
-    ): Promise<UpstreamPullRequestReviewComment[]> {
+    ): Promise<GitPullRequestReviewComment[]> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        const impl = asUpstreamCapabilities(plugin).listPullRequestReviewComments;
+        const impl = plugin.listPullRequestReviewComments;
         if (typeof impl !== 'function') {
             throw new GitOperationNotSupportedError('listPullRequestReviewComments', plugin.id);
         }
@@ -1609,9 +1568,9 @@ export class GitFacadeService implements IGitFacade {
         owner: string,
         repo: string,
         options: GitFacadeOptions,
-    ): Promise<UpstreamInteractionLimit | null> {
+    ): Promise<GitInteractionLimit | null> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        const impl = asUpstreamCapabilities(plugin).getInteractionLimit;
+        const impl = plugin.getInteractionLimit;
         if (typeof impl !== 'function') {
             return null;
         }

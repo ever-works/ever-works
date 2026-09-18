@@ -49,7 +49,11 @@ import type {
 	GitRepositoryCopyResult,
 	GitActionsPermissionsInput,
 	GitActionsPermissionsResult,
-	GitWebhookInput
+	GitWebhookInput,
+	// Upstream pull requests (APW-09 T2).
+	GitPullRequestReview,
+	GitPullRequestReviewComment,
+	GitInteractionLimit
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 // Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
@@ -504,6 +508,39 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 	): Promise<GitDiffResult> {
 		const settings = await this.getSettings();
 		return this.apiService.getCompareDiff(owner, repo, base, head, opts, token, settings.apiBaseUrl);
+	}
+
+	// Upstream pull requests (APW-09 T2) — the two review reads and the temporary
+	// interaction limit. Delegated EXPLICITLY, like every other optional member
+	// above: a service method with no delegation here reads as ABSENT to the
+	// lazy-plugin proxy, so every call would surface as `providerUnsupported`
+	// even though the provider implements it (G17). The signals stay distinct —
+	// the review lists throw the provider error, the interaction limit answers
+	// `null` for "cannot tell".
+
+	async listPullRequestReviews(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReview[]> {
+		const settings = await this.getSettings();
+		return this.apiService.listPullRequestReviews(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	async listPullRequestReviewComments(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReviewComment[]> {
+		const settings = await this.getSettings();
+		return this.apiService.listPullRequestReviewComments(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	async getInteractionLimit(owner: string, repo: string, token: string): Promise<GitInteractionLimit | null> {
+		const settings = await this.getSettings();
+		return this.apiService.getInteractionLimit(owner, repo, token, settings.apiBaseUrl);
 	}
 
 	async createPullRequestComment(

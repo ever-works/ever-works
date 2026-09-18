@@ -41,6 +41,12 @@ import type {
 	GitWorkflowRef,
 	GitWebhookInput,
 	GitProviderErrorDetails,
+	// Upstream pull requests (APW-09 T2): the two review reads and the temporary
+	// interaction limit.
+	GitPullRequestReview,
+	GitPullRequestReviewState,
+	GitPullRequestReviewComment,
+	GitInteractionLimit,
 	IGitOperations
 } from '@ever-works/plugin/git';
 import {
@@ -92,6 +98,117 @@ const REVIEW_DECISION_MAP: Record<string, GitReviewDecision> = {
 	CHANGES_REQUESTED: 'changes_requested',
 	REVIEW_REQUIRED: 'review_required'
 };
+
+// ── Upstream pull requests (APW-09 T1/T2) ────────────────────────────────────
+//
+// The cross-repository head, the review reads and the temporary interaction
+// limit of an upstream pull request. Every mapping below is ADDITIVE: a call
+// that passes none of the new fields sends exactly the request it sent before
+// (T1's "omission" rule), and a provider read that cannot answer says so
+// rather than inventing an answer.
+
+/**
+ * Review states, GitHub's spelling → the contract's (APW-09 T2).
+ *
+ * GitHub's five values are exactly the contract's five. An unrecognised value
+ * degrades to `commented` rather than being dropped: keeping the review visible
+ * with the WEAKEST effect is the one mapping that can neither invent an
+ * approval nor hide a reviewer, and the review-summary rule
+ * (`changes_requested` > `approved` > `commented`) already treats `commented`
+ * as contributing nothing but a name.
+ */
+const REVIEW_STATE_MAP: Record<string, GitPullRequestReviewState> = {
+	APPROVED: 'approved',
+	CHANGES_REQUESTED: 'changes_requested',
+	COMMENTED: 'commented',
+	DISMISSED: 'dismissed',
+	PENDING: 'pending'
+};
+
+/**
+ * Reviews and inline review comments read per pull request — one page, which is
+ * GitHub's maximum. APW-09 polls this list on every due row (`≤ 4 requests`),
+ * so a second page is not free and is not asked for: the caller diffs review
+ * ids between polls, and 100 reviews on one pull request is already past the
+ * point where a reviewer's LATEST word is what matters.
+ */
+const REVIEWS_PER_PAGE = 100;
+
+/** APW-09 `UPSTREAM_TEXT` bounds, applied where the strings enter the platform. */
+const REVIEW_BODY_MAX_BYTES = 8 * 1024;
+const REVIEW_COMMENT_BODY_MAX_BYTES = 4 * 1024;
+
+/** The four values GitHub's interaction-limit endpoints can report. */
+const INTERACTION_LIMITS: readonly GitInteractionLimit[] = [
+	'none',
+	'existing_users',
+	'contributors_only',
+	'collaborators_only'
+];
+
+/** Is this string one of the four contract interaction limits? */
+function isInteractionLimit(value: unknown): value is GitInteractionLimit {
+	return typeof value === 'string' && (INTERACTION_LIMITS as readonly string[]).includes(value);
+}
+
+/**
+ * Truncate a provider string to at most `maxBytes` UTF-8 bytes, on a code-point
+ * boundary.
+ *
+ * Capped HERE, where the provider's text enters the platform, because both
+ * consumers are size-bounded: the status poll checks `body.length` and the
+ * review follow-up seeds fenced review text into a Task brief bounded at 64 KB
+ * in total. A cut string carries a trailing `…` so a reader can tell a short
+ * review from a truncated one — the contract's review shapes have no
+ * `truncated` flag, and a silently cut instruction is worse than a visibly cut
+ * one. The ellipsis is inside the budget, so the result never exceeds
+ * `maxBytes`.
+ */
+function truncateUtf8(text: string, maxBytes: number): string {
+	// eslint-disable-next-line no-undef
+	if (typeof TextEncoder !== 'function') return text.slice(0, maxBytes);
+
+	// eslint-disable-next-line no-undef
+	const encoder = new TextEncoder();
+	if (encoder.encode(text).length <= maxBytes) return text;
+
+	const ELLIPSIS = '…';
+	const ELLIPSIS_BYTES = encoder.encode(ELLIPSIS).length;
+	const budget = Math.max(0, maxBytes - ELLIPSIS_BYTES);
+
+	let out = '';
+	let spent = 0;
+	// `for … of` iterates CODE POINTS, so a surrogate pair is never split into
+	// two lone halves (which would be encoded as replacement characters).
+	for (const char of text) {
+		const size = encoder.encode(char).length;
+		if (spent + size > budget) break;
+		out += char;
+		spent += size;
+	}
+	return out + ELLIPSIS;
+}
+
+/**
+ * The pull-request payload fields the T1 mappings read. Structural because the
+ * three reads (create/get/list/status) return the same three shapes and this
+ * file only needs the nested head repository.
+ */
+interface PullRequestHeadPayload {
+	readonly head?: {
+		readonly repo?: { readonly full_name?: string } | null;
+	} | null;
+}
+
+/**
+ * `"{owner}/{repo}"` of the head branch's repository, or `null` when the
+ * provider reported none — GitHub answers `head.repo: null` once the head
+ * repository is deleted, and that is a real answer APW-09 tracks (a pull
+ * request whose head repository is gone must not read as "still ours").
+ */
+function headRepoFullName(pr: PullRequestHeadPayload): string | null {
+	return pr.head?.repo?.full_name ?? null;
+}
 
 /**
  * How many of a commit's workflow runs to read when looking for one named
@@ -1585,6 +1702,27 @@ export class GitHubApiService {
 		}
 	}
 
+	/**
+	 * Open a pull request (APW-09 T1 — cross-repository head).
+	 *
+	 * Three additive options ride this call and NOTHING else changes about it:
+	 *
+	 * - `headOwner` composes `head` as `"{headOwner}:{head}"`, which is how
+	 *   GitHub names a branch of another repository — without it `head` can only
+	 *   ever mean a branch of the base repository, so an upstream pull request
+	 *   from the member's fork is unexpressible.
+	 * - `maintainerCanModify` is sent as `maintainer_can_modify` only when the
+	 *   caller defined it: `false` is a choice the member made, and defaulting it
+	 *   would rewrite that choice into "not specified".
+	 * - `headRepo` is sent as `head_repo` **only when the head owner equals the
+	 *   base owner** (plan §4, G23). GitHub needs the head repository named when
+	 *   base and head share an owner (the same-fork-network case); in the
+	 *   ordinary cross-owner case it resolves the head repository from `head`
+	 *   and an extra `head_repo` is not sent.
+	 *
+	 * A call that passes none of them sends byte-for-byte the request this method
+	 * sent before these options existed.
+	 */
 	async createPullRequest(options: CreatePROptions, token: string, baseUrl?: string): Promise<GitPullRequest> {
 		const octokit = this.createOctokit(token, baseUrl);
 
@@ -1592,10 +1730,14 @@ export class GitHubApiService {
 			owner: options.owner,
 			repo: options.repo,
 			title: options.title,
-			head: options.head,
+			head: options.headOwner ? `${options.headOwner}:${options.head}` : options.head,
 			base: options.base,
 			body: options.body || `Pull request from ${options.head} to ${options.base}`,
-			draft: options.draft || false
+			draft: options.draft || false,
+			...(options.maintainerCanModify === undefined
+				? {}
+				: { maintainer_can_modify: options.maintainerCanModify }),
+			...(options.headOwner === options.owner && options.headRepo ? { head_repo: options.headRepo } : {})
 		});
 
 		const author = await this.buildPrAuthor(data.user, token, baseUrl);
@@ -1609,6 +1751,9 @@ export class GitHubApiService {
 			createdAt: data.created_at,
 			updatedAt: data.updated_at,
 			body: data.body ?? undefined,
+			// `null` when the head repository was deleted; a real answer, not an
+			// omission (APW-09 T1).
+			headRepoFullName: headRepoFullName(data),
 			...(author ? { author } : {})
 		};
 	}
@@ -1641,6 +1786,9 @@ export class GitHubApiService {
 				createdAt: data.created_at,
 				updatedAt: data.updated_at,
 				body: data.body ?? undefined,
+				// APW-09 T1: which repository the head branch lives in — the
+				// fact that makes a tracked upstream pull request provable.
+				headRepoFullName: headRepoFullName(data),
 				...(author ? { author } : {}),
 				...(labels ? { labels } : {})
 			};
@@ -1686,6 +1834,14 @@ export class GitHubApiService {
 		};
 	}
 
+	/**
+	 * List pull requests (APW-09 T1 — the `head` filter).
+	 *
+	 * `options.head` (`"{owner}:{branch}"`) is passed through when set and
+	 * omitted otherwise, so an ordinary list request is unchanged. The filter is
+	 * what answers "is there already a pull request for MY fork branch?" in one
+	 * bounded request, which is the recovery path after a lost open (G17).
+	 */
 	async listPullRequests(
 		owner: string,
 		repo: string,
@@ -1700,7 +1856,8 @@ export class GitHubApiService {
 			repo,
 			state: options?.state || 'open',
 			per_page: options?.perPage || 30,
-			page: options?.page || 1
+			page: options?.page || 1,
+			...(options?.head ? { head: options.head } : {})
 		});
 
 		// Map sequentially: the per-author verified-org call is cached, so
@@ -1723,6 +1880,9 @@ export class GitHubApiService {
 				createdAt: pr.created_at,
 				updatedAt: pr.updated_at,
 				body: pr.body ?? undefined,
+				// APW-09 T1: the recovery path adopts an existing pull request
+				// only when its head repository AND branch equal the row's.
+				headRepoFullName: headRepoFullName(pr),
 				...(author ? { author } : {}),
 				...(labels ? { labels } : {})
 			});
@@ -1825,6 +1985,10 @@ export class GitHubApiService {
 			ciState: deriveCiState(checks),
 			checks: capped,
 			checksComplete: read.complete,
+			// APW-09 T1: the status poll is what notices a tracked pull
+			// request's head repository disappearing; `null` is that answer,
+			// not an omission.
+			headRepoFullName: headRepoFullName(pr),
 			url: pr.html_url,
 			title: pr.title
 		};
@@ -2024,6 +2188,18 @@ export class GitHubApiService {
 	 * the REQUEST (`per_page`) so we never pull a 3,000-file PR into
 	 * memory just to slice it; `capDiffFiles` then enforces the byte
 	 * budget and the final file cap with the shared rule.
+	 *
+	 * APW-09 T1 adds `totalCommits` to the result. `pulls.listFiles` — the read
+	 * this method is built on, and the only one that bounds the file cap at the
+	 * request — carries NO commit count, so the count comes from the pull
+	 * request itself (`pulls.get` → `commits`), which is the same question
+	 * ("how many commits does this pull request hold?") answered by the only
+	 * endpoint that holds it. That is one extra read on a display/approval path,
+	 * and it is deliberately NON-FATAL: the diff is the answer, the commit count
+	 * is advisory here (the upstream verifier reads it from `getCompareDiff`),
+	 * so a failed count read returns the diff with the field absent —
+	 * `undefined` meaning "this read did not report it", which is exactly what
+	 * the contract's optional field says.
 	 */
 	async getPullRequestDiff(
 		owner: string,
@@ -2045,12 +2221,22 @@ export class GitHubApiService {
 			per_page: Math.min(maxFiles + 1, 100)
 		});
 
-		return capDiffFiles(data.map(toDiffFile), opts);
+		const result = capDiffFiles(data.map(toDiffFile), opts);
+
+		try {
+			const pr = await octokit.rest.pulls.get({ owner, repo, pull_number: prNumber });
+			const commits = (pr.data as { commits?: unknown }).commits;
+			return typeof commits === 'number' ? { ...result, totalCommits: commits } : result;
+		} catch {
+			return result;
+		}
 	}
 
 	/**
 	 * PR insights (kanban M6) — `base...head` compare for a branch that
-	 * has no PR yet. Same caps, same shape.
+	 * has no PR yet. Same caps, same shape, and (APW-09 T1) the compare's own
+	 * `total_commits`, which is the count APW-09's `notSingleCommit` check reads
+	 * — never the file count, which cannot express it.
 	 */
 	async getCompareDiff(
 		owner: string,
@@ -2071,7 +2257,140 @@ export class GitHubApiService {
 			per_page: Math.min(maxFiles + 1, 100)
 		});
 
-		return capDiffFiles((data.files ?? []).map(toDiffFile), opts);
+		const result = capDiffFiles((data.files ?? []).map(toDiffFile), opts);
+		return typeof data.total_commits === 'number' ? { ...result, totalCommits: data.total_commits } : result;
+	}
+
+	/**
+	 * Every review on a pull request, oldest first (APW-09 T2).
+	 *
+	 * One bounded page (`per_page: 100`, GitHub's maximum) and a body cap of
+	 * 8 KB per review, applied here rather than at each consumer: the status job
+	 * reads this list on every due row, and the follow-up brief that quotes it is
+	 * bounded too.
+	 *
+	 * `state` is mapped onto the contract's five values and `submittedAt` is
+	 * `null` for a review GitHub reports without one (a `PENDING` review the
+	 * caller of this token has started but not submitted). A provider failure is
+	 * the contract's typed error, so a caller can tell "no reviews yet" (an empty
+	 * array) from "the read failed" (a throw) — the two must never collapse.
+	 */
+	async listPullRequestReviews(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequestReview[]> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			const { data } = await octokit.rest.pulls.listReviews({
+				owner,
+				repo,
+				pull_number: prNumber,
+				per_page: REVIEWS_PER_PAGE
+			});
+
+			return (data ?? []).slice(0, REVIEWS_PER_PAGE).map((review) => ({
+				id: review.id,
+				state: REVIEW_STATE_MAP[review.state ?? ''] ?? 'commented',
+				author: review.user?.login ?? null,
+				submittedAt: review.submitted_at ?? null,
+				body: truncateUtf8(review.body ?? '', REVIEW_BODY_MAX_BYTES)
+			}));
+		} catch (err) {
+			throw toGitProviderError(err, 'pull_requests');
+		}
+	}
+
+	/**
+	 * Inline review comments on a pull request (APW-09 T2) — the half of a
+	 * review that says WHICH line, which is what a review follow-up Task is
+	 * seeded with. One bounded page, 4 KB per body.
+	 */
+	async listPullRequestReviewComments(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequestReviewComment[]> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			const { data } = await octokit.rest.pulls.listReviewComments({
+				owner,
+				repo,
+				pull_number: prNumber,
+				per_page: REVIEWS_PER_PAGE
+			});
+
+			return (data ?? []).slice(0, REVIEWS_PER_PAGE).map((comment) => ({
+				id: comment.id,
+				author: comment.user?.login ?? null,
+				body: truncateUtf8(comment.body ?? '', REVIEW_COMMENT_BODY_MAX_BYTES),
+				path: comment.path ?? null,
+				// `line` is null on a comment GitHub considers outdated (the
+				// diff moved under it) and for a file-level comment; the
+				// ORIGINAL line is deliberately NOT substituted, because a
+				// caller pointing an agent at a line must be told when the
+				// anchor no longer exists rather than be sent to the wrong one.
+				line: comment.line ?? null,
+				createdAt: comment.created_at ?? null
+			}));
+		} catch (err) {
+			throw toGitProviderError(err, 'pull_requests');
+		}
+	}
+
+	/**
+	 * The repository's TEMPORARY interaction limit (APW-09 T2, G16) —
+	 * `'none' | 'existing_users' | 'contributors_only' | 'collaborators_only'`,
+	 * or `null` for "cannot tell".
+	 *
+	 * The mapping is deliberately conservative in one direction only:
+	 *
+	 * - A `403` (a token without admin rights — GitHub's answer for this
+	 *   endpoint) and a `404` (an invisible repository) answer `null`, never
+	 *   `'none'`. "I was not allowed to look" is not "there is no limit", and a
+	 *   caller that read it as unrestricted would open a pull request into a
+	 *   repository that restricts interactions.
+	 * - An EMPTY answer (GitHub's `204` when a repository has no temporary
+	 *   limit) answers `null` too, which is the same rule the plan states
+	 *   ("404/403/empty → null, never `'none'`"): `null` refuses nothing new,
+	 *   and only a provider that literally reports a limit value is believed.
+	 *   `'none'` therefore remains reachable for a provider that says it and is
+	 *   never fabricated here.
+	 * - Every other failure (a 5xx, a spent rate limit, a transport error)
+	 *   THROWS rather than answering `null`: a broken read and an answer of
+	 *   "cannot tell" send the operator to different places, and swallowing a
+	 *   500 into a silent `null` would hide a provider that is down.
+	 *
+	 * This read answers the TEMPORARY limit only. `pullRequestsDisabled` and
+	 * `outsideContributorCap` are the repository-level control and the
+	 * outside-contributor cap — different settings, read elsewhere.
+	 */
+	async getInteractionLimit(
+		owner: string,
+		repo: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitInteractionLimit | null> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			const response = await octokit.rest.interactions.getRestrictionsForRepo({ owner, repo });
+			// `204 No Content` (no temporary limit) arrives with no usable
+			// body; the optional chain is what turns it into `null`.
+			const limit = (response.data as { limit?: unknown } | undefined)?.limit;
+			return isInteractionLimit(limit) ? limit : null;
+		} catch (err) {
+			if (err instanceof RequestError && (err.status === 403 || err.status === 404)) {
+				return null;
+			}
+			throw err;
+		}
 	}
 
 	async createPullRequestComment(

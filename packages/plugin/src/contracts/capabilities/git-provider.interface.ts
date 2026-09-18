@@ -236,6 +236,37 @@ export interface CreatePROptions {
 	readonly base: string;
 	readonly body?: string;
 	readonly draft?: boolean;
+	/**
+	 * Cross-repository head (APW-09 T1, plan §4) — the OWNER the `head`
+	 * branch lives under, when that is not the base repository's owner.
+	 *
+	 * Without it `head` is a bare branch name, which can only ever name a
+	 * branch of the base repository: an upstream pull request whose head
+	 * lives in the member's fork is unexpressible. GitHub spells the pair
+	 * `head = "<headOwner>:<branch>"`; the provider composes it.
+	 *
+	 * OPTIONAL and additive. A call that omits it sends exactly the
+	 * request it sent before this field existed, which is why every
+	 * existing caller and provider compiles and behaves unchanged.
+	 */
+	readonly headOwner?: string;
+	/**
+	 * The head REPOSITORY's name, when it differs from `repo` (the member
+	 * forked `upstream/widgets` to `member/widgets-fork`). GitHub needs it
+	 * only in the one case plan §4 names — a head repository that shares
+	 * the base owner (G23) — and a provider that cannot express a
+	 * different head repository omits it rather than guessing.
+	 */
+	readonly headRepo?: string;
+	/**
+	 * "Allow edits and access to secrets by maintainers" — GitHub's
+	 * `maintainer_can_modify`.
+	 *
+	 * OPTIONAL and only SENT when defined: `false` is a value the member
+	 * chose, so a defaulting provider must not collapse "the member
+	 * unchecked it" into "the caller did not say".
+	 */
+	readonly maintainerCanModify?: boolean;
 }
 
 export interface MergeOptions {
@@ -330,6 +361,21 @@ export interface GitPullRequest {
 	 * a permission it grants.
 	 */
 	readonly labels?: readonly string[];
+	/**
+	 * `"{owner}/{repo}"` of the repository the head branch lives in, as the
+	 * provider reports it — the field that makes an upstream pull request
+	 * PROVABLE after the fact (APW-09 T1, plan §1.2/G17).
+	 *
+	 * `head` alone is a branch name, and a branch name says nothing about
+	 * which repository it is in: a tracked upstream pull request whose
+	 * head repository was deleted, renamed or never the fork would read
+	 * exactly like one that came from the member's fork. `null` is a real
+	 * answer — the provider reported no head repository (GitHub sends
+	 * `head.repo: null` once the head repository is deleted) — and is
+	 * deliberately distinct from `undefined`, which means "this read did
+	 * not report it".
+	 */
+	readonly headRepoFullName?: string | null;
 }
 
 export interface GitRepositoryPermissions {
@@ -359,6 +405,18 @@ export interface ListPullRequestsOptions {
 	readonly state?: 'open' | 'closed' | 'all';
 	readonly perPage?: number;
 	readonly page?: number;
+	/**
+	 * Filter by head (`"{owner}:{branch}"`, GitHub's own `head` filter) —
+	 * APW-09 T1 (G17).
+	 *
+	 * The upstream-recovery path asks "is there already a pull request for
+	 * MY fork branch?" after a lost open, and answering it by listing
+	 * every pull request and filtering locally both burns pages and can
+	 * miss the row (a fork with many open pull requests). OPTIONAL: a
+	 * provider without the filter omits the field and the caller keeps
+	 * paging.
+	 */
+	readonly head?: string;
 }
 
 // ── PR insights (kanban run cockpit M5/M6) ─────────────────────────
@@ -455,6 +513,14 @@ export interface GitPullRequestStatus {
 	readonly checksComplete?: boolean;
 	readonly url?: string;
 	readonly title?: string;
+	/**
+	 * `"{owner}/{repo}"` of the head branch's repository — the same fact
+	 * `GitPullRequest.headRepoFullName` carries, on the STATUS read
+	 * (APW-09 T1). The status poll is what notices that a tracked pull
+	 * request's head repository has gone; `null` means the provider
+	 * reported none, `undefined` that this read did not report it.
+	 */
+	readonly headRepoFullName?: string | null;
 }
 
 // ── Workflow runs (release promotion lane, self-build slice AI) ─────
@@ -517,6 +583,79 @@ export interface GitWorkflowRun {
 	readonly pullRequestNumbers?: readonly number[];
 }
 
+// ── Upstream pull requests (APW-09 T2, plan §3.3/§4) ────────────────
+//
+// The two review reads and the temporary-interaction-limit read an upstream
+// pull request needs, plus their element types. All three members are
+// OPTIONAL on `IGitProviderPlugin` (declared at the foot of this file), and
+// the calling rule is the one the fork-lifecycle group already states:
+// **materialise the method on the plugin instance before calling it**,
+// because the lazy-plugin proxy over-reports optional methods.
+//
+// Nothing here reuses `GitReviewDecision`: that type is GitHub's
+// `review_decision` AGGREGATE ("the pull request as a whole"), and the
+// review SUMMARY APW-09 derives (latest non-`pending`, non-`dismissed` review
+// per author, `changes_requested` > `approved` > `commented`) cannot be
+// computed from an aggregate that never says who reviewed or when.
+
+/** The five review states a provider's review list is mapped onto. */
+export type GitPullRequestReviewState = 'approved' | 'changes_requested' | 'commented' | 'dismissed' | 'pending';
+
+/**
+ * One review submitted on a pull request.
+ *
+ * The state union is closed and five-valued on purpose: `dismissed` and
+ * `pending` are NOT folded into `commented`. A dismissed review no longer
+ * counts for or against the pull request, and a pending one has not been
+ * submitted at all, so a summary that treated either as a comment would
+ * report a reviewer's opinion that the upstream project does not have.
+ */
+export interface GitPullRequestReview {
+	/** Provider-side review id — the identity a status poll diffs on. */
+	readonly id: number;
+	readonly state: GitPullRequestReviewState;
+	/** Reviewer login; `null` when the provider reports no author. */
+	readonly author: string | null;
+	/** ISO timestamp, or `null` for a review that was never submitted. */
+	readonly submittedAt: string | null;
+	/** Review body, capped by the implementation (APW-09: ≤ 8 KB). */
+	readonly body: string;
+}
+
+/**
+ * One inline review comment on a pull request — a comment on a line of a
+ * file, which is the half of a review a follow-up Task must be seeded with
+ * (a review's own `body` is the summary; the comments are the instructions).
+ */
+export interface GitPullRequestReviewComment {
+	readonly id: number;
+	/** Commenter login; `null` when the provider reports no author. */
+	readonly author: string | null;
+	/** Comment body, capped by the implementation (APW-09: ≤ 4 KB). */
+	readonly body: string;
+	/** File the comment is anchored to; `null` for a file-level comment. */
+	readonly path: string | null;
+	/**
+	 * Line the comment is anchored to; `null` when the provider reports no
+	 * line (an outdated comment on a commit the pull request no longer
+	 * points at, or a provider without line anchors).
+	 */
+	readonly line: number | null;
+	/** ISO timestamp, or `null` when the provider reports none. */
+	readonly createdAt: string | null;
+}
+
+/**
+ * A repository's TEMPORARY interaction limit — the four values GitHub's
+ * `interaction-limits` endpoint can report.
+ *
+ * `null` (the return type of `getInteractionLimit?`) is a fifth answer and
+ * NOT a synonym for `'none'`: it means "cannot tell" — the read was refused,
+ * the repository is invisible, or the provider has no such capability — and
+ * a caller must never read it as "unrestricted" (APW-09 G16).
+ */
+export type GitInteractionLimit = 'none' | 'existing_users' | 'contributors_only' | 'collaborators_only';
+
 /** Hard caps a diff request may ask for. */
 export interface GitDiffOptions {
 	readonly maxBytes?: number;
@@ -556,6 +695,20 @@ export interface GitDiffResult {
 	readonly totalDeletions: number;
 	/** Bytes of patch text actually returned. */
 	readonly patchBytes: number;
+	/**
+	 * How many COMMITS the compared range holds, as the provider reports it
+	 * (GitHub's compare payload carries `total_commits`) — APW-09 T1 (G13).
+	 *
+	 * It exists because a commit count cannot be derived from the file list
+	 * at all: one commit can touch forty files and forty commits can touch
+	 * one. APW-09's `notSingleCommit` check reads THIS and never the file
+	 * count.
+	 *
+	 * OPTIONAL, and absence is meaningful: `undefined` is "this read did
+	 * not report a commit count" (a provider whose diff endpoint has none,
+	 * or a file-list-backed read), never "zero commits".
+	 */
+	readonly totalCommits?: number;
 }
 
 /**
@@ -953,6 +1106,70 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		options: { force: false },
 		token: string
 	): Promise<GitBranch>;
+
+	// ── Upstream pull requests (APW-09 T2, plan §4) ──────────────────────────
+	//
+	// Three OPTIONAL reads an upstream pull request needs while it is open,
+	// with the element types declared above. Same calling rule as the fork
+	// group: materialise the member on the plugin before calling it.
+	//
+	// The two review lists THROW when absent rather than answering `[]`,
+	// because an empty list is a fact ("nobody reviewed this yet") and the
+	// absence is a different one ("this provider cannot answer"), and only
+	// the caller can decide which of the two its surface should show. The
+	// interaction limit is the exception: its absence answers `null`, which
+	// is already this read's own honest answer for "cannot tell".
+
+	/**
+	 * Every review on a pull request, oldest first, bounded (APW-09: ≤ 100
+	 * reviews, each `body` ≤ 8 KB).
+	 *
+	 * The bound is a real one, not a hint: a status poll reads this list on
+	 * every due row, and GitHub's default page is 30. An implementation
+	 * must not silently page past the cap — the caller derives its review
+	 * summary from what it is given and diffs new ids on the next poll.
+	 *
+	 * OPTIONAL. Callers MUST materialise `listPullRequestReviews` on the
+	 * plugin before calling it (the lazy-plugin proxy over-reports optional
+	 * methods).
+	 */
+	listPullRequestReviews?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReview[]>;
+
+	/**
+	 * Inline review comments on a pull request, bounded (APW-09: ≤ 100
+	 * comments, each `body` ≤ 4 KB) — the brief a review follow-up is
+	 * seeded with.
+	 *
+	 * OPTIONAL. Callers MUST materialise `listPullRequestReviewComments` on
+	 * the plugin before calling it.
+	 */
+	listPullRequestReviewComments?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReviewComment[]>;
+
+	/**
+	 * The repository's temporary interaction limit, or `null` for "cannot
+	 * tell" — which includes every refused read (APW-09 G16: a 403, a 404
+	 * and an empty answer are NOT `'none'`).
+	 *
+	 * This answers the TEMPORARY limit only. A repository that has pull
+	 * requests switched off, or a cap on pull requests from outside
+	 * contributors, are different repository-level settings with their own
+	 * refusal codes; conflating them here would report an unrelated refusal
+	 * as "interactions are restricted".
+	 *
+	 * OPTIONAL. Callers MUST materialise `getInteractionLimit` on the
+	 * plugin before calling it.
+	 */
+	getInteractionLimit?(owner: string, repo: string, token: string): Promise<GitInteractionLimit | null>;
 }
 
 export function isGitProviderPlugin(plugin: IPlugin): plugin is IGitProviderPlugin {
