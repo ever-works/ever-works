@@ -238,3 +238,7 @@ export * from './work-upstream-state.entity';
 // row per (Work, kind) recording what a dependency provider provisioned.
 export * from './work-app-env-value.entity';
 export * from './work-app-dependency.entity';
+// APW-03 App spec & catalog — one row per App Work: the head reading, the
+// effective spec at a commit, the Blueprint it came from and the licence
+// classification, plus the sequence columns the evaluation coalesces on.
+export * from './work-app-spec-state.entity';

@@ -188,6 +188,9 @@ import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 // row per (Work, kind) recording what a dependency provider provisioned.
 import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
 import { WorkAppDependency } from '../entities/work-app-dependency.entity';
+// APW-03 App spec & catalog — the per-App-Work spec state row (head reading,
+// effective spec, Blueprint and licence classification).
+import { WorkAppSpecState } from '../entities/work-app-spec-state.entity';
 
 import {
     PluginEntity,
@@ -487,4 +490,7 @@ export const ENTITIES = [
     // Work, and the dependency rows a provider provisions and reports on.
     WorkAppEnvValue,
     WorkAppDependency,
+    // APW-03 App spec & catalog — the App spec state of one App Work, and the
+    // row every evaluation and licence classification coalesces on.
+    WorkAppSpecState,
 ];

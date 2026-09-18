@@ -133,3 +133,11 @@ export * from './repositories/work-upstream-state.repository';
 // entry that is not a provider there.
 export * from './repositories/work-app-env-value.repository';
 export * from './repositories/work-app-dependency.repository';
+// APW-03 App spec & catalog — the App spec state of one App Work, and the
+// coalescing arithmetic (`requestedSeq` / `startedSeq` / `evaluatedSeq` and the
+// licence pair) that only this repository may touch. Feature-owned and wired by
+// the App spec module, so it is exported here rather than listed in
+// `_repository-inventory.ts` — that file is only for the repositories
+// `DatabaseModule` itself wires, and its drift check fails on an entry that is
+// not a provider there.
+export * from './repositories/work-app-spec-state.repository';

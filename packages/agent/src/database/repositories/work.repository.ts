@@ -278,6 +278,74 @@ export class WorkRepository {
     }
 
     /**
+     * APW-03 T11 (plan §1.1:45, §6.5:693-694) — every **App Work** whose Work
+     * Repository is `<owner>/<repo>`, case-insensitively, **for one tenant**.
+     * This is the lookup the `push` / `pull_request` intake of APW-03 uses to
+     * turn a GitHub delivery into `requestEvaluation(workId, 'push')`.
+     *
+     * It is a sibling of {@link findByDataRepoFullName}, not a replacement, and
+     * the three differences are each a defect that sibling would cause here:
+     *
+     *   1. **Kind `app` only.** Only an App Work has an App spec to evaluate,
+     *      and only an App Work's code lives in the Work Repository.
+     *   2. **The `website` role, not `data`.** README §1's repository-role note
+     *      is explicit: "An App Work's app-code fork — the repository Tasks,
+     *      builds and deploys target — is the Work Repository (`website`
+     *      role)". The `data` role of an App Work holds its data, so matching on
+     *      it would evaluate the wrong repository.
+     *   3. **No `githubAppInstalled` filter.** `findByDataRepoFullName` selects
+     *      Works the platform GitHub App is installed on. The normal Wave 1 App
+     *      Work is a fork in the member's own account whose webhook APW-02
+     *      created, with no platform App anywhere near it — filtering on that
+     *      flag would find no App Work at all.
+     *
+     * **The scope is not optional.** `findByDataRepoFullName` has no owner
+     * binding, so one tenant's delivery would request evaluations for every
+     * tenant's Works on that repository. The delivery's binding identifies one
+     * owner, and this method refuses to answer without it: an organization
+     * binding matches `organizationId` **alone** (the Works of that
+     * Organization belong to whichever member created them, so combining it
+     * with `userId` would miss them), a personal binding matches `userId`, and
+     * neither means no answer rather than an unscoped one.
+     *
+     * `sourceRepository` is a `simple-json` column, so the JSON is filtered in
+     * memory — the same portable split {@link findByDataRepoFullName} and
+     * {@link findRepositoryWorksWrapping} use, with `kind` and the scope column
+     * narrowing the candidate set in SQL.
+     */
+    async findAppWorksByDataRepoFullName(
+        fullName: string,
+        scope: { userId?: string; organizationId?: string } = {},
+    ): Promise<Work[]> {
+        const { userId, organizationId } = scope ?? {};
+
+        if (!fullName || !fullName.includes('/') || (!organizationId && !userId)) {
+            return [];
+        }
+
+        const query = this.repository
+            .createQueryBuilder('work')
+            .where('work.kind = :kind', { kind: 'app' });
+
+        if (organizationId) {
+            query.andWhere('work.organizationId = :organizationId', { organizationId });
+        } else {
+            query.andWhere('work.userId = :userId', { userId });
+        }
+
+        const candidates = await query.getMany();
+        const target = fullName.toLowerCase();
+
+        return candidates.filter((work) => {
+            const website = work.sourceRepository?.relatedRepositories?.website;
+            if (!website?.owner || !website?.repo) {
+                return false;
+            }
+            return `${website.owner}/${website.repo}`.toLowerCase() === target;
+        });
+    }
+
+    /**
      * Repository Work (self-build slice D, EW-766) — every `repo` Work that
      * wraps `<owner>/<repo>`, case-insensitively, regardless of who owns it.
      *
