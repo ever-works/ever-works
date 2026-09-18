@@ -184,6 +184,10 @@ import { AppLauncherPreference } from '../entities/app-launcher-preference.entit
 // APW-02 Fork lifecycle — the per-App-Work upstream state row. Concrete path,
 // never the barrel: see the module docstring.
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+// APW-07 App env & dependencies — one encrypted value per (Work, name), and one
+// row per (Work, kind) recording what a dependency provider provisioned.
+import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
+import { WorkAppDependency } from '../entities/work-app-dependency.entity';
 
 import {
     PluginEntity,
@@ -479,4 +483,8 @@ export const ENTITIES = [
     // APW-02 Fork lifecycle — the Upstream state of one App Work: readiness,
     // Actions hygiene, schedule, divergence and the manual-sync allowance.
     WorkUpstreamState,
+    // APW-07 App env & dependencies — the stored Environment values of one App
+    // Work, and the dependency rows a provider provisions and reports on.
+    WorkAppEnvValue,
+    WorkAppDependency,
 ];

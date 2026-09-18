@@ -241,6 +241,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkAgentPreference',
     'WorkAgentRun',
     'WorkAgentRunLog',
+    // APW-07 App env & dependencies — one encrypted value per (Work, name),
+    // and one row per (Work, kind) recording what a provider provisioned.
+    'WorkAppDependency',
+    'WorkAppEnvValue',
     'WorkBudget',
     'WorkBudgetAlertState',
     'WorkBuildRequest',
