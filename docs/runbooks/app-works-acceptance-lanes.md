@@ -75,11 +75,20 @@ environment — substitute your own origins for the variables.
 #    must already reach it). Port 3900.
 node apps/web/e2e/fakes/github-fake/server.mjs &
 
+# 1a. BUILD THE PLUGIN PACKAGES FIRST. `packages/plugins/github/dist` absent is the single most
+#     expensive oversight here: the API logs "Failed to load plugin module from …packages/plugins/github"
+#     and every GitProvider read then answers `connected: false`, so a lane looks like "no GitHub
+#     connection" instead of "the plugin was never built".
+pnpm --filter @ever-works/github-plugin build
+
 # 2. The API — built dist, in-memory SQLite, the lane's switches. Port 3100.
 DATABASE_TYPE=sqlite DATABASE_IN_MEMORY=true DATABASE_AUTOMIGRATE=true \
 AUTH_SECRET=<32+ chars> NODE_ENV=development PORT=3100 \
+REQUIRE_EMAIL_VERIFICATION=false \
 EVER_WORKS_E2E_FAKES=1 APW_E2E_GITHUB_FAKE_URL=<the fake's origin> \
-EVER_WORKS_APP_WORKS_ENABLED=true node apps/api/dist/main.js &
+EVER_WORKS_APP_WORKS_ENABLED=true DEPLOY_EVER_WORKS_ENABLED=true \
+EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER=3 \
+GITHUB_APP_WEBHOOK_SECRET=<any CI-only value> node apps/api/dist/main.js &
 
 # 3. The web — a PROD build (`next build` first), and the port must be set for the web process only.
 NODE_ENV=production PORT=3000 pnpm --filter ever-works-web start &
@@ -105,6 +114,21 @@ pnpm --filter ever-works-web exec playwright test -c playwright.app-works.config
   defaulted; the secret deliberately never is.
 - **The API takes minutes to boot on a loaded machine** (route-table compilation). The workflow's
   readiness loop retries with connection refused until it answers; that is expected, not a failure.
+- **Four variables are load-bearing in ways the first version of this runbook did not say**, each of which
+  cost a stack restart to find (recorded by APW-13 T63, 2026-09-18):
+    - `pnpm --filter @ever-works/github-plugin build` **before** the API, or every GitProvider read answers
+      `connected: false` and the lane looks unconnected rather than unbuilt (§4 step 1a).
+    - `REQUIRE_EMAIL_VERIFICATION=false`, or `POST /api/auth/login` answers **403 "Email not verified"** and
+      the Playwright global setup dies before a single spec runs.
+    - `DEPLOY_EVER_WORKS_ENABLED=true`, or the managed-subdomain lane's cap and allocation-boundary cases
+      fail — without it the platform rewrites `deployProvider: 'ever-works'` to `'vercel'` and the cap is
+      unreachable.
+    - `GITHUB_APP_WEBHOOK_SECRET` must reach the **Playwright** process as well as the API, or the four
+      intake specs self-skip instead of signing their own deliveries.
+- **A concurrent build of a workspace package can wipe `apps/api/dist` mid-build.** Rebuilding
+  `packages/plugin` or `packages/agent` in another process while the API is building produces phantom type
+  errors and an empty `dist`; if the API stops starting, rebuild it **after** the package builds finish
+  rather than chasing the errors.
 
 ---
 

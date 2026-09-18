@@ -191,6 +191,13 @@ export const CAPABILITY_LABELS: Record<string, string> = {
     'put-object': 'Put Object',
     'get-object': 'Get Object',
     'presigned-put': 'Presigned Upload',
+    // The three capabilities the App Works epics added (register row C4, 2026-09-18). The map is a
+    // non-exhaustive `Record<string, string>` with a humanise fallback, so these are not required for it
+    // to compile — they exist so the labels read the way the product names these things instead of
+    // falling through to `App Dependency` / `Build` / `Identity Provider` derived from the raw key.
+    build: 'Build',
+    'app-dependency': 'App Dependency',
+    'identity-provider': 'Identity Provider',
 };
 
 /**
