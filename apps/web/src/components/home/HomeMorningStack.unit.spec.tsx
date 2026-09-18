@@ -21,7 +21,13 @@ vi.mock('@/lib/hooks/use-active-scope', () => ({
         activeOrganization: { slug: 'acme', displayName: 'Acme', legalName: null },
     }),
 }));
-vi.mock('@/app/actions/dashboard/home', () => ({ createHomeTaskAction: vi.fn() }));
+// The composer is the `/new` prompt + chips (`HomeStartComposer`), covered by
+// its own spec and by `e2e/home-start.spec.ts`. Here it is a stub, so this
+// spec can pin the STACK — the order of the blocks and their states — without
+// dragging the composer's chat/attachment machinery in.
+vi.mock('./HomeStartComposer', () => ({
+    HomeStartComposer: () => <div data-testid="home-composer" />,
+}));
 
 import { HomeMorningStack, isFirstRunSummary } from './HomeMorningStack';
 
@@ -141,11 +147,12 @@ function renderStack(
             onError={(e) => errors.push(e)}
         >
             <HomeMorningStack
-                userName="Dana"
                 summary={value}
-                renderedAt={COMPUTED_AT}
                 attentionItems={attentionItems}
                 jobRuntimeConfigured
+                // The stats card is page data rather than morning-read data, so
+                // the page passes it in; here it is a marker for the ordering.
+                workspaceStats={<div data-testid="home-workspace-stats" />}
             />
         </NextIntlClientProvider>,
     );
@@ -157,31 +164,32 @@ describe('HomeMorningStack', () => {
         refresh.mockReset();
     });
 
-    it('renders the morning read in order with the score line (S1)', () => {
+    it('renders the stack in the owner’s order, composer first and recent activity last', () => {
         const { errors } = renderStack(summary());
 
-        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Good morning, Dana.');
-        expect(screen.getByTestId('home-score-line')).toHaveTextContent(
-            '3 need you·2 working now·7 done today·1 failed',
-        );
+        // Owner 2026-09-18 — no greeting, no subtitle, no date line, no
+        // "Times shown in UTC." footnote anywhere on the page.
+        expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+        expect(screen.queryByTestId('home-greeting')).toBeNull();
+        expect(screen.queryByTestId('home-score-line')).toBeNull();
+        expect(screen.queryByTestId('home-timezone-footnote')).toBeNull();
+
         const order = [
-            'needsYou',
-            'glance',
-            'today',
-            'thisWeek',
-            'workingNow',
-            'recentActivity',
-        ].map((id) => screen.getByTestId(`home-block-${id}`));
+            'home-composer',
+            'home-workspace-stats',
+            'home-block-needsYou',
+            'home-block-workingNow',
+            'home-block-today',
+            'home-block-thisWeek',
+            'home-block-recentActivity',
+        ].map((id) => screen.getByTestId(id));
+
         for (let index = 1; index < order.length; index += 1) {
             expect(
                 order[index - 1].compareDocumentPosition(order[index]) &
                     Node.DOCUMENT_POSITION_FOLLOWING,
             ).toBeTruthy();
         }
-        expect(
-            screen.getByTestId('home-composer').compareDocumentPosition(order[0]) &
-                Node.DOCUMENT_POSITION_FOLLOWING,
-        ).toBeTruthy();
         expect(errors).toEqual([]);
     });
 
@@ -221,7 +229,6 @@ describe('HomeMorningStack', () => {
         expect(screen.getAllByTestId('home-decision-row')).toHaveLength(5);
         expect(screen.getByTestId('home-needs-you-open-all')).toHaveTextContent('Open all (14)');
         expect(screen.getByText('9 more waiting')).toBeInTheDocument();
-        expect(screen.getByTestId('home-score-line')).toHaveTextContent('14 need you');
     });
 
     it('renders the platform failures under Also broken, outside the decision count', () => {
@@ -250,19 +257,6 @@ describe('HomeMorningStack', () => {
         expect(screen.getByRole('region', { name: 'Working now (2)' })).toBeInTheDocument();
     });
 
-    it('colours the failed-today counter only when it is above zero', () => {
-        renderStack(summary());
-        expect(screen.getByTestId('home-glance-failedToday')).toHaveAttribute(
-            'data-tone',
-            'danger',
-        );
-        expect(screen.getByTestId('home-glance-failedToday')).toHaveAttribute(
-            'href',
-            '/runs?g=day&status=failed',
-        );
-        expect(screen.getByTestId('home-glance-doneToday')).toHaveAttribute('data-tone', 'neutral');
-    });
-
     it('fails one block without touching the others, and retries by re-reading (S10)', () => {
         renderStack(summary({ today: { status: 'failed', errorKey: 'timeout', data: null } }));
 
@@ -287,12 +281,13 @@ describe('HomeMorningStack', () => {
         expect(screen.getByTestId('home-summary-error')).toHaveTextContent(
             "We couldn't load your morning report.",
         );
-        expect(screen.getByRole('textbox')).toBeEnabled();
-        expect(screen.queryByTestId('home-score-line')).toBeNull();
+        expect(screen.getByTestId('home-composer')).toBeInTheDocument();
+        // The stats card is page data and survives a failed morning read.
+        expect(screen.getByTestId('home-workspace-stats')).toBeInTheDocument();
         expect(screen.getByTestId('dashboard-attention')).toBeInTheDocument();
     });
 
-    it('suppresses the score line when every counter is zero and shows the first-run card (S9)', () => {
+    it('shows the first-run card for an account with nothing at all (S9)', () => {
         const empty = summary({
             needsYou: {
                 status: 'ok',
@@ -308,12 +303,14 @@ describe('HomeMorningStack', () => {
         expect(isFirstRunSummary(empty)).toBe(true);
         renderStack(empty);
 
-        expect(screen.queryByTestId('home-score-line')).toBeNull();
         expect(screen.getByTestId('home-first-run')).toHaveTextContent('Nothing yet.');
         expect(screen.getByRole('link', { name: 'Set up your first agent' })).toHaveAttribute(
             'href',
             '/agents/new',
         );
+        // The composer and the workspace card lead, first run or not.
+        expect(screen.getByTestId('home-composer')).toBeInTheDocument();
+        expect(screen.getByTestId('home-workspace-stats')).toBeInTheDocument();
     });
 
     it('never reads a failed block as a first run', () => {
@@ -325,12 +322,5 @@ describe('HomeMorningStack', () => {
             },
         });
         expect(isFirstRunSummary(partial)).toBe(false);
-    });
-
-    it('explains a UTC fallback (S18)', () => {
-        renderStack(summary({ timezone: 'UTC', timezoneFallback: true }));
-        expect(screen.getByTestId('home-timezone-footnote')).toHaveTextContent(
-            'Times shown in UTC.',
-        );
     });
 });

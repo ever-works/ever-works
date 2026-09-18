@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { AlertTriangle, Sun } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { HomeSummaryDto } from '@ever-works/contracts';
@@ -9,25 +10,26 @@ import { SoonSection } from '@/components/dashboard/SoonSection';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useActiveScope } from '@/lib/hooks/use-active-scope';
 import { ROUTES } from '@/lib/constants';
-import { GlanceCounters } from './GlanceCounters';
-import { HomeComposer } from './HomeComposer';
-import { HomeGreeting } from './HomeGreeting';
+import { HomeStartComposer } from './HomeStartComposer';
 import { NeedsYouBlock } from './NeedsYouBlock';
 import { RecentActivityBlock } from './RecentActivityBlock';
 import { ThisWeekPanel } from './ThisWeekPanel';
 import { WorkingNowPanel } from './WorkingNowPanel';
 
 interface HomeMorningStackProps {
-    userName: string;
     /** The composed morning read; null when the whole summary could not be read. */
     summary: HomeSummaryDto | null;
-    /** The instant the page rendered, for the greeting when there is no summary. */
-    renderedAt: string;
     /** Failures the platform raised on its own, composed from the page's existing reads. */
     attentionItems: AttentionItem[];
     jobRuntimeConfigured: boolean | null;
-    /** Secondary line kept from the previous Home header. */
-    subtitle?: string;
+    /**
+     * The `Your workspace` stats card (Today + All), built by the page because
+     * half of it is page data rather than morning-read data. Rendered second,
+     * directly under the composer.
+     */
+    workspaceStats: ReactNode;
+    /** Work-kind chip values whose PostHog flag resolved to `false`, for the composer. */
+    disabledKinds?: readonly string[];
 }
 
 /**
@@ -54,42 +56,41 @@ export function isFirstRunSummary(summary: HomeSummaryDto): boolean {
 }
 
 /**
- * Home (AW-19) — the morning stack, in order: greeting and score, the
- * composer, Needs you, Today at a glance, Today beside This week, Working now
- * and Recent activity. Each block renders its own state from the one summary;
- * the composer never depends on it. Retry re-renders the page, which reads the
- * summary afresh.
+ * Home (AW-19) — the morning stack, in the order the owner set on 2026-09-18:
+ *
+ *   1. the composer (the `/new` prompt + kind chips, one line tall)
+ *   2. `Your workspace` — the Today counters and the All totals in one card
+ *   3. `Needs you` — what is waiting on the human
+ *   4. `Working now` — what is running
+ *   5. `Today` beside `This week`
+ *   6. `Recent activity` — last, deliberately: the tail of the story, not its head
+ *
+ * The greeting, the page subtitle, the date line and the "Times shown in UTC."
+ * footnote are gone by the owner's instruction; the timezone is now a setting
+ * (see the profile's `Time zone` control) rather than a note under the title.
+ *
+ * Each block renders its own state from the one summary; the composer never
+ * depends on it. Retry re-renders the page, which reads the summary afresh.
  */
 export function HomeMorningStack({
-    userName,
     summary,
-    renderedAt,
     attentionItems,
     jobRuntimeConfigured,
-    subtitle,
+    workspaceStats,
+    disabledKinds = [],
 }: HomeMorningStackProps) {
     const t = useTranslations('dashboard.home');
     const router = useRouter();
     const { activeOrganization } = useActiveScope();
     const retry = () => router.refresh();
 
-    const greeting = (
-        <HomeGreeting
-            name={userName}
-            at={summary?.computedAt ?? renderedAt}
-            timeZone={summary?.timezone ?? 'UTC'}
-            glance={summary?.glance?.status === 'ok' ? summary.glance.data : null}
-            timezoneFallback={summary?.timezoneFallback ?? false}
-            subtitle={subtitle}
-        />
-    );
-    const composer = <HomeComposer jobRuntimeConfigured={jobRuntimeConfigured} />;
+    const composer = <HomeStartComposer disabledKinds={disabledKinds} />;
 
     if (!summary) {
         return (
-            <div data-testid="home-morning">
-                {greeting}
+            <div data-testid="home-morning" className="space-y-4">
                 {composer}
+                {workspaceStats}
                 <div
                     role="alert"
                     data-testid="home-summary-error"
@@ -113,20 +114,16 @@ export function HomeMorningStack({
                         {t('summaryError.action')}
                     </button>
                 </div>
-                {attentionItems.length > 0 ? (
-                    <div className="mt-6">
-                        <AttentionSection items={attentionItems} />
-                    </div>
-                ) : null}
+                {attentionItems.length > 0 ? <AttentionSection items={attentionItems} /> : null}
             </div>
         );
     }
 
     if (isFirstRunSummary(summary) && attentionItems.length === 0) {
         return (
-            <div data-testid="home-morning">
-                {greeting}
+            <div data-testid="home-morning" className="space-y-4">
                 {composer}
+                {workspaceStats}
                 <div
                     data-testid="home-first-run"
                     className="rounded-xl border border-card-border bg-card p-8 text-center dark:border-white/8 dark:bg-card-primary-dark/60"
@@ -151,12 +148,10 @@ export function HomeMorningStack({
 
     return (
         <div data-testid="home-morning" className="space-y-4">
-            <div>
-                {greeting}
-                {composer}
-            </div>
+            {composer}
+            {workspaceStats}
             <NeedsYouBlock block={summary.needsYou} alsoBroken={attentionItems} onRetry={retry} />
-            <GlanceCounters block={summary.glance} onRetry={retry} />
+            <WorkingNowPanel block={summary.workingNow} onRetry={retry} />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <SoonSection
                     today={summary.today?.status === 'ok' ? summary.today.data : null}
@@ -176,7 +171,6 @@ export function HomeMorningStack({
                     onRetry={retry}
                 />
             </div>
-            <WorkingNowPanel block={summary.workingNow} onRetry={retry} />
             <RecentActivityBlock
                 block={summary.recentActivity}
                 now={new Date(summary.computedAt)}
