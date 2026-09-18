@@ -48,6 +48,10 @@ import { TemplateCatalogModule } from './template-catalog/template-catalog.modul
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
 import { IdeaBuildExecutorDispatchModule } from './work-proposals/idea-build-executor-dispatch.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
+// APW-11 (App Launcher) — the registry routes: GET/PUT /api/me/apps and the
+// public GET /api/app-launcher/platforms. Every one of them answers the same
+// opaque 404 unless EVER_WORKS_APP_LAUNCHER_ENABLED is 'true' (FR-54).
+import { AppLauncherModule } from './app-launcher/app-launcher.module';
 import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
@@ -194,6 +198,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // adapter (inert until EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED=true).
         IdeaBuildExecutorDispatchModule,
         WorkAgentModule,
+        // APW-11 (App Launcher) — additive: one module, three routes, all of
+        // them behind AppLauncherEnabledGuard. Nothing above or below moves.
+        AppLauncherModule,
         // Missions/Ideas/Works (spec 2026-05-24) — Phase 3 PR G:
         // skeleton module exposing GET /me/missions. CRUD + lifecycle
         // ship in PR H; Clone in PR HH; tick worker (Trigger.dev) in PR J.
