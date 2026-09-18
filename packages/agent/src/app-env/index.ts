@@ -1,0 +1,108 @@
+/**
+ * APW-07 (App env & dependencies) — the Environment service's public surface.
+ *
+ * T24/T25's routes, APW-05's Build value materialisation, APW-06's Deploy
+ * preflight and T15's listener consume this barrel, not the file paths (plan
+ * §5:822-826): `AppEnvService.list/missingRequired/buildRedactor/ensureGenerated`,
+ * `AppEnvService.apply/rotate` for the write routes, and `AppEnvCrypto` for the
+ * epic's one envelope.
+ *
+ * The six provisional tokens are exported on purpose — their owners bind them
+ * (`{ provide: APP_ENV_SPEC_SOURCE, useExisting: … }` and the same for the
+ * parser, the activity writer, the two recorded fingerprint maps and the
+ * resolver's), so a consumer takes the token from the owner of the seam rather
+ * than declaring a second `Symbol` of the same name.
+ */
+
+export {
+    APP_ENV_ACTIVITY,
+    APP_ENV_ACTIVITY_ACTIONS,
+    APP_ENV_ACTOR_NAMES,
+    APP_ENV_BUILD_FINGERPRINTS,
+    APP_ENV_DEPLOY_FINGERPRINTS,
+    APP_ENV_RESOLVER_FINGERPRINTS,
+    APP_ENV_SPEC_SOURCE,
+    APP_ENV_WARNING_CODES,
+    AppEnvRefusalError,
+    AppEnvService,
+    isAppEnvRefusalError,
+    orderAppEnvEntries,
+    resolvedGenerateSpec,
+    resolvedGeneratorFingerprint,
+    summarizeAppEnvEntries,
+    type AppEnvActivity,
+    type AppEnvActivityAction,
+    type AppEnvActivityEvent,
+    type AppEnvActor,
+    type AppEnvActorNames,
+    type AppEnvApplyAction,
+    type AppEnvApplyInput,
+    type AppEnvApplyReason,
+    type AppEnvApplyResult,
+    type AppEnvApplyResultItem,
+    type AppEnvApplyWarning,
+    type AppEnvDeployedFingerprints,
+    type AppEnvEnsureGeneratedResult,
+    type AppEnvEnsureGeneratedSkipCode,
+    type AppEnvGeneratedEntry,
+    type AppEnvMissingRequirement,
+    type AppEnvRecordedFingerprints,
+    type AppEnvRefusalCode,
+    type AppEnvResolvedFingerprints,
+    type AppEnvRotateResult,
+    type AppEnvSetItem,
+    type AppEnvSpecSnapshot,
+    type AppEnvSpecSource,
+    type AppEnvSummary,
+    type AppEnvViewer,
+    type AppEnvWarningCode,
+} from './app-env.service';
+
+export { AppEnvModule } from './app-env.module';
+
+// APW-07 T12 — the `.env` grammar, re-exported so a consumer of
+// `@ever-works/agent/app-env` reaches the parser T13's `apply({ import })`
+// consumes without a second entry point.
+export * from './dotenv-parser.js';
+
+export {
+    APP_ENV_ENVELOPE_PREFIX,
+    AppEnvCrypto,
+    AppEnvEncryptionUnavailableError,
+    AppEnvEnvelopeError,
+    hasAppEnvEnvelope,
+    isAppEnvEncryptionUnavailableError,
+    isAppEnvEnvelopeError,
+} from './app-env-crypto';
+
+export {
+    APP_ENV_GENERATOR_DEFAULT_ALPHABET,
+    APP_ENV_GENERATOR_DEFAULT_BYTES,
+    APP_ENV_GENERATOR_DEFAULT_KEYPAIR_TYPE,
+    APP_ENV_GENERATOR_DEFAULT_LENGTH,
+    AppEnvGeneratorError,
+    generateAppEnvValue,
+    generateBase64,
+    generateChars,
+    generateHex,
+    generateKeypair,
+    generateUuid,
+    isAppEnvGeneratorError,
+    type AppEnvGeneratedValue,
+    type AppEnvKeypair,
+} from './generators';
+
+export {
+    AppEnvPatternError,
+    appEnvPatternCacheSize,
+    clearAppEnvPatternCache,
+    compileAppEnvPattern,
+    isAppEnvPatternError,
+    validateAppEnvValue,
+    type AppEnvCompiledPattern,
+    type AppEnvPatternEngine,
+    type AppEnvValidationOptions,
+    type AppEnvValidationRefusal,
+    type AppEnvValidationResult,
+    type AppEnvValueRules,
+} from './validation';

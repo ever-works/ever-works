@@ -272,6 +272,14 @@
         "./app-works": {
             "types": "./dist/app-works/index.d.ts",
             "default": "./dist/app-works/index.js"
+        },
+        "./app-env": {
+            "types": "./dist/app-env/index.d.ts",
+            "default": "./dist/app-env/index.js"
+        },
+        "./app-dependencies": {
+            "types": "./dist/app-dependencies/index.d.ts",
+            "default": "./dist/app-dependencies/index.js"
         }
     },
     "scripts": {
