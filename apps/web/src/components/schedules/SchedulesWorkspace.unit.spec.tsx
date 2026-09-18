@@ -205,3 +205,64 @@ describe('SchedulesWorkspace — a superseded read never replaces a newer one', 
         expect(rowNames()).toEqual(['NEW FILTERED ROW']);
     });
 });
+
+/**
+ * The mount that owes a read.
+ *
+ * This list is two things: the page it used to be (always server-rendered with
+ * its first page) and the Activity page's Schedules VIEW, which is reached by
+ * clicking a tab — at which point the page on screen was rendered for a
+ * different view and carries no schedules payload at all. Skipping the first
+ * load unconditionally, as the page always could, left the embedded mount
+ * showing its "no match" empty state over a list it had never fetched.
+ */
+describe('SchedulesWorkspace — first load', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        searchParams = new URLSearchParams();
+    });
+
+    it('fetches the page AND the health summary when the host had no payload', async () => {
+        vi.mocked(getSchedulePage).mockResolvedValue(ok(pageOf(['FETCHED ROW'])));
+        vi.mocked(getScheduleHealth).mockResolvedValue({
+            ok: true,
+            summary: {
+                checkedAt: '',
+                counts: { ok: 0, neverRuns: 0 },
+                flagged: [],
+                degradedSources: [],
+            },
+        } as never);
+
+        render(<SchedulesWorkspace initialPage={null} initialHealth={null} />);
+
+        await waitFor(() => expect(rowNames()).toEqual(['FETCHED ROW']));
+        expect(getSchedulePage).toHaveBeenCalledTimes(1);
+        expect(getScheduleHealth).toHaveBeenCalledTimes(1);
+        // The empty state must not have been what the reader saw.
+        expect(screen.queryByTestId('schedules-empty-filtered')).toBeNull();
+    });
+
+    it('never re-fetches a page the server already delivered', async () => {
+        vi.mocked(getSchedulePage).mockResolvedValue(ok(pageOf(['SHOULD NOT APPEAR'])));
+        vi.mocked(getScheduleHealth).mockResolvedValue({ ok: false } as never);
+
+        render(<SchedulesWorkspace initialPage={pageOf(['SERVER ROW'])} initialHealth={null} />);
+
+        await waitFor(() => expect(rowNames()).toEqual(['SERVER ROW']));
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        expect(getSchedulePage).not.toHaveBeenCalled();
+        expect(getScheduleHealth).not.toHaveBeenCalled();
+    });
+
+    it('leaves the server’s failure screen alone instead of retrying behind it', async () => {
+        vi.mocked(getSchedulePage).mockResolvedValue(ok(pageOf(['SHOULD NOT APPEAR'])));
+        vi.mocked(getScheduleHealth).mockResolvedValue({ ok: false } as never);
+
+        render(<SchedulesWorkspace initialPage={null} initialFailed initialHealth={null} />);
+
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        expect(getSchedulePage).not.toHaveBeenCalled();
+        expect(screen.getByTestId('schedules-workspace-failed')).toBeTruthy();
+    });
+});

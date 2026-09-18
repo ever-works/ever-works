@@ -98,7 +98,12 @@ export function SchedulesWorkspace({
     const [healthFailed, setHealthFailed] = useState(initialHealthFailed);
     const [serverOffsetMs, setServerOffsetMs] = useState(() => offsetFrom(initialPage));
     const knownAgents = useRef(new Map<string, string>());
-    const firstRender = useRef(true);
+    /**
+     * Did the server hand this instance a result — a page, or a recorded
+     * failure to retry? See the mount effect below for why the answer decides
+     * whether the first load happens here.
+     */
+    const hostFetched = initialPage !== null || initialFailed;
     /**
      * Every read that writes the list (a filter change, a background refresh,
      * a row change, load more) takes the next generation, and only a response
@@ -161,12 +166,27 @@ export function SchedulesWorkspace({
     }, []);
 
     // A filter change starts again from the first page.
+    //
+    // The mount is the first load only when the SERVER actually delivered one.
+    // As the `/schedules` page it always had: either a page or a recorded
+    // failure, and in both cases re-fetching on mount would duplicate the read
+    // (or stamp on the retry screen). As the Activity page's Schedules view it
+    // often has neither — the reader switched to the tab client-side, so the
+    // page was rendered for a different view — and then there is nothing to
+    // show until this runs. Without the distinction the tab renders its
+    // "no match" empty state over an unfetched list.
+    const firstRender = useRef(hostFetched);
     useEffect(() => {
         if (firstRender.current) {
             firstRender.current = false;
             return;
         }
         void load(1, true);
+        // The health summary comes from a second read that the page also made
+        // on the server; the embedded mount owes it too, rather than waiting for
+        // the 60 s background refresh to notice.
+        if (!hostFetched) void loadHealth();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [load]);
 
     // Background refresh: every minute, and as soon as the tab is visible again.
