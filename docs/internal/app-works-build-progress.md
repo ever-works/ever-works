@@ -365,6 +365,29 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · Two more slices land — the env resolver (the critical path) and the upstream sync service** (`ba6496736`).
+  **APW-07 T14**: `app-env.resolver.ts` (the §2.2 table for both phases, the §4.6.2 build-service outputs, `ew-dep://`
+  placeholders decided from `ctx.target` and never the stored row, the depth-10 template re-check failing closed as
+  `templateUnresolvable`, the §2.2 fingerprint rule) and `app-env-runtime.source.ts` (APW-06's `AppRuntimeEnvSource` with
+  `values` / `fingerprints` / `secretNames` / `unsetRequired` / `notReadyDependencies` from **exactly one**
+  `ensureReadyForDeploy` call — the GAP-05 dispatch path — and `egress`, plus `resolveEphemeral`'s two targets). This was
+  the critical path: it is what APW-06 T22 and APW-07 T15 were waiting for. **APW-02 T26**: `upstream-schedule.ts` (all
+  four `upstreamSync` fields, `enabled: false` leaving `nextSyncAt` null while manual _Sync now_ still works),
+  `app-upstream-sync.service.ts` (the per-Work claim taken **API-side** through `beginSync`/`finishSync`, because a lock
+  callback cannot cross the SuperJSON remote proxy, and the licence re-evaluation requested through the API-side proxy so
+  a missing binding cannot silently skip it), `app-upstream-conflict.copy.ts`, two specs, and the additive
+  `AppLicenseService.request` reason union in contracts — which was re-measured with that edit in the tree
+  (`@ever-works/contracts` **84 files / 3533 tests**, `tsc --noEmit` clean).
+  **Committed ahead of their authors' reports, stated rather than hidden**: both were green on two consecutive runs
+  immediately before the commit, no perturbation markers were present, and each diff is additions-only (13/0 and 32/0 on
+  the two modified files). Anything the authors change from here lands as a **follow-up commit**, never folded in
+  silently — the same discipline that has already caught two cross-attribution incidents on this branch.
+  **Still owed, and the next round's first job:** the authors' perturbation tables and my own perturbations of the
+  behaviours that matter — wrong-target placeholders, a secret fingerprinted from its **value** rather than its inputs, a
+  doubled `ensureReadyForDeploy`, and the template depth check allowed past 10; for T26, `enabled: false` still
+  scheduling, a diverged branch force-pushed or merged instead of raised as a PR, `finishSync` never releasing the lease,
+  and the budget stop moved past 20 calls.
+
 - **2026-09-18 · The first full-package integration run on this branch, and the security guard that fired on it.** Every
   round so far verified _filtered_ suites (`-- app-env`, `-- app-dependencies`, `-- app-works` …), which cannot see a
   repo-wide invariant. `pnpm --filter @ever-works/agent test` → **850 suites / 16,844 tests: 848 passed, 3 skipped, 3
