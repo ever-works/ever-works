@@ -372,11 +372,11 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   (ACC-07-01)"), `app-env.resolver.ts:365` ("called from `app.spec.applied`") and `app-env.resolver.spec.ts:296`. There is no
   event class, no `EVENT_NAME` constant and no `@OnEvent` subscriber anywhere — while the listeners that do exist in this
   package follow a real pattern (`@OnEvent(AgentActionProposalDecidedEvent.EVENT_NAME, { async: true })`).
-  **The consequence is a genuine ordering constraint the plan does not state**: T15's emitter is APW-03''s emit side
+  **The consequence is a genuine ordering constraint the plan does not state**: T15's emitter is APW-03's emit side
   (`app.spec.applied`, produced by T12/T13, neither landed), so a listener written today has nothing to subscribe to and
   nothing can prove it fires. That is why the dispatch was silent rather than slow — the agent was asked to build against a
   seam that is not there. **What T15 needs before it can be written and _proven_:** a contracts-level event name for
-  `app.spec.applied` (the same shape every other listener in this package uses) plus a producer, which is APW-03 T12/T13''s
+  `app.spec.applied` (the same shape every other listener in this package uses) plus a producer, which is APW-03 T12/T13's
   side of the boundary. Written down rather than worked around: inventing a private literal here would put a second
   definition of a platform event in an epic that does not own it — exactly the class of duplicate-seam defect this
   programme has already had to repair twice (the two `APP_DEPENDENCY_PROVISION_DISPATCHER` Symbols, and the provisional
@@ -384,24 +384,24 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   **Also recorded:** both stalls in this session had the same shape — a dispatch handed work whose dependency had not
   landed — and the fix in each case was to find the missing seam myself, not to dispatch again.
 
-- **2026-09-18 · APW-06''s env port catches up with APW-07''s plan — the mismatch T14 had to work around** (`e20313f99`).
+- **2026-09-18 · APW-06's env port catches up with APW-07's plan — the mismatch T14 had to work around** (`e20313f99`).
   Three additive, **optional** members on `packages/agent/src/app-runtime/ports.ts`: `fingerprints?: Record<string, string>`
   on the `resolve` result (plan §4.6.1:429), `dependencyOutputs?: Record<string, Record<string, string>>` on the ephemeral
   cluster context (§4.6.1:446 — the map APW-06 passes after `provisionEphemeral`, without which a derived reference has no
   output to resolve against, which is why APW07-G04 added it rather than letting the resolver re-read rows it may not
   write under R-10), and `'derived'` on `AppRuntimeEnvRecipeEntry.source`, which the contracts already define at
   §4.6.1:447 — its absence is why a derived entry had to be smuggled through as a one-token template. **Optional
-  everywhere**, so nothing that compiled before can fail now: `type-check` **exit 0**, `app-runtime` plus T14''s two specs
+  everywhere**, so nothing that compiled before can fail now: `type-check` **exit 0**, `app-runtime` plus T14's two specs
   **8 suites / 289 tests green**, Prettier clean, `git diff --numstat` **27/1** with the single removed line quoted in the
   commit — the recipe-source union the change widens.
   🌟 **Why I wrote it myself:** the agent dispatched for this two rounds earlier had still not touched the file after three
   rounds of an empty worktree, and the edit is fully specified by the plan — so waiting longer was costing the programme
-  time for no added safety. The genuinely useful remainder of that brief (dropping the resolver''s now-redundant casts, once
+  time for no added safety. The genuinely useful remainder of that brief (dropping the resolver's now-redundant casts, once
   `tsc` and the specs prove them unnecessary) stays open for the next session, which is the part that actually needed a
   fresh pair of eyes rather than a copy of the plan.
 
 - **2026-09-18 · T14 closed out, and with it the last of the owed perturbations — both Wave-1 slices are VERIFIED, not merely green.**
-  **`1a4369f34`** lands the author''s post-commit refactor on my own verification: T14''s pair **52 tests green**,
+  **`1a4369f34`** lands the author's post-commit refactor on my own verification: T14's pair **52 tests green**,
   `type-check` **exit 0**, Prettier clean, worktree clean. The `−16` lines are **all lines this task authored today**
   (an injected-but-unused T8 repository and the old envelope loop), and the change is a strengthening rather than a
   tidy-up: the resolver now asks T8 which names are _set_ and only then loads envelopes, so **ephemeral mode never loads
@@ -410,30 +410,30 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   (`Expected: "ew-dep://postgres/url" / Received: undefined`, with the _inverse_ mutation caught by the other direction
   of the same pair), the fingerprinting rule (`Expected pattern: /^t[0-9a-f]{64}$/ / Received string: "a5f986a3…"` — a
   raw sha256 of the secret value, precisely the leak §2.2 forbids), the readiness call twice and never, and the depth
-  guard — **2 of the 4 reproduced by me** (depth guard, once-only readiness) and 2 on the author''s table with the
+  guard — **2 of the 4 reproduced by me** (depth guard, once-only readiness) and 2 on the author's table with the
   assertion text quoted and byte-identical restores. **T26: 6 of 6.** Every red in both tables is an assertion failure
   with its expected/received pair quoted, and every restore is hash-verified — which is the standard this log has been
   holding to, now met by both slices.
-  **The most consequential routed item is not a defect in either slice but a cross-epic mismatch**: APW-06''s
-  `app-runtime/ports.ts` is **behind APW-07''s plan** — no `fingerprints` on the resolve result (`ports.ts:187-193` vs
+  **The most consequential routed item is not a defect in either slice but a cross-epic mismatch**: APW-06's
+  `app-runtime/ports.ts` is **behind APW-07's plan** — no `fingerprints` on the resolve result (`ports.ts:187-193` vs
   plan §4.6.1:429), no `ctx.dependencyOutputs` (`:164-171` vs §4.6.1:446), and a recipe union without `derived`
-  (`:174-179` vs `contracts/src/apps/app-env.ts:585-590`) — so the resolver returns the plan''s superset and stays
-  assignable, and APW-06''s owner has three members to add. And **APW-05''s `verify-plan.schema.json:195-227` types the
+  (`:174-179` vs `contracts/src/apps/app-env.ts:585-590`) — so the resolver returns the plan's superset and stays
+  assignable, and APW-06's owner has three members to add. And **APW-05's `verify-plan.schema.json:195-227` types the
   recipe FLAT** while plan §4.6.1:447 and the contracts require `spec: {…}`, so T14 emits the plan-normative shape and
-  APW-05''s `ajv` will reject it until one side moves. Four smaller contract inconsistencies are named with file:line in
+  APW-05's `ajv` will reject it until one side moves. Four smaller contract inconsistencies are named with file:line in
   the commit: `isAppDependencyOutputSecret` calling a bucket **name** a secret (§11:236 says it is not),
   `appEnvTemplateFingerprint` returning an unhashed canonical serialization where §2.2:140 says `t<sha256 …>`,
-  `smtpNotConfigured` having neither a contracts constant nor a copy leaf, and §4.9a:650''s env-side `required` having no
+  `smtpNotConfigured` having neither a contracts constant nor a copy leaf, and §4.9a:650's env-side `required` having no
   field in `schema.md` §12.
 
 - **2026-09-18 · The count perturbation re-run against a REACHABLE mutation, and it reddens — T14 is now 2 of 4 proven.**
-  Last round''s inert duplicate is replaced by an **awaited extra call inserted before the return** in
-  `app-env-runtime.source.ts`''s `readReadiness` (`await this.readiness.ensureReadyForDeploy(workId);` ahead of the real
+  Last round's inert duplicate is replaced by an **awaited extra call inserted before the return** in
+  `app-env-runtime.source.ts`'s `readReadiness` (`await this.readiness.ensureReadyForDeploy(workId);` ahead of the real
   one), which is a mutation the compiler cannot fold away and the runtime cannot skip. Result: **2 failed / 12 passed**,
   the named test among them — _"asks ensureReadyForDeploy exactly once per resolve, and never from an ephemeral path
-  (§4.6.1:432-434, GAP-05)"_ — then restored **byte-identically** (hash-checked). So ACC-06-54''s "asks once" is not
-  merely asserted in a test I read, it is **falsifiable**, and the difference between last round''s green and this
-  round''s red is entirely whether the mutation was reachable. Both directions of that pair are now in this log: a
+  (§4.6.1:432-434, GAP-05)"_ — then restored **byte-identically** (hash-checked). So ACC-06-54's "asks once" is not
+  merely asserted in a test I read, it is **falsifiable**, and the difference between last round's green and this
+  round's red is entirely whether the mutation was reachable. Both directions of that pair are now in this log: a
   mutation that cannot execute proves nothing, and a mutation that can, does. **T14 perturbation tally: 2 of 4** — the
   depth guard and the once-only readiness read; remaining are the wrong-target placeholder and the value-vs-inputs
   fingerprint. **T26: 6 of 6.**
@@ -456,7 +456,7 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   count perturbation to be re-run against a _reachable_ mutation (drop the memoisation, or call the seam from a second
   live path) rather than logged as a pass.
 
-- **2026-09-18 · T26 verified on its author''s evidence, and one of my own perturbations came back NEGATIVE — recorded as such.**
+- **2026-09-18 · T26 verified on its author's evidence, and one of my own perturbations came back NEGATIVE — recorded as such.**
   **APW-02 T26** (committed `ba6496736` + `711a1ddae`; its author confirmed every committed blob is byte-identical to what it
   verified, `git diff HEAD` empty): **110 tests** across the two specs, **228** for the whole `app-works` selection,
   type-check exit 0, contracts rebuilt and green (77 contract tests) before the dependants, Prettier clean, and
@@ -465,13 +465,13 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   (`Received: 2026-01-05T06:04:19.000Z` where `null` was required), `{force:false}` → `{force:true}`, a diverged fork
   taking the merge path instead of opening a PR, an injected `push` to the upstream, `finishSync` skipped (6 tests red,
   `Expected number of calls: 1 / Received: 0`) and the budget bound moved from `>=` to `>`. 🌟 **The methodological find
-  is the author''s own**: its first attempt at the `finishSync` perturbation used `false ? … : await …`, the suite stayed
+  is the author's own**: its first attempt at the `finishSync` perturbation used `false ? … : await …`, the suite stayed
   **green** because the compiler constant-folds it — _"a foldable mutation is not evidence"_ — and the quoted red uses a
   runtime-guarded flag instead. That is the same class of error as the PowerShell `\t` false-red earlier in this
   programme, caught this time before it was reported as proof.
   **My own perturbation of T14 returned a negative, and it is not being dressed up as a pass.** I duplicated
   `app-env-runtime.source.ts:273` — `return (await this.readiness.ensureReadyForDeploy(workId)) ?? null;` — to test the
-  task''s "**exactly one** `ensureReadyForDeploy` call" requirement, and the suite stayed **14/14 green**, restored
+  task's "**exactly one** `ensureReadyForDeploy` call" requirement, and the suite stayed **14/14 green**, restored
   byte-identically. So either the duplication is observationally inert at that seam (the second result is discarded and
   the call is idempotent by contract) or the spec does **not** actually pin the call count at this layer, in which case
   the ACC-06-54/GAP-05 claim of "asks once" is asserted somewhere else — or not at all. **Routed, not resolved**: the
@@ -481,7 +481,7 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   **T14 perturbation tally: 1 of 4 proven** (the depth guard, `7355816E…A6F9F`, one test red / 36 green). **T26: 6 of 6
   proven by its author**, with the additivity and format evidence above.
 
-- **2026-09-18 · The first of T14''s owed perturbations, run by me rather than taken on report** (`711a1ddae` carries the
+- **2026-09-18 · The first of T14's owed perturbations, run by me rather than taken on report** (`711a1ddae` carries the
   slice). The depth guard `if (depth > APP_ENV_TEMPLATE_MAX_DEPTH)` was replaced with `if (false)` in
   `app-env.resolver.ts` and the suite went red in exactly one place —
   `fails closed with templateUnresolvable past depth 10 (§4.6.1:449)`, **1 failed / 36 passed** — then the file was
