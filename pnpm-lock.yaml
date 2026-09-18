@@ -1096,6 +1096,9 @@ importers:
       pg:
         specifier: ^8.16
         version: 8.18.0
+      re2js:
+        specifier: ^1.2.1
+        version: 1.2.1
       reflect-metadata:
         specifier: ^0.2
         version: 0.2.2
@@ -1239,13 +1242,13 @@ importers:
 
   packages/app-launcher:
     dependencies:
-      '@ever-works/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       lit:
         specifier: ^3.3.3
         version: 3.3.3
     devDependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@types/node':
         specifier: ^22.19.11
         version: 22.19.11
