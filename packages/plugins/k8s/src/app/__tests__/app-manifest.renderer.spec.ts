@@ -13,6 +13,7 @@
  * Fixtures carry no secret, digest or hostname from the real world: RFC 2606 hosts, RFC 5737
  * addresses and synthetic 64-hex digests only.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
@@ -53,6 +54,7 @@ import {
 	type AppRenderedObject
 } from '../app-manifest.renderer';
 import { APP_FORBIDDEN_LABEL_KEYS } from '../app-names';
+import { planAppJobs } from '../app-jobs.renderer';
 
 // --- fixture plumbing -------------------------------------------------------
 
@@ -1060,5 +1062,183 @@ describe('T6 — pure library entry points (R-5)', () => {
 		expect(
 			renderComponentDeployment(fixture(WEB_WORKER_VOLUME), fixture(WEB_WORKER_VOLUME).components[1]).kind
 		).toBe('Deployment');
+	});
+});
+
+// --- T60: a verification target's whole plan, and the proof a normal one is untouched -----------
+
+/**
+ * APW-06 T60, plan §4.12:649-652 — "**Not rendered**: Ingress, TLS, CronJobs, DNS records, custom
+ * domains, PVCs — every volume becomes an `emptyDir` with the declared size as `sizeLimit`".
+ *
+ * The verification branch itself landed with T4/T6; what this block adds is the four clauses a
+ * reviewer has to be able to walk in one place, each with the **control** that proves the assertion
+ * is about the verification branch rather than about a fixture that happens to have nothing:
+ *
+ * | Clause of §4.12:649-652            | The control (the same input, `purpose: 'deploy'`) |
+ * | ---------------------------------- | ------------------------------------------------- |
+ * | no Ingress and no TLS block        | renders `Ingress/web` with a `spec.tls` block      |
+ * | no CronJob                         | renders `CronJob/cron-purge-trash`                 |
+ * | no PVC; volumes are `emptyDir`     | renders `PersistentVolumeClaim/worker-uploads`     |
+ * | no host anywhere in the plan       | renders `Ingress/web` with `hosts.primary`         |
+ *
+ * …followed by the proof §4.12's "Epic-owned name" clause depends on: **a normal render is
+ * byte-identical** to what it rendered before this task — pinned twice, once as a deep equality
+ * against the existing golden fixture and once as a SHA-256 over the serialised objects, so a change
+ * of a single byte in a normal render fails a test that names this task.
+ */
+describe('T60 — a verification target’s plan (plan §4.12:649-652, ACC-06-48)', () => {
+	/** WEB_WORKER_VOLUME + everything §4.12 forbids: a TLS mode, hosts, a cron, and a volume. */
+	const verificationInput = (): AppRenderInput => {
+		const draft = JSON.parse(JSON.stringify(fixture(WEB_WORKER_VOLUME))) as Json;
+		draft.purpose = 'verification';
+		draft.ttlMinutes = 30;
+		draft.ref.namespace = 'ew-helpdesk-1a2b3c4d-v5e6f7a-1';
+		draft.isFirstDeploymentOnCluster = true;
+		return draft as unknown as AppRenderInput;
+	};
+
+	/** The same input, one field different: the target every other test in this file renders. */
+	const deployInput = (): AppRenderInput => ({
+		...verificationInput(),
+		purpose: 'deploy',
+		ttlMinutes: undefined
+	});
+
+	it('renders no Ingress, no TLS, no CronJob and no PVC — while a deploy ref renders all four', () => {
+		const plan = planAppRender(verificationInput(), { now: '2026-09-18T10:00:00.000Z' });
+		const kinds = plan.objects.map((object) => object.kind);
+
+		expect(kinds).not.toContain('Ingress');
+		expect(kinds).not.toContain('CronJob');
+		expect(kinds).not.toContain('PersistentVolumeClaim');
+
+		// No TLS block, and no object with a `tls` field at all — an Ingress is the only object that
+		// carries one, and `ingress.tls` is `cert-manager` in this fixture.
+		expect(verificationInput().ingress.tls).toBe('cert-manager');
+		for (const object of plan.objects) {
+			expect(asJson(object).spec?.tls).toBeUndefined();
+		}
+		// §4.12:651 — a CronJob is a §4.8 concern and `planAppJobs` owns it, so it is asked there.
+		expect(planAppJobs(verificationInput(), {}).cronJobs).toHaveLength(0);
+
+		// The control: the same input as a deploy ref renders each of them.
+		const deployed = planAppRender(deployInput(), { now: '2026-09-18T10:00:00.000Z' });
+		const deployedKinds = deployed.objects.map((object) => object.kind);
+		expect(deployedKinds).toContain('Ingress');
+		expect(deployedKinds).toContain('PersistentVolumeClaim');
+		expect(planAppJobs(deployInput(), {}).cronJobs).toHaveLength(1);
+		expect((objectNamed(deployed, 'Ingress', 'web') as Json).spec.tls).toMatchObject([
+			{ hosts: ['helpdesk.example.com', 'support.example.com', 'old-helpdesk.example.com'] }
+		]);
+	});
+
+	it('publishes no host rule anywhere — so no DNS record can be derived from the plan', () => {
+		const plan = planAppRender(verificationInput(), { now: '2026-09-18T10:00:00.000Z' });
+		const hosts = ['helpdesk.example.com', 'support.example.com', 'old-helpdesk.example.com'];
+
+		const rulesOf = (objects: readonly AppRenderedObject[]): string[] =>
+			objects
+				.map((object) => asJson(object).spec?.rules)
+				.filter(Boolean)
+				.flatMap((rules: Json[]) => rules.map((rule) => rule.host));
+
+		// The control first: with the same input as a deploy ref, all three hosts reach an Ingress.
+		expect(rulesOf(planAppRender(deployInput(), {}).objects)).toEqual(hosts);
+
+		// §4.12:651 — a verification renders no host-bearing object, which is what the agent side's
+		// DNS record creation keys off.
+		expect(rulesOf(plan.objects)).toEqual([]);
+		expect(plan.objects.filter((object) => object.kind === 'Ingress')).toEqual([]);
+
+		// Reported, not hidden: §4.7's platform ConfigMap still carries `EVER_WORKS_APP_HOST` derived
+		// from `hosts.primary`. §4.12:651 forbids Ingress/TLS/CronJob/DNS/custom-domain/PVC
+		// **objects** and says nothing about §4.7's values, so what a verification's ConfigMap holds
+		// is decided by the render input APW-06 T22 builds — which must pass `hosts: { primary: null }`
+		// for a verification (`primaryHost: null` is what this task's own env context passes).
+		const platform = objectNamed(plan, 'ConfigMap', 'app-platform-b41d7e6c0a') as Json;
+		expect(platform.data.EVER_WORKS_APP_HOST).toBe('helpdesk.example.com');
+	});
+
+	it('carries the purpose label and the caller’s expiry annotation, and nothing else on the namespace', () => {
+		const input = verificationInput();
+		const namespace = asJson(renderNamespace(input, { now: '2026-09-18T10:00:00.000Z' }));
+
+		expect(namespace.metadata.name).toBe('ew-helpdesk-1a2b3c4d-v5e6f7a-1');
+		expect(namespace.metadata.labels['ever-works.io/purpose']).toBe('verification');
+		expect(namespace.metadata.annotations).toEqual({
+			'ever-works.io/expires-at': '2026-09-18T10:30:00.000Z'
+		});
+
+		// §4.12:660 — a deploy namespace carries neither.
+		const live = asJson(renderNamespace(deployInput(), { now: '2026-09-18T10:00:00.000Z' }));
+		expect(live.metadata.labels['ever-works.io/purpose']).toBeUndefined();
+		expect(live.metadata.annotations).toBeUndefined();
+	});
+
+	it('turns every declared volume into an emptyDir of the declared size, mounts unchanged', () => {
+		const plan = planAppRender(verificationInput(), { now: '2026-09-18T10:00:00.000Z' });
+		const worker = deploymentIn(plan, 'worker');
+
+		expect(podSpecOf(worker).volumes).toContainEqual({ name: 'uploads', emptyDir: { sizeLimit: '5Gi' } });
+		expect(containerOf(worker).volumeMounts).toContainEqual({
+			name: 'uploads',
+			mountPath: '/data/uploads'
+		});
+		// The control: the same volume is a claim for a deploy ref.
+		const deployed = deploymentIn(planAppRender(deployInput(), {}), 'worker');
+		expect(podSpecOf(deployed).volumes).toContainEqual({
+			name: 'uploads',
+			persistentVolumeClaim: { claimName: 'worker-uploads' }
+		});
+	});
+
+	it('still renders the workloads, the Services and the secrets — a verification is not an empty plan', () => {
+		const plan = planAppRender(verificationInput(), { now: '2026-09-18T10:00:00.000Z' });
+		const names = plan.objects.map((object) => `${object.kind}/${object.metadata.name}`);
+
+		expect(names).toEqual([
+			'Namespace/ew-helpdesk-1a2b3c4d-v5e6f7a-1',
+			'ServiceAccount/app',
+			'LimitRange/ew-defaults',
+			'NetworkPolicy/ew-default-deny',
+			'NetworkPolicy/ew-allow-same-namespace',
+			'NetworkPolicy/ew-allow-egress',
+			'NetworkPolicy/ew-allow-ingress',
+			'NetworkPolicy/ew-allow-deps',
+			'Secret/app-env-b41d7e6c0a',
+			'ConfigMap/app-platform-b41d7e6c0a',
+			'Service/web',
+			'Deployment/web',
+			'Deployment/worker'
+		]);
+
+		// §4.12:651 — the pre-deploy and first-deploy Jobs, which `planAppJobs` owns, are rendered.
+		const jobPlan = planAppJobs(verificationInput(), {});
+		expect(jobPlan.jobs.map((job) => job.name)).toContain('migrate');
+		expect(jobPlan.objects.every((object) => object.metadata.namespace === 'ew-helpdesk-1a2b3c4d-v5e6f7a-1')).toBe(
+			true
+		);
+	});
+
+	it('leaves a normal render byte-identical: golden deep-equality plus a SHA-256 over the bytes', () => {
+		// The deep equality is the existing golden fixture's, restated here so the T60 claim is one
+		// test; the hash is what catches a change `toEqual` would still consider equal.
+		const singleWeb = JSON.parse(JSON.stringify(renderAppObjects(fixture(SINGLE_WEB))));
+		expect(singleWeb).toEqual(golden('expected.single-web.objects.json'));
+
+		const webWorkerVolume = JSON.parse(JSON.stringify(renderAppObjects(fixture(WEB_WORKER_VOLUME))));
+		expect(webWorkerVolume).toEqual(golden('expected.web-worker-volume.objects.json'));
+
+		expect(
+			createHash('sha256')
+				.update(JSON.stringify(renderAppObjects(fixture(SINGLE_WEB))))
+				.digest('hex')
+		).toBe('8524880f76f40bc6bff251e1fe5a887dcaa3b20a8adbbbdf5632fc3ed7f38d26');
+		expect(
+			createHash('sha256')
+				.update(JSON.stringify(renderAppObjects(fixture(WEB_WORKER_VOLUME))))
+				.digest('hex')
+		).toBe('d04874375a7582a1f571c49b3f19d1a85b71667cb8ef76075105484b3185fc71');
 	});
 });

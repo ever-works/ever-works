@@ -1136,6 +1136,61 @@ describe('T12 — rollback, first-Deployment handling, the deadline and the veri
 		expect(result.isolationEnforced).toBe(true);
 	});
 
+	it('runs the verification smoke in-namespace ONLY: `http://<component>.<ns>.svc:80`, no Host override, no public and no hairpin run (T60, §4.12:657-658)', async () => {
+		const verificationNamespace = verificationNamespaceName(NAMESPACE, 'ffffffff-1111-4222-8333-444444444444', 1);
+		const h = harness({
+			change: (draft) => {
+				draft.purpose = 'verification';
+				draft.ttlMinutes = 60;
+				draft.ref.namespace = verificationNamespace;
+				// The spec asks for the self-address check; §4.12:658 renders none for a verification.
+				draft.network.needsHairpin = true;
+			},
+			render: { now: '2026-09-17T10:00:00.000Z' }
+		});
+
+		const result = await h.deploy();
+
+		const smokeConfigMap = h.cluster
+			.appliedRunnerConfigMaps()
+			.find((object) => String(object.data?.['requests.json']).includes('"kind":"smoke"'));
+		const requests = JSON.parse(String(smokeConfigMap?.data?.['requests.json'])).requests as Json[];
+		expect(requests.length).toBeGreaterThan(0);
+
+		for (const request of requests) {
+			// §4.12:657 — `Host: <component>.<ns>.svc`, which for an in-cluster request IS the URL's
+			// authority: the runner sets `Host` from the URL unless a request overrides it.
+			expect(String(request.url)).toMatch(
+				new RegExp(`^http://web\\.${verificationNamespace.replace(/\./g, '\\.')}\\.svc:80/`)
+			);
+			const url = new URL(String(request.url));
+			expect(url.hostname).toBe(`web.${verificationNamespace}.svc`);
+			// `http:` on the default port, so `URL` reports an empty explicit port — the request
+			// never leaves the cluster's own DNS.
+			expect(url.port).toBe('');
+			expect(url.protocol).toBe('http:');
+			expect(request.host ?? null).toBeNull();
+			// Nothing in the request list can leave the namespace.
+			expect(String(request.url)).not.toContain('example.com');
+		}
+
+		// No public smoke and no hairpin — and no Ingress that could publish either.
+		expect(h.record.verify).toEqual([]);
+		expect(result.smoke.public).toEqual([]);
+		expect(result.smoke.hairpin).toBeUndefined();
+		expect(h.cluster.appliedNames()).not.toContain(`Job/${HAIRPIN_JOB}`);
+		expect(h.cluster.appliedNames().filter((name) => name.startsWith('Ingress/'))).toEqual([]);
+		expect(h.record.phases).not.toContain('publish');
+		expect(h.record.phases).not.toContain('public-smoke');
+
+		// …and the in-cluster smoke really did run, as a Job inside the verification namespace.
+		expect(h.cluster.appliedNames()).toContain(`Job/${SMOKE_JOB}`);
+		expect(h.cluster.applied('Job').find((job) => job.metadata.name === SMOKE_JOB)?.metadata.namespace).toBe(
+			verificationNamespace
+		);
+		expect(result.smoke.inCluster.length).toBeGreaterThan(0);
+	});
+
 	it('reports `isolationEnforced: false` and fails the Deployment when the policy requires enforcement (§4.10)', async () => {
 		const h = harness();
 		withLiveVersion(h);
