@@ -28,6 +28,16 @@
  *   of plan §6.2 and its recorded sleep ladder. Its `APP_PROVISION_EVENTS_PORT` consumer
  *   half is **provisional** until APW-04 lands, and carries the mandatory-swap note on
  *   its declaration.
+ * - `./upstream-schedule` — `computeNextUpstreamSync` and the four-field reader of
+ *   `upstreamSync` (T26, plan §6.4): the schedule, `enabled`, `branch` and `mode`, with
+ *   the documented defaults, the hourly clamp and the stable per-Work jitter.
+ * - `./app-upstream-conflict.copy` — the spec §6.3 copy templates (T26): the conflict
+ *   Task's title, description and comment, and the one path list that caps them at 50.
+ * - `./app-upstream-sync.service` — `AppUpstreamSyncService.run` (T26, plan §6.3), its
+ *   `ProviderCallBudget` (FR-49) and the three **provisional** seams it declares for the
+ *   collaborators that have not landed (`APP_UPSTREAM_SYNC_SPEC_SOURCE` — APW-03 T12;
+ *   `APP_UPSTREAM_LICENSE_SERVICE` — APW-03 T42; `APP_UPSTREAM_PRIVATE_COPY_PORT` —
+ *   APW-02 P1's private-copy capability). Each carries its mandatory-swap note.
  */
 
 export * from './app-works.module';
@@ -35,3 +45,6 @@ export * from './app-upstream-state.service';
 export * from './app-fork-ready-handler.port';
 export * from './app-actions-hygiene.service';
 export * from './app-fork-readiness.service';
+export * from './upstream-schedule';
+export * from './app-upstream-conflict.copy';
+export * from './app-upstream-sync.service';

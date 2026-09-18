@@ -387,6 +387,38 @@ export const APP_BEHIND_EVENT_STEP = 25;
 /** An unreadable upstream is re-checked every 24 hours (FR-41, spec.md:354-355). */
 export const APP_UPSTREAM_UNAVAILABLE_RECHECK_MS = 86_400_000;
 
+// ---------------------------------------------------------------------------
+// The license gate's request reasons (APW-02 T26; CONTRACTS §2A)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why APW-03's license gate is asked to re-evaluate an App Work —
+ * `AppLicenseService.request(workId, reason)`.
+ *
+ * Added by **APW-02 T26**, whose task text fixes the contract: "`AppLicenseService.request(workId,
+ * reason)` gains its reason union in CONTRACTS §2A as part of this task's PR". The union did not
+ * exist anywhere in this package, and it is declared here — in APW-02's own Upstream module, beside
+ * the sync limits that produce two of its three members — rather than in a second file, so
+ * `AppLicenseService` has exactly one reason vocabulary.
+ *
+ * Members, and the caller each one comes from:
+ *
+ * - `upstream_synced` — APW-02 §6.3 step 8 / FR-40: a sync moved the tracked branch
+ *   (`APW-02/plan.md:751-752`, status service `app-upstream-state.service.ts:989`).
+ * - `upstream_merged` — APW-02 FR-62 / T29: a sync pull request was merged, so the license is asked
+ *   once more for the range that landed (`APW-02/tasks.md:719`).
+ * - `blueprint_applied` — APW-03 §2.5 step 0: a Blueprint was applied and its `license` block may
+ *   have changed the classification (`APW-03/plan.md:286`).
+ *
+ * APW-03 appends its own triggers (registry refresh, manual re-check, header evidence —
+ * `CONTRACTS.md:487`) to this list when its job lands: the union is **append-only** (R-26), and a
+ * caller that switches exhaustively over it gains a compile error rather than a silent default.
+ */
+export const APP_LICENSE_EVALUATION_REASONS = ['upstream_synced', 'upstream_merged', 'blueprint_applied'] as const;
+
+/** Union derived from {@link APP_LICENSE_EVALUATION_REASONS}. */
+export type AppLicenseEvaluationReason = (typeof APP_LICENSE_EVALUATION_REASONS)[number];
+
 /**
  * Whether a manual **Sync now** may start, given how many ran in the current
  * hour — `at most 6`, so the seventh is refused (FR-33).
