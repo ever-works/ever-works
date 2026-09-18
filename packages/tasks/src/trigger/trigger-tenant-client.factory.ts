@@ -87,6 +87,7 @@ import type {
     KbTranscribePayload,
     KbReembedWorkPayload,
     MemoryFactEmbedPayload,
+    AppDependencyProvisionPayload,
 } from '@ever-works/agent/tasks';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -114,6 +115,9 @@ const TASK_IDS = {
     notificationChannelDelivery: 'notification-channel-delivery',
     // AW-07 — must match `MEMORY_FACT_EMBED_JOB_ID` / the task module id.
     memoryFactEmbed: 'memory-fact-embed',
+    // APW-07 T17 — must match the `app-dependency-provision` task's own `id`
+    // (and the APW-06 `app-cluster-io` queue it declares).
+    appDependencyProvision: 'app-dependency-provision',
 } as const;
 
 /**
@@ -389,6 +393,47 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                     ...(delay ? { delay } : {}),
                 } as TriggerTaskOptions),
             );
+        },
+
+        /**
+         * APW-07 T17 — app dependencies PROPAGATE errors (APW07-G24), so this
+         * uses the same `propagate` shape as `dispatchKbReembedWork` and does
+         * NOT go through `softDispatch`: a silently dropped provisioning
+         * dispatch leaves a dependency row `pending` with nothing scheduled
+         * behind it, and `AppDependenciesService` has no reconciliation pass to
+         * catch that — it records `dispatchUnavailable` and the card tells the
+         * owner, which only works if the throw escapes.
+         *
+         * The delayed re-dispatch rides the payload (`deferUntil` ISO-8601, or
+         * `notBefore` epoch ms — the same `delay` mapping the singleton uses),
+         * so a BYO tenant gets identical re-dispatch behaviour and the job never
+         * sleeps.
+         */
+        async dispatchAppDependencyProvision(
+            payload: AppDependencyProvisionPayload,
+        ): Promise<string> {
+            const deferUntil =
+                payload.deferUntil ??
+                (payload.notBefore ? new Date(payload.notBefore).toISOString() : undefined);
+            const delay = deferUntil ? new Date(deferUntil) : undefined;
+
+            const handle = await client.tasks.trigger(TASK_IDS.appDependencyProvision, payload, {
+                tags: [
+                    'app-dependency-provision',
+                    `work:${payload.workId}`,
+                    ...(payload.kind ? [`kind:${payload.kind}`] : []),
+                    `mode:${payload.mode}`,
+                ],
+                concurrencyKey: `app-dependency:${payload.workId}:${payload.kind ?? 'all'}`,
+                ...(delay ? { delay } : {}),
+            } as TriggerTaskOptions);
+
+            if (!handle?.id) {
+                throw new Error(
+                    `dispatchAppDependencyProvision(work=${payload.workId}): SDK returned no run id`,
+                );
+            }
+            return handle.id;
         },
     };
 

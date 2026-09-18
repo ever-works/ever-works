@@ -1,5 +1,6 @@
 import type { Provider } from '@nestjs/common';
 import type { IJobRuntimeProvider } from '@ever-works/plugin';
+import { APP_DEPENDENCY_PROVISION_DISPATCHER } from './app-dependency-provision-dispatcher';
 import { KB_BACKFILL_SKELETON_DISPATCHER } from './kb-backfill-skeleton-dispatcher';
 import { KB_EMBED_DOCUMENT_DISPATCHER } from './kb-embed-document-dispatcher';
 import { KB_MIRROR_DOCUMENT_DISPATCHER } from './kb-mirror-document-dispatcher';
@@ -33,7 +34,8 @@ import { WORKSPACE_BACKUP_DISPATCHER } from './workspace-backup-dispatcher';
  *
  * Every `*_DISPATCHER` symbol in `@ever-works/agent/tasks` is now bound
  * through this factory in `packages/tasks/src/trigger/trigger.module.ts`
- * (no `symbols:` filter — all 14 dispatchers flow through the registry).
+ * (no `symbols:` filter — every entry of {@link DISPATCHER_SYMBOLS} flows
+ * through the registry, counted rather than numbered).
  * The previous 8-vs-3 split (with `KB_NORMALIZE_MEDIA_DISPATCHER` /
  * `KB_TRANSCRIBE_DISPATCHER` / `KB_REEMBED_WORK_DISPATCHER` still bound
  * as custom adapters in `apps/api/src/works/works.module.ts`) was
@@ -133,8 +135,16 @@ export class InMemoryJobRuntimeProviderRegistry implements JobRuntimeProviderReg
  * honest: missing a symbol here means that symbol won't get rebound when
  * the cutover flips, which is exactly the kind of silent drift the
  * EW-683 §3 conformance suite (P6 / EW-750) will eventually backstop.
+ *
+ * **Exported on purpose (APW-07 T17).** `__tests__/job-runtime.providers.spec.ts`
+ * pins the provider arity against THIS list rather than against a magic number —
+ * `expect(providers).toHaveLength(DISPATCHER_SYMBOLS.length)` — so a merge
+ * that adds a dispatcher on one branch and a provider count on another cannot
+ * produce a green suite over a stale count. The explicit expected-set assertion
+ * next to it stays as the deliberate cross-check.
  */
-const DISPATCHER_SYMBOLS: readonly symbol[] = [
+export const DISPATCHER_SYMBOLS: readonly symbol[] = [
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
     KB_BACKFILL_SKELETON_DISPATCHER,
     KB_EMBED_DOCUMENT_DISPATCHER,
     KB_MIRROR_DOCUMENT_DISPATCHER,
@@ -170,17 +180,20 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  *     letting the API's existing in-process dev fallback continue to
  *     kick in unchanged.
  *
- * Provider arity is pinned at 14 — one per entry in {@link DISPATCHER_SYMBOLS}
- * (the original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER`, develop's
- * `ROSTER_PROVISION_DISPATCHER` and AW-22's `WORKSPACE_BACKUP_DISPATCHER`)
- * — and verified by `__tests__/job-runtime.providers.spec.ts`. COUNT the
- * array after every merge rather than adding two branches' numbers together.
+ * Provider arity is pinned by COUNTING {@link DISPATCHER_SYMBOLS} (the
+ * original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER`, develop's
+ * `ROSTER_PROVISION_DISPATCHER`, AW-22's `WORKSPACE_BACKUP_DISPATCHER` and
+ * APW-07's `APP_DEPENDENCY_PROVISION_DISPATCHER`) — every one of them is
+ * verified by `__tests__/job-runtime.providers.spec.ts`, which asserts
+ * `providers.length === DISPATCHER_SYMBOLS.length`. COUNT the array after
+ * every merge rather than adding two branches' numbers together.
  *
  * @param opts Optional `symbols` filter — when supplied, only those
  *   tokens are bound (the rest stay wherever the operator's module
  *   tree binds them today). The EW-685 T4 full cutover in
  *   `packages/tasks/src/trigger/trigger.module.ts` now passes no
- *   filter (all 14 dispatchers flow through the registry) — the
+ *   filter (every {@link DISPATCHER_SYMBOLS} entry flows through the
+ *   registry) — the
  *   `symbols:` option is retained for tests and for future modules
  *   that want to bind a subset (e.g. a pull-model worker host that
  *   only owns a strict subset of the dispatcher surface).
@@ -192,8 +205,9 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  */
 export interface BuildJobRuntimeProvidersOptions {
     /**
-     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, all 14
-     * are bound (the default `trigger.module.ts` path post-EW-685 T4
+     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, every
+     * entry of {@link DISPATCHER_SYMBOLS} is bound (the default
+     * `trigger.module.ts` path post-EW-685 T4
      * full cutover). Used by tests and by future modules that want
      * to bind a strict subset.
      */

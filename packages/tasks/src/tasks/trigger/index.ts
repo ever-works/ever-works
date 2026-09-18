@@ -70,3 +70,8 @@ export * from './skill-readiness-sweep.task';
 // records so the history list stays honest.
 export * from './workspace-backup.task';
 export * from './workspace-backup-sweeper.task';
+// APW-07 T17 — provision / refresh / release one App dependency of one App
+// Work, on APW-06's isolated `app-cluster-io` queue. It refuses to run in
+// production unless the operator attested the worker's isolation
+// (`EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`).
+export * from './app-dependency-provision.task';

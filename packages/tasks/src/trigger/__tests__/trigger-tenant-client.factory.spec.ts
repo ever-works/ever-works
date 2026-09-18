@@ -302,6 +302,86 @@ describe('dispatchersFromTenantClient', () => {
         ).rejects.toThrow('SDK down');
     });
 
+    it('dispatchAppDependencyProvision propagates SDK errors (APW07-G24 — no silent drop)', async () => {
+        const fakeTrigger = vi.fn().mockRejectedValue(new Error('SDK down'));
+        const fakeClient = {
+            tasks: { trigger: fakeTrigger },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchAppDependencyProvision: (p: unknown) => Promise<string>;
+        };
+
+        // A silently dropped provisioning dispatch would leave the dependency
+        // row `pending` with nothing scheduled behind it, and nothing else in
+        // the platform picks that up — so the throw MUST escape.
+        await expect(
+            dispatchers.dispatchAppDependencyProvision({
+                workId: 'w',
+                kind: 'postgres',
+                mode: 'provision',
+            }),
+        ).rejects.toThrow('SDK down');
+    });
+
+    it('dispatchAppDependencyProvision propagates a missing run id (never a silent null)', async () => {
+        const fakeClient = {
+            tasks: { trigger: vi.fn().mockResolvedValue(undefined) },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchAppDependencyProvision: (p: unknown) => Promise<string>;
+        };
+
+        await expect(
+            dispatchers.dispatchAppDependencyProvision({
+                workId: 'w',
+                kind: 'redis',
+                mode: 'refresh',
+            }),
+        ).rejects.toThrow('SDK returned no run id');
+    });
+
+    it('dispatchAppDependencyProvision carries the delayed re-dispatch as the runtime delay', async () => {
+        const fakeTrigger = vi.fn().mockResolvedValue({ id: 'run_dep' });
+        const fakeClient = {
+            tasks: { trigger: fakeTrigger },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchAppDependencyProvision: (p: unknown) => Promise<string>;
+        };
+
+        const notBefore = Date.parse('2026-09-17T09:05:00.000Z');
+        const runId = await dispatchers.dispatchAppDependencyProvision({
+            workId: 'w',
+            kind: 'postgres',
+            mode: 'provision',
+            requestedAtMs: Date.parse('2026-09-17T09:00:00.000Z'),
+            notBefore,
+        });
+
+        expect(runId).toBe('run_dep');
+        expect(fakeTrigger).toHaveBeenCalledTimes(1);
+        const [taskId, payload, options] = fakeTrigger.mock.calls[0] as [
+            string,
+            Record<string, unknown>,
+            { delay?: Date; concurrencyKey?: string; tags?: string[] },
+        ];
+        expect(taskId).toBe('app-dependency-provision');
+        expect(payload).toMatchObject({ workId: 'w', kind: 'postgres', mode: 'provision' });
+        // `notBefore` (epoch ms) becomes the runtime's own `delay` — the job
+        // never sleeps (plan §7:875-876).
+        expect(options.delay).toEqual(new Date(notBefore));
+        expect(options.concurrencyKey).toBe('app-dependency:w:postgres');
+        expect(options.tags).toEqual([
+            'app-dependency-provision',
+            'work:w',
+            'kind:postgres',
+            'mode:provision',
+        ]);
+    });
+
     it('two dispatcher maps for two clients do not cross-pollute', async () => {
         const triggerA = vi.fn().mockResolvedValue({ id: 'a-run' });
         const triggerB = vi.fn().mockResolvedValue({ id: 'b-run' });

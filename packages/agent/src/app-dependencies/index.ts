@@ -45,3 +45,15 @@ export {
 } from './app-dependencies.service';
 
 export { AppDependenciesModule } from './app-dependencies.module';
+
+// APW-07 T17 — the `app-dependency-provision` runner. Exported from this barrel
+// (rather than reached by path) because `packages/tasks`'s task on APW-06's
+// `app-cluster-io` queue resolves it by class through Nest DI, and a task may
+// only import what the package's `exports` map publishes.
+export {
+    AppDependencyProvisionRunner,
+    APP_DEPENDENCY_PROVISION_LEASE_MS,
+    APP_DEPENDENCY_PROVISION_MAX_REDISPATCH_MS,
+    type AppDependencyProvisionKindResult,
+    type AppDependencyProvisionRunResult,
+} from './app-dependency-provision.runner';

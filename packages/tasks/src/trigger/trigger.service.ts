@@ -31,6 +31,8 @@ import {
     WorkspaceBackupDispatcher,
     MemoryFactEmbedPayload,
     MemoryFactEmbedDispatcher,
+    AppDependencyProvisionPayload,
+    AppDependencyProvisionDispatcher,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -56,6 +58,7 @@ import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
 import { memoryFactEmbedTask } from '../tasks/trigger/memory-fact-embed.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import { workspaceBackupTask } from '../tasks/trigger/workspace-backup.task';
+import { appDependencyProvisionTask } from '../tasks/trigger/app-dependency-provision.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -113,7 +116,8 @@ export class TriggerService
         KbTranscribeDispatcher,
         KbReembedWorkDispatcher,
         WorkspaceBackupDispatcher,
-        MemoryFactEmbedDispatcher
+        MemoryFactEmbedDispatcher,
+        AppDependencyProvisionDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -974,5 +978,96 @@ export class TriggerService
             );
             return null;
         }
+    }
+
+    /**
+     * APW-07 T17 — enqueue one `app-dependency-provision` run.
+     *
+     * **Errors PROPAGATE (APW07-G24).** This is the loud-error shape, like
+     * {@link dispatchKbReembedWork} and unlike every `… | null` dispatcher
+     * above: a dropped provisioning dispatch leaves a dependency row at
+     * `pending` with nothing scheduled behind it, the Dependencies card reads
+     * *Provisioning* forever, and no reconciliation pass exists to notice. The
+     * caller (`AppDependenciesService`) records `dispatchUnavailable` and the
+     * card tells the owner; a `null` here would tell it nothing.
+     *
+     * **Two refusals, both before anything is enqueued:**
+     *
+     * 1. the runtime is disabled (`shouldUseTrigger()` false / no secret key) —
+     *    the in-process fallback every other dispatcher relies on does not exist
+     *    for this job, because the job needs APW-06's isolated worker;
+     * 2. `NODE_ENV=production` without
+     *    `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true` (APW-06 plan
+     *    §6.2:950-952) — the operator's attestation that this queue's worker has
+     *    no route to internal networks. This work dials the owner's own cluster
+     *    and external servers, so an unattested production worker must not be
+     *    handed it. The task itself refuses to run under the same condition, so
+     *    a message already queued when the flag flips still cannot dial.
+     *
+     * **The delayed re-dispatch.** A `pending` outcome or a transient failure is
+     * re-dispatched by the RUNNER through this same method, with the instant it
+     * wants the run to start on the payload (`deferUntil` as ISO-8601, or
+     * `notBefore` as epoch ms). It becomes the runtime's own `delay` — the exact
+     * shape {@link dispatchNotificationChannelDelivery} already uses for
+     * quiet-hours — so the job never sleeps and every attempt is its own
+     * observable run.
+     *
+     * The `concurrencyKey` is per (Work, kind): two kinds provision in parallel,
+     * the same kind never twice at once — which is what makes a re-dispatch
+     * arriving while the previous attempt is still running queue instead of
+     * racing it for the row's lease.
+     */
+    async dispatchAppDependencyProvision(payload: AppDependencyProvisionPayload): Promise<string> {
+        if (!this.ensureConfigured()) {
+            throw new Error(
+                'app-dependency-provision dispatch attempted while Trigger.dev is disabled — ' +
+                    'the dependency would stay pending with nothing scheduled behind it.',
+            );
+        }
+
+        // Optional-chained on purpose: `config.everWorks` is absent in several
+        // specs' partial config mocks, and a missing accessor must fail CLOSED
+        // (undefined !== true) rather than throw a TypeError that reads like a
+        // dispatch bug.
+        if (
+            process.env.NODE_ENV === 'production' &&
+            config.everWorks?.apps?.isClusterWorkerIsolated?.() !== true
+        ) {
+            throw new Error(
+                'worker_not_isolated: refusing to dispatch app-dependency-provision in production ' +
+                    'unless EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true — this job dials the ' +
+                    "owner's cluster and external servers from the App cluster worker.",
+            );
+        }
+
+        // `deferUntil` (ISO-8601) is the wire spelling; `notBefore` (epoch ms) is
+        // the runner's arithmetic spelling. Either is honoured (plan §7:875-876).
+        const deferUntil =
+            payload.deferUntil ??
+            (payload.notBefore ? new Date(payload.notBefore).toISOString() : undefined);
+        const delay = deferUntil ? new Date(deferUntil) : undefined;
+
+        const handle = await appDependencyProvisionTask.trigger(
+            payload,
+            this.stampTenantOptions({
+                tags: [
+                    'app-dependency-provision',
+                    `work:${payload.workId}`,
+                    ...(payload.kind ? [`kind:${payload.kind}`] : []),
+                    `mode:${payload.mode}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `app-dependency:${payload.workId}:${payload.kind ?? 'all'}`,
+                ...(delay ? { delay } : {}),
+            }),
+        );
+
+        if (!handle?.id) {
+            throw new Error(
+                `dispatchAppDependencyProvision(work=${payload.workId}): SDK returned no run id`,
+            );
+        }
+
+        return handle.id;
     }
 }

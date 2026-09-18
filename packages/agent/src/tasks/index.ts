@@ -127,3 +127,11 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // inside the request that asked for it.
 export * from './workspace-backup.types';
 export * from './workspace-backup-dispatcher';
+
+// APW-07 T17 — the app-dependency-provision job. One message per
+// (Work, kind): claim the row's lease, dial the dependency provider on the
+// isolated `app-cluster-io` worker, persist, and re-dispatch with a delay
+// rather than sleeping. The dispatcher PROPAGATES errors (APW07-G24): a
+// dropped provision leaves a card at "Provisioning" with nothing behind it.
+export * from './app-dependency-provision.types';
+export * from './app-dependency-provision-dispatcher';

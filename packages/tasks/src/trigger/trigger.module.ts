@@ -14,6 +14,11 @@ import {
     KB_TRANSCRIBE_DISPATCHER,
     KB_REEMBED_WORK_DISPATCHER,
     MEMORY_FACT_EMBED_DISPATCHER,
+    // APW-07 T17 — the `app-dependency-provision` dispatcher. Bound by the
+    // `buildJobRuntimeProviders()` spread below like every other symbol and
+    // EXPORTED here so `AppDependenciesService` (declared in the agent-side
+    // `AppDependenciesModule`, which the API imports) can inject it.
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
     JOB_RUNTIME_PROVIDER_REGISTRY,
     InMemoryJobRuntimeProviderRegistry,
     buildJobRuntimeProviders,
@@ -163,6 +168,11 @@ import {
         // agent-side `MemoryFactsModule`, can see it.
         MEMORY_FACT_EMBED_DISPATCHER,
         NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
+        // APW-07 T17 — exported for the API's dependency wiring; the token
+        // itself is bound by `...buildJobRuntimeProviders()` above (all
+        // `DISPATCHER_SYMBOLS` flow through the registry), so this line is the
+        // export and nothing else.
+        APP_DEPENDENCY_PROVISION_DISPATCHER,
     ],
 })
 export class TriggerModule {}

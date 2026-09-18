@@ -27,6 +27,11 @@
  */
 
 export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
+    // APW-07 T17 — the `app-dependency-provision` dispatcher symbol. The
+    // service's own provisional declaration of the same NAME is a different
+    // Symbol; this barrel entry is the one `job-runtime.providers.ts` binds
+    // and the one `TriggerModule` exports.
+    'APP_DEPENDENCY_PROVISION_DISPATCHER',
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) — credential
     // versioning service for graceful drain on rotation. See ADR-017 §3.
     'CredentialVersionService',
