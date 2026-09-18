@@ -32,6 +32,7 @@ import {
 	type AppDeployTarget,
 	type AppDeploymentState,
 	type AppFailureCode,
+	type AppPrecondition,
 	type AppPreconditionCode,
 	type AppRuntimeHealth,
 	type AppRuntimeState
@@ -734,5 +735,52 @@ describe('app-runtime — the derived unions reject what they do not list', () =
 		const deployment: AppDeploymentState = 'ready';
 
 		expect([target, state, phase, failure, health, precondition, deployment]).toHaveLength(7);
+	});
+});
+
+describe('app-runtime — AppPrecondition (plan §3.1:375, §5.1:674)', () => {
+	it('requires only `code` and `message`, so a producer with no names and no fix still fits', () => {
+		const bare: AppPrecondition = { code: 'paused', message: 'This app is paused.' };
+		const full: AppPrecondition = {
+			code: 'env_required_unset',
+			names: ['DATABASE_URL', 'SMTP_HOST'],
+			message: 'Two required values are unset.',
+			fixUrl: '/works/w1/app/settings#env'
+		};
+		// @ts-expect-error `message` is required — a precondition with no sentence is not reportable
+		const noMessage: AppPrecondition = { code: 'paused' };
+		// @ts-expect-error `code` is a §5.1 code; `stale` is a status flag (plan §7.2)
+		const badCode: AppPrecondition = { code: 'stale', message: 'x' };
+
+		expect(Object.keys(bare)).toEqual(['code', 'message']);
+		expect(full.names).toHaveLength(2);
+		expect(full.fixUrl).toBeDefined();
+		expect([noMessage, badCode]).toHaveLength(2);
+	});
+
+	it('accepts every §5.1 code, so no row of that table is a compile error', () => {
+		// One `AppPrecondition` per code, built the way a producer would build
+		// it: the message leaf is the code's own English leaf (plan §10.3). The
+		// assignment is the assertion — a code missing from the union fails
+		// `type-check:tests`, not merely this loop.
+		const all: AppPrecondition[] = APP_PRECONDITION_CODES.map((code) => ({
+			code,
+			message: APP_PRECONDITION_MESSAGE_LEAVES[code]
+		}));
+
+		expect(all).toHaveLength(APP_PRECONDITION_CODES.length);
+		expect(all.every((precondition) => typeof precondition.message === 'string')).toBe(true);
+	});
+
+	it('is satisfied by the render refusals the k8s plugin already returns', () => {
+		// `AppRenderRefusal` says "`AppPrecondition`-shaped" in both renderers.
+		// These are its three codes; each must be a precondition code, or that
+		// comment is a lie and a caller cannot hand them to `unmet`.
+		const renderRefusalCodes = ['volume_replicas', 'volume_shrink', 'privileged_port'] as const;
+
+		for (const code of renderRefusalCodes) {
+			const shaped: AppPrecondition = { code, message: 'Refused by the renderer.' };
+			expect(APP_PRECONDITION_CODES).toContain(shaped.code);
+		}
 	});
 });

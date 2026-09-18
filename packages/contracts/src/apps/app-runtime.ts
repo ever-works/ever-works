@@ -317,6 +317,45 @@ export const APP_PRECONDITION_CODES = [
 export type AppPreconditionCode = (typeof APP_PRECONDITION_CODES)[number];
 
 /**
+ * One unmet precondition, in the shape plan §3.1:375 and §5.1:674 write down —
+ * `{ code, names?, message, fixUrl? }` — and the element type of §4.9's
+ * `APP_DEPLOY_PRECONDITIONS` / `APP_TARGET_REFUSED` error bodies
+ * (`unmet: AppPrecondition[]`, plan:151 and plan:1213).
+ *
+ * **Why this is declared here rather than "unchanged" as the plan said.** The
+ * plan's prose called the type unchanged, so it read as though the substrate
+ * already carried it; it did not — nothing under `packages/**` declared it, and
+ * the two modules that needed the shape each declared a structurally
+ * compatible interface locally instead
+ * (`packages/plugins/k8s/src/app/app-manifest.renderer.ts` and
+ * `app-jobs.renderer.ts` both say "`AppPrecondition`-shaped" beside their own
+ * `AppRenderRefusal`). Declaring it is purely additive: nothing is renamed,
+ * moved or removed, those local interfaces stay exactly as they are, and they
+ * remain assignable to this one — which is all "`AppPrecondition`-shaped" ever
+ * claimed. `AppRenderRefusal`'s three codes are a subset of
+ * {@link APP_PRECONDITION_CODES}, asserted in `app-runtime.spec.ts`.
+ *
+ * `names` is plural because one precondition can be about several things at
+ * once: three unset env values are one `env_required_unset` naming three
+ * entries, not three rows a caller has to merge. `fixUrl` is present only when
+ * there is somewhere to send the person. Both are optional, so a producer that
+ * has neither still returns the shape.
+ *
+ * **Open question, recorded rather than guessed.** §5.1's table writes
+ * `managed_ineligible` as "`managed_ineligible` (+ reasons)" and never says
+ * where those reasons live. The four fields the plan states explicitly are the
+ * four declared here; if that code's producer (APW-10's tier policy) needs a
+ * fifth field, it is added as another **optional** member, never by making one
+ * of these required.
+ */
+export interface AppPrecondition {
+	code: AppPreconditionCode;
+	names?: string[];
+	message: string;
+	fixUrl?: string;
+}
+
+/**
  * Every app state each precondition code can be reported in — the companion
  * that makes adding a code to {@link APP_PRECONDITION_CODES} without deciding
  * where it is reported a **test failure** rather than a silent hole.

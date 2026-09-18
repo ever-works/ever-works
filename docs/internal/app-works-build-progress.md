@@ -41,20 +41,22 @@ findings once.
 
 ### Wave 1 foundation ledger (what "done" means here)
 
-| Task             | Deliverable                                                                                                                | Test evidence                                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| contracts        | `packages/contracts/src/apps/` — **11 modules**, 4 specs                                                                   | contracts **3377 / 81 files**, 0 collisions                                                                            |
-| **T1**           | `app-runtime.ts` — 84 exports (12 unions, 38 precondition + 18 failure codes, 52 numbers)                                  | +111 tests, pins proven by 3 perturbations                                                                             |
-| **T4/T5**        | `app-names.ts` + `app-security.ts` — every name/label of plan §4.1, the whole §4.4 table                                   | k8s plugin **242 / 12 files** (was 184/10), one test per §4.4 cell                                                     |
-| **T2**           | `app-deployment.types.ts` (29 types) + the ten **optional** `IDeploymentPlugin` members + `isAppDeploymentPlugin`          | plugin **458 / 32 files** (was 419/31); **vercel 51/2 IDENTICAL** and still builds — no existing plugin needed an edit |
-| **T3**           | `packages/agent/src/app-runtime/{ports,default-ports,index}.ts` — every interface of plan §9.6 + five fail-closed bindings | agent **16 tests**; the `./app-runtime` subpath resolves after a build                                                 |
-| **T6/T7**        | `app-manifest.renderer.ts` (58 exports) + `app-network-policy.renderer.ts` (27)                                            | k8s plugin **358 / 14 files** (was 242/12); 4 perturbations red then reverted; old renderer hash-identical to HEAD     |
-| **APW-11 T1**    | `app-launcher.ts` — 36 exports, 11 constants, 2 fail-closed predicates                                                     | contracts **+45 tests**; pins proven by 4 runtime + 3 compile failures                                                 |
-| APW-03 T1        | `app-spec.types.ts`, `app-spec-issues.ts`, `app-license.types.ts`, `apps-catalog.types.ts`, `work-app-spec.dto.ts`         | contracts **3454 / 82 files**; barrel **34 areas**, 524 runtime exports                                                |
-| T8/T9            | `app-runner.script.ts`, `app-jobs.renderer.ts`, `app-rollout.ts`                                                           | k8s plugin **505 / 17 files**; `status.mapper.ts` + `manifest.renderer.ts` hash-identical to HEAD                      |
-| **APW-11 T2–T5** | launcher persistence: entity + repository + migration (`1792110000000-CreateAppLauncherPreferences`)                       | diff 242 insertions / **1 deletion**; migration reversible                                                             |
-| **APW-11 T30**   | R-25: `AppLauncherPreference` → `data/account/app-launcher-preferences.jsonl`, `by: 'user'`; `redaction.ts` untouched      | agent **95 / 5 suites**; 4 perturbations red then reverted, 3 hashes restored; zip read back with `jszip`              |
-| **APW06-G26**    | `AppComponentInput.runAsUser?: number` — the contract catches up with APW-03 `schema.md:202`                               | k8s **505 / 17** after a **rebuilt** plugin dist; `tsc --noEmit` exit 0; renderer needed no code change                |
+| Task                | Deliverable                                                                                                                | Test evidence                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| contracts           | `packages/contracts/src/apps/` — **11 modules**, 4 specs                                                                   | contracts **3377 / 81 files**, 0 collisions                                                                            |
+| **T1**              | `app-runtime.ts` — 84 exports (12 unions, 38 precondition + 18 failure codes, 52 numbers)                                  | +111 tests, pins proven by 3 perturbations                                                                             |
+| **T4/T5**           | `app-names.ts` + `app-security.ts` — every name/label of plan §4.1, the whole §4.4 table                                   | k8s plugin **242 / 12 files** (was 184/10), one test per §4.4 cell                                                     |
+| **T2**              | `app-deployment.types.ts` (29 types) + the ten **optional** `IDeploymentPlugin` members + `isAppDeploymentPlugin`          | plugin **458 / 32 files** (was 419/31); **vercel 51/2 IDENTICAL** and still builds — no existing plugin needed an edit |
+| **T3**              | `packages/agent/src/app-runtime/{ports,default-ports,index}.ts` — every interface of plan §9.6 + five fail-closed bindings | agent **16 tests**; the `./app-runtime` subpath resolves after a build                                                 |
+| **T6/T7**           | `app-manifest.renderer.ts` (58 exports) + `app-network-policy.renderer.ts` (27)                                            | k8s plugin **358 / 14 files** (was 242/12); 4 perturbations red then reverted; old renderer hash-identical to HEAD     |
+| **APW-11 T1**       | `app-launcher.ts` — 36 exports, 11 constants, 2 fail-closed predicates                                                     | contracts **+45 tests**; pins proven by 4 runtime + 3 compile failures                                                 |
+| APW-03 T1           | `app-spec.types.ts`, `app-spec-issues.ts`, `app-license.types.ts`, `apps-catalog.types.ts`, `work-app-spec.dto.ts`         | contracts **3454 / 82 files**; barrel **34 areas**, 524 runtime exports                                                |
+| T8/T9               | `app-runner.script.ts`, `app-jobs.renderer.ts`, `app-rollout.ts`                                                           | k8s plugin **505 / 17 files**; `status.mapper.ts` + `manifest.renderer.ts` hash-identical to HEAD                      |
+| **APW-11 T2–T5**    | launcher persistence: entity + repository + migration (`1792110000000-CreateAppLauncherPreferences`)                       | diff 242 insertions / **1 deletion**; migration reversible                                                             |
+| **APW-11 T30**      | R-25: `AppLauncherPreference` → `data/account/app-launcher-preferences.jsonl`, `by: 'user'`; `redaction.ts` untouched      | agent **95 / 5 suites**; 4 perturbations red then reverted, 3 hashes restored; zip read back with `jszip`              |
+| **APW06-G26**       | `AppComponentInput.runAsUser?: number` — the contract catches up with APW-03 `schema.md:202`                               | k8s **505 / 17** after a **rebuilt** plugin dist; `tsc --noEmit` exit 0; renderer needed no code change                |
+| **APW-11 T31**      | the five operator switches in the three deploy manifests + `.env.example`; `_ENV` literal per file; switch ships OFF       | manifests **24/24/24** + env **18** insertions, **0 deletions**; guard spec **13 tests**; 3 perturbations red          |
+| **AppPrecondition** | declared in `app-runtime.ts` (plan §3.1:375, §5.1:674) after being referenced-but-absent everywhere under `packages/**`    | contracts **3457 / 82**; `type-check:tests` exit 0; 2 perturbations red (`TS2578` + union removal), hash restored      |
 
 **Two foundation tasks own a guard worth knowing about:**
 
@@ -286,6 +288,43 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the launcher's operator switches are wired, and `AppPrecondition` stops being a dangling name.**
+  **APW-11 T31 (the manifest half).** `.deploy/k8s/k8s-manifest.{dev,stage,prod}.yaml` and `apps/api/.env.example`
+  now carry the five variables this epic introduces — `EVER_WORKS_APP_LAUNCHER_ENABLED`,
+  `EVER_WORKS_PLATFORM_CATALOG_{REPO,REF,ENV,SELF_ID}` — with **24 / 24 / 24 and 18 insertions and zero deletions**.
+  `_ENV` is a literal per file on purpose (`develop` / `stage` / `production`): its documented default is
+  `production`, so an installation that never set it would show production addresses on stage and dev (spec FR-10,
+  APW11-G19). The switch ships **`false` everywhere** — unset, empty and any unrecognised value are all the OFF
+  state, so it cannot fail open, and flipping that one line is the whole operation (XC-10, FR-65).
+  T31's stated Test is a hand-run `git grep`, which is a check someone must remember to run and which cannot tell
+  the right container from the wrong one — and the container is exactly what matters here, because
+  `PlatformCatalogService` fetches the catalog **inside the API process** (plan §5.2, APW11-G06), so a variable
+  that only reached the web container would configure nothing. The grep therefore became a spec:
+  `apps/api/src/app-launcher/__tests__/launcher-deploy-switches.spec.ts` — **13 tests** that parse the three
+  manifests as YAML and assert, per file, that the API container carries all five, that **no other container
+  carries the catalog variables**, that `_ENV` is that file's own environment, and that the switch value is exactly
+  `'true'` or `'false'` (never `1`, `yes` or empty, which read as ON to a person and OFF to the guard). The
+  switch's _value_ is deliberately not pinned: a test that failed when an operator turned the launcher on would be
+  fighting the feature it guards. Proven by three perturbations, each captured red then reverted with the file's
+  sha256 restored: `_ENV` deleted from the stage manifest (2 red), a catalog variable added to the **web** container
+  (1 red), and the prod switch set to `"1"` (1 red). Hashes after revert: dev `9EB22AB1…`, stage `C7C84DF2…`, prod
+  `4729DA54…`, byte-identical — and one perturbation taught a lesson worth recording: a `(?m)^…$` regex silently
+  matches **nothing** in these CRLF files, which is why the edits are done by line identity instead.
+  **Deferred, explicitly:** T31's second half — the controller-spec case that flipping the flag off leaves every
+  stored row untouched and answers 404 on all three routes (ACC-11-50) — belongs with T9, which does not exist yet;
+  it lands there rather than being simulated here.
+  **`AppPrecondition` is declared.** APW-06 plan §3.1:375 and §5.1:674 name a shape
+  (`{ code, names?, message, fixUrl? }`) as "unchanged", and §4.9's `APP_DEPLOY_PRECONDITIONS` /
+  `APP_TARGET_REFUSED` bodies carry `unmet: AppPrecondition[]` — but **no such type existed anywhere under
+  `packages/**`**, and the two renderers that needed it each declared a structurally compatible interface locally
+instead (both even say "`AppPrecondition`-shaped" beside their own `AppRenderRefusal`). It is now declared in
+`packages/contracts/src/apps/app-runtime.ts`, beside the union its `code`comes from, with three tests: only`code`+`message`are required, every §5.1 code is accepted, and`AppRenderRefusal`'s three codes are a subset of
+`APP_PRECONDITION_CODES` — so the "`-shaped`" claim is checkable rather than aspirational. Additive throughout:
+nothing renamed, nothing removed, the local interfaces untouched and still assignable. Two `@ts-expect-error`
+pins make it non-vacuous, and the gate for them is **`type-check:tests`**, not the vitest run — vitest's own
+typecheck does not cover spec files, which the first perturbation proved by staying green exactly where
+`tsc -p tsconfig.speccheck.json`reported`TS2578: Unused '@ts-expect-error' directive`. §5.1's "`managed_ineligible`(+ reasons)" is recorded as an **open question** in the type's docstring rather than guessed: if that code needs a
+fifth field, it arrives as another optional member. Contracts: **3457 / 82 files** green,`type-check`and`type-check:tests` exit 0.
 - **2026-09-18 · the R-25 classification is closed for APW-11, and `AppComponentInput.runAsUser` lands (APW06-G26).**
   `AppLauncherPreference` is classified in the **account** domain of the AW-22 workspace backup
   (`data/account/app-launcher-preferences.jsonl`, `by: 'user'`), with **`redaction.ts` untouched** — the rows hold
