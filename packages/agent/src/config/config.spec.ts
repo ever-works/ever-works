@@ -1283,6 +1283,46 @@ describe('agent/config', () => {
         });
     });
 
+    describe('everWorks.apps.worksEnabled (APW-01 T7)', () => {
+        const KEY = 'EVER_WORKS_APP_WORKS_ENABLED';
+        let saved: string | undefined;
+
+        beforeEach(() => {
+            saved = process.env[KEY];
+            delete process.env[KEY];
+        });
+
+        afterEach(() => {
+            if (saved === undefined) delete process.env[KEY];
+            else process.env[KEY] = saved;
+        });
+
+        it('is OFF when the variable is unset — the default is off', () => {
+            expect(config.everWorks.apps.worksEnabled()).toBe(false);
+        });
+
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['true ', false],
+            ['', false],
+        ])('reads %p as %p — only the exact string "true" is on', (value, expected) => {
+            process.env[KEY] = value;
+            expect(config.everWorks.apps.worksEnabled()).toBe(expected);
+        });
+
+        it('is the same answer the web chip reads, from the same variable name', () => {
+            // `apps/web/src/lib/feature-flags/work-kinds.ts` reads
+            // `EVER_WORKS_APP_WORKS_ENABLED` at request time and requires exactly
+            // `'true'` too — this test exists so the two sides are pinned to one
+            // convention rather than to a comment claiming they agree.
+            process.env[KEY] = 'true';
+            expect(config.everWorks.apps.worksEnabled()).toBe(true);
+        });
+    });
+
     describe('appLauncher (APW-11)', () => {
         const KEY = 'EVER_WORKS_APP_LAUNCHER_ENABLED';
         let saved: string | undefined;

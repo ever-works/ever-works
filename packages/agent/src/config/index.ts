@@ -1042,6 +1042,27 @@ export const config = {
     // Ever Works platform-default providers used by the onboarding wizard.
     // Each is env-gated until the underlying external resource is provisioned.
     everWorks: {
+        /**
+         * APW-01 T7 — the App Work instance setting (spec FR-3, plan §12).
+         *
+         * `EVER_WORKS_APP_WORKS_ENABLED` is the API-side twin of the web's gate
+         * (`apps/web/src/lib/feature-flags/work-kinds.ts`), and the reason both
+         * read the SAME variable name rather than two: a chip that offers `app`
+         * while the API refuses to build one is a dead end, and an API that
+         * accepts `app` while the picker hides it is a missing feature. The web
+         * half reads its own deployment's copy at request time; when the API
+         * starts publishing this on `/api/config`, callers pass that answer and
+         * the environment read becomes the fallback.
+         *
+         * Exactly `'true'` is on, defaulting to OFF, beside the other
+         * `*_ENABLED` getters — the same posture as `config.appLauncher`.
+         */
+        apps: {
+            worksEnabled() {
+                return process.env.EVER_WORKS_APP_WORKS_ENABLED === 'true';
+            },
+        },
+
         // "Ever Works Git" storage option — push customer repos to a
         // platform-owned GitHub org using a server-held PAT, so users can
         // ship without bringing their own GitHub account.
