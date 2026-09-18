@@ -6,6 +6,7 @@ import {
     Gauge,
     HelpCircle,
     Keyboard,
+    LayoutGrid,
     Lightbulb,
     Link2,
     ListChecks,
@@ -115,6 +116,22 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
         label: ({ t }) => t('dashboard.commandPalette.commands.openHelp'),
         aliases: ({ t }) => t('dashboard.commandPalette.commandAliases.openHelp'),
         run: (ctx) => ctx.openHelp(),
+    },
+    {
+        /**
+         * APW-11 T15 — the launcher reached from the palette, which is the only
+         * door to it from the keyboard. The command is offered exactly when the
+         * shell supplied an opener, so an installation without the launcher (or a
+         * provider whose element failed to load) never shows a command that
+         * opens nothing — the launcher's own trigger lives in the header, and
+         * this is the same action, not a second one.
+         */
+        id: 'openAppLauncher',
+        icon: LayoutGrid,
+        label: ({ t }) => t('dashboard.commandPalette.commands.openAppLauncher'),
+        aliases: ({ t }) => t('dashboard.commandPalette.commandAliases.openAppLauncher'),
+        available: (ctx) => ctx.openAppLauncher !== undefined,
+        run: (ctx) => ctx.openAppLauncher?.(),
     },
     {
         id: 'keyboardShortcuts',

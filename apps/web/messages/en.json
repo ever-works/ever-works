@@ -3795,7 +3795,8 @@
                 "copyPageLink": "Copy link to this page",
                 "switchWorkspace": "Switch workspace → {name}",
                 "switchWork": "Switch Work → {name}",
-                "signOut": "Sign out"
+                "signOut": "Sign out",
+                "openAppLauncher": "App Launcher"
             },
             "commandAliases": {
                 "newMission": "create mission, start mission, add mission",
@@ -3818,7 +3819,8 @@
                 "copyPageLink": "copy url, share link, copy address",
                 "switchWorkspace": "change workspace, switch organization, change organization",
                 "switchWork": "change work, go to work, open work",
-                "signOut": "log out, logout, sign off"
+                "signOut": "log out, logout, sign off",
+                "openAppLauncher": "launcher, apps, switch app, app launcher"
             }
         },
         "schedules": {
