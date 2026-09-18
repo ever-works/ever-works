@@ -119,53 +119,98 @@ describe('the App Launcher message keys (APW-11 T19, ACC-11-31)', () => {
         // The launcher components that render copy. `AppLauncherProvider.tsx` is
         // deliberately absent: it is the context that lets the palette open the
         // element and renders no strings at all, so requiring a namespace of it
-        // would be requiring copy it should not have. T16/T17's two settings
-        // surfaces are scanned the moment they exist rather than being skipped
-        // silently — a file that appears with a namespace must resolve.
-        const required = ['AppLauncherButton.tsx'];
-        const whenPresent = [
-            'AppLauncherSettings.tsx',
-            'AppLauncherExposureSetting.tsx',
-            'AppLauncherExposureCard.tsx',
-        ];
-        const names = [
-            ...required,
-            ...whenPresent.filter((name) => existsSync(join(COMPONENTS_DIR, name))),
+        // would be requiring copy it should not have.
+        //
+        // ⚠️ The settings editor lives in `components/settings`, NOT beside the
+        // panel, which the first version of this scan missed entirely — it looked
+        // in one directory. It renders copy from TWO namespaces (its own
+        // `dashboard.settings.appLauncher` and, for the strings it reuses from the
+        // panel, `dashboard.appLauncher`), which is why the scan below maps each
+        // translator VARIABLE to the namespace it was created from instead of
+        // assuming the file's first namespace governs every `t('…')` in it. A
+        // per-file namespace would have reported a false failure on exactly the
+        // file with the most keys.
+        const files = [
+            join(COMPONENTS_DIR, 'AppLauncherButton.tsx'),
+            join(COMPONENTS_DIR, 'AppLauncherProvider.tsx'),
+            join(__dirname, '..', '..', '..', 'components', 'settings', 'AppLauncherSettings.tsx'),
+            join(
+                __dirname,
+                '..',
+                '..',
+                '..',
+                'components',
+                'works',
+                'detail',
+                'settings',
+                'AppLauncherExposureSetting.tsx',
+            ),
+            join(
+                __dirname,
+                '..',
+                '..',
+                '..',
+                'components',
+                'works',
+                'detail',
+                'overview',
+                'AppLauncherExposureCard.tsx',
+            ),
         ];
         let checked = 0;
+        let scanned = 0;
+        /** The files that actually rendered copy — asserted below, so the scan cannot shrink silently. */
+        const contributing = new Set<string>();
 
-        for (const name of names) {
-            const path = join(COMPONENTS_DIR, name);
-            expect(existsSync(path), `${name} must exist for this scan to mean anything`).toBe(
-                true,
-            );
+        for (const path of files) {
+            const name = path.split(/[\\/]/).pop() ?? path;
+            // Absent files are skipped, but the file the whole feature hangs on is not.
+            if (!existsSync(path)) {
+                if (name === 'AppLauncherButton.tsx') {
+                    throw new Error('AppLauncherButton.tsx is missing — the scan proves nothing');
+                }
+                continue;
+            }
+            scanned += 1;
 
             const source = readFileSync(path, 'utf8');
-            // The namespace each `useTranslations('…')` in the file establishes.
-            const namespaces = [...source.matchAll(/useTranslations\(\s*'([^']+)'\s*\)/g)].map(
-                (match) => match[1],
-            );
-            expect(
-                namespaces.length,
-                `${name}: no useTranslations namespace found`,
-            ).toBeGreaterThan(0);
-            const namespace = namespaces[0];
-
-            // Relative `t('key')` calls, which resolve under that namespace.
-            const keys = [...source.matchAll(/\bt\(\s*'([A-Za-z0-9_]+)'/g)].map(
-                (match) => match[1],
-            );
-            expect(keys.length, `${name}: no t('…') calls found`).toBeGreaterThan(5);
-            checked += keys.length;
-
-            for (const key of new Set(keys)) {
-                const value = resolve(`${namespace}.${key}`);
-                expect(typeof value, `${name}: ${namespace}.${key}`).toBe('string');
+            // `const t = useTranslations('a.b')` (and any other variable name) →
+            // the namespace that variable resolves against.
+            const byVariable = new Map<string, string>();
+            for (const match of source.matchAll(
+                /const\s+([A-Za-z0-9_$]+)\s*=\s*useTranslations\(\s*'([^']+)'\s*\)/g,
+            )) {
+                byVariable.set(match[1], match[2]);
             }
+            // A file with no translator renders no copy — the provider is exactly
+            // that, and requiring copy of it would be requiring copy it should not
+            // have. Such a file is skipped, never counted as verified.
+            if (byVariable.size === 0) continue;
+            contributing.add(name);
+
+            // Every `<var>('key')` call, resolved through its own namespace. A call
+            // on something that is not a translator (a local helper) is ignored.
+            let calls = 0;
+            for (const match of source.matchAll(/\b([A-Za-z0-9_$]+)\(\s*'([A-Za-z0-9_]+)'/g)) {
+                const namespace = byVariable.get(match[1]);
+                if (!namespace) continue;
+                calls += 1;
+                const key = `${namespace}.${match[2]}`;
+                expect(typeof resolve(key), `${name}: ${key}`).toBe('string');
+            }
+            expect(calls, `${name}: no translator calls found`).toBeGreaterThan(0);
+            checked += calls;
         }
 
-        // Vacuity guard: a scan that silently matched nothing would pass every
-        // assertion above.
-        expect(checked).toBeGreaterThan(20);
+        // Vacuity guards: a scan that silently matched nothing — or that only ever
+        // looked at one file — would pass every assertion above. The two that must
+        // contribute are named, so deleting a `useTranslations` call from one of them
+        // fails here instead of quietly shrinking the scan.
+        expect(scanned, 'files present').toBeGreaterThanOrEqual(2);
+        expect(contributing.has('AppLauncherButton.tsx'), 'the control contributed').toBe(true);
+        expect(contributing.has('AppLauncherSettings.tsx'), 'the settings editor contributed').toBe(
+            true,
+        );
+        expect(checked, 'translator calls resolved').toBeGreaterThan(40);
     });
 });
