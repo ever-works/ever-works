@@ -1,4 +1,4 @@
-import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
+import { Injectable, Logger, NestMiddleware, Optional } from '@nestjs/common';
 
 /**
  * Minimal request/response/next shapes, copied from
@@ -139,9 +139,17 @@ export function resolveLauncherOrigins(env: NodeJS.ProcessEnv = process.env): st
 export class LauncherDelegatedCorsMiddleware implements NestMiddleware {
     private readonly origins: readonly string[];
 
-    constructor(origins?: readonly string[]) {
-        // Injectable for tests; the default reads the environment once, at construction, so a running
-        // process cannot change its allow-list without a restart.
+    constructor(@Optional() origins?: readonly string[]) {
+        // `@Optional()` is load-bearing, NOT decoration. Without it Nest reads this parameter as an
+        // injectable dependency and refuses to boot the whole API:
+        //   UnknownDependenciesException: Nest can't resolve dependencies of the
+        //   LauncherDelegatedCorsMiddleware (?). … argument at index [0] …
+        //   dependencies: [ [Function: Object] ]
+        // because a `readonly string[]` parameter has no provider token to resolve. `@Optional()`
+        // makes Nest inject `undefined` when the token is absent, which is the "read the environment"
+        // arm below — exactly what a running process wants. The parameter stays so tests can pass an
+        // explicit list (see the spec), and the default reads the environment once, at construction,
+        // so a running process cannot change its allow-list without a restart.
         this.origins = origins ?? resolveLauncherOrigins();
     }
 
