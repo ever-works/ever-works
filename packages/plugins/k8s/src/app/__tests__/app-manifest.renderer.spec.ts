@@ -478,7 +478,7 @@ describe('T6 — Ingress (plan §4.3, §4.11)', () => {
 
 		expect(ingresses).toHaveLength(1);
 		expect(ingresses[0].metadata.name).toBe('web');
-		expect(primaryWebComponent(fixture(TWO_WEB)).name).toBe('web');
+		expect(primaryWebComponent(fixture(TWO_WEB))?.name).toBe('web');
 		expect(objectNamed(plan, 'Ingress', 'admin')).toBeUndefined();
 	});
 
@@ -788,8 +788,8 @@ describe('T6 — ACC-06-54: the prepare-namespace subset (plan §4.2)', () => {
 	});
 
 	it('derives the managed CPU limit as max(1, 4 × cpu) when the spec declares none (plan §4.5)', () => {
-		expect(cpuLimitForTarget('your-cluster', undefined, true)).toBeUndefined();
-		expect(cpuLimitForTarget('ever-works-apps', undefined, true)).toBe('1');
+		expect(cpuLimitForTarget('your-cluster', undefined, undefined)).toBeUndefined();
+		expect(cpuLimitForTarget('ever-works-apps', undefined, undefined)).toBe('1');
 		expect(cpuLimitForTarget('ever-works-apps', undefined, '500m')).toBe('2');
 		expect(cpuLimitForTarget('ever-works-apps', undefined, '2')).toBe('8');
 		expect(cpuLimitForTarget('ever-works-apps', '3', '500m')).toBe('3');
@@ -940,9 +940,9 @@ describe('T6 — Services and containers (plan §4.3)', () => {
 		const plan = planAppRender(input);
 
 		for (const object of plan.objects) {
-			expect(object.metadata.labels['ever-works.io/work-id']).toBe(input.ref.workId);
-			expect(object.metadata.labels['ever-works.io/kind']).toBe('app');
-			expect(object.metadata.labels['app.kubernetes.io/managed-by']).toBe('ever-works-k8s-plugin');
+			expect(object.metadata.labels?.['ever-works.io/work-id']).toBe(input.ref.workId);
+			expect(object.metadata.labels?.['ever-works.io/kind']).toBe('app');
+			expect(object.metadata.labels?.['app.kubernetes.io/managed-by']).toBe('ever-works-k8s-plugin');
 			for (const forbidden of APP_FORBIDDEN_LABEL_KEYS) {
 				expect(object.metadata.labels).not.toHaveProperty(forbidden);
 			}

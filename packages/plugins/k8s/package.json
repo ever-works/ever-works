@@ -22,7 +22,7 @@
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
-		"type-check": "tsc --noEmit",
+		"type-check": "tsc --noEmit && tsc -p tsconfig.specs.json --noEmit",
 		"clean": "rm -rf dist",
 		"test": "vitest run --passWithNoTests",
 		"test:watch": "vitest",

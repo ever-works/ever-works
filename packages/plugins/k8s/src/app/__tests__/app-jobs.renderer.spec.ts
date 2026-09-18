@@ -376,7 +376,7 @@ describe('renderRunnerJob (plan §4.8: "http jobs, http cron and every smoke run
 		expect(request.url).toBe('http://web.ew-helpdesk-1a2b3c4d.svc:80/api/seed');
 		expect(request.method).toBe(APP_JOB_HTTP_METHOD_DEFAULT);
 		expect(APP_JOB_HTTP_METHOD_DEFAULT).toBe('POST');
-		expect(request.expect.status).toEqual([200, 201, 204]);
+		expect(request.expect?.status).toEqual([200, 201, 204]);
 	});
 
 	it('is named `run-<name>-<8 hex>` for a manual run (plan §4.1, FR-51)', () => {
@@ -464,8 +464,8 @@ describe('renderRunnerJob (plan §4.8: "http jobs, http cron and every smoke run
 		expect(request.url).toBe('http://web.ew-helpdesk-1a2b3c4d.svc:80/healthz');
 		expect(request.method).toBe(APP_SMOKE_HTTP_METHOD_DEFAULT);
 		expect(APP_SMOKE_HTTP_METHOD_DEFAULT).toBe('GET');
-		expect(request.expect.status).toEqual([...APP_SMOKE_EXPECT_STATUS]);
-		expect(request.expect.maxLatencyMs).toBe(10_000);
+		expect(request.expect?.status).toEqual([...APP_SMOKE_EXPECT_STATUS]);
+		expect(request.expect?.maxLatencyMs).toBe(10_000);
 	});
 
 	it('leaves a `first-deploy` smoke check out of a later Deployment (plan §5.5)', () => {

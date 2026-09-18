@@ -1,5 +1,20 @@
 import type {
 	AddDomainResult,
+	AppClusterCheckRequest,
+	AppDeployHooks,
+	AppDeployResult,
+	AppDestroyResult,
+	AppJobResult,
+	AppJobRunRequest,
+	AppLimitRangeInput,
+	AppLogRequest,
+	AppLogTail,
+	AppRenderInput,
+	AppScaleResult,
+	AppSmokeInput,
+	AppStatusSnapshot,
+	AppStatusSpec,
+	AppTargetRef,
 	ConnectionValidationResult,
 	DeploymentConfig,
 	DeploymentDomain,
@@ -41,6 +56,21 @@ import {
 	verifyDomainResolution,
 	type DnsResolver
 } from './domain.handler.js';
+// The App runtime (APW-06 T14). The plugin is the wiring: §6.1's guard runs over every credential
+// here, once, and each method then delegates to the module that owns the behaviour — `AppDeployer`
+// (T12), `AppStatusReader` / `AppLifecycle` (T13) and `AppClusterChecker` (T13).
+import { AppClusterChecker } from './app/app-cluster-check.js';
+import { AppDeployer } from './app/app-deployer.js';
+import { AppLifecycle } from './app/app-lifecycle.js';
+import { AppStatusReader } from './app/app-status.reader.js';
+import {
+	assertSupportedKubeconfig,
+	CLUSTER_PRIVATE_ALLOWLIST_ENV,
+	pinKubeconfigServer,
+	readClusterPrivateAllowlist
+} from './app/app-kubeconfig.guard.js';
+import type { AppClusterCheckReport } from './app/app-cluster-check.js';
+import type { KubeconfigDnsResolver } from './app/app-kubeconfig.guard.js';
 import type {
 	ClusterNodeDescriptor,
 	ClusterSource,
@@ -302,6 +332,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	readonly capabilities: readonly string[] = ['deployment'];
 	readonly providerName = 'kubernetes';
 
+	/**
+	 * This plugin implements APW-06's App members (below), so `isAppDeploymentPlugin` narrows it and
+	 * the runtime target resolver may route `your-cluster` App Work operations here. It deliberately
+	 * does **not** serve `ever-works-apps`: on the managed tier the platform never applies manifests
+	 * (R-5) — APW-10's `apps-tier` plugin reconciles a `Work` resource in-zone from the same renderer.
+	 */
+	readonly supportsApps = true;
+
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
 
 	readonly settingsSchema: JsonSchema = {
@@ -445,6 +483,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private readonly registries: RegistryProviderRegistry;
 	private readonly ingressStrategies: IngressStrategyRegistry;
 	private readonly dnsResolver: DnsResolver;
+	// The App runtime's four collaborators (APW-06 T14). Built over the same `KubernetesApiService`
+	// the pre-existing deployment path uses, so an App call and a website deploy reach one client.
+	private readonly appDeployer: AppDeployer;
+	private readonly appStatusReader: AppStatusReader;
+	private readonly appLifecycle: AppLifecycle;
+	private readonly appClusterChecker: AppClusterChecker;
+	/** §6.1 step 2's DNS seam. Unset in production (the guard falls back to `node:dns`). */
+	private readonly clusterAddressResolver?: KubeconfigDnsResolver;
 
 	constructor(
 		opts: {
@@ -452,12 +498,19 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			registries?: RegistryProviderRegistry;
 			ingressStrategies?: IngressStrategyRegistry;
 			dnsResolver?: DnsResolver;
+			/** Test seam for §6.1: the resolver `pinKubeconfigServer` resolves the cluster host with. */
+			clusterAddressResolver?: KubeconfigDnsResolver;
 		} = {}
 	) {
 		this.api = opts.api ?? new KubernetesApiService();
 		this.registries = opts.registries ?? defaultRegistryProviderRegistry;
 		this.ingressStrategies = opts.ingressStrategies ?? defaultIngressStrategyRegistry;
 		this.dnsResolver = opts.dnsResolver ?? defaultDnsResolver;
+		this.appDeployer = new AppDeployer(this.api);
+		this.appStatusReader = new AppStatusReader(this.api);
+		this.appLifecycle = new AppLifecycle(this.api);
+		this.appClusterChecker = new AppClusterChecker(this.api);
+		this.clusterAddressResolver = opts.clusterAddressResolver;
 	}
 
 	// IPlugin lifecycle ------------------------------------------------------
@@ -1102,6 +1155,156 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			out.REGISTRY_PASSWORD = registry.password;
 		}
 		return out;
+	}
+
+	// App members (APW-06 T14) ----------------------------------------------
+
+	/**
+	 * Deploy an App Work to `your-cluster` (plan §5.5). The phase machine, the rollback and the
+	 * object rendering all live in `AppDeployer`; this method's own job is the §6.1 guard plus the
+	 * `ever-works-apps` refusal R-5 requires, and it is the first thing that runs.
+	 */
+	async deployApp(input: AppRenderInput, credential: string, hooks: AppDeployHooks): Promise<AppDeployResult> {
+		this.assertThisPluginServes(input?.ref);
+		const pinned = await this.guardedAppCredential(credential, input?.ref?.kubeContext);
+		return this.appDeployer.deployApp(input, pinned, hooks);
+	}
+
+	/** Observe the App Work's live state (FR-46) — `AppStatusReader.getAppStatus`. */
+	async getAppStatus(ref: AppTargetRef, credential: string, spec: AppStatusSpec): Promise<AppStatusSnapshot> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appStatusReader.getAppStatus(ref, pinned, spec);
+	}
+
+	/** Run one App spec job once (FR-51) — `AppLifecycle.runAppJob`. */
+	async runAppJob(ref: AppTargetRef, credential: string, job: AppJobRunRequest): Promise<AppJobResult> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.runAppJob(ref, pinned, job);
+	}
+
+	/** Remove the App Work's workloads while keeping its data (FR-50) — `AppLifecycle.destroyApp`. */
+	async destroyApp(
+		ref: AppTargetRef,
+		credential: string,
+		opts: { deleteVolumes: boolean }
+	): Promise<AppDestroyResult> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.destroyApp(ref, pinned, opts);
+	}
+
+	/** Pause or resume the App Work's components (FR-49) — `AppLifecycle.scaleApp`. */
+	async scaleApp(
+		ref: AppTargetRef,
+		credential: string,
+		mode: 'pause' | 'resume',
+		replicas: Record<string, number>,
+		resumeChecks?: { smoke: AppSmokeInput[]; deadlines: Record<string, number> }
+	): Promise<AppScaleResult> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.scaleApp(ref, pinned, mode, replicas, resumeChecks);
+	}
+
+	/** Tail component or job logs, redacted by value (FR-48) — `AppLifecycle.getAppLogs`. */
+	async getAppLogs(ref: AppTargetRef, credential: string, req: AppLogRequest): Promise<AppLogTail> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.getAppLogs(ref, pinned, req);
+	}
+
+	/**
+	 * Verify what the credential may do and report what the cluster has (plan §6.3) —
+	 * `AppClusterChecker.checkAppCluster`. The report is T13's `AppClusterCheckReport`, a superset of
+	 * the frozen `AppClusterCheck` that also carries the ingress controller's address (GAP-09).
+	 */
+	async checkAppCluster(credential: string, req: AppClusterCheckRequest): Promise<AppClusterCheckReport> {
+		const pinned = await this.guardedAppCredential(credential);
+		return this.appClusterChecker.checkAppCluster(pinned, req);
+	}
+
+	/** Namespace preparation for dependency provisioning (GAP-06) — `AppLifecycle.prepareAppNamespace`. */
+	async prepareAppNamespace(
+		ref: AppTargetRef,
+		credential: string,
+		opts: { isolation: boolean; limitRange: AppLimitRangeInput }
+	): Promise<{ warnings: Array<{ code: string; message: string }> }> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.prepareAppNamespace(ref, pinned, opts);
+	}
+
+	/**
+	 * Re-apply only the `Ingress` for the given hosts — `AppLifecycle.publishAppHosts`. The
+	 * `ingress-reconcile` op calls this and never `deployApp` (APW06-G03).
+	 */
+	async publishAppHosts(
+		ref: AppTargetRef,
+		credential: string,
+		hosts: {
+			primary: string | null;
+			extra: string[];
+			previous: string[];
+			tls: string;
+			issuer: string | null;
+		}
+	): Promise<{ ingressAddress: { ip?: string; hostname?: string } | null }> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.publishAppHosts(ref, pinned, hosts);
+	}
+
+	/**
+	 * R-5: this plugin serves App Work targets on `your-cluster` only.
+	 *
+	 * `ever-works-apps` is APW-10's `apps-tier` plugin — the platform never applies manifests on the
+	 * managed tier — and `none` is "no cluster chosen yet". Neither may ever reach a cluster through
+	 * here, so the refusal is a property of *this* plugin rather than of the routing that happens to
+	 * call it. A ref with no `target` at all is read as `your-cluster`, which is how the App modules
+	 * themselves default it (`minimalRenderInput`, `app-lifecycle.ts`).
+	 */
+	private assertThisPluginServes(ref: AppTargetRef | undefined): void {
+		const target = ref?.target;
+		if (target === undefined || target === 'your-cluster') return;
+		throw new K8sPluginError(
+			'NOT_CONFIGURED',
+			`The Kubernetes plugin serves App Work targets on 'your-cluster' only; '${target}' is served by the apps-tier plugin (APW-06 R-5).`
+		);
+	}
+
+	/**
+	 * §6.1 over one App credential, whoever supplied it — the reason every App method above calls
+	 * this before it touches a collaborator.
+	 *
+	 * Three steps, in the plan's order: the kubeconfig shapes App Works do not support are refused
+	 * (`assertSupportedKubeconfig` — pure, no I/O); every address the server names must be public, or
+	 * covered by the operator's own `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`; and the rewritten
+	 * YAML pins `server:` to the validated address with the original name kept as `tls-server-name`,
+	 * so nothing can re-resolve between this check and the call.
+	 *
+	 * The **pinned** YAML is what the `src/app/*` modules receive — it is the credential they hand
+	 * to `KubernetesApiService`, and therefore the one the client loads.
+	 */
+	private async guardedAppCredential(credential: string, kubeContext?: string | null): Promise<string> {
+		const allowlist = readClusterPrivateAllowlist();
+		if (allowlist.invalid.length > 0) {
+			// Plan §6.1: an entry that does not parse never widens the policy — it is reported, then
+			// ignored. This is the only reader of the variable in the plugin; it is never shared with
+			// the agent's configuration (the k8s plugin does not import agent config at all).
+			this.context?.logger.warn(
+				`Ignoring ${allowlist.invalid.length} unparseable ${CLUSTER_PRIVATE_ALLOWLIST_ENV} entr${allowlist.invalid.length === 1 ? 'y' : 'ies'}: ${allowlist.invalid.join(', ')}`
+			);
+		}
+
+		const context = kubeContext ?? undefined;
+		assertSupportedKubeconfig(credential, context);
+		return pinKubeconfigServer(credential, {
+			allowlist: allowlist.cidrs,
+			context,
+			resolver: this.clusterAddressResolver
+		});
 	}
 
 	// Helpers ---------------------------------------------------------------
