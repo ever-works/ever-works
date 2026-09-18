@@ -32,6 +32,15 @@
  *   cross-package reason as the marker above: the `app-deploy` task in `packages/tasks` re-runs the
  *   precondition pass (§5.6 step 1) and the API's deploy route answers from it (§2.2 step 2), and
  *   both can only reach this folder through the subpath barrel.
+ * - `./app-render-input.builder` — `AppRenderInputBuilder` (plan §5.6 step 2, §5.8; T22): the one
+ *   place an `AppRenderInput` is assembled, plus the §3 resolution helpers it publishes
+ *   (`componentInputs`, `jobInputs`, `cronInputs`, `smokeInputs`, `internalUrlsFor`,
+ *   `primaryComponentName`, `declaredDependencyKinds`, `deploymentShortFor`, `urlForHost`,
+ *   `pinnedReference`, `workSlugFromNamespace`) and its provisional host seam. It implements T60's
+ *   `AppVerificationSpecSource` (§4.12's spec side, `readVerificationSpec`), which is why the
+ *   `verification-deploy` handler can bind `APP_VERIFICATION_SPEC_SOURCE` with
+ *   `useExisting: AppRenderInputBuilder`. Exported here because T25's orchestrator lives in
+ *   `packages/tasks` and can only reach this folder through the subpath barrel.
  */
 
 export * from './ports';
@@ -41,3 +50,4 @@ export * from './app-runtime-deletion.service';
 export * from './app-verification-target.service';
 export * from './app-license-gate';
 export * from './app-deploy-preconditions.service';
+export * from './app-render-input.builder';
