@@ -124,10 +124,7 @@ const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works-shared', 'k8
  * rather than three times against three classes. A provider that stopped answering one of them would be a
  * compile error here rather than a `undefined is not a function` at the first dependency of that kind.
  */
-type AppDependencyK8sProvider =
-	| PostgresDependencyProvider
-	| RedisDependencyProvider
-	| ObjectStorageDependencyProvider;
+type AppDependencyK8sProvider = PostgresDependencyProvider | RedisDependencyProvider | ObjectStorageDependencyProvider;
 
 function isClusterSource(value: unknown): value is ClusterSource {
 	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);

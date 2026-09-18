@@ -201,10 +201,7 @@ describe('T20 — the workload shape (FR-36, FR-37, ACC-07-16)', () => {
 
 	it("honours the owner's declared size and the plugin's default size setting (FR-37)", async () => {
 		const declared = redisCluster();
-		await provider(declared).provision(
-			REDIS_PROVIDER_ID,
-			context({ sizeGiB: 4, declared: { persistence: true } })
-		);
+		await provider(declared).provision(REDIS_PROVIDER_ID, context({ sizeGiB: 4, declared: { persistence: true } }));
 		expect(declared.appliedOf('StatefulSet')[0].spec.volumeClaimTemplates[0].spec.resources.requests.storage).toBe(
 			'4Gi'
 		);
@@ -213,7 +210,11 @@ describe('T20 — the workload shape (FR-36, FR-37, ACC-07-16)', () => {
 		const fromSettings = redisCluster();
 		await provider(fromSettings).provision(
 			REDIS_PROVIDER_ID,
-			context({ sizeGiB: undefined, settings: { appDependencySizes: { redis: 3 } }, declared: { persistence: true } })
+			context({
+				sizeGiB: undefined,
+				settings: { appDependencySizes: { redis: 3 } },
+				declared: { persistence: true }
+			})
 		);
 		expect(
 			fromSettings.appliedOf('StatefulSet')[0].spec.volumeClaimTemplates[0].spec.resources.requests.storage
@@ -244,7 +245,10 @@ describe('T20 — the workload shape (FR-36, FR-37, ACC-07-16)', () => {
 		// (only the Postgres path fails on `noDefaultStorageClass` — ACC-07-20 belongs to T19).
 		const bare = new FakeDependencyCluster();
 
-		await provider(cluster).provision(REDIS_PROVIDER_ID, context({ settings: { appDependencyImages: { redis: override } } }));
+		await provider(cluster).provision(
+			REDIS_PROVIDER_ID,
+			context({ settings: { appDependencyImages: { redis: override } } })
+		);
 		expect(cluster.appliedOf('Deployment')[0].spec.template.spec.containers[0].image).toBe(
 			`docker.io/library/redis@${override}`
 		);
@@ -336,7 +340,9 @@ describe('T20 — the args and the readiness probe (plan §4.9:617)', () => {
 	it('appends --appendonly yes only on the persisted shape (plan §4.9:617)', async () => {
 		const transient = redisCluster();
 		await provider(transient).provision(REDIS_PROVIDER_ID, context());
-		expect(transient.appliedOf('Deployment')[0].spec.template.spec.containers[0].args).not.toContain('--appendonly');
+		expect(transient.appliedOf('Deployment')[0].spec.template.spec.containers[0].args).not.toContain(
+			'--appendonly'
+		);
 
 		const persisted = redisCluster();
 		await provider(persisted).provision(
@@ -543,9 +549,7 @@ describe('T20 — the outputs (FR-40, FR-42)', () => {
 		const outputs = await provider(cluster).getOutputs(REDIS_PROVIDER_ID, context());
 
 		expect(outputs.password).toBe('rotated-by-hand');
-		expect(outputs.url).toBe(
-			`redis://:rotated-by-hand@dep-redis.${NAMESPACE}.svc.cluster.local:6379/0`
-		);
+		expect(outputs.url).toBe(`redis://:rotated-by-hand@dep-redis.${NAMESPACE}.svc.cluster.local:6379/0`);
 	});
 
 	it('throws rather than answering an empty output set when the Secret is gone (plan §9.2:955)', async () => {

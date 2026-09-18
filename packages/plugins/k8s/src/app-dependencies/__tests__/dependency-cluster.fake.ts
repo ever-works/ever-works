@@ -82,7 +82,11 @@ export class FakeDependencyCluster implements AppDependencyApi {
 		this.seed({
 			apiVersion: 'apps/v1',
 			kind: 'Deployment',
-			metadata: { name: 'cnpg-controller-manager', namespace, labels: { 'app.kubernetes.io/name': 'cloudnative-pg' } }
+			metadata: {
+				name: 'cnpg-controller-manager',
+				namespace,
+				labels: { 'app.kubernetes.io/name': 'cloudnative-pg' }
+			}
 		});
 	}
 
@@ -177,7 +181,9 @@ export class FakeDependencyCluster implements AppDependencyApi {
 		this.calls.push({ op: 'delete', apiVersion, kind, namespace, name });
 		const index = this.store.findIndex(
 			(object) =>
-				object.kind === kind && object.metadata?.name === name && (object.metadata?.namespace ?? '') === namespace
+				object.kind === kind &&
+				object.metadata?.name === name &&
+				(object.metadata?.namespace ?? '') === namespace
 		);
 		if (index >= 0) this.store.splice(index, 1);
 	}

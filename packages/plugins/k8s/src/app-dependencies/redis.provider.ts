@@ -328,9 +328,7 @@ export class RedisDependencyProvider {
 		try {
 			await this.api.applyObject(
 				cluster.kubeconfig,
-				persisted
-					? statefulSetManifest(ctx, cluster, input)
-					: deploymentManifest(ctx, cluster, input),
+				persisted ? statefulSetManifest(ctx, cluster, input) : deploymentManifest(ctx, cluster, input),
 				cluster.context
 			);
 		} catch (error) {
@@ -558,14 +556,9 @@ export class RedisDependencyProvider {
 		kind: { apiVersion: string; kind: string }
 	): Promise<AppDependencyObjectRef[]> {
 		const objects = await this.api
-			.listObjects<{ metadata?: { name?: string } }>(
-				cluster.kubeconfig,
-				kind.apiVersion,
-				kind.kind,
-				cluster.namespace,
-				`${APP_DEPENDENCY_POLICY_LABEL}=${REDIS_OBJECT_KIND}`,
-				cluster.context
-			)
+			.listObjects<{
+				metadata?: { name?: string };
+			}>(cluster.kubeconfig, kind.apiVersion, kind.kind, cluster.namespace, `${APP_DEPENDENCY_POLICY_LABEL}=${REDIS_OBJECT_KIND}`, cluster.context)
 			.catch(() => []);
 
 		const found: AppDependencyObjectRef[] = [];
@@ -741,10 +734,7 @@ export function redisContainerEnv(): Record<string, unknown>[] {
 }
 
 /** The single container both shapes run. */
-function redisContainer(
-	ctx: AppDependencyContext,
-	input: RedisProvisionInput
-): Record<string, unknown> {
+function redisContainer(ctx: AppDependencyContext, input: RedisProvisionInput): Record<string, unknown> {
 	return {
 		name: REDIS_OBJECT_KIND,
 		image: redisImageFor(ctx?.settings),
@@ -983,7 +973,10 @@ function decodeSecretValue(value: unknown): string | null {
 }
 
 /** A readiness wait that ran past its own observation bound: not ready *yet*, so ask again. */
-function exhaustedOutcome(pollIntervalMs: number, maxPolls: number = REDIS_READY_MAX_POLLS): AppDependencyProvisionOutcome {
+function exhaustedOutcome(
+	pollIntervalMs: number,
+	maxPolls: number = REDIS_READY_MAX_POLLS
+): AppDependencyProvisionOutcome {
 	return {
 		state: 'pending',
 		retryAfterMs: pollIntervalMs,
@@ -999,10 +992,7 @@ function exhaustedOutcome(pollIntervalMs: number, maxPolls: number = REDIS_READY
  * one thing that could keep the pod unschedulable; the non-persistent shape has no such excuse and reads
  * `deadlineExceeded`.
  */
-function waitFailure(
-	input: RedisProvisionInput,
-	outcome: 'deadline' | 'aborted'
-): AppDependencyProvisionOutcome {
+function waitFailure(input: RedisProvisionInput, outcome: 'deadline' | 'aborted'): AppDependencyProvisionOutcome {
 	return {
 		state: 'failed',
 		reason: input.persistence && !input.ephemeral ? 'volumeNotReady' : 'deadlineExceeded',

@@ -34,11 +34,7 @@ import {
 	APP_MANAGED_BY,
 	dependencyNetworkPolicyName
 } from '../../app/app-names';
-import {
-	APP_DEPENDENCY_PORTS,
-	dependencyContainerSecurityContext,
-	dependencyPodSecurityContext
-} from '../common';
+import { APP_DEPENDENCY_PORTS, dependencyContainerSecurityContext, dependencyPodSecurityContext } from '../common';
 import { isDigestPinned } from '../images';
 import {
 	OBJECT_STORAGE_JOB_CONTAINERS,
@@ -337,10 +333,7 @@ describe('T21 — the init Job creates every declared bucket (ACC-07-16)', () =>
 	it('declares no bucket container when nothing is declared, and still registers the service account', async () => {
 		const cluster = objectStorageCluster();
 
-		const outcome = await provider(cluster).provision(
-			OBJECT_STORAGE_PROVIDER_ID,
-			context({ declared: {} })
-		);
+		const outcome = await provider(cluster).provision(OBJECT_STORAGE_PROVIDER_ID, context({ declared: {} }));
 
 		expect(outcome.state).toBe('ready');
 		if (outcome.state !== 'ready') return;
@@ -754,9 +747,7 @@ describe('T21 — the outputs (FR-40, FR-42)', () => {
 	it('throws rather than answering an empty output set when dep-s3-app is gone (plan §9.2:955)', async () => {
 		const cluster = objectStorageCluster();
 
-		await expect(provider(cluster).getOutputs(OBJECT_STORAGE_PROVIDER_ID, context())).rejects.toThrow(
-			/dep-s3-app/
-		);
+		await expect(provider(cluster).getOutputs(OBJECT_STORAGE_PROVIDER_ID, context())).rejects.toThrow(/dep-s3-app/);
 	});
 
 	it('answers with a typed error for a provider id it does not serve', async () => {
@@ -815,10 +806,12 @@ describe('T21 — backup state and deprovision (FR-48, plan §4.9:624-628)', () 
 		// R-15: the volume holds the buckets, and nothing but the workload was touched.
 		expect(cluster.deleted()).toEqual([]);
 		expect(cluster.stored('PersistentVolumeClaim')).toHaveLength(1);
-		expect(cluster.stored('Secret').map((entry) => entry.metadata?.name).sort()).toEqual([
-			'dep-s3',
-			'dep-s3-app'
-		]);
+		expect(
+			cluster
+				.stored('Secret')
+				.map((entry) => entry.metadata?.name)
+				.sort()
+		).toEqual(['dep-s3', 'dep-s3-app']);
 		expect(cluster.stored('NetworkPolicy').some((entry) => entry.metadata?.name === 'dep-s3')).toBe(true);
 	});
 
@@ -826,7 +819,9 @@ describe('T21 — backup state and deprovision (FR-48, plan §4.9:624-628)', () 
 		const cluster = objectStorageCluster();
 		await provider(cluster).provision(OBJECT_STORAGE_PROVIDER_ID, context());
 
-		const outcome = await provider(cluster).deprovision(OBJECT_STORAGE_PROVIDER_ID, context(), { deleteData: true });
+		const outcome = await provider(cluster).deprovision(OBJECT_STORAGE_PROVIDER_ID, context(), {
+			deleteData: true
+		});
 
 		expect(outcome).toEqual({ state: 'deleted' });
 		expect(cluster.deleted()).toEqual(
@@ -866,7 +861,9 @@ describe('T21 — backup state and deprovision (FR-48, plan §4.9:624-628)', () 
 			return undefined;
 		}) as typeof cluster.deleteObject;
 
-		const outcome = await provider(cluster).deprovision(OBJECT_STORAGE_PROVIDER_ID, context(), { deleteData: true });
+		const outcome = await provider(cluster).deprovision(OBJECT_STORAGE_PROVIDER_ID, context(), {
+			deleteData: true
+		});
 
 		expect(outcome.state).toBe('pending');
 		expect(outcome.remaining?.objects).toEqual([{ kind: 'PersistentVolumeClaim', name: 'dep-s3-data-0' }]);
@@ -881,10 +878,7 @@ describe('T21 — the ephemeral variant (R-10, FR-60, ACC-07-31)', () => {
 	it('uses emptyDir, renders no PVC and never probes for a storage class, and says so', async () => {
 		const cluster = objectStorageCluster();
 
-		const outcome = await provider(cluster).provision(
-			OBJECT_STORAGE_PROVIDER_ID,
-			context({ ephemeral: true })
-		);
+		const outcome = await provider(cluster).provision(OBJECT_STORAGE_PROVIDER_ID, context({ ephemeral: true }));
 
 		expect(outcome.state).toBe('ready');
 		if (outcome.state !== 'ready') return;
@@ -912,7 +906,10 @@ describe('T21 — the declared block, read defensively', () => {
 	it('reads only the App spec’s own name shape and reports everything it drops', () => {
 		const warnings: string[] = [];
 
-		expect(declaredBuckets(context({ declared: { buckets: ['a', 'b-1', 'c.d'] } }), warnings)).toEqual(['a', 'b-1']);
+		expect(declaredBuckets(context({ declared: { buckets: ['a', 'b-1', 'c.d'] } }), warnings)).toEqual([
+			'a',
+			'b-1'
+		]);
 		expect(warnings).toEqual(['bucketNameInvalid=c.d']);
 		// Not an array at all is "nothing declared", never a crash.
 		expect(declaredBuckets(context({ declared: { buckets: 'uploads' } }), warnings)).toEqual([]);
@@ -923,7 +920,11 @@ describe('T21 — the declared block, read defensively', () => {
 		const warnings: string[] = [];
 
 		expect(
-			declaredPublicBuckets(context({ declared: { publicBuckets: ['uploads', 'nope', 'uploads'] } }), ['uploads'], warnings)
+			declaredPublicBuckets(
+				context({ declared: { publicBuckets: ['uploads', 'nope', 'uploads'] } }),
+				['uploads'],
+				warnings
+			)
 		).toEqual(['uploads']);
 		expect(warnings).toEqual(['publicBucketUndeclared=nope']);
 		expect(declaredPublicBuckets(context({ declared: {} }), ['uploads'], warnings)).toEqual([]);

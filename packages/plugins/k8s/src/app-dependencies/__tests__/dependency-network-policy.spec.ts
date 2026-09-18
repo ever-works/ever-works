@@ -109,9 +109,7 @@ describe('T20/T21 — the shared dep-<kind> policy: name and labels', () => {
 		}
 
 		expect(policyOf(input({ kind: 'postgres' })).metadata.name).toBe('dep-postgres');
-		expect(
-			policyOf(input({ kind: 'redis', port: APP_DEPENDENCY_PORTS.redis })).metadata.name
-		).toBe('dep-redis');
+		expect(policyOf(input({ kind: 'redis', port: APP_DEPENDENCY_PORTS.redis })).metadata.name).toBe('dep-redis');
 	});
 
 	it('normalises a mixed-case kind, which is why object storage renders dep-s3', () => {
@@ -232,9 +230,7 @@ describe('T20/T21 — the shared dep-<kind> policy: drawn with isolation off (AP
 
 describe('T20/T21 — the shared dep-<kind> policy: the operator-namespace variant', () => {
 	it('admits the operator’s namespace on 5432 and the status port, and warns about nothing', () => {
-		const plan = planDependencyNetworkPolicy(
-			input({ kind: 'postgres', operatorNamespace: 'cnpg-system' })
-		);
+		const plan = planDependencyNetworkPolicy(input({ kind: 'postgres', operatorNamespace: 'cnpg-system' }));
 		const ingress = (plan.policy as unknown as RenderedPolicy).spec.ingress ?? [];
 
 		expect(plan.warnings).toEqual([]);

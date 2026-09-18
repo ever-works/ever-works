@@ -362,7 +362,12 @@ export class ObjectStorageDependencyProvider {
 		// Both credentials are reused when they exist: re-provisioning must never rotate the root password of
 		// a server holding the app's uploads, nor the service account the app is already authenticating with
 		// (FR-47 — credentials are never rotated implicitly).
-		const rootPassword = (await this.readSecretValue(cluster, OBJECT_STORAGE_OBJECT_NAMES.secret, OBJECT_STORAGE_SECRET_KEYS.rootPassword)) ?? generateRootPassword();
+		const rootPassword =
+			(await this.readSecretValue(
+				cluster,
+				OBJECT_STORAGE_OBJECT_NAMES.secret,
+				OBJECT_STORAGE_SECRET_KEYS.rootPassword
+			)) ?? generateRootPassword();
 		const appCredentials = (await this.readAppCredentials(cluster)) ?? generateAppCredentials();
 
 		try {
@@ -703,14 +708,9 @@ export class ObjectStorageDependencyProvider {
 		kind: { apiVersion: string; kind: string }
 	): Promise<AppDependencyObjectRef[]> {
 		const objects = await this.api
-			.listObjects<{ metadata?: { name?: string } }>(
-				cluster.kubeconfig,
-				kind.apiVersion,
-				kind.kind,
-				cluster.namespace,
-				`${APP_DEPENDENCY_POLICY_LABEL}=${OBJECT_STORAGE_OBJECT_KIND}`,
-				cluster.context
-			)
+			.listObjects<{
+				metadata?: { name?: string };
+			}>(cluster.kubeconfig, kind.apiVersion, kind.kind, cluster.namespace, `${APP_DEPENDENCY_POLICY_LABEL}=${OBJECT_STORAGE_OBJECT_KIND}`, cluster.context)
 			.catch(() => []);
 
 		const found: AppDependencyObjectRef[] = [];
@@ -877,7 +877,12 @@ export function serviceManifest(
 			type: 'ClusterIP',
 			selector: dependencyPodSelector(OBJECT_STORAGE_OBJECT_KIND),
 			ports: [
-				{ name: OBJECT_STORAGE_OBJECT_KIND, port: OBJECT_STORAGE_PORT, targetPort: OBJECT_STORAGE_PORT, protocol: 'TCP' }
+				{
+					name: OBJECT_STORAGE_OBJECT_KIND,
+					port: OBJECT_STORAGE_PORT,
+					targetPort: OBJECT_STORAGE_PORT,
+					protocol: 'TCP'
+				}
 			]
 		}
 	};
