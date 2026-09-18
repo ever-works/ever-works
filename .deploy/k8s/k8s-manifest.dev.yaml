@@ -294,6 +294,12 @@ spec:
               value: "$DEPLOY_EVER_WORKS_ENABLED"
             - name: EVER_WORKS_DOMAIN
               value: "$EVER_WORKS_DOMAIN"
+            # APW-01 — the App Works instance switch: whether this installation
+            # offers Work kinds built from an arbitrary GitHub repository. The API
+            # reads it through config.everWorks.apps.worksEnabled().
+            - name: EVER_WORKS_APP_WORKS_ENABLED
+              value: "false"
+
 
             # APW-11 (XC-10, spec FR-65) - the App Launcher's operator switches.
             # The flag is a LIVE switch: the guard reads it per request and answers
@@ -418,6 +424,13 @@ spec:
           image: registry.digitalocean.com/ever/ever-works-web-dev:latest
           imagePullPolicy: Always
           env:
+            # APW-01 — the SAME variable on the web side, and that is deliberate:
+            # the chip's gate reads it at request time rather than asking the API, so
+            # an install that set it on one deployment only would show a chip the API
+            # refuses (or hide one it would build). Keep the two values in step.
+            - name: EVER_WORKS_APP_WORKS_ENABLED
+              value: "false"
+
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"
             - name: WEB_URL
