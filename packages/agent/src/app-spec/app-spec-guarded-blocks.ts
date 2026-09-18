@@ -147,7 +147,10 @@ export function diffGuardedSpecBlocks(
     const next = (after ?? null) as AppSpec | null;
 
     const changedBlocks: GuardedSpecBlock[] = [];
-    const removedProtectedPaths: readonly string[] = [];
+    const removedProtectedPaths = removedEntries(
+        protectedPathsOf(previous),
+        protectedPathsOf(next),
+    );
     const removedRequireHumanMergePaths = removedEntries(
         requireHumanMergePathsOf(previous),
         requireHumanMergePathsOf(next),

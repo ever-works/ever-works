@@ -823,7 +823,7 @@ export class AppSpecService {
             : false;
 
         let eventEmitted = false;
-        if (effectiveChanged) {
+        if (written) {
             // One transition object, so the Activity row and the in-process event
             // can never describe different changes.
             const transition: AppSpecTransition = {
