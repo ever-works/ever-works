@@ -3,52 +3,122 @@
  *
  * Owning epic: **APW-11** (T11/T12), plan §6.1–§6.3.
  *
- * **The registry shapes are not declared here.** `AppLauncherItem`,
- * `AppLauncherListResponse` and the section/chip/kind/status/empty-action unions
- * already exist in `@ever-works/contracts` (`src/apps/app-launcher.ts`, the
- * landed T1 contract) and this package re-exports them rather than declaring a
- * second copy — the failure one copy prevents is the panel and **Manage apps**
- * disagreeing about what a person pinned (CONTRACTS R-26).
+ * **Everything the element consumes is declared HERE, structurally.** The
+ * registry shapes also exist in `@ever-works/contracts`
+ * (`src/apps/app-launcher.ts`, the landed T1 contract) and the host passes those
+ * values straight in, which works because the two are structurally identical —
+ * and plan §6.1 is explicit about why that duplication is deliberate: this
+ * package must be extractable on its own for P2 (T28), so its source may not
+ * depend on the monorepo. `dist/index.d.ts` referencing `@ever-works/contracts`
+ * would make an extracted package's types unresolvable.
  *
- * > **Deviation from plan §6.1, deliberate.** The plan's file table says
- * > `src/types.ts` "mirrors `AppLauncherItem` without importing
- * > `@ever-works/contracts`, so P2 extraction has no monorepo dependency". The
- * > build instruction for this task is the opposite — "do not duplicate them;
- * > import from `@ever-works/contracts`" — and this file follows that. The
- * > imports below are **type-only** and are erased by the compiler, so
- * > `dist/index.js` still has no runtime dependency on anything (which is what
- * > `scripts/check-size.mjs` proves); the P2 extraction (T28) would have to
- * > rewrite these re-exports, and that is recorded in the task report rather
- * > than hidden.
+ * The cost of a mirror is drift, so drift is what §6.1's own conformance is for:
+ * `src/__tests__/types.conformance.spec.ts` imports BOTH declarations and
+ * asserts each is assignable to the other in both directions, for the unions
+ * **and** the two object shapes. A field added to the contract alone, or
+ * renamed here alone, fails that spec rather than failing a host's build.
  *
- * What is declared here is only what the contracts do not own: the element's
- * own string table, its error vocabulary and the four event details of plan
- * §6.2.
+ * What is declared here, then: the registry vocabulary the element reads, plus
+ * what the contracts do not own at all — the element's string table, its error
+ * vocabulary and the event details of plan §6.2.
  */
 
 // ---------------------------------------------------------------------------
-// Re-exported registry vocabulary (contracts `src/apps/app-launcher.ts`)
+// The registry vocabulary, mirrored from `@ever-works/contracts`
+// (apps/app-launcher.ts) — see the conformance spec before changing anything.
 // ---------------------------------------------------------------------------
 
-import type {
-	AppLauncherEmptyAction,
-	AppLauncherEnvironment,
-	AppLauncherItem,
-	AppLauncherItemKind,
-	AppLauncherListResponse,
-	AppLauncherSection,
-	AppLauncherWorkChip
-} from '@ever-works/contracts';
+/** `production` | `stage` | `develop` (contracts `APP_LAUNCHER_ENVIRONMENTS`). */
+export type AppLauncherEnvironment = 'production' | 'stage' | 'develop';
 
-export type {
-	AppLauncherEmptyAction,
-	AppLauncherEnvironment,
-	AppLauncherItem,
-	AppLauncherItemKind,
-	AppLauncherListResponse,
-	AppLauncherSection,
-	AppLauncherWorkChip
-};
+/** A platform from the Ever apps catalog, or one of the person's own Works. */
+export type AppLauncherItemKind = 'platform' | 'work';
+
+/** The three sections an item renders under (FR-2). */
+export type AppLauncherSection = 'pinned' | 'platforms' | 'works';
+
+/** The two chips a Work tile may carry (FR-18). */
+export type AppLauncherWorkChip = 'deploying' | 'lastDeployFailed';
+
+/** Why an item is (not) in the panel, as **Manage apps** renders it (FR-27). */
+export type AppLauncherManageState = 'listed' | 'notLive' | 'exposureOff';
+
+/** A platform entry's status (FR-9). */
+export type AppLauncherPlatformStatus = 'available' | 'beta';
+
+/** S8's two buttons (FR-64). */
+export type AppLauncherEmptyAction = 'createAppWork' | 'goToWorks';
+
+/**
+ * One launcher tile (contracts `AppLauncherItem`, plan §3.3).
+ *
+ * Every derived fact travels with the tile because none of it may be computed in
+ * the browser: the address (FR-16), the **You're here** marker (FR-13), the chip
+ * (FR-58) and whether the item is listed at all (FR-56). `url` is `null` exactly
+ * when `manageState !== 'listed'`; when it is not `null` it is `https`.
+ */
+export interface AppLauncherItem {
+	/** `platform:<catalogId>` or `work:<uuid>`. */
+	key: string;
+	kind: AppLauncherItemKind;
+	/** The section the tile renders under; `pinned` wins over the kind's section (FR-2). */
+	section: AppLauncherSection;
+	/** Display name. */
+	name: string;
+	/** Platforms only. */
+	description?: string;
+	/** Inline `data:` icon, present only within the icon byte cap (NFR-5). */
+	iconDataUri?: string;
+	/** `https`, or `null` exactly when `manageState !== 'listed'` (FR-16). */
+	url: string | null;
+	/** The address's host, so a caller never re-parses `url`. */
+	host: string | null;
+	/** FR-13's **You're here** marker; such a tile is not a link. */
+	current?: boolean;
+	/** Platforms only (FR-9). */
+	status?: AppLauncherPlatformStatus;
+	/** Works only: the Work's kind, so the tile can say what it is. */
+	workKind?: string;
+	/** Works only: FR-18's chip, decided from the one latest production row (FR-58). */
+	chip?: AppLauncherWorkChip;
+	visible: boolean;
+	pinned: boolean;
+	/** Position in the merged pinned view, or `null` when not pinned (FR-26). */
+	pinOrder: number | null;
+	/** The tile's order inside its section (FR-26). */
+	order: number;
+	manageState: AppLauncherManageState;
+}
+
+/**
+ * `GET /api/me/apps` — the merged, ordered list plus the facts a client must not
+ * re-derive (contracts `AppLauncherListResponse`, plan §4.1).
+ *
+ * `pinLimit` is the literal `6` here as it is in the contracts
+ * (`APP_LAUNCHER_PIN_LIMIT`), so the number the panel renders and the number the
+ * save path enforces cannot drift; the conformance spec pins the literal.
+ */
+export interface AppLauncherListResponse {
+	items: AppLauncherItem[];
+	meta: {
+		/** The environment these addresses belong to (FR-10). */
+		environment: AppLauncherEnvironment;
+		/** The catalog version read, or `null` when no catalog is available (S9/S10). */
+		catalogVersion: string | null;
+		/** False when the catalog could not be read and the current platform alone is shown. */
+		catalogAvailable: boolean;
+		/** `global`, `personal`, or the active Organization id. */
+		scopeKey: string;
+		/** How many Works this scope holds, so **View all {count}** is exact (FR-4). */
+		worksTotal: number;
+		/** True when the response hit its cap — the answer is short, never silently complete (FR-34). */
+		truncated: boolean;
+		/** Always `6`; the same literal the contracts declare (FR-25). */
+		pinLimit: 6;
+		/** spec S8/FR-64 — App Works are available to this person (APW-01's fail-closed gate, R-6). */
+		appWorksAvailable: boolean;
+	};
+}
 
 // ---------------------------------------------------------------------------
 // Element-local vocabulary (plan §6.2)
