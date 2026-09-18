@@ -2422,6 +2422,7 @@
                     "generation": "生成",
                     "comparison": "比較",
                     "deployment": "デプロイ",
+                    "appLauncher": "アプリランチャー",
                     "workCreated": "ワーク作成",
                     "workUpdated": "ワーク更新",
                     "workDeleted": "ワーク削除",

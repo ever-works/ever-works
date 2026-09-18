@@ -2422,6 +2422,7 @@
                     "generation": "Генерация",
                     "comparison": "Сравнение",
                     "deployment": "Развертывание",
+                    "appLauncher": "Запуск приложений",
                     "workCreated": "Работа создан",
                     "workUpdated": "Работа обновлён",
                     "workDeleted": "Работа удалён",

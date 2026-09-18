@@ -2422,6 +2422,7 @@
                     "generation": "Üretim",
                     "comparison": "Karşılaştırma",
                     "deployment": "Dağıtım",
+                    "appLauncher": "Uygulama başlatıcı",
                     "workCreated": "İş Oluşturuldu",
                     "workUpdated": "İş Güncellendi",
                     "workDeleted": "İş Silindi",

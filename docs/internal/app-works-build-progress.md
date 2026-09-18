@@ -57,6 +57,7 @@ findings once.
 | **APW06-G26**       | `AppComponentInput.runAsUser?: number` — the contract catches up with APW-03 `schema.md:202`                               | k8s **505 / 17** after a **rebuilt** plugin dist; `tsc --noEmit` exit 0; renderer needed no code change                |
 | **APW-11 T31**      | the five operator switches in the three deploy manifests + `.env.example`; `_ENV` literal per file; switch ships OFF       | manifests **24/24/24** + env **18** insertions, **0 deletions**; guard spec **13 tests**; 3 perturbations red          |
 | **AppPrecondition** | declared in `app-runtime.ts` (plan §3.1:375, §5.1:674) after being referenced-but-absent everywhere under `packages/**`    | contracts **3457 / 82**; `type-check:tests` exit 0; 2 perturbations red (`TS2578` + union removal), hash restored      |
+| **APW-11 T32**      | `app_launcher` badge: `TYPE_TO_I18N` + colour entry, and `appLauncher` in **all 21 locales** (XC-24)                       | badge spec **4 tests** (real `de.json` bundle + a fallback control); 3 perturbations red; bundles 1+0 across 21 files  |
 
 **Two foundation tasks own a guard worth knowing about:**
 
@@ -288,6 +289,31 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the `app_launcher` Activity row stops reading "app launcher" in 21 locales (APW-11 T32, XC-24).**
+  `ActivityTypeBadge` translates a row only when `TYPE_TO_I18N` names its `actionType`, and otherwise shows
+  `actionType.replace(/_/g, ' ')` — the raw wire value. A missing entry is therefore neither a crash nor a blank: it
+  is the English words "app launcher" rendered in a German, Japanese or Arabic UI, and it is invisible in an English
+  screenshot. `app_launcher: 'appLauncher'` plus a colour entry (the one palette the table had not used, `sky`, so a
+  launcher row is distinguishable at a glance from the deploy/plugin/member rows around it) are added, and
+  `dashboard.activity.filters.types.appLauncher` now exists in **all 21 bundles** — real translations, not English
+  fallbacks (ar · bg · de `App-Starter` · en · es · fr · he · hi · id · it · ja · ko · nl · pl · pt · ru · th · tr ·
+  uk · vi · zh).
+  The spec is `apps/web/src/components/activity-log/ActivityTypeBadge.unit.spec.tsx` — **4 tests**, and two design
+  choices make it mean something: the `next-intl` mock resolves the key out of **the real `messages/de.json`**, so the
+  test fails when a locale loses the key as well as when the component forgets to ask for it (a mock that echoed the
+  key back would pass for both faults), and there is a **control** — an unmapped action type must still fall through
+  to `some future type`, so "no raw text anywhere" cannot be what is being asserted, because the fallback is a
+  feature and it stays. A fourth test walks all 21 bundles for the key, which is T32's "in every locale, in this PR"
+  and is checked nowhere else. Proven by three perturbations, each captured red then reverted with its sha256
+  restored: the `TYPE_TO_I18N` entry removed (1 red — T32's own "Done when"), the colour entry removed (1 red), and
+  the key removed from `ja.json` (1 red). The control stayed green throughout, which is its job. Bundle edits are
+  **1 insertion / 0 deletions per file, 21 files**, so nothing existing moved.
+  🛑 **A baseline condition found while doing this, deliberately NOT fixed here: the non-English bundles are ~1,692
+  keys behind English, each.** `apps/web/scripts/sync-locale-parity.mjs` backfills them with **English text** — its
+  own run reported "33840 key(s) added across 20 locale(s)" — so running it inside a task silently turns 20 locales
+  into copies of `en`. Its output was reverted to the committed bytes by a per-file copy (byte-verified: the diff
+  went to zero files before this task's one line was re-applied), and the drift is recorded for the owner to decide
+  on: it is a translation-programme decision, not an App Works task.
 - **2026-09-18 · the launcher's operator switches are wired, and `AppPrecondition` stops being a dangling name.**
   **APW-11 T31 (the manifest half).** `.deploy/k8s/k8s-manifest.{dev,stage,prod}.yaml` and `apps/api/.env.example`
   now carry the five variables this epic introduces — `EVER_WORKS_APP_LAUNCHER_ENABLED`,

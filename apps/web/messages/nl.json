@@ -2422,6 +2422,7 @@
                     "generation": "Generatie",
                     "comparison": "Vergelijking",
                     "deployment": "Implementatie",
+                    "appLauncher": "App-launcher",
                     "workCreated": "Werk gemaakt",
                     "workUpdated": "Werk bijgewerkt",
                     "workDeleted": "Werk verwijderd",

@@ -4033,6 +4033,7 @@
                     "generation": "Generation",
                     "comparison": "Comparison",
                     "deployment": "Deployment",
+                    "appLauncher": "App Launcher",
                     "workCreated": "Work Created",
                     "workUpdated": "Work Updated",
                     "workDeleted": "Work Deleted",

@@ -2422,6 +2422,7 @@
                     "generation": "Generowanie",
                     "comparison": "Porównanie",
                     "deployment": "Wdrożenie",
+                    "appLauncher": "Program uruchamiający aplikacje",
                     "workCreated": "Praca utworzony",
                     "workUpdated": "Praca zaktualizowany",
                     "workDeleted": "Praca usunięty",

@@ -2422,6 +2422,7 @@
                     "generation": "生成",
                     "comparison": "比较",
                     "deployment": "部署",
+                    "appLauncher": "应用启动器",
                     "workCreated": "作品已创建",
                     "workUpdated": "作品已更新",
                     "workDeleted": "作品已删除",

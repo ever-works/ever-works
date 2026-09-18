@@ -2494,6 +2494,7 @@
                     "generation": "التوليد",
                     "comparison": "المقارنة",
                     "deployment": "النشر",
+                    "appLauncher": "مشغّل التطبيقات",
                     "workCreated": "تم إنشاء العمل",
                     "workUpdated": "تم تحديث العمل",
                     "workDeleted": "تم حذف العمل",

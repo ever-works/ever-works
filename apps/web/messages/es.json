@@ -2494,6 +2494,7 @@
                     "generation": "Generación",
                     "comparison": "Comparación",
                     "deployment": "Despliegue",
+                    "appLauncher": "Lanzador de apps",
                     "workCreated": "Trabajo creado",
                     "workUpdated": "Trabajo actualizado",
                     "workDeleted": "Trabajo eliminado",

@@ -2422,6 +2422,7 @@
                     "generation": "생성",
                     "comparison": "비교",
                     "deployment": "배포",
+                    "appLauncher": "앱 런처",
                     "workCreated": "워크 생성됨",
                     "workUpdated": "워크 업데이트됨",
                     "workDeleted": "워크 삭제됨",

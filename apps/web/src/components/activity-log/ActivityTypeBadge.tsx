@@ -7,6 +7,11 @@ const TYPE_COLORS: Record<string, string> = {
     comparison_generation:
         'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
     deployment: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+    // APW-11 (XC-24) — the launcher's exposure changes (`app_launcher`, the
+    // `ActivityActionType.APP_LAUNCHER` member). `sky` is the one palette the
+    // table had not used, so a launcher row is distinguishable at a glance from
+    // the deploy/plugin/member rows it sits between.
+    app_launcher: 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300',
     work_created: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
     work_updated: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300',
     work_deleted: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
@@ -32,6 +37,10 @@ const TYPE_TO_I18N: Record<string, string> = {
     generation: 'generation',
     comparison_generation: 'comparison',
     deployment: 'deployment',
+    // APW-11 (XC-24). Without this entry the row falls through to
+    // `actionType.replace(/_/g, ' ')` and reads "app launcher" in every
+    // locale — the raw wire value shown to a person who reads German.
+    app_launcher: 'appLauncher',
     work_created: 'workCreated',
     work_updated: 'workUpdated',
     work_deleted: 'workDeleted',

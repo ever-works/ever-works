@@ -2422,6 +2422,7 @@
                     "generation": "Tạo",
                     "comparison": "So sánh",
                     "deployment": "Triển khai",
+                    "appLauncher": "Trình khởi chạy ứng dụng",
                     "workCreated": "Công việc Đã Tạo",
                     "workUpdated": "Công việc Đã Cập nhật",
                     "workDeleted": "Công việc Đã Xóa",

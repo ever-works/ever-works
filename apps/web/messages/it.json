@@ -2422,6 +2422,7 @@
                     "generation": "Generazione",
                     "comparison": "Confronto",
                     "deployment": "Distribuzione",
+                    "appLauncher": "Avvio app",
                     "workCreated": "Lavori Creata",
                     "workUpdated": "Lavori Aggiornata",
                     "workDeleted": "Lavori Eliminata",
