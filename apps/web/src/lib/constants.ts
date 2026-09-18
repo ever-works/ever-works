@@ -265,6 +265,16 @@ export const ROUTES = {
     // feature landed; it simply had no route constant.
     DASHBOARD_SETTINGS_ENVIRONMENTS: '/settings/environments',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
+    /**
+     * APW-11 T16 — **Manage apps**, the App Launcher's own settings page.
+     *
+     * The constant lands here with the launcher's control (T14), which links to
+     * it from two places (`:manage` in the element, and the P2 "Manage apps in
+     * Ever Works" link), because a link written against a missing constant is a
+     * link nobody can review. The page itself — and the tab that gates it —
+     * arrives with T16, which is why nothing renders this path yet.
+     */
+    DASHBOARD_SETTINGS_APP_LAUNCHER: '/settings/app-launcher',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
     // Agent Plugins (EW-772) — packages in the open cross-vendor format.
     // Sits beside Connections: both are about capabilities the platform

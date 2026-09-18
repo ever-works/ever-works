@@ -8,6 +8,7 @@ import { NotificationDropdown } from './NotificationDropdown';
 import { WhatsNewButton } from './WhatsNewButton';
 import { WorkSwitcher } from './WorkSwitcher';
 import { CommandPaletteTrigger } from '@/components/command-palette/CommandPaletteTrigger';
+import { AppLauncherButton } from '@/components/app-launcher/AppLauncherButton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Menu, HelpCircle, Sparkles, X } from 'lucide-react';
 
@@ -53,6 +54,7 @@ export function DashboardHeader({
     onMenuClick,
     isSidebarOpen = true,
     onHelpClick,
+    appLauncherEnabled = false,
     onboardingBadge,
     whatsNew,
 }: DashboardHeaderProps) {
@@ -160,6 +162,16 @@ export function DashboardHeader({
                                 <HelpCircle className="w-3.5 h-3.5" />
                             </button>
                         </Tooltip>
+
+                        {/*
+                          APW-11 T14 — the App Launcher, AFTER the Help button, and
+                          only when the installation resolved the flag. The control
+                          mounts the `<ever-app-launcher>` element itself (it is the
+                          element's own trigger) and renders a disabled control if
+                          the element's chunk cannot load, so the header never breaks
+                          and this slot is never empty-but-clickable (ACC-11-01).
+                        */}
+                        {appLauncherEnabled && <AppLauncherButton />}
                     </div>
                 </div>
             </div>
