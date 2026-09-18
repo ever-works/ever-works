@@ -71,26 +71,27 @@
 
 ### Dashboard
 
-| Route                                               | Status | Spec(s)                                            |
-| --------------------------------------------------- | ------ | -------------------------------------------------- |
-| `/[locale]/(dashboard)/(home)`                      | [x]    | dashboard.spec.ts, dashboard-comprehensive.spec.ts |
-| `/[locale]/(dashboard)/activity`                    | [x]    | activity-log.spec.ts                               |
-| `/[locale]/(dashboard)/discover`                    | [x]    | dashboard-comprehensive.spec.ts                    |
-| `/[locale]/(dashboard)/admin/usage`                 | [x]    | budgets.spec.ts                                    |
-| `/[locale]/(dashboard)/plugins`                     | [x]    | plugins.spec.ts                                    |
-| `/[locale]/(dashboard)/plugins/[pluginId]`          | [x]    | plugin-detail-ui.spec.ts, plugins.spec.ts          |
-| `/[locale]/(dashboard)/profile`                     | [x]    | profile.spec.ts                                    |
-| `/[locale]/(dashboard)/runs`                        | [x]    | runs-ledger.spec.ts                                |
-| `/[locale]/(dashboard)/help`                        | [x]    | help-center.spec.ts, help-deep-links.spec.ts       |
-| `/[locale]/(dashboard)/help/[slug]`                 | [x]    | help-center.spec.ts                                |
-| `/[locale]/(dashboard)/templates`                   | [x]    | website-templates.spec.ts                          |
-| `/[locale]/(dashboard)/settings`                    | [x]    | settings.spec.ts                                   |
-| `/[locale]/(dashboard)/settings/api-keys`           | [x]    | api-keys.spec.ts                                   |
-| `/[locale]/(dashboard)/settings/security`           | [x]    | security-settings.spec.ts                          |
-| `/[locale]/(dashboard)/settings/data`               | [x]    | account-data.spec.ts                               |
-| `/[locale]/(dashboard)/settings/danger`             | [x]    | account-data.spec.ts                               |
-| `/[locale]/(dashboard)/settings/github-app`         | [x]    | github-app.spec.ts                                 |
-| `/[locale]/(dashboard)/settings/plugins/[category]` | [x]    | plugin-detail-ui.spec.ts, settings-extra.spec.ts   |
+| Route                                                   | Status | Spec(s)                                                    |
+| ------------------------------------------------------- | ------ | ---------------------------------------------------------- |
+| `/[locale]/(dashboard)/(home)`                          | [x]    | dashboard.spec.ts, dashboard-comprehensive.spec.ts         |
+| `/[locale]/(dashboard)/activity`                        | [x]    | activity-log.spec.ts                                       |
+| `/[locale]/(dashboard)/discover`                        | [x]    | dashboard-comprehensive.spec.ts                            |
+| `/[locale]/(dashboard)/admin/usage`                     | [x]    | budgets.spec.ts                                            |
+| `/[locale]/(dashboard)/plugins`                         | [x]    | plugins.spec.ts                                            |
+| `/[locale]/(dashboard)/plugins/[pluginId]`              | [x]    | plugin-detail-ui.spec.ts, plugins.spec.ts                  |
+| `/[locale]/(dashboard)/profile`                         | [x]    | profile.spec.ts                                            |
+| `/[locale]/(dashboard)/runs` (-> `/activity?view=runs`) | [x]    | runs-ledger.spec.ts                                        |
+| `/[locale]/(dashboard)/activity`                        | [x]    | activity-log.spec.ts, feed-\*.spec.ts, runs-ledger.spec.ts |
+| `/[locale]/(dashboard)/help`                            | [x]    | help-center.spec.ts, help-deep-links.spec.ts               |
+| `/[locale]/(dashboard)/help/[slug]`                     | [x]    | help-center.spec.ts                                        |
+| `/[locale]/(dashboard)/templates`                       | [x]    | website-templates.spec.ts                                  |
+| `/[locale]/(dashboard)/settings`                        | [x]    | settings.spec.ts                                           |
+| `/[locale]/(dashboard)/settings/api-keys`               | [x]    | api-keys.spec.ts                                           |
+| `/[locale]/(dashboard)/settings/security`               | [x]    | security-settings.spec.ts                                  |
+| `/[locale]/(dashboard)/settings/data`                   | [x]    | account-data.spec.ts                                       |
+| `/[locale]/(dashboard)/settings/danger`                 | [x]    | account-data.spec.ts                                       |
+| `/[locale]/(dashboard)/settings/github-app`             | [x]    | github-app.spec.ts                                         |
+| `/[locale]/(dashboard)/settings/plugins/[category]`     | [x]    | plugin-detail-ui.spec.ts, settings-extra.spec.ts           |
 
 ### Works
 
