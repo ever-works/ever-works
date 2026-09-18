@@ -57,14 +57,15 @@ export function SchedulesCreateMenu({ onNewTrigger }: { onNewTrigger?: () => voi
                     </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                    className="gap-2 text-xs"
-                    data-testid="schedules-create-inbound-trigger"
-                    onClick={() => onNewTrigger?.()}
-                >
+                {/* `DropdownMenuItem` takes a closed set of props, so the test
+                    id goes on the label inside it — the same shape the row
+                    menu uses, and a click on it bubbles to the item. */}
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => onNewTrigger?.()}>
                     <Webhook className="h-3.5 w-3.5" />
                     <span className="flex flex-col items-start text-left">
-                        <span>{tTriggers('new')}</span>
+                        <span data-testid="schedules-create-inbound-trigger">
+                            {tTriggers('new')}
+                        </span>
                         <span className="text-[11px] font-normal text-text-muted dark:text-text-muted-dark">
                             {t('create.inboundTriggerHint')}
                         </span>
