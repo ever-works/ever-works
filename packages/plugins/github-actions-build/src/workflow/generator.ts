@@ -20,6 +20,7 @@ import {
 import type { AppBuildBlock, BuildValue } from '@ever-works/plugin';
 
 import { ACTION_PINS, actionPin } from './action-pins.js';
+import { checksJob } from './checks-job.js';
 import {
 	canonicalCheck,
 	computeWorkflowInputsHash,
@@ -59,12 +60,19 @@ import { EMBEDDED_VERIFY_RUNNER_SCRIPT } from './verify-runner.sh.js';
  *      and its own `verify-<buildId>` concurrency group so it can never replace —
  *      or be replaced by — the push Build of the head commit (`APW05-G02`).
  *
+ * ## The `checks` job
+ *
+ * T41 landed it: the job is `src/workflow/checks-job.ts`'s (R-9, plan §2.4:276–308,
+ * §4.14) and this file only decides **whether** it is emitted — after the `build`
+ * job, which is where §2.4's job order puts it (build → verify → checks), and only
+ * when the App spec declares at least one check and the file is not the bootstrap
+ * file of §4.6 step 0 (which has no App spec to read checks from). `checks` also
+ * travels into the canonical inputs, so the fingerprint covers a check-command
+ * change as well as the bytes (plan §4.5: "A check command change therefore
+ * changes the file and its fingerprint").
+ *
  * ## What this generator deliberately does not emit
  *
- *   - **The `checks` job** (R-9, plan §4.14). T41 owns `src/workflow/checks-job.ts`;
- *     `checks` still travels into the canonical inputs, so the fingerprint covers
- *     a check-command change from the day this file lands (plan §4.5: "A check
- *     command change therefore changes the file and its fingerprint").
  *   - **An attestation step.** Plan §4.5 says a private repository never gets "the
  *     attestation permissions or steps", but §4.3's pin set carries no attestation
  *     action and §2.4's step list no attestation step, so only the two permissions
@@ -335,6 +343,14 @@ export function generateWorkflow(input: WorkflowGeneratorInput): string {
 		lines.push(...buildJob({ canonical, build, image, slug, runnerLabel, secretNames, verifyRunnerScript }));
 	}
 	lines.push(...verifyJob({ build, image, runnerLabel, verifyRunnerScript }));
+	// T41 (R-9): the `checks` job, after `build` (§2.4's job order is build →
+	// verify → checks) and only for a file that has an App spec with checks in it.
+	// A bootstrap file carries no check: §4.6 step 0 is dispatched for a
+	// verification, and §4.14 gives checks the pull-request trigger alone.
+	const checks = bootstrap ? [] : (input.checks ?? []);
+	if (checks.length > 0) {
+		lines.push(...checksJob({ checks, trackedBranch: canonical.trackedBranch, runnerLabel }));
+	}
 
 	return `${lines.join('\n')}\n`;
 }

@@ -47,14 +47,23 @@ import {
  * *properties* below are asserted independently of the goldens, which is what
  * makes the pair worth having: a golden catches a silent byte change, an assertion
  * catches a wrong byte. Every full-file golden is additionally parsed as YAML,
- * because the file GitHub will run has to be a file GitHub can read: `actionlint`
- * is **not installed on this machine** (checked), so T8's "passes `actionlint`
- * locally" leg is proven by a real YAML parse plus the structural assertions
- * below, and the missing binary is reported as a routed item rather than claimed.
+ * because the file GitHub will run has to be a file GitHub can read.
+ *
+ * **`actionlint` (updated by T41).** This comment used to say the binary was *not
+ * installed on this machine*, and that T8's "passes `actionlint` locally" leg was
+ * therefore proven by the YAML parse plus the structural assertions instead. That
+ * is no longer true and the difference is worth recording: Go is on this machine,
+ * so T41 built `actionlint` v1.7.12 from source (a scratch `GOBIN`, nothing added
+ * to the repo or `PATH`), and the leg is now **verified rather than substituted** —
+ * every full-file golden exits **0**, and `checks.yml` exits 0 too. The two that do
+ * not are `verify-job.yml` and `restricted-values.yml`, which are deliberate
+ * *fragments* (a single job map and a three-line values block), so `actionlint`
+ * reports the missing `jobs` section — the same two T8 recorded, and they must not
+ * be "fixed".
  */
 const UPDATE_GOLDEN = process.env.EW_UPDATE_GOLDEN === '1';
 
-/** The checks job's id — R-9's job is T41's, and T8 asserts it is absent. */
+/** The checks job's id — R-9's job is T41's, and T8 asserts it is absent without a check and present with one. */
 const APP_BUILD_CHECKS_JOB = 'checks';
 
 /** Read the golden, or write it when the recorder is running. */
@@ -681,12 +690,13 @@ describe('generator — the small pure helpers', () => {
 		});
 	});
 
-	it('leaves the checks job to T41 and fingerprints the checks meanwhile', () => {
+	it('emits the checks job T41 owns for a check, and no checks job without one', () => {
 		const withCheck = generateWorkflow({
 			...fixtures.minimal,
 			checks: [{ name: 'lint', command: 'npm run lint', required: true, timeoutSeconds: 60 }]
 		});
-		expect(withCheck).not.toContain(APP_BUILD_CHECK_NAME_PREFIX);
-		expect(withCheck).not.toContain(`\n  ${APP_BUILD_CHECKS_JOB}:\n`);
+		expect(withCheck).toContain(APP_BUILD_CHECK_NAME_PREFIX);
+		expect(withCheck).toContain(`\n  ${APP_BUILD_CHECKS_JOB}:\n`);
+		expect(generateWorkflow(fixtures.minimal)).not.toContain(`\n  ${APP_BUILD_CHECKS_JOB}:\n`);
 	});
 });
