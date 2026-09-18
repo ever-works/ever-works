@@ -365,6 +365,31 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · T26 verified on its author''s evidence, and one of my own perturbations came back NEGATIVE — recorded as such.**
+  **APW-02 T26** (committed `ba6496736` + `711a1ddae`; its author confirmed every committed blob is byte-identical to what it
+  verified, `git diff HEAD` empty): **110 tests** across the two specs, **228** for the whole `app-works` selection,
+  type-check exit 0, contracts rebuilt and green (77 contract tests) before the dependants, Prettier clean, and
+  **additivity measured from the pre-slice commit: 2092 / 295 / 195 / 1845 / 13 / 344 / 32 added, ZERO deleted on every
+  path**. Six perturbations, each with the assertion quoted and a byte-identical restore: the `enabled` gate dropped
+  (`Received: 2026-01-05T06:04:19.000Z` where `null` was required), `{force:false}` → `{force:true}`, a diverged fork
+  taking the merge path instead of opening a PR, an injected `push` to the upstream, `finishSync` skipped (6 tests red,
+  `Expected number of calls: 1 / Received: 0`) and the budget bound moved from `>=` to `>`. 🌟 **The methodological find
+  is the author''s own**: its first attempt at the `finishSync` perturbation used `false ? … : await …`, the suite stayed
+  **green** because the compiler constant-folds it — _"a foldable mutation is not evidence"_ — and the quoted red uses a
+  runtime-guarded flag instead. That is the same class of error as the PowerShell `\t` false-red earlier in this
+  programme, caught this time before it was reported as proof.
+  **My own perturbation of T14 returned a negative, and it is not being dressed up as a pass.** I duplicated
+  `app-env-runtime.source.ts:273` — `return (await this.readiness.ensureReadyForDeploy(workId)) ?? null;` — to test the
+  task''s "**exactly one** `ensureReadyForDeploy` call" requirement, and the suite stayed **14/14 green**, restored
+  byte-identically. So either the duplication is observationally inert at that seam (the second result is discarded and
+  the call is idempotent by contract) or the spec does **not** actually pin the call count at this layer, in which case
+  the ACC-06-54/GAP-05 claim of "asks once" is asserted somewhere else — or not at all. **Routed, not resolved**: the
+  next round anchors the count perturbation on the seam's _recording_ double rather than a duplicated statement, and if
+  the count genuinely is unpinned, that is a gap in T14''s spec worth a test rather than a claim. I would rather report a
+  negative I ran than a positive I assumed.
+  **T14 perturbation tally: 1 of 4 proven** (the depth guard, `7355816E…A6F9F`, one test red / 36 green). **T26: 6 of 6
+  proven by its author**, with the additivity and format evidence above.
+
 - **2026-09-18 · The first of T14''s owed perturbations, run by me rather than taken on report** (`711a1ddae` carries the
   slice). The depth guard `if (depth > APP_ENV_TEMPLATE_MAX_DEPTH)` was replaced with `if (false)` in
   `app-env.resolver.ts` and the suite went red in exactly one place —
