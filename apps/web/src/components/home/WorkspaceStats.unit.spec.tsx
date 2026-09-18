@@ -59,18 +59,25 @@ describe('WorkspaceStats (owner 2026-09-18 — Today at a glance merged in)', ()
             'href',
             '/inbox?view=decisions',
         );
+        // The Runs ledger is the Activity page's `Runs` view now, so each run
+        // counter links straight there instead of via the retired `/runs`.
         expect(screen.getByTestId('home-glance-workingNow')).toHaveAttribute(
             'href',
-            '/runs?g=day&status=running',
+            '/activity?view=runs&g=day&status=running',
         );
         expect(screen.getByTestId('home-glance-doneToday')).toHaveAttribute(
             'href',
-            '/runs?g=day&status=completed',
+            '/activity?view=runs&g=day&status=completed',
         );
         expect(screen.getByTestId('home-glance-failedToday')).toHaveAttribute(
             'href',
-            '/runs?g=day&status=failed',
+            '/activity?view=runs&g=day&status=failed',
         );
+        expect(screen.getByTestId('home-glance-failedToday')).toHaveAttribute(
+            'data-tone',
+            'danger',
+        );
+        expect(screen.getByTestId('home-glance-doneToday')).toHaveAttribute('data-tone', 'neutral');
 
         // All — the account totals, unchanged.
         expect(within(card).getByText('Total Missions')).toBeInTheDocument();

@@ -1930,6 +1930,10 @@
                     "cancel": "Cancel",
                     "runBy": "Run by {agent}",
                     "receiptHeading": "Receipt"
+                },
+                "viewToggle": {
+                    "sessions": "Sessions",
+                    "ledger": "Ledger"
                 }
             },
             "archived": {
@@ -2103,7 +2107,8 @@
                     "tooLong": "Init script exceeds 16 KB."
                 }
             },
-            "messageAgent": "Message {agent}"
+            "messageAgent": "Message {agent}",
+            "subTabsLabel": "Agents sections"
         },
         "runsPage": {
             "title": "Runs",
@@ -4013,7 +4018,8 @@
             "viewToggle": {
                 "log": "Log",
                 "schedules": "Schedules",
-                "feed": "Live Feed"
+                "feed": "Live Feed",
+                "runs": "Runs"
             },
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
@@ -4111,6 +4117,9 @@
                     "failed": "Failed",
                     "cancelled": "Cancelled"
                 }
+            },
+            "shortcuts": {
+                "switchView": "Switch view"
             }
         },
         "feed": {

@@ -12,7 +12,10 @@ import { formatCount } from './home.shared';
 
 /** Today's Runs ledger narrowed to one status — the surface each run counter comes from. */
 export function runsTodayHref(status: RunLedgerStatus): string {
-    return `${ROUTES.DASHBOARD_RUNS}?${buildRunsSearch({
+    // The ledger is the Activity page's `Runs` view now, so the counter links
+    // straight at it instead of at the retired `/runs` (which would only
+    // redirect here) — one less hop on the home page's most-used tile.
+    return `${ROUTES.DASHBOARD_ACTIVITY_RUNS}&${buildRunsSearch({
         granularity: 'day',
         date: null,
         filters: { statuses: [status] },

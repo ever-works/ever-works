@@ -131,13 +131,12 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
         await expect(page.getByText('Create Agent Manually').first()).toBeVisible();
     });
 
-    test('the header exposes the Agents Chart CTA and the Skills block renders below the grid', async ({
-        page,
-    }) => {
+    test('the header exposes the Agents Chart CTA and the hub sub-tabs', async ({ page }) => {
         // Navigation consolidation (docs/specs/features/navigation-consolidation
-        // §3.5): /agents is tab 2 of the Teams hub — it owns the Agents Chart
-        // entry point and hosts the Skills catalog as a block (anchor #skills;
-        // /skills redirects here).
+        // §3.5): /agents is tab 2 of the Teams hub and owns the Agents Chart
+        // entry point. The Activity merge then gave the hub a sub-strip —
+        // Agents | Skills | Activity — and moved the Skills catalog off this
+        // page and onto its own sub-tab (/agents/skills).
         await page.goto('/en/agents', { waitUntil: 'domcontentloaded' });
         await expect(page).not.toHaveURL(/\/login/);
 
@@ -145,20 +144,22 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
         await expect(chartLink).toBeVisible({ timeout: 30_000 });
         await expect(chartLink).toHaveAttribute('href', /\/agents\/chart$/);
 
-        const skills = page.getByTestId('agents-skills-section');
-        await expect(skills).toBeVisible({ timeout: 30_000 });
-        await expect(skills).toHaveAttribute('id', 'skills');
-        // The block keeps the old page's chrome: an h2 (the page's single h1
-        // stays "Agents") plus the two catalog CTAs.
-        await expect(skills.getByRole('heading', { name: 'Skills', level: 2 })).toBeVisible();
+        await expect(page.getByTestId('agents-hub-tabs')).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByTestId('agents-hub-tab-skills')).toHaveAttribute(
+            'href',
+            /\/agents\/skills$/,
+        );
+        await expect(page.getByTestId('agents-hub-tab-activity')).toHaveAttribute(
+            'href',
+            /\/agents\/activity$/,
+        );
+        // The catalog itself is no longer a block on this page.
+        await expect(page.getByTestId('agents-skills-section')).toHaveCount(0);
     });
 
-    test('/skills redirects into the Agents tab, filters intact', async ({ page }) => {
+    test('/skills redirects into the Skills sub-tab, filters intact', async ({ page }) => {
         await page.goto('/en/skills?section=custom', { waitUntil: 'domcontentloaded' });
 
-        // Playwright reports the hash inconsistently across navigations, so the
-        // pathname + query are the post-condition, not the raw url string.
-        //
         // The pathname is asserted prefix-agnostically because `/en/…` never
         // survives: `i18n/routing.ts` runs `localePrefix: 'never'`, so
         // `proxy.ts` (`detectLegacyLocalePrefix`) 307s the legacy `/en/skills`
@@ -168,7 +169,21 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
         // and `flow-i18n-locale-switching` ("legacy /en/login collapses").
         await expect
             .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
-            .toMatch(/^\/(en\/)?agents$/);
+            .toMatch(/^\/(en\/)?agents\/skills$/);
+        expect(new URL(page.url()).searchParams.get('section')).toBe('custom');
+        await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
+    });
+
+    test('the retired /agents#skills anchor forwards to the Skills sub-tab', async ({ page }) => {
+        // The catalog was a block at the bottom of /agents for a while, so
+        // `/agents#skills` (and the filtered form of it) is what the docs, the
+        // help centre and a pile of bookmarks point at. A fragment never reaches
+        // the server, so this one is a client-side forward.
+        await page.goto('/en/agents?section=custom#skills', { waitUntil: 'domcontentloaded' });
+
+        await expect
+            .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
+            .toMatch(/^\/(en\/)?agents\/skills$/);
         expect(new URL(page.url()).searchParams.get('section')).toBe('custom');
         await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
     });
