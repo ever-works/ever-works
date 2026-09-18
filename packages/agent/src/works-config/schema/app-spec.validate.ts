@@ -2036,8 +2036,15 @@ export function validateAppSpecObject(
         );
     }
 
+    // `kindOf` reads `value['kind']`, so it takes the OBJECT: handing it
+    // `obj['kind']` (the string) made it answer `null` for every document, and
+    // `rootKind` fell through to `options.rootKind` — which a document-form
+    // caller does not pass — so `kind_mismatch` carried no `root` and a
+    // document that disagreed with itself was reported as a bare
+    // `invalid_value`. `validateAppSpecText` always passed the object
+    // (`:1986`), so the two entry points disagreed about the same document.
     const rootKind = asDocument
-        ? (kindOf((obj as Record<string, unknown>)['kind']) ?? options.rootKind ?? null)
+        ? (kindOf(obj) ?? options.rootKind ?? null)
         : (options.rootKind ?? null);
 
     return runPipeline({ specBlock, lookup: null, rootKind, fatal: null, leading: [] }, options);

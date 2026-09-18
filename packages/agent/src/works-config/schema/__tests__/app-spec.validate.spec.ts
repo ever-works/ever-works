@@ -1061,6 +1061,28 @@ describe('the envelope, the sort and the cap', () => {
         expect(issue.params).toMatchObject({ root: 'app', declared: 'website' });
     });
 
+    it('reports kind_mismatch through the OBJECT entry point, not only the text one', () => {
+        // `validateAppSpecObject` accepts the whole document as well as the bare
+        // block, and it must reach the same verdict as `validateAppSpecDocument`
+        // for the same document (its own doc comment says so). The root `kind`
+        // is what the two spellings are compared through, so a document-form
+        // caller that got `null` here would silently lose the rule.
+        const result = validateAppSpecObject({
+            version: 2,
+            kind: 'app',
+            name: 'fixture',
+            spec: {
+                kind: 'website',
+                source: { relation: 'fork' },
+                build: { strategy: 'dockerfile', dockerfile: 'Dockerfile' },
+                components: [{ name: 'web', role: 'web', port: 3000 }],
+            },
+        });
+        const issue = issueWith(result, 'kind_mismatch');
+        expect(issue.displayPath).toBe('kind');
+        expect(issue.params).toMatchObject({ root: 'app', declared: 'website' });
+    });
+
     it('reports blueprint_repo_outside_org for a repository outside ever-works', () => {
         const result = validateAppSpecDocument(
             documentOf(

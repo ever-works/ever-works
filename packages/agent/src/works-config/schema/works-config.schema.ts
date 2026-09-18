@@ -500,15 +500,18 @@ export function validateWorksConfig(raw: unknown): WorksConfigValidation {
             // the envelope's own `spec`.
             //
             // `rootKind` is passed **explicitly** — `result.data.kind`, the root
-            // spelling. It is required rather than redundant: in
-            // `app-spec.validate.ts:2040` the document form reads
-            // `kindOf(obj['kind'])`, i.e. it hands `kindOf` the *value* of `kind`
-            // where that helper expects the object, so the root kind it derives
-            // is always `null` and `kind_mismatch` never fires unless the caller
-            // supplies one. (T6 owns that line; reported, not edited here.)
-            // Passing it also keeps this route's result identical to
-            // `validateAppSpecDocument`'s, which does read the root kind
-            // (`app-spec.validate.ts:1986`).
+            // spelling. When this route was written it was required, not
+            // redundant: the document form of `validateAppSpecObject` handed
+            // `kindOf` the *value* of `kind` where that helper expects the
+            // object, so the root kind it derived was always `null` and
+            // `kind_mismatch` fired without its `root` param. **That bug is
+            // fixed** (`app-spec.validate.ts:2039-2046` now reads `kindOf(obj)`,
+            // with a spec case that fails without it), so this line is now
+            // belt-and-braces rather than a workaround. It stays because it is
+            // still true, still cheap, and makes this route's verdict
+            // independent of how the helper derives what it was given — the two
+            // entry points must agree, and this one does not have to trust that
+            // they do.
             //
             // No `context` is passed: `validateWorksConfig` holds none. §22:502
             // makes an absent input **unknown**, so no server-only rule fires
