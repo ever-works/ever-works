@@ -104,7 +104,16 @@ export const PLUGIN_CATEGORIES = [
 	// those maps are `Record<PluginCategory, …>`, so a category appended here
 	// without them is a **build break in apps/web**, not a cosmetic gap. That is
 	// why the capability landed in the previous round and this line did not.
-	'app-dependency'
+	'app-dependency',
+	// APW-05 T2 — build providers: the plugin that turns a commit into an image.
+	// Category of `IBuildPlugin` (plan §4.1); `github-actions-build` is the P1
+	// plugin and P3 adds `apps-builder` under the same category (plan §4.3,
+	// §4.13). Appended last, and — like the line above — landed together with its
+	// `CATEGORY_ICONS` / `CATEGORY_LABELS` entries in
+	// `apps/web/src/lib/utils/plugin-category-icons.ts`, because those two maps
+	// are `Record<PluginCategory, …>` and a category without them breaks the
+	// apps/web type-check.
+	'build'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];

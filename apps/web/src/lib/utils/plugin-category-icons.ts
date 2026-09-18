@@ -24,6 +24,8 @@ import {
     Network,
     // APW-07 T3 — the App dependency category's icon (see the map below).
     Server,
+    // APW-05 T2 — the build category's icon (see the map below).
+    Hammer,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -78,6 +80,11 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // are `Record<PluginCategory, …>`, so the category and its icon must land
     // together or apps/web stops compiling.
     'app-dependency': Server,
+    // APW-05 T2 — build providers (`github-actions-build`, later
+    // `apps-builder`). Same rule as the line above: the `build` category in
+    // `packages/plugin/src/contracts/plugin-manifest.types.ts` and its two map
+    // entries here are one change.
+    build: Hammer,
 };
 
 /**
@@ -110,6 +117,8 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     connector: 'Connectors',
     metrics: 'Metrics',
     'app-dependency': 'App Dependencies',
+    // APW-05 T2 — the `build` category (see the icon map above).
+    build: 'Builds',
 };
 
 // Type-safe assertion that all categories are covered

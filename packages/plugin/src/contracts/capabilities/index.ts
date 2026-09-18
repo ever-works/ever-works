@@ -94,3 +94,11 @@ export * from './connection-scopes.interface.js';
 // its own descriptor, prompt schema and backup policy. Additive: no existing
 // capability, category or contract changes.
 export * from './app-dependency.interface.js';
+// App Works (APW-05 T2) — the `build` capability: `IBuildPlugin` and the shapes
+// the workflow generator, the secret sync, the run observer and the registry
+// check are written against (`PrepareRepositoryInput`/`Result`, `BuildSnapshot`,
+// `ImageAccessResult`, `BuildRunRef`, `isBuildPlugin`). Additive: no existing
+// capability, category or contract changes, and `BuildRunRef` /
+// `AppBuildVerificationResult` / `BUILD_SERVICE_DEFAULTS` are re-exported from
+// `@ever-works/contracts` (APW-05 T1) rather than redeclared (Resolution R-1).
+export * from './build.interface.js';

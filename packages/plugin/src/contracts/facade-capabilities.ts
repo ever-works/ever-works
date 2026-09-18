@@ -112,7 +112,15 @@ export const PLUGIN_CAPABILITIES = {
 	// and P2's `apps-tier-dependencies` the managed ones. Consumed only through
 	// `AppDependencyFacadeService`; see
 	// capabilities/app-dependency.interface.ts.
-	APP_DEPENDENCY: 'app-dependency'
+	APP_DEPENDENCY: 'app-dependency',
+	// App Works (APW-05 T2) — producing a container image from a commit. The
+	// `github-actions-build` plugin declares it (`IBuildPlugin`, `buildKind
+	// 'github-actions'`), and P3's `apps-builder` declares the same capability
+	// with the other `buildKind`. Consumed only through `BuildFacadeService`
+	// (APW-05 T16); see `capabilities/build.interface.ts`. Resolution R-13 keeps
+	// `build` a CAPABILITY while the strategy (`dockerfile` / `image` / `auto` /
+	// `none`) stays the App spec's own choice.
+	BUILD: 'build'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

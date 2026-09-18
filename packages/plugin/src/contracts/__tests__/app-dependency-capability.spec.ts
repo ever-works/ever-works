@@ -79,8 +79,8 @@ const EXISTING_CAPABILITIES = [
 	'workspace'
 ] as const;
 
-/** Every category that existed before the same change. */
-const EXISTING_CATEGORIES = [
+/** Every category that existed before APW-07 T3 appended `app-dependency`. */
+const PRE_APW07_CATEGORIES = [
 	'git-provider',
 	'deployment',
 	'screenshot',
@@ -107,6 +107,18 @@ const EXISTING_CATEGORIES = [
 	'metrics'
 ] as const;
 
+/**
+ * Every category present BESIDES `app-dependency`, in the tuple's own order: the
+ * block above followed by whatever a later epic appended — APW-05 T2 added
+ * `build`, the last entry.
+ *
+ * The epic that appends a category extends this list in the same change (and its
+ * own spec pins where its member sits). Leaving it behind does not make the
+ * append-only assertion below weaker, it makes it FAIL on a legitimate append,
+ * which is exactly how this line was found.
+ */
+const EXISTING_CATEGORIES = [...PRE_APW07_CATEGORIES, 'build'] as const;
+
 describe('the app-dependency capability (APW-07 T3)', () => {
 	it('names the capability exactly as the plan does', () => {
 		expect(PLUGIN_CAPABILITIES.APP_DEPENDENCY).toBe('app-dependency');
@@ -123,9 +135,13 @@ describe('the app-dependency capability (APW-07 T3)', () => {
 		expect(remaining).toEqual([...EXISTING_CATEGORIES]);
 		expect(new Set(PLUGIN_CATEGORIES).size).toBe(PLUGIN_CATEGORIES.length);
 
-		// …and the new member is LAST, which is what "append" means here: a category
-		// inserted in the middle would renumber every index a consumer persisted.
-		expect(PLUGIN_CATEGORIES[PLUGIN_CATEGORIES.length - 1]).toBe('app-dependency');
+		// …and it was appended at the end of ITS change, which is what "append" means
+		// here: a category inserted in the middle would renumber every index a consumer
+		// persisted. Later epics append behind it (APW-05 T2's `build`), so the durable
+		// form is "it sits immediately after the block that preceded it" — pinned as an
+		// index and as a slice, both of which a mid-tuple insertion breaks.
+		expect(PLUGIN_CATEGORIES.indexOf('app-dependency')).toBe(PRE_APW07_CATEGORIES.length);
+		expect(PLUGIN_CATEGORIES.slice(0, PRE_APW07_CATEGORIES.length)).toEqual([...PRE_APW07_CATEGORIES]);
 
 		// The derived union follows the tuple (a `satisfies` line, so a future edit
 		// cannot widen one without the other).
