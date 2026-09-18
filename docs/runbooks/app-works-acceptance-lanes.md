@@ -1,0 +1,143 @@
+# App Works acceptance lanes — operator runbook
+
+**Owner:** APW-13 (T56). **Applies to:** the App Works PR lane and the acceptance (`live`) lane.
+**Deliberately carries no addresses:** estate hosts, IPs and private domains live in the private
+operations repository and in the lane's own environment block, never here. Everything below names a
+**variable** and lets the environment supply the value.
+
+---
+
+## 1. What the lanes are
+
+| Lane                       | Config / workflow                                                                             | What it proves                                                                                                                                                                                                                                           | Needs                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **PR lane**                | `.github/workflows/e2e.yml` (sharded Playwright matrix) + the fake GitHub the workflow starts | the platform's existing behaviour, plus APW-13's five regression specs (`flow-repo-work-kind-regression`, `flow-template-fork-success`, `flow-activity-deploy-and-pr-events`, `flow-github-intake-signed-delivery`, `flow-managed-subdomain-allocation`) | a stack the workflow builds itself: fake GitHub, in-memory SQLite API, prod-built web, the App runtime worker |
+| **Acceptance (live) lane** | `apps/web/playwright.app-works.config.ts` (`workers: 1`, its own setup project)               | the golden paths end to end against the run account                                                                                                                                                                                                      | everything above, plus the interlocks and a GitHub connection surface (T63)                                   |
+| **Nightly lane**           | `app-works-nightly.yml` / `app-works-golden-path.yml` (APW-13 T36/T45)                        | the Blueprints, the fixture variants and the live sandbox checks                                                                                                                                                                                         | operator switches and an estate                                                                               |
+| **Harness unit lane**      | `apps/web/vitest.e2e-harness.config.ts` (`pnpm exec vitest run -c …`)                         | the harness's own specs — fake GitHub, helpers, evidence                                                                                                                                                                                                 | nothing but the repo                                                                                          |
+
+The harness unit lane is the one to run first when something looks wrong: it is fast, needs no
+stack, and covers the fake and the helpers.
+
+---
+
+## 2. Dispatching a lane
+
+```bash
+gh workflow run e2e.yml --ref <branch>
+```
+
+**A dispatched run tests the SHA the branch pointed at when the dispatch was created, not the branch as
+it moves.** Confirm what a run actually tested before drawing conclusions from it:
+
+```bash
+gh run view <run-id> --json headSha --jq .headSha
+git ls-tree -r --name-only <sha> -- packages/tasks/src/tasks/trigger/   # e.g. is the local worker in it?
+```
+
+That check is not academic: a run dispatched before the App runtime worker landed legitimately took the
+worker step's "no script yet" branch, and its logs show a `::warning title=App runtime worker absent`
+that reads like a defect and is not one.
+
+---
+
+## 3. Reading the summary and finding evidence
+
+```bash
+gh run view <run-id>                     # per-shard conclusions
+gh run view <run-id> --json jobs | jq '.jobs[] | {name, conclusion}'
+gh run view --job <job-id> --log-failed  # the failing step's log
+gh api repos/<org>/<repo>/actions/jobs/<job-id>/logs > /tmp/job.log
+```
+
+Where the artefacts live:
+
+| Artefact                                               | Path                                                                        |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Playwright traces, screenshots, error contexts         | `apps/web/e2e/test-results/` (per-attempt directories; gitignored)          |
+| The run's estate record (account, Agent, cleanup list) | the path in `APW_E2E_ESTATE_PATH`                                           |
+| The lane's evidence JSON                               | written by `helpers/app-works-evidence.ts`; the catalog schema validates it |
+| The fake GitHub's served state and fixtures            | `apps/web/e2e/fakes/github-fake/` (43 recorded fixtures)                    |
+
+**Before believing a red, reproduce it locally** (§4). This fleet runs a shard in roughly half an hour
+where a developer machine finishes the same shard in under a minute, and several shards per run fail on
+assorted pre-existing specs; a failing shard is a lead, not a verdict.
+
+---
+
+## 4. Running the lanes locally
+
+The lane is three processes and two Playwright invocations. Every value below comes from the
+environment — substitute your own origins for the variables.
+
+```bash
+# 1. The fake GitHub (the workflow starts this BEFORE the API, because the API's first GitHub call
+#    must already reach it). Port 3900.
+node apps/web/e2e/fakes/github-fake/server.mjs &
+
+# 2. The API — built dist, in-memory SQLite, the lane's switches. Port 3100.
+DATABASE_TYPE=sqlite DATABASE_IN_MEMORY=true DATABASE_AUTOMIGRATE=true \
+AUTH_SECRET=<32+ chars> NODE_ENV=development PORT=3100 \
+EVER_WORKS_E2E_FAKES=1 APW_E2E_GITHUB_FAKE_URL=<the fake's origin> \
+EVER_WORKS_APP_WORKS_ENABLED=true node apps/api/dist/main.js &
+
+# 3. The web — a PROD build (`next build` first), and the port must be set for the web process only.
+NODE_ENV=production PORT=3000 pnpm --filter ever-works-web start &
+
+# 4. The five regression specs (the PR lane's App Works half)
+pnpm --filter ever-works-web exec playwright test --project=chromium \
+  flow-repo-work-kind-regression flow-template-fork-success flow-activity-deploy-and-pr-events \
+  flow-github-intake-signed-delivery flow-managed-subdomain-allocation
+
+# 5. The acceptance lane's interlocks and setup
+pnpm --filter ever-works-web exec playwright test -c playwright.app-works.config.ts
+```
+
+### Traps that cost real time
+
+- **Windows:** `Start-Process pnpm` does not launch — use `pnpm.cmd`. A failed launch shows up later as
+  `ERR_CONNECTION_REFUSED` from Playwright, not as a clear error.
+- **A `PORT` set for the API leaks into `next start`.** The web then tries the API's port, dies with
+  `EADDRINUSE`, and Playwright fails at the login page. Set the web's port **after** the API has started.
+- **The worker answers 200 even when it is useless.** Without `TRIGGER_INTERNAL_SECRET` it starts
+  _degraded_: its health endpoint returns 200 with `{"status":"degraded","boot":{"ok":false}}` and every
+  `POST /run` answers 503. Read `boot.ok`, never the status code alone. `TRIGGER_INTERNAL_API_URL` is
+  defaulted; the secret deliberately never is.
+- **The API takes minutes to boot on a loaded machine** (route-table compilation). The workflow's
+  readiness loop retries with connection refused until it answers; that is expected, not a failure.
+
+---
+
+## 5. What each refusal means, and what to do
+
+| Symptom                                                                                                 | Meaning                                                                                                                    | Action                                                                                                                |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `APW_E2E_RUN_ID is not set`, `… is not in APW_E2E_ALLOWED_BASE_URLS`, `APW_E2E_TOKEN_BUDGET is not set` | one of the seven interlocks refused **before** anything ran. The message names the variable and the plan clause            | set it. All of them are in the workflow's env block — copy from there rather than inventing values                    |
+| `S10: no supported GitHub connection surface for this run account`                                      | the lane has no GitHub connection to act as (FR-56 / plan §8.8), so every create, fork and link scenario is `test.fixme`'d | land T63, or run the lane with the fixtures that need no connection (`flow-github-intake-signed-delivery` needs none) |
+| A job pauses with a named reason instead of failing                                                     | the credential of record is unusable (member left, access lost, scope withdrawn) — FR-43                                   | hand the credential over from the UI, or re-connect the member's GitHub; nothing upstream was touched                 |
+| `waiting: 'budget'` / the member sees a reset time                                                      | the Work's own budget refused the run (FR-44)                                                                              | wait for the reset, or raise the Work's budget. The row keeps its state and nothing was opened                        |
+| `dispatch_unavailable` on fork readiness                                                                | no App runtime worker is reachable                                                                                         | check the worker's `boot.ok` (§4); in CI, that the step is enabled and the secret is set                              |
+| A shard fails with API timeouts under load                                                              | fleet contention, not a defect                                                                                             | reproduce locally (§4) before opening anything                                                                        |
+
+---
+
+## 6. Leftovers
+
+- **Namespaces.** Live lanes create real namespaces. The estate file (`APW_E2E_ESTATE_PATH`) carries
+  the cleanup list; the lane's cleanup step reads it. If a run died before cleanup, drive the cleanup
+  from that file rather than deleting by hand — the file is the only record of what the run created.
+- **Throwaway accounts and Agents.** Every run seeds them from `APW_E2E_RUN_ID`, which is why every
+  run-unique name is derived from it (ACCEPTANCE §0.4). Re-using a run id re-uses the account; changing
+  it leaves the old one behind for the cleanup step.
+- **The fake's data** is in-process and dies with the server, except for the git roots it writes under
+  the system temp directory — clear those if a probe was killed mid-clone.
+
+---
+
+## 7. See also
+
+- `docs/internal/app-works-test-estate.md` — the two Organizations the lanes use and the estate gaps.
+- `docs/specs/features/app-works/APW-13-golden-paths/plan.md` — §8 is the lane's design, §9.1 its wiring.
+- [`apps/web/e2e/COVERAGE.md`](../../apps/web/e2e/COVERAGE.md) — which spec covers which acceptance id.
+- `docs/internal/app-works-build-progress.md` — the build ledger: what is landed, what is routed, and the
+  programme's own traps (§5 is the routed-findings register).
