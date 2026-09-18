@@ -188,6 +188,26 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
         'A sha256 of the spec the Work is actually running under (head, or a pinned earlier commit). A content digest for change detection, not a credential.',
     licenseRegistryHash:
         'A sha256 of the license registry the App spec resolved against, used to notice a registry change between evaluations. The registry is public template metadata.',
+    // APW-04 T7 / APW-05 T4 — the provisioning and build tables. The guard fired on
+    // these the moment those entities landed (2026-09-18, caught by APW-09 T43's
+    // full-suite run rather than by the slice that added them), which is precisely
+    // its job: a new secret-shaped column has to be *decided*, not inherited. Each
+    // reason below is read off the column's own docstring and the contract it holds,
+    // not inferred from the name.
+    tokenCap:
+        'A numeric CEILING on how many model tokens a provisioning run may spend (default 3,000,000). A budget, not a credential — the sibling `tokensUsed` is already benign for the same reason.',
+    appSpecHash:
+        'A digest of the App spec the Build ran under, for change detection. The spec is a file in the member’s own repository, which the archive does not carry.',
+    buildInputsHash:
+        'sha256 over (name, fingerprint) of the build values a preparation synced (plan §4.7) — a digest of NAMES and fingerprints, never of a value.',
+    secretsSyncedAt:
+        'A timestamp — when the secret sync finished. The deployable verdict’s freshness clock (§5.1).',
+    buildSecretNames:
+        'The `EW_` secret NAMES a preparation wrote (≤ 50). The entity docstring is explicit: "Names only, never values" — the values are sealed in the platform’s secret store and never reach this table.',
+    verifySecretNames:
+        'The names of the per-run prompted values a verification created (§4.10), kept so the cleanup can find and remove them. Names only; the values live in the secret store and are removed at the end of the run.',
+    secretCheck:
+        'The closed three-value verdict `passed | failed | not_needed` (`APP_BUILD_SECRET_CHECK_RESULTS`). The name matched the guard’s pattern; the value is an enum, not a secret.',
 });
 
 /** Does this entity produce no lines in an archive at all? */
