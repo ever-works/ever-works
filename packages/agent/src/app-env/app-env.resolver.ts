@@ -173,7 +173,7 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
     APP_DEPENDENCY_BUCKET_OUTPUT_PREFIX,
     APP_ENV_BUILD_SERVICE_OBJECT_STORAGE_REGION,
@@ -877,15 +877,19 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
     /**
      * Every stored value of the App Work, decrypted.
      *
-     * T8's metadata read is the "which names are set" pass (§4.2's own
-     * docstring), and the entity's repository is the targeted envelope read; a
-     * row that exists is a name that is SET even if its value cannot be read, and
+     * Two reads, exactly as T13 splits them: T8's `findByWork` is the "which
+     * names are set" pass (its own docstring names this consumer, and it is the
+     * read that deliberately withholds the envelope), and the entity's repository
+     * is the targeted envelope read for the names that pass the filter. A row that
+     * exists is therefore a name that is SET even if its value cannot be read, and
      * an unreadable value is a refusal rather than a silently missing name
      * (plan §9.2:950).
      *
      * Ephemeral mode reads neither a GENERATED row nor a derived public half
-     * (R-10): the fresh pair is generated in memory, and a stored public half
-     * would describe a private key this verification does not hold.
+     * (R-10), and because the filter runs on the METADATA before the second read,
+     * their envelopes are never even loaded: the fresh pair is generated in
+     * memory, and a stored public half would describe a private key this
+     * verification does not hold.
      */
     private async readStoredValues(
         workId: string,
@@ -896,10 +900,22 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
             return stored;
         }
 
-        void this.values;
-        let envelopes: WorkAppEnvValue[];
+        let facts: Array<Pick<StoredEnvValue, 'name' | 'version' | 'origin' | 'derivedFromName'>>;
         try {
-            envelopes = await this.rows.find({ where: { workId } });
+            const metadata = this.values ? await this.values.findByWork(workId) : null;
+            facts = metadata
+                ? metadata.map((row) => ({
+                      name: row.name,
+                      version: row.version ?? 1,
+                      origin: row.origin,
+                      derivedFromName: row.derivedFromName ?? null,
+                  }))
+                : (await this.rows.find({ where: { workId } })).map((row) => ({
+                      name: row.name,
+                      version: row.version ?? 1,
+                      origin: row.origin,
+                      derivedFromName: row.derivedFromName ?? null,
+                  }));
         } catch (error) {
             this.logger.warn(
                 `App env: the stored values of work ${workId} could not be read (${describeError(error)}).`,
@@ -907,15 +923,44 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
             return stored;
         }
 
-        for (const row of envelopes) {
-            if (!row?.name) continue;
-            if (ephemeral && (row.origin === 'generated' || row.origin === 'derived')) continue;
-            stored.set(row.name, {
-                name: row.name,
-                version: row.version ?? 1,
-                origin: row.origin,
+        const wanted = [
+            ...new Set(
+                facts
+                    .filter(
+                        (fact) =>
+                            fact.name &&
+                            !(
+                                ephemeral &&
+                                (fact.origin === 'generated' || fact.origin === 'derived')
+                            ),
+                    )
+                    .map((fact) => fact.name),
+            ),
+        ];
+        if (wanted.length === 0) {
+            return stored;
+        }
+
+        let envelopes: WorkAppEnvValue[];
+        try {
+            envelopes = await this.rows.find({ where: { workId, name: In(wanted) } });
+        } catch (error) {
+            this.logger.warn(
+                `App env: the stored values of work ${workId} could not be read (${describeError(error)}).`,
+            );
+            return stored;
+        }
+
+        const byName = new Map(envelopes.map((row) => [row.name, row]));
+        for (const fact of facts) {
+            const row = byName.get(fact.name);
+            if (!row) continue;
+            stored.set(fact.name, {
+                name: fact.name,
+                version: fact.version ?? row.version ?? 1,
+                origin: fact.origin,
                 value: this.decrypt(row),
-                derivedFromName: row.derivedFromName ?? null,
+                derivedFromName: fact.derivedFromName ?? row.derivedFromName ?? null,
             });
         }
 

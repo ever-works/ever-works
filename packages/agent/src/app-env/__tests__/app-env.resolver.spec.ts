@@ -1153,6 +1153,17 @@ describe('AppEnvResolver (T14, plan §2.2:110-150, §4.6:422-464)', () => {
             expect(names(result)).not.toContain('NEXTAUTH_SECRET');
             expect(unresolved(result, 'NEXTAUTH_SECRET').reason).toBe('missingRequired');
         });
+
+        it('still reads the stored values when T8’s metadata repository is unbound', async () => {
+            await store('NEXTAUTH_SECRET', SECRET_VALUE, { origin: 'generated', version: 4 });
+
+            const result = await makeResolver({ values: null }).resolveRuntime(WORK, {
+                target: 'your-cluster',
+            });
+
+            expect(value(result, 'NEXTAUTH_SECRET').value).toBe(SECRET_VALUE);
+            expect(value(result, 'NEXTAUTH_SECRET').fingerprint).toBe('v4');
+        });
     });
 
     describe('the build-service output table (pure, plan §4.6.2:455-462)', () => {
