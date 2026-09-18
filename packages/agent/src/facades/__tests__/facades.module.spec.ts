@@ -31,6 +31,8 @@ import { PlaybookCatalogFacadeService } from '../playbook-catalog.facade';
 import { ConnectionScopesFacadeService } from '../connection-scopes.facade';
 // APW-06 T20 — the App runtime plugin-and-credential facade (R-5).
 import { AppRuntimeFacadeService } from '../app-runtime.facade';
+// APW-07 T16 — the App-dependency provider facade (capability `app-dependency`).
+import { AppDependencyFacadeService } from '../app-dependency.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -77,6 +79,9 @@ describe('FacadesModule + barrel re-exports', () => {
         // APW-06 T20 — App runtime plugin-and-credential facade. Constructed in every process
         // that imports FacadesModule (APW06-G02); callable only in the isolated worker.
         AppRuntimeFacadeService,
+        // APW-07 T16 — App dependency providers (PostgreSQL, Redis, object storage, SMTP).
+        // The provider is selected by capability and preference, never by id (R-5).
+        AppDependencyFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -155,6 +160,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.PlaybookCatalogFacadeService).toBe(PlaybookCatalogFacadeService);
             expect(facadesBarrel.ConnectionScopesFacadeService).toBe(ConnectionScopesFacadeService);
             expect(facadesBarrel.AppRuntimeFacadeService).toBe(AppRuntimeFacadeService);
+            expect(facadesBarrel.AppDependencyFacadeService).toBe(AppDependencyFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -192,6 +198,10 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(typeof facadesBarrel.NotificationChannelFacadeError).toBe('function');
             // Goals feature PR-7 — metrics.
             expect(typeof facadesBarrel.MetricsFacadeError).toBe('function');
+            // APW-07 T16 — app-dependency: the base error plus the two selection failures.
+            expect(typeof facadesBarrel.AppDependencyFacadeError).toBe('function');
+            expect(typeof facadesBarrel.NoAppDependencyProviderError).toBe('function');
+            expect(typeof facadesBarrel.AppDependencyProviderNotFoundError).toBe('function');
         });
 
         it('re-exports the shared FacadeError + base classes (NoProviderError / ProviderNotFoundError)', () => {
@@ -213,6 +223,11 @@ describe('FacadesModule + barrel re-exports', () => {
                 [
                     'AiFacadeError',
                     'AiFacadeService',
+                    // APW-07 T16 — the App-dependency facade and its three runtime errors.
+                    // Its type-only members are erased by `tsc` and correctly absent here.
+                    'AppDependencyFacadeError',
+                    'AppDependencyFacadeService',
+                    'AppDependencyProviderNotFoundError',
                     'BaseFacadeService',
                     'BrowserAutomationFacadeError',
                     'BrowserAutomationFacadeService',
@@ -230,6 +245,7 @@ describe('FacadesModule + barrel re-exports', () => {
                     'GitFacadeError',
                     'GitFacadeService',
                     'GitProviderNotFoundError',
+                    'NoAppDependencyProviderError',
                     'NoContentExtractorProviderError',
                     'NoDeployCredentialsError',
                     'NoDeployProviderError',
