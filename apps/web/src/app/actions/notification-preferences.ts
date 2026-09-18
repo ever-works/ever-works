@@ -110,6 +110,46 @@ export async function setNotificationQuietHours(input: {
     }
 }
 
+/**
+ * Owner 2026-09-18 — set the account's time zone, from Settings → Profile's
+ * `Time zone` control.
+ *
+ * The profile time zone is ONE value the whole product reads (`GET
+ * /api/home/summary` falls back to it, the runs ledger resolves its day window
+ * in it, and quiet hours are interpreted in it), and until now it was only
+ * reachable as a side effect of the quiet-hours form. This is the control that
+ * makes it a deliberate choice: `UTC` for a fixed clock, or the browser's own
+ * IANA zone for local time.
+ *
+ * Quiet hours are read back and sent unchanged — the API's quiet-hours write
+ * is a full replace, so sending only `timezone` would silently clear a window
+ * the person set. `urgentBypassesQuietHours` is deliberately omitted so the
+ * stored opt-in survives.
+ */
+export async function setProfileTimezone(
+    timezone: string,
+): Promise<NotificationMatrixActionResult<{ timezone: string }>> {
+    await ensureAuth();
+    const zone = typeof timezone === 'string' ? timezone.trim() : '';
+    // The API enforces the IANA list too; this only keeps an empty or absurd
+    // value from being sent at all.
+    if (zone.length === 0 || zone.length > 64) {
+        return { success: false, error: 'A time zone is required' };
+    }
+    try {
+        const { preference } = await notificationPreferencesAPI.getPreferences();
+        await notificationPreferencesAPI.setQuietHours({
+            quietHoursStart: preference?.quietHoursStart ?? null,
+            quietHoursEnd: preference?.quietHoursEnd ?? null,
+            timezone: zone,
+        });
+        revalidateNotificationSettings();
+        return { success: true, data: { timezone: zone } };
+    } catch (error) {
+        return { success: false, error: errorMessage(error, 'Failed to save your time zone') };
+    }
+}
+
 /** End a category mute early. */
 export async function unmuteNotificationCategory(
     category: string,

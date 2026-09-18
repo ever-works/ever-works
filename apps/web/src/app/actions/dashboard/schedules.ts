@@ -121,6 +121,7 @@ export async function runScheduleNow(
     await requireSession();
     try {
         const result = await schedulesAPI.runNow(id);
+        revalidatePath(ROUTES.DASHBOARD_ACTIVITY);
         revalidatePath(ROUTES.DASHBOARD_SCHEDULES);
         return { ok: true, result };
     } catch (error) {
@@ -135,6 +136,7 @@ export async function pauseSchedule(
     await requireSession();
     try {
         const schedule = await schedulesAPI.pause(id, options.acknowledgeMissionPause === true);
+        revalidatePath(ROUTES.DASHBOARD_ACTIVITY);
         revalidatePath(ROUTES.DASHBOARD_SCHEDULES);
         return { ok: true, schedule };
     } catch (error) {
@@ -148,6 +150,7 @@ export async function resumeSchedule(
     await requireSession();
     try {
         const schedule = await schedulesAPI.resume(id);
+        revalidatePath(ROUTES.DASHBOARD_ACTIVITY);
         revalidatePath(ROUTES.DASHBOARD_SCHEDULES);
         return { ok: true, schedule };
     } catch (error) {

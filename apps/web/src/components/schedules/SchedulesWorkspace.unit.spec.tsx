@@ -79,6 +79,17 @@ function pageOf(names: string[], nextCursor: string | null = null): SchedulePage
             data_sync: 0,
             inbound_trigger: names.length,
         },
+        // The PRE-filter breakdown the source chips are built from: it stays
+        // complete while a filter narrows `countsBySourceType`.
+        unfilteredCountsBySourceType: {
+            recurring_task: 0,
+            agent_heartbeat: 0,
+            work_schedule: 0,
+            mission_tick: 0,
+            source_validation: 0,
+            data_sync: 0,
+            inbound_trigger: names.length,
+        },
         countsByStatus: { active: names.length, paused: 0, disabled: 0, error: 0, ended: 0 },
         healthCounts: { ok: names.length, neverRuns: 0 },
         degradedSources: [],

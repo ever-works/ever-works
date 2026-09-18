@@ -25,6 +25,11 @@ import { composeAttentionItems, getTeamsTotal } from './dashboard-data';
 // the dashboard layout already reads (React-cache()d, so no second request).
 import { getHomeSummaryAction } from '@/app/actions/dashboard/home';
 import { healthAPI } from '@/lib/api/health';
+// Owner 2026-09-18 — the Dashboard composer is the `/new` prompt + kind chips,
+// so it resolves the same `works-<value>` PostHog flags the `/new` page does
+// (fail-open: no PostHog config ⇒ every kind enabled).
+import { ALL_NEW_CHIP_VALUES } from '@/components/new';
+import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -77,6 +82,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         matchCandidateWorks,
         homeSummary,
         jobRuntimeConfigured,
+        disabledWorkKinds,
     ] = await Promise.all([
         searchParams,
         getAuthFromCookie(),
@@ -159,6 +165,10 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             return null;
         }),
         healthAPI.getJobRuntimeConfigured().catch(() => null),
+        // Work-kind chips — the same `works-<value>` flags `/new` resolves, so
+        // a kind disabled platform-wide is disabled in the Dashboard composer
+        // too. Never throws; a slow PostHog costs nothing (1500 ms cap).
+        getDisabledWorkKinds(ALL_NEW_CHIP_VALUES),
     ]);
 
     // Security: defense-in-depth guard — if middleware matcher is misconfigured and
@@ -221,8 +231,8 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             attentionItems={attentionItems}
             // Home (AW-19) — the morning stack.
             homeSummary={homeSummary}
-            renderedAt={new Date().toISOString()}
             jobRuntimeConfigured={jobRuntimeConfigured}
+            disabledKinds={Array.from(disabledWorkKinds)}
         />
     );
 }

@@ -4010,6 +4010,10 @@
                 "recurringTask": "Make a task recurring",
                 "heartbeat": "Give an agent a heartbeat",
                 "workUpdates": "Set a work to update itself"
+            },
+            "create": {
+                "button": "Create",
+                "inboundTriggerHint": "A signed webhook that spawns a task"
             }
         },
         "activity": {
@@ -4607,6 +4611,15 @@
                     "description": "Override the name and email used in git commits. Leave empty to use your account name ({defaultName}) and email ({defaultEmail}).",
                     "nameLabel": "Committer Name",
                     "emailLabel": "Committer Email"
+                },
+                "timeZone": {
+                    "title": "Time zone",
+                    "description": "Which time zone times are shown in — the Dashboard, the runs ledger, and the hours your quiet window is read in. Pick your local time, or UTC for a clock that never shifts.",
+                    "local": "My local time",
+                    "utc": "UTC",
+                    "current": "Times are shown in {zone}.",
+                    "unset": "No time zone chosen yet — times are shown in UTC.",
+                    "saveFailed": "Couldn't save your time zone."
                 }
             },
             "security": {
@@ -10482,8 +10495,13 @@
             },
             "workspace": {
                 "title": "Your workspace",
-                "show": "Show your workspace",
-                "hide": "Hide your workspace"
+                "today": "Today",
+                "all": "All"
+            },
+            "more": {
+                "title": "More",
+                "show": "Show more",
+                "hide": "Hide more"
             }
         }
     },

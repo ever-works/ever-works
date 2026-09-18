@@ -8,13 +8,14 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 /**
  * Schedules ("Cadence") view — UI JOURNEY, driven in the browser (#1671).
  *
- * The Schedules view is the second tab of the dashboard Activity page
- * (`/activity`): a segmented Log | Schedules toggle. The Schedules tab
- * client-fetches `GET /api/schedules` (via the `getSchedules` server action)
- * and renders the unified read-model as `<SchedulesList>` (one row per
- * recurring task / agent heartbeat / work schedule / mission tick /
- * source-validation / data-sync / inbound-trigger), plus the
- * `<TriggersManager>` write surface below it.
+ * The Schedules view is the fourth tab of the dashboard Activity page
+ * (`/activity`): a segmented Log | Runs | Live Feed | Schedules toggle. It is
+ * the former `/schedules` PAGE, moved in whole — same `<SchedulesWorkspace>`
+ * (one row per recurring task / agent heartbeat / work schedule / mission tick
+ * / source-validation / data-sync / inbound-trigger, with the health banner,
+ * the filters, the columns and the per-row control menu), plus the
+ * `<TriggersManager>` write surface below it. `/schedules` redirects here with
+ * the whole filter set, so both addresses name the same list.
  *
  * This spec drives the REAL rendered surface as the authenticated storageState
  * user (the seeded TEST_USER). It seeds each scheduled source through the API
@@ -25,7 +26,7 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
  * `flow-schedules-view-deep.spec.ts` (pure API projection contract) and
  * `activity-log.spec.ts` (the Log tab) — here we assert the CLIENT surface:
  *
- *   • the Log|Schedules toggle: default Log tab, switching, aria-pressed,
+ *   • the view toggle: default Log tab, switching, aria-pressed,
  *     Log-only chrome (Export CSV) hidden on Schedules, `?view=schedules`
  *     URL sync, reload persistence, localStorage tab restore, deep-link entry
  *   • each source projected into a real row with its icon-label, human cadence,
@@ -37,8 +38,8 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
  *       - agent_heartbeat  "Agent heartbeat"  "Every hour"          Disabled  next-run "—"
  *       - inbound_trigger  "Inbound trigger"  "On event"            Active    next-run "—"
  *   • clicking an owner link navigates to the owning entity
- *   • the client filter chips (source-type + counts) narrow the visible rows;
- *     the "Active only" checkbox drops disabled rows
+ *   • the source chips (with pre-filter counts) narrow the visible rows and put
+ *     the filter in the URL; the "Active only" switch drops disabled rows
  *   • next-run-ascending DOM order (a timed row sorts above a null-next-run one)
  *   • the TriggersManager: heading + New-trigger dialog (create → one-time
  *     secret reveal with webhook URL + signing secret + signed-curl recipe),
@@ -49,10 +50,11 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
  *    sources were seeded for one user and confirmed to project into the list.
  *
  * Robustness: unique per-test suffixes; every row asserted by its synthetic
- * `data-testid="schedule-row-${sourceType}:${ownerId}"` (never global counts);
- * generous 30s budgets for first-hit route compiles. `loadSeededTestUser()` is
- * called INSIDE tests (never at module scope — module-scope reads run at
- * collection before global-setup writes the credentials file).
+ * `data-testid="schedule-workspace-row-${sourceType}:${ownerId}"` (never global
+ * counts); generous 30s budgets for first-hit route compiles.
+ * `loadSeededTestUser()` is called INSIDE tests (never at module scope —
+ * module-scope reads run at collection before global-setup writes the
+ * credentials file).
  */
 
 const ACTIVITY_URL = '/en/activity';
@@ -153,9 +155,9 @@ async function resumeTriggerViaAPI(
     expect(res.status(), `resume body=${await res.text().catch(() => '')}`).toBe(200);
 }
 
-/** synthetic row test-id: schedule-row-${sourceType}:${ownerId}. */
+/** synthetic row test-id: schedule-workspace-row-${sourceType}:${ownerId}. */
 function rowTestId(sourceType: string, ownerId: string): string {
-    return `schedule-row-${sourceType}:${ownerId}`;
+    return `schedule-workspace-row-${sourceType}:${ownerId}`;
 }
 
 /**
@@ -170,9 +172,9 @@ async function openSchedulesTab(page: Page): Promise<void> {
     // The segmented toggle is a client control: a click landing before React
     // has attached its handler is silently swallowed — the button is visible
     // and "clickable", the click reports success, and the tab never switches,
-    // so `schedules-list` never mounts. Click until the list is actually up.
+    // so `schedules-workspace` never mounts. Click until the list is actually up.
     // (Same hydration hazard as helpers/nav.ts documents.)
-    const list = page.getByTestId('schedules-list');
+    const list = page.getByTestId('schedules-workspace');
     await clickUntil(
         toggle.getByRole('button', { name: 'Schedules' }),
         async () => (await list.count()) > 0,
@@ -212,7 +214,7 @@ test.describe('Schedules UI — shell & tab toggle', () => {
         await expect(page.getByRole('button', { name: /Export CSV/i })).toBeVisible({
             timeout: 15_000,
         });
-        await expect(page.getByTestId('schedules-list')).toHaveCount(0);
+        await expect(page.getByTestId('schedules-workspace')).toHaveCount(0);
     });
 
     test('clicking the Schedules toggle mounts the list + triggers manager and hides Export CSV', async ({
@@ -225,10 +227,10 @@ test.describe('Schedules UI — shell & tab toggle', () => {
         // Post-condition: the schedules list is actually MOUNTED (the tab really
         // switched). A toggle click landing before React attaches the handler is
         // silently swallowed — visible + "clicked", but no tab change at all.
-        const list = page.getByTestId('schedules-list');
+        const list = page.getByTestId('schedules-workspace');
         await clickUntil(schedulesBtn, async () => (await list.count()) > 0);
 
-        await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
         await expect(schedulesBtn).toHaveAttribute('aria-pressed', 'true');
         // The Inbound-triggers write surface only exists on the Schedules tab.
         await expect(page.getByRole('heading', { name: 'Inbound triggers' })).toBeVisible({
@@ -256,7 +258,7 @@ test.describe('Schedules UI — shell & tab toggle', () => {
 
         await page.reload({ waitUntil: 'domcontentloaded' });
         // The ?view= param wins on load → still on the Schedules tab after reload.
-        await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
         await expect(
             page
                 .getByTestId('activity-view-toggle')
@@ -269,7 +271,7 @@ test.describe('Schedules UI — shell & tab toggle', () => {
         page,
     }) => {
         await page.goto('/activity?view=schedules', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
         await expect(
             page
                 .getByTestId('activity-view-toggle')
@@ -287,7 +289,7 @@ test.describe('Schedules UI — shell & tab toggle', () => {
         await page.goto('/en/works', { waitUntil: 'domcontentloaded' });
         await page.goto(ACTIVITY_URL, { waitUntil: 'domcontentloaded' });
         // The mount-restore effect reads 'activity-tab' → Schedules again.
-        await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
         await expect(
             page
                 .getByTestId('activity-view-toggle')
@@ -455,16 +457,18 @@ test.describe('Schedules UI — client filters', () => {
         await expect(missionRow).toBeVisible({ timeout: 30_000 });
         await expect(dataSyncRow).toBeVisible();
 
-        // Click the "Mission tick" filter chip (label + count = its accessible name).
-        const chip = page
-            .getByTestId('schedules-list')
-            .getByRole('button', { name: /Mission tick/ });
+        // Click the "Mission tick" source chip. The chip SETS the filter (not a
+        // toggle) and is addressed by its own test id, so the count it carries
+        // can never be mistaken for part of another control's name.
+        const chip = page.getByTestId('schedules-source-chip-mission_tick');
         // Post-condition: the non-matching data_sync row is really gone (the filter
         // applied). A chip click that beats hydration is swallowed — aria-pressed
         // never flips and nothing narrows. The chip SETS the filter (not a toggle),
         // so a retry can never undo a click that already landed.
         await clickUntil(chip, async () => !(await dataSyncRow.isVisible().catch(() => false)));
         await expect(chip).toHaveAttribute('aria-pressed', 'true');
+        // The filter is in the URL, so the narrowed list is shareable.
+        await expect(page).toHaveURL(/[?&]source=mission_tick/);
 
         // The mission survives the filter; the data_sync (work) row is filtered out.
         await expect(missionRow).toBeVisible();
@@ -491,20 +495,31 @@ test.describe('Schedules UI — client filters', () => {
         await expect(missionRow).toBeVisible({ timeout: 30_000 });
         await expect(hbRow).toBeVisible();
 
-        // `check()` throws outright when the click beats hydration
-        // ("Clicking the checkbox did not change its state") — this is a client
-        // filter whose handler may not be attached yet. Drive it to the STATE:
-        // click until the disabled heartbeat row is actually filtered out.
-        const activeOnly = page.getByTestId('schedules-list').locator('input[type="checkbox"]');
-        await clickUntil(activeOnly, async () => !(await hbRow.isVisible().catch(() => false)));
+        // "Active only" is a SERVER filter now (`enabledOnly`), so the row goes
+        // away only after a round trip. Driving the checkbox with `clickUntil`
+        // would toggle it back off mid-flight, so correct the STATE instead and
+        // assert the URL along with the effect: re-click only while it is wrong.
+        const activeOnly = page.getByTestId('schedules-filter-active-only');
+        await expect(async () => {
+            if (!(await activeOnly.isChecked())) {
+                await activeOnly.click().catch(() => undefined);
+            }
+            await expect(page).toHaveURL(/[?&]active=1/);
+            await expect(hbRow).toBeHidden();
+        }).toPass({ timeout: 30_000 });
 
         // The active mission stays; the draft (disabled) heartbeat is dropped.
         await expect(missionRow).toBeVisible();
         await expect(hbRow).toBeHidden();
 
         // Unchecking restores the disabled row (same state-driven approach).
-        await clickUntil(activeOnly, async () => hbRow.isVisible().catch(() => false));
-        await expect(hbRow).toBeVisible();
+        await expect(async () => {
+            if (await activeOnly.isChecked()) {
+                await activeOnly.click().catch(() => undefined);
+            }
+            await expect(hbRow).toBeVisible();
+        }).toPass({ timeout: 30_000 });
+        await expect(page).not.toHaveURL(/[?&]active=1/);
     });
 
     test('rows are ordered next-run ascending: a timed source sorts above a null-next-run one', async ({
@@ -525,7 +540,7 @@ test.describe('Schedules UI — client filters', () => {
         await expect(triggerRow).toBeVisible();
 
         const order = await page
-            .locator('[data-testid^="schedule-row-"]')
+            .locator('[data-testid^="schedule-workspace-row-"]')
             .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
         const iMission = order.indexOf(rowTestId('mission_tick', missionId));
         const iTrigger = order.indexOf(rowTestId('inbound_trigger', trigger.id));
@@ -718,10 +733,11 @@ test.describe('Schedules UI — resilience', () => {
         const hbRow = page.getByTestId(rowTestId('agent_heartbeat', agentHb.id));
         await expect(hbRow).toBeVisible({ timeout: 30_000 });
         // The animated spinner must be gone once content has rendered.
-        await expect(page.getByTestId('schedules-list').locator('.animate-spin')).toHaveCount(0);
-        // The source-type filter chips only render in the loaded state.
-        await expect(
-            page.getByTestId('schedules-list').getByRole('button', { name: /Agent heartbeat/ }),
-        ).toBeVisible();
+        await expect(page.getByTestId('schedules-workspace').locator('.animate-spin')).toHaveCount(
+            0,
+        );
+        // The source chips only render once the page has loaded, and they carry
+        // the PRE-filter counts, so a chip for this heartbeat exists.
+        await expect(page.getByTestId('schedules-source-chip-agent_heartbeat')).toBeVisible();
     });
 });
