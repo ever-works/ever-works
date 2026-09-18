@@ -64,7 +64,7 @@ function makeChunk(overrides: Partial<KnowledgeChunk> & Pick<KnowledgeChunk, 'id
 		chunkIndex: 0,
 		content: 'placeholder',
 		tokenCount: 1,
-		embedding: VEC.x as number[],
+		embedding: [...VEC.x],
 		metadata: null,
 		tenantId: null,
 		organizationId: null,
@@ -106,15 +106,15 @@ export function runVectorStoreContractSuite(
 				workId: 'w1',
 				documentId: 'd1',
 				chunks: [
-					makeChunk({ id: 'c-x', chunkIndex: 0, content: 'x-chunk', embedding: VEC.x as number[] }),
-					makeChunk({ id: 'c-y', chunkIndex: 1, content: 'y-chunk', embedding: VEC.y as number[] }),
-					makeChunk({ id: 'c-z', chunkIndex: 2, content: 'z-chunk', embedding: VEC.z as number[] })
+					makeChunk({ id: 'c-x', chunkIndex: 0, content: 'x-chunk', embedding: [...VEC.x] }),
+					makeChunk({ id: 'c-y', chunkIndex: 1, content: 'y-chunk', embedding: [...VEC.y] }),
+					makeChunk({ id: 'c-z', chunkIndex: 2, content: 'z-chunk', embedding: [...VEC.z] })
 				]
 			});
 
 			const { hits } = await plugin.queryChunks({
 				workId: 'w1',
-				queryEmbedding: VEC.x as number[],
+				queryEmbedding: [...VEC.x],
 				topK: 2
 			});
 
@@ -128,22 +128,22 @@ export function runVectorStoreContractSuite(
 
 		it('2. upsert is idempotent — re-running with the same chunks returns the same top-K (no duplicates)', async () => {
 			const chunks = [
-				makeChunk({ id: 'c-x', chunkIndex: 0, content: 'x-chunk', embedding: VEC.x as number[] }),
-				makeChunk({ id: 'c-y', chunkIndex: 1, content: 'y-chunk', embedding: VEC.y as number[] }),
-				makeChunk({ id: 'c-z', chunkIndex: 2, content: 'z-chunk', embedding: VEC.z as number[] })
+				makeChunk({ id: 'c-x', chunkIndex: 0, content: 'x-chunk', embedding: [...VEC.x] }),
+				makeChunk({ id: 'c-y', chunkIndex: 1, content: 'y-chunk', embedding: [...VEC.y] }),
+				makeChunk({ id: 'c-z', chunkIndex: 2, content: 'z-chunk', embedding: [...VEC.z] })
 			];
 
 			await plugin.upsertChunks({ workId: 'w1', documentId: 'd1', chunks });
 			const first = await plugin.queryChunks({
 				workId: 'w1',
-				queryEmbedding: VEC.x as number[],
+				queryEmbedding: [...VEC.x],
 				topK: 3
 			});
 
 			await plugin.upsertChunks({ workId: 'w1', documentId: 'd1', chunks });
 			const second = await plugin.queryChunks({
 				workId: 'w1',
-				queryEmbedding: VEC.x as number[],
+				queryEmbedding: [...VEC.x],
 				topK: 3
 			});
 
@@ -153,7 +153,7 @@ export function runVectorStoreContractSuite(
 			// Independently verify no row leaked — topK=10 must still be ≤ 3 chunks.
 			const wide = await plugin.queryChunks({
 				workId: 'w1',
-				queryEmbedding: VEC.x as number[],
+				queryEmbedding: [...VEC.x],
 				topK: 10
 			});
 			expect(wide.hits).toHaveLength(3);
@@ -173,7 +173,7 @@ export function runVectorStoreContractSuite(
 							documentId: 'd1',
 							chunkIndex: 0,
 							content: 'd1-chunk-0',
-							embedding: VEC.x as number[]
+							embedding: [...VEC.x]
 						})
 					]
 				});
@@ -186,7 +186,7 @@ export function runVectorStoreContractSuite(
 							documentId: 'd2',
 							chunkIndex: 0,
 							content: 'd2-chunk-0',
-							embedding: VEC.y as number[]
+							embedding: [...VEC.y]
 						})
 					]
 				});
@@ -195,7 +195,7 @@ export function runVectorStoreContractSuite(
 
 				const { hits } = await plugin.queryChunks({
 					workId: 'w1',
-					queryEmbedding: VEC.x as number[],
+					queryEmbedding: [...VEC.x],
 					topK: 10
 				});
 
@@ -212,7 +212,7 @@ export function runVectorStoreContractSuite(
 					documentId: 'd-same',
 					chunkIndex: 0,
 					content: `${workId}-content`,
-					embedding: VEC.x as number[]
+					embedding: [...VEC.x]
 				});
 
 			await plugin.upsertChunks({
@@ -228,7 +228,7 @@ export function runVectorStoreContractSuite(
 
 			const w1Hits = await plugin.queryChunks({
 				workId: 'w1',
-				queryEmbedding: VEC.x as number[],
+				queryEmbedding: [...VEC.x],
 				topK: 10
 			});
 
@@ -263,14 +263,14 @@ export function runVectorStoreContractSuite(
 						id,
 						chunkIndex: idx,
 						content: id,
-						embedding: embedding as number[]
+						embedding: [...embedding]
 					})
 				)
 			});
 
 			const { hits } = await plugin.queryChunks({
 				workId: 'w1',
-				queryEmbedding: VEC.x as number[],
+				queryEmbedding: [...VEC.x],
 				topK: 5
 			});
 
@@ -285,8 +285,8 @@ export function runVectorStoreContractSuite(
 				workId: 'w1',
 				documentId: 'd1',
 				chunks: [
-					makeChunk({ id: 'c-x', chunkIndex: 0, embedding: VEC.x as number[] }),
-					makeChunk({ id: 'c-y', chunkIndex: 1, embedding: VEC.y as number[] })
+					makeChunk({ id: 'c-x', chunkIndex: 0, embedding: [...VEC.x] }),
+					makeChunk({ id: 'c-y', chunkIndex: 1, embedding: [...VEC.y] })
 				]
 			});
 
