@@ -75,6 +75,14 @@ this phase._
 - [ ] **T3 (parallel with T1). Branch at a commit; fast-forward a branch.**
       **Modify** `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` — `createBranchFromSha?`,
       `updateBranchRef?` (skip the interface edit when APW-02 T10 already added them with these signatures).
+      **Landed early (recorded 2026-09-17):** APW-02 T9/T10 have **already** added both to the interface —
+      `createBranchFromSha?(owner, repo, name, sha, token)` at `git-provider.interface.ts:935` and
+      `updateBranchRef?(owner, repo, name, sha, { force: false }, token)` at `:948`, both optional, both returning
+      `Promise<GitBranch>` (matching the sibling `createBranch?`; no return type was fixed before). So the interface
+      modification above is a **skip**, and this task's remaining scope is the plugin implementation, the facade
+      passthrough and the tests — **do not re-declare the two methods**. This is a pointer, not a change of scope:
+      nothing in T3 is withdrawn, and if a different return type is ever wanted it changes in this epic **and** in
+      APW-02 in one PR (CONTRACTS §3).
       **Modify** `packages/plugins/github/src/github-api.service.ts` —
       `git.createRef({ ref: 'refs/heads/{name}', sha })`; `git.updateRef({ ref: 'heads/{name}', sha, force: false })`
       (422 not-fast-forward → typed `BranchNotFastForwardError`).

@@ -362,3 +362,21 @@ Two examples of drift seen during this task, both of which changed a golden file
 `check.mjs` re-reads the **Blueprints** at run time and prints their sha256, so Blueprint drift is
 caught automatically. It does **not** re-read the specs — a lane comparing platform output against
 these files must confirm the spec revision first, or re-derive from §3.
+
+### 8.1 Later spec revisions — the golden set was NOT regenerated (added 2026-09-17)
+
+The table in §8 is the revision the artifacts in this directory were produced against, and it stays exactly as it
+is: those outputs are still the outputs of that revision. The spec tree has moved since (the programme audit round
+added resolutions R-28…R-41, the quota/notification/threat/signal registers, and the acceptance-id reconciliation
+in `ACCEPTANCE.md`), so a comparison lane that reads a spec file today will see a newer revision than the pin:
+
+| Spec file                                | sha256 (first 16) — current | Lines | Relationship to the §8 pin                                                                       |
+| ---------------------------------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------------ |
+| `CONTRACTS.md`                           | `8dbae7149b4b7e9f`          | 726   | newer revision; the §8 pin (`5141efa2806702ad`, 702 lines) still names the golden set's revision |
+| `APW-09-upstream-pull-requests/tasks.md` | `2b1bbf4c1e543e75`          | 786   | not in the §8 table (T3 now records that APW-02 T9/T10 landed the interface half first)          |
+
+**How to read this:** the §8 hash is provenance — "what the golden outputs were generated from" — and the §8.1
+hash is a freshness check for a lane about to compare. A mismatch against §8.1 means the specs moved, **not** that
+the golden files are wrong; re-derive from §3 before concluding anything, and never edit a golden file to match a
+newer spec. Later revisions append rows to this subsection rather than replacing a hash, so every revision the
+golden set has drifted past stays readable.

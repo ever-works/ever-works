@@ -291,6 +291,31 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · a task-path METER, and the APW-09 interface handoff recorded in the spec tree.**
+  **The meter.** `docs/specs/features/app-works/tools/verify-task-paths.mjs` reads all 13 epics' `tasks.md`, extracts
+  the exact paths each task names, and reports which already exist. Building it taught the reason a naive version of
+  this is useless: the tree writes the newness marker **two ways** (`(**new**)` 212 times, `(new)` 375 times), so a
+  checker that knows only one of them reports ~1 400 "stale" paths that are simply not built yet. It is therefore
+  published as a **meter, not a defect list** — and the crisp signal it does produce is "a path a task marks as new
+  that already exists", i.e. landed surface: **APW-06 15 paths, APW-11 8, every other epic 0**, which matches exactly
+  where this branch has work. Numbers: 699 tasks, 2 667 root-anchored paths (202 package-relative ones skipped rather
+  than guessed at), 1 117 present, 1 550 absent — of which 629 are absent _because_ another task says it creates
+  them. It refuses to report at all if it parses fewer than 600 tasks or 500 paths, so a broken parser cannot look
+  like a clean tree.
+  **The handoff.** CONTRACTS.md §3 now records that APW-02 T9/T10 landed the **interface half** of APW-09 T3
+  (`createBranchFromSha?` / `updateBranchRef?`, both optional, both `Promise<GitBranch>`), that APW-09 T3 must
+  therefore **implement, facade and test** them but **not re-declare** them, and that a different return type is a
+  change in both epics in one PR. APW-09's own `tasks.md` gained the pointer. Two measured facts went in as well:
+  `packages/plugins/gitlab` does not exist here, so the plan's "every existing implementation compiles unchanged"
+  covers github-plugin + agent and not the three packages its wording implies; and `GitProviderRequestError` does not
+  set `this.name`, so `error.name === 'Error'` while `message === reason` — branch on `instanceof` or `reason`, never
+  on `name`, the opposite of `RepositoryNotReadyError`. Verified here: the spec-tree verifier is still
+  **CLEAN (1833 links, 549/549 ids)**, **R- rows 41 → 41** so nothing was withdrawn, and CONTRACTS.md's 36 changed
+  lines are **all table rows re-padded by prettier**, with the file's word count _rising_ 16 238 → 16 538. The golden
+  README gained **§8.1**, which keeps provenance honest: §8 stays the revision the golden outputs were generated from
+  (it is deliberately _not_ rewritten) and §8.1 records the current spec hashes as a **freshness** check, with the
+  reading rule — a §8.1 mismatch means the specs moved, never that a golden file is wrong.
+
 - **2026-09-18 · APW-02 T9 + T10 land: the git-provider contract grows its fork capabilities, additively.**
   **915 insertions, zero deletions**, five files: nine OPTIONAL fields on `GitRepository` (`source?`, `allowForking?`,
   `archived?`, `visibility?`, `stars?`, `sizeKb?`, `licenseSpdx?`, `empty?`, `movedFrom?`), nine OPTIONAL members on
