@@ -43,6 +43,7 @@ import { NotificationService } from '../notifications/notification.service';
 import { TaskChatService } from '../tasks-domain/task-chat.service';
 import { TasksService } from '../tasks-domain/tasks.service';
 import type { AppForkReadyOutcome } from './app-fork-ready-handler.port';
+import { computeNextUpstreamSync } from './upstream-schedule';
 
 /**
  * APW-02 (Fork lifecycle) — the Upstream state service: the one writer of
@@ -674,6 +675,23 @@ export class AppUpstreamStateService {
               : 'ready';
         const now = new Date();
 
+        /**
+         * **Plan §6.2 step 5: `readyAt` and `nextSyncAt` are written together.** A ready fork that
+         * keeps `nextSyncAt = NULL` never syncs, because the dispatcher selects rows by
+         * `nextSyncAt <= now` (`app-upstream-sync-dispatcher.service.ts`, plan §6.2) and NULL is not
+         * `<=` anything — the first scheduled sync would have to wait for something else to stamp
+         * the slot first, which nothing does until the Work is dispatched some other way. So the
+         * slot is computed here, through the same §6.4 helper the dispatcher's own `stampNextSlot`
+         * uses (the row's effective cron, the hourly clamp and this Work's stable jitter).
+         *
+         * A **failed** readiness is deliberately left unstamped rather than cleared: there is no
+         * repository to sync, and overwriting a stored slot would change a row this transition does
+         * not own. `null` is the documented "nothing scheduled" state either way (§3.1).
+         */
+        const nextSyncAt = failed
+            ? undefined
+            : (computeNextUpstreamSync(state.syncSchedule ?? null, now, workId) ?? null);
+
         await this.states.update(workId, {
             readinessState: nextState,
             readinessReason: failed ? handlerFailureReason(outcome?.reason) : null,
@@ -682,6 +700,7 @@ export class AppUpstreamStateService {
             setupPullRequestUrl: outcome?.setupPullRequestUrl ?? state.setupPullRequestUrl ?? null,
             setupPullRequestNumber:
                 outcome?.setupPullRequestNumber ?? state.setupPullRequestNumber ?? null,
+            ...(nextSyncAt === undefined ? {} : { nextSyncAt }),
         });
 
         if (!firstReady) {

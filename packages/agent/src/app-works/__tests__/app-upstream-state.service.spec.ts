@@ -613,6 +613,33 @@ describe('AppUpstreamStateService', () => {
     });
 
     describe('markReady / timeout — one event per transition', () => {
+        it('stamps nextSyncAt in the same write as readyAt (plan §6.2 step 5)', async () => {
+            // The regression this pins: `nextSyncAt` NULL is never `<= now`, so a ready fork that
+            // is not stamped here is never selected by the dispatcher — its first scheduled sync
+            // would not fire at all. Measured against the clock rather than against a constant: the
+            // helper adds this Work's stable jitter to a real cron slot, so the assertion is
+            // "some future instant", which is what the schedule means.
+            await seedWork();
+            await seedState(WORK_ID, { readinessState: 'preparing', readyAt: null });
+            const state = service();
+
+            await state.markReady(WORK_ID, { result: 'initialized' });
+
+            const stamped = await stored();
+            expect(stamped.nextSyncAt).toBeInstanceOf(Date);
+            expect((stamped.nextSyncAt as Date).getTime()).toBeGreaterThan(Date.now());
+        });
+
+        it('leaves a failed readiness unstamped — there is no repository to sync', async () => {
+            await seedWork();
+            await seedState(WORK_ID, { readinessState: 'preparing', readyAt: null });
+            const state = service();
+
+            await state.markReady(WORK_ID, { result: 'failed', reason: 'blueprint_apply_failed' });
+
+            expect(await stored()).toMatchObject({ readinessState: 'failed', nextSyncAt: null });
+        });
+
         it('emits app.fork.ready exactly once across repeated calls', async () => {
             await seedWork();
             await seedState(WORK_ID, { readinessState: 'preparing', readyAt: null });
