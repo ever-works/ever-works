@@ -61,11 +61,23 @@ import { parseKubeconfig } from './kubeconfig.parser.js';
 // delegates each of the five contract methods to the provider that owns the behaviour, exactly as the App
 // runtime members above delegate to `AppDeployer` / `AppLifecycle` / `AppStatusReader`.
 import { APP_DEPENDENCY_SIZE_DEFAULTS } from './app-dependencies/common.js';
+// APW-07 T21 — the S3-compatible object store.
+import {
+	OBJECT_STORAGE_PROVIDER_DESCRIPTOR,
+	OBJECT_STORAGE_PROVIDER_ID,
+	ObjectStorageDependencyProvider
+} from './app-dependencies/object-storage.provider.js';
 import {
 	POSTGRES_PROVIDER_DESCRIPTOR,
 	POSTGRES_PROVIDER_ID,
 	PostgresDependencyProvider
 } from './app-dependencies/postgres.provider.js';
+// APW-07 T20 — the single-replica cache.
+import {
+	REDIS_PROVIDER_DESCRIPTOR,
+	REDIS_PROVIDER_ID,
+	RedisDependencyProvider
+} from './app-dependencies/redis.provider.js';
 import {
 	appendHostToIngress,
 	buildDnsGuidance,
@@ -103,6 +115,19 @@ import type {
 } from './types.js';
 
 const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works-shared', 'k8s-works', 'custom-kubeconfig'];
+
+/**
+ * The three in-cluster dependency providers this plugin publishes — APW-07 T19, T20 and T21.
+ *
+ * They share one structural shape: `descriptor` plus the four contract methods (`supports`, `provision`,
+ * `getOutputs`, `deprovision`, `backupStatus`), so the delegation below is written once against the union
+ * rather than three times against three classes. A provider that stopped answering one of them would be a
+ * compile error here rather than a `undefined is not a function` at the first dependency of that kind.
+ */
+type AppDependencyK8sProvider =
+	| PostgresDependencyProvider
+	| RedisDependencyProvider
+	| ObjectStorageDependencyProvider;
 
 function isClusterSource(value: unknown): value is ClusterSource {
 	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);
@@ -366,13 +391,16 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	readonly supportsApps = true;
 
 	/**
-	 * APW-07 T19 — the dependency providers this plugin answers for (plan §4.9:570).
+	 * APW-07 T19/T20/T21 — the dependency providers this plugin answers for (plan §4.9:570, §4.9:617-618).
 	 *
-	 * One entry today: `k8s-inline-postgres`. T20 (`k8s-inline-redis`) and T21 (`k8s-inline-minio`) append
-	 * theirs to this list, and the AppDependencyFacadeService orders the whole set by `preference` — which is
-	 * why the list is a `readonly` array of descriptors rather than three named fields.
+	 * All three in-cluster providers, and the AppDependencyFacadeService orders the whole set by
+	 * `preference` — which is why the list is a `readonly` array of descriptors rather than three named fields.
 	 */
-	readonly dependencyProviders: readonly AppDependencyProviderDescriptor[] = [POSTGRES_PROVIDER_DESCRIPTOR];
+	readonly dependencyProviders: readonly AppDependencyProviderDescriptor[] = [
+		POSTGRES_PROVIDER_DESCRIPTOR,
+		REDIS_PROVIDER_DESCRIPTOR,
+		OBJECT_STORAGE_PROVIDER_DESCRIPTOR
+	];
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
 
@@ -591,10 +619,21 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private readonly appLifecycle: AppLifecycle;
 	private readonly appClusterChecker: AppClusterChecker;
 	/**
-	 * APW-07 T19's provider (plan §4.9:568-633). Built over the same `KubernetesApiService` the App runtime
-	 * members use, so a dependency call and a deploy reach one client.
+	 * APW-07 T19/T20/T21's three providers (plan §4.9:568-633). Built over the same `KubernetesApiService`
+	 * the App runtime members use, so a dependency call and a deploy reach one client.
 	 */
 	private readonly postgresDependencies: PostgresDependencyProvider;
+	/** T20's provider (`k8s-inline-redis`). */
+	private readonly redisDependencies: RedisDependencyProvider;
+	/** T21's provider (`k8s-inline-minio`). */
+	private readonly objectStorageDependencies: ObjectStorageDependencyProvider;
+	/**
+	 * The providers by id — the one lookup {@link dependencyProviderFor} performs, so adding a provider is one
+	 * entry in the published descriptor list and one entry here, and the two cannot drift silently: a
+	 * descriptor without an instance answers `null` (`providerNotSupported`), never another provider's
+	 * implementation.
+	 */
+	private readonly dependencyProviderInstances: Readonly<Partial<Record<string, AppDependencyK8sProvider>>>;
 	/** §6.1 step 2's DNS seam. Unset in production (the guard falls back to `node:dns`). */
 	private readonly clusterAddressResolver?: KubeconfigDnsResolver;
 
@@ -617,6 +656,13 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		this.appLifecycle = new AppLifecycle(this.api);
 		this.appClusterChecker = new AppClusterChecker(this.api);
 		this.postgresDependencies = new PostgresDependencyProvider(this.api);
+		this.redisDependencies = new RedisDependencyProvider(this.api);
+		this.objectStorageDependencies = new ObjectStorageDependencyProvider(this.api);
+		this.dependencyProviderInstances = {
+			[POSTGRES_PROVIDER_ID]: this.postgresDependencies,
+			[REDIS_PROVIDER_ID]: this.redisDependencies,
+			[OBJECT_STORAGE_PROVIDER_ID]: this.objectStorageDependencies
+		};
 		this.clusterAddressResolver = opts.clusterAddressResolver;
 	}
 
@@ -1485,15 +1531,16 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * The provider behind one id, or `null`.
 	 *
 	 * One lookup path for all five members, so "which provider answers" is answered once: the descriptor list is
-	 * the published contract and this map is what implements it. T20/T21 add one entry to the list and one line
-	 * here; until then an id this plugin does not publish is `null` — never a fallback to another provider,
+	 * the published contract and {@link dependencyProviderInstances} is what implements it. An id this plugin
+	 * does not publish — or publishes without an instance — is `null`, never a fallback to another provider,
 	 * because provisioning a dependency with an implementation the owner did not choose is the thing
 	 * `AppDependencyFacadeService.select` refuses (plan §4.8:543-544).
 	 */
-	private dependencyProviderFor(providerId: string): PostgresDependencyProvider | null {
-		if (providerId !== POSTGRES_PROVIDER_ID) return null;
+	private dependencyProviderFor(providerId: string): AppDependencyK8sProvider | null {
+		const provider = this.dependencyProviderInstances[providerId];
+		if (!provider) return null;
 		const published = (this.dependencyProviders ?? []).some((entry) => entry.id === providerId);
-		return published ? this.postgresDependencies : null;
+		return published ? provider : null;
 	}
 
 	/**

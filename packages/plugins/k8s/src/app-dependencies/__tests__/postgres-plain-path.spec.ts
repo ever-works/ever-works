@@ -1093,7 +1093,9 @@ describe('T19 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 	it('publishes the postgres descriptor, with the plan’s preference and backup policy', () => {
 		const plugin = new KubernetesPlugin();
 
-		expect(plugin.dependencyProviders).toEqual([POSTGRES_PROVIDER_DESCRIPTOR]);
+		// T20/T21 appended theirs to this list (plan §4.9:570 — "dependencyProviders for the three ids"); the
+		// full three-entry list and its order are pinned by `object-storage.spec.ts`, which owns T21.
+		expect(plugin.dependencyProviders).toContainEqual(POSTGRES_PROVIDER_DESCRIPTOR);
 		expect(plugin.dependencyProviders[0]).toEqual({
 			id: 'k8s-inline-postgres',
 			kind: 'postgres',
@@ -1116,7 +1118,9 @@ describe('T19 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 			supported: false,
 			reason: 'providerNotSupported'
 		});
-		expect(await plugin.supports('redis', 'your-cluster', context())).toEqual({
+		// `redis` and `objectStorage` are served by this plugin too since T20/T21 (each has its own spec);
+		// `smtp` is `app-dependencies-external`'s, so this plugin answers for nothing there.
+		expect(await plugin.supports('smtp', 'your-cluster', context())).toEqual({
 			supported: false,
 			reason: 'providerNotSupported'
 		});
@@ -1138,14 +1142,16 @@ describe('T19 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 			state: 'released'
 		});
 
-		// An unpublished provider id is refused, never served by a fallback (plan §4.8:543-544).
-		expect(await plugin.provision('k8s-inline-minio', context())).toMatchObject({
+		// An unpublished provider id is refused, never served by a fallback (plan §4.8:543-544). `s3-external`
+		// is `app-dependencies-external`'s provider, so no entry here will ever publish it — unlike
+		// `k8s-inline-minio` and `k8s-inline-redis`, which T20/T21 have since registered.
+		expect(await plugin.provision('s3-external', context())).toMatchObject({
 			state: 'failed',
 			reason: 'providerNotSupported'
 		});
-		await expect(plugin.getOutputs('k8s-inline-minio', context())).rejects.toThrow(/k8s-inline-minio/);
-		expect(await plugin.backupStatus('k8s-inline-minio', context())).toEqual({ state: 'none' });
-		expect(await plugin.deprovision('k8s-inline-minio', context(), { deleteData: true })).toEqual({
+		await expect(plugin.getOutputs('s3-external', context())).rejects.toThrow(/s3-external/);
+		expect(await plugin.backupStatus('s3-external', context())).toEqual({ state: 'none' });
+		expect(await plugin.deprovision('s3-external', context(), { deleteData: true })).toEqual({
 			state: 'released'
 		});
 	});
