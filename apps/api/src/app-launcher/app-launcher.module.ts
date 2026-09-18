@@ -1,9 +1,10 @@
-import { Module, type Type } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod, type Type } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AppLauncherModule as AgentAppLauncherModule } from '@ever-works/agent/app-launcher';
 import { AppLauncherController, AppLauncherPlatformsController } from './app-launcher.controller';
 import { E2eSeedController, isE2eAppLauncherSeedEnabled } from './e2e-seed.controller';
 import { AppLauncherEnabledGuard } from './guards/app-launcher-enabled.guard';
+import { LauncherDelegatedCorsMiddleware } from './launcher-delegated-cors.middleware';
 import { PlatformCatalogService } from './platform-catalog.service';
 
 /**
@@ -77,4 +78,31 @@ if (isE2eAppLauncherSeedEnabled()) {
     providers: [AppLauncherEnabledGuard, PlatformCatalogService],
     exports: [PlatformCatalogService],
 })
-export class AppLauncherModule {}
+export class AppLauncherModule implements NestModule {
+    /**
+     * APW-11 T26 (plan §4.7): the delegated-read CORS middleware, applied to the two launcher read
+     * routes **only** — `GET|OPTIONS /api/me/apps` and `/api/app-launcher/platforms`.
+     *
+     * Two deliberate exclusions, both of which a test in the middleware's spec pins:
+     *   - `PUT /api/me/apps/preferences` — the arrangement write is a session call. A cross-origin
+     *     write is exactly what the delegated surface must not allow, so the middleware is not applied
+     *     to it and a browser from any origin gets no CORS headers there.
+     *   - **every other route in the API** — the middleware lives in this module and is applied through
+     *     `forRoutes`, so it cannot leak into another module's routes. `ScopeResolverMiddleware` keeps
+     *     its global `api/{*splat}` registration untouched.
+     *
+     * The paths are spelled in full (`api/…`) because these controllers declare their own full paths
+     * (`apps/api/src/app-launcher/app-launcher.controller.ts:251,413`) and the app sets no global
+     * prefix — the same convention `ScopeResolverMiddleware` uses.
+     */
+    configure(consumer: MiddlewareConsumer): void {
+        consumer
+            .apply(LauncherDelegatedCorsMiddleware)
+            .forRoutes(
+                { path: 'api/me/apps', method: RequestMethod.GET },
+                { path: 'api/me/apps', method: RequestMethod.OPTIONS },
+                { path: 'api/app-launcher/platforms', method: RequestMethod.GET },
+                { path: 'api/app-launcher/platforms', method: RequestMethod.OPTIONS },
+            );
+    }
+}
