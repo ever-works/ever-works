@@ -231,3 +231,6 @@ export * from './workspace-backup.entity';
 // launcher item, keyed by a portable `scopeKey` rather than a nullable
 // organization id. Written only by the launcher's own save path.
 export * from './app-launcher-preference.entity';
+// APW-02 Fork lifecycle — one row per App Work: readiness, Actions hygiene,
+// the sync schedule, the divergence reading and the manual-sync allowance.
+export * from './work-upstream-state.entity';

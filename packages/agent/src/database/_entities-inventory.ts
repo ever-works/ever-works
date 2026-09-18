@@ -181,6 +181,9 @@ import { SharedView } from '../entities/shared-view.entity';
 import { WorkspaceBackup } from '../entities/workspace-backup.entity';
 // APW-11 App Launcher — one person's arrangement of one launcher item.
 import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
+// APW-02 Fork lifecycle — the per-App-Work upstream state row. Concrete path,
+// never the barrel: see the module docstring.
+import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 
 import {
     PluginEntity,
@@ -473,4 +476,7 @@ export const ENTITIES = [
     // columns: the active Organization must never be stamped onto a 'global'
     // row every Organization shares.
     AppLauncherPreference,
+    // APW-02 Fork lifecycle — the Upstream state of one App Work: readiness,
+    // Actions hygiene, schedule, divergence and the manual-sync allowance.
+    WorkUpstreamState,
 ];

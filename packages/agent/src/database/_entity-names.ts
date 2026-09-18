@@ -260,6 +260,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkProposal',
     'WorkProposalAttachment',
     'WorkSchedule',
+    // APW-02 Fork lifecycle — one per App Work; readiness through sync.
+    'WorkUpstreamState',
     'Workflow',
     'WorkflowRun',
     'WorkspaceBackup',

@@ -121,3 +121,7 @@ export * from './repositories/workspace-backup.repository';
 // `DatabaseModule` itself wires, and its drift check fails on an entry that is
 // not a provider there.
 export * from './repositories/app-launcher-preference.repository';
+// APW-02 Fork lifecycle — the Upstream state of one App Work (readiness,
+// Actions hygiene, schedule, divergence, manual-sync allowance). Also
+// feature-owned and wired by the App Works module (T15), for the same reason.
+export * from './repositories/work-upstream-state.repository';
