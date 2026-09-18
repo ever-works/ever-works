@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1272 · absent: 1395 · of the absent, another task says it creates them: 908
+present: 1406 · absent: 1261 · of the absent, another task says it creates them: 848
 
-## LANDED SURFACE — marked "new", already in the repository (104)
+## LANDED SURFACE — marked "new", already in the repository (136)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -24,13 +24,29 @@ present: 1272 · absent: 1395 · of the absent, another task says it creates the
 - APW-02-fork-lifecycle T16 — `packages/plugins/github/src/github-errors.ts`
 - APW-02-fork-lifecycle T23 — `packages/agent/src/app-works/app-fork-ready-handler.port.ts`
 - APW-02-fork-lifecycle T23 — `packages/agent/src/app-works/app-upstream-state.service.ts`
+- APW-02-fork-lifecycle T24 — `packages/agent/src/app-works/app-fork-readiness.service.ts`
+- APW-02-fork-lifecycle T25 — `packages/agent/src/app-works/app-actions-hygiene.service.ts`
+- APW-02-fork-lifecycle T26 — `packages/agent/src/app-works/upstream-schedule.ts`
+- APW-02-fork-lifecycle T26 — `packages/agent/src/app-works/app-upstream-sync.service.ts`
+- APW-02-fork-lifecycle T26 — `packages/agent/src/app-works/app-upstream-conflict.copy.ts`
+- APW-02-fork-lifecycle T27 — `apps/api/src/app-works/app-works.module.ts`
+- APW-02-fork-lifecycle T28 — `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts`
+- APW-02-fork-lifecycle T30 — `apps/web/src/components/works/app/AppUpstreamCard.tsx`
+- APW-03-app-spec-and-catalog T2 — `packages/agent/src/events/app-spec-applied.event.ts`
 - APW-03-app-spec-and-catalog T3 — `packages/agent/src/works-config/schema/app-spec.schema.ts`
 - APW-03-app-spec-and-catalog T4 — `packages/agent/src/works-config/schema/app-spec.refs.ts`
 - APW-03-app-spec-and-catalog T5 — `packages/agent/src/works-config/schema/app-spec.rules.ts`
 - APW-03-app-spec-and-catalog T6 — `packages/agent/src/works-config/schema/app-spec.issues.ts`
 - APW-03-app-spec-and-catalog T6 — `packages/agent/src/works-config/schema/app-spec.validate.ts`
 - APW-03-app-spec-and-catalog T8 — `packages/agent/src/works-config/schema/emit-app-spec-json-schema.ts`
+- APW-03-app-spec-and-catalog T9 — `packages/agent/src/entities/work-app-spec-state.entity.ts`
+- APW-03-app-spec-and-catalog T10 — `apps/api/src/migrations/1792030000000-CreateWorkAppSpecStates.ts`
+- APW-03-app-spec-and-catalog T11 — `packages/agent/src/database/repositories/work-app-spec-state.repository.ts`
+- APW-03-app-spec-and-catalog T12 — `packages/agent/src/app-spec/app-spec.service.ts`
+- APW-03-app-spec-and-catalog T12 — `packages/agent/src/app-spec/app-spec-hash.ts`
+- APW-03-app-spec-and-catalog T13 — `packages/agent/src/tasks/app-spec-evaluate.types.ts`
 - APW-05-builds T1 — `packages/contracts/src/apps/builds.ts`
+- APW-05-builds T2 — `packages/plugin/src/contracts/capabilities/build.interface.ts`
 - APW-06-app-runtime T1 — `packages/contracts/src/apps/app-runtime.ts`
 - APW-06-app-runtime T2 — `packages/plugin/src/contracts/capabilities/app-deployment.types.ts`
 - APW-06-app-runtime T2 — `packages/plugin/src/contracts/__tests__/app-deployment.types.spec.ts`
@@ -50,6 +66,14 @@ present: 1272 · absent: 1395 · of the absent, another task says it creates the
 - APW-06-app-runtime T20 — `packages/agent/src/facades/app-runtime.facade.ts`
 - APW-06-app-runtime T20 — `packages/agent/src/app-runtime/worker-context.ts`
 - APW-06-app-runtime T20 — `packages/agent/src/facades/__tests__/app-runtime.facade.spec.ts`
+- APW-06-app-runtime T21 — `packages/agent/src/app-runtime/app-deploy-preconditions.service.ts`
+- APW-06-app-runtime T21 — `packages/agent/src/app-runtime/app-license-gate.ts`
+- APW-06-app-runtime T22 — `packages/agent/src/app-runtime/app-render-input.builder.ts`
+- APW-06-app-runtime T22 — `packages/agent/src/app-runtime/__tests__/app-render-input.builder.spec.ts`
+- APW-06-app-runtime T23 — `packages/agent/src/app-runtime/app-public-smoke.service.ts`
+- APW-06-app-runtime T23 — `packages/agent/src/app-runtime/__tests__/app-public-smoke.service.spec.ts`
+- APW-06-app-runtime T24 — `packages/agent/src/app-runtime/app-deploy-request.service.ts`
+- APW-06-app-runtime T24 — `packages/agent/src/app-runtime/__tests__/app-deploy-request.service.spec.ts`
 - APW-06-app-runtime T28 — `packages/agent/src/events/index.ts`
 - APW-06-app-runtime T58 — `packages/agent/src/app-runtime/app-runtime-deletion.service.ts`
 - APW-06-app-runtime T58 — `packages/agent/src/app-runtime/__tests__/app-runtime-deletion.service.spec.ts`
@@ -66,7 +90,15 @@ present: 1272 · absent: 1395 · of the absent, another task says it creates the
 - APW-07-app-env-and-dependencies T10 — `packages/agent/src/app-env/generators.ts`
 - APW-07-app-env-and-dependencies T11 — `packages/agent/src/app-env/validation.ts`
 - APW-07-app-env-and-dependencies T12 — `packages/agent/src/app-env/dotenv-parser.ts`
+- APW-07-app-env-and-dependencies T13 — `packages/agent/src/app-env/app-env.service.ts`
+- APW-07-app-env-and-dependencies T13 — `packages/agent/src/app-env/app-env.module.ts`
+- APW-07-app-env-and-dependencies T14 — `packages/agent/src/app-env/app-env.resolver.ts`
+- APW-07-app-env-and-dependencies T15 — `packages/agent/src/app-env/app-env.listener.ts`
 - APW-07-app-env-and-dependencies T16 — `packages/agent/src/facades/app-dependency.facade.ts`
+- APW-07-app-env-and-dependencies T17 — `packages/agent/src/tasks/app-dependency-provision-dispatcher.ts`
+- APW-07-app-env-and-dependencies T19 — `packages/plugins/k8s/src/app-dependencies/common.ts`
+- APW-07-app-env-and-dependencies T20 — `packages/plugins/k8s/src/app-dependencies/redis.provider.ts`
+- APW-07-app-env-and-dependencies T21 — `packages/plugins/k8s/src/app-dependencies/object-storage.provider.ts`
 - APW-07-app-env-and-dependencies T35 — `packages/contracts/src/apps/tenant-postgres-ddl.ts`
 - APW-09-upstream-pull-requests T1 — `packages/plugins/github/src/__tests__/github-api.service.cross-repo.spec.ts`
 - APW-09-upstream-pull-requests T4 — `packages/agent/src/facades/__tests__/git.facade.member-token.spec.ts`
@@ -120,13 +152,13 @@ present: 1272 · absent: 1395 · of the absent, another task says it creates the
 
 | Epic | Named | Landed (marked new, exists) |
 | ---- | ----- | --------------------------- |
-| APW-01-app-work-kind | 72 | 3 |
-| APW-02-fork-lifecycle | 95 | 10 |
-| APW-03-app-spec-and-catalog | 160 | 6 |
+| APW-01-app-work-kind | 71 | 3 |
+| APW-02-fork-lifecycle | 47 | 18 |
+| APW-03-app-spec-and-catalog | 140 | 13 |
 | APW-04-app-provisioner | 124 | 0 |
-| APW-05-builds | 123 | 1 |
-| APW-06-app-runtime | 163 | 24 |
-| APW-07-app-env-and-dependencies | 91 | 13 |
+| APW-05-builds | 122 | 2 |
+| APW-06-app-runtime | 155 | 32 |
+| APW-07-app-env-and-dependencies | 67 | 21 |
 | APW-08-evolve-loop | 125 | 0 |
 | APW-09-upstream-pull-requests | 91 | 2 |
 | APW-10-apps-hosting-tier | 151 | 1 |
@@ -134,21 +166,21 @@ present: 1272 · absent: 1395 · of the absent, another task says it creates the
 | APW-12-ever-id | 123 | 1 |
 | APW-13-golden-paths | 111 | 0 |
 
-## ABSENT PATHS (1395) — grouped by epic
+## ABSENT PATHS (1261) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
-- APW-03-app-spec-and-catalog: 154
 - APW-10-apps-hosting-tier: 150
-- APW-06-app-runtime: 139
+- APW-03-app-spec-and-catalog: 127
 - APW-08-evolve-loop: 125
 - APW-04-app-provisioner: 124
-- APW-05-builds: 122
+- APW-06-app-runtime: 123
 - APW-12-ever-id: 122
+- APW-05-builds: 120
 - APW-13-golden-paths: 111
 - APW-09-upstream-pull-requests: 89
-- APW-02-fork-lifecycle: 85
-- APW-07-app-env-and-dependencies: 78
-- APW-01-app-work-kind: 69
+- APW-01-app-work-kind: 68
+- APW-07-app-env-and-dependencies: 46
+- APW-02-fork-lifecycle: 29
 - APW-11-app-launcher: 27
