@@ -311,6 +311,36 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the fork lookup becomes three steps, and the launcher switch gets one reader.**
+  **APW-02 T17/T18** (github-plugin 226 → **255 tests**). `findExistingFork` was only the plan's step 1; it is now the
+  contract-shaped public method — the same-name identity check (previous body preserved verbatim, shared through a
+  pure `isForkOfUpstream`), then GraphQL filtered by owner, then a REST listing bounded at **three pages**.
+  `forkRepository` keeps its signature and calls the same orchestrator before every create, which is what makes the
+  lookup a capability rather than a private helper of the create path. T18 adds sync (409 → `conflict`,
+  422 → `unprocessable`), divergence with the exact `owner:branch...branch` basehead, and branch refs —
+  `updateBranchRef` **always** sends `force: false`, with the caller's option deliberately unread.
+  The Done-when is asserted, not assumed: the happy path issues exactly **1 REST + 1 GraphQL + 1 REST**, and "nothing
+  found" is exactly three listing calls, pages [1, 2, 3]. Five perturbations red, restored to `DA0EF3C3…`.
+  🛑 **Three things plan §4.3 gets wrong, found with read-only `gh api` probes and recorded:** (1) `forkHeadSha`
+  **cannot** come from a `per_page: 1` compare — compare commits are **chronological**, so that single commit is the
+  OLDEST of the range, and unpaginated the list caps at 250 (probed on `nodejs/node`: `per_page=1` → `f131cca0…`
+  while the branch tip is `d1ef63f8…`), so one extra branch read supplies the head; (2) GraphQL `affiliations` is
+  **viewer-relative**, so step 2 finds a renamed fork only when the target owner is the token's own user or one of
+  its orgs — every other owner relies on step 3; (3) a 200 merge-upstream with `merge_type` absent is reported as
+  `merged`, the outcome that never under-reports a change, and `up_to_date` is only claimed from `none`.
+  `base_commit.sha` as the upstream head **is** correct as written (it equals `main`'s tip, distinct from
+  `merge_base_commit`).
+  **APW-11 T9's config half** — `config.appLauncher.isEnabled()` now exists and **both** readers go through it: the
+  guard's seam and `features.appLauncherEnabled` on `GET /api/config`, with `apps/api/src/config/constants.ts`
+  _delegating_ rather than re-reading, so the two agree by construction (APW11-G12).
+  ⚖️ **A contradiction inside T9's own task text, resolved deliberately and written down:** its guard line says
+  `=== 'true'` while its accessor line asks for the platform's `truthy()` set. The **strict** reading wins — the
+  controller spec already pins `'1'`/`'yes'`/`'TRUE'`/`''` as OFF, the "no installation stops working" rationale
+  cannot apply to a variable this epic introduces (all three manifests ship `'false'`), and a surface-wide gate fails
+  closed. One function decides it, which is the reason the accessor exists. Proven by two perturbations restored to
+  `39E39C32…` / `114BE3CD…`: failing **open** when unset is 5 red, and making the controller stop delegating (back to
+  `truthy()`) is 2 red — the two readers disagreeing is itself a test failure.
+
 - **2026-09-18 · the fork lifecycle gets its state row, the launcher gets its routes: APW-02 T12–T14 + T15, APW-11 T9.**
   **APW-02 T12/T13/T14 — `WorkUpstreamState`** (entity 308 lines, migration 317, repository 483, specs 35 + 44 + 14;
   **2483 insertions, zero deletions**). The entity spec _and_ the migration spec both pin the **column count and the
