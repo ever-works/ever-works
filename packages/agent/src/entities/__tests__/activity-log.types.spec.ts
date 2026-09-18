@@ -147,6 +147,10 @@ describe('activity-log.types', () => {
             ['APP_FORK', 'app_fork'],
             ['APP_ACTIONS', 'app_actions'],
             ['APP_UPSTREAM', 'app_upstream'],
+            // APW-03 App spec (T12, Resolution R-2) — the App spec family. The
+            // dotted CONTRACTS §6 events (`app.spec.validated`,
+            // `app.spec.invalid`, `app.spec.applied`) are stored in `action`.
+            ['APP_SPEC', 'app_spec'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -442,7 +446,20 @@ describe('activity-log.types', () => {
             //    for the same derived-complement reason as `app_launcher`
             //    above. The count moves by exactly the three members this task
             //    appends: no existing pair is renamed, retyped or removed.
-            expect(literals).toHaveLength(204);
+            //
+            // +1 app_spec (APW-03 App spec, T12 — Resolution R-2's first family:
+            //    the App spec read true, with the dotted CONTRACTS §6 event in
+            //    `action`) — this branch's own addition, disjoint from everything
+            //    the branches above carry, and COUNTED from the merged enum the
+            //    same way -> 205. It carries its `FEED_KIND_RULES` row in
+            //    `activity-log/feed-kind.ts` in the same change (program contract
+            //    R-34; `feed-kind.spec.ts:14-19` fails on a member without one),
+            //    and the Shared-view classification needs no edit for the same
+            //    derived-complement reason as `app_launcher` above. T12 appends
+            //    THIS member and no other: APW-03 T2 owns `app_blueprint` and
+            //    `app_license` and has not landed, so when it does it appends its
+            //    two and counts 207 — never this one again.
+            expect(literals).toHaveLength(205);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

@@ -75,3 +75,8 @@ export * from './workspace-backup-sweeper.task';
 // production unless the operator attested the worker's isolation
 // (`EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`).
 export * from './app-dependency-provision.task';
+// APW-03 T13 — one App spec evaluation of one App Work. Delegates to the
+// runtime-neutral handler in `@ever-works/agent/tasks` and resolves
+// `AppSpecService` through the internal RPC channel, because FR-90 puts the
+// evaluation, its writes and its `app.spec.applied` event in the API process.
+export * from './app-spec-evaluate.task';

@@ -135,3 +135,12 @@ export * from './workspace-backup-dispatcher';
 // dropped provision leaves a card at "Provisioning" with nothing behind it.
 export * from './app-dependency-provision.types';
 export * from './app-dependency-provision-dispatcher';
+
+// APW-03 T13 — the `app-spec-evaluate` job: the dispatcher token, its payload
+// and the runtime-neutral handler + job id (`app-works-jobs.ts`) every provider
+// registers. A `null` dispatch runs the handler IN-PROCESS for this job id only
+// (plan §6.1:661-662, FR-90), which is what makes the emit side of
+// `AppSpecAppliedEvent` reach the API-process listeners.
+export * from './app-spec-evaluate.types';
+export * from './app-spec-evaluate-dispatcher';
+export * from './app-works-jobs';

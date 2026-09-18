@@ -73,6 +73,22 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // entry.
     [ActivityActionType.APP_LAUNCHER]: 'work',
 
+    // APW-03 (App spec) — Resolution R-2's first family (R-34: every new
+    // `ActivityActionType` member gets an explicit bucket here, or
+    // `feed-kind.spec.ts:14-19` fails). `deliveryWhenCompleted` is the
+    // deliberate bucket: applying the App spec is what makes a Work's declared
+    // build and runtime real (`app.spec.applied`, plan §2.3), so it reads as
+    // `work` while an evaluation is in flight and `delivery` once it has
+    // landed — the same shape as the generation and deployment families above.
+    // `app.spec.invalid` is written with `ActivityStatus.FAILED`, and
+    // `resolveFeedKind` classifies any failed status as a `problem` before it
+    // consults this table, so a spec error surfaces as a problem with no second
+    // rule. The dotted `action` values of the family
+    // (`app.spec.validated` / `app.spec.invalid` / `app.spec.applied`) are
+    // Resolution R-2's names and never appear here — the bucket is per
+    // `actionType`.
+    [ActivityActionType.APP_SPEC]: 'deliveryWhenCompleted',
+
     // Plugins
     [ActivityActionType.PLUGIN_ENABLED]: 'system',
     [ActivityActionType.PLUGIN_DISABLED]: 'system',

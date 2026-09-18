@@ -1,6 +1,7 @@
 import type { Provider } from '@nestjs/common';
 import type { IJobRuntimeProvider } from '@ever-works/plugin';
 import { APP_DEPENDENCY_PROVISION_DISPATCHER } from './app-dependency-provision-dispatcher';
+import { APP_SPEC_EVALUATE_DISPATCHER } from './app-spec-evaluate-dispatcher';
 import { KB_BACKFILL_SKELETON_DISPATCHER } from './kb-backfill-skeleton-dispatcher';
 import { KB_EMBED_DOCUMENT_DISPATCHER } from './kb-embed-document-dispatcher';
 import { KB_MIRROR_DOCUMENT_DISPATCHER } from './kb-mirror-document-dispatcher';
@@ -145,6 +146,10 @@ export class InMemoryJobRuntimeProviderRegistry implements JobRuntimeProviderReg
  */
 export const DISPATCHER_SYMBOLS: readonly symbol[] = [
     APP_DEPENDENCY_PROVISION_DISPATCHER,
+    // APW-03 T13 — evaluates one App Work's App spec. Bound like every other
+    // dispatcher; `null` (no runtime) makes the CALLER run the handler
+    // in-process, which is the plan §6.1:661-662 rule for this job id alone.
+    APP_SPEC_EVALUATE_DISPATCHER,
     KB_BACKFILL_SKELETON_DISPATCHER,
     KB_EMBED_DOCUMENT_DISPATCHER,
     KB_MIRROR_DOCUMENT_DISPATCHER,
@@ -182,10 +187,11 @@ export const DISPATCHER_SYMBOLS: readonly symbol[] = [
  *
  * Provider arity is pinned by COUNTING {@link DISPATCHER_SYMBOLS} (the
  * original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER`, develop's
- * `ROSTER_PROVISION_DISPATCHER`, AW-22's `WORKSPACE_BACKUP_DISPATCHER` and
- * APW-07's `APP_DEPENDENCY_PROVISION_DISPATCHER`) — every one of them is
+ * `ROSTER_PROVISION_DISPATCHER`, AW-22's `WORKSPACE_BACKUP_DISPATCHER`,
+ * APW-07's `APP_DEPENDENCY_PROVISION_DISPATCHER` and APW-03 T13's
+ * `APP_SPEC_EVALUATE_DISPATCHER` — every one of them is
  * verified by `__tests__/job-runtime.providers.spec.ts`, which asserts
- * `providers.length === DISPATCHER_SYMBOLS.length`. COUNT the array after
+ * `providers.length === DISPATCHER_SYMBOLS.length`). COUNT the array after
  * every merge rather than adding two branches' numbers together.
  *
  * @param opts Optional `symbols` filter — when supplied, only those

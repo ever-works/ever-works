@@ -439,6 +439,31 @@ export enum ActivityActionType {
     APP_FORK = 'app_fork',
     APP_ACTIONS = 'app_actions',
     APP_UPSTREAM = 'app_upstream',
+    // APW-03 (App spec, Apps catalog and license gate) — Resolution R-2's
+    // first family: the App spec read true. The dotted CONTRACTS §6 event goes
+    // in `action` (`app.spec.validated`, `app.spec.invalid`, `app.spec.applied`
+    // — plan §6.2:666-669) and `details` carry `{ commitSha, errorCount,
+    // warningCount, codes: first 10 codes }` or the applied transition's
+    // `{ commitSha, previousCommitSha, specHash, addedDependencies,
+    // changedEnvNames, changedBlocks }`. Codes, counts and shas only: no
+    // secret value and no `env` value ever reaches a row (R8, FR-6).
+    //
+    // Additive member — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Program contract R-34 (Activity completeness) is
+    // satisfied by this member plus its `FEED_KIND_RULES` entry in
+    // `packages/agent/src/activity-log/feed-kind.ts` (`feed-kind.spec.ts:14-19`
+    // fails on a member without one); the Shared-view classification needs no
+    // edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
+    // the publishable allow-list, so this member is unpublished by construction.
+    //
+    // 🛑 APW-03 T2 owns APP_BLUEPRINT = 'app_blueprint' and
+    // APP_LICENSE = 'app_license' and has NOT landed. T12 needs this one member
+    // (its Activity rows are written with `actionType: APP_SPEC`) and appends it
+    // here rather than declaring a second name for the same family. When T2
+    // lands it appends its two and must NOT append this one again (a duplicate
+    // enum member is a TypeScript error) — its ledger comment should count this
+    // member as already present.
+    APP_SPEC = 'app_spec',
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { IJobRuntimeProvider, JobRuntimeDispatchers } from '@ever-works/plugin';
 import { APP_DEPENDENCY_PROVISION_DISPATCHER } from '../app-dependency-provision-dispatcher';
+import { APP_SPEC_EVALUATE_DISPATCHER } from '../app-spec-evaluate-dispatcher';
 import { KB_BACKFILL_SKELETON_DISPATCHER } from '../kb-backfill-skeleton-dispatcher';
 import { KB_EMBED_DOCUMENT_DISPATCHER } from '../kb-embed-document-dispatcher';
 import { KB_MIRROR_DOCUMENT_DISPATCHER } from '../kb-mirror-document-dispatcher';
@@ -140,7 +141,8 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // COUNTED off the live `DISPATCHER_SYMBOLS` list, never a magic
             // number: the count has moved three times in this file's life (11 →
             // 13 on develop, → 14 with AW-22's WORKSPACE_BACKUP_DISPATCHER, → 15
-            // with APW-07's APP_DEPENDENCY_PROVISION_DISPATCHER), and a literal
+            // with APW-07's APP_DEPENDENCY_PROVISION_DISPATCHER, → 16 with
+            // APW-03 T13's APP_SPEC_EVALUATE_DISPATCHER), and a literal
             // here is exactly what let a merge add a dispatcher without the
             // provider count following it. The explicit symbol-set assertion
             // below is what pins the MEMBERSHIP; this pins the ARITY against
@@ -157,11 +159,15 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 15-symbol list is the actual invariant we care about — it is
+            // 16-symbol list is the actual invariant we care about — it is
             // also what keeps `DISPATCHER_SYMBOLS` itself from silently
             // losing an entry (the arity assertion above would still pass).
+            // Sixteen since APW-03 T13 added `APP_SPEC_EVALUATE_DISPATCHER`
+            // (fifteen before it — COUNTED off `DISPATCHER_SYMBOLS`, never
+            // added up from a branch's own number).
             const expected = new Set<symbol>([
                 APP_DEPENDENCY_PROVISION_DISPATCHER,
+                APP_SPEC_EVALUATE_DISPATCHER,
                 KB_BACKFILL_SKELETON_DISPATCHER,
                 KB_EMBED_DOCUMENT_DISPATCHER,
                 KB_MIRROR_DOCUMENT_DISPATCHER,
