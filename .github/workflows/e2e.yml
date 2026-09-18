@@ -456,6 +456,21 @@ jobs:
           # than in the default minutes. Honoured only outside production
           # (CONTRACTS §7, clamped 5 000–900 000).
           EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS: '15000'
+          # APW-06 T32 — the App runtime worker started earlier in this step
+          # (`app-runtime:local-worker`) reaches the API's internal RPC channel with
+          # these two. The worker defaults the URL; the SECRET is deliberately never
+          # defaulted, because an unauthenticated internal channel is the one thing
+          # that must not exist. The API reads the same variable names.
+          #
+          # Without them the worker starts DEGRADED rather than failing the step: its
+          # `/health` answers 200 with `{"status":"degraded","boot":{"ok":false,…}}` so
+          # the readiness gate above still passes and no shard dies at "Starting the App
+          # runtime worker", while every `POST /run` answers 503
+          # `worker_context_unavailable` — the state in which fork readiness reports
+          # `dispatch_unavailable` and every App cluster call is refused by name.
+          # CI-only value, obviously fake.
+          TRIGGER_INTERNAL_API_URL: http://127.0.0.1:3100/internal/trigger
+          TRIGGER_INTERNAL_SECRET: ever-works-e2e-trigger-internal-secret-not-a-real-credential
           # E2E-only escape hatch (hard-gated off in production â€” ignored
           # unless NODE_ENV !== 'production'). Without a real billing
           # integration wired in, the only path to a PAID plan is the
