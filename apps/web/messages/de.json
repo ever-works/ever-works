@@ -5265,6 +5265,16 @@
                     }
                 },
                 "generalSettings": "Allgemeine Einstellungen",
+                "appLauncher": {
+                    "title": "Im App-Starter anzeigen",
+                    "description": "Listet die Live-Adresse dieses Werks im App-Starter der Mitglieder auf. Die Website wird dadurch weder veröffentlicht noch erhält jemand Zugriff darauf.",
+                    "disabledNotLive": "Verfügbar, sobald dieses Werk eine Live-Adresse hat.",
+                    "viewerReadOnly": "Nur Bearbeiter können dies ändern.",
+                    "resetToDefault": "Auf Standard zurücksetzen",
+                    "switchLabel": "Im App-Starter anzeigen",
+                    "saved": "Gespeichert",
+                    "saveFailed": "Speichern fehlgeschlagen. Versuchen Sie es erneut."
+                },
                 "generalTitle": "Allgemeine Einstellungen",
                 "workName": "Werkname",
                 "description": "Beschreibung",

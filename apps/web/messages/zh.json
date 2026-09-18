@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "通用设置",
+                "appLauncher": {
+                    "title": "在应用启动器中显示",
+                    "description": "将本作品的线上地址列入成员的应用启动器。这不会发布网站，也不会授予任何人访问权限。",
+                    "disabledNotLive": "本作品有线上地址后即可使用。",
+                    "viewerReadOnly": "只有编辑者可以更改此项。",
+                    "resetToDefault": "重置为默认",
+                    "switchLabel": "在应用启动器中显示",
+                    "saved": "已保存",
+                    "saveFailed": "无法保存。请重试。"
+                },
                 "generalTitle": "通用设置",
                 "workName": "作品名称",
                 "description": "描述",

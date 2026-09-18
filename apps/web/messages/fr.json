@@ -5265,6 +5265,16 @@
                     }
                 },
                 "generalSettings": "Paramètres généraux",
+                "appLauncher": {
+                    "title": "Afficher dans le Lanceur d’applis",
+                    "description": "Ajoute l’adresse en ligne de ce Travail au Lanceur d’applis des membres. Cela ne publie pas le site et ne donne accès à personne.",
+                    "disabledNotLive": "Disponible dès que ce Travail dispose d’une adresse en ligne.",
+                    "viewerReadOnly": "Seuls les éditeurs peuvent modifier ceci.",
+                    "resetToDefault": "Réinitialiser par défaut",
+                    "switchLabel": "Afficher dans le Lanceur d’applis",
+                    "saved": "Enregistré",
+                    "saveFailed": "Impossible d’enregistrer. Réessayez."
+                },
                 "generalTitle": "Paramètres généraux",
                 "workName": "Nom du travail",
                 "description": "Description",

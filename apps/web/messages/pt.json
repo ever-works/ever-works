@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Configurações Gerais",
+                "appLauncher": {
+                    "title": "Mostrar no Iniciador de apps",
+                    "description": "Lista o endereço ativo deste Trabalho no Iniciador de apps dos membros. Isto não publica o site nem permite que alguém o abra.",
+                    "disabledNotLive": "Disponível quando este Trabalho tiver um endereço ativo.",
+                    "viewerReadOnly": "Somente editores podem alterar isto.",
+                    "resetToDefault": "Redefinir para o padrão",
+                    "switchLabel": "Mostrar no Iniciador de apps",
+                    "saved": "Salvo",
+                    "saveFailed": "Não foi possível salvar. Tente novamente."
+                },
                 "generalTitle": "Configurações Gerais",
                 "workName": "Nome do Trabalho",
                 "description": "Descrição",

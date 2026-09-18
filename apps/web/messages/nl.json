@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Algemene instellingen",
+                "appLauncher": {
+                    "title": "Weergeven in App-launcher",
+                    "description": "Vermeldt het live adres van dit Werk in de App-launcher van leden. Het publiceert de site niet en geeft niemand toegang.",
+                    "disabledNotLive": "Beschikbaar zodra dit Werk een live adres heeft.",
+                    "viewerReadOnly": "Alleen editors kunnen dit wijzigen.",
+                    "resetToDefault": "Terugzetten naar standaard",
+                    "switchLabel": "Weergeven in App-launcher",
+                    "saved": "Opgeslagen",
+                    "saveFailed": "Opslaan mislukt. Probeer het opnieuw."
+                },
                 "generalTitle": "Algemene instellingen",
                 "workName": "Mapnaam",
                 "description": "Beschrijving",

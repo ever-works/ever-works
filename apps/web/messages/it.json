@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Impostazioni generali",
+                "appLauncher": {
+                    "title": "Mostra in Avvio app",
+                    "description": "Elenca l’indirizzo attivo di questo Lavoro nell’Avvio app dei membri. Non pubblica il sito e non dà a nessuno la possibilità di aprirlo.",
+                    "disabledNotLive": "Disponibile quando questo Lavoro avrà un indirizzo attivo.",
+                    "viewerReadOnly": "La modifica è riservata agli editor.",
+                    "resetToDefault": "Ripristina il valore predefinito",
+                    "switchLabel": "Mostra in Avvio app",
+                    "saved": "Salvato",
+                    "saveFailed": "Impossibile salvare. Riprova."
+                },
                 "generalTitle": "Impostazioni generali",
                 "workName": "Nome lavori",
                 "description": "Descrizione",

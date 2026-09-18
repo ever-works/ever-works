@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "一般設定",
+                "appLauncher": {
+                    "title": "アプリランチャーに表示",
+                    "description": "このワークの公開アドレスをメンバーのアプリランチャーに表示します。サイトが公開されたり、誰かにアクセス権が付与されたりすることはありません。",
+                    "disabledNotLive": "このワークに公開アドレスが設定されると利用できます。",
+                    "viewerReadOnly": "変更できるのは編集者のみです。",
+                    "resetToDefault": "既定値に戻す",
+                    "switchLabel": "アプリランチャーに表示",
+                    "saved": "保存しました",
+                    "saveFailed": "保存できませんでした。もう一度お試しください。"
+                },
                 "generalTitle": "一般設定",
                 "workName": "ワーク名",
                 "description": "説明",

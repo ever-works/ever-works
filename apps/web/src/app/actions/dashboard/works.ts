@@ -1823,3 +1823,95 @@ export async function createCampaignWork(input: {
         };
     }
 }
+
+/** What one exposure save tells the caller (plan §8's `Saved` / save-failed copy). */
+export interface SetWorkAppLauncherExposureResult {
+    success: boolean;
+    /** The value the API was asked to store — `null` = back to the kind default. */
+    appLauncherExposed?: boolean | null;
+    error?: string;
+}
+
+/**
+ * APW-11 T17 (plan §4.4 + §7, spec FR-19/FR-60) — the **only** writer of a
+ * Work's App Launcher exposure.
+ *
+ * ## Why this action exists instead of the General form (APW11-G02)
+ *
+ * `useSettings().handleUpdate` submits the whole General form to
+ * {@link updateWork}, whose zod object declares `name`, `description`, `owner`,
+ * `organization`, `websiteTemplateId` and `readmeConfig` — and **zod strips what
+ * it does not declare**. `appLauncherExposed` would therefore never reach the
+ * API, and every save would additionally call `workAPI.updateReadme`, rewriting
+ * the Work's README for a toggle that did nothing. So the toggle gets its own
+ * action, and this action sends **exactly one field**:
+ * `PUT /api/works/:id { appLauncherExposed }`.
+ *
+ * ## The three states, and who may send them
+ *
+ * `true` shows the Work in members' App Launcher, `false` hides it, and `null`
+ * clears the explicit choice so the Work follows its kind default (`app` on,
+ * everything else off). The API validates the field with
+ * `@IsOptional() @IsBoolean()` on `UpdateWorkDto.appLauncherExposed` and grants
+ * the change to EDITOR or higher (`ensureCanEdit`) — the same rank the surfaces
+ * use to decide whether the control is interactive, so the client never offers a
+ * control the API would refuse.
+ *
+ * It deliberately does **not** revalidate the README, call `updateReadme`, or
+ * touch any other Work field: a failure here changes nothing but this one
+ * setting. Both surfaces (`AppLauncherExposureSetting`, `AppLauncherExposureCard`)
+ * call it and render `Saved` / `Couldn't save. Try again.` from its answer.
+ */
+export async function setWorkAppLauncherExposureAction(
+    workId: string,
+    value: boolean | null,
+): Promise<SetWorkAppLauncherExposureResult> {
+    // Security: verify authentication at the server-action boundary — server
+    // actions are reachable as POST endpoints via the `Next-Action` header.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('actions.works');
+
+    const schema = z.object({
+        workId: z.string().uuid(t('invalidId')),
+        appLauncherExposed: z.boolean().nullable(),
+    });
+
+    try {
+        const validation = schema.safeParse({ workId, appLauncherExposed: value });
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        // Exactly one field. `null` is meaningful (reset to the kind default),
+        // so the value is sent as-is rather than omitted when falsy.
+        const body: UpdateWorkDto = {
+            appLauncherExposed: validation.data.appLauncherExposed,
+        };
+
+        await workAPI.update(validation.data.workId, body);
+
+        // Both surfaces live on different routes and both read the Work from the
+        // server on a refresh, so both are revalidated — the settings page and
+        // the Overview card that stands in for it outside MANAGER+.
+        revalidatePath(ROUTES.DASHBOARD_WORK_SETTINGS(validation.data.workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK(validation.data.workId));
+
+        return {
+            success: true,
+            appLauncherExposed: validation.data.appLauncherExposed,
+        };
+    } catch (error) {
+        console.error('Failed to update App Launcher exposure:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('updateFailed'),
+        };
+    }
+}

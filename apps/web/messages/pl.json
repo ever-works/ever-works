@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Ustawienia ogólne",
+                "appLauncher": {
+                    "title": "Pokaż w Programie uruchamiającym aplikacje",
+                    "description": "Dodaje aktywny adres tej Pracy do Programu uruchamiającego aplikacje u członków. Nie publikuje strony ani nie przyznaje nikomu dostępu.",
+                    "disabledNotLive": "Dostępne, gdy ta Praca będzie miała aktywny adres.",
+                    "viewerReadOnly": "Tylko redaktorzy mogą to zmienić.",
+                    "resetToDefault": "Przywróć domyślne",
+                    "switchLabel": "Pokaż w Programie uruchamiającym aplikacje",
+                    "saved": "Zapisano",
+                    "saveFailed": "Nie udało się zapisać. Spróbuj ponownie."
+                },
                 "generalTitle": "Ustawienia ogólne",
                 "workName": "Nazwa pracy",
                 "description": "Opis",

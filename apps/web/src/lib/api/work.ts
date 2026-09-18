@@ -151,6 +151,36 @@ export interface UpdateWorkDto {
      *  Work. `null` clears every claim. Rejected server-side when another
      *  Work you own already claims one of the identifiers. */
     externalRefs?: WorkExternalRefs | null;
+    /**
+     * APW-11 (plan §4.4, spec FR-19/FR-60) — the Work-level **Show in App
+     * Launcher** setting. Three states: `true` shows the Work, `false` hides
+     * it, `null` clears the explicit choice and returns the Work to its kind
+     * default (`true` for an `app` Work, `false` otherwise).
+     *
+     * Written ONLY by `setWorkAppLauncherExposureAction`
+     * (`apps/web/src/app/actions/dashboard/works.ts`): the General settings
+     * form's zod object does not list it, so a save through `updateWork`
+     * would strip it AND rewrite the Work's README (APW11-G02).
+     */
+    appLauncherExposed?: boolean | null;
+}
+
+/**
+ * APW-11 (App Launcher, plan §4.4) — `work.appLauncher` on the Work detail
+ * payload, mirroring `WorkAppLauncherStatus` in
+ * `packages/agent/src/services/work-query.service.ts`.
+ *
+ *   - `exposed` — the stored choice: `true`, `false`, or `null` for "no
+ *     explicit choice, follow the kind default" (spec FR-19);
+ *   - `effectiveExposed` — what the Work does today
+ *     (`exposed ?? (kind === 'app')`);
+ *   - `live` — whether the launcher has an address to open for this Work, i.e.
+ *     whether the setting is offered enabled (spec FR-15/FR-23).
+ */
+export interface WorkAppLauncherExposure {
+    exposed: boolean | null;
+    effectiveExposed: boolean;
+    live: boolean;
 }
 
 /** Wave 2 M7 — Work-level worktree-per-Task isolation settings. */
@@ -345,6 +375,13 @@ export interface Work {
     // Work. Absent/null means the Work claims nothing and only its
     // repositories route events.
     externalRefs?: WorkExternalRefs | null;
+    /**
+     * APW-11 — the Work-level **Show in App Launcher** projection
+     * (plan §4.4). Present on the **Work detail** payload only; the list
+     * payload keeps its existing shape, so treat `undefined` as "the API
+     * did not answer" and render nothing rather than guessing.
+     */
+    appLauncher?: WorkAppLauncherExposure;
 }
 
 /** Wave 4 M3 — per-Work AgentRun summary counts

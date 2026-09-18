@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "일반 설정",
+                "appLauncher": {
+                    "title": "앱 런처에 표시",
+                    "description": "이 워크의 라이브 주소를 멤버의 앱 런처에 표시합니다. 사이트를 공개하거나 누구에게도 접근 권한을 주지 않습니다.",
+                    "disabledNotLive": "이 워크에 라이브 주소가 있으면 사용할 수 있습니다.",
+                    "viewerReadOnly": "편집자만 변경할 수 있습니다.",
+                    "resetToDefault": "기본값으로 초기화",
+                    "switchLabel": "앱 런처에 표시",
+                    "saved": "저장됨",
+                    "saveFailed": "저장하지 못했습니다. 다시 시도하세요."
+                },
                 "generalTitle": "일반 설정",
                 "workName": "워크 이름",
                 "description": "설명",

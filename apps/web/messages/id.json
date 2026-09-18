@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Pengaturan Umum",
+                "appLauncher": {
+                    "title": "Tampilkan di Peluncur Aplikasi",
+                    "description": "Menampilkan alamat aktif Karya ini di Peluncur Aplikasi anggota. Ini tidak menerbitkan situs atau memberi siapa pun akses ke sana.",
+                    "disabledNotLive": "Tersedia setelah Karya ini memiliki alamat aktif.",
+                    "viewerReadOnly": "Hanya editor yang dapat mengubah ini.",
+                    "resetToDefault": "Kembalikan ke bawaan",
+                    "switchLabel": "Tampilkan di Peluncur Aplikasi",
+                    "saved": "Tersimpan",
+                    "saveFailed": "Gagal menyimpan. Coba lagi."
+                },
                 "generalTitle": "Pengaturan Umum",
                 "workName": "Nama Karya",
                 "description": "Deskripsi",

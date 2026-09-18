@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Genel Ayarlar",
+                "appLauncher": {
+                    "title": "Uygulama başlatıcıda göster",
+                    "description": "Bu İş’in yayındaki adresini üyelerin Uygulama başlatıcısında listeler. Siteyi yayımlamaz ve kimseye erişim vermez.",
+                    "disabledNotLive": "Bu İş’in yayında bir adresi olduğunda kullanılabilir.",
+                    "viewerReadOnly": "Bunu yalnızca editörler değiştirebilir.",
+                    "resetToDefault": "Varsayılana sıfırla",
+                    "switchLabel": "Uygulama başlatıcıda göster",
+                    "saved": "Kaydedildi",
+                    "saveFailed": "Kaydedilemedi. Yeniden deneyin."
+                },
                 "generalTitle": "Genel Ayarlar",
                 "workName": "İş Adı",
                 "description": "Açıklama",

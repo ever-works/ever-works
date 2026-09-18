@@ -5265,6 +5265,16 @@
                     }
                 },
                 "generalSettings": "Configuración general",
+                "appLauncher": {
+                    "title": "Mostrar en el Lanzador de apps",
+                    "description": "Incluye la dirección activa de este Trabajo en el Lanzador de apps de los miembros. No publica el sitio ni da acceso a nadie.",
+                    "disabledNotLive": "Disponible cuando este Trabajo tenga una dirección activa.",
+                    "viewerReadOnly": "Solo los editores pueden cambiar esto.",
+                    "resetToDefault": "Restablecer al valor predeterminado",
+                    "switchLabel": "Mostrar en el Lanzador de apps",
+                    "saved": "Guardado",
+                    "saveFailed": "No se pudo guardar. Inténtalo de nuevo."
+                },
                 "generalTitle": "Configuración general",
                 "workName": "Nombre del trabajo",
                 "description": "Descripción",

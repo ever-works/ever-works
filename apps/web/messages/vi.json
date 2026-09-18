@@ -5197,6 +5197,16 @@
                     }
                 },
                 "generalSettings": "Cài đặt chung",
+                "appLauncher": {
+                    "title": "Hiển thị trong Trình khởi chạy ứng dụng",
+                    "description": "Liệt kê địa chỉ đang hoạt động của Công việc này trong Trình khởi chạy ứng dụng của thành viên. Thao tác này không xuất bản trang web và không cấp quyền truy cập cho bất kỳ ai.",
+                    "disabledNotLive": "Khả dụng khi Công việc này có địa chỉ đang hoạt động.",
+                    "viewerReadOnly": "Chỉ người chỉnh sửa mới có thể thay đổi mục này.",
+                    "resetToDefault": "Đặt lại về mặc định",
+                    "switchLabel": "Hiển thị trong Trình khởi chạy ứng dụng",
+                    "saved": "Đã lưu",
+                    "saveFailed": "Không thể lưu. Hãy thử lại."
+                },
                 "generalTitle": "Cài đặt chung",
                 "workName": "Tên công việc",
                 "description": "Mô tả",

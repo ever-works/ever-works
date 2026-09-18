@@ -6994,6 +6994,16 @@
                     }
                 },
                 "generalSettings": "General Settings",
+                "appLauncher": {
+                    "title": "Show in App Launcher",
+                    "description": "Lists this Work's live address in members' App Launcher. It doesn't publish the site or give anyone access to it.",
+                    "disabledNotLive": "Available once this Work has a live address.",
+                    "viewerReadOnly": "Only editors can change this.",
+                    "resetToDefault": "Reset to default",
+                    "switchLabel": "Show in App Launcher",
+                    "saved": "Saved",
+                    "saveFailed": "Couldn't save. Try again."
+                },
                 "generalTitle": "General Settings",
                 "workName": "Work Name",
                 "description": "Description",
