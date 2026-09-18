@@ -45,6 +45,18 @@
  * left as a property of `Array.prototype.sort`'s implementation-defined
  * stability.
  *
+ * ## The filter is applied before the cap (FR-63)
+ *
+ * `options.filter` narrows the **eligible** set here, and `limit` then applies
+ * to what survives — never the other way round, because a filter applied after
+ * the cap could only answer from the items the cap had already chosen, which is
+ * precisely the "item 201 is unreachable" gap FR-63 exists to close. Filtering
+ * removes whole items and never re-ranks the ones it keeps, so the FR-26 order
+ * of a filtered response is the order of the unfiltered one (minus what the
+ * needle excluded) and the section `order` numbers are recomputed over what is
+ * left. {@link OrderLauncherItemsResult.total} carries the pre-filter,
+ * pre-cap count the **Showing 200 of {count}** line renders.
+ *
  * ## The numbers are imported, never restated
  *
  * Every cap below comes from `@ever-works/contracts` (`apps/app-launcher.ts`,
@@ -63,6 +75,7 @@ import {
     type AppLauncherManageState,
     type AppLauncherSection,
 } from '@ever-works/contracts';
+import { matchesLauncherFilter } from './launcher-filter';
 
 /**
  * Plan §3.2:211 — the scope key Ever app rows are stored under. Every
@@ -152,6 +165,13 @@ export interface OrderLauncherItemsOptions {
      * (FR-34, FR-63) and is never raised by this module.
      */
     limit?: number;
+    /**
+     * FR-63's filter, applied to the **eligible set before the cap** so an item
+     * past `limit` is still reachable. A blank or whitespace-only filter is no
+     * filter at all; matching is a case- and accent-insensitive substring test
+     * on the item's name ({@link matchesLauncherFilter}).
+     */
+    filter?: string;
 }
 
 /** One ordered item, with the facts the tile needs that only ordering can decide. */
@@ -174,15 +194,30 @@ export interface LauncherOrderedItem<T extends LauncherOrderableItem> {
 export interface OrderLauncherItemsResult<T extends LauncherOrderableItem> {
     items: LauncherOrderedItem<T>[];
     /**
-     * Every eligible Work in scope, counted **before** any cap — so the panel
+     * Every eligible item in scope, counted **before** the filter and **before**
+     * any cap, so FR-63's **Showing 200 of {count}** is a reported fact rather
+     * than `items.length` — which, on a capped response, is the one number the
+     * line must not be (ACC-11-47).
+     */
+    total: number;
+    /**
+     * Every eligible Work in scope, counted **before** the cap — so the panel
      * can render **View all {count}** from the same response that holds only
-     * {@link APP_LAUNCHER_PANEL_WORKS_MAX} of them (ACC-11-14).
+     * {@link APP_LAUNCHER_PANEL_WORKS_MAX} of them (ACC-11-14). A filter narrows
+     * it, because the Works it names are the ones this request is about.
      */
     worksTotal: number;
     /**
-     * `true` when the response holds fewer items than the eligible set — either
-     * because a section hit spec FR-4's maximum or because the response hit
-     * FR-34's cap. Spec FR-63 renders **Showing 200 of {count}** off this flag.
+     * `true` when the response holds fewer items than the set it was asked for —
+     * either because a section hit spec FR-4's maximum or because the response
+     * hit FR-34's cap. Spec FR-63 renders **Showing 200 of {count}** off this
+     * flag.
+     *
+     * Judged **after** the filter: a filtered response that returned everything
+     * the filter matched was not truncated, however small it is next to
+     * {@link total}. The unfiltered read is the one that answers "is this
+     * person's eligible set bigger than one page", which is why **Manage apps**
+     * decides whether to offer the filter from the first read it makes.
      */
     truncated: boolean;
     /** The merged pinned view's size — what FR-25's budget counts (FR-62). */
@@ -293,8 +328,10 @@ export function isMergedPinLimitExceeded(
  * Render the list (plan §4.1 steps 5-6, §4.2:420-435).
  *
  * The result is deterministic: the same inputs always produce the same array,
- * whatever order the input array happened to be in. See the module docstring
- * for the rule and `launcher-order.spec.ts` for the proof.
+ * whatever order the input array happened to be in — and that holds with a
+ * filter too, because filtering happens before the ordering and never inside
+ * it. See the module docstring for the rule and `launcher-order.spec.ts` for
+ * the proof.
  */
 export function orderLauncherItems<T extends LauncherOrderableItem>(
     items: ReadonlyArray<T>,
@@ -332,9 +369,19 @@ export function orderLauncherItems<T extends LauncherOrderableItem>(
         return visible && manageState === 'listed';
     });
 
-    const worksTotal = eligible.filter((item) => item.kind === 'work').length;
+    // FR-63's `{count}` is a fact about the scope, so it is taken here — before
+    // the filter narrows the set and before the cap shortens it.
+    const total = eligible.length;
 
-    const described: Array<LauncherOrderedItem<T>> = eligible.map((item) => {
+    // The filter narrows the ELIGIBLE set, and the cap then applies to what is
+    // left. That order is the whole of FR-63's "no eligible item is
+    // unreachable": filtering after the cap could only ever answer from the 200
+    // items already chosen, which is exactly the reachability gap it closes.
+    const matching = eligible.filter((item) => matchesLauncherFilter(item.name, options.filter));
+
+    const worksTotal = matching.filter((item) => item.kind === 'work').length;
+
+    const described: Array<LauncherOrderedItem<T>> = matching.map((item) => {
         const preference = merged.get(item.key);
         const pinned = preference?.pinned === true;
         const position = pinned ? pinPosition.get(item.key) : undefined;
@@ -371,8 +418,9 @@ export function orderLauncherItems<T extends LauncherOrderableItem>(
 
     return {
         items: numberWithinSections(capped),
+        total,
         worksTotal,
-        truncated: capped.length < eligible.length,
+        truncated: capped.length < matching.length,
         pinnedTotal: pinnedKeys.length,
     };
 }

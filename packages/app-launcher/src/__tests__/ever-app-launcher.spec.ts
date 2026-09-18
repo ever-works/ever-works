@@ -54,6 +54,10 @@ function response(
 			catalogAvailable: true,
 			scopeKey: 'personal',
 			worksTotal: items.filter((entry) => entry.kind === 'work').length,
+			// FR-63's `{count}`: the eligible total, which is not `items.length`
+			// once a response is capped. A host that renders the whole fixture
+			// passes the same number it handed in.
+			total: items.length,
 			truncated: false,
 			pinLimit: 6,
 			appWorksAvailable: true,

@@ -168,6 +168,18 @@ export interface AppLauncherListOptions {
     includeHidden?: boolean;
     /** The response cap, 1..200; the ordering module clamps it (FR-34). */
     limit?: number;
+    /**
+     * FR-63's filter — the text a person typed into **Manage apps**' filter box,
+     * applied to the **eligible set before** the ordering module's cap so an
+     * item past the cap is still reachable (spec.md:303-305).
+     *
+     * Matching is a case- and accent-insensitive substring test on the item's
+     * name (`./launcher-filter.ts`); a blank or whitespace-only filter is
+     * no filter at all, never "match nothing". The eligible count the response
+     * reports (`meta.total`) is counted **before** this filter, so a filtered
+     * answer still tells the client how many items the scope holds.
+     */
+    filter?: string;
     /** The environment the addresses belong to (FR-10); defaults to the catalog's. */
     environment?: AppLauncherEnvironment;
     /** The catalog version read, echoed in `meta` (S9/S10). */
@@ -335,6 +347,11 @@ export class AppLauncherService {
      * A request with no person reads nothing and answers an empty list: every read
      * is scoped to the signed-in person (FR-53), and the controller is
      * session-guarded, so there is nothing for an anonymous caller to see.
+     *
+     * `options.filter` is FR-63's **Manage apps** filter: it narrows the
+     * **eligible** set before the response cap, so an item past the cap is still
+     * reachable, and it never moves `meta.total` — the eligible count, which is
+     * what FR-63's counted line reports.
      */
     async listForUser(
         user: AppLauncherUser | null | undefined,
@@ -356,6 +373,10 @@ export class AppLauncherService {
                     catalogAvailable: options.catalogAvailable ?? catalog.length > 0,
                     scopeKey,
                     worksTotal: 0,
+                    // An anonymous read has no eligible set to count — and this
+                    // early return is a response like any other, so it owes the
+                    // client every field (FR-63).
+                    total: 0,
                     truncated: false,
                     pinLimit: APP_LAUNCHER_PIN_LIMIT,
                     appWorksAvailable: this.appWorksAvailable(),
@@ -389,6 +410,7 @@ export class AppLauncherService {
             scopeKey,
             includeHidden: options.includeHidden === true,
             limit: options.limit,
+            filter: options.filter,
         });
 
         return {
@@ -399,6 +421,9 @@ export class AppLauncherService {
                 catalogAvailable: options.catalogAvailable ?? catalog.length > 0,
                 scopeKey,
                 worksTotal: ordered.worksTotal,
+                // FR-63's `{count}`: the eligible set, counted before the filter
+                // and before the cap by the ordering module.
+                total: ordered.total,
                 truncated: ordered.truncated,
                 pinLimit: APP_LAUNCHER_PIN_LIMIT,
                 appWorksAvailable: this.appWorksAvailable(),

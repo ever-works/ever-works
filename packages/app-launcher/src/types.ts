@@ -97,6 +97,10 @@ export interface AppLauncherItem {
  * `pinLimit` is the literal `6` here as it is in the contracts
  * (`APP_LAUNCHER_PIN_LIMIT`), so the number the panel renders and the number the
  * save path enforces cannot drift; the conformance spec pins the literal.
+ *
+ * `total` is the one field a host may need before the element does: it is FR-63's
+ * `{count}`, mirrored here so a host that renders its own **Showing 200 of
+ * {count}** line reads the same number the element would.
  */
 export interface AppLauncherListResponse {
 	items: AppLauncherItem[];
@@ -111,6 +115,13 @@ export interface AppLauncherListResponse {
 		scopeKey: string;
 		/** How many Works this scope holds, so **View all {count}** is exact (FR-4). */
 		worksTotal: number;
+		/**
+		 * How many items are **eligible** in this scope, counted before the
+		 * response cap and before FR-63's filter — the number the **Showing 200
+		 * of {count}** line means, and deliberately not `items.length`, which on
+		 * a capped response is the one number that line must not be.
+		 */
+		total: number;
 		/** True when the response hit its cap — the answer is short, never silently complete (FR-34). */
 		truncated: boolean;
 		/** Always `6`; the same literal the contracts declare (FR-25). */

@@ -193,6 +193,25 @@ export interface AppLauncherListResponse {
 		scopeKey: string;
 		/** How many Works this scope holds, so **View all {count}** is exact (FR-4 spec.md:193, ACC-11-14 spec.md:580). */
 		worksTotal: number;
+		/**
+		 * How many items are **eligible** in this scope — counted before `limit`
+		 * truncates the answer and before the FR-63 filter narrows it, so it is
+		 * the number the **Showing 200 of {count}** line means (FR-63
+		 * spec.md:303-305, ACC-11-47 spec.md:665).
+		 *
+		 * Deliberately **not** `items.length`: a response with more than
+		 * {@link APP_LAUNCHER_MAX_ITEMS_RESPONSE} eligible items carries the first
+		 * 200 of them (FR-34 spec.md:321-322), so a client that counted the rows
+		 * it holds would render **Showing 200 of 200** for a person with 250 — it
+		 * could not say how many items it is not showing, which is exactly what
+		 * the counted line exists to say. A filter never moves it either: the
+		 * count is a fact about the scope, not about one query.
+		 *
+		 * `worksTotal` stays what it was — Works only, for FR-4's **View all
+		 * {count}** — because the two counts answer different questions and the
+		 * panel renders one while **Manage apps** renders the other.
+		 */
+		total: number;
 		/** True when the response hit its cap — the answer is short, never silently complete (FR-34, FR-63). */
 		truncated: boolean;
 		/** Always {@link APP_LAUNCHER_PIN_LIMIT}; the same literal type, one source (FR-25 spec.md:287-288). */
@@ -342,6 +361,21 @@ export const APP_LAUNCHER_NAME_MAX_LENGTH = 100;
  * catalog reader and the tile's field comment state the same cap.
  */
 export const APP_LAUNCHER_DESCRIPTION_MAX_LENGTH = 80;
+
+/**
+ * The longest **Manage apps** filter a read accepts — `?q=` on
+ * `GET /api/me/apps` (FR-63 spec.md:303-305).
+ *
+ * A filter is a **substring of an item's name**, and a name is at most
+ * {@link APP_LAUNCHER_NAME_MAX_LENGTH} characters (FR-57 spec.md:248-250), so a
+ * longer needle cannot match anything: the cap is the name cap itself rather
+ * than a number of its own. The route's DTO refuses one character past it with
+ * `400` (plan §4.5) instead of reading the whole eligible set to answer nothing.
+ *
+ * Declared here, beside the other limits, because the DTO that refuses it and
+ * the client that sends it must agree on one number.
+ */
+export const APP_LAUNCHER_FILTER_MAX_LENGTH = APP_LAUNCHER_NAME_MAX_LENGTH;
 
 // ---------------------------------------------------------------------------
 // Pure predicates

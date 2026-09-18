@@ -9,6 +9,7 @@ import {
 	APP_LAUNCHER_DESCRIPTION_MAX_LENGTH,
 	APP_LAUNCHER_EMPTY_ACTIONS,
 	APP_LAUNCHER_ENVIRONMENTS,
+	APP_LAUNCHER_FILTER_MAX_LENGTH,
 	APP_LAUNCHER_ICON_MAX_BYTES,
 	APP_LAUNCHER_ITEM_KINDS,
 	APP_LAUNCHER_MANAGE_STATES,
@@ -83,6 +84,13 @@ type _EmptyAction = Expect<Equal<AppLauncherEmptyAction, SpecAppLauncherEmptyAct
 
 /** `meta.pinLimit` carries the literal 6, not a general number (plan.md:282). */
 type _PinLimitLiteral = Expect<Equal<AppLauncherListResponse['meta']['pinLimit'], 6>>;
+
+/**
+ * `meta.total` is a plain count (FR-63 spec.md:303-305): the number of eligible
+ * items **before** the filter and before the cap, so it cannot be pinned to a
+ * literal and cannot be `items.length` either.
+ */
+type _TotalIsANumber = Expect<Equal<AppLauncherListResponse['meta']['total'], number>>;
 
 /**
  * Every closed union this module exports, with the members its spec line fixes,
@@ -187,6 +195,9 @@ const LIST_RESPONSE: AppLauncherListResponse = {
 		catalogAvailable: true,
 		scopeKey: 'global',
 		worksTotal: 140,
+		// The eligible count FR-63 renders — 140, while this envelope carries 2
+		// items, because it is counted before the cap (FR-34).
+		total: 140,
 		truncated: false,
 		pinLimit: APP_LAUNCHER_PIN_LIMIT,
 		appWorksAvailable: true
@@ -405,6 +416,23 @@ describe('app-launcher — the tile and response shapes (plan §3.3:253-324)', (
 
 		expect(Object.keys(minimal)).toEqual(['key']);
 		expect(full.order).toBe(9_999);
+	});
+});
+
+describe('app-launcher — the eligible count and the filter cap (FR-63 spec.md:303-305)', () => {
+	it('carries meta.total as the eligible count, not the length of the answer', () => {
+		expect(LIST_RESPONSE.meta.total).toBe(140);
+		// The envelope holds 2 items: a response that reported `items.length` would
+		// tell the person "Showing 200 of 200", which is the one thing FR-63 forbids.
+		expect(LIST_RESPONSE.meta.total).not.toBe(LIST_RESPONSE.items.length);
+	});
+
+	it('caps the Manage apps filter at the name cap, so no needle is longer than a name', () => {
+		// A filter is a substring of an item's name (FR-57), so a needle past the
+		// name cap could never match anything: the DTO answers 400 instead. The cap
+		// is the name cap itself rather than a number of its own.
+		expect(APP_LAUNCHER_FILTER_MAX_LENGTH).toBe(APP_LAUNCHER_NAME_MAX_LENGTH);
+		expect(Number.isInteger(APP_LAUNCHER_FILTER_MAX_LENGTH)).toBe(true);
 	});
 });
 

@@ -459,6 +459,140 @@ describe('orderLauncherItems — FR-4 panel maxima vs FR-34 response cap', () =>
     });
 });
 
+describe('orderLauncherItems — the Manage apps filter (FR-63)', () => {
+    /** 250 eligible Works, named so the name order is the numeric order. */
+    function bulk(count: number): LauncherOrderableItem[] {
+        return Array.from({ length: count }, (_, index) =>
+            work(
+                `w${String(index + 1).padStart(3, '0')}`,
+                null,
+                `Bulk ${String(index + 1).padStart(3, '0')}`,
+            ),
+        );
+    }
+
+    const manage = (items: LauncherOrderableItem[], filter?: string) =>
+        orderLauncherItems(items, [], {
+            scopeKey: LAUNCHER_PERSONAL_SCOPE_KEY,
+            includeHidden: true,
+            filter,
+        });
+
+    it('reaches an item the response cap left out — the filter runs BEFORE the cap', () => {
+        const items = bulk(250);
+
+        const page = manage(items);
+        expect(page.items).toHaveLength(APP_LAUNCHER_MAX_ITEMS_RESPONSE);
+        // The whole point of FR-63: this item is beyond the cap…
+        expect(page.items.map((entry) => entry.key)).not.toContain('work:w240');
+
+        // …and a filter naming only it reaches it, because the filter narrows the
+        // eligible set and the cap is applied to what is left.
+        const filtered = manage(items, 'Bulk 240');
+        expect(filtered.items.map((entry) => entry.key)).toEqual(['work:w240']);
+    });
+
+    it('counts total before the filter and before the cap, and never as items.length', () => {
+        const items = bulk(250);
+
+        const page = manage(items);
+        expect(page.total).toBe(250);
+        // `total` is the eligible count, never the length of a capped answer.
+        expect(page.total).not.toBe(page.items.length);
+
+        const filtered = manage(items, 'Bulk 240');
+        // A filter never moves the eligible count…
+        expect(filtered.total).toBe(250);
+
+        const narrowed = orderLauncherItems(items, [], {
+            scopeKey: LAUNCHER_PERSONAL_SCOPE_KEY,
+            includeHidden: true,
+            limit: 1,
+        });
+        // …and neither does a smaller limit.
+        expect(narrowed.total).toBe(250);
+        expect(narrowed.items).toHaveLength(1);
+    });
+
+    it('counts only the eligible set — a panel read counts what the panel may show', () => {
+        const items = [
+            work('visible', T1, 'Visible'),
+            { ...work('hidden', T1, 'Hidden'), visible: false },
+            { ...work('not-live', T1, 'Not live'), manageState: 'notLive' as const },
+        ];
+
+        expect(orderLauncherItems(items, [], { scopeKey: LAUNCHER_PERSONAL_SCOPE_KEY }).total).toBe(
+            1,
+        );
+        expect(
+            orderLauncherItems(items, [], {
+                scopeKey: LAUNCHER_PERSONAL_SCOPE_KEY,
+                includeHidden: true,
+            }).total,
+        ).toBe(3);
+    });
+
+    it('treats a blank filter as no filter at all', () => {
+        const items = bulk(30);
+        const unfiltered = manage(items).items.map((entry) => entry.key);
+
+        for (const blank of ['', '   ', '\t\n ']) {
+            const result = manage(items, blank);
+            expect(result.items.map((entry) => entry.key)).toEqual(unfiltered);
+            expect(result.total).toBe(30);
+        }
+    });
+
+    it('matches case- and accent-insensitively, and matches a substring only', () => {
+        const items = [work('cafe', null, 'Café Central'), work('other', null, 'Workshop')];
+
+        for (const needle of ['CAFE CENTRAL', 'café', 'afe cen', 'Cafe']) {
+            expect(manage(items, needle).items.map((entry) => entry.key)).toEqual(['work:cafe']);
+        }
+
+        // A control, so "everything matches" cannot pass for a matcher: a needle
+        // no name contains returns nothing while the count stays put.
+        const missing = manage(items, 'zzz');
+        expect(missing.items).toEqual([]);
+        expect(missing.total).toBe(2);
+    });
+
+    it('leaves the FR-26 order of what it returns alone', () => {
+        const items = [
+            work('newest', T3, 'Shared newest'),
+            work('middle', T2, 'Shared middle'),
+            work('oldest', T1, 'Shared oldest'),
+            work('unrelated', null, 'Nothing in common'),
+        ];
+
+        const all = manage(items).items;
+        const filtered = manage(items, 'shared').items;
+
+        expect(all.map((entry) => entry.key)).toEqual([
+            'work:newest',
+            'work:middle',
+            'work:oldest',
+            'work:unrelated',
+        ]);
+        // The filter removes whole items; it never re-ranks the ones it keeps.
+        expect(filtered.map((entry) => entry.key)).toEqual([
+            'work:newest',
+            'work:middle',
+            'work:oldest',
+        ]);
+        // …and the section is renumbered over what is left (plan.md:171).
+        expect(filtered.map((entry) => entry.order)).toEqual([0, 1, 2]);
+    });
+
+    it('reports truncated off a filtered set: nothing the filter kept was dropped', () => {
+        const items = bulk(250);
+
+        const filtered = manage(items, 'Bulk 240');
+        expect(filtered.truncated).toBe(false);
+        expect(manage(items).truncated).toBe(true);
+    });
+});
+
 describe('orderLauncherItems — a Work with no address (FR-56)', () => {
     const items: LauncherOrderableItem[] = [
         work('live', T1),

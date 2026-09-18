@@ -10,7 +10,11 @@ import {
     type AppLauncherPreferenceChange,
     type AppLauncherSection,
 } from '@ever-works/contracts';
-import { saveAppLauncherPreferencesAction } from '@/app/actions/settings/app-launcher';
+import {
+    readAppLauncherListAction,
+    saveAppLauncherPreferencesAction,
+} from '@/app/actions/settings/app-launcher';
+import { foldText } from '@/components/command-palette/registry/local-match';
 import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
 
 /**
@@ -40,9 +44,16 @@ import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
  *    `{ key, order }` per row at flush time
  *    ({@link AppLauncherSettings.buildChanges}).
  * 3. **Nothing is silently hidden** (FR-63). The list is the server's, capped at
- *    200; the header counts the eligible set the read reported, and the filter
- *    narrows **the view** without ever dropping a row from the list, so clearing
- *    it restores every item the page holds.
+ *    200; the header counts the eligible set the read reported — `meta.total`,
+ *    never a number rebuilt from the rows in hand — and the filter narrows **the
+ *    view** without ever dropping a row from the list, so clearing it restores
+ *    every item the page holds. The filter is also **sent to the server** on its
+ *    own short debounce ({@link AppLauncherSettings.FILTER_DEBOUNCE_MS}): a
+ *    client-side filter can only narrow the 200 rows the page already has, so
+ *    the 240th of 250 eligible items could never be reached, and the whole point
+ *    of FR-63's filter is that it can be. The rows a filtered read returns are
+ *    merged into the list, which is how an item past the cap becomes editable
+ *    here at all.
  *
  * ## Pinned rows are reordered through the pin sequence
  *
@@ -68,6 +79,18 @@ import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
 
 /** FR-28 / plan §4.2: the debounce window before a batch is sent. */
 export const SAVE_DEBOUNCE_MS = 500;
+
+/**
+ * FR-63: the window before the filter is sent to the server.
+ *
+ * Deliberately **its own** number and deliberately shorter than
+ * {@link SAVE_DEBOUNCE_MS}: the filter is a **read**, and borrowing the save's
+ * half-second would make typing feel like a save that has not happened yet —
+ * while a write and a read sharing one timer would also mean a keystroke could
+ * postpone a pending arrangement save. Long enough to coalesce a burst of
+ * keystrokes into one request, short enough that the list still feels live.
+ */
+export const FILTER_DEBOUNCE_MS = 250;
 
 /** The three sections the API orders a list into (plan §4.2:420-435). */
 const SECTION_ORDER: ReadonlyArray<AppLauncherSection> = ['pinned', 'platforms', 'works'];
@@ -144,6 +167,42 @@ function withSectionRows(
     return next;
 }
 
+/**
+ * The rows the page holds, with the rows a filtered read returned folded in
+ * (FR-63).
+ *
+ * The editor's list only ever **grows**: a filtered read is what makes an item
+ * past the 200-item cap reachable, and replacing the list with its answer would
+ * throw away the 200 rows the page already had — clearing the filter would then
+ * show one row instead of the page. So a row the page already holds is refreshed
+ * from the server's copy, and a row it did not hold is inserted at the position
+ * the server's own ordering gives it (the response is ordered by section, so a
+ * new row lands inside its section and not at the end of the table).
+ */
+function mergeRows(held: AppLauncherItem[], incoming: AppLauncherItem[]): AppLauncherItem[] {
+    if (incoming.length === 0) return held;
+
+    const positionInAnswer = new Map(incoming.map((row, index) => [row.key, index]));
+    const serverCopy = new Map(incoming.map((row) => [row.key, row]));
+    const merged = held.map((row) => serverCopy.get(row.key) ?? row);
+    const heldKeys = new Set(held.map((row) => row.key));
+
+    for (const row of incoming) {
+        if (heldKeys.has(row.key)) continue;
+        const at = positionInAnswer.get(row.key) ?? Number.MAX_SAFE_INTEGER;
+        const before = merged.findIndex(
+            (existing) => (positionInAnswer.get(existing.key) ?? Number.MAX_SAFE_INTEGER) > at,
+        );
+        if (before < 0) {
+            merged.push(row);
+        } else {
+            merged.splice(before, 0, row);
+        }
+    }
+
+    return merged;
+}
+
 export function AppLauncherSettings({
     initialItems,
     initialMeta,
@@ -161,6 +220,19 @@ export function AppLauncherSettings({
 
     const [items, setItems] = useState<AppLauncherItem[]>(initialItems);
     const [filter, setFilter] = useState('');
+    /**
+     * FR-63's `{count}` — the eligible count the read **reported**
+     * (`meta.total`), counted before the cap and before the filter.
+     *
+     * It is state because a filtered read answers with the same number and the
+     * page takes the freshest one; it is seeded from the page's own read so the
+     * line is exact on first paint. Deliberately not rebuilt from the rows: with
+     * 200 of 250 items in hand, `worksTotal + platform rows` is a guess, and a
+     * count line that guesses is the one thing FR-63's counted line must not be.
+     */
+    const [eligibleTotal, setEligibleTotal] = useState(initialMeta.total);
+    /** `true` when a filtered read failed, so the shortage is not silent. */
+    const [filterFailed, setFilterFailed] = useState(false);
     const [saveState, setSaveState] = useState<SaveState>('idle');
     /** Bumped by every queued change; the effect below owns the debounce timer. */
     const [queueToken, setQueueToken] = useState(0);
@@ -182,6 +254,10 @@ export function AppLauncherSettings({
     const itemsRef = useRef<AppLauncherItem[]>(items);
     /** The row a native drag started on. */
     const draggingRef = useRef<string | null>(null);
+    /** The needle the server was last asked for — `''` is the page's own read. */
+    const requestedFilterRef = useRef('');
+    /** The newest read's number, so a slower earlier answer cannot win. */
+    const readSequenceRef = useRef(0);
 
     useEffect(() => {
         itemsRef.current = items;
@@ -193,15 +269,16 @@ export function AppLauncherSettings({
     const pinBudgetSpent = pinCount >= pinLimit;
 
     /**
-     * FR-63: the read caps at 200 and says whether it did. `meta.worksTotal` is
-     * the eligible Works counted **before** the cap (plan §4.1:401) and every
-     * Ever app is inside the cap — the platform catalog is its own bounded list
-     * (plan §5.2) and always sorts before the Works — so the eligible total is
-     * the works total plus the platform rows actually returned.
+     * FR-63's counted line and filter, from the read the page made.
+     *
+     * `truncated` comes from that first, unfiltered read — not from the latest
+     * one: a filtered read that answers three rows is not truncated, and taking
+     * its flag would make the count line and the filter box disappear the moment
+     * the person used them. `eligibleTotal` is `meta.total`, the eligible count
+     * before any filter, so the line keeps saying **Showing 200 of {count}**
+     * while the view is narrowed.
      */
-    const platformCount = items.filter((item) => item.kind === 'platform').length;
     const truncated = initialMeta.truncated === true;
-    const eligibleTotal = truncated ? initialMeta.worksTotal + platformCount : items.length;
 
     const sections = useMemo<SectionRows[]>(
         () =>
@@ -212,16 +289,61 @@ export function AppLauncherSettings({
         [items],
     );
 
+    /**
+     * The rows the filter shows **now**, while the server is still being asked.
+     *
+     * The same fold the registry applies (`foldText`,
+     * `command-palette/registry/local-match.ts:10-18`, which
+     * `packages/agent/src/app-launcher/launcher-filter.ts` mirrors), so the
+     * browser never hides a row the server just matched: narrowing with a plain
+     * `toLowerCase()` would drop **Café Central** from the answer to `cafe`.
+     * This local narrowing is also why clearing the filter is instant — the list
+     * itself is never narrowed, only the view.
+     */
     const visibleSections = useMemo<SectionRows[]>(() => {
-        const needle = filter.trim().toLocaleLowerCase();
+        const needle = foldText(filter);
         if (needle.length === 0) return sections;
         return sections
             .map((entry) => ({
                 section: entry.section,
-                rows: entry.rows.filter((row) => row.name.toLocaleLowerCase().includes(needle)),
+                rows: entry.rows.filter((row) => foldText(row.name).includes(needle)),
             }))
             .filter((entry) => entry.rows.length > 0);
     }, [filter, sections]);
+
+    /**
+     * Ask the server for the filter (FR-63).
+     *
+     * The answer is **merged** into the list rather than replacing it: the rows
+     * it adds are the ones the 200-item cap left out, and the rows it repeats are
+     * the page's own (see {@link mergeRows}). A failed read leaves the page with
+     * what it holds and says so, because the alternative — silently pretending
+     * the list is complete — is exactly the unreachability FR-63 exists to
+     * remove.
+     */
+    const readFiltered = useCallback(async (needle: string): Promise<void> => {
+        const sequence = (readSequenceRef.current += 1);
+        const result = await readAppLauncherListAction(needle);
+        // A slower earlier answer must not overwrite a newer one.
+        if (sequence !== readSequenceRef.current) return;
+        if (!result || result.success !== true) {
+            setFilterFailed(true);
+            return;
+        }
+        setFilterFailed(false);
+        setEligibleTotal(result.data.meta.total);
+        setItems((rows) => mergeRows(rows, result.data.items));
+    }, []);
+
+    useEffect(() => {
+        // The page's own read already answered for `''`.
+        if (filter === requestedFilterRef.current) return;
+        const timer = setTimeout(() => {
+            requestedFilterRef.current = filter;
+            void readFiltered(filter);
+        }, FILTER_DEBOUNCE_MS);
+        return () => clearTimeout(timer);
+    }, [filter, readFiltered]);
 
     // -----------------------------------------------------------------------
     // Queuing and flushing (FR-28)
@@ -476,6 +598,23 @@ export function AppLauncherSettings({
                         className="w-48 rounded-md border border-border bg-surface px-2 py-1 text-sm text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
                     />
                 </div>
+            ) : null}
+
+            {/*
+              A failed filtered read is never silent: the rows past the cap are
+              unreachable again while it is failing, and the person is looking at
+              a list that cannot show them why. The sentence is the launcher's own
+              read-failure copy (T14's `worksError`) rather than a second string
+              that says the same thing.
+            */}
+            {truncated && filterFailed ? (
+                <p
+                    role="status"
+                    data-testid="app-launcher-filter-error"
+                    className="text-sm text-text-muted dark:text-text-muted-dark"
+                >
+                    {tLauncher('worksError')}
+                </p>
             ) : null}
 
             {items.length === 0 ? (

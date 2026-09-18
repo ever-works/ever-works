@@ -167,6 +167,9 @@ function appsPayload(
             catalogAvailable: true,
             scopeKey: scope,
             worksTotal: 2,
+            // The eligible count FR-63 renders; this fixture is not capped, so it
+            // is the number of tiles above.
+            total: 4,
             truncated: false,
             pinLimit: 6,
             appWorksAvailable: true,

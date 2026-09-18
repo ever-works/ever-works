@@ -67,12 +67,17 @@ vi.mock('@/lib/hooks/use-workspace-scope', () => ({
 
 vi.mock('@/app/actions/settings/app-launcher', () => ({
     saveAppLauncherPreferencesAction: vi.fn(),
+    readAppLauncherListAction: vi.fn(),
 }));
 
-import { saveAppLauncherPreferencesAction } from '@/app/actions/settings/app-launcher';
-import { AppLauncherSettings } from './AppLauncherSettings';
+import {
+    readAppLauncherListAction,
+    saveAppLauncherPreferencesAction,
+} from '@/app/actions/settings/app-launcher';
+import { AppLauncherSettings, FILTER_DEBOUNCE_MS, SAVE_DEBOUNCE_MS } from './AppLauncherSettings';
 
 const saveAction = vi.mocked(saveAppLauncherPreferencesAction);
+const readAction = vi.mocked(readAppLauncherListAction);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -130,11 +135,23 @@ function meta(
         catalogAvailable: true,
         scopeKey: 'org-1',
         worksTotal: 0,
+        // `total` is FR-63's `{count}` — the eligible count the read reported.
+        // Only the count line renders it, and only a truncated read renders the
+        // count line, so a fixture that shows it states its own number.
+        total: 0,
         truncated: false,
         pinLimit: 6,
         appWorksAvailable: true,
         ...overrides,
     };
+}
+
+/** A successful `GET /api/me/apps`, as the filter read answers it. */
+function listedResponse(
+    items: AppLauncherItem[],
+    overrides: Partial<AppLauncherListResponse['meta']> = {},
+): Awaited<ReturnType<typeof readAppLauncherListAction>> {
+    return { success: true, data: { items, meta: meta(overrides) }, error: null };
 }
 
 /** A successful save, echoing the list the editor should re-render from. */
@@ -232,6 +249,20 @@ async function flushDebounce(): Promise<void> {
     });
 }
 
+/**
+ * Flush the filter's own — much shorter — window and let its read settle.
+ *
+ * FR-63's filter is a **read**, so it must not borrow
+ * {@link SAVE_DEBOUNCE_MS}: a save's half-second would mean half a second of
+ * typing before the server is asked, and the two windows are asserted to be
+ * different numbers by `asks the server on its own debounce` below.
+ */
+async function flushFilterDebounce(): Promise<void> {
+    await act(async () => {
+        await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS);
+    });
+}
+
 /** Every key with an explicit `order` in one save. */
 function orderedKeys(changes: AppLauncherPreferenceChange[]): string[] {
     return changes.filter((change) => change.order !== undefined).map((change) => change.key);
@@ -240,6 +271,10 @@ function orderedKeys(changes: AppLauncherPreferenceChange[]): string[] {
 beforeEach(() => {
     vi.useFakeTimers();
     saveAction.mockReset();
+    readAction.mockReset();
+    // The filter read answers "nothing new" unless a test says otherwise, so the
+    // list a fixture handed in is the list the editor renders.
+    readAction.mockResolvedValue(listedResponse([]));
     workspaceScope = { kind: 'organization', slug: 'acme' };
 });
 
@@ -573,7 +608,7 @@ describe('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', (
         const platform = platformItem('gauzy');
         const allWorks = Array.from({ length: 204 }, (_, index) => workItem(index + 1));
         const items = [platform, ...allWorks.slice(0, 199)];
-        return { items, meta: meta({ worksTotal: 204, truncated: true }) };
+        return { items, meta: meta({ worksTotal: 204, total: 205, truncated: true }) };
     }
 
     it('renders the counted line and the filter', () => {
@@ -583,6 +618,17 @@ describe('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', (
         expect(screen.getByTestId('app-launcher-count')).toHaveTextContent('Showing 200 of 205');
         expect(screen.getByTestId('app-launcher-filter')).toHaveAccessibleName('Filter apps');
         expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
+    });
+
+    it('counts what the read REPORTED, not a number rebuilt from the rows it holds', () => {
+        // `worksTotal` is Works only and the page holds one Ever app, so the old
+        // reconstruction would render "Showing 200 of 205" here. Only
+        // `meta.total` can produce 250.
+        const items = [platformItem('gauzy'), workItem(1)];
+        renderEditor(items, { meta: meta({ worksTotal: 204, total: 250, truncated: true }) });
+
+        expect(screen.getByTestId('app-launcher-count')).toHaveTextContent('Showing 200 of 250');
+        expect(screen.getByTestId('app-launcher-count')).not.toHaveTextContent('205');
     });
 
     it('keeps every item it holds reachable: the filter narrows the view, never the list', () => {
@@ -607,6 +653,113 @@ describe('AppLauncherSettings — past 200 eligible items (FR-63, ACC-11-47)', (
 
         fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: '' } });
         expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
+    });
+
+    it('reaches an item past the cap: the filter is sent to the server and its rows are rendered', async () => {
+        const { items, meta: pageMeta } = truncatedFixture();
+        // The 240th Work is not in the 200 rows the page holds…
+        const beyond = workItem(240, { name: 'Work 240' });
+        expect(items.map((item) => item.key)).not.toContain(beyond.key);
+        readAction.mockResolvedValue(
+            listedResponse([beyond], { worksTotal: 204, total: 250, truncated: true }),
+        );
+
+        renderEditor(items, { meta: pageMeta });
+        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+            target: { value: 'Work 240' },
+        });
+        await flushFilterDebounce();
+
+        // …and the read that names it is what makes it reachable (FR-63).
+        expect(readAction).toHaveBeenCalledTimes(1);
+        expect(readAction).toHaveBeenCalledWith('Work 240');
+        expect(rowFor(beyond.key)).toBeInTheDocument();
+        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(1);
+        // The count is the eligible total the read reported, before the filter.
+        expect(screen.getByTestId('app-launcher-count')).toHaveTextContent('Showing 200 of 250');
+    });
+
+    it('asks the server on its own debounce — never on the save window (FR-28, FR-63)', async () => {
+        const { items, meta: pageMeta } = truncatedFixture();
+        renderEditor(items, { meta: pageMeta });
+
+        expect(saveAction).not.toHaveBeenCalled();
+        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+            target: { value: 'Work 240' },
+        });
+
+        // The filter is a read: it must not wait for the save's half-second.
+        expect(FILTER_DEBOUNCE_MS).toBeLessThan(SAVE_DEBOUNCE_MS);
+        await flushFilterDebounce();
+        expect(readAction).toHaveBeenCalledTimes(1);
+        expect(saveAction, 'a filter never saves anything').not.toHaveBeenCalled();
+
+        // Clearing the filter asks again, so the page goes back to the read's own
+        // unfiltered answer instead of keeping a filtered list.
+        fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: '' } });
+        await flushFilterDebounce();
+        expect(readAction).toHaveBeenCalledTimes(2);
+        expect(readAction).toHaveBeenLastCalledWith('');
+        // Nothing is fetched until the window closes: a second keystroke inside it
+        // restarts the window rather than opening a second read.
+        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(200);
+    });
+
+    it('coalesces keystrokes inside the window into one read', async () => {
+        const { items, meta: pageMeta } = truncatedFixture();
+        renderEditor(items, { meta: pageMeta });
+
+        const input = screen.getByTestId('app-launcher-filter');
+        fireEvent.change(input, { target: { value: 'W' } });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS - 50);
+        });
+        expect(readAction).not.toHaveBeenCalled();
+
+        fireEvent.change(input, { target: { value: 'Wo' } });
+        await flushFilterDebounce();
+
+        expect(readAction).toHaveBeenCalledTimes(1);
+        expect(readAction).toHaveBeenCalledWith('Wo');
+    });
+
+    it('narrows case- and accent-insensitively, the same fold the server applies', () => {
+        const cafe = workItem(1, { name: 'Café Central' });
+        renderEditor([cafe, workItem(2)], {
+            meta: meta({ worksTotal: 2, total: 300, truncated: true }),
+        });
+
+        fireEvent.change(screen.getByTestId('app-launcher-filter'), { target: { value: 'CAFE' } });
+
+        expect(screen.getAllByTestId('app-launcher-row')).toHaveLength(1);
+        expect(rowFor(cafe.key)).toBeInTheDocument();
+    });
+
+    it('keeps the local narrowing and says so when the filtered read fails', async () => {
+        const { items, meta: pageMeta } = truncatedFixture();
+        readAction.mockResolvedValue({ success: false, data: null, error: 'failed_to_load_apps' });
+
+        renderEditor(items, { meta: pageMeta });
+        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+            target: { value: 'Work 199' },
+        });
+        await flushFilterDebounce();
+
+        // The read failed, so a row past the cap cannot be reached — but the rows
+        // the page holds are still filtered, and the failure is not silent.
+        expect(rowFor(workKey(199))).toBeInTheDocument();
+        expect(screen.getByTestId('app-launcher-filter-error')).toHaveTextContent(
+            "Your apps couldn't be loaded.",
+        );
+
+        // A later read that succeeds clears the message.
+        readAction.mockResolvedValue(listedResponse([], { total: 205, truncated: true }));
+        fireEvent.change(screen.getByTestId('app-launcher-filter'), {
+            target: { value: 'Work 200' },
+        });
+        await flushFilterDebounce();
+
+        expect(screen.queryByTestId('app-launcher-filter-error')).toBeNull();
     });
 
     it('does not claim a cap when the whole eligible set fits', () => {

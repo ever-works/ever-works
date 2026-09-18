@@ -10,6 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { THROTTLER_LIMIT, THROTTLER_TTL } from '@nestjs/throttler/dist/throttler.constants';
 import {
+    APP_LAUNCHER_FILTER_MAX_LENGTH,
     APP_LAUNCHER_MAX_CHANGES_PER_SAVE,
     APP_LAUNCHER_PIN_LIMIT,
     type AppLauncherItem,
@@ -265,6 +266,11 @@ class FakeLauncherService {
                 catalogAvailable: options.catalogAvailable ?? handedIn.length > 0,
                 scopeKey,
                 worksTotal: this.rowsOf(scopeKey).length,
+                // This stand-in does not implement the FR-63 filter — it records
+                // the option and echoes the unfiltered list — so its `total` is the
+                // whole eligible set, which is what the real registry reports
+                // whatever the filter is.
+                total: items.length,
                 truncated: items.length > limit,
                 pinLimit: APP_LAUNCHER_PIN_LIMIT,
                 appWorksAvailable: false,
@@ -774,6 +780,51 @@ describe('APW-11 T9 — App Launcher controllers', () => {
             },
         );
 
+        it('forwards the Manage apps filter, trimmed, as `q` (FR-63)', async () => {
+            switchOn();
+            launcher.reset(seededRows);
+
+            const spaced = await getApps('?includeHidden=true&q=%20cal%20');
+            expect(spaced.status).toBe(200);
+            expect(launcher.reads[0].options).toMatchObject({ includeHidden: true, filter: 'cal' });
+
+            const atTheCap = await getApps(`?q=${'x'.repeat(APP_LAUNCHER_FILTER_MAX_LENGTH)}`);
+            // A filter exactly at the cap is accepted…
+            expect(atTheCap.status).toBe(200);
+            expect(launcher.reads[1].options.filter).toHaveLength(APP_LAUNCHER_FILTER_MAX_LENGTH);
+        });
+
+        it('treats a blank filter as no filter at all rather than a 400 (FR-63)', async () => {
+            switchOn();
+            launcher.reset(seededRows);
+
+            const response = await getApps('?q=%20%20');
+
+            expect(response.status).toBe(200);
+            expect(launcher.reads[0].options.filter ?? '').toBe('');
+        });
+
+        it.each<[string, string]>([
+            [
+                'a filter one character past the cap',
+                `?q=${'x'.repeat(APP_LAUNCHER_FILTER_MAX_LENGTH + 1)}`,
+            ],
+            // A repeated or bracketed parameter arrives as an array, which is not
+            // the string the route declares.
+            ['an array-shaped filter', '?q[]=cal'],
+            // The DTO is the route's whitelist: a parameter it does not declare is
+            // still a 400, so `q` cannot quietly become "anything goes".
+            ['a parameter the DTO does not declare', '?filter=cal'],
+            ['an unknown parameter', '?unknown=1'],
+        ])('answers 400 for %s (plan §4.5)', async (_label, query) => {
+            switchOn();
+
+            const response = await getApps(query);
+
+            expect(response.status).toBe(400);
+            expect(launcher.reads).toHaveLength(0);
+        });
+
         it('serves another workspace its own arrangement, never its neighbour’s (FR-53, FR-62)', async () => {
             switchOn();
             launcher.reset(seededRows);
@@ -1057,6 +1108,20 @@ describe('APW-11 T9 — App Launcher controllers', () => {
 
             expect(listParams).toContain(ListAppLauncherQueryDto);
             expect(saveParams).toContain(SaveAppLauncherPreferencesDto);
+        });
+
+        it('declares the FR-63 filter as `q` and trims it in the DTO itself', async () => {
+            // The pipe the two HTTP suites above run through, so the trim cannot be
+            // a client-side convention the API does not hold.
+            const pipe = new ValidationPipe({
+                whitelist: true,
+                transform: true,
+                forbidNonWhitelisted: true,
+            });
+            const context = { type: 'query' as const, metatype: ListAppLauncherQueryDto };
+
+            await expect(pipe.transform({ q: '  cal  ' }, context)).resolves.toEqual({ q: 'cal' });
+            await expect(pipe.transform({}, context)).resolves.toEqual({});
         });
     });
 });

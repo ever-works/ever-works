@@ -2,9 +2,10 @@
 
 import { redirect } from 'next/navigation';
 import { getAuthFromCookie } from '@/lib/auth';
-import { appLauncherAPI } from '@/lib/api/app-launcher';
+import { APP_LAUNCHER_SETTINGS_PAGE_SIZE, appLauncherAPI } from '@/lib/api/app-launcher';
 import { ApiResponseError } from '@/lib/api/server-api';
 import type {
+    AppLauncherListResponse,
     AppLauncherPreferenceChange,
     AppLauncherSavePreferencesResponse,
 } from '@ever-works/contracts';
@@ -62,6 +63,11 @@ export type SaveAppLauncherPreferencesResult =
     | { success: true; data: AppLauncherSavePreferencesResponse; error: null }
     | { success: false; data: null; error: string };
 
+/** What FR-63's filter read answers: the registry's list, or a failure to report. */
+export type ReadAppLauncherListResult =
+    | { success: true; data: AppLauncherListResponse; error: null }
+    | { success: false; data: null; error: string };
+
 async function ensureAuth() {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -99,6 +105,41 @@ export async function saveAppLauncherPreferencesAction(
     await ensureAuth();
     try {
         const data = await appLauncherAPI.savePreferences(changes);
+        return { success: true, data, error: null };
+    } catch (error) {
+        return { success: false, data: null, error: errorMessage(error) };
+    }
+}
+
+/**
+ * FR-63's filter, as a read (spec.md:303-305).
+ *
+ * The **Manage apps** filter cannot be a browser-side predicate alone: a
+ * client-side filter narrows the 200 rows the page already holds, so the 240th
+ * of 250 eligible items is unreachable — the one thing FR-63 forbids. This
+ * action re-reads the registry with `q` set, and the API narrows the **eligible**
+ * set before its cap, so the answer can contain a row the first page never had.
+ *
+ * It is a read, so it is deliberately **not** the save action: no
+ * `revalidatePath`, no write, and the editor debounces it on its own, much
+ * shorter window (`FILTER_DEBOUNCE_MS` in `AppLauncherSettings.tsx`) rather than
+ * on FR-28's half-second save window.
+ *
+ * `filter` travels verbatim — the action is transport, and the API's
+ * `ListAppLauncherQueryDto` is what trims it and refuses one past its cap. The
+ * page size is the same {@link APP_LAUNCHER_SETTINGS_PAGE_SIZE} the page read
+ * with, so the unfiltered case answers exactly the list the page already has.
+ */
+export async function readAppLauncherListAction(
+    filter: string,
+): Promise<ReadAppLauncherListResult> {
+    await ensureAuth();
+    try {
+        const data = await appLauncherAPI.list({
+            includeHidden: true,
+            limit: APP_LAUNCHER_SETTINGS_PAGE_SIZE,
+            filter,
+        });
         return { success: true, data, error: null };
     } catch (error) {
         return { success: false, data: null, error: errorMessage(error) };

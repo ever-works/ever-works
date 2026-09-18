@@ -52,6 +52,17 @@ export interface AppLauncherReadOptions {
     includeHidden?: boolean;
     /** `1..200`; the DTO's own bound. */
     limit?: number;
+    /**
+     * FR-63's filter — sent as `q`, the one parameter `ListAppLauncherQueryDto`
+     * declares for it (the API's pipe runs with `forbidNonWhitelisted`, so the
+     * spelling is part of the route's contract and not this module's choice).
+     *
+     * A blank needle is not sent at all: the API trims it to "no filter" anyway,
+     * so `?q=` would be a request that says nothing twice. The length cap stays
+     * the DTO's (`APP_LAUNCHER_FILTER_MAX_LENGTH`); it is not re-checked here,
+     * because a second copy of a boundary is how the two drift apart.
+     */
+    filter?: string;
 }
 
 export const appLauncherAPI = {
@@ -63,6 +74,10 @@ export const appLauncherAPI = {
      * is the API's default 200, which is the same number
      * {@link APP_LAUNCHER_SETTINGS_PAGE_SIZE} names — sending it explicitly
      * makes the page's assumption visible in the request rather than implied.
+     *
+     * `q` is sent only when there is something to filter by (FR-63): an empty
+     * filter and no filter are the same request, and the API answers them the
+     * same way.
      */
     list(options: AppLauncherReadOptions = {}): Promise<AppLauncherListResponse> {
         const params = new URLSearchParams();
@@ -70,6 +85,10 @@ export const appLauncherAPI = {
             params.set('includeHidden', options.includeHidden ? 'true' : 'false');
         }
         params.set('limit', String(options.limit ?? APP_LAUNCHER_SETTINGS_PAGE_SIZE));
+        const filter = options.filter?.trim() ?? '';
+        if (filter.length > 0) {
+            params.set('q', filter);
+        }
         return serverFetch<AppLauncherListResponse>(`${APPS_ENDPOINT}?${params.toString()}`);
     },
 

@@ -13,12 +13,15 @@
  * - `./launcher-address` and `./launcher-order` — the two pure modules, exported
  *   so the API's controller and the web's server action can reuse the same
  *   address model and the same section reorder helper instead of restating them;
+ * - `./launcher-filter` — FR-63's one text fold and its substring match, so a
+ *   caller that narrows a list itself folds it exactly as the registry does;
  * - `./app-launcher.module` — `AppLauncherModule`, what `apps/api` imports.
  */
 
 export * from './app-launcher.errors';
 export * from './app-launcher.service';
 export * from './launcher-address';
+export * from './launcher-filter';
 export * from './launcher-order';
 export * from './managed-host-root.resolver';
 export * from './app-launcher.module';

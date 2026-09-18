@@ -81,6 +81,7 @@ export default async function AppLauncherSettingsPage() {
         catalogAvailable: false,
         scopeKey: '',
         worksTotal: 0,
+        total: 0,
         truncated: false,
         pinLimit: APP_LAUNCHER_PIN_LIMIT,
         appWorksAvailable: false,

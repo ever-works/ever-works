@@ -269,6 +269,7 @@ describe('AppLauncherService.listForUser (APW-11 T6)', () => {
         options: {
             includeHidden?: boolean;
             limit?: number;
+            filter?: string;
             scope?: AppLauncherScope;
             user?: { id: string };
             service?: AppLauncherService;
@@ -282,6 +283,7 @@ describe('AppLauncherService.listForUser (APW-11 T6)', () => {
             {
                 includeHidden: options.includeHidden,
                 limit: options.limit,
+                filter: options.filter,
             },
         );
     }
@@ -1061,6 +1063,172 @@ describe('AppLauncherService.listForUser (APW-11 T6)', () => {
 
             expect(response.items).toEqual([]);
             expect(response.meta.worksTotal).toBe(0);
+            // The early return is one of the places the response is built, so it
+            // owes the client the same fields as the main one (FR-63).
+            expect(response.meta.total).toBe(0);
+        });
+    });
+
+    // ── The Manage apps filter and the eligible count (FR-63) ───────────────
+
+    describe('the Manage apps filter and the eligible count (FR-63)', () => {
+        /**
+         * `count` eligible Works named `Bulk 001…`, so the name order — which is
+         * what a Work that never deployed falls back to (FR-26) — is the numeric
+         * order and "item 240" means the 240th.
+         */
+        async function makeBulkWorks(count: number): Promise<string[]> {
+            const works = dataSource.getRepository(Work);
+            const rows = Array.from({ length: count }, (_value, index) => {
+                sequence += 1;
+                return works.create({
+                    userId: USER,
+                    name: `Bulk ${String(index + 1).padStart(3, '0')}`,
+                    slug: `bulk-${sequence}`,
+                    description: `Bulk fixture ${index + 1}`,
+                    kind: 'app',
+                    status: 'active',
+                    organizationId: null,
+                    managedSubdomain: `bulk-${index + 1}`,
+                    appLauncherExposed: null,
+                } as unknown as Partial<Work>);
+            });
+            const saved = await works.save(rows);
+            return saved.map((work) => work.id);
+        }
+
+        it('reaches the 240th eligible item with a filter, which the cap alone cannot (FR-63)', async () => {
+            const ids = await makeBulkWorks(250);
+            const target = ids[239];
+
+            const page = await list({ includeHidden: true, limit: 200 });
+            expect(page.items).toHaveLength(200);
+            expect(page.meta.truncated).toBe(true);
+            // Reachability is the whole criterion: today the 240th Work is simply
+            // not in the answer, and the client-side filter could only narrow what
+            // it already held.
+            expect(page.items.map((item) => item.key)).not.toContain(keyOf(target));
+
+            const filtered = await list({
+                includeHidden: true,
+                limit: 200,
+                filter: 'Bulk 240',
+            });
+
+            expect(filtered.items.map((item) => item.key)).toEqual([keyOf(target)]);
+            expect(tileOf(filtered, target)).toMatchObject({
+                kind: 'work',
+                name: 'Bulk 240',
+                manageState: 'notLive',
+            });
+        });
+
+        it('reports meta.total as the eligible count, whatever the filter and the cap', async () => {
+            await makeBulkWorks(250);
+
+            // 250 Works + the 3 catalog tiles the caller handed in: counted before
+            // the filter and before the cap, which is what FR-63's {count} means.
+            const page = await list({ includeHidden: true, limit: 200 });
+            expect(page.meta.total).toBe(253);
+            expect(page.meta.total).not.toBe(page.items.length);
+
+            const filtered = await list({ includeHidden: true, filter: 'Bulk 240' });
+            expect(filtered.items).toHaveLength(1);
+            expect(filtered.meta.total).toBe(253);
+
+            const noMatch = await list({ includeHidden: true, filter: 'nothing matches this' });
+            expect(noMatch.items).toEqual([]);
+            expect(noMatch.meta.total).toBe(253);
+
+            const capped = await list({ includeHidden: true, limit: 1 });
+            expect(capped.items).toHaveLength(1);
+            expect(capped.meta.total).toBe(253);
+        });
+
+        it('changes nothing for a blank filter (FR-63)', async () => {
+            const ids = await makeBulkWorks(5);
+            const workId = ids[0];
+            await deploy(workId, 'READY', { website: `https://bulk-live.${APPS_APEX}/` });
+
+            const unfiltered = await list({ includeHidden: true });
+            for (const blank of ['', '   ', '\t']) {
+                const result = await list({ includeHidden: true, filter: blank });
+                expect(result.items.map((item) => item.key)).toEqual(
+                    unfiltered.items.map((item) => item.key),
+                );
+                expect(result.meta.total).toBe(unfiltered.meta.total);
+                expect(result.meta.truncated).toBe(unfiltered.meta.truncated);
+            }
+        });
+
+        it('leaves the order of what it returns alone (FR-26)', async () => {
+            const first = await makeWork({ kind: 'app', name: 'Shared newest' });
+            const second = await makeWork({ kind: 'app', name: 'Shared middle' });
+            const third = await makeWork({ kind: 'app', name: 'Nothing in common' });
+            await deploy(first, 'READY', {
+                website: `https://shared-newest.${APPS_APEX}/`,
+                createdAt: '2026-03-01T00:00:00.000Z',
+            });
+            await deploy(second, 'READY', {
+                website: `https://shared-middle.${APPS_APEX}/`,
+                createdAt: '2026-02-01T00:00:00.000Z',
+            });
+            await deploy(third, 'READY', {
+                website: `https://unrelated.${APPS_APEX}/`,
+                createdAt: '2026-01-01T00:00:00.000Z',
+            });
+
+            const all = await list({ includeHidden: true });
+            const filtered = await list({ includeHidden: true, filter: 'shared' });
+
+            // Newest successful production deployment first (FR-26) — and the
+            // filter removes whole items rather than re-ranking the ones it keeps.
+            expect(
+                all.items.filter((item) => item.kind === 'work').map((item) => item.key),
+            ).toEqual([keyOf(first), keyOf(second), keyOf(third)]);
+            expect(filtered.items.map((item) => item.key)).toEqual([keyOf(first), keyOf(second)]);
+            expect(filtered.items.map((item) => item.order)).toEqual([0, 1]);
+        });
+
+        it('matches a name case- and accent-insensitively, and only as a substring', async () => {
+            const cafe = await makeWork({ kind: 'app', name: 'Café Central' });
+            const other = await makeWork({ kind: 'app', name: 'Workshop' });
+
+            const lowercase = await list({ includeHidden: true, filter: 'cafe central' });
+            const uppercase = await list({ includeHidden: true, filter: 'CAFÉ' });
+            const partial = await list({ includeHidden: true, filter: 'afe cen' });
+
+            expect(lowercase.items.map((item) => item.key)).toEqual([keyOf(cafe)]);
+            expect(uppercase.items.map((item) => item.key)).toEqual([keyOf(cafe)]);
+            expect(partial.items.map((item) => item.key)).toEqual([keyOf(cafe)]);
+
+            // The control: the matcher is not "everything matches", and a miss
+            // still reports the eligible count rather than zero (FR-63).
+            const missing = await list({ includeHidden: true, filter: 'zzz' });
+            expect(missing.items).toEqual([]);
+            expect(missing.meta.total).toBe(5);
+            expect(missing.items.map((item) => item.key)).not.toContain(keyOf(other));
+        });
+
+        it('filters the panel read as well, over what the panel may show (FR-27)', async () => {
+            const live = await makeWork({ kind: 'app', name: 'Shared live' });
+            const hidden = await makeWork({ kind: 'app', name: 'Shared hidden' });
+            await deploy(live, 'READY', { website: `https://shared-live.${APPS_APEX}/` });
+            await preferences().upsertMany(USER, [
+                { scopeKey: 'personal', itemKey: keyOf(hidden), visible: false },
+            ]);
+
+            const panel = await list({ filter: 'Shared' });
+            const manage = await list({ includeHidden: true, filter: 'Shared' });
+
+            expect(panel.items.map((item) => item.key)).toEqual([keyOf(live)]);
+            // 3 catalog tiles + the one live Work: the hidden, never-deployed Work
+            // is not part of the panel's eligible set at all (FR-27, FR-56).
+            expect(panel.meta.total).toBe(4);
+            expect(manage.items.map((item) => item.key).sort()).toEqual(
+                [keyOf(live), keyOf(hidden)].sort(),
+            );
+            expect(manage.meta.total).toBe(5);
         });
     });
 });

@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
     ArrayMaxSize,
     ArrayMinSize,
@@ -23,10 +23,12 @@ import {
     IsString,
     Matches,
     Max,
+    MaxLength,
     Min,
     ValidateNested,
 } from 'class-validator';
 import {
+    APP_LAUNCHER_FILTER_MAX_LENGTH,
     APP_LAUNCHER_MAX_CHANGES_PER_SAVE,
     APP_LAUNCHER_MAX_ITEMS_RESPONSE,
     APP_LAUNCHER_PIN_LIMIT,
@@ -151,7 +153,8 @@ export const APP_LAUNCHER_PUBLIC_ORIGIN = '*';
 // ---------------------------------------------------------------------------
 
 /**
- * `GET /api/me/apps` — the two paging inputs of plan §4.1:356-364 and FR-63.
+ * `GET /api/me/apps` — the paging and filtering inputs of plan §4.1:356-364 and
+ * FR-63.
  *
  * `includeHidden` is the string `'true' | 'false'` the plan's table names, and
  * anything else is a `400` rather than a coerced truthy: **Manage apps**
@@ -159,6 +162,22 @@ export const APP_LAUNCHER_PUBLIC_ORIGIN = '*';
  * typo silently falling back to the panel's shorter list would look like data
  * loss. `limit` is `1..200` with the service's own default (200) when absent
  * (FR-34, FR-63).
+ *
+ * `q` is FR-63's filter, and it is the one input plan §4.1's table does not
+ * list — added because the table's own claim ("`limit`/`order` are the only
+ * paging inputs — no eligible item needs a second endpoint to be reached") only
+ * holds if a person with more than 200 eligible items can name the one they
+ * want, and a client-side filter can only narrow the rows the response already
+ * carried (spec.md:303-305). It is trimmed here, so `?q=%20cal%20` and `?q=cal`
+ * are one request, and capped at {@link APP_LAUNCHER_FILTER_MAX_LENGTH}: a
+ * filter longer than an item's name (FR-57) could never match, so it is a `400`
+ * rather than a read of the whole eligible set that returns nothing.
+ *
+ * The name `q` is deliberate: it is the conventional free-text needle, and it
+ * keeps the route's declared surface distinct from `includeHidden`/`limit`,
+ * which select *what* is returned rather than *which* rows match. Because the
+ * platform's pipe runs with `forbidNonWhitelisted`, a parameter this class does
+ * not declare is still a `400` — `?filter=cal` included.
  */
 export class ListAppLauncherQueryDto {
     @IsOptional()
@@ -171,6 +190,12 @@ export class ListAppLauncherQueryDto {
     @Min(1)
     @Max(APP_LAUNCHER_MAX_ITEMS_RESPONSE)
     limit?: number;
+
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    @IsString()
+    @MaxLength(APP_LAUNCHER_FILTER_MAX_LENGTH)
+    q?: string;
 }
 
 /**
@@ -241,16 +266,24 @@ export class AppLauncherController {
      * readable by another, and a request can never name somebody else's scope
      * (FR-53). The catalog is read once per request and handed in; the service
      * echoes its version and availability in `meta` (S9/S10).
+     *
+     * `q` is handed to the registry as `filter`, which narrows the eligible set
+     * **before** the response cap — so `?includeHidden=true&limit=200&q=<name>`
+     * reaches the 240th of 250 eligible items, which neither the cap nor any
+     * client-side filter can (FR-63).
      */
     @Get()
     @Throttle({ long: { limit: APP_LAUNCHER_READS_PER_MINUTE, ttl: 60_000 } })
     @ApiOperation({
         summary: 'List the App Launcher items for the signed-in person',
         description:
-            'The merged, ordered list of pinned items, Ever apps and the person’s own Works, with each tile’s address, chip, visibility and Manage-apps state resolved server-side. `includeHidden=true` is the Manage apps view: it also returns hidden and not-live items, up to `limit` (1..200).',
+            'The merged, ordered list of pinned items, Ever apps and the person’s own Works, with each tile’s address, chip, visibility and Manage-apps state resolved server-side. `includeHidden=true` is the Manage apps view: it also returns hidden and not-live items, up to `limit` (1..200); `q` filters them by name, case- and accent-insensitively, before that cap, and `meta.total` reports the eligible count the filter never changes.',
     })
     @ApiResponse({ status: 200, description: 'The ordered list plus its `meta` facts.' })
-    @ApiResponse({ status: 400, description: '`limit` outside 1..200, or an unknown query shape.' })
+    @ApiResponse({
+        status: 400,
+        description: '`limit` outside 1..200, `q` longer than its cap, or an unknown query shape.',
+    })
     @ApiResponse({ status: 401, description: 'No session.' })
     @ApiResponse({ status: 404, description: 'The App Launcher is switched off.' })
     async list(
@@ -265,6 +298,7 @@ export class AppLauncherController {
             {
                 includeHidden: query.includeHidden === 'true',
                 limit: query.limit,
+                filter: query.q,
                 environment: catalog.environment,
                 catalogVersion: catalog.catalogVersion,
                 catalogAvailable: catalog.catalogAvailable,
