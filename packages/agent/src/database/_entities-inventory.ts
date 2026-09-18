@@ -195,6 +195,10 @@ import { WorkAppSpecState } from '../entities/work-app-spec-state.entity';
 // the per-App-Work preparation state that is derived, never API-written.
 import { WorkBuild } from '../entities/work-build.entity';
 import { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
+// APW-04 App Provisioner — one row per provisioning attempt of an App Work, at
+// most one of them ACTIVE (the partial unique this inventory's drift spec
+// cannot see, because it compares names, not indexes).
+import { WorkAppProvisioning } from '../entities/work-app-provisioning.entity';
 
 import {
     PluginEntity,
@@ -501,4 +505,7 @@ export const ENTITIES = [
     // preparation row the consumer stamps a push/pull-request Build from.
     WorkBuild,
     WorkBuildPreparation,
+    // APW-04 App Provisioner — the provisioning rows of an App Work: derived
+    // only, written by the start path and the step executor, read by the card.
+    WorkAppProvisioning,
 ];

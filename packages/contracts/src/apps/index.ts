@@ -50,3 +50,5 @@ export * from './builds.js';
 export * from './ever-id.js';
 export * from './tenant-postgres-ddl.js';
 export * from './work-app-spec.dto.js';
+export * from './app-provisioning.js';
+export * from './app-provisioning-copy.js';

@@ -247,6 +247,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkAppEnvValue',
     // APW-03 App spec & catalog — the per-App-Work spec state row.
     'WorkAppSpecState',
+    // APW-04 App Provisioner — one row per provisioning attempt of an App Work.
+    'WorkAppProvisioning',
     'WorkBudget',
     'WorkBudgetAlertState',
     // APW-05 Builds — one row per Build of an App Work (per-Work numbering),

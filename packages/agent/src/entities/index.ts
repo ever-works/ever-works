@@ -246,3 +246,7 @@ export * from './work-app-spec-state.entity';
 // the per-App-Work preparation state that is derived, never API-written.
 export * from './work-build.entity';
 export * from './work-build-preparation.entity';
+// APW-04 App Provisioner — one row per provisioning ATTEMPT of an App Work:
+// the §2.5 step table, the attempts, the spend, the open question and the step
+// executor's lease. At most one ACTIVE row per Work (a partial unique).
+export * from './work-app-provisioning.entity';

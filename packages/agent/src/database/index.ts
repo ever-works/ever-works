@@ -150,3 +150,10 @@ export * from './repositories/work-app-spec-state.repository';
 // entry that is not a provider there.
 export * from './repositories/app-build.repository';
 export * from './repositories/app-build-preparation.repository';
+// APW-04 App Provisioner — the provisioning rows of one App Work (the active
+// lookup the start path dedupes on, the four lease/attempt compare-and-sets and
+// the four sweep scans). Feature-owned and wired by the provisioning module, so
+// it is exported here rather than listed in `_repository-inventory.ts` — that
+// file is only for the repositories `DatabaseModule` itself wires, and its drift
+// check fails on an entry that is not a provider there.
+export * from './repositories/work-app-provisioning.repository';
