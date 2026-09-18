@@ -35,7 +35,16 @@ import { AppBuildPreparationRepository } from '../../../../../packages/agent/src
  * modules the API wires actually run.
  */
 
-const REPOSITORIES = ['app-build.repository.ts', 'app-build-preparation.repository.ts'] as const;
+const REPOSITORIES = [
+    'app-build.repository.ts',
+    'app-build-preparation.repository.ts',
+    // APW-04 T7's repository, added by the coordinator on that slice's own recommendation: it carries
+    // partial indexes and a lease/attempts compare-and-set of exactly the shape this file exists to
+    // protect, and an entry here is what puts it under BOTH halves — the source scan that catches a
+    // double-quoted fragment or an `interval '` literal SQLite would happily accept, and the recording
+    // builder that proves every value is bound rather than interpolated.
+    'work-app-provisioning.repository.ts',
+] as const;
 
 const repositoriesDir = join(
     __dirname,
