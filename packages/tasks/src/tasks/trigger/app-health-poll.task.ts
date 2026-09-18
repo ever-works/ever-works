@@ -1,6 +1,7 @@
 import { logger, schedules } from '@trigger.dev/sdk';
 import { CACHE_MANAGER } from '@ever-works/agent/cache';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { AppHealthService, type AppHealthPollSummary } from '@ever-works/agent/app-runtime';
 import {
     APP_RUNTIME_TASK_QUEUE,
     TriggerAppRuntimeModule,
@@ -43,12 +44,15 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * sweep starts working the moment that method is part of the published surface, and a rejection is
  * a visible warning rather than a silent no-op.
  *
- * ## The sweep itself — and the owner file that has not landed
+ * ## The sweep itself — T27's service, which landed with T70
  *
- * §9.3's health service is `packages/agent/src/app-runtime/app-health.service.ts`, APW-06 **T27**,
- * and it is not in this tree. This tick does not re-implement it (that would be a rival service T27
- * then has to reconcile); it reports `health_service_unavailable` naming that path, exactly as
- * `app-smoke` and `app-cluster-op` report theirs.
+ * §9.3's health service is `packages/agent/src/app-runtime/app-health.service.ts`, APW-06 **T27**.
+ * This tick does not re-implement it (that would be a rival service T27 then has to reconcile): it
+ * resolves `AppHealthService` from the worker context and calls `poll()`, reporting the summary the
+ * sweep answered with. `health_service_unavailable` — naming that path — remains for the one case
+ * that still deserves it: a context that boots without the service. **`T17` is the reason a sweep is
+ * still usually short**: the runtime-state repository has not landed, so `poll()` answers
+ * `health_store_unavailable` and this tick reports that verbatim rather than a zero-work "ran".
  */
 
 /** The task id — exported so the local worker and the specs never copy the string. */
@@ -66,7 +70,7 @@ export const APP_HEALTH_POLL_MAX_DURATION_SECONDS = 900 as const;
  */
 export const APP_HEALTH_POLL_LOCK_KEY = 'app-health-poll' as const;
 
-/** The file T27 lands; named here so a run log points at the gap instead of describing it. */
+/** The file T27 landed; named for the one case that still points at it — a context without it. */
 export const APP_HEALTH_SERVICE_PATH =
     'packages/agent/src/app-runtime/app-health.service.ts' as const;
 
@@ -90,6 +94,12 @@ export interface AppHealthPollTaskResult {
     /** The owner file a refusal is waiting on, when the refusal is a missing delegation. */
     missing: string | null;
     error: string | null;
+    /**
+     * §9.3's own summary, verbatim: what the sweep selected, polled, skipped, notified and
+     * concluded. `null` only when no service was resolvable — a sweep that could not run (T17's
+     * store is still unbound) answers `ok: false` with a `reason` here instead of a null.
+     */
+    health: AppHealthPollSummary | null;
 }
 
 /** `error.message` when there is one, `String(error)` otherwise. */
@@ -118,6 +128,7 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
                     reason: 'lock_service_unavailable',
                     missing: null,
                     error: null,
+                    health: null,
                 };
             }
 
@@ -133,6 +144,7 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
                     reason: 'lock_service_unavailable',
                     missing: null,
                     error: errorText(error),
+                    health: null,
                 };
             }
 
@@ -146,6 +158,7 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
                     reason: 'lock_held',
                     missing: null,
                     error: null,
+                    health: null,
                 };
             }
 
@@ -153,20 +166,87 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
             const cacheSweep = await sweepExpiredCacheEntries(appContext);
 
             // ---- the sweep itself (T27) ---------------------------------------------------
-            logger.error(
-                `app-health-poll: AppHealthService (plan §9.3) is not in this tree — ` +
-                    `${APP_HEALTH_SERVICE_PATH} is APW-06 T27's file and it has not landed, so no ` +
-                    'App Work was polled. Nothing was dialled.',
-            );
+            const health = appContext.get(AppHealthService, { strict: false }) as
+                | AppHealthService
+                | undefined;
+
+            if (!health?.poll) {
+                logger.error(
+                    `app-health-poll: AppHealthService (plan §9.3) is not resolvable from this ` +
+                        `worker context — ${APP_HEALTH_SERVICE_PATH} is APW-06 T27's file and it ` +
+                        'is a provider of TriggerAppRuntimeModule, so this context is not the one ' +
+                        'the module builds. No App Work was polled and nothing was dialled.',
+                );
+
+                return {
+                    status: 'skipped',
+                    jobId: APP_HEALTH_POLL_TASK_ID,
+                    lockGuard: 'free',
+                    cacheSweep,
+                    reason: 'health_service_unavailable',
+                    missing: APP_HEALTH_SERVICE_PATH,
+                    error: null,
+                    health: null,
+                };
+            }
+
+            let summary: AppHealthPollSummary;
+            try {
+                summary = await health.poll();
+            } catch (error) {
+                // §9.3's service resolves for every refusal it can name, so a throw here means the
+                // sweep died around it — reported, never reported as a poll that happened.
+                const message = errorText(error);
+                logger.error(`app-health-poll: the health sweep threw — ${message}`);
+
+                return {
+                    status: 'skipped',
+                    jobId: APP_HEALTH_POLL_TASK_ID,
+                    lockGuard: 'free',
+                    cacheSweep,
+                    reason: 'health_sweep_failed',
+                    missing: null,
+                    error: message,
+                    health: null,
+                };
+            }
+
+            if (summary?.ok === false) {
+                // The sweep could not run — T17's store is unbound today, which is the usual
+                // reason. Named, with its own code, rather than a zero-work "ran".
+                logger.warn(
+                    `app-health-poll: the health sweep could not run (${summary?.reason ?? 'unknown'}).`,
+                );
+
+                return {
+                    status: 'skipped',
+                    jobId: APP_HEALTH_POLL_TASK_ID,
+                    lockGuard: 'free',
+                    cacheSweep,
+                    reason: summary?.reason ?? 'health_sweep_unavailable',
+                    missing: null,
+                    error: null,
+                    health: summary,
+                };
+            }
+
+            logger.info('app-health-poll finished', {
+                selected: summary?.selected ?? 0,
+                polled: summary?.polled ?? 0,
+                skipped: summary?.skipped ?? 0,
+                notifications: summary?.notifications ?? 0,
+                verdicts: summary?.verdicts ?? null,
+            });
 
             return {
-                status: 'skipped',
+                status: 'ran',
                 jobId: APP_HEALTH_POLL_TASK_ID,
                 lockGuard: 'free',
                 cacheSweep,
-                reason: 'health_service_unavailable',
-                missing: APP_HEALTH_SERVICE_PATH,
+                reason: null,
+                missing: null,
                 error: null,
+                health: summary,
             };
         },
         TriggerAppRuntimeModule,

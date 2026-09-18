@@ -70,6 +70,23 @@
  *   `APP_COMMIT_ANCESTRY` for APW-02, `APP_RUNTIME_NOTIFICATIONS` for T29's producers). It lives
  *   here because the `app-deploy` task in `packages/tasks` — the only caller — can reach this folder
  *   through the subpath barrel alone, and the API must never construct a working one.
+ * - `./app-cluster-op.router` — `AppClusterOpRouter` (T70, plan §9.10): `handle(payload)` routes an
+ *   `app-cluster-op` payload by `op`, `register(op, handler)` is the extension point T48/T58/T60/T69
+ *   use, and the classifier maps §9.2's fifteen ids onto the four services that own them. It is on
+ *   the barrel because `app-cluster-op.task.ts` in `packages/tasks` resolves it from the worker
+ *   context by class token — a cross-package resolution that can only reach the built subpath.
+ * - `./app-lifecycle-ops.service` — `AppLifecycleOpsService` (T70, plan §9.10): the nine handlers
+ *   (`status-refresh`, `logs`, `pause`, `resume`, `remove`, `cancel-deploy`, `job-run`,
+ *   `cluster-check`, `ingress-reconcile`), the `app-op:` / `app-logs:` cache keys and their
+ *   300 000 ms TTL, and the provisional seams each handler refuses by name through.
+ * - `./app-smoke.service` — `AppSmokeService` (T70, plan §5.7): the on-demand smoke run behind
+ *   `app-smoke` — in-cluster through `runAppJob` with `runner: 'smoke'`, public through T23's
+ *   `AppPublicSmokeService`, `smokeResult` on the Deployment, `app.smoke.*` and **no rollback**.
+ * - `./app-health.service` — `AppHealthService` (T27, plan §9.3, FR-47): the every-minute sweep
+ *   behind `app-health-poll` — §9.3's selection and 500-row cap, five polls per cluster, a 20 s
+ *   budget per poll, FR-47's verdicts and streak rules, the `app.health.*` events, and the
+ *   notification producers T29 owns. It is on the barrel because `app-health-poll.task.ts` in
+ *   `packages/tasks` resolves it from the worker context by class token.
  */
 
 export * from './ports';
@@ -85,3 +102,7 @@ export * from './app-deploy-request.service';
 export * from './app-hosts.service';
 export * from './app-domains.service';
 export * from './app-deploy.orchestrator';
+export * from './app-cluster-op.router';
+export * from './app-lifecycle-ops.service';
+export * from './app-smoke.service';
+export * from './app-health.service';

@@ -76,6 +76,7 @@ vi.mock('../trigger/worker/utils/worker-context.utils', () => ({
 }));
 
 import { CACHE_MANAGER, DistributedTaskLockService } from '@ever-works/agent/cache';
+import { AppHealthService } from '@ever-works/agent/app-runtime';
 import {
     APP_HEALTH_POLL_CRON,
     APP_HEALTH_POLL_LOCK_KEY,
@@ -219,5 +220,63 @@ describe('app-health-poll (APW-06 T32)', () => {
             missing: 'packages/agent/src/app-runtime/app-health.service.ts',
         });
         expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('runs T27’s sweep through the service the context resolves, and reports its summary', async () => {
+        const summary = {
+            ok: true,
+            reason: null,
+            selected: 4,
+            polled: 4,
+            skipped: 0,
+            notifications: 1,
+            verdicts: { healthy: 3, degraded: 0, down: 1, unreachable: 0 },
+        };
+        const poll = vi.fn(async () => summary);
+        appContext.get.mockImplementation((token: unknown) =>
+            token === AppHealthService
+                ? { poll }
+                : new Map<unknown, unknown>([
+                      [DistributedTaskLockService, { isLocked }],
+                      [CACHE_MANAGER, { cleanExpired }],
+                  ]).get(token),
+        );
+
+        const result = await registered.run();
+
+        expect(poll).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe('ran');
+        expect(result.health).toEqual(summary);
+        expect(result.cacheSweep).toEqual({ status: 'swept', expired: 3, message: null });
+    });
+
+    it('reports T27’s own refusal — the store T17 owes — rather than a zero-work “ran”', async () => {
+        const summary = {
+            ok: false,
+            reason: 'health_store_unavailable',
+            selected: 0,
+            polled: 0,
+            skipped: 0,
+            notifications: 0,
+            verdicts: { healthy: 0, degraded: 0, down: 0, unreachable: 0 },
+        };
+        const poll = vi.fn(async () => summary);
+        appContext.get.mockImplementation((token: unknown) =>
+            token === AppHealthService
+                ? { poll }
+                : new Map<unknown, unknown>([
+                      [DistributedTaskLockService, { isLocked }],
+                      [CACHE_MANAGER, { cleanExpired }],
+                  ]).get(token),
+        );
+
+        const result = await registered.run();
+
+        expect(result).toMatchObject({
+            status: 'skipped',
+            reason: 'health_store_unavailable',
+            lockGuard: 'free',
+            health: summary,
+        });
     });
 });

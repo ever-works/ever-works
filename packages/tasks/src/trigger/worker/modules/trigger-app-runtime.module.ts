@@ -5,19 +5,24 @@ import {
     APP_IMAGE_PULL_CREDENTIAL_SOURCE,
     APP_RUNTIME_DELETION_FACADE,
     APP_RUNTIME_ENV_SOURCE,
+    APP_RUNTIME_HEALTH_FACADE,
     APP_RUNTIME_TARGET,
     APP_RUNTIME_VERIFICATION_FACADE,
     APP_VERIFICATION_SINK,
     APP_VERIFICATION_SPEC_SOURCE,
     APPS_TIER_POLICY,
+    AppClusterOpRouter,
     AppDeployOrchestrator,
     AppDeployPreconditionsService,
     AppDomainsService,
+    AppHealthService,
     AppHostsService,
     AppLicenseGate,
+    AppLifecycleOpsService,
     AppPublicSmokeService,
     AppRenderInputBuilder,
     AppRuntimeDeletionService,
+    AppSmokeService,
     AppVerificationTargetService,
     DisabledAppsTierPolicy,
     UnavailablePullCredentialSource,
@@ -110,18 +115,20 @@ import { createRemoteProxy } from '../remote-proxy';
  * These owners have not landed, so their classes do not exist to provide:
  *
  * - `AppImageReferenceResolver` — APW-06 **T72** (`packages/agent/src/app-runtime/app-image-reference.resolver.ts`).
- * - `AppClusterOpRouter`, `AppLifecycleOpsService`, `AppSmokeService` — APW-06 **T70**
- *   (`packages/agent/src/app-runtime/app-cluster-op.router.ts`, `app-lifecycle-ops.service.ts`,
- *   `app-smoke.service.ts`). Their op *handlers* do exist — `AppRuntimeDeletionService.handleDeleteAppWork`
- *   (T58) and `AppVerificationTargetService.handleVerificationDeploy/Status/Destroy` (T60) — and are
- *   provided here so T70's router finds them the moment it lands.
- * - `AppHealthService` — APW-06 **T27** (`packages/agent/src/app-runtime/app-health.service.ts`).
  * - `AppRuntimeEventRelayService` (the `APP_RUNTIME_EVENT_SINK` proxy) — APW-06 **T28**
  *   (`apps/api/src/app-runtime/app-runtime-event-relay.service.ts`).
  * - `WORK_APP_RUNTIME_STATES`' binding (`WorkAppRuntimeStateRepository`) — APW-06 **T17**; the token
  *   itself is APW-11 T5's (`packages/agent/src/app-launcher/app-launcher.service.ts:223`) and is
  *   deliberately **not** re-declared here.
  * - APW-05's `WorkBuild` reads and APW-03's `AppLicenseService` (T29/T30's `APP_LICENSE_SERVICE`).
+ *
+ * **APW-06 T70's three classes and T27's service are provided below** (added 2026-09-18):
+ * `AppClusterOpRouter` plus the `AppLifecycleOpsService` and `AppSmokeService` it and the
+ * `app-smoke` task resolve, so the two refusals this module used to answer by name —
+ * `op_router_unavailable` and `smoke_service_unavailable` — are now real results; and
+ * `AppHealthService`, whose own facade token is bound to the same class as T58's and T60's, so
+ * `health_service_unavailable` is likewise a fallback rather than the norm. The router reaches
+ * T58's and T60's already provided op handlers by method presence, so no op is implemented twice.
  *
  * None of them is stubbed. Every consumer declares the collaborator `@Optional()` and answers a
  * named refusal, so the module boots, the four `app-*` tasks run, and what a run *cannot* do is
@@ -254,6 +261,17 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         AppDeployOrchestrator,
         AppRuntimeDeletionService,
         AppVerificationTargetService,
+        // T70 — the `app-cluster-op` router and its two services, and the body of `app-smoke`.
+        // §9.10 gives the router the nine lifecycle handlers and the smoke service; T58's and T60's
+        // op handlers above are what its classifier reaches for `delete-app-work` and the three
+        // `verification-*` ops, so no op is re-implemented in this module.
+        AppClusterOpRouter,
+        AppLifecycleOpsService,
+        AppSmokeService,
+        // T27 — the every-minute health sweep behind `app-health-poll`. Its own facade token is
+        // bound below, exactly as T58's and T60's are, so the poll reaches the cluster through the
+        // one place that assembles a plugin and a credential (R-5).
+        AppHealthService,
 
         // ---- the seams the landed services declare, bound to their own classes -----------
         // T25's orchestrator resolves its credential through T20's facade
@@ -268,6 +286,10 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         // T26's binding, which is what retires T22's `hosts_incomplete` warning: one class answers
         // every host question (`packages/agent/src/app-runtime/index.ts:58-63`).
         { provide: APP_DEPLOY_HOST_SOURCE, useExisting: AppHostsService },
+        // T27's own narrow reading of the same facade, at T27's token — the third of the three
+        // (`APP_RUNTIME_DELETION_FACADE`, `APP_RUNTIME_VERIFICATION_FACADE`, this one), all bound
+        // to the one class so no consumer can be handed a different plugin.
+        { provide: APP_RUNTIME_HEALTH_FACADE, useExisting: AppRuntimeFacadeService },
 
         // ---- the ports: fail-closed defaults until T73 publishes §9.8 -------------------
         // See the header note. These are `default-ports.ts`'s own classes, not new behaviour.
@@ -290,6 +312,12 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         AppDeployOrchestrator,
         AppRuntimeDeletionService,
         AppVerificationTargetService,
+        // T70 — what the three tasks resolve from this context: the router (`app-cluster-op`), the
+        // smoke service (`app-smoke`) and T27's health service (`app-health-poll`).
+        AppClusterOpRouter,
+        AppLifecycleOpsService,
+        AppSmokeService,
+        AppHealthService,
         WorkRepository,
         WorkDeploymentRepository,
         WorkCustomDomainRepository,

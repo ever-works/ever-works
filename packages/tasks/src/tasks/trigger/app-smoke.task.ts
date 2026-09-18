@@ -1,4 +1,5 @@
 import { logger, task } from '@trigger.dev/sdk';
+import { AppSmokeService } from '@ever-works/agent/app-runtime';
 import {
     APP_RUNTIME_TASK_QUEUE,
     TriggerAppRuntimeModule,
@@ -8,26 +9,22 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
 
 /**
  * APW-06 T32 (`tasks.md:556-573`) — **`app-smoke`**, the one-shot behind FR-36/FR-37's on-demand
- * smoke run (plan §5.7, §9.2:1246, §9.10).
+ * smoke run (plan §5.7, §9.2:1246, §9.10:1597-1599).
  *
- * ## What it delegates to — and the delegation that is NOT in this tree yet
+ * ## What it delegates to
  *
- * T32 says this task "delegates to the service", and T70 names that service:
- * `packages/agent/src/app-runtime/app-smoke.service.ts` — `AppSmokeService`, plan §5.7 — which T70
- * also lists as one of `TriggerAppRuntimeModule`'s local providers. **That file does not exist in
- * this tree** (T70 has not landed), so there is no class to resolve and no method to call. This
- * task therefore does the two things it *can* do honestly:
+ * T32 says this task "delegates to the service", and **T70 landed** (APW-06
+ * `packages/agent/src/app-runtime/app-smoke.service.ts`): this file boots
+ * {@link TriggerAppRuntimeModule} — which is what arms T20's worker-context flag, without which no
+ * cluster call in this process is legal — resolves `AppSmokeService` from that context and calls
+ * `run({ workId, deploymentId, trigger, userId })`. §5.7's whole body is the service's: the current
+ * Deployment, the in-cluster run through `runAppJob` with `runner: 'smoke'`, the public half
+ * through T23's `AppPublicSmokeService`, `smokeResult` on that Deployment, `app.smoke.passed|failed`
+ * — and **no rollback**, because an on-demand run against a live app has nothing to roll back to.
  *
- * 1. It registers on the same id, queue and budget T32 specifies, and boots
- *    {@link TriggerAppRuntimeModule} — which is what arms T20's worker-context flag, so the moment
- *    T70 lands a resolution of `AppSmokeService` from this very context starts working;
- * 2. It **refuses by name** — `smoke_service_unavailable`, with the missing file path in the result
- *    and in the run log — rather than reporting a green smoke run that never happened.
- *
- * 🛑 **Nothing here is a stub of T70.** There is no second smoke implementation in this file: a
- * re-implementation would be a rival to §5.7's service that T70 then has to reconcile, and a
- * "successful" run that ran no check is exactly the silent no-op this programme's rule forbids.
- * The remainder is reported, with its path, not papered over.
+ * This file keeps three things, and only three: the **isolation refusal** (`worker_not_isolated`),
+ * the **missing-delegation refusal** (`smoke_service_unavailable`, now a fallback for a context
+ * that boots without the service rather than the norm), and the registration itself.
  *
  * ## `maxDuration: 900`
  *
@@ -58,9 +55,16 @@ export interface AppSmokeTaskResult {
     /** The owner file a refusal is waiting on, when the refusal is a missing delegation. */
     missing: string | null;
     error: string | null;
+    /** `true` ⇔ both halves passed. A smoke run that failed is still a run that happened. */
+    passed: boolean;
+    /** The service's own answer, verbatim — check names and codes only, never a log tail. */
+    result: unknown;
 }
 
-/** The file T70 lands; named here so a run log points at the gap instead of describing it. */
+/**
+ * The file T70 landed, kept for the one case that still names it: a context that boots without the
+ * service.
+ */
 export const APP_SMOKE_SERVICE_PATH =
     'packages/agent/src/app-runtime/app-smoke.service.ts' as const;
 
@@ -80,27 +84,88 @@ export async function runAppSmokeTask(payload: AppSmokeTaskPayload): Promise<App
             reason: refusal.code,
             missing: null,
             error: null,
+            passed: false,
+            result: null,
+        };
+    }
+
+    if (!workId) {
+        return {
+            status: 'skipped',
+            jobId: APP_SMOKE_TASK_ID,
+            workId,
+            deploymentId,
+            reason: 'invalid_payload',
+            missing: null,
+            error: null,
+            passed: false,
+            result: null,
         };
     }
 
     return withWorkerContext(
         'AppSmoke',
-        async (): Promise<AppSmokeTaskResult> => {
-            logger.error(
-                `app-smoke: AppSmokeService (plan §5.7) is not in this tree — ` +
-                    `${APP_SMOKE_SERVICE_PATH} is APW-06 T70's file and it has not landed, so no ` +
-                    'smoke check ran. Nothing was dialled.',
-                { workId, deploymentId },
-            );
+        async (appContext): Promise<AppSmokeTaskResult> => {
+            const service = appContext.get(AppSmokeService, { strict: false }) as
+                | AppSmokeService
+                | undefined;
 
-            return {
-                status: 'skipped',
-                jobId: APP_SMOKE_TASK_ID,
+            if (!service?.run) {
+                logger.error(
+                    `app-smoke: AppSmokeService (plan §5.7) is not resolvable from this worker ` +
+                        `context — ${APP_SMOKE_SERVICE_PATH} is APW-06 T70's file and it is a ` +
+                        'provider of TriggerAppRuntimeModule, so this context is not the one the ' +
+                        'module builds. No smoke check ran and nothing was dialled.',
+                    { workId, deploymentId },
+                );
+
+                return {
+                    status: 'skipped',
+                    jobId: APP_SMOKE_TASK_ID,
+                    workId,
+                    deploymentId,
+                    reason: 'smoke_service_unavailable',
+                    missing: APP_SMOKE_SERVICE_PATH,
+                    error: null,
+                    passed: false,
+                    result: null,
+                };
+            }
+
+            const result = await service.run({
                 workId,
                 deploymentId,
-                reason: 'smoke_service_unavailable',
-                missing: APP_SMOKE_SERVICE_PATH,
+                trigger: typeof payload?.trigger === 'string' ? payload.trigger : null,
+                userId: typeof payload?.userId === 'string' ? payload.userId : null,
+            });
+
+            if (result.state === 'refused') {
+                logger.warn(`app-smoke: refused (${result.code}) for work ${workId}.`, {
+                    workId,
+                    deploymentId,
+                });
+            } else {
+                logger.info(
+                    `app-smoke: ${result.passed ? 'passed' : 'failed'} for work ${workId}.`,
+                    {
+                        workId,
+                        deploymentId,
+                        inCluster: result.record?.inCluster?.length ?? 0,
+                        public: result.record?.public?.length ?? 0,
+                    },
+                );
+            }
+
+            return {
+                status: result.state === 'refused' ? 'skipped' : 'ran',
+                jobId: APP_SMOKE_TASK_ID,
+                workId,
+                deploymentId: result.deploymentId ?? deploymentId,
+                reason: result.state === 'refused' ? result.code : null,
+                missing: null,
                 error: null,
+                passed: result.passed === true,
+                result,
             };
         },
         TriggerAppRuntimeModule,
