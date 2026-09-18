@@ -1,0 +1,73 @@
+  verify:
+    if: github.event_name == 'workflow_dispatch' && inputs.ew_mode == 'verify'
+    runs-on: "ubuntu-latest"
+    timeout-minutes: 60
+    permissions: { contents: read, packages: read }
+    env:
+      EW_IMAGE: "ghcr.io/ever-works/fixture-app/ever-works-app"
+      EW_SHA: "${{ inputs.ew_sha }}"
+      EW_REUSE_DIGEST: "${{ inputs.ew_reuse_digest }}"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: "${{ inputs.ew_sha }}"
+          fetch-depth: 1
+          persist-credentials: false
+          lfs: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          buildkitd-flags: "--allow-insecure-entitlement network.host"
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Take the image to verify
+        run: |
+          set -euo pipefail
+          plan="$RUNNER_TEMP/ew-verify-plan.json"
+          plan_b64="$(printf '%s' "${{ inputs.ew_verify_plan }}" | tr '_-' '/+')"
+          case $(( ${#plan_b64} % 4 )) in 2) plan_b64="${plan_b64}==" ;; 3) plan_b64="${plan_b64}=" ;; esac
+          printf '%s' "$plan_b64" | base64 -d > "$plan"
+          printf 'EW_VERIFY_BUILD=%s\n' "$(jq -r '.build // empty | @base64' "$plan")" >> "$GITHUB_ENV"
+          if [ -n "$EW_REUSE_DIGEST" ]; then
+            docker pull "$EW_IMAGE@$EW_REUSE_DIGEST"
+            exit 0
+          fi
+          [ -n "$EW_VERIFY_BUILD" ] || { echo "EW_VERIFY_NO_BUILD"; exit 78; }
+          context="$(jq -r '.build.context // "."' "$plan")"
+          dockerfile="$(jq -r '.build.dockerfile // "Dockerfile"' "$plan")"
+          target="$(jq -r '.build.target // empty' "$plan")"
+          buildx_args=(--load --file "$context/$dockerfile" --cache-from "$EW_IMAGE:buildcache" --tag ew-verify:local)
+          if [ -n "$target" ]; then buildx_args+=(--target "$target"); fi
+          while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+            buildx_args+=(--build-arg "$entry")
+          done < <(jq -r '(.build.args // [])[] | select(.value != null) | "\(.name)=\(.value)"' "$plan")
+          docker buildx build "${buildx_args[@]}" "$context"
+      - name: Verify in the runner
+        if: inputs.ew_verify_plan != ''
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          echo "EW_VERIFY_NOT_IMPLEMENTED: the runner verification script is not embedded yet (APW-05 T15, plan §4.10)." >&2
+          exit 70
+      - name: Write result
+        if: always()
+        run: |
+          set -euo pipefail
+          reused_digest="$EW_REUSE_DIGEST"
+          local_build=true
+          [ -z "$reused_digest" ] || local_build=false
+          jq -n --arg buildId "${{ inputs.ew_build_id }}" --arg sha "$EW_SHA" \
+            --arg imageRepository "$EW_IMAGE" --arg reusedDigest "$reused_digest" \
+            --argjson localBuild "$local_build" \
+            '{schema:"ever-works-build-result",version:1,buildId:$buildId,sha:$sha,imageRepository:$imageRepository,'
+              reusedDigest:$reusedDigest,localBuild:$localBuild,verification:{jobs:[],smoke:[]}}' > ever-works-build-result.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: "ever-works-build-result"
+          path: "ever-works-build-result.json"
+          retention-days: 7
+          if-no-files-found: ignore

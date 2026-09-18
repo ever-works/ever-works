@@ -1,0 +1,3 @@
+NODE_ENV=production
+SENTRY_DSN=${{ github.event_name == 'pull_request' && 'ew-restricted' || secrets.EW_SENTRY_DSN }}
+DATABASE_URL=${{ github.event_name == 'pull_request' && 'ew-restricted' || secrets.EW_DATABASE_URL }}

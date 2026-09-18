@@ -2052,6 +2052,46 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.1)(@types/node@22.19.11)(happy-dom@20.14.5)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/plugins/github-actions-build:
+    dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      fflate:
+        specifier: ^0.4.8
+        version: 0.4.8
+      libsodium-wrappers:
+        specifier: ^0.7.15
+        version: 0.7.16
+      octokit:
+        specifier: ^4.0.0
+        version: 4.1.4
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/libsodium-wrappers':
+        specifier: ^0.7.14
+        version: 0.7.14
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      js-yaml:
+        specifier: ^5.2.3
+        version: 5.2.3
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.23))(jiti@2.6.1)(postcss@8.5.26)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.1)(@types/node@22.19.11)(happy-dom@20.14.5)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
   packages/plugins/github-storage:
     dependencies:
       octokit:
