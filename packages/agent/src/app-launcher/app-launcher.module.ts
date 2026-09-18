@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DatabaseModule } from '../database/database.module';
 import { AppLauncherPreferenceRepository } from '../database/repositories/app-launcher-preference.repository';
 import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
 import { AppLauncherService } from './app-launcher.service';
@@ -30,7 +31,15 @@ import {
  *
  * The repositories the service reads Works, deployments and custom domains
  * through are **not** declared here: they belong to `DatabaseModule`, which
- * exports them, and the API module imports it.
+ * exports them — and this module therefore **imports** `DatabaseModule`
+ * itself. Importing it in the *parent* is not enough: Nest resolves a provider
+ * in the context of the module that declares it, so `apps/api`'s wrapper
+ * importing `DatabaseModule` alongside this module left `AppLauncherService`
+ * unresolvable and the API refused to boot
+ * (`UnknownDependenciesException … the argument WorkRepository at index [0] is
+ * not available in the AppLauncherModule module`), which the e2e lane caught on
+ * 2026-09-18. A declared provider that injects a repository must declare where
+ * that repository comes from.
  *
  * `APP_PUBLISHED_HOSTS`, `WORK_APP_RUNTIME_STATES`, `APPS_TIER_POLICY` and
  * `APP_SPEC_DISPLAY_NAMES` are intentionally **not** bound here. Each is
@@ -40,7 +49,7 @@ import {
  * prevent.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([AppLauncherPreference])],
+    imports: [DatabaseModule, TypeOrmModule.forFeature([AppLauncherPreference])],
     providers: [
         AppLauncherPreferenceRepository,
         AppLauncherService,

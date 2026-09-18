@@ -42,6 +42,7 @@
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DatabaseModule } from '../database/database.module';
 import { WorkAppSpecState } from '../entities/work-app-spec-state.entity';
 import { WorkAppSpecStateRepository } from '../database/repositories/work-app-spec-state.repository';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
@@ -50,7 +51,12 @@ import { FacadesModule } from '../facades/facades.module';
 import { AppSpecService } from './app-spec.service';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([WorkAppSpecState]), FacadesModule, ActivityLogModule],
+    imports: [
+        DatabaseModule,
+        TypeOrmModule.forFeature([WorkAppSpecState]),
+        FacadesModule,
+        ActivityLogModule,
+    ],
     providers: [WorkAppSpecStateRepository, DistributedTaskLockService, AppSpecService],
     exports: [AppSpecService, WorkAppSpecStateRepository],
 })
