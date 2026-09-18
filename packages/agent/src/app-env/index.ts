@@ -60,6 +60,56 @@ export {
 
 export { AppEnvModule } from './app-env.module';
 
+// APW-07 T14 — the resolver and APW-06's runtime source (plan §2.2, §4.6).
+//
+// `AppEnvResolver` is what APW-05's `app-build-prepare` calls
+// (`resolveForBuild`, plan §5:825) and what T13's `APP_ENV_RESOLVER_FINGERPRINTS`
+// swap binds (`read`); `AppEnvRuntimeSource` is the `APP_RUNTIME_ENV_SOURCE`
+// implementation APW-06 consumes, and `APP_ENV_DEPLOY_READINESS` the token its
+// binder aliases to `AppDependenciesService` (`useExisting`, so the one call
+// really is `ensureReadyForDeploy` — GAP-05).
+export {
+    APP_ENV_BUILD_SERVICE_NAMES,
+    APP_ENV_BUILD_SERVICE_OBJECT_STORAGE_DEFAULT,
+    APP_ENV_BUILD_SERVICE_OBJECT_STORAGE_ENV,
+    APP_ENV_BUILD_SERVICE_POSTGRES_DEFAULTS,
+    APP_ENV_BUILD_SERVICE_POSTGRES_ENV,
+    APP_ENV_ENSURE_GENERATED,
+    APP_ENV_EXTERNAL_PROVIDER_IDS,
+    APP_ENV_RESOLUTION_WARNING_CODES,
+    APP_ENV_SMTP_RELAY_PROVIDER_ID,
+    AppEnvResolver,
+    appEnvPhaseCarries,
+    appEnvSecretFingerprint,
+    appEnvValueFingerprint,
+    buildServiceOutputs,
+    runnerDependencyLiteral,
+    valuesToRecord,
+    type AppEnvDeployReadiness,
+    type AppEnvDependencyFact,
+    type AppEnvEgressDestination,
+    type AppEnvEphemeralClusterResolution,
+    type AppEnvEphemeralResolutionContext,
+    type AppEnvGeneratorPass,
+    type AppEnvMissingValue,
+    type AppEnvResolutionContext,
+    type AppEnvResolutionResult,
+    type AppEnvResolutionWarning,
+    type AppEnvResolutionWarningCode,
+    type AppEnvRunnerRecipeResolution,
+    type AppEnvRuntimeRecipeEntry,
+} from './app-env.resolver';
+
+export {
+    APP_ENV_DEPLOY_READINESS,
+    AppEnvRuntimeSource,
+    notReadyKinds,
+    type AppEnvDeployReadinessSource,
+    type AppEnvRuntimeEphemeralResolveResult,
+    type AppEnvRuntimeResolveResult,
+    type AppRuntimeEphemeralEnvContext,
+} from './app-env-runtime.source';
+
 // APW-07 T12 — the `.env` grammar, re-exported so a consumer of
 // `@ever-works/agent/app-env` reaches the parser T13's `apply({ import })`
 // consumes without a second entry point.
