@@ -7,6 +7,7 @@ const {
     workImportTriggerMock,
     templateCustomizationTriggerMock,
     kbOrgOverlayFanoutTriggerMock,
+    appSpecEvaluateTriggerMock,
     triggerConfig,
     subscriptionsConfig,
 } = vi.hoisted(() => {
@@ -17,6 +18,10 @@ const {
         workImportTriggerMock: vi.fn(),
         templateCustomizationTriggerMock: vi.fn(),
         kbOrgOverlayFanoutTriggerMock: vi.fn(),
+        // APW-02 T28 wired `TriggerService.dispatchAppSpecEvaluate`, which imports
+        // APW-03 T13's task module — mocked here for the same reason its four
+        // siblings are: this spec asserts the SERVICE, not the task graph.
+        appSpecEvaluateTriggerMock: vi.fn(),
         triggerConfig: {
             shouldUseTrigger: vi.fn(),
             getSecretKey: vi.fn(),
@@ -66,6 +71,12 @@ vi.mock('../tasks/trigger/template-customization.task', () => ({
 }));
 vi.mock('../tasks/trigger/kb-org-overlay-fanout.task', () => ({
     kbOrgOverlayFanoutTask: { trigger: kbOrgOverlayFanoutTriggerMock },
+}));
+// APW-03 T13's job — the module APW-02 T28's `dispatchAppSpecEvaluate` triggers.
+// Mocked rather than loaded: the real module pulls `TriggerWorkerModule`, the whole
+// worker graph and `@ever-works/agent/app-spec` into a spec about this service.
+vi.mock('../tasks/trigger/app-spec-evaluate.task', () => ({
+    appSpecEvaluateTask: { trigger: appSpecEvaluateTriggerMock },
 }));
 
 import { TriggerService } from '../trigger/trigger.service';

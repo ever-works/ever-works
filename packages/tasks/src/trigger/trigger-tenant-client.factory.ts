@@ -88,6 +88,8 @@ import type {
     KbReembedWorkPayload,
     MemoryFactEmbedPayload,
     AppDependencyProvisionPayload,
+    // APW-03 T13 — the payload of the job APW-02 T28 wires below.
+    AppSpecEvaluatePayload,
 } from '@ever-works/agent/tasks';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -118,6 +120,9 @@ const TASK_IDS = {
     // APW-07 T17 — must match the `app-dependency-provision` task's own `id`
     // (and the APW-06 `app-cluster-io` queue it declares).
     appDependencyProvision: 'app-dependency-provision',
+    // APW-03 T13 — must match the `app-spec-evaluate` task's own `id`. Wired by
+    // APW-02 T28 so the same dispatch works for a BYO Trigger.dev tenant.
+    appSpecEvaluate: 'app-spec-evaluate',
 } as const;
 
 /**
@@ -431,6 +436,28 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
             if (!handle?.id) {
                 throw new Error(
                     `dispatchAppDependencyProvision(work=${payload.workId}): SDK returned no run id`,
+                );
+            }
+            return handle.id;
+        },
+
+        /**
+         * APW-03 T13's `app-spec-evaluate`, for a BYO Trigger.dev tenant — the
+         * mirror of the singleton `TriggerService.dispatchAppSpecEvaluate`
+         * (APW-02 T28 wired both). Same propagate shape as
+         * `dispatchAppDependencyProvision` above: a swallowed error here would
+         * report an evaluation as queued with nothing behind it, which is the
+         * silent no-op the shape exists to prevent.
+         */
+        async dispatchAppSpecEvaluate(payload: AppSpecEvaluatePayload): Promise<string> {
+            const handle = await client.tasks.trigger(TASK_IDS.appSpecEvaluate, payload, {
+                tags: ['app-spec-evaluate', `work:${payload.workId}`, `trigger:${payload.trigger}`],
+                concurrencyKey: `app-spec-evaluate:${payload.workId}`,
+            } as TriggerTaskOptions);
+
+            if (!handle?.id) {
+                throw new Error(
+                    `dispatchAppSpecEvaluate(work=${payload.workId}): SDK returned no run id`,
                 );
             }
             return handle.id;

@@ -28,6 +28,7 @@ import {
     UserRepository,
     WebhookSubscriptionRepository,
     WorkKnowledgeDocumentRepository,
+    WorkUpstreamStateRepository,
 } from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
@@ -92,6 +93,11 @@ import {
     CreditsSweepService,
     PaygService,
 } from '@ever-works/agent/subscriptions';
+import {
+    AppUpstreamStateService,
+    AppUpstreamSyncDispatcherService,
+} from '@ever-works/agent/app-works';
+import { AppSpecService } from '@ever-works/agent/app-spec';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -432,6 +438,39 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly memoryFactEmbedService?: MemoryFactEmbedService,
         @Optional()
         private readonly memoryFactSweepService?: MemoryFactSweepService,
+        // APW-02 T28 — the App upstream trio the Trigger.dev worker reaches over
+        // the internal RPC channel. All three are appended LAST + `@Optional()`
+        // per the arity rule above (every positional
+        // `new TriggerInternalController(...)` in the specs keeps compiling), and
+        // all three come from the API's `AppWorksModule`, which
+        // `TriggerInternalModule` now imports:
+        //   - `AppUpstreamStateService` — the two upstream jobs' claim
+        //     (`beginSync`/`finishSync`), the readiness probes and the conflict
+        //     Task all live API-side (plan §2.4);
+        //   - `AppUpstreamSyncDispatcherService` — the `app-upstream-sync-dispatcher`
+        //     cron's `dispatchDue()` (plan §6.6);
+        //   - `WorkUpstreamStateRepository` — `AppUpstreamSyncService` reads the
+        //     Work's coordinates and the two counters §6.3 steps 3 and 9 need from
+        //     the epic's own row, and that service runs in the worker, which owns
+        //     no DataSource. T26 reported this binding by name
+        //     (`app-upstream-sync.service.ts:86-92`); this is it.
+        @Optional()
+        private readonly appUpstreamStateService?: AppUpstreamStateService,
+        @Optional()
+        private readonly appUpstreamSyncDispatcherService?: AppUpstreamSyncDispatcherService,
+        @Optional()
+        private readonly workUpstreamStateRepository?: WorkUpstreamStateRepository,
+        // APW-03 T12/T13 — `AppSpecService`, so the worker-side `app.spec.*` calls
+        // land on the API process where the state row, the git facade and the
+        // Activity log are wired. Without this entry the worker's proxy answers
+        // `Unknown remote target: AppSpecService` (a named failure, but a failure
+        // nonetheless) and the per-tenant dispatcher's whole point is lost. The
+        // API-side path already falls back to running the evaluation in-process
+        // (`app-spec.module.ts` docstring, plan §6.1:661-662); this is the worker
+        // half of the same job. Appended LAST + `@Optional()` per the arity rule
+        // above, exactly as its siblings are.
+        @Optional()
+        private readonly appSpecService?: AppSpecService,
     ) {}
 
     onModuleInit() {
@@ -561,6 +600,24 @@ export class TriggerInternalController implements OnModuleInit {
             // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
             // here (allow-list auto-derived).
             SkillReadinessService: this.skillReadinessService,
+            // APW-02 T28 — the App upstream trio. `AppUpstreamStateService` backs
+            // the `app-fork-readiness` / `app-upstream-sync` jobs' claim and
+            // probes, `AppUpstreamSyncDispatcherService` backs the
+            // `app-upstream-sync-dispatcher` cron's `dispatchDue()`, and
+            // `WorkUpstreamStateRepository` backs the sync run's read of the
+            // epic's own row. Registered unconditionally as their sibling
+            // services are: the controller's `callRemote` answers
+            // "Unknown remote target" for a name that maps to `undefined`, which
+            // is the loud answer a missing binding must have.
+            AppUpstreamStateService: this.appUpstreamStateService,
+            AppUpstreamSyncDispatcherService: this.appUpstreamSyncDispatcherService,
+            WorkUpstreamStateRepository: this.workUpstreamStateRepository,
+            // APW-03 T12/T13 — the worker side of `app-spec-evaluate`'s service
+            // calls (`AppSpecService.evaluate` / `getEffectiveSpec` /
+            // `validateDraft`), registered unconditionally for the same reason the
+            // trio above is: a name that maps to nothing answers a loud
+            // "Unknown remote target" instead of pretending.
+            AppSpecService: this.appSpecService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

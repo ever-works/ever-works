@@ -8,6 +8,24 @@ jest.mock('@ever-works/agent/database', () => ({
     WorkKnowledgeDocumentRepository: class WorkKnowledgeDocumentRepository {},
     AgentRepository: class AgentRepository {},
     AgentRunRepository: class AgentRunRepository {},
+    WorkUpstreamStateRepository: class WorkUpstreamStateRepository {},
+}));
+// APW-02 T28 — the controller imports the App upstream trio from the app-works
+// barrel. Loading the real barrel pulls the whole epic's service graph (entities
+// → TypeORM, facades → provider plugins) into this suite, so stub it exactly as
+// every sibling barrel above is stubbed. The classes are only ever used as
+// injection tokens here; the behaviour behind them is asserted where it lives
+// (`packages/agent/src/app-works/__tests__/**`).
+jest.mock('@ever-works/agent/app-works', () => ({
+    AppUpstreamStateService: class AppUpstreamStateService {},
+    AppUpstreamSyncDispatcherService: class AppUpstreamSyncDispatcherService {},
+}));
+// APW-03 T12/T13 (wired by APW-02 T28) — same rationale: the app-spec barrel
+// reaches the spec state entity and the git facade, neither of which this suite
+// needs in order to assert that the remote target is registered.
+jest.mock('@ever-works/agent/app-spec', () => ({
+    AppSpecService: class AppSpecService {},
+    AppSpecModule: class AppSpecModule {},
 }));
 // FU-2 post-CI fix: trigger-internal.controller.ts imports the
 // AgentScheduleDispatcherService from `@ever-works/agent/agents` and
@@ -162,6 +180,12 @@ describe('TriggerInternalController', () => {
     let agentRunService: any;
     let tasksService: any;
     let taskChatService: any;
+    // APW-02 T28 — the App upstream trio the Trigger.dev worker reaches.
+    let appUpstreamStateService: any;
+    let appUpstreamSyncDispatcherService: any;
+    let workUpstreamStateRepository: any;
+    // APW-03 T12/T13 — the App spec service the worker's `app.spec.*` calls reach.
+    let appSpecService: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -189,6 +213,7 @@ describe('TriggerInternalController', () => {
             // PR-4 — ideaBuildExecutorService (idea-build-execute task).
             // Not exercised by these tests; undefined is sufficient.
             undefined, // ideaBuildExecutorService
+            undefined, // goalEvaluationService
             // Agents/Skills/Tasks PR #1017 — Phase 6 + 17 added 4 new
             // constructor args after missionTickService; tests pass
             // undefined since they don't exercise these paths.
@@ -219,6 +244,40 @@ describe('TriggerInternalController', () => {
             undefined, // agentRunSweeperService (Optional trailing)
             // Wave 3 M2 — quality gates. Not exercised by these tests.
             undefined, // taskGateRunnerService (Optional trailing)
+            // Every remaining optional between the gate runner and the APW-02 trio.
+            // 🛑 They are positional: stopping at `taskGateRunnerService` would land the
+            // three values below on `runDispatchGateService`/`eventIngestService`/
+            // `digestService`, and the failures would look like a missing remoteMap entry
+            // rather than a shifted argument list (this is exactly how the first draft of
+            // this spec failed).
+            undefined, // runDispatchGateService
+            undefined, // eventIngestService
+            undefined, // digestService
+            undefined, // creditLedgerService
+            undefined, // eventSourcePullService
+            undefined, // terminalTranscriptService
+            undefined, // fleetJobService
+            undefined, // agentEscalationService
+            undefined, // taskReviewRejectionService
+            undefined, // memoryConsolidationScheduleService
+            undefined, // taskPrStatusService
+            undefined, // taskGateJudgeService
+            undefined, // goalOrchestratorService
+            undefined, // creditsSweepService
+            undefined, // paygService
+            undefined, // modelAccountHealthService
+            undefined, // conversationMessageService
+            undefined, // skillReadinessService
+            undefined, // rosterProvisioningService
+            undefined, // memoryFactEmbedService
+            undefined, // memoryFactSweepService
+            // APW-02 T28 — the App upstream trio, appended LAST + `@Optional()` per
+            // the arity rule above.
+            appUpstreamStateService,
+            appUpstreamSyncDispatcherService,
+            workUpstreamStateRepository,
+            // APW-03 T12/T13 — the App spec service (wired by APW-02 T28).
+            appSpecService,
         );
         c.onModuleInit();
         return c;
@@ -247,6 +306,28 @@ describe('TriggerInternalController', () => {
         agentRunService = { name: 'AgentRunService', execute: jest.fn() };
         tasksService = { name: 'TasksService', getOne: jest.fn() };
         taskChatService = { name: 'TaskChatService', list: jest.fn() };
+        // APW-02 T28 — each double carries ONE real method, because "registered in
+        // the map" is only half the claim: the RPC hop must reach the method.
+        appUpstreamStateService = {
+            name: 'AppUpstreamStateService',
+            beginSync: jest.fn((workId: string, trigger: string) => ({
+                allowed: true,
+                reason: null,
+                startedAt: `${trigger}:${workId}`,
+            })),
+        };
+        appUpstreamSyncDispatcherService = {
+            name: 'AppUpstreamSyncDispatcherService',
+            dispatchDue: jest.fn((now: number) => ({ dueCount: 1, dispatched: 1, at: now })),
+        };
+        workUpstreamStateRepository = {
+            name: 'WorkUpstreamStateRepository',
+            findByWorkId: jest.fn((workId: string) => ({ workId, relation: 'fork' })),
+        };
+        appSpecService = {
+            name: 'AppSpecService',
+            getEffectiveSpec: jest.fn((workId: string) => ({ workId, status: 'valid' })),
+        };
 
         controller = buildController();
     });
@@ -497,6 +578,96 @@ describe('TriggerInternalController', () => {
             // each controller instance has its own remoteMap pointing at its own injections
             expect((controller as any).remoteMap).not.toBe((second as any).remoteMap);
             expect((controller as any).remoteMap.PluginRepository).toBe(pluginRepository);
+        });
+
+        // -------------------------------------------------------------------
+        // APW-02 T28 — the App upstream trio
+        // -------------------------------------------------------------------
+
+        it('registers the three APW-02 remote targets in remoteMap', () => {
+            const map = (controller as any).remoteMap;
+
+            expect(map.AppUpstreamStateService).toBe(appUpstreamStateService);
+            expect(map.AppUpstreamSyncDispatcherService).toBe(appUpstreamSyncDispatcherService);
+            expect(map.WorkUpstreamStateRepository).toBe(workUpstreamStateRepository);
+        });
+
+        it('derives a callable allow-list for each of the three (an unknown method is named)', async () => {
+            // `callRemote` answers "Unknown remote target" for a name that is absent and
+            // "Method not in allow-list for <name>" for a name that IS registered — so the
+            // second message is the proof of registration, not the first.
+            for (const name of [
+                'AppUpstreamStateService',
+                'AppUpstreamSyncDispatcherService',
+                'WorkUpstreamStateRepository',
+            ]) {
+                await expect(
+                    controller.callRemote(VALID_SECRET, {
+                        name,
+                        method: 'doesNotExist',
+                        args: superjson.serialize([]) as any,
+                    }),
+                ).rejects.toThrow(`Method not in allow-list for ${name}: doesNotExist`);
+            }
+        });
+
+        it('reaches beginSync on the state service over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppUpstreamStateService',
+                method: 'beginSync',
+                args: superjson.serialize(['work-1', 'manual']) as any,
+            });
+
+            expect(appUpstreamStateService.beginSync).toHaveBeenCalledWith('work-1', 'manual');
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                allowed: true,
+                reason: null,
+                startedAt: 'manual:work-1',
+            });
+        });
+
+        it('reaches dispatchDue on the dispatcher and findByWorkId on the repository', async () => {
+            const dispatchDue = await controller.callRemote(VALID_SECRET, {
+                name: 'AppUpstreamSyncDispatcherService',
+                method: 'dispatchDue',
+                args: superjson.serialize([1_700_000_000_000]) as any,
+            });
+            const findByWorkId = await controller.callRemote(VALID_SECRET, {
+                name: 'WorkUpstreamStateRepository',
+                method: 'findByWorkId',
+                args: superjson.serialize(['work-1']) as any,
+            });
+
+            expect(appUpstreamSyncDispatcherService.dispatchDue).toHaveBeenCalledWith(
+                1_700_000_000_000,
+            );
+            expect(superjson.deserialize(dispatchDue.result as any)).toEqual({
+                dueCount: 1,
+                dispatched: 1,
+                at: 1_700_000_000_000,
+            });
+            expect(superjson.deserialize(findByWorkId.result as any)).toEqual({
+                workId: 'work-1',
+                relation: 'fork',
+            });
+        });
+
+        it('registers AppSpecService so the worker’s app.spec.* calls reach the API', async () => {
+            // APW-03 T12/T13, wired by APW-02 T28: without this entry the worker's
+            // proxy answers `Unknown remote target: AppSpecService`.
+            expect((controller as any).remoteMap.AppSpecService).toBe(appSpecService);
+
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppSpecService',
+                method: 'getEffectiveSpec',
+                args: superjson.serialize(['work-1']) as any,
+            });
+
+            expect(appSpecService.getEffectiveSpec).toHaveBeenCalledWith('work-1');
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                workId: 'work-1',
+                status: 'valid',
+            });
         });
     });
 });

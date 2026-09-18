@@ -33,6 +33,9 @@ import {
     MemoryFactEmbedDispatcher,
     AppDependencyProvisionPayload,
     AppDependencyProvisionDispatcher,
+    // APW-03 T13 — the `app-spec-evaluate` payload, re-exported by the agent
+    // package's tasks barrel. (APW-02 T28 wires the dispatch below.)
+    AppSpecEvaluatePayload,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -59,6 +62,8 @@ import { memoryFactEmbedTask } from '../tasks/trigger/memory-fact-embed.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import { workspaceBackupTask } from '../tasks/trigger/workspace-backup.task';
 import { appDependencyProvisionTask } from '../tasks/trigger/app-dependency-provision.task';
+// APW-03 T13's job — dispatched by `dispatchAppSpecEvaluate` below (APW-02 T28).
+import { appSpecEvaluateTask } from '../tasks/trigger/app-spec-evaluate.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -1065,6 +1070,56 @@ export class TriggerService
         if (!handle?.id) {
             throw new Error(
                 `dispatchAppDependencyProvision(work=${payload.workId}): SDK returned no run id`,
+            );
+        }
+
+        return handle.id;
+    }
+
+    /**
+     * APW-03 T13's `app-spec-evaluate` job, dispatched through the **propagate**
+     * shape — the same one {@link dispatchAppDependencyProvision} uses above and
+     * for the same reason.
+     *
+     * `AppSpecService.evaluate` reaches the job through the
+     * `APP_SPEC_EVALUATE_DISPATCHER` port (`packages/agent/src/tasks/job-runtime.providers.ts`
+     * binds it through `buildJobRuntimeProviders()`), and it answers a **missing or
+     * throwing** dispatcher with the documented in-process path (plan §6.1:661-662,
+     * `app-spec.module.ts`'s docstring). That fallback is a *fallback*: when a
+     * dispatcher IS bound and the enqueue fails, a swallowed error would leave the
+     * evaluation reported as queued with nothing behind it — the silent no-op the
+     * propagate shape exists to prevent. So this method never `softDispatch`es and
+     * never swallows: it returns the run id or throws.
+     *
+     * Wired by APW-02 T28 at the packaging owner's request: the dispatcher whose
+     * service cannot be reached from the worker is a silent no-op, and the two
+     * registration points (`remoteMap` on the API side, this method plus its
+     * `dispatchersFromTenantClient` mirror for a BYO tenant) are what make the
+     * worker-side call land.
+     */
+    async dispatchAppSpecEvaluate(payload: AppSpecEvaluatePayload): Promise<string> {
+        if (!this.ensureConfigured()) {
+            throw new Error(
+                'app-spec-evaluate dispatch attempted while Trigger.dev is disabled — ' +
+                    'the evaluation would never be recorded against the App spec.',
+            );
+        }
+
+        const handle = await appSpecEvaluateTask.trigger(
+            payload,
+            this.stampTenantOptions({
+                tags: ['app-spec-evaluate', `work:${payload.workId}`, `trigger:${payload.trigger}`],
+                machine: this.machine() as any,
+                // Per Work: two evaluations of the same App spec never run at once,
+                // which is what makes the job's own per-Work lock a second belt
+                // rather than the only one.
+                concurrencyKey: `app-spec-evaluate:${payload.workId}`,
+            }),
+        );
+
+        if (!handle?.id) {
+            throw new Error(
+                `dispatchAppSpecEvaluate(work=${payload.workId}): SDK returned no run id`,
             );
         }
 

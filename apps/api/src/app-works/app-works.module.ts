@@ -1,0 +1,81 @@
+import { Module } from '@nestjs/common';
+import { DatabaseModule } from '@ever-works/agent/database';
+import { FacadesModule } from '@ever-works/agent/facades';
+import { NotificationsModule } from '@ever-works/agent/notifications';
+import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import { AppWorksModule as AgentAppWorksModule } from '@ever-works/agent/app-works';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { AppUpstreamController } from './app-upstream.controller';
+
+/**
+ * APW-02 T27 — the API-side App Works module: the three upstream routes of plan §4.1
+ * (`plan.md:487-516`) over the agent package's services.
+ *
+ * ## What is imported, and why each import is load-bearing
+ *
+ *   - `AgentAppWorksModule` (`@ever-works/agent/app-works`) provides and exports
+ *     `WorkUpstreamStateRepository`, `AppUpstreamStateService` (T23) and
+ *     `AppUpstreamSyncDispatcherService` (T28) — the state service and the dispatcher
+ *     are what `apps/api/src/trigger/trigger-internal.controller.ts`'s `remoteMap`
+ *     needs, and the repository is what T26's worker-side sync run reads its
+ *     coordinates from.
+ *   - `DatabaseModule` is **not optional**, and the ledger already said so
+ *     (`docs/internal/app-works-build-progress.md:1090-1092`): `AppUpstreamStateService`
+ *     resolves the Work through `WorkRepository.findByIdForAccess` and the member
+ *     through `WorkMemberRepository.isMember`, so without this import **every route
+ *     answers `404`** — the fail-closed visibility check cannot tell "not yours" from
+ *     "I cannot read Works at all", which is exactly the degradation a missing
+ *     database module must not produce silently.
+ *   - `NotificationsModule` and `TasksDomainModule` are the other two the same ledger
+ *     entry names: `NotificationService` (the owner notice when no Agent could be
+ *     resolved for a conflict Task) and `TasksService` + `TaskChatService` (the
+ *     conflict Task itself, plan §6.5).
+ *   - `FacadesModule` supplies `GitFacadeService`, which the state service's
+ *     `probeReadiness` and `recordConflict` read the provider through.
+ *   - `ActivityLogModule` supplies `ActivityLogService`, the one writer of the epic's
+ *     eight dotted events (§3.5).
+ *
+ * Every one of those collaborators is `@Optional()` in the service, so this module
+ * compiles either way and a *missing* import degrades a feature rather than failing
+ * boot. The list above is therefore the difference between "the Upstream card works"
+ * and "it 404s", and it is why each line carries its reason instead of an ordering.
+ *
+ * `DistributedTaskLockService` is deliberately **not** imported: the state service reads
+ * it only for the informational half of `syncInProgress` (the claim itself is the row's
+ * `syncStartedAt` window, and `beginSync` is what refuses a second run), and importing
+ * `BudgetsModule` for that would couple this epic to another feature's module for an
+ * optional read that already has a documented fallback.
+ *
+ * ## What is not bound here
+ *
+ * Nothing else. `APP_WORK_AGENT_RESOLVER` (APW-08 T25), `APP_FORK_READINESS_DISPATCHER` /
+ * `APP_UPSTREAM_SYNC_DISPATCHER` (APW-02 T31), `APP_FORK_READY_HANDLER` (APW-01),
+ * `APP_UPSTREAM_SYNC_SPEC_SOURCE` (APW-03 T12) and `APP_UPSTREAM_LICENSE_SERVICE`
+ * (APW-03 T42) all belong to other tasks, and binding a placeholder would make an
+ * unconfigured installation look configured — the same rule the agent module's own
+ * docstring states. **APW-01 T15 adds the handler binding here**, which is why this
+ * module declares its controller in a plain `controllers` array and nothing else.
+ *
+ * ## `exports: [AgentAppWorksModule]`
+ *
+ * A re-export, so `apps/api/src/trigger/trigger-internal.module.ts` resolves the whole
+ * trio by importing this one module (the established shape: `activity-log.module.ts:16`,
+ * `budgets.module.ts:54`, `safety.module.ts:30`). Two modules may import
+ * `AgentAppWorksModule`; Nest instantiates it once, so the API has one state service and
+ * one dispatcher whichever door is used.
+ *
+ * Registered additively in `apps/api/src/api.module.ts`, next to `AppLauncherModule`.
+ */
+@Module({
+    imports: [
+        AgentAppWorksModule,
+        DatabaseModule,
+        NotificationsModule,
+        TasksDomainModule,
+        FacadesModule,
+        ActivityLogModule,
+    ],
+    controllers: [AppUpstreamController],
+    exports: [AgentAppWorksModule],
+})
+export class AppWorksModule {}

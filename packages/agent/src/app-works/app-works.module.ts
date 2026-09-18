@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import { AppUpstreamStateService } from './app-upstream-state.service';
+import { AppUpstreamSyncDispatcherService } from './app-upstream-sync-dispatcher.service';
 
 /**
  * APW-02 App Works (Fork lifecycle) — the agent-side module.
@@ -46,6 +47,17 @@ import { AppUpstreamStateService } from './app-upstream-state.service';
  * installation look configured (see above), and every collaborator it reads through is
  * `@Optional()` so this module still compiles on its own — which is what
  * `__tests__/app-works.module.spec.ts` asserts.
+ *
+ * ## T28 — the dispatcher joins them (additive)
+ *
+ * `AppUpstreamSyncDispatcherService` (T28, plan §6.6) is provided and exported here beside
+ * the state service, for the same reason and in the same shape: it is API-side (§2.4), the
+ * API's `TriggerInternalModule` reaches it through the `remoteMap`/`createRemoteProxy`
+ * pair, and its only two hard dependencies — this repository and the state service — are
+ * already in this module. Its two job dispatchers stay **unbound** (`@Optional()`), exactly
+ * as the state service's are: T31 owns the real `APP_UPSTREAM_SYNC_DISPATCHER` /
+ * `APP_FORK_READINESS_DISPATCHER` declarations and bindings, and a placeholder here would
+ * make a tick that queues nothing look like a tick that queued something.
  */
 @Module({
     imports: [
@@ -55,7 +67,15 @@ import { AppUpstreamStateService } from './app-upstream-state.service';
         // the API fails at boot.
         TypeOrmModule.forFeature([WorkUpstreamState]),
     ],
-    providers: [WorkUpstreamStateRepository, AppUpstreamStateService],
-    exports: [WorkUpstreamStateRepository, AppUpstreamStateService],
+    providers: [
+        WorkUpstreamStateRepository,
+        AppUpstreamStateService,
+        AppUpstreamSyncDispatcherService,
+    ],
+    exports: [
+        WorkUpstreamStateRepository,
+        AppUpstreamStateService,
+        AppUpstreamSyncDispatcherService,
+    ],
 })
 export class AppWorksModule {}

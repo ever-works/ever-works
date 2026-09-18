@@ -21,6 +21,10 @@ import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { AppWorksModule } from '../app-works/app-works.module';
+// APW-03 T12/T13 — the App spec service, exposed through the remote-proxy
+// controller (APW-02 T28 wired the entry).
+import { AppSpecModule } from '@ever-works/agent/app-spec';
 
 @Module({
     imports: [
@@ -127,6 +131,19 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // (in packages/tasks) can load the Conversation it answers and
         // record the Agent's reply over the internal RPC channel.
         ConversationsModule,
+        // APW-02 T28 — exposes the App upstream trio through the remote-proxy
+        // controller: AppUpstreamStateService (the readiness/sync jobs' claim,
+        // probes and the conflict Task), AppUpstreamSyncDispatcherService (the
+        // `app-upstream-sync-dispatcher` cron's `dispatchDue()`) and
+        // WorkUpstreamStateRepository (the sync run's read of the epic's own
+        // row — T26 reported this binding by name). The API-side AppWorksModule
+        // re-exports the agent one, so this single import resolves all three.
+        AppWorksModule,
+        // APW-03 T12/T13 — exposes AppSpecService through the remote-proxy
+        // controller so the worker-side `app.spec.*` calls land here, where the
+        // App-spec state row, the git facade and the Activity log are wired
+        // (APW-02 T28 wired this entry at the packaging owner's request).
+        AppSpecModule,
     ],
     controllers: [TriggerInternalController],
 })

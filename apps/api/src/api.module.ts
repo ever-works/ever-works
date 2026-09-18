@@ -100,6 +100,11 @@ import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
 import { VectorStoreHostChunkTablesModule } from '@ever-works/agent/services';
 import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+// APW-02 (Fork lifecycle) — the three Upstream routes of plan §4.1
+// (`GET/POST /api/works/:id/upstream…`). Every one of them answers through the
+// agent package's AppUpstreamStateService, and each refusal travels as §4.1's
+// `{ status: 'error', code, message, details? }` body.
+import { AppWorksModule } from './app-works/app-works.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -362,6 +367,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Markdown export).
         KnowledgeLibraryApiModule,
         WebhooksModule,
+        // APW-02 (Fork lifecycle) — additive: one module, three routes, all of
+        // them behind the global session guard and the per-Work visibility check
+        // the agent service performs. It also re-exports the agent package's
+        // AppWorksModule, which is what `TriggerInternalModule` imports for its
+        // remote-proxy targets (T27/T28). Nothing above or below moves.
+        AppWorksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,
         // OnboardingModule, GitHubAppModule) and the public
