@@ -20,6 +20,7 @@ import { buildDecisionsHref } from '@/lib/api/inbox.shared';
 import { HomeMorningStack } from '@/components/home/HomeMorningStack';
 import { WorkspaceSection } from '@/components/home/WorkspaceSection';
 import { WorkspaceStats } from '@/components/home/WorkspaceStats';
+import { glanceForSummary } from '@/components/home/home.shared';
 import type { HomeSummaryDto } from '@ever-works/contracts';
 import type { Task } from '@/lib/api/tasks';
 import type { Agent } from '@/lib/api/agents';
@@ -158,7 +159,7 @@ export default function DashboardClient({
                 disabledKinds={disabledKinds}
                 workspaceStats={
                     <WorkspaceStats
-                        glance={homeSummary?.glance}
+                        glance={glanceForSummary(homeSummary)}
                         totalMissions={totalMissions}
                         totalIdeas={totalIdeas}
                         totalWorks={totalWorks}
