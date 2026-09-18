@@ -151,6 +151,12 @@ describe('activity-log.types', () => {
             // dotted CONTRACTS §6 events (`app.spec.validated`,
             // `app.spec.invalid`, `app.spec.applied`) are stored in `action`.
             ['APP_SPEC', 'app_spec'],
+            // APW-05 Builds (T17, Resolution R-2) — the `app_build` family. The
+            // dotted CONTRACTS §6 events (`app.build.queued`,
+            // `app.build.started`, `app.build.succeeded`, `app.build.failed`,
+            // `app.build.cancelled`) are stored in `action`; `blocked` is a
+            // stored status and publishes nothing (plan.md:1560).
+            ['APP_BUILD', 'app_build'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -459,7 +465,19 @@ describe('activity-log.types', () => {
             //    THIS member and no other: APW-03 T2 owns `app_blueprint` and
             //    `app_license` and has not landed, so when it does it appends its
             //    two and counts 207 — never this one again.
-            expect(literals).toHaveLength(205);
+            //
+            // +1 app_build (APW-05 Builds, T17 — Resolution R-2's `app_build`
+            //    family: one Activity row per `app.build.*` transition, written by
+            //    the ONE writer `AppBuildsService.publish`) — this branch's own
+            //    addition, disjoint from everything the branches above carry, and
+            //    COUNTED from the merged enum the same way -> 206. It carries its
+            //    `FEED_KIND_RULES` row in `activity-log/feed-kind.ts` in the same
+            //    change (program contract R-34; `feed-kind.spec.ts:14-19` fails on
+            //    a member without one), and the Shared-view classification needs no
+            //    edit for the same derived-complement reason as `app_launcher`
+            //    above. The count moves by exactly the one member this task
+            //    appends: no existing member is renamed, retyped or removed.
+            expect(literals).toHaveLength(206);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

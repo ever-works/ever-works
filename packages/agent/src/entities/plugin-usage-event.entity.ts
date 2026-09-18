@@ -33,6 +33,13 @@ export enum PluginUsageCapability {
     // needed (column is varchar). Recorded best-effort by
     // MetricsFacadeService after each provider call.
     METRICS = 'metrics',
+    // APW-05 T17 (Builds) — the build capability. One event per App Work
+    // Build, written by `AppBuildsService.finalize` as the Build's receipt
+    // (`units` = the runner's billable minutes, `operation: 'build.run'`, payer
+    // `workspace`, `costCents: 0` — GitHub bills the owner's account, not the
+    // platform, so the row audits the run and charges no credits; ACC-05-20).
+    // Additive enum value, no migration needed (the column is varchar).
+    BUILD = 'build',
 }
 
 @Index(['workId', 'occurredAt'])

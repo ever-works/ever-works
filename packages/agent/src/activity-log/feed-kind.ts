@@ -384,6 +384,23 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.APP_FORK]: 'deliveryWhenCompleted',
     [ActivityActionType.APP_ACTIONS]: 'work',
     [ActivityActionType.APP_UPSTREAM]: 'work',
+
+    // APW-05 (Builds) — Resolution R-2's `app_build` family (`APW05-G05`).
+    // `deliveryWhenCompleted` is the deliberate bucket, and it is the same call
+    // APW-03's `APP_SPEC` and APW-02's `APP_FORK` make: a Build is the epic's
+    // long-running operation, so its row reads as `work` while it is queued or
+    // running and as `delivery` once it succeeded — which is exactly what the
+    // `builds` tab and the Work feed should say. A `failed` or `cancelled` Build
+    // is written with those statuses and `resolveFeedKind` classifies any failed
+    // status as a `problem` before it consults this table, so a broken Build
+    // surfaces as a problem with no second rule. `blocked` writes no Activity row
+    // at all (`plan.md:1560`), which is why there is no fifth bucket to decide:
+    // the dotted `action` values of the family (`app.build.queued`,
+    // `app.build.started`, `app.build.succeeded`, `app.build.failed`,
+    // `app.build.cancelled`) never appear here — the bucket is per `actionType`.
+    // Revisiting it means a *different* value here, never an omission —
+    // `feed-kind.spec.ts:14-19` fails on a member with no entry.
+    [ActivityActionType.APP_BUILD]: 'deliveryWhenCompleted',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

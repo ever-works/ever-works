@@ -316,6 +316,17 @@ describe('agent/events submodule', () => {
                     // APW-03 T12/T13 — the App spec applied event, subscribed to by
                     // APW-05, 06, 07 and 08 (CONTRACTS.md:327).
                     'AppSpecAppliedEvent',
+                    // APW-05 T17 — the five `app.build.*` events and their explicit
+                    // status → event map (plan §7.8, `APW05-G05`). `blocked` maps to
+                    // `null` on purpose: it is not a CONTRACTS §6 name, so a blocked
+                    // Build publishes nothing. `__tests__/events.spec.ts` owns the
+                    // family's own assertions; this list is the barrel's pin.
+                    'AppBuildCancelledEvent',
+                    'AppBuildFailedEvent',
+                    'AppBuildQueuedEvent',
+                    'AppBuildStartedEvent',
+                    'AppBuildSucceededEvent',
+                    'APP_BUILD_EVENT_CLASSES',
                     'BaseEvent',
                     'DeploymentCompletedEvent',
                     'DeploymentDispatchedEvent',

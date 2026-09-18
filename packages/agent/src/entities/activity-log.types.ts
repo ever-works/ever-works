@@ -464,6 +464,25 @@ export enum ActivityActionType {
     // enum member is a TypeScript error) — its ledger comment should count this
     // member as already present.
     APP_SPEC = 'app_spec',
+    // APW-05 (Builds) — Resolution R-2's next family: one Activity row per
+    // `app.build.*` transition, written by the ONE writer
+    // `AppBuildsService.publish` (plan §7.8, `APW05-G05`). The dotted
+    // CONTRACTS §6 event goes in `action` — `app.build.queued`,
+    // `app.build.started`, `app.build.succeeded`, `app.build.failed`,
+    // `app.build.cancelled` — and `metadata` carries `{ buildId, number,
+    // commitSha, trigger, failureClass }`: names, ids and shas only, never a
+    // value and never a log line (FR-40). A `blocked` Build publishes nothing,
+    // because `blocked` is not one of the five CONTRACTS §6 names
+    // (`plan.md:1560`).
+    //
+    // Additive member — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Program contract R-34 (Activity completeness) is
+    // satisfied by this member plus its `FEED_KIND_RULES` entry in
+    // `packages/agent/src/activity-log/feed-kind.ts` (`feed-kind.spec.ts:14-19`
+    // fails on a member without one); the Shared-view classification needs no
+    // edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
+    // the publishable allow-list, so this member is unpublished by construction.
+    APP_BUILD = 'app_build',
 }
 
 /**
