@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1455 · absent: 1212 · of the absent, another task says it creates them: 811
+present: 1462 · absent: 1205 · of the absent, another task says it creates them: 804
 
-## LANDED SURFACE — marked "new", already in the repository (169)
+## LANDED SURFACE — marked "new", already in the repository (176)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -160,6 +160,8 @@ present: 1455 · absent: 1212 · of the absent, another task says it creates the
 - APW-11-app-launcher T33 — `apps/api/src/app-launcher/e2e-seed.controller.ts`
 - APW-11-app-launcher T33 — `apps/api/src/app-launcher/e2e-seed.controller.spec.ts`
 - APW-12-ever-id T3 — `packages/contracts/src/apps/ever-id.ts`
+- APW-12-ever-id T4 — `packages/plugin/src/contracts/capabilities/identity-provider.interface.ts`
+- APW-12-ever-id T4 — `packages/plugin/src/contracts/__tests__/identity-provider.interface.spec.ts`
 - APW-12-ever-id T5 — `packages/plugins/oidc-identity/src/__tests__/settings.schema.spec.ts`
 - APW-13-golden-paths T1 — `apps/web/e2e/fakes/github-fake/fixtures/README.md`
 - APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/server.mjs`
@@ -180,6 +182,11 @@ present: 1455 · absent: 1212 · of the absent, another task says it creates the
 - APW-13-golden-paths T11 — `apps/web/e2e/helpers/canary-sink.ts`
 - APW-13-golden-paths T11 — `apps/web/e2e/helpers/__tests__/app-works-evidence.unit.spec.ts`
 - APW-13-golden-paths T12 — `apps/web/playwright.app-works.config.ts`
+- APW-13-golden-paths T14 — `apps/web/e2e/flow-repo-work-kind-regression.spec.ts`
+- APW-13-golden-paths T15 — `apps/web/e2e/flow-template-fork-success.spec.ts`
+- APW-13-golden-paths T16 — `apps/web/e2e/flow-activity-deploy-and-pr-events.spec.ts`
+- APW-13-golden-paths T17 — `apps/web/e2e/flow-github-intake-signed-delivery.spec.ts`
+- APW-13-golden-paths T18 — `apps/web/e2e/flow-managed-subdomain-allocation.spec.ts`
 
 ## PER EPIC — named / already present / landed (13 epics)
 
@@ -196,10 +203,10 @@ present: 1455 · absent: 1212 · of the absent, another task says it creates the
 | APW-09-upstream-pull-requests | 91 | 2 |
 | APW-10-apps-hosting-tier | 151 | 2 |
 | APW-11-app-launcher | 72 | 45 |
-| APW-12-ever-id | 122 | 2 |
-| APW-13-golden-paths | 101 | 19 |
+| APW-12-ever-id | 122 | 4 |
+| APW-13-golden-paths | 101 | 24 |
 
-## ABSENT PATHS (1212) — grouped by epic
+## ABSENT PATHS (1205) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
@@ -209,10 +216,10 @@ in the repository would be noise. Pass `--full` to print every path to stdout in
 - APW-08-evolve-loop: 123
 - APW-04-app-provisioner: 122
 - APW-05-builds: 120
-- APW-12-ever-id: 120
+- APW-12-ever-id: 118
 - APW-06-app-runtime: 110
 - APW-09-upstream-pull-requests: 89
-- APW-13-golden-paths: 82
+- APW-13-golden-paths: 77
 - APW-01-app-work-kind: 68
 - APW-07-app-env-and-dependencies: 46
 - APW-02-fork-lifecycle: 29
