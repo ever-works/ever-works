@@ -114,3 +114,10 @@ export * from './repositories/agent-repo-attachment.repository';
 // AW-22 Workspace backup — the record of one archive attempt, and the
 // compare-and-set transitions the runner, the sweeper and the owner race on.
 export * from './repositories/workspace-backup.repository';
+// APW-11 App Launcher — the personal arrangement (visible / pinned / order)
+// behind `GET /api/me/apps` and `PUT /api/me/apps/preferences`. Provided by the
+// feature's own `app-launcher.module.ts`, so it is exported here rather than
+// listed in `_repository-inventory.ts` — that file is only for the repositories
+// `DatabaseModule` itself wires, and its drift check fails on an entry that is
+// not a provider there.
+export * from './repositories/app-launcher-preference.repository';

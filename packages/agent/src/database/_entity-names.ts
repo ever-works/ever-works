@@ -67,6 +67,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentRunLog',
     // ───────────────────────────────
     'ApiKey',
+    // APW-11 App Launcher — one person's arrangement of one launcher item.
+    'AppLauncherPreference',
     'AuthAccount',
     'AuthSession',
     'AuthVerification',

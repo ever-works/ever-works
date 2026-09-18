@@ -1025,4 +1025,93 @@ export class WorkRepository {
             sourceValidationNextRunAt: nextRunAt,
         });
     }
+
+    /**
+     * APW-11 (App Launcher, plan §4.1 step 2) — the bounded candidate set a
+     * launcher listing is built from.
+     *
+     * The four rules, each a spec requirement rather than a convenience:
+     *
+     *   - **creator-or-member.** A person sees a Work they made or one they were
+     *     invited to, and nothing else (spec FR-17). Membership is passed in as
+     *     ids, the same shape `findAllAccessible` takes, so this method adds no
+     *     second definition of "who can view a Work".
+     *   - **`status <> 'archived'`.** An archived Work is not live and must not
+     *     appear in the panel (plan §4.1 step 2). Nothing else about a Work's
+     *     status excludes it: a `draft` Work can carry a live address, and
+     *     hiding it here would drop a tile FR-17 says belongs in the list.
+     *   - **scope.** `organizationId = :org` for an Organization-scoped read, or
+     *     `IS NULL` for the personal scope (plan §4.1 step 2, spec FR-24). The
+     *     two are different buckets and are never mixed, which is what keeps a
+     *     personal Work out of an Organization's panel.
+     *   - **`updatedAt DESC`.** The candidate window is a *recency* window, so a
+     *     person who has just touched a Work sees it before the 500-row cap can
+     *     cut it off. `id ASC` breaks a same-millisecond tie so the set is
+     *     deterministic across calls.
+     *
+     * The cap is {@link LAUNCHER_CANDIDATE_LIMIT_MAX} (plan §4.1:374, §9.2) and
+     * a larger `limit` is clamped rather than honoured: the value bounds how
+     * much of one request's work is unbounded-by-data, so a caller cannot raise
+     * it into a full table scan.
+     *
+     * The `user` relation is deliberately NOT joined: nothing in a launcher tile
+     * reads it, and joining it across 500 rows is exactly the cost plan §9.2's
+     * "candidate cap 500, three batched queries" exists to avoid.
+     */
+    async findLauncherCandidates(options: {
+        userId: string;
+        memberWorkIds?: string[];
+        organizationId?: string | null;
+        limit?: number;
+    }): Promise<Work[]> {
+        const { userId, memberWorkIds = [], organizationId = null } = options ?? {};
+        if (!userId) {
+            return [];
+        }
+
+        const take = launcherCandidateLimit(options?.limit);
+
+        const query = this.repository.createQueryBuilder('work');
+
+        const members = [...new Set(memberWorkIds.filter(Boolean))];
+        if (members.length > 0) {
+            query.where(
+                new Brackets((qb) => {
+                    qb.where('work.userId = :userId', { userId }).orWhere(
+                        'work.id IN (:...memberWorkIds)',
+                        { memberWorkIds: members },
+                    );
+                }),
+            );
+        } else {
+            query.where('work.userId = :userId', { userId });
+        }
+
+        query.andWhere('work.status <> :archivedStatus', { archivedStatus: 'archived' });
+
+        if (organizationId) {
+            query.andWhere('work.organizationId = :organizationId', { organizationId });
+        } else {
+            query.andWhere('work.organizationId IS NULL');
+        }
+
+        query.orderBy('work.updatedAt', 'DESC').addOrderBy('work.id', 'ASC').take(take);
+
+        return query.getMany();
+    }
+}
+
+/**
+ * APW-11 — the candidate cap plan §4.1:374 passes as `limit: 500` and §9.2
+ * ("Deployment table slow for 500 candidates") names as the bound that keeps a
+ * launcher listing a fixed number of batched queries.
+ */
+export const LAUNCHER_CANDIDATE_LIMIT_MAX = 500;
+
+/** The requested candidate limit, clamped to the documented maximum. */
+function launcherCandidateLimit(requested: number | undefined): number {
+    if (typeof requested !== 'number' || !Number.isFinite(requested) || requested <= 0) {
+        return LAUNCHER_CANDIDATE_LIMIT_MAX;
+    }
+    return Math.min(Math.trunc(requested), LAUNCHER_CANDIDATE_LIMIT_MAX);
 }

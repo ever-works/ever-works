@@ -47,3 +47,9 @@ export * from './app/app-security.js';
 // plan §4.10) — the pure library R-5 asks for: `AppRenderInput` in, cluster objects out, no I/O.
 export * from './app/app-network-policy.renderer.js';
 export * from './app/app-manifest.renderer.js';
+// App jobs, CronJobs and the runner (APW-06 T8, plan §4.8/§4.9) with the runner script they mount
+// and the rollout predicate/classifier of §5.4 (T9) — pure functions over `AppRenderInput` and over
+// observed cluster state, no I/O and no clock of their own.
+export * from './app/app-runner.script.js';
+export * from './app/app-jobs.renderer.js';
+export * from './app/app-rollout.js';

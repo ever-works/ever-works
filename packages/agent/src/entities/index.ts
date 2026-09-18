@@ -227,3 +227,7 @@ export * from './shared-view.entity';
 // dated archive of one workspace, with the manifest summary that keeps the
 // history legible after the archive itself expires.
 export * from './workspace-backup.entity';
+// APW-11 App Launcher — one person's visible / pinned / order values per
+// launcher item, keyed by a portable `scopeKey` rather than a nullable
+// organization id. Written only by the launcher's own save path.
+export * from './app-launcher-preference.entity';

@@ -179,6 +179,8 @@ import { ReleasePromotion } from '../entities/release-promotion.entity';
 import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 import { SharedView } from '../entities/shared-view.entity';
 import { WorkspaceBackup } from '../entities/workspace-backup.entity';
+// APW-11 App Launcher — one person's arrangement of one launcher item.
+import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
 
 import {
     PluginEntity,
@@ -465,4 +467,10 @@ export const ENTITIES = [
     // unique index in the migration (never at decorator level) is what stops
     // two tabs starting two backups of the same workspace at once.
     WorkspaceBackup,
+    // APW-11 App Launcher — one person's visible / pinned / order values per
+    // launcher item. `scopeKey` carries 'global' | 'personal' | <organizationId>
+    // so uniqueness is portable, and there are deliberately no scope-stamp
+    // columns: the active Organization must never be stamped onto a 'global'
+    // row every Organization shares.
+    AppLauncherPreference,
 ];
