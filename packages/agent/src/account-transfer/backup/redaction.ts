@@ -179,6 +179,15 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
         'A digest of a knowledge document’s whitespace-normalized body, used to tell a substantive edit from a reformat. Derived from content the archive already carries in full.',
     includeSecrets:
         'A boolean toggle on the legacy config-repo sync — whether that path was asked to carry masked secrets. Not itself a secret.',
+    // APW-03 T9 — the App spec state table's three digests. The guard fired on
+    // them the moment `WorkAppSpecState` landed (2026-09-18), which is exactly
+    // what it is for: a new `*Hash` column has to be decided, not inherited.
+    headSpecHash:
+        'A sha256 of the App spec at the repository head, used to tell one evaluation from the next. The spec is a file in the member’s own repository, which the archive does not carry — the digest gives nothing away that the repository does not already publish to anyone who can read it.',
+    effectiveSpecHash:
+        'A sha256 of the spec the Work is actually running under (head, or a pinned earlier commit). A content digest for change detection, not a credential.',
+    licenseRegistryHash:
+        'A sha256 of the license registry the App spec resolved against, used to notice a registry change between evaluations. The registry is public template metadata.',
 });
 
 /** Does this entity produce no lines in an archive at all? */
