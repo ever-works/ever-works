@@ -354,6 +354,16 @@ jobs:
           # Fresh free users already consume their one included seat, so keep
           # fixture setup unbounded. The config getter ignores this in prod.
           E2E_BYPASS_SEAT_LIMITS: 'true'
+          # APW-11 (App Launcher) — the seed route's gate. `POST
+          # /api/e2e/app-launcher/seed` answers 404 unless this is exactly
+          # 'true' AND NODE_ENV is not production, so the lane can create the
+          # Works, deployments and custom domains the launcher specs render —
+          # with no cluster, no build and no network (APW11-G07). The launcher's
+          # OWN switch (`EVER_WORKS_APP_LAUNCHER_ENABLED`) stays out of this
+          # block on purpose: T20's flag-off lane boots the same stack with that
+          # variable unset and proves every launcher route answers 404, which it
+          # could not do if seeding were gated on the same switch.
+          E2E_APP_LAUNCHER_SEED: 'true'
           # E2E-only escape hatch (hard-gated off in production â€” ignored
           # unless NODE_ENV !== 'production'). Without a real billing
           # integration wired in, the only path to a PAID plan is the
