@@ -350,6 +350,36 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · two routed bugs closed and the launcher's telemetry landed, while the element package and the 21 locale
+  bundles are built in parallel.**
+  **T6 follow-up — `kind_mismatch` could not fire through the object entry point** (`ff3877a94`). The document form of
+  `validateAppSpecObject` called `kindOf(obj['kind'])`, handing that helper the **value** of `kind` where it expects the
+  **object** (`kindOf` reads `value['kind']`, and `isPlainObject('app')` is false), so the root kind it derived was
+  always `null` and a document that disagreed with itself was reported without its `root` param. The TEXT entry point
+  always passed the object, so the two disagreed about the same document — contradicting that function's own doc
+  comment. Nothing caught it because the only `kind_mismatch` case drove the text path; the new case drives the object
+  path, went red with `- Expected - 1 / + Received + 0` (the `root` param simply absent), and restoring the wrong
+  argument turns exactly that case red. `works-config` **661 → 662**. The T7 workaround comment that said "T6 owns that
+  line; reported, not edited here" is now false and was corrected — a stale comment tells the next reader to expect a
+  bug that is gone.
+  **The k8s scrubber spliced the match offset into every mid-line redaction** (`d9175646b`). A `String.replace` callback
+  receives capture groups after the match — and for a **group-less** pattern that argument is the match **offset**, a
+  number. Two patterns are group-less on purpose (the `Authorization: Bearer …` one, and `buildSecretPattern`, which
+  matches a runtime secret literally), so a registry failure read `401 Unauthorized for 37[REDACTED]` and a Bearer
+  failure read `failed: 8[REDACTED]`. Production call sites `k8s.plugin.ts:1202-1206`. It hid because `0` is falsy, so
+  the "the whole line is the secret" case was correct, and every assertion was `not.toContain(secret)` — which holds
+  whether or not the offset is in the output. Four additive cases now assert those redactions by **equality**; k8s
+  **730 → 734**. 🌟 The first perturbation attempt stayed GREEN and was recorded rather than hidden: `String(groups[0])`
+  while keeping the `typeof` check does not reintroduce the bug, and a perturbation that cannot fail proves nothing.
+  **APW-11 T14 (telemetry half)** (`f0c260de6`) — `lib/app-launcher/app-launcher-telemetry.ts`, the four events of plan
+  §9.1 as a closed union, following `help-telemetry.ts`. The value is what the union cannot express: a launcher tile
+  holds a host, an address, a Work key and a title, and none of them has a field to travel in. The negative claim is
+  asserted with a fixture that has everything to leak and **a positive control** (`catalog_id` really does travel),
+  because otherwise a capture that sent nothing would pass; three perturbations red, each restored byte-identically.
+  Deferred honestly: nothing emits the preferences-saved or exposure-changed events until T16/T17/T22 exist.
+  **In flight in parallel:** T10-T12's `packages/app-launcher` (the Lit element, its keyboard model and its size
+  budget) and the 21-locale `dashboard.appLauncher.*` block. Both are delegated; the coordinator verifies and commits.
+
 - **2026-09-18 · five slices land in one round — the App spec is published, the k8s lifecycle exists, the state row
   gets its writer, the upstream PR surface opens, and the launcher's BFF read carries its scope.**
   **APW-09 T1/T2 — cross-repository PRs, review reads, interaction limits** (`fb59836fb`; plugin `+217/−0`, github
