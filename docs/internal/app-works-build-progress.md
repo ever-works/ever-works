@@ -291,6 +291,58 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · four more verified slices and one guard: APW-06 T11, APW-03 T3, APW-11 T7 and T6, plus T21.**
+  **APW-06 T11 — the kubeconfig guard** (`app-kubeconfig.guard.ts` 863 lines + 44 tests; `errors.ts` gains exactly two
+  codes). It refuses a kubeconfig's local-execution and file-reading features, requires a public https server and pins
+  the validated IP. The trap it exists for is **IPv4-mapped and NAT64 addresses** — `::ffff:10.0.0.1` carries a private
+  IPv4 inside an IPv6 literal, so a naive `10.0.0.0/8` check passes it — and the perturbation that removed the
+  mapped-form re-check while leaving the deny tables intact is what proves it (3 red, including
+  `::ffff:10.0.0.1 … expected true to be false`). Five further perturbations each went red and were restored to
+  `B30D3610…`. It also ships a **source scan** with a vacuity check: any file under `src/app` that loads a kubeconfig
+  must reference the guard, with a known-good control, so the next task cannot quietly bypass it.
+  🛑 **Two spec-vs-reality findings routed, not fixed:** plan §6.1's claim that _"client-node does not follow
+  redirects"_ is **false for the installed v1.4.0** (its `isomorphic-fetch` transport passes no `redirect` option and
+  node-fetch v2 defaults to `follow`), so the transport fix belongs to T10/T14 — the guard can only guarantee one
+  request to the validated literal IP with the 307 surfaced, which the mocked-307 test asserts; and plan §6.1
+  (APW06-G20) places this classifier in `packages/plugin/src/helpers/cluster-address-policy.ts`, which does not exist
+  and is outside T11's ownership, so it is exported from the guard and a later move is a re-export.
+  **APW-03 T3 — the structural App spec schema** (1498 lines + 210 tests; `KIND_SPEC_SCHEMAS` gains `app`, +14/0).
+  **No refinements anywhere, deliberately:** `z.toJSONSchema()` silently _drops_ them, so a `.refine()` would make
+  T8's published artifact weaker than the runtime. The flagged trap was honoured — `source` and `components` stay
+  optional — and the mutual-assignability assertion of plan.md:517-518 is written four ways (raw `z.input` → `AppSpec`,
+  the reverse through an array-readonly normaliser, type identity, and a modifier-mismatch check that **names** the
+  drifting field), going red when either field is made required. Six perturbations, each restored to `38B4E277…`.
+  **And the artifact that registration turned red was regenerated, not hand-edited:** `works.v2.schema.json` is
+  generated and has its own drift guard, so it is now 43,015 → 132,095 bytes, **+1378 lines / 0 deletions**; T8 still
+  owns refining it. Whole `works-config` sweep: **387 tests / 14 suites green** (384 + 1 failure before).
+  **APW-11 T7 — exposure on Work update** (8 files, +1041/−4; the four deleted lines are the pinned activity-type
+  count 200 → 201 and three _widened_ imports). The subtle requirement is that "changed" compares the PAIR
+  `(storedValue, storedExplicit)`, so `null → true` on an `app` Work is a real change while `null → null` and
+  `true → true` write nothing at all — the perturbation that logs the no-op turns exactly those three tests red. The
+  Activity row names neither the Work nor an address, asserted **against the produced record** (perturbation 3 put
+  both into the summary and printed the offending row), and `feed-kind.ts`'s explicit classification is load-bearing:
+  removing it is red while the fallback test stays green.
+  **APW-11 T6 — `AppLauncherService`** (7 new files + 2 specs, 67 tests, written first: the suite started red on
+  `Cannot find module '../app-launcher.service'`), plus the `"./app-launcher"` **subpath in
+  `packages/agent/package.json`** — without it the module exists but is unreachable by T8's API module. Four
+  perturbations restored to `E73ED38B…`, including the **chip rule** I routed to this task in advance:
+  `findLatestReadyForWorks` decides liveness and `findLatestForWorks` stays unfiltered, so CANCELED/SUPERSEDED ⇒ no
+  chip is the service's decision, not the repository's. Seams are named so the next tasks cannot miss them: APW-06 T17
+  must bind a **batch** `findStateForWorks` over `WORK_APP_RUNTIME_STATES`, APW-06 T48 must bind over **this** module's
+  `MANAGED_HOST_ROOT_RESOLVER` / `APP_PUBLISHED_HOSTS` tokens (a second `Symbol('APP_PUBLISHED_HOSTS')` would leave
+  the port unbound), and APW-03 must bind `APP_SPEC_DISPLAY_NAMES`.
+  **APW-11 T21 — the no-sign-on copy guard** (6 tests): it reads the term list out of `no-sso-terms-draft.md` rather
+  than copying it, and scans **every launcher key in every bundle** instead of a fixed three namespaces — a spec
+  pinned to those three would have scanned _nothing_ today and passed. Proven by three perturbations run as a pair: an
+  English claim is 2 red; the German phrase with its row still `seeded` adds **no** red, which is the review state
+  working; flipping the row to `reviewed` makes the guard name it. A control pins that spec §6's two permitted
+  sentences ("You may need to sign in") do not match.
+  🔧 **Convention corrected, and it cost two agents time:** prettier settings are **per package**.
+  `packages/agent`, `apps/api` and `apps/web` each carry a `.prettierrc` (printWidth **100**, trailingComma **"all"**,
+  spaces); everything without one — `packages/plugin`, `packages/plugins/k8s` — resolves to the root `package.json`
+  key (printWidth **120**, **tabs**, trailingComma **"none"**). My briefs said 120/none for agent and api files, which
+  is wrong; `prettier --check`, which every task runs, is what caught it both times.
+
 - **2026-09-18 · a task-path METER, and the APW-09 interface handoff recorded in the spec tree.**
   **The meter.** `docs/specs/features/app-works/tools/verify-task-paths.mjs` reads all 13 epics' `tasks.md`, extracts
   the exact paths each task names, and reports which already exist. Building it taught the reason a naive version of
