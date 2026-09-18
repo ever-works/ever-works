@@ -264,42 +264,25 @@ export interface AppDependencySpecSource {
 /** DI token for {@link AppDependencySpecSource} — bound by APW-07's module owner (T25). */
 export const APP_DEPENDENCY_SPEC_SOURCE = Symbol('APP_DEPENDENCY_SPEC_SOURCE');
 
-// ── provisional — APW-07 T17, the `app-dependency-provision` dispatcher ──────
+// ── APW-07 T17 — the `app-dependency-provision` dispatcher (landed) ──────────
 //
-// `packages/agent/src/tasks/app-dependency-provision-dispatcher.ts` and its
-// `APP_DEPENDENCY_PROVISION_DISPATCHER` symbol (`tasks.md:258-259`) do not exist
-// yet: T17 owns them, and T17 also owns `app-dependency-provision.types.ts`,
-// whose payload is the shape below (`tasks.md:869-870`). The method name is
-// T17's own too — `TriggerService.dispatchAppDependencyProvision(payload)`
-// (`tasks.md:262`).
-//
-// 🛑 The token here and T17's are two different Symbols. When T17 lands, this
-// declaration is DELETED and the import is added — leaving both in place would
-// let the real binding resolve to nothing, and every dispatch would silently
-// report `dispatchUnavailable`.
+// These three names were declared **provisionally** here while T17 was in flight,
+// with a warning that a temporary `Symbol` and T17's real one are two different
+// keys: leaving both in place would let the binding in `TriggerModule` resolve
+// nothing, and every dispatch would report `dispatchUnavailable` **silently**.
+// T17 has landed (`packages/agent/src/tasks/app-dependency-provision-dispatcher.ts`
+// and `…types.ts`), so the declarations are gone and the real ones are imported and
+// **re-exported under the same names** — a consumer that imported them from this
+// module keeps compiling and, more importantly, keeps receiving the one token that
+// is actually bound.
+import {
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
+    type AppDependencyProvisionDispatcher,
+} from '../tasks/app-dependency-provision-dispatcher';
+import type { AppDependencyProvisionPayload } from '../tasks/app-dependency-provision.types';
 
-/** The `app-dependency-provision` payload (plan §7:869). */
-export interface AppDependencyProvisionPayload {
-    workId: string;
-    kind?: AppDependencyKind;
-    mode: 'provision' | 'refresh' | 'deprovision';
-    deleteData?: boolean;
-    requestedByUserId?: string;
-    /**
-     * Epoch ms of the first attempt, echoed on a re-dispatch so the kind's
-     * readiness deadline is measured from a value the work carries rather than
-     * from a second clock read (plan §7:875).
-     */
-    requestedAtMs?: number;
-}
-
-/** The dispatcher this service asks to schedule one provisioning job. */
-export interface AppDependencyProvisionDispatcher {
-    dispatchAppDependencyProvision(payload: AppDependencyProvisionPayload): Promise<string | null>;
-}
-
-/** DI token for {@link AppDependencyProvisionDispatcher} — owned by APW-07 T17. */
-export const APP_DEPENDENCY_PROVISION_DISPATCHER = Symbol('APP_DEPENDENCY_PROVISION_DISPATCHER');
+export { APP_DEPENDENCY_PROVISION_DISPATCHER };
+export type { AppDependencyProvisionDispatcher, AppDependencyProvisionPayload };
 
 // ── provisional — APW-07 T9 `AppEnvCrypto` ───────────────────────────────────
 //

@@ -51,11 +51,13 @@ import type {
 import type { WorkAppDependencyMetadata } from '../../database/repositories/work-app-dependency.repository';
 import type { WorkAppDependency } from '../../entities/work-app-dependency.entity';
 import {
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
     AppDependenciesService,
     AppDependencyRefusalError,
     type AppDependencyProvisionPayload,
     type AppDependencySpecSnapshot,
 } from '../app-dependencies.service';
+import { APP_DEPENDENCY_PROVISION_DISPATCHER as TASKS_APP_DEPENDENCY_PROVISION_DISPATCHER } from '../../tasks/app-dependency-provision-dispatcher';
 import { AppDependencyFacadeService } from '../../facades/app-dependency.facade';
 // The two provisional seams the last round left open, imported ONLY as types:
 // this spec is where "does the service APW-06 is waiting for actually satisfy
@@ -1593,5 +1595,29 @@ describe('AppDependenciesService — the port’s unavailable vocabulary (APW07-
             true,
             'provisioning',
         ]);
+    });
+});
+
+describe('the provisioning dispatcher token is the ONE T17 binds (APW07-G24 wiring)', () => {
+    it('re-exports the token T17 owns instead of declaring a second one', () => {
+        // Two Symbols with the same description are two DIFFERENT keys. While T17
+        // was in flight this service declared its own provisional token, and its
+        // own docstring named the consequence: the binding in `TriggerModule`
+        // would resolve to nothing and every dispatch would report
+        // `dispatchUnavailable` — silently, because a missing optional provider is
+        // not an error. This assertion is the guard for that trap.
+        expect(APP_DEPENDENCY_PROVISION_DISPATCHER).toBe(TASKS_APP_DEPENDENCY_PROVISION_DISPATCHER);
+        expect(typeof APP_DEPENDENCY_PROVISION_DISPATCHER).toBe('symbol');
+        expect(APP_DEPENDENCY_PROVISION_DISPATCHER.description).toBe(
+            'APP_DEPENDENCY_PROVISION_DISPATCHER',
+        );
+    });
+
+    it('never declares a local Symbol of its own in the source', () => {
+        const source = readFileSync(join(__dirname, '..', 'app-dependencies.service.ts'), 'utf8');
+        // Comments first: the module explains this rule and therefore names it.
+        const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+        expect(code).not.toMatch(/Symbol\(\s*'APP_DEPENDENCY_PROVISION_DISPATCHER'\s*\)/);
+        expect(code).toMatch(/@Inject\(APP_DEPENDENCY_PROVISION_DISPATCHER\)/);
     });
 });
