@@ -629,6 +629,9 @@ describe('SchedulesService — workspace additions', () => {
         expect(paused.unfilteredTotal).toBe(9);
         expect(paused.countsByStatus.paused).toBe(3);
         expect(paused.countsBySourceType.inbound_trigger).toBe(3);
+        // The pre-filter breakdown is the one a source picker can offer, and
+        // it is unaffected by the status filter above.
+        expect(paused.unfilteredCountsBySourceType.inbound_trigger).toBe(9);
 
         const text = await service.getPage(SCOPE, { q: 'hook 004' });
         expect(text.items.map((item) => item.id)).toEqual(['inbound_trigger:trigger-004']);
@@ -639,6 +642,34 @@ describe('SchedulesService — workspace additions', () => {
 
         const byAgent = await service.getPage(SCOPE, { agentId: 'agent-x' });
         expect(byAgent.total).toBe(0);
+    });
+
+    it('keeps the pre-filter source breakdown complete while a source is selected', async () => {
+        // The trap this field exists for: `countsBySourceType` is taken AFTER
+        // `sourceType` is applied, so selecting one source zeroes every other
+        // entry and a picker built on it collapses to a single usable chip.
+        const service = emptyService({ triggers: manyTriggers(4) });
+        const page = await service.getPage(SCOPE, { sourceType: 'inbound_trigger' });
+
+        expect(page.countsBySourceType.inbound_trigger).toBe(4);
+        expect(page.countsBySourceType.recurring_task).toBe(0);
+        expect(page.unfilteredCountsBySourceType.inbound_trigger).toBe(4);
+        // Every known source is present, so a picker never reads `undefined`.
+        expect(Object.keys(page.unfilteredCountsBySourceType).sort()).toEqual(
+            [
+                'agent_heartbeat',
+                'data_sync',
+                'inbound_trigger',
+                'mission_tick',
+                'recurring_task',
+                'source_validation',
+                'work_schedule',
+            ].sort(),
+        );
+
+        const none = await service.getPage(SCOPE, { sourceType: 'recurring_task' });
+        expect(none.total).toBe(0);
+        expect(none.unfilteredCountsBySourceType.inbound_trigger).toBe(4);
     });
 
     it('names a source whose query failed instead of blanking the page', async () => {

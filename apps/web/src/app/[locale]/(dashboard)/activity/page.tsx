@@ -4,9 +4,15 @@ import { getTranslations } from 'next-intl/server';
 import type { RunLedgerPage, RunWindowStats } from '@ever-works/contracts';
 import { getActivityLog } from '@/app/actions/activity-log';
 import { getFeedActors, getFeedPage } from '@/app/actions/feed';
+import { getScheduleHealth, getSchedulePage } from '@/app/actions/dashboard/schedules';
 import { parseFeedFilters } from '@/components/feed/feed-filters';
 import { parseRunsViewState } from '@/components/runs/runs.shared';
 import type { RunsAgentOption } from '@/components/runs/RunsFilters';
+import {
+    EMPTY_SCHEDULE_FILTERS,
+    filtersFromSearchParams,
+    pageParamsFor,
+} from '@/components/schedules/schedules-filters.shared';
 import { agentsAPI } from '@/lib/api/agents';
 import { notificationPreferencesAPI } from '@/lib/api/notification-preferences';
 import { runsAPI } from '@/lib/api/runs';
@@ -24,6 +30,17 @@ function firstParam(value: string | string[] | undefined): string | null {
     return (Array.isArray(value) ? value[0] : value) ?? null;
 }
 
+/** The incoming query as `URLSearchParams`, so the schedules parser reads
+ * exactly what it read when the list was a page of its own. */
+function asSearchParams(params: Record<string, string | string[] | undefined>): URLSearchParams {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        const first = firstParam(value);
+        if (first !== null) search.set(key, first);
+    }
+    return search;
+}
+
 export default async function ActivityPage({
     searchParams,
 }: {
@@ -39,11 +56,17 @@ export default async function ActivityPage({
     // the state in the URL, so first paint is real entries and not a spinner.
     const feedRequested = view === 'feed';
     const runsRequested = isActivityView(view) && view === 'runs';
+    const schedulesRequested = view === 'schedules';
 
     const feedFilters = feedRequested ? parseFeedFilters(source) : null;
     // The Runs view's view-state lives in the same address bar, so a shared
     // `/activity?view=runs&g=week&status=failed` link paints that exact window.
     const runsView = runsRequested ? parseRunsViewState(source) : null;
+    // …and so do the Schedules view's filters, which are read by the same
+    // parser the list used when it was a page of its own.
+    const scheduleFilters = schedulesRequested
+        ? filtersFromSearchParams(asSearchParams(params))
+        : null;
 
     // The Runs view's CONTEXT — the viewer's timezone and the Agent roster its
     // filter offers — is fetched on every load, not only when the view was
@@ -58,7 +81,7 @@ export default async function ActivityPage({
         .then((prefs) => prefs.preference?.timezone || 'UTC')
         .catch(() => 'UTC');
 
-    const [response, feedPage, feedActors, resolvedTimeZone, agentRoster, ledger] =
+    const [response, feedPage, feedActors, resolvedTimeZone, agentRoster, ledger, schedules] =
         await Promise.all([
             getActivityLog({ limit: 25 }).catch(() => ({
                 success: false,
@@ -85,6 +108,23 @@ export default async function ActivityPage({
                 )
                 .catch(() => [] as RunsAgentOption[]),
             loadLedgerWindow(runsView, runsRequested, timeZone),
+            // The Schedules view is the former `/schedules` page, so it is
+            // server-rendered for the filters in the link exactly as that page
+            // was. Each half fails on its own: a failing list must not blank
+            // the health banner and vice versa.
+            scheduleFilters
+                ? Promise.all([
+                      getSchedulePage(pageParamsFor(scheduleFilters)).catch(() => ({
+                          ok: false as const,
+                      })),
+                      getScheduleHealth().catch(() => ({ ok: false as const })),
+                  ]).then(([pageResponse, healthResponse]) => ({
+                      page: pageResponse.ok ? pageResponse.page : null,
+                      failed: !pageResponse.ok,
+                      health: healthResponse.ok ? healthResponse.summary : null,
+                      healthFailed: !healthResponse.ok,
+                  }))
+                : Promise.resolve(null),
         ]);
 
     return (
@@ -105,6 +145,13 @@ export default async function ActivityPage({
                     page: ledger.page,
                     stats: ledger.stats,
                     agents: agentRoster,
+                }}
+                schedules={{
+                    filters: scheduleFilters ?? EMPTY_SCHEDULE_FILTERS,
+                    page: schedules?.page ?? null,
+                    failed: schedules?.failed ?? false,
+                    health: schedules?.health ?? null,
+                    healthFailed: schedules?.healthFailed ?? false,
                 }}
             />
         </Suspense>

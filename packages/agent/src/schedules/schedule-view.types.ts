@@ -202,7 +202,16 @@ export interface SchedulePage {
     total: number;
     /** Rows before any filter — lets the surface say "you have N in total". */
     unfilteredTotal: number;
+    /** Per-source counts WITHIN the current filters. */
     countsBySourceType: Record<ScheduleSourceType, number>;
+    /**
+     * Per-source counts BEFORE any filter — the breakdown a source picker
+     * offers, which `countsBySourceType` cannot answer: that one is taken
+     * after `sourceType` itself has been applied, so every other source reads
+     * 0 as soon as one is selected and the picker collapses to a single
+     * usable entry.
+     */
+    unfilteredCountsBySourceType: Record<ScheduleSourceType, number>;
     countsByStatus: Record<ScheduleStatus, number>;
     healthCounts: { ok: number; neverRuns: number };
     /** Sources whose query failed; their rows are missing from this page. */

@@ -117,15 +117,21 @@ export const ROUTES = {
     // used to link at the Runs PAGE links here instead (the page is gone; its
     // features are the Runs view).
     DASHBOARD_ACTIVITY_RUNS: '/activity?view=runs',
+    // The Schedules view of the Activity page, likewise — the Schedules PAGE is
+    // gone and its list, filters and row controls are this view. The filter
+    // parameters ride along on the links that need them.
+    DASHBOARD_ACTIVITY_SCHEDULES: '/activity?view=schedules',
     // Runs ledger (AW-09) — RETIRED as a page in favour of the Activity page's
     // Runs view. Kept as a constant because the route still EXISTS: it 308s to
     // `DASHBOARD_ACTIVITY_RUNS`, carrying the whole view state with it, so
     // every bookmark, dashboard tile, help article and e2e journey written
     // against `/runs` keeps working (and keeps its filters).
     DASHBOARD_RUNS: '/runs',
-    // Schedules workspace — every recurring definition from every source,
-    // with run-now / pause / resume. The Activity page's Schedules tab keeps
-    // working and links here.
+    // Schedules — RETIRED as a page in favour of the Activity page's Schedules
+    // view (`DASHBOARD_ACTIVITY_SCHEDULES` above). Kept as a constant because
+    // the route still EXISTS: it redirects there carrying the whole filter set,
+    // so every bookmark, help link and e2e journey written against `/schedules`
+    // keeps working (and keeps its filters).
     DASHBOARD_SCHEDULES: '/schedules',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.

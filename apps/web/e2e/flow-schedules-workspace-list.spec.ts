@@ -3,15 +3,16 @@ import { API_BASE, authedHeaders, createWorkViaAPI } from './helpers/api';
 import { createTaskViaAPI } from './helpers/agents-tasks';
 import { createTriggerViaAPI } from './helpers/triggers';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
-import { clickAndExpectUrl, clickUntil } from './helpers/nav';
+import { clickUntil } from './helpers/nav';
 
 /**
- * Schedules workspace — `/schedules`, the list surface.
+ * Schedules list — `/activity?view=schedules`, the list surface.
  *
  * Seeds sources through the API as the storageState user (personal scope, the
  * same scope the browser reads in) and asserts the REAL surface:
  *
- *   • the sidebar reaches `/schedules`, and the Activity Schedules tab links to it
+ *   • `/schedules` (the retired page) still resolves — it redirects here with
+ *     the filter set — and the sidebar has ONE Activity entry, not two
  *   • rows from several sources render with source label, cadence and health
  *   • a cadence that can never fire (30 February) is flagged NEVER RUNS, the
  *     banner counts it, and Review shows the proposed before/after
@@ -23,6 +24,7 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
  */
 
 const SCHEDULES_URL = '/en/schedules';
+const SCHEDULES_VIEW_URL = '/en/activity?view=schedules';
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -55,18 +57,43 @@ function rowTestId(sourceType: string, ownerId: string): string {
 }
 
 test.describe('Schedules workspace — list', () => {
-    test('the sidebar reaches /schedules and the Activity tab links there', async ({ page }) => {
+    test('the Schedules page is retired into the Activity view, and the sidebar has one entry', async ({
+        page,
+    }) => {
+        // The sidebar no longer carries a Schedules item: the list is a view of
+        // Activity, and the retired path still highlights that entry.
         await page.goto('/en/tasks', { waitUntil: 'domcontentloaded' });
-        const navLink = page.locator('aside a[href$="/schedules"]').first();
-        await clickAndExpectUrl(page, navLink, /\/schedules/);
+        await expect(page.locator('aside a[href$="/schedules"]')).toHaveCount(0);
+        const activityLink = page.locator('aside a[href$="/activity"]').first();
+        await expect(activityLink).toBeVisible({ timeout: 30_000 });
+
+        // A bookmark on the old page lands on the list, and gains the view param.
+        await page.goto(SCHEDULES_URL, { waitUntil: 'domcontentloaded' });
+        await expect
+            .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
+            .toMatch(/^\/(en\/)?activity$/);
+        expect(new URL(page.url()).searchParams.get('view')).toBe('schedules');
         await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
 
-        await page.goto('/en/activity?view=schedules', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByTestId('activity-open-schedules')).toHaveAttribute(
-            'href',
-            /\/schedules$/,
-        );
+        // The deep link addresses the same list directly.
+        await page.goto(SCHEDULES_VIEW_URL, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
+    });
+
+    test('the retired /schedules path forwards the filter set it was given', async ({ page }) => {
+        // The FILTERS are the thing worth preserving: a shared link to a
+        // narrowed list has to land on that narrowed list, not on a default one.
+        await page.goto('/en/schedules?status=paused&active=1&q=zzz', {
+            waitUntil: 'domcontentloaded',
+        });
+        await expect
+            .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
+            .toMatch(/^\/(en\/)?activity$/);
+        const params = new URL(page.url()).searchParams;
+        expect(params.get('view')).toBe('schedules');
+        expect(params.get('status')).toBe('paused');
+        expect(params.get('active')).toBe('1');
+        expect(params.get('q')).toBe('zzz');
     });
 
     test('renders several sources with their labels, cadence and health', async ({

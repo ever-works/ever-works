@@ -10,8 +10,14 @@ import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
 import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState';
 import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
 import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
-import { SchedulesList } from '@/components/schedules/SchedulesList';
+import { SchedulesWorkspace } from '@/components/schedules/SchedulesWorkspace';
 import { TriggersManager } from '@/components/schedules/TriggersManager';
+import {
+    EMPTY_SCHEDULE_FILTERS,
+    scheduleFilterParams,
+    type SchedulesFilterState,
+} from '@/components/schedules/schedules-filters.shared';
+import type { ScheduleHealthSummary, SchedulePage } from '@/lib/api/schedules';
 import { LiveFeed } from '@/components/feed/LiveFeed';
 import {
     feedFiltersToQuery,
@@ -31,7 +37,6 @@ import type { RunsAgentOption } from '@/components/runs/RunsFilters';
 import { toast } from 'sonner';
 import {
     Activity as ActivityIcon,
-    ArrowUpRight,
     Download,
     Keyboard,
     Loader2,
@@ -65,6 +70,19 @@ export interface ActivityRunsPayload {
     agents: RunsAgentOption[];
 }
 
+/**
+ * The Schedules view's server-rendered payload — the filters the link named,
+ * plus the first page and the health summary they select. This is the former
+ * `/schedules` page's own payload, unchanged.
+ */
+export interface ActivitySchedulesPayload {
+    filters: SchedulesFilterState;
+    page: SchedulePage | null;
+    failed: boolean;
+    health: ScheduleHealthSummary | null;
+    healthFailed: boolean;
+}
+
 interface ActivityClientProps {
     initialActivities: ActivityLogEntry[];
     totalActivities: number;
@@ -73,6 +91,8 @@ interface ActivityClientProps {
     initialFeedActors?: FeedActorSummaryDto[] | null;
     /** Server-rendered Runs window, when the page was opened on `?view=runs`. */
     runs: ActivityRunsPayload;
+    /** Server-rendered Schedules page, when the page was opened on `?view=schedules`. */
+    schedules: ActivitySchedulesPayload;
 }
 
 /**
@@ -97,9 +117,9 @@ export function ActivityClient({
     initialFeedPage = null,
     initialFeedActors = null,
     runs,
+    schedules,
 }: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
-    const tSchedules = useTranslations('dashboard.schedules');
     const tRuns = useTranslations('dashboard.runsPage');
     const tFeed = useTranslations('dashboard.feed');
     const searchParams = useSearchParams();
@@ -166,6 +186,18 @@ export function ActivityClient({
     const logSearchRef = useRef<HTMLInputElement>(null);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
+    // The Schedules list owns its filters, but not the address bar: this
+    // component is the page's single URL writer, so the list reports through
+    // `onFiltersChange` and the state lives here — which is also what keeps a
+    // schedule filter alive while the reader visits another view and comes
+    // back. Seeded from the URL the server parsed, so a shared link paints the
+    // exact list it names.
+    const [scheduleFilters, setScheduleFilters] = useState<SchedulesFilterState>(
+        schedules.filters ?? EMPTY_SCHEDULE_FILTERS,
+    );
+    // Lets the list's "Create" menu open the inbound-trigger dialog below it.
+    const triggerCreateRef = useRef<(() => void) | null>(null);
+
     // The Live Feed owns its own filters and reports them here, so this
     // component stays the single writer of the page URL.
     const [feedQuery, setFeedQuery] = useState(() =>
@@ -223,6 +255,12 @@ export function ActivityClient({
             }
         } else if (activeView === 'schedules') {
             params.set(ACTIVITY_VIEW_PARAM, 'schedules');
+            // The list's own filters, written exactly as the `/schedules` page
+            // wrote them, so every link and bookmark for that page still names
+            // the list it always named.
+            for (const [key, value] of scheduleFilterParams(scheduleFilters)) {
+                params.set(key, value);
+            }
         } else {
             if (actionType) params.set('actionType', actionType);
             if (status) params.set('status', status);
@@ -232,13 +270,13 @@ export function ActivityClient({
         const query = params.toString();
 
         // The ledger writes its window into the address bar on every arrow key
-        // and every granularity change. A `router.replace` there would ask the
-        // App Router for a server render of this page that nothing uses (the
-        // ledger's actions refetch the window themselves) and the address bar
-        // would trail the keystroke — the same reason the standalone page used
-        // a same-document write. `location.pathname` is the address bar's own
-        // path, so an `/org/<slug>` prefix is kept.
-        if (activeView === 'runs') {
+        // and every granularity change; the schedules list writes its filters on
+        // every chip, select and search keystroke. A `router.replace` for either
+        // would ask the App Router for a server render of this page that nothing
+        // uses — both views refetch through their own actions — and the address
+        // bar would trail the interaction. `location.pathname` is the address
+        // bar's own path, so an `/org/<slug>` prefix is kept.
+        if (activeView === 'runs' || activeView === 'schedules') {
             window.history.replaceState(
                 null,
                 '',
@@ -251,6 +289,7 @@ export function ActivityClient({
         activeView,
         runsView,
         feedQuery,
+        scheduleFilters,
         actionType,
         status,
         debouncedSearch,
@@ -661,21 +700,26 @@ export function ActivityClient({
 
             {isSchedulesTab && (
                 <>
-                    {/* Schedules workspace — the same projection with run-now,
-                        pause and resume. Kept OUTSIDE the `schedules-list`
-                        container so the list below is untouched. */}
-                    <div className="flex justify-end">
-                        <Link
-                            href={ROUTES.DASHBOARD_SCHEDULES}
-                            data-testid="activity-open-schedules"
-                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                        >
-                            {tSchedules('openWorkspace')}
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                        </Link>
-                    </div>
-                    <SchedulesList />
-                    <TriggersManager />
+                    {/* Schedules list — this IS the `/schedules` page, moved in
+                        whole: the same filters (agent / source / status /
+                        health / search / active-only), the same columns, the
+                        same per-row control menu and the same health banner. It
+                        keeps the state and reports changes up, because this
+                        component owns the page's address bar. */}
+                    <SchedulesWorkspace
+                        initialPage={schedules.page}
+                        initialHealth={schedules.health}
+                        initialFailed={schedules.failed}
+                        initialHealthFailed={schedules.healthFailed}
+                        syncUrl={false}
+                        filters={scheduleFilters}
+                        onFiltersChange={setScheduleFilters}
+                        createTriggerRef={triggerCreateRef}
+                    />
+                    {/* Inbound triggers have no row of their own in that list —
+                        they are configurations, not scheduled fires — so their
+                        write surface sits below it, exactly as before. */}
+                    <TriggersManager createRef={triggerCreateRef} />
                 </>
             )}
 

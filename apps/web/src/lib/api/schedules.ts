@@ -113,6 +113,12 @@ export interface SchedulePage {
     total: number;
     unfilteredTotal: number;
     countsBySourceType: Record<ScheduleSourceType, number>;
+    /**
+     * Per-source counts taken BEFORE the filters. Optional because an API
+     * replica that predates the field simply omits it — callers fall back to
+     * `countsBySourceType` rather than crashing on `undefined`.
+     */
+    unfilteredCountsBySourceType?: Record<ScheduleSourceType, number>;
     countsByStatus: Record<ScheduleStatus, number>;
     healthCounts: { ok: number; neverRuns: number };
     degradedSources: ScheduleSourceType[];
