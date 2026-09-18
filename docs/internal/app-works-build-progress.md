@@ -294,21 +294,25 @@ Mirrors the plan's step tables. Tracked per epic in §3.
 
 ## 3. Track C — per-epic status
 
-| Epic                          | Spec  | Gaps closed | Implemented | Tested | Notes |
-| ----------------------------- | ----- | ----------- | ----------- | ------ | ----- |
-| APW-01 app Work kind          | ready |             |             |        |       |
-| APW-02 fork lifecycle         | ready |             |             |        |       |
-| APW-03 App spec + catalog     | ready |             |             |        |       |
-| APW-04 App Provisioner        | ready |             |             |        |       |
-| APW-05 builds                 | ready |             |             |        |       |
-| APW-06 app runtime            | ready |             |             |        |       |
-| APW-07 app env + dependencies | ready |             |             |        |       |
-| APW-08 evolve loop            | ready |             |             |        |       |
-| APW-09 upstream pull requests | ready |             |             |        |       |
-| APW-10 apps hosting tier      | ready |             |             |        |       |
-| APW-11 app launcher           | ready |             |             |        |       |
-| APW-12 Ever ID                | ready |             |             |        |       |
-| APW-13 golden paths           | ready |             |             |        |       |
+Filled 2026-09-18 from `tools/verify-task-paths.report.txt` (the meter) and `TRACKER.md`, because an empty table with "Tracked per epic in §3" beside it was worse than no table. **Landed paths** = paths the epic's own tasks mark _new_ that already exist; **landed tasks** = distinct task headings with at least one landed path (both from the meter, so they count surfaces rather than effort); **absent** = paths the epic names that do not exist yet. Task ids per epic live in `TRACKER.md`, which this table deliberately does not duplicate.
+
+| Epic                          | Spec  | Landed paths (named) | Landed tasks | Absent paths | Next / note                                                                                                                                                             |
+| ----------------------------- | ----- | -------------------- | ------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| APW-01 app Work kind          | ready | 3 (of 71)            | 2            | 68           | the kind, its capabilities and the instance setting are in; the create-from-URL path is APW-13's lanes                                                                  |
+| APW-02 fork lifecycle         | ready | 18 (of 47)           | 14           | 29           | the entity/service/dispatcher/UI are in; the setup-PR check (**T43's neighbour**, `checkSetupPullRequest`) is still absent                                              |
+| APW-03 App spec + catalog     | ready | 13 (of 140)          | 11           | 127          | contracts, rules and the service are in; routes and the catalog service are the bulk of what is left                                                                    |
+| APW-04 App Provisioner        | ready | 2 (of 124)           | 1            | 122          | T1 + T2 landed; **T6/T7/T8 in flight**; T3/T48 (the worker branch and the session runner) and T4 (the live spec) remain                                                 |
+| APW-05 builds                 | ready | 5 (of 114)           | 5            | 109          | the data layer landed (`6ae8c678f`); **T7–T10 (the plugin) in flight**                                                                                                  |
+| APW-06 app runtime            | ready | 43 (of 144)          | 25           | 101          | the worker + tasks landed (`208bd49e4`); **T70/T27 in flight** close the two refusing tasks; T73 owes the ports module                                                  |
+| APW-07 app env + dependencies | ready | 21 (of 67)           | 20           | 46           | env and the three k8s providers are in; the managed providers (T36/T37) sit behind the facade gate                                                                      |
+| APW-08 evolve loop            | ready | 2 (of 125)           | 1            | 123          | **P0 T1–T5 have all landed** (the last two at `4793cce11`); T6 is the ship gate — the rest of the epic is the evolve loop itself                                        |
+| APW-09 upstream pull requests | ready | 2 (of 91)            | 2            | 89           | T1/T2/T4 are in; **T43 (the credential of record) in flight**; T44 (budgets) and T45 (the fake's upstream routes) remain                                                |
+| APW-10 apps hosting tier      | ready | 4 (of 150)           | 2            | 146          | T1 + T2 (contracts) are in; T3 (the controller package and CRDs) is the next real block                                                                                 |
+| APW-11 app launcher           | ready | 45 (of 72)           | 20           | 27           | the epic's UI and API are essentially done; what is left is mostly its own hardening tasks                                                                              |
+| APW-12 Ever ID                | ready | 4 (of 122)           | 3            | 118          | T3/T4/T5 landed (types, capability, plugin skeleton); **T6 (the OIDC methods) and T33 (the built-in row)** remain, and the fleet blockers below gate the deployment     |
+| APW-13 golden paths           | ready | 24 (of 101)          | 17           | 77           | **P0 is complete and its lanes pass locally** (§3.8 of the handover); the CI matrix is the outstanding proof, and T63 (the GitHub connection surface) un-skips the rest |
+
+**Reading the table honestly:** the landed-task counts are _surfaces_, not effort — an epic can land twenty contract tasks and still have no working feature (APW-11 is the clearest case: 45 landed paths and its UI works, while APW-08 has 2 landed paths and is nonetheless the epic whose P0 is finished). The two numbers that matter for "is this programme working" are the ones in §0's wave ledger and the acceptance lanes, neither of which this table measures.
 
 ---
 
