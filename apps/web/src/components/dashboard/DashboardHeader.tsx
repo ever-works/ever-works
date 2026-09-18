@@ -34,6 +34,19 @@ interface DashboardHeaderProps {
     onHelpClick?: () => void;
     onboardingBadge?: DashboardHeaderOnboardingBadge;
     whatsNew?: DashboardHeaderWhatsNew;
+    /**
+     * APW-11 — whether the App Launcher exists for this installation and this
+     * person, resolved ONCE in the dashboard layout
+     * (`app/[locale]/(dashboard)/layout.tsx` → `lib/feature-flags/app-launcher.ts`)
+     * and defaulted to `false` here so a caller that has not resolved it never
+     * renders a launcher by accident.
+     *
+     * The header is where the launcher's trigger mounts (APW-11 T14); until that
+     * lands this prop carries the resolved answer so no surface has to ask the
+     * config endpoint again — and so a stale answer cannot differ from the one
+     * the API's own guard uses.
+     */
+    appLauncherEnabled?: boolean;
 }
 
 export function DashboardHeader({

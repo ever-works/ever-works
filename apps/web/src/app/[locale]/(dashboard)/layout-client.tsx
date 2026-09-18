@@ -65,6 +65,18 @@ interface DashboardLayoutClientProps {
     jobRuntimeConfigured?: boolean | null;
     /** What's new (AW-14) — unread product changelog entries; null = unknown (no badge). */
     changelogUnreadCount?: number | null;
+    /**
+     * APW-11 — whether this installation (and this person) has the App Launcher
+     * at all. Computed once in the server layout by
+     * `lib/feature-flags/app-launcher.ts`, which is fail-closed: an unreachable
+     * or slow `/api/config` means `false`.
+     *
+     * Passed down so the header, the palette entry and the settings tab read ONE
+     * answer rather than each fetching it. The surfaces that render the panel
+     * arrive with APW-11 T14–T17; until then this prop is the wiring, not a
+     * feature.
+     */
+    appLauncherEnabled?: boolean;
 }
 
 /**
@@ -102,6 +114,7 @@ export function DashboardLayoutClient({
     apiVersion,
     jobRuntimeConfigured = null,
     changelogUnreadCount = null,
+    appLauncherEnabled = false,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
@@ -620,6 +633,7 @@ export function DashboardLayoutClient({
                                 onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                                 isSidebarOpen={sidebarOpen}
                                 onHelpClick={openHelpFromHeader}
+                                appLauncherEnabled={appLauncherEnabled}
                                 onboardingBadge={
                                     showOnboardingBadge
                                         ? {
