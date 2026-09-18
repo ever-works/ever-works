@@ -63,10 +63,12 @@
  *   `component.deadlineSeconds` of §3.1 wins when it is present, clamped into §5.3's range — that is
  *   the superset of §3.1 and §4.3.
  * - **`components[].runAsUser`.** §4.4's added paragraph (plan.md:489-497) and APW-03 `schema.md`
- *   §10 make it a component field that is "passed through **verbatim**", while `AppComponentInput`
- *   (plan §3.1) does not declare it yet. {@link componentRunAsUser} therefore reads it structurally
- *   when a component carries it and emits nothing when it does not, so the day the contract gains
- *   the field this renderer already does the right thing.
+ *   §10 make it a component field that is "passed through **verbatim**". {@link componentRunAsUser}
+ *   reads it structurally and emits nothing when a component does not carry it, so it kept working
+ *   while `AppComponentInput` (plan §3.1) lacked the field — and it keeps working now that the field
+ *   has landed there (`AppComponentInput.runAsUser?: number`, added with APW06-G26), because the
+ *   structural read and the declared field agree. **No change was needed here when the contract
+ *   caught up, which is the point of reading it structurally.**
  */
 import { createHash } from 'node:crypto';
 

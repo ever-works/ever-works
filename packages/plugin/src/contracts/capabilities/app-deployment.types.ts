@@ -205,6 +205,24 @@ export interface AppComponentInput {
 	readonly port?: number;
 	readonly replicas: number;
 	readonly writableRootFilesystem: boolean;
+	/**
+	 * The numeric uid the container must run as, when the App spec declares one
+	 * (`schema.md` §10, added 2026-09-17 by APW06-G26).
+	 *
+	 * **Why this field exists.** An image whose `USER` is a **name** — Umami's is
+	 * `nextjs` — cannot satisfy `runAsNonRoot`: the kubelet refuses it with
+	 * "image has non-numeric user", which the rollout classifier maps to
+	 * `image_user_unverifiable` (`plan.md` §4.4, §5.4). Before this field the App
+	 * was undeployable on **both** targets with nothing the author could set, which
+	 * is why the App spec gained `components[].runAsUser` and why the renderer
+	 * needs to receive it.
+	 *
+	 * **Optional, and never derived.** Absent means the image's own user, exactly
+	 * as before, so every existing App spec renders byte-identically. The renderer
+	 * passes a supplied value through **verbatim** and must never invent one
+	 * (`app-security.ts`'s `runAsUser` seam; validator rule R27 pins the range).
+	 */
+	readonly runAsUser?: number;
 	readonly probes: {
 		readonly startup?: AppComponentProbeInput;
 		readonly readiness?: AppComponentProbeInput;
