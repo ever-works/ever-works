@@ -311,6 +311,35 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the App spec's references and rules, and a seed route the e2e lane can trust.**
+  **APW-03 T4/T5** — `app-spec.refs.ts` (1190 lines) and `app-spec.rules.ts` (1958), four new files,
+  **5504 insertions, zero deletions**; the `works-config` sweep goes **387 → 550 tests** across 16 suites.
+  T4 implements every row of schema.md §21 with an accept **and** a refuse case, Tarjan cycle detection (a
+  three-entry cycle names all three, a self-reference is a one-entry cycle, two independent cycles are both found,
+  a diamond is not a cycle) and the depth-10 limit. T5 implements **R1–R27 as pure functions** plus the four
+  companions the T3 handoff assigned here — the quantity RANGES T3 deliberately left out of the schema,
+  `http.body` over 16 KiB, `cron_invalid` via `parseCron`, and RE2 `pattern_unsupported` — with a registry test
+  that every §22 rule id and every code has a failing _and_ a passing fixture asserting code, severity, line and
+  column, and §24.4's display paths pinned exactly.
+  🌟 **The best evidence of the round came from a perturbation that could not fail:** making R27 read a `fork`
+  relation as private produced **zero red**, which means the assertion was missing rather than the code correct —
+  the assertion was added and the same perturbation re-run red. Four other perturbations (depth off-by-one, Tarjan
+  replaced by a depth check, R4 ignoring the implicit `<NAME>_PUBLIC`, R24 _guessing_ a licence class with no
+  registry) were red on the first try, all restored to `75A977AE…` / `5C59E6BF…`.
+  Honest boundaries, all decisions rather than omissions: the five **server-only** codes stay with T6 and the
+  context type reserves their §22 field names; R24 and R27 **skip** when their registry/visibility input is absent
+  because a guess is worse than silence; and T6 must not re-emit this task's codes or one leaf gets two reports.
+  Two requirements nobody owns yet are flagged: §16:363's "`smoke.http.body` is POST only", and secret-scanning
+  `build.services[].env[].value` (R10 covers `build.args[].value` only — and §24.1's `POSTGRES_PASSWORD:
+build-only` service env suggests that limit is deliberate).
+  **APW-11 T33 — the non-production seed route** (515-line controller + 234-line DTO + 24 tests; api `app-launcher`
+  106 → **130 tests**). The gate is the point: production answers **404 even with the variable set**, an unset
+  variable answers 404 anywhere, both from a guard and never 403. It is deliberately **not** behind the launcher's
+  own switch, because T20's flag-off lane must be able to seed the rows it then proves are invisible. Three
+  perturbations red, restored to `78132EB4…` — the third wrote rows for a stranger and turned ACC-11-52's tile
+  assertion red, which is the property that makes such a route safe to expose at all. R-40's config getter does not
+  exist yet, so the gate is implemented locally behind an optional seam; landing the getter needs no change here.
+
 - **2026-09-18 · the fork lookup becomes three steps, and the launcher switch gets one reader.**
   **APW-02 T17/T18** (github-plugin 226 → **255 tests**). `findExistingFork` was only the plan's step 1; it is now the
   contract-shaped public method — the same-name identity check (previous body preserved verbatim, shared through a
