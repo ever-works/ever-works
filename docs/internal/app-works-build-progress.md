@@ -116,6 +116,26 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
 
 ### Known baseline conditions (recorded, deliberately NOT "fixed")
 
+- **A full agent-package sweep is not a clean gate in this worktree, for two unrelated reasons.** Running all 820
+  suites (`pnpm --filter @ever-works/agent test`, `--maxWorkers=2`) reported **4 failed suites / 2 failed tests**, and
+  the split matters:
+    1. **One genuine, PRE-EXISTING failure, nothing to do with App Works:** `agent-plugins/mcp-server-config.service.spec.ts`
+       fails two assertions because this machine's temp directory is spelled `E:\temp\…` in the expectation and
+       `E:\Temp\…` in the value — a **path-case artifact of Windows**, not a behaviour difference. Evidence that it is
+       not ours: `git log --since=2026-09-17 -- packages/agent/src/agent-plugins` returns **zero commits**, and the two
+       diffs are only the drive-directory's case (`packageRoot`, and `${PLUGIN_ROOT}/data` expansion, which the spec
+       deliberately does not normalise because the string may not be a path at all).
+    2. **Three suites that pass ALONE and fail only in the sweep** — `items-generator.module` (9/9 alone),
+       `campaign-activation.service` (13/13) and `work-lifecycle.org-enrollment` (5/5) all reported "Test suite failed
+       to run" under load while several agents were building and running suites on the same machine. Re-run them before
+       treating a red sweep as a regression; the individual suites are the reliable signal here.
+- **Prettier settings are PER PACKAGE, not global.** `packages/agent`, `apps/api` and `apps/web` each carry their own
+  `.prettierrc` — printWidth **100**, tabWidth 4, **spaces**, trailingComma **"all"** — and those files resolve to it.
+  Anything without one (`packages/plugin`, `packages/plugins/k8s`) resolves to the **root `package.json`** `prettier`
+  key: printWidth **120**, **tabs**, trailingComma **"none"**. My own briefs said 120/none for agent and api files and
+  were wrong twice; `prettier --check`, which every task runs, is what caught it. Check with
+  `pnpm exec prettier --find-config-path <file>` rather than assuming.
+
 - **Prettier drift is now FIXED** for the programme's own tree. `npx prettier --check "docs/**/*.md"` passes
   wholesale — the app-works specs, the internal app-works docs, and the two files a glob kept missing. It had been
   pre-existing drift across 34+ files, including all four programme-level files. Reformatting prose can silently

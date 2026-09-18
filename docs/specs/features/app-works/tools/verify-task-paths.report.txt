@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1117 · absent: 1550 · of the absent, another task says it creates them: 629
+present: 1135 · absent: 1532 · of the absent, another task says it creates them: 620
 
-## LANDED SURFACE — marked "new", already in the repository (23)
+## LANDED SURFACE — marked "new", already in the repository (31)
 
 - APW-06-app-runtime T1 — `packages/contracts/src/apps/app-runtime.ts`
 - APW-06-app-runtime T2 — `packages/plugin/src/contracts/capabilities/app-deployment.types.ts`
@@ -24,6 +24,7 @@ present: 1117 · absent: 1550 · of the absent, another task says it creates the
 - APW-06-app-runtime T8 — `packages/plugins/k8s/src/app/app-runner.script.ts`
 - APW-06-app-runtime T8 — `packages/plugins/k8s/src/app/app-jobs.renderer.ts`
 - APW-06-app-runtime T9 — `packages/plugins/k8s/src/app/app-rollout.ts`
+- APW-06-app-runtime T11 — `packages/plugins/k8s/src/app/app-kubeconfig.guard.ts`
 - APW-06-app-runtime T28 — `packages/agent/src/events/index.ts`
 - APW-06-app-runtime T63 — `apps/web/e2e/accessibility-axe-deep.spec.ts`
 - APW-11-app-launcher T1 — `packages/contracts/src/apps/__tests__/app-launcher.spec.ts`
@@ -33,6 +34,13 @@ present: 1117 · absent: 1550 · of the absent, another task says it creates the
 - APW-11-app-launcher T3 — `apps/api/src/migrations/__tests__/CreateAppLauncherPreferences.spec.ts`
 - APW-11-app-launcher T4 — `packages/agent/src/app-launcher/launcher-address.ts`
 - APW-11-app-launcher T4 — `packages/agent/src/app-launcher/launcher-order.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/app-launcher.service.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/app-launcher.errors.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/app-launcher.module.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/__tests__/app-launcher.service.spec.ts`
+- APW-11-app-launcher T8 — `apps/api/src/app-launcher/platform-catalog.service.ts`
+- APW-11-app-launcher T8 — `apps/api/src/app-launcher/platform-catalog.service.spec.ts`
+- APW-11-app-launcher T21 — `apps/web/src/lib/app-launcher/__tests__/no-sso-claims.unit.spec.ts`
 - APW-11-app-launcher T32 — `apps/web/src/components/activity-log/ActivityTypeBadge.unit.spec.tsx`
 
 ## PER EPIC — named / already present / landed (13 epics)
@@ -40,34 +48,34 @@ present: 1117 · absent: 1550 · of the absent, another task says it creates the
 | Epic | Named | Landed (marked new, exists) |
 | ---- | ----- | --------------------------- |
 | APW-01-app-work-kind | 79 | 0 |
-| APW-02-fork-lifecycle | 111 | 0 |
-| APW-03-app-spec-and-catalog | 167 | 0 |
+| APW-02-fork-lifecycle | 108 | 0 |
+| APW-03-app-spec-and-catalog | 165 | 0 |
 | APW-04-app-provisioner | 125 | 0 |
 | APW-05-builds | 122 | 0 |
-| APW-06-app-runtime | 173 | 15 |
+| APW-06-app-runtime | 172 | 16 |
 | APW-07-app-env-and-dependencies | 109 | 0 |
 | APW-08-evolve-loop | 130 | 0 |
 | APW-09-upstream-pull-requests | 93 | 0 |
 | APW-10-apps-hosting-tier | 150 | 0 |
-| APW-11-app-launcher | 81 | 8 |
+| APW-11-app-launcher | 77 | 15 |
 | APW-12-ever-id | 122 | 0 |
 | APW-13-golden-paths | 111 | 0 |
 
-## ABSENT PATHS (1550) — grouped by epic
+## ABSENT PATHS (1532) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
-- APW-03-app-spec-and-catalog: 167
-- APW-06-app-runtime: 158
+- APW-03-app-spec-and-catalog: 165
+- APW-06-app-runtime: 156
 - APW-10-apps-hosting-tier: 150
 - APW-08-evolve-loop: 130
 - APW-04-app-provisioner: 125
 - APW-12-ever-id: 122
 - APW-05-builds: 122
-- APW-02-fork-lifecycle: 111
 - APW-13-golden-paths: 111
 - APW-07-app-env-and-dependencies: 109
+- APW-02-fork-lifecycle: 108
 - APW-09-upstream-pull-requests: 93
 - APW-01-app-work-kind: 79
-- APW-11-app-launcher: 73
+- APW-11-app-launcher: 62
