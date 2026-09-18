@@ -311,6 +311,44 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the fork lifecycle gets its state row, the launcher gets its routes: APW-02 T12–T14 + T15, APW-11 T9.**
+  **APW-02 T12/T13/T14 — `WorkUpstreamState`** (entity 308 lines, migration 317, repository 483, specs 35 + 44 + 14;
+  **2483 insertions, zero deletions**). The entity spec _and_ the migration spec both pin the **column count and the
+  sorted name set against plan §3.1's table**, so the table and the entity cannot drift apart — that is the guard the
+  "the table exactly" claim rests on. Registration is the three required places, all additions; `_repository-inventory.ts`
+  is deliberately untouched because this repository is feature-owned.
+  **Concurrency is the point and it is tested with real simultaneity:** both claim methods are driven by `Promise.all`
+  of two calls, asserting the union of claimed ids has no duplicates _and_ that every due row was claimed exactly
+  once. The plan's single `UPDATE … WHERE id IN (…)` was **rejected with a reason worth keeping**: two callers with the
+  same `nowMs` write the same stamp, so a read-back cannot tell whose claim a row is. The implementation selects
+  candidates then conditionally updates each row with the same predicate inside one transaction. The perturbation that
+  removed the 600 s claim lease made the second call take the same row (union 6 entries, 3 unique ids). `down()`
+  dropping `works` itself was another, and the `readinessState` default a third — all restored byte-identically.
+  **APW-02 T15 — the AppWorks module** (module + barrel + 5-test spec; the three Activity families `APP_FORK`,
+  `APP_ACTIONS`, `APP_UPSTREAM` with their feed-kind rows; the `"./app-works"` subpath). Its module spec is the pattern
+  worth copying: it compiles the module **twice** — standalone with only the repository token overridden, and over a
+  **real better-sqlite3 DataSource** that then queries the table — so a `forFeature` the DataSource never heard of
+  fails with "no such table" instead of passing on a metadata comparison. The perturbation that emptied `providers`
+  went red in _both_ compiles.
+  **APW-11 T9 — the three routes, the guard and the module** (controller 416 lines + 45 HTTP-level tests, guard 73,
+  module 51; `api.module.ts` +7/0). The guard answers an opaque **404, not 403**, on all three routes when the switch
+  is off, because a switched-off feature must be invisible; the pin limit maps to **422 `{code:'pinLimit',limit}`**.
+  Three perturbations red, restored to `01C1C781…` / `88BA0202…`. Note for future readers: **T9's text names
+  `apps/api/src/app.module.ts`, which does not exist** — the root module is `api.module.ts`, and the spec now asserts
+  the registration is present there.
+  🛑 **A NEW MASKING HAZARD, found by this task's own run: `apps/api/jest.config.js` ignores TS2307.** ts-jest stayed
+  green while `tsc` could not resolve `@ever-works/agent/app-launcher` at all (stale `packages/agent/dist`). Building
+  the package fixed the type-check and _immediately_ exposed a real bad import in the new spec. The lesson already
+  recorded for `packages/plugin/dist` now has teeth: **build the workspace packages before trusting an `apps/api`
+  type-check**, and never read a green jest run as a type check.
+  **Sweeps this round, and one that must NOT be read as a regression:** `apps/web` **422 files / 4062 tests green**
+  (so the 21-locale edit and the two new guards are safe); contracts 3457 / 82; k8s plugin 578 / 18; github-plugin
+  226 / 11; agent's targeted suites 353 + 332 + 79 + 81 + 387. The **full agent sweep (820 suites) reported 4 failed
+  suites**, and the split matters: one is a genuine **pre-existing** failure (`agent-plugins/mcp-server-config`, two
+  assertions differing only in the _case_ of `E:\temp` vs `E:\Temp` — that package has had **zero** commits since
+  2026-09-17), and three pass alone (9/9, 13/13, 5/5) and failed only under load while several agents were building on
+  the same machine. Both are recorded in the baseline-conditions section rather than "fixed".
+
 - **2026-09-18 · three more slices: APW-11 T8 (catalog), APW-02 T16 (GitHub errors + facts), APW-06 T10 (k8s wrappers).**
   **APW-11 T8 — `PlatformCatalogService`** (schema 518 + service 835 + a 48-test spec, all new). The catalog is read
   **inside the API process** (APW11-G06), so this is where the fetch and its safety rules live: `_REPO` containment
