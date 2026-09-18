@@ -43,7 +43,13 @@ import type {
 	GitWorkflowRun,
 	// App Works fork lifecycle (APW-02 T17/T18).
 	GitForkSyncResult,
-	GitForkDivergence
+	GitForkDivergence,
+	// App Works fork lifecycle (APW-02 T19/T20/T21).
+	GitRepositoryCopyInput,
+	GitRepositoryCopyResult,
+	GitActionsPermissionsInput,
+	GitActionsPermissionsResult,
+	GitWebhookInput
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 // Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
@@ -318,6 +324,46 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 	): Promise<GitBranch> {
 		const settings = await this.getSettings();
 		return this.apiService.updateBranchRef(owner, repo, name, sha, options, token, settings.apiBaseUrl);
+	}
+
+	// App Works fork lifecycle (APW-02 T19/T20/T21) — the private copy, the
+	// Actions hygiene pass and the signed webhook. Each is a pass-through of the
+	// optional `IGitProviderPlugin` member, resolved exactly like T17/T18's:
+	// plugin settings first, then one service call.
+
+	async createRepositoryCopy(input: GitRepositoryCopyInput, token: string): Promise<GitRepositoryCopyResult> {
+		const settings = await this.getSettings();
+		// The copy needs the plugin's own `GitOperations` (its credentials, its
+		// checkout base): `ensureGitOps()` is what `cloneBranch`/`replaceRemote`/`push`
+		// below are reached through, and it is the same instance the other git
+		// operations use.
+		this.ensureGitOps();
+		return this.apiService.createRepositoryCopy(input, token, settings.apiBaseUrl, this.gitOps);
+	}
+
+	async setActionsPermissions(
+		owner: string,
+		repo: string,
+		input: GitActionsPermissionsInput,
+		token: string
+	): Promise<GitActionsPermissionsResult> {
+		const settings = await this.getSettings();
+		return this.apiService.setActionsPermissions(owner, repo, input, token, settings.apiBaseUrl);
+	}
+
+	async createWebhook(
+		owner: string,
+		repo: string,
+		input: GitWebhookInput,
+		token: string
+	): Promise<{ id: number; created: boolean }> {
+		const settings = await this.getSettings();
+		return this.apiService.createWebhook(owner, repo, input, token, settings.apiBaseUrl);
+	}
+
+	async deleteWebhook(owner: string, repo: string, hookId: number, token: string): Promise<void> {
+		const settings = await this.getSettings();
+		return this.apiService.deleteWebhook(owner, repo, hookId, token, settings.apiBaseUrl);
 	}
 
 	async hasForkRelationship(

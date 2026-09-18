@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { Octokit, RequestError } from 'octokit';
 import type {
 	GitRepository,
@@ -30,9 +31,31 @@ import type {
 	GitWorkflowRun,
 	// App Works fork lifecycle (APW-02 T18).
 	GitForkSyncResult,
-	GitForkDivergence
+	GitForkDivergence,
+	// App Works fork lifecycle (APW-02 T19/T20/T21): the private copy, the Actions
+	// hygiene pass and the webhooks.
+	GitRepositoryCopyInput,
+	GitRepositoryCopyResult,
+	GitActionsPermissionsInput,
+	GitActionsPermissionsResult,
+	GitWorkflowRef,
+	GitWebhookInput,
+	GitProviderErrorDetails,
+	IGitOperations
 } from '@ever-works/plugin/git';
-import { capChecks, capDiffFiles, deriveCiState, resolveDiffCaps } from '@ever-works/plugin/git';
+import {
+	capChecks,
+	capDiffFiles,
+	deriveCiState,
+	resolveDiffCaps,
+	GitProviderRequestError
+} from '@ever-works/plugin/git';
+// Security (SSRF): the same lexical guard this plugin already applies to its own
+// configurable `apiBaseUrl` (see `github.plugin.ts`). A webhook URL is
+// member-supplied and handed to a third party to deliver to, so it gets the same
+// treatment. Imported from the dedicated subpath because the guard pulls in
+// node:net/dns and is intentionally not re-exported from the package root.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
 import { toGitProviderError } from './github-errors.js';
 
@@ -307,6 +330,229 @@ function isForkOfUpstream(
 	if (candidate.isFork !== true) return false;
 	const upstream = candidate.sourceFullName ?? candidate.parentFullName ?? '';
 	return upstream.toLowerCase() === `${upstreamOwner}/${upstreamRepo}`.toLowerCase();
+}
+
+// ── App Works private copy, Actions hygiene and webhooks (APW-02 T19–T21) ────
+//
+// The three plan §4.3 capabilities that were still missing after T17/T18. They
+// share one rule: a refusal THIS side decides — a size ceiling, a webhook URL,
+// a listing cap — is reported as the contract's own error type and never as a
+// provider error GitHub did not send, and every bound the plan states is
+// enforced here rather than documented.
+
+/** Root attributes file whose `filter=lfs` marker refuses a private copy (FR-21). */
+const GITATTRIBUTES_PATH = '.gitattributes';
+
+/** The marker a `.gitattributes` must not carry for a private copy to be possible. */
+const LFS_FILTER_MARKER = 'filter=lfs';
+
+/** Workflows read per page. 100 is GitHub's maximum. */
+const ACTIONS_WORKFLOW_PAGE_SIZE = 100;
+
+/** `maxWorkflows` when the caller names none — plan §3.3's documented default. */
+const ACTIONS_MAX_WORKFLOWS = 100;
+
+/** Webhooks read per page. 100 is GitHub's maximum. */
+const WEBHOOK_PAGE_SIZE = 100;
+
+/**
+ * Pages of `GET /repos/{o}/{r}/hooks` the create-or-update lookup reads.
+ *
+ * GitHub allows **20** hooks per repository, so one page is already five times
+ * the provider's own ceiling: the bound exists so that a provider answering an
+ * endless listing cannot make this call run forever, not because a real
+ * repository is expected to page.
+ */
+const WEBHOOK_MAX_PAGES = 3;
+
+/** What a hook's secret is replaced with wherever a diagnostic could carry it. */
+const SECRET_PLACEHOLDER = '[redacted]';
+
+/** The marker GitHub uses when the token is an App installation token. */
+const APP_TOKEN_PERMISSION_MARKER = 'resource not accessible by integration';
+
+/** The subset of GitHub's workflow payload the hygiene pass reads. */
+interface ActionsWorkflowPayload {
+	readonly id: number;
+	readonly path: string;
+	readonly state?: string | null;
+}
+
+/** The subset of GitHub's webhook payload the create-or-update lookup reads. */
+interface WebhookPayload {
+	readonly id?: number;
+	readonly config?: { readonly url?: string | null } | null;
+}
+
+/**
+ * A refusal decided here, not by GitHub, in the contract's one error type.
+ *
+ * §4.3 words these as "`unprocessable` + `too_large`" and "`uses_lfs`": the
+ * reason is `unprocessable` — no provider call failed, the request cannot be
+ * carried out — and the plan's own code says WHICH refusal it was. The contract
+ * has no field for that code (`GitProviderErrorDetails` is `retryAt` /
+ * `permission` only, and `packages/plugin` is not this plugin's to change), so
+ * the code travels in `message`, the one channel left, while `reason` and
+ * `status` stay exactly what the plan names and every caller that branches on
+ * them is unaffected.
+ *
+ * The consequence is stated rather than hidden: for these refusals — and only
+ * these — `message` is NOT the reason. A provider failure still arrives from
+ * `toGitProviderError` with `message === reason`.
+ */
+function refusalError(code: string): GitProviderRequestError {
+	const error = new GitProviderRequestError('unprocessable', 422);
+	error.message = code;
+	return error;
+}
+
+/**
+ * The provider's own words for a failure, lowercased — the response body's
+ * `message` and the error's message, exactly the two strings `github-errors.ts`
+ * matches its markers against.
+ */
+function providerMessageLower(err: unknown): string {
+	if (!(err instanceof Error)) return '';
+	const data = (err as { response?: { data?: unknown } }).response?.data;
+	const body =
+		data && typeof data === 'object' && typeof (data as { message?: unknown }).message === 'string'
+			? (data as { message: string }).message
+			: '';
+	return `${body} ${err.message}`.trim().toLowerCase();
+}
+
+/**
+ * Which permission a refused workflow enable/disable names (plan §4.3):
+ * `administration` for a GitHub App installation token, `actions` for every
+ * other credential.
+ *
+ * The token KIND is not visible from the request, only from GitHub's refusal —
+ * "Resource not accessible by integration" is an App installation token. That
+ * distinction is load-bearing for the caller, which has one state for a member
+ * who must be sent to grant admin (`needs_admin`, plan §6.7) and another for a
+ * missing App permission, so the two are told apart here, once.
+ */
+function actionsPermissionForRefusal(err: unknown): GitProviderErrorDetails['permission'] {
+	return providerMessageLower(err).includes(APP_TOKEN_PERMISSION_MARKER) ? 'administration' : 'actions';
+}
+
+/**
+ * Classify a failure of an Actions call, with §4.3's one override.
+ *
+ * `toGitProviderError` classifies every path — rate limits, SSO and OAuth-app
+ * restrictions included, none of which this may mask. What it cannot know is
+ * §4.3's own row for these endpoints: a 403 on a workflow enable/disable or on
+ * the repository switch IS `permission_missing`, even when GitHub's wording
+ * matches none of the markers §4.2 keys on (an OAuth token's refusal is plain
+ * prose, and the classifier's documented fallback is `unprocessable` — which
+ * would hide the one thing the member has to act on).
+ */
+function actionsFailure(err: unknown, permission: GitProviderErrorDetails['permission']): GitProviderRequestError {
+	const mapped = toGitProviderError(err, permission);
+	if (mapped.status === 403 && (mapped.reason === 'permission_missing' || mapped.reason === 'unprocessable')) {
+		return new GitProviderRequestError('permission_missing', 403, { permission });
+	}
+	return mapped;
+}
+
+/**
+ * The workflow-listing cap, as a usable page bound.
+ *
+ * §3.3 documents 100 as the default and names no maximum; a value that is not a
+ * positive whole number (`0`, `-1`, `NaN`, `Infinity`) falls back to the
+ * default rather than removing the bound — a cap of zero would silently turn
+ * hygiene into a no-op that reports success.
+ */
+function resolveMaxWorkflows(requested: number | undefined): number {
+	return typeof requested === 'number' && Number.isFinite(requested) && requested >= 1
+		? Math.floor(requested)
+		: ACTIONS_MAX_WORKFLOWS;
+}
+
+/**
+ * Does this `.gitattributes` send anything to Git LFS?
+ *
+ * Comment lines are ignored — a commented-out rule sends nothing — and every
+ * other line is matched literally for `filter=lfs`, which is how GitHub's own
+ * LFS guidance writes it (space or tab). This is a search, not a full
+ * `git check-attr` evaluation: the copy is refused when the file COULD send a
+ * file to LFS, because isomorphic-git has no LFS filter and would check out
+ * pointer files that nothing can hydrate.
+ */
+function usesLfsFilter(content: string): boolean {
+	return content.split('\n').some((line) => !line.trimStart().startsWith('#') && line.includes(LFS_FILTER_MARKER));
+}
+
+/**
+ * Remove one `cloneBranch` working copy, and never fail the copy over it.
+ *
+ * `IGitOperations` exposes NO removal for the directory `cloneBranch` returns:
+ * the only removal it has, `removeLocalDir(owner, repo, checkoutKey?)`, resolves
+ * the per-REPOSITORY checkout — a different directory that another caller may be
+ * using at that very moment — so calling it here would delete somebody else's
+ * working copy instead of ours. The directory therefore comes off with
+ * `node:fs` directly, and a failure to remove it is swallowed:
+ * `cloneBranch` names every directory uniquely (a fresh `Date.now()` suffix per
+ * call) and clears its own target first, so a directory that survives can never
+ * be reused by, or confused with, a later copy. A `removeDir(dir)` member on
+ * `IGitOperations` is the additive fix, and it is not this plugin's to add.
+ */
+async function removeClonedDirectory(dir: string): Promise<void> {
+	await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+}
+
+/** The `config` object both hook endpoints take — one shape, two call sites. */
+function webhookConfig(input: GitWebhookInput): {
+	url: string;
+	secret: string;
+	content_type: 'json';
+	insecure_ssl: '0';
+} {
+	return { url: input.url, secret: input.secret, content_type: 'json', insecure_ssl: '0' };
+}
+
+/**
+ * What a webhook request must satisfy before GitHub is called at all.
+ *
+ * Each rule describes a hook nobody can use, so none of them is worth a round
+ * trip — and each is enforced rather than assumed of the caller:
+ *
+ * - the URL must pass the SSRF guard this plugin already applies to its own
+ *   `apiBaseUrl`. A hook aimed at loopback, a private range or a cloud-metadata
+ *   alias is refused by GitHub's own delivery rules anyway, and storing one
+ *   would leave a member believing an integration exists;
+ * - the secret must be non-empty: FR-55 installs a SIGNED webhook, and an empty
+ *   secret configures deliveries the receiver cannot verify;
+ * - at least one event must be named: GitHub's default for an omitted `events`
+ *   is `push`, so an empty list is a hook that fires on nothing — a silent
+ *   no-op created by an explicit instruction.
+ */
+function webhookRefusal(input: GitWebhookInput): GitProviderRequestError | null {
+	if (!isSafeWebhookUrl(input.url)) return refusalError('webhook_url_refused');
+	if (input.secret.trim() === '') return refusalError('webhook_secret_required');
+	if (input.events.length === 0) return refusalError('webhook_events_required');
+	return null;
+}
+
+/**
+ * Classify a webhook failure, and keep the signing secret out of it.
+ *
+ * `toGitProviderError` is the classifier (§4.2), but on this path it is also a
+ * carrier: Octokit's `RequestError` keeps the exact request it made — its
+ * `request.body` holds the JSON just sent, secret included — and the classifier
+ * attaches that whole error as `cause`. So the message is scrubbed AND the
+ * cause is replaced with a message-only error: a caller logging a webhook
+ * failure (which it will — FR-58 forbids the secret in telemetry) must not be
+ * able to leak the secret by accident.
+ */
+function webhookFailure(err: unknown, secret: string | undefined): GitProviderRequestError {
+	const mapped = toGitProviderError(err, 'webhooks');
+	const scrub = (text: string): string => (secret ? text.split(secret).join(SECRET_PLACEHOLDER) : text);
+
+	const safe = new GitProviderRequestError(mapped.reason, mapped.status, mapped.details);
+	safe.message = scrub(mapped.message);
+	if (err instanceof Error) Object.assign(safe, { cause: new Error(scrub(err.message)) });
+	return safe;
 }
 
 export class GitHubApiService {
@@ -2102,5 +2348,493 @@ export class GitHubApiService {
 			}
 			throw err;
 		}
+	}
+
+	// ── App Works fork lifecycle (APW-02 T19–T21, plan §4.3) ────────────────
+
+	/**
+	 * Copy one branch of a source repository into a repository the platform owns
+	 * (APW-02 T19 — plan §4.3, FR-21, ACC-02-15).
+	 *
+	 * Order is the feature. The two refusals §4.3 names happen BEFORE any git
+	 * work, because both describe a clone that must not be started: a source
+	 * larger than the caller's `maxSizeKb` ceiling (the caller has authorised
+	 * that size and no larger), and a root `.gitattributes` that sends files to
+	 * Git LFS (isomorphic-git has no LFS filter, so the copy would land a tree of
+	 * pointer files nothing can hydrate). Both are `unprocessable` and carry the
+	 * plan's own code — see {@link refusalError}.
+	 *
+	 * Then the idempotency half (FR-21, "safe to run twice"): when the target
+	 * branch already points at the source head there is nothing to copy, so
+	 * nothing is cloned, nothing is pushed, and the answer says so.
+	 *
+	 * Otherwise the source branch is cloned into a directory of its own
+	 * (`cloneBranch` — never the shared per-repository checkout, which another
+	 * caller may be rewriting at that instant), its `origin` is repointed at the
+	 * TARGET's clone URL, and the branch is pushed under
+	 * `input.branchName ?? input.sourceBranch`. The push carries no `force`
+	 * member at all (ACC-02-10): a target branch that cannot be fast-forwarded is
+	 * a conflict for the caller to resolve, never history to rewrite.
+	 *
+	 * `gitOps` is passed in rather than built here: the plugin owns the one
+	 * `GitOperations` instance (created in `GitHubPlugin.onLoad`) together with
+	 * its credentials, and a second one built behind its back would authenticate
+	 * differently.
+	 */
+	async createRepositoryCopy(
+		input: GitRepositoryCopyInput,
+		token: string,
+		baseUrl?: string,
+		gitOps?: IGitOperations
+	): Promise<GitRepositoryCopyResult> {
+		// `cloneBranch` is OPTIONAL on `IGitOperations` — the contract says a caller
+		// MUST verify it — and it is the only method that can produce the isolated
+		// directory this copy needs. Checked before the first provider read: a
+		// capability that cannot run must not read, let alone clone, first.
+		if (typeof gitOps?.cloneBranch !== 'function') {
+			throw refusalError('git_operations_unavailable');
+		}
+
+		const octokit = this.createOctokit(token, baseUrl);
+		const branchName = input.branchName ?? input.sourceBranch;
+
+		// 1. The source, for its size. `getRepository` is T16's single repository
+		// read, so the ceiling is checked against the same fact the caller saw.
+		const source = await this.getRepository(input.sourceOwner, input.sourceRepo, token, baseUrl);
+		if (!source) {
+			// A source the token cannot read is indistinguishable from one that is not
+			// there, and GitHub answers 404 for both.
+			throw new GitProviderRequestError('not_found', 404);
+		}
+		if (source.sizeKb === undefined || source.sizeKb > input.maxSizeKb) {
+			// An UNREPORTED size is refused too, and that is deliberate: the ceiling is
+			// the caller's authorisation, and a copy whose size cannot be compared to it
+			// cannot be shown to be within it. GitHub always reports `size`; a provider
+			// that does not gets the refusal rather than an unbounded clone.
+			throw refusalError('too_large');
+		}
+
+		// 2. The LFS probe, on the branch being copied — a `.gitattributes` on the
+		// default branch says nothing about a release branch that added its own.
+		let attributes: { content: string } | null;
+		try {
+			attributes = await this.getFileContent(
+				input.sourceOwner,
+				input.sourceRepo,
+				GITATTRIBUTES_PATH,
+				token,
+				input.sourceBranch,
+				baseUrl
+			);
+		} catch (err) {
+			// `getFileContent` predates the typed error and rethrows anything that is not
+			// a 404 raw; §4.2's "new plugin methods throw only `GitProviderRequestError`"
+			// is this method's contract, so the classification happens here.
+			throw toGitProviderError(err, 'contents');
+		}
+		if (attributes !== null && usesLfsFilter(attributes.content)) {
+			throw refusalError('uses_lfs');
+		}
+
+		// 3. The target, for its clone URL. The copy lands in a repository the caller
+		// has already created (FR-21's empty repository); pushing into one that is not
+		// there would fail at the git layer with a transport error naming nothing
+		// actionable.
+		const target = await this.getRepository(input.targetOwner, input.targetRepo, token, baseUrl);
+		if (!target) {
+			throw new GitProviderRequestError('not_found', 404);
+		}
+
+		// 4. The two heads the idempotency check compares: the source branch's, and the
+		// target branch's when it exists at all.
+		const sourceHead = await this.readBranchHead(octokit, input.sourceOwner, input.sourceRepo, input.sourceBranch);
+		const targetHead = await this.readBranchHeadOrNone(octokit, input.targetOwner, input.targetRepo, branchName);
+		if (targetHead !== undefined && targetHead === sourceHead) {
+			return { pushedSha: sourceHead, alreadyUpToDate: true };
+		}
+
+		// 5. The copy itself. A git-layer failure — the clone, the remote rewrite, the
+		// push — is not a GitHub API error, and §4.2 classifies what it cannot know as
+		// `unprocessable` with the real status preserved (`0`: no response arrived). It
+		// still leaves as the contract's error, because every new plugin method throws
+		// only that, and the original travels as `cause` for whoever logs it.
+		let dir: string;
+		try {
+			dir = await gitOps.cloneBranch({
+				owner: input.sourceOwner,
+				repo: input.sourceRepo,
+				branch: input.sourceBranch,
+				token
+			});
+		} catch (err) {
+			// No directory to clean up: `cloneBranch` removes its own target before it
+			// starts, and nothing of ours exists until it returns.
+			throw toGitProviderError(err);
+		}
+
+		try {
+			await gitOps.replaceRemote(dir, 'origin', target.cloneUrl);
+			// No `force` member: `GitOperations.push` defaults it to `false`, and a
+			// caller who cannot pass one cannot turn this into a rewrite. No
+			// `maxRetries` either — the git layer's own default is not this method's to
+			// change, and no retry is added on top of it.
+			await gitOps.push({ dir, token, ref: input.sourceBranch, remoteRef: branchName });
+			return { pushedSha: sourceHead, alreadyUpToDate: false };
+		} catch (err) {
+			throw toGitProviderError(err);
+		} finally {
+			// On every path out of the copy, error included: the working copy is this
+			// call's own and holds a full checkout of the source.
+			await removeClonedDirectory(dir);
+		}
+	}
+
+	/**
+	 * Apply a caller's Actions intent to one repository (APW-02 T20 — plan §4.3,
+	 * FR-27, FR-30, ACC-02-08, ACC-02-20).
+	 *
+	 * Three independent instructions, each acted on only when the caller gives it
+	 * (§3.3: "an omitted field means leave that alone"):
+	 *
+	 * - `enabled` — the repository-level switch (`PUT /actions/permissions`), sent
+	 *   only when the field is present. When it is absent the current value is READ
+	 *   instead, because `GitActionsPermissionsResult.actionsEnabled` has to report
+	 *   what the repository is, and a guess is worse than one read.
+	 * - `enableWorkflows` / `disableWorkflowsExcept` — the per-workflow half, over a
+	 *   listing paginated up to `maxWorkflows` (100 by default).
+	 * - `skipWorkflowIds` — ids never touched, in either direction (FR-27: they were
+	 *   already judged, so re-enabling one is as wrong as disabling it).
+	 *
+	 * ONE deliberate reading of §4.3 lives here. §4.3 scopes the per-workflow half
+	 * to `state === 'active'` workflows; read literally, `enableWorkflows` could
+	 * only ever "enable" a workflow that is already active — exactly the case where
+	 * APW-05 needs it to work, since hygiene disables everything but the build
+	 * workflow first and the deploy workflow it later asks for is then
+	 * `disabled_manually`. An id in `enableWorkflows` is therefore enabled whatever
+	 * its state (the contract's own words for the field are "enable exactly these
+	 * paths"), while DISABLING keeps §4.3's `active` restriction, so an
+	 * already-disabled workflow is never touched and never reported as work done.
+	 *
+	 * The calls are made one at a time, in listing order, and a 403 STOPS the pass
+	 * (§4.3). "Stop" is only meaningful — and only honest — with ordered calls: a
+	 * parallel sweep would keep disabling after the first refusal and report a
+	 * partial pass as a whole one.
+	 */
+	async setActionsPermissions(
+		owner: string,
+		repo: string,
+		input: GitActionsPermissionsInput,
+		token: string,
+		baseUrl?: string
+	): Promise<GitActionsPermissionsResult> {
+		const octokit = this.createOctokit(token, baseUrl);
+		const maxWorkflows = resolveMaxWorkflows(input.maxWorkflows);
+		const skipIds = new Set(input.skipWorkflowIds ?? []);
+		const enablePaths = new Set(input.enableWorkflows ?? []);
+		const allowlist =
+			input.disableWorkflowsExcept === undefined ? undefined : new Set(input.disableWorkflowsExcept);
+
+		let actionsEnabled: boolean;
+		if (input.enabled === undefined) {
+			actionsEnabled = await this.readActionsEnabled(octokit, owner, repo);
+		} else {
+			await this.setActionsEnabled(octokit, owner, repo, input.enabled);
+			actionsEnabled = input.enabled;
+		}
+
+		const { workflows, truncated } = await this.listWorkflowsUpTo(octokit, owner, repo, maxWorkflows);
+
+		const seenIds: number[] = [];
+		const disabled: GitWorkflowRef[] = [];
+		const enabled: GitWorkflowRef[] = [];
+		const kept: GitWorkflowRef[] = [];
+
+		for (const workflow of workflows) {
+			// Every id the pass looked at, skipped ones included: `seenIds` is the audit
+			// half of the result, and a caller proves its `skipWorkflowIds` were honoured
+			// by finding them here untouched.
+			seenIds.push(workflow.id);
+			if (skipIds.has(workflow.id)) continue;
+
+			const ref: GitWorkflowRef = { id: workflow.id, path: workflow.path };
+
+			if (enablePaths.has(workflow.path)) {
+				await this.enableWorkflow(octokit, owner, repo, workflow.id);
+				enabled.push(ref);
+				continue;
+			}
+
+			if (allowlist !== undefined && workflow.state === 'active' && !allowlist.has(workflow.path)) {
+				await this.disableWorkflow(octokit, owner, repo, workflow.id);
+				disabled.push(ref);
+				continue;
+			}
+
+			if (workflow.state === 'active') kept.push(ref);
+		}
+
+		return { actionsEnabled, disabled, kept, enabled, seenIds, truncated };
+	}
+
+	/**
+	 * Install a signed webhook on a repository, updating the one already pointed at
+	 * the same URL instead of adding a second (APW-02 T21 — plan §4.3, FR-55).
+	 *
+	 * Idempotence is by URL: a hook whose `config.url` equals the requested one is
+	 * PATCHed to the requested events and secret and answers `created: false`.
+	 * That is what makes a retried call safe — creating unconditionally would leave
+	 * the receiver verifying two hooks for every event. The PATCH carries the whole
+	 * `config` (URL, secret, `content_type`, `insecure_ssl`) rather than the two
+	 * fields that changed, so the hook converges on the requested state whatever it
+	 * was left in.
+	 *
+	 * Every failure leaves through {@link webhookFailure}, which never carries the
+	 * signing secret — including on the `cause` the classifier would otherwise
+	 * attach.
+	 */
+	async createWebhook(
+		owner: string,
+		repo: string,
+		input: GitWebhookInput,
+		token: string,
+		baseUrl?: string
+	): Promise<{ id: number; created: boolean }> {
+		const refused = webhookRefusal(input);
+		if (refused) throw refused;
+
+		const octokit = this.createOctokit(token, baseUrl);
+		const existing = await this.findWebhookByUrl(octokit, owner, repo, input.url, input.secret);
+		const events = [...input.events];
+
+		try {
+			if (existing !== undefined) {
+				const { data } = await octokit.rest.repos.updateWebhook({
+					owner,
+					repo,
+					hook_id: existing,
+					config: webhookConfig(input),
+					events,
+					active: true
+				});
+				// The id of the hook that was updated, whether or not the provider echoed
+				// one back: `existing` is the hook we just told it to update.
+				return { id: typeof data?.id === 'number' ? data.id : existing, created: false };
+			}
+
+			const { data } = await octokit.rest.repos.createWebhook({
+				owner,
+				repo,
+				config: webhookConfig(input),
+				events,
+				active: true
+			});
+			return { id: data.id, created: true };
+		} catch (err) {
+			throw webhookFailure(err, input.secret);
+		}
+	}
+
+	/**
+	 * Remove a webhook (APW-02 T21 — plan §4.3).
+	 *
+	 * A 404 is SUCCESS: the hook is not there, which is exactly the state the
+	 * caller asked for, so a delete retried after a half-failed flow does not
+	 * report a failure that is not one.
+	 */
+	async deleteWebhook(owner: string, repo: string, hookId: number, token: string, baseUrl?: string): Promise<void> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			await octokit.rest.repos.deleteWebhook({ owner, repo, hook_id: hookId });
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 404) return;
+			// No secret is in scope here: this call carries none.
+			throw webhookFailure(err, undefined);
+		}
+	}
+
+	/**
+	 * One branch's head commit sha.
+	 *
+	 * Every failure — the 404 of a branch that is not there included — leaves as
+	 * the contract's typed error, with `contents` named as the permission a refusal
+	 * to read it needs (plan §4.2, §4.5).
+	 */
+	private async readBranchHead(octokit: Octokit, owner: string, repo: string, branch: string): Promise<string> {
+		try {
+			const { data } = await octokit.rest.repos.getBranch({ owner, repo, branch });
+			return data.commit.sha;
+		} catch (err) {
+			throw toGitProviderError(err, 'contents');
+		}
+	}
+
+	/**
+	 * The same read, for a branch that may legitimately not exist yet: the target of
+	 * a copy is an EMPTY repository, so its branch is a 404 until the first push
+	 * lands. Only a 404 answers `undefined`; anything else is still a failure.
+	 */
+	private async readBranchHeadOrNone(
+		octokit: Octokit,
+		owner: string,
+		repo: string,
+		branch: string
+	): Promise<string | undefined> {
+		try {
+			const { data } = await octokit.rest.repos.getBranch({ owner, repo, branch });
+			return data.commit.sha;
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 404) return undefined;
+			throw toGitProviderError(err, 'contents');
+		}
+	}
+
+	/** The repository-level Actions switch, as the provider reports it. */
+	private async readActionsEnabled(octokit: Octokit, owner: string, repo: string): Promise<boolean> {
+		try {
+			const { data } = await octokit.rest.actions.getGithubActionsPermissionsRepository({ owner, repo });
+			return data.enabled;
+		} catch (err) {
+			// The repository switch is an administration write (§4.5); reading it back
+			// needs the same access, so that is the permission a refusal names.
+			throw actionsFailure(err, 'administration');
+		}
+	}
+
+	/** `PUT /actions/permissions` — sent only when the caller asked for a value. */
+	private async setActionsEnabled(octokit: Octokit, owner: string, repo: string, enabled: boolean): Promise<void> {
+		try {
+			await octokit.rest.actions.setGithubActionsPermissionsRepository({ owner, repo, enabled });
+		} catch (err) {
+			throw actionsFailure(err, 'administration');
+		}
+	}
+
+	private async enableWorkflow(octokit: Octokit, owner: string, repo: string, workflowId: number): Promise<void> {
+		try {
+			await octokit.rest.actions.enableWorkflow({ owner, repo, workflow_id: workflowId });
+		} catch (err) {
+			throw actionsFailure(err, actionsPermissionForRefusal(err));
+		}
+	}
+
+	private async disableWorkflow(octokit: Octokit, owner: string, repo: string, workflowId: number): Promise<void> {
+		try {
+			await octokit.rest.actions.disableWorkflow({ owner, repo, workflow_id: workflowId });
+		} catch (err) {
+			throw actionsFailure(err, actionsPermissionForRefusal(err));
+		}
+	}
+
+	/**
+	 * The repository's workflows, paginated, and never more than `maxWorkflows` of
+	 * them (§4.3's cap; T20's "150 workflows with `maxWorkflows: 100`").
+	 *
+	 * `truncated` is answered rather than assumed: when the cap lands exactly on a
+	 * page boundary the next page is peeked at, because "the cap was reached" and
+	 * "the repository has more workflows than the cap" are different facts, and only
+	 * the second one means the pass was partial — which §3.3 forbids reporting as a
+	 * complete one.
+	 */
+	private async listWorkflowsUpTo(
+		octokit: Octokit,
+		owner: string,
+		repo: string,
+		maxWorkflows: number
+	): Promise<{ workflows: ActionsWorkflowPayload[]; truncated: boolean }> {
+		const workflows: ActionsWorkflowPayload[] = [];
+
+		for (let page = 1; ; page++) {
+			let pageItems: ActionsWorkflowPayload[];
+
+			try {
+				const { data } = await octokit.rest.actions.listRepoWorkflows({
+					owner,
+					repo,
+					per_page: ACTIONS_WORKFLOW_PAGE_SIZE,
+					page
+				});
+				pageItems = Array.isArray(data.workflows) ? (data.workflows as ActionsWorkflowPayload[]) : [];
+			} catch (err) {
+				throw actionsFailure(err, 'actions');
+			}
+
+			const room = maxWorkflows - workflows.length;
+			workflows.push(...pageItems.slice(0, Math.max(room, 0)));
+
+			// A short page is the last page GitHub has.
+			const lastPage = pageItems.length < ACTIONS_WORKFLOW_PAGE_SIZE;
+
+			if (workflows.length >= maxWorkflows) {
+				if (pageItems.length > room) return { workflows, truncated: true };
+				if (lastPage) return { workflows, truncated: false };
+				return { workflows, truncated: await this.hasWorkflowsAtPage(octokit, owner, repo, page + 1) };
+			}
+
+			if (lastPage) return { workflows, truncated: false };
+		}
+	}
+
+	/** One peek, so `truncated` reports the provider's answer and not an assumption. */
+	private async hasWorkflowsAtPage(octokit: Octokit, owner: string, repo: string, page: number): Promise<boolean> {
+		try {
+			const { data } = await octokit.rest.actions.listRepoWorkflows({
+				owner,
+				repo,
+				per_page: ACTIONS_WORKFLOW_PAGE_SIZE,
+				page
+			});
+			return Array.isArray(data.workflows) && data.workflows.length > 0;
+		} catch (err) {
+			// A peek that failed is not "nothing lies beyond the cap": reporting a
+			// complete pass off a read that never answered is the one outcome §3.3
+			// forbids.
+			throw actionsFailure(err, 'actions');
+		}
+	}
+
+	/**
+	 * The hook already pointed at `url`, if there is one.
+	 *
+	 * Bounded at {@link WEBHOOK_MAX_PAGES} pages: GitHub's own ceiling is 20 hooks
+	 * per repository, so a real repository is answered by the first page, and the
+	 * bound is what stops a provider that answers an endless listing.
+	 */
+	private async findWebhookByUrl(
+		octokit: Octokit,
+		owner: string,
+		repo: string,
+		url: string,
+		secret: string
+	): Promise<number | undefined> {
+		for (let page = 1; page <= WEBHOOK_MAX_PAGES; page++) {
+			let hooks: ReadonlyArray<WebhookPayload | null>;
+
+			try {
+				const { data } = await octokit.rest.repos.listWebhooks({
+					owner,
+					repo,
+					per_page: WEBHOOK_PAGE_SIZE,
+					page
+				});
+				hooks = Array.isArray(data) ? (data as WebhookPayload[]) : [];
+			} catch (err) {
+				throw webhookFailure(err, secret);
+			}
+
+			const match = hooks.find(
+				(hook) =>
+					typeof hook?.id === 'number' &&
+					typeof hook?.config?.url === 'string' &&
+					// The URL is compared as configured — trimmed, because a trailing newline
+					// in a stored value is a paste artefact, not a different hook.
+					hook.config.url.trim() === url
+			);
+			if (match && typeof match.id === 'number') return match.id;
+
+			if (hooks.length < WEBHOOK_PAGE_SIZE) return undefined;
+		}
+
+		return undefined;
 	}
 }
