@@ -365,6 +365,32 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · T14 closed out, and with it the last of the owed perturbations — both Wave-1 slices are VERIFIED, not merely green.**
+  **`1a4369f34`** lands the author''s post-commit refactor on my own verification: T14''s pair **52 tests green**,
+  `type-check` **exit 0**, Prettier clean, worktree clean. The `−16` lines are **all lines this task authored today**
+  (an injected-but-unused T8 repository and the old envelope loop), and the change is a strengthening rather than a
+  tidy-up: the resolver now asks T8 which names are _set_ and only then loads envelopes, so **ephemeral mode never loads
+  a generated or derived envelope at all** — a stronger R-10 than the code it replaces.
+  **Perturbation tally, with the credit split honestly**: T14 **4 of 4** behaviours — the wrong-target placeholder
+  (`Expected: "ew-dep://postgres/url" / Received: undefined`, with the _inverse_ mutation caught by the other direction
+  of the same pair), the fingerprinting rule (`Expected pattern: /^t[0-9a-f]{64}$/ / Received string: "a5f986a3…"` — a
+  raw sha256 of the secret value, precisely the leak §2.2 forbids), the readiness call twice and never, and the depth
+  guard — **2 of the 4 reproduced by me** (depth guard, once-only readiness) and 2 on the author''s table with the
+  assertion text quoted and byte-identical restores. **T26: 6 of 6.** Every red in both tables is an assertion failure
+  with its expected/received pair quoted, and every restore is hash-verified — which is the standard this log has been
+  holding to, now met by both slices.
+  **The most consequential routed item is not a defect in either slice but a cross-epic mismatch**: APW-06''s
+  `app-runtime/ports.ts` is **behind APW-07''s plan** — no `fingerprints` on the resolve result (`ports.ts:187-193` vs
+  plan §4.6.1:429), no `ctx.dependencyOutputs` (`:164-171` vs §4.6.1:446), and a recipe union without `derived`
+  (`:174-179` vs `contracts/src/apps/app-env.ts:585-590`) — so the resolver returns the plan''s superset and stays
+  assignable, and APW-06''s owner has three members to add. And **APW-05''s `verify-plan.schema.json:195-227` types the
+  recipe FLAT** while plan §4.6.1:447 and the contracts require `spec: {…}`, so T14 emits the plan-normative shape and
+  APW-05''s `ajv` will reject it until one side moves. Four smaller contract inconsistencies are named with file:line in
+  the commit: `isAppDependencyOutputSecret` calling a bucket **name** a secret (§11:236 says it is not),
+  `appEnvTemplateFingerprint` returning an unhashed canonical serialization where §2.2:140 says `t<sha256 …>`,
+  `smtpNotConfigured` having neither a contracts constant nor a copy leaf, and §4.9a:650''s env-side `required` having no
+  field in `schema.md` §12.
+
 - **2026-09-18 · The count perturbation re-run against a REACHABLE mutation, and it reddens — T14 is now 2 of 4 proven.**
   Last round''s inert duplicate is replaced by an **awaited extra call inserted before the return** in
   `app-env-runtime.source.ts`''s `readReadiness` (`await this.readiness.ensureReadyForDeploy(workId);` ahead of the real
