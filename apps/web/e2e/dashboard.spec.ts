@@ -4,6 +4,12 @@ import { test, expect } from '@playwright/test';
  * Dashboard E2E tests.
  *
  * These run WITH pre-authenticated state (chromium project with storageState).
+ *
+ * Owner 2026-09-18 — the Dashboard deliberately has NO page header any more:
+ * the greeting, the subtitle and the date line were removed, so `/en` no
+ * longer carries an `<h1>` (the page opens with the composer and the
+ * `Your workspace` card, whose heading is an `<h2>`). The old assertions here
+ * looked for that `<h1>`; they now pin what the page actually opens with.
  */
 
 test.describe('Dashboard', () => {
@@ -13,17 +19,23 @@ test.describe('Dashboard', () => {
         // Should not redirect to login
         await expect(page).not.toHaveURL(/\/login/);
 
-        // Dashboard should show welcome heading
-        const heading = page.locator('h1');
-        await expect(heading).toBeVisible({ timeout: 10_000 });
+        // The morning stack is the page: the composer comes first.
+        await expect(page.getByTestId('home-morning')).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByTestId('home-composer')).toBeVisible({ timeout: 15_000 });
     });
 
-    test('should display stats overview section', async ({ page }) => {
+    test('should display the Your workspace stats card', async ({ page }) => {
         await page.goto('/en');
 
-        // StatsOverview component should render
-        // It shows totalWorks, totalItems, activeWebsites
-        await expect(page.locator('h1')).toBeVisible({ timeout: 10_000 });
+        // The merged card: a `Your workspace` heading with a Today half and
+        // an All half, the latter holding the account totals (Total Works,
+        // Total Items, …) that used to live in the collapsed region.
+        const card = page.getByTestId('home-block-workspace');
+        await expect(card).toBeVisible({ timeout: 15_000 });
+        await expect(card.getByRole('heading', { name: 'Your workspace' })).toBeVisible();
+        await expect(card.getByRole('heading', { name: 'Today' })).toBeVisible();
+        await expect(card.getByRole('heading', { name: 'All' })).toBeVisible();
+        await expect(card.getByText('Total Works')).toBeVisible();
     });
 
     test('should have navigation sidebar', async ({ page }) => {

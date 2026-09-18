@@ -2,7 +2,6 @@
 
 import { AuthUser } from '@/lib/auth';
 import { WorkList } from '@/components/works/WorkList';
-import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { WorkProposalsSection } from '@/components/dashboard/WorkProposalsSection';
 import { MissionsPreviewSection } from '@/components/missions';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -20,6 +19,8 @@ import { ApprovalsQueue } from '@/components/approvals/ApprovalsQueue';
 import { buildDecisionsHref } from '@/lib/api/inbox.shared';
 import { HomeMorningStack } from '@/components/home/HomeMorningStack';
 import { WorkspaceSection } from '@/components/home/WorkspaceSection';
+import { WorkspaceStats } from '@/components/home/WorkspaceStats';
+import { glanceForSummary } from '@/components/home/home.shared';
 import type { HomeSummaryDto } from '@ever-works/contracts';
 import type { Task } from '@/lib/api/tasks';
 import type { Agent } from '@/lib/api/agents';
@@ -88,7 +89,8 @@ interface DashboardClientProps {
      *   - `attentionItems` — red signal cards ABOVE the Missions list;
      *     empty ⇒ the block (and its divider) render nothing.
      *   - `soonItems` / `soonTotal` — upcoming scheduled runs; empty ⇒
-     *     nothing renders (gated on the Schedules front).
+     *     nothing renders (gated on the Schedules front). Superseded on
+     *     this page by the morning read's Today block.
      */
     teamsTotal?: number;
     attentionItems?: AttentionItem[];
@@ -100,10 +102,14 @@ interface DashboardClientProps {
      * entirely by a caller that does not render the morning stack.
      */
     homeSummary?: HomeSummaryDto | null;
-    /** The instant the page rendered — the greeting's clock when there is no summary. */
-    renderedAt?: string;
     /** From the dashboard layout's health read; `false` = nothing will be dispatched. */
     jobRuntimeConfigured?: boolean | null;
+    /**
+     * Work-kind chip values whose `works-<value>` PostHog flag resolved to
+     * `false`. Passed to the composer's kind chips, exactly as `/new` passes
+     * them — resolved server-side by the page.
+     */
+    disabledKinds?: readonly string[];
 }
 
 export default function DashboardClient({
@@ -133,8 +139,8 @@ export default function DashboardClient({
     teamsTotal,
     attentionItems = [],
     homeSummary = null,
-    renderedAt,
     jobRuntimeConfigured = null,
+    disabledKinds = [],
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -142,40 +148,38 @@ export default function DashboardClient({
 
     return (
         <div className="w-full">
-            {/* Home (AW-19) — the morning read: greeting, composer, Needs you
-                (with the Attention signals as `Also broken`), the glance
-                counters, Today (the Soon block, widened to the local day and
-                every schedule kind) beside This week, Working now and Recent
-                activity. The page header's greeting lives here now. */}
+            {/* Home (AW-19) — the morning read, in the order the owner set on
+                2026-09-18: the composer, `Your workspace` (Today + All), Needs
+                you, Working now, Today beside This week, Recent activity. The
+                page header is gone: no greeting, no subtitle, no date line. */}
             <HomeMorningStack
-                userName={user.username}
                 summary={homeSummary}
-                renderedAt={renderedAt ?? new Date(0).toISOString()}
                 attentionItems={attentionItems}
                 jobRuntimeConfigured={jobRuntimeConfigured}
-                subtitle={t('header.subtitle')}
+                disabledKinds={disabledKinds}
+                workspaceStats={
+                    <WorkspaceStats
+                        glance={glanceForSummary(homeSummary)}
+                        totalMissions={totalMissions}
+                        totalIdeas={totalIdeas}
+                        totalWorks={totalWorks}
+                        totalItems={totalItems}
+                        activeWebsites={activeWebsites}
+                        monthSpendCents={monthSpendCents}
+                        monthSpendCurrency={monthSpendCurrency}
+                        agentsTotal={agentsTotal}
+                        agentsActive={agentsActive}
+                        tasksInProgress={tasksInProgress}
+                        tasksBlocked={tasksBlocked}
+                        teamsTotal={teamsTotal}
+                    />
+                }
             />
 
-            {/* Everything Home showed before the morning read, unchanged. */}
+            {/* The long tail — everything else Home holds, on demand. */}
             <WorkspaceSection>
-                {/* Stats strip */}
-                <StatsOverview
-                    totalMissions={totalMissions}
-                    totalIdeas={totalIdeas}
-                    totalWorks={totalWorks}
-                    totalItems={totalItems}
-                    activeWebsites={activeWebsites}
-                    monthSpendCents={monthSpendCents}
-                    monthSpendCurrency={monthSpendCurrency}
-                    agentsTotal={agentsTotal}
-                    agentsActive={agentsActive}
-                    tasksInProgress={tasksInProgress}
-                    tasksBlocked={tasksBlocked}
-                    teamsTotal={teamsTotal}
-                />
-
                 {/* Content sections — divided by a subtle rule for visual rhythm */}
-                <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
+                <div className="divide-y divide-border/30 dark:divide-white/6">
                     {/* Agent Action Approval Queue — attention block above
                     Missions. Self-hides when the queue empties. */}
                     {initialApprovals.length > 0 && (

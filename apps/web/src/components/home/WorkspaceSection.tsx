@@ -12,12 +12,17 @@ interface WorkspaceSectionProps {
 }
 
 /**
- * Home (AW-19) — `Your workspace`: everything Home showed before the morning
- * read, gathered under one heading and rendered exactly as it was. Collapsing
- * hides it without unmounting it, so nothing inside loses its state.
+ * Home (AW-19) — `More`: everything Home showed before the morning read,
+ * gathered under one heading and rendered exactly as it was. Collapsing hides
+ * it without unmounting it, so nothing inside loses its state.
+ *
+ * Owner 2026-09-18 — the heading used to read `Your workspace`, which the
+ * merged stats card at the top of the page now owns. This region is the
+ * long tail below the morning stack (approvals, Missions, Ideas, Works, Tasks,
+ * Agents), so it is titled for what it is: more, on demand.
  */
 export function WorkspaceSection({ children, defaultExpanded = true }: WorkspaceSectionProps) {
-    const t = useTranslations('dashboard.home.workspace');
+    const t = useTranslations('dashboard.home.more');
     const [expanded, setExpanded] = useState(defaultExpanded);
     const regionId = useId();
 
