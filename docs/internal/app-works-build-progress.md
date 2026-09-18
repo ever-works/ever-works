@@ -365,6 +365,32 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · an App Work can be deleted end to end, and a correction to my own brief.** **APW-06 T58 — runtime removal
+  (R-15)** (`0c587e379`; `app-runtime` **16 → 51 tests**). Plan §9.7's order, in one service: APW-07's
+  `onAppWorkDeleting` first, then `destroyApp` with `deleteVolumes === deleteStoredData`, then the managed DNS record last
+  (so DNS is never withdrawn while the app is still serving), then Activity `app.deploy.removed` with `kept[]` /
+  `mayRemain[]`, then APW-01's `completeAppWorkDeletion`. 5-minute re-dispatch, 3 attempts, and after the third the entry
+  still runs with `mayRemain[]`; a `remaining` answer from APW-07 **downgrades** `deleteVolumes` rather than cancelling,
+  because a live app must not be left serving while its data is stranded. Three collaborators whose owners have not landed
+  are declared as clearly-marked provisional seams naming owner + plan line (APW-01 T39's port and completion, APW-07
+  T16's hooks); APW-01's own file was deliberately not created.
+  🛑 **My brief contradicted the plan and the agent caught it.** I said to route `ever-works-apps` to APW-10's `removeWork`
+  _instead of_ `destroyApp`; the plan says the opposite at `plan.md:1500-1503` — the op calls `destroyApp` for every
+  target, and the **apps-tier plugin's** `destroyApp` is what maps to `removeWork`. The agent implemented my instruction
+  and flagged the divergence instead of silently choosing, which is what made the correction cheap. **Corrected here to
+  the plan's letter**, with the reasoning recorded in the code: the target-agnostic call is the whole point of the plugin
+  boundary — T14's k8s plugin refuses `ever-works-apps` outright, a refusal that only makes sense if callers DO call
+  `destroyApp` uniformly — and `resolveAccess` already resolved the plugin **for the Work's target**, so there is nothing
+  left for a tier-specific seam to do. `'tier_unavailable'` stays in the refusal union with a comment, because a stored
+  `reason` must still parse. Two perturbations re-run by me after the correction: skipping `destroyApp` on an apps-tier
+  target reddens exactly the two rewritten cases.
+  **Gap-register triage** (`3ebfe1dd7`): rows 23/24 (APW13-UF-01/02) move to partial — `runAsUser` **is** rendered
+  (`componentRunAsUser` → `AppSecurityInput.runAsUser` → both manifests and jobs), so the image-user problem is now an
+  ARTIFACT (Blueprint declares the UID), not a renderer gap; row 11 (APW06-G01) was re-checked and is **still open**,
+  with the reason recorded (the guard resolves with `node:dns` in whatever process runs the plugin, and the plugin runs
+  in the API — pinning makes it safe, not worker-side). The table now says what it is: epic-sized watch items.
+  **Measured progress:** the task-path meter reads **present 1195 → 1233**, absent 1472 → 1434, landed-surface 41 → 57.
+
 - **2026-09-18 · the launcher's Work-level control and the FR-63 window — the first two APW-11 slices after the launcher
   itself.** **APW-11 T17 — the Work's exposure, on both surfaces** (`ab74c4bc5`). One shared control
   (`AppLauncherExposureSetting`) rendered by the Work's settings page **and** by an Overview card, because
