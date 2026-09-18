@@ -106,7 +106,13 @@ export const PLUGIN_CAPABILITIES = {
 	// write") mapped onto the tool-grant lattice. Declared alongside a
 	// provider's main capability; see
 	// capabilities/connection-scopes.interface.ts.
-	CONNECTION_SCOPES: 'connection-scopes'
+	CONNECTION_SCOPES: 'connection-scopes',
+	// App Works (APW-07 T3) — App dependency providers: the `k8s` plugin serves
+	// the three in-cluster ids, `app-dependencies-external` the external ones,
+	// and P2's `apps-tier-dependencies` the managed ones. Consumed only through
+	// `AppDependencyFacadeService`; see
+	// capabilities/app-dependency.interface.ts.
+	APP_DEPENDENCY: 'app-dependency'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

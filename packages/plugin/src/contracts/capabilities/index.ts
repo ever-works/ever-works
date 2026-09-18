@@ -89,3 +89,8 @@ export * from './playbook-provider.interface.js';
 // write") a provider plugin declares; the platform writes the chosen level
 // onto the existing tool-grant lattice. See `connection-scopes.interface.ts`.
 export * from './connection-scopes.interface.js';
+// App Works (APW-07 T3) — the `app-dependency` capability: one plugin serves
+// several provider ids (`k8s-inline-postgres`, `smtp-external`, …), each with
+// its own descriptor, prompt schema and backup policy. Additive: no existing
+// capability, category or contract changes.
+export * from './app-dependency.interface.js';

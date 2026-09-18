@@ -177,6 +177,24 @@ export {
     type AppRuntimeStateTargetStore,
     type AppRuntimeStateTargetView,
 } from './app-runtime.facade';
+
+// App Dependency Facade — APW-07 T16. The ONE place an App dependency provider
+// is chosen for a (kind, deploy target) and called: enabled plugins declaring
+// the `app-dependency` capability are asked `supports` in ascending
+// `preference`, and the owner's explicit choice wins when it is supported
+// (plan §4.8:543-546). It also carries the `awaitingConfig` flag of plan §4.9a,
+// which is what makes a provider needing the owner's settings land in
+// `awaiting_config` instead of burning its deadline.
+export {
+    AppDependencyFacadeService,
+    AppDependencyFacadeError,
+    NoAppDependencyProviderError,
+    AppDependencyProviderNotFoundError,
+    type AppDependencyFacadeOptions,
+    type AppDependencySelection,
+    type AppDependencySelectionResult,
+    type ResolvedAppDependencyProvider,
+} from './app-dependency.facade';
 export type {
     IMetricsProviderPlugin,
     MetricDescriptor,

@@ -31,6 +31,7 @@ import { MetricsFacadeService } from './metrics.facade';
 import { PlaybookCatalogFacadeService } from './playbook-catalog.facade';
 import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 import { AppRuntimeFacadeService } from './app-runtime.facade';
+import { AppDependencyFacadeService } from './app-dependency.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -77,6 +78,11 @@ const FACADES = [
     // it, and `apps/api/src` carries a static test asserting no file there
     // imports the marker that would arm the flag.
     AppRuntimeFacadeService,
+    // APW-07 T16 — the App dependency provider facade. Like every other facade
+    // here it depends only on the global PluginRegistryService plus two
+    // @Optional() injections, so it resolves in this module; it is what
+    // `AppDependenciesService` selects a provider through (plan §4.8:543-546).
+    AppDependencyFacadeService,
 ];
 
 /**
