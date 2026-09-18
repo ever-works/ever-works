@@ -365,6 +365,32 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · APW-07''s recipe stops being narrower than the contract it feeds** (`fbb9eb61f`), and the port-alignment
+  agent turned out to be working rather than stalled. The last port-coupling artifact in APW-07 is gone —
+  `readonly source: Exclude<AppEnvRecipeEntry['source'], 'derived'>` plus the two comment lines whose premise it voided —
+  verified on my own run (**8 suites / 289 tests**, `type-check` exit 0, Prettier clean), and it is a **widening**: the
+  recipe was narrower than the contract it feeds (`AppVerificationPlan.env`, `contracts/src/apps/builds.ts:1372-1373`),
+  while the producer still emits only the four sources it emitted before.
+  **Why that agent was slow, and it is not a fault of its own:** its first read of `ports.ts` was served a **stale
+  pre-fix revision**, so its edit was refused with _"file changed since it was read"_ — which is how it discovered that I
+  had committed the three port members while its brief was in flight. It then re-measured my commit and reproduced my
+  numbers exactly (type-check 0, 8 suites / 289, Prettier clean) before doing the item my ledger had left open. It also
+  **corrected my own wording**: there were never any `as` casts to drop in either APW-07 file — the `Exclude<>` was the
+  only port-coupling artifact, and "dropping the resolver''s now-redundant casts" was the wrong description of the work.
+  🌟 **Its best evidence is a counterfactual (P5)**: with the pre-edit resolver, mutating the port to lose `derived` stays
+  **green**; with the widening in place the same mutation is a **compile error** (`TS2416` on `resolveEphemeral`). That is
+  the rare perturbation that proves a change created a _pin_ rather than merely passing — and the mirror experiment proves
+  the opposite direction is forbidden, because typing the recipe `spec` with the contracts'' payloads reddens
+  `default-ports.ts:193`, an APW-06 stub that must keep compiling unchanged. Four other perturbations (P1–P4) each
+  reddened tsc and, where the diagnostics were spec-local, jest with the suite names quoted.
+  **Open at the end of this round, stated plainly:** (a) **T15 is written but RED** — `app-env.listener.ts`, its spec and a
+  +21 barrel line are on disk, and the failing test is `keeps every generated row when reconcile throws — no rollback, no
+rejection`, which is exactly the acceptance behaviour the task turns on, so it is not committed; (b) three now-stale
+  "reported" notes in APW-07''s two files and a one-line R-1 consistency swap at `ports.ts:194` (the union spelled inline
+  where the file''s own rule wants `AppEnvRecipeSource` imported) — both left deliberately rather than churned blind; (c) the
+  branch-wide full-package run could not be re-measured this round (it exceeds the 600 s executor cap), so the integration
+  number stands as of the redaction fix rather than as of `fbb9eb61f`.
+
 - **2026-09-18 · Why T15 produced nothing: the event it listens for does not exist yet — `app.spec.applied` is referenced only in comments.**
   After three rounds of an empty worktree from the T15 dispatch (and three earlier from the ports-alignment one, which I then
   did myself as `e20313f99`), I stopped waiting and went looking for the seam the listener needs. `grep -r "app\.spec\.applied"`
