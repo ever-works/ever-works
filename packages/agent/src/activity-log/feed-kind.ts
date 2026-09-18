@@ -331,6 +331,43 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.WORKSPACE_BACKUP_CREATED]: 'work',
     [ActivityActionType.WORKSPACE_BACKUP_DOWNLOADED]: 'delivery',
     [ActivityActionType.WORKSPACE_BACKUP_DELETED]: 'system',
+
+    // App Works (APW-02) — fork readiness, Actions hygiene and upstream sync.
+    // Three families, three deliberate decisions; the dotted `action` decides
+    // which event of the family a row is, so each of these is a family-level
+    // call and the row's `status` (CONTRACTS §0 R-34) finishes the job.
+    //
+    // `app_fork` is the epic's long-running operation: the job polls a fork
+    // from `preparing` to `ready`, so while it runs its row reads as `work`
+    // and the terminal success — "your fork is ready" — reads as `delivery`,
+    // the same shape as `GENERATION` / `DEPLOYMENT` above and APW-09's
+    // `app_upstream_pr`. `app.fork.timeout` and `app.fork.missing` are
+    // recorded `FAILED`, which `FEED_PROBLEM_STATUSES` turns into `problem`
+    // before this rule is ever consulted.
+    //
+    // `app_actions` records repository hygiene on the App Work — the
+    // workflows the platform switched off in the member's fork. It is not
+    // `delivery` (nothing was generated or deployed), not `decision` (nothing
+    // is held waiting on a person) and not `system` (that bucket is the
+    // member's own configuration and platform object lifecycle —
+    // `SETTINGS_UPDATED`, `ENVIRONMENT_*`, `MODEL_ACCOUNT_*`,
+    // `REPO_CONNECTION_*`). The platform's own writes into a repository are
+    // `work` beside it (`GIT_PUSHED`, `GIT_COMMITTED`), which is the closest
+    // sibling this family has.
+    //
+    // `app_upstream` is deliberately `work` and NOT `deliveryWhenCompleted`.
+    // The family holds a completed sync, a divergence reading and two failure
+    // states, and this table is keyed by family, so it cannot see the dotted
+    // `action`: `deliveryWhenCompleted` would report `app.upstream.behind` —
+    // a completed comparison in which nothing landed — as a **delivery**,
+    // which is a false claim in a user-visible bucket. `work` is coarser for
+    // `app.upstream.synced` but never false, and `app.upstream.unavailable`
+    // plus any refused or failed sync read as `problem` through their status.
+    // Revisiting any of the three means a *different* value here, never an
+    // omission — `feed-kind.spec.ts:14-19` fails on a member with no entry.
+    [ActivityActionType.APP_FORK]: 'deliveryWhenCompleted',
+    [ActivityActionType.APP_ACTIONS]: 'work',
+    [ActivityActionType.APP_UPSTREAM]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

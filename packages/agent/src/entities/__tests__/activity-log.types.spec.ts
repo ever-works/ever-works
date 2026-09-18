@@ -138,6 +138,15 @@ describe('activity-log.types', () => {
             // APW-11 App Launcher (T7) — the Work-level **Show in App
             // Launcher** setting changed.
             ['APP_LAUNCHER', 'app_launcher'],
+            // APW-02 Fork lifecycle (T15, Resolution R-2) — three families for
+            // the App Work's fork readiness, Actions hygiene and upstream sync.
+            // The dotted CONTRACTS §6 event (`app.fork.ready`, `app.fork.timeout`,
+            // `app.fork.missing`, `app.actions.disabled`, `app.upstream.synced`,
+            // `app.upstream.behind`, `app.upstream.conflict`,
+            // `app.upstream.unavailable`) is stored in `action`.
+            ['APP_FORK', 'app_fork'],
+            ['APP_ACTIONS', 'app_actions'],
+            ['APP_UPSTREAM', 'app_upstream'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -420,7 +429,20 @@ describe('activity-log.types', () => {
             //    Shared-view classification needs no edit because
             //    `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
             //    the publishable allow-list.
-            expect(literals).toHaveLength(201);
+            //
+            // +3 app_fork / app_actions / app_upstream (APW-02 Fork lifecycle,
+            //    T15 — Resolution R-2: fork readiness, Actions hygiene and
+            //    upstream sync, with the dotted CONTRACTS §6 event in `action`)
+            //    — this branch's own additions, disjoint from everything the
+            //    branches above carry, and COUNTED from the merged enum the
+            //    same way -> 204. Each one carries its `FEED_KIND_RULES` row in
+            //    `activity-log/feed-kind.ts` in the same change (program
+            //    contract R-34; `feed-kind.spec.ts:14-19` fails on a member
+            //    without one), and the Shared-view classification needs no edit
+            //    for the same derived-complement reason as `app_launcher`
+            //    above. The count moves by exactly the three members this task
+            //    appends: no existing pair is renamed, retyped or removed.
+            expect(literals).toHaveLength(204);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {
@@ -445,6 +467,70 @@ describe('activity-log.types', () => {
             for (const v of literals) {
                 expect(v).toMatch(/^[a-z][a-z0-9_]*$/);
             }
+        });
+    });
+
+    /**
+     * Resolution R-2 has two halves: the snake_case family is the
+     * `actionType` (pinned above) and the dotted CONTRACTS §6 event is the
+     * `action`. APW-02's three families own exactly the eight events below —
+     * the six CONTRACTS §6 already listed plus the two APW-02 added
+     * (`app.fork.missing`, `app.upstream.unavailable`). A seventh event is
+     * added to CONTRACTS §6 and to this list together, never to one alone, so
+     * a family cannot quietly start writing an event nobody specified.
+     */
+    describe('APW-02 App Works families — the dotted `action` each one carries', () => {
+        const FAMILIES: Array<{
+            actionType: ActivityActionType;
+            namespace: string;
+            events: readonly string[];
+        }> = [
+            {
+                actionType: ActivityActionType.APP_FORK,
+                namespace: 'app.fork',
+                events: ['app.fork.ready', 'app.fork.timeout', 'app.fork.missing'],
+            },
+            {
+                actionType: ActivityActionType.APP_ACTIONS,
+                namespace: 'app.actions',
+                events: ['app.actions.disabled'],
+            },
+            {
+                actionType: ActivityActionType.APP_UPSTREAM,
+                namespace: 'app.upstream',
+                events: [
+                    'app.upstream.synced',
+                    'app.upstream.behind',
+                    'app.upstream.conflict',
+                    'app.upstream.unavailable',
+                ],
+            },
+        ];
+
+        it.each(FAMILIES)(
+            '$actionType writes $namespace.* events, and only those',
+            ({ actionType, namespace, events }) => {
+                // The family and its namespace are the same word — snake_case in
+                // `actionType`, dotted in `action` (R-2).
+                expect(actionType).toBe(namespace.split('.').join('_'));
+                for (const event of events) {
+                    expect(event.startsWith(`${namespace}.`)).toBe(true);
+                    expect(event).toMatch(/^app(\.[a-z][a-z0-9_]*)+$/);
+                }
+            },
+        );
+
+        it('pins the whole APW-02 event set — six from CONTRACTS §6 plus the two APW-02 adds', () => {
+            expect(FAMILIES.flatMap((family) => [...family.events])).toEqual([
+                'app.fork.ready',
+                'app.fork.timeout',
+                'app.fork.missing',
+                'app.actions.disabled',
+                'app.upstream.synced',
+                'app.upstream.behind',
+                'app.upstream.conflict',
+                'app.upstream.unavailable',
+            ]);
         });
     });
 

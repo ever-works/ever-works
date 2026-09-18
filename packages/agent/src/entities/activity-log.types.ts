@@ -421,6 +421,24 @@ export enum ActivityActionType {
     // is the derived complement of the publishable allow-list, so this
     // member is unpublished by construction.
     APP_LAUNCHER = 'app_launcher',
+    // APW-02 (Fork lifecycle) — Resolution R-2: three families for the App
+    // Work's fork readiness, its Actions hygiene and its upstream sync. The
+    // dotted CONTRACTS §6 event goes in `action` (`app.fork.ready`,
+    // `app.fork.timeout`, `app.fork.missing`, `app.actions.disabled`,
+    // `app.upstream.synced`, `app.upstream.behind`, `app.upstream.conflict`,
+    // `app.upstream.unavailable`) and `details` carry counts, shas, pull
+    // request numbers and reason codes. Workflow paths appear ONLY in
+    // `app.actions.disabled`: they are repository file names, never secrets.
+    // Additive members — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Program contract R-34 (Activity completeness) is
+    // satisfied by the three `FEED_KIND_RULES` entries in
+    // `packages/agent/src/activity-log/feed-kind.ts`; the Shared-view
+    // classification needs no edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS`
+    // is the derived complement of the publishable allow-list, so these three
+    // are unpublished by construction.
+    APP_FORK = 'app_fork',
+    APP_ACTIONS = 'app_actions',
+    APP_UPSTREAM = 'app_upstream',
 }
 
 /**
