@@ -770,9 +770,30 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
                 expect(refused.code).toBe(APP_DEPLOY_CODE_IN_PROGRESS);
             }
 
-            // Exactly the two triggers `tasks.md:1157` queues, and they are the two constants say.
-            expect(APP_DEPLOY_QUEUEABLE_TRIGGERS).toEqual(['build', 'domain-change']);
+            // `tasks.md:1157` names manual, rollback and target-saved as the refused three;
+            // `spec-applied` (FR-23's sixth source, §5.8:886-889) queues with the event-driven two.
+            expect(APP_DEPLOY_QUEUEABLE_TRIGGERS).toEqual([
+                'build',
+                'domain-change',
+                'spec-applied',
+            ]);
             expect(h.store.rows).toHaveLength(1);
+        });
+
+        it('queues a `spec-applied` request, recording FR-23’s sixth source by name', async () => {
+            const h = harness();
+            h.states.claimGranted = false;
+            h.states.state = {
+                ...h.states.state,
+                deployLockId: '00000000-0000-4000-8000-00000000aaaa',
+            };
+
+            const result = await h.service.request(
+                manual({ trigger: 'spec-applied', buildId: null }),
+            );
+
+            expect(result.status).toBe('queued');
+            expect(h.store.rows[0].appTrigger).toBe('spec-applied');
         });
 
         it('refuses 409 — never a queue — when the lock store cannot answer at all', async () => {
@@ -1087,15 +1108,21 @@ describe('AppDeployRequestService (APW-06 T24)', () => {
      * ---------------------------------------------------------------------- */
 
     describe('pure helpers', () => {
-        it('pins the five triggers and defaults an unknown one to manual', () => {
-            expect(APP_DEPLOY_TRIGGERS).toEqual([
+        it('keeps §7.1’s five triggers verbatim, appends `spec-applied`, defaults an unknown to manual', () => {
+            // The five plan §7.1:1036 stores, in its own order — renamed by nothing.
+            expect(APP_DEPLOY_TRIGGERS.slice(0, 5)).toEqual([
                 'manual',
                 'build',
                 'domain-change',
                 'rollback',
                 'target-saved',
             ]);
+            // …and FR-23's sixth source, which that list omits (§5.8:886-889).
+            expect(APP_DEPLOY_TRIGGERS).toHaveLength(6);
+            expect(APP_DEPLOY_TRIGGERS[5]).toBe('spec-applied');
+
             expect(normaliseTrigger('build')).toBe('build');
+            expect(normaliseTrigger('spec-applied')).toBe('spec-applied');
             expect(normaliseTrigger('nonsense' as never)).toBe('manual');
             expect(normaliseTrigger(null)).toBe('manual');
             expect(normaliseTrigger(undefined)).toBe('manual');

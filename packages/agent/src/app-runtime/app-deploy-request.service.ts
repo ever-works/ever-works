@@ -142,31 +142,58 @@ import {
  * -------------------------------------------------------------------------- */
 
 /**
- * The five FR-23 sources, as `work_deployments.appTrigger` stores them (plan §7.1:1036).
+ * The FR-23 sources, as `work_deployments.appTrigger` stores them.
  *
  * `triggerSource` is **not** widened here: it keeps its own two values (`manual` · `scheduled`,
  * `work-deployment.entity.ts:20-23`) and every App trigger is recorded as `manual` there, because
- * none of the five is a schedule. The App-specific value lives in `appTrigger`, which is what T16
- * adds for exactly this reason.
+ * none of them is a schedule. The App-specific value lives in `appTrigger`, which is what T16 adds
+ * for exactly this reason.
+ *
+ * **`spec-applied` — the sixth value, and the one place the plan and the task text disagree
+ * (reported, R-26).** Plan §7.1:1036 lists five — "`manual` · `build` · `domain-change` ·
+ * `rollback` · `target-saved` … so the FR-23 sources had nowhere to live" — while FR-23 itself
+ * (`spec.md:357-360`) and T24's own task text (`tasks.md:422-424`, "manual vs Build-triggered vs
+ * `spec-applied` vs domain-change vs rollback") both count a **sixth** source: §5.8:886-889's
+ * "`app.spec.applied` on the deploy branch while the strategy is `image` … **Trigger name
+ * `spec-applied`**". The plan's own list therefore enumerates FR-23's sources one short.
+ *
+ * The resolution is additive and narrows nothing: the five stored values keep their exact spelling
+ * and order, `spec-applied` is appended, and the column (`varchar(24)`, plan §7.1:1036) holds it
+ * unchanged. Dropping it would have meant a spec-applied redeploy being recorded as `manual` —
+ * which is the one thing `appTrigger` exists to prevent.
  */
-export type AppDeployTrigger = 'manual' | 'build' | 'domain-change' | 'rollback' | 'target-saved';
+export type AppDeployTrigger =
+    | 'manual'
+    | 'build'
+    | 'domain-change'
+    | 'rollback'
+    | 'target-saved'
+    | 'spec-applied';
 
-/** Every trigger, in plan §7.1:1036's own order. */
+/** Every trigger: plan §7.1:1036's five in its own order, then the sixth it omits (see above). */
 export const APP_DEPLOY_TRIGGERS: readonly AppDeployTrigger[] = [
     'manual',
     'build',
     'domain-change',
     'rollback',
     'target-saved',
+    'spec-applied',
 ];
 
 /**
- * The two triggers `tasks.md:1157` queues — "`manual`, `rollback` and `target-saved` are refused
- * with 409 while the lock is held; `build` and `domain-change` are queued".
+ * The triggers `tasks.md:1157` queues — "`manual`, `rollback` and `target-saved` are refused with
+ * 409 while the lock is held; `build` and `domain-change` are queued".
+ *
+ * `spec-applied` queues with them, and the reason is that paragraph's own logic rather than a
+ * preference: it names exactly three refused triggers, and a `spec-applied` redeploy is
+ * event-driven like `build` (FR-23's "a Build succeeding on the deploy branch" and §5.8's
+ * "`app.spec.applied` … that changes what runs" are the same family — a change on the deploy branch
+ * asks for a Deployment, and the newest one wins).
  */
 export const APP_DEPLOY_QUEUEABLE_TRIGGERS: readonly AppDeployTrigger[] = [
     'build',
     'domain-change',
+    'spec-applied',
 ];
 
 /** T17's stale-lock window: the Deployment's 7 200 s maximum plus 60 (plan §7.2:1054). */
