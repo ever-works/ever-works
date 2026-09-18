@@ -365,6 +365,17 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · The first of T14''s owed perturbations, run by me rather than taken on report** (`711a1ddae` carries the
+  slice). The depth guard `if (depth > APP_ENV_TEMPLATE_MAX_DEPTH)` was replaced with `if (false)` in
+  `app-env.resolver.ts` and the suite went red in exactly one place —
+  `fails closed with templateUnresolvable past depth 10 (§4.6.1:449)`, **1 failed / 36 passed** — then the file was
+  restored **byte-identically** (`7355816E052BF2A4847FE05D150E22BD1C9C39E8B7BC5F5BE8F3BF8D729A6F9F` before and after,
+  hash-checked). That is the perturbation that matters most in this file: a resolver that keeps recursing past the
+  depth limit does not fail loudly, it resolves a template into itself until the stack or the memory goes, and the
+  failure would surface far from the entry that caused it. Three more remain owed for T14 (a placeholder emitted for the
+  wrong target, a secret fingerprinted from its **value** rather than its inputs, `ensureReadyForDeploy` called twice)
+  and four for T26, all named in the entry above; the slices stay _green_ rather than _verified_ until they are run.
+
 - **2026-09-18 · Two more slices land — the env resolver (the critical path) and the upstream sync service** (`ba6496736`).
   **APW-07 T14**: `app-env.resolver.ts` (the §2.2 table for both phases, the §4.6.2 build-service outputs, `ew-dep://`
   placeholders decided from `ctx.target` and never the stored row, the depth-10 template re-check failing closed as
