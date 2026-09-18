@@ -1,4 +1,5 @@
 import {
+    AppWindow,
     BookOpen,
     Building2,
     Files,
@@ -77,6 +78,16 @@ export const WORK_KIND_PRESENTATION: Record<WorkKindValue, WorkKindPresentation>
     repo: {
         icon: GitBranch,
         tone: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+    },
+    /**
+     * APW-01 — a Work built from somebody else's GitHub repository. `fuchsia` is
+     * the one tone the other nine do not use, so an App Work is distinguishable
+     * at a glance from the `repo` Work it is often confused with: that one
+     * mirrors a repository, this one runs it.
+     */
+    app: {
+        icon: AppWindow,
+        tone: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
     },
     company: {
         icon: Building2,

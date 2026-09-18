@@ -1,13 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { getWorkCapabilities, WORK_KIND_CAPABILITIES, workKindHasItems } from '../work-capabilities.js';
 import {
+	isAppWorkKind,
 	isRepositoryWorkKind,
 	isUserSelectableWorkKind,
 	normalizeWorkKind,
 	WORK_KINDS,
-	USER_SELECTABLE_WORK_KINDS
+	USER_SELECTABLE_WORK_KINDS,
+	type WorkKind
 } from '../work-kind.js';
 import { WORK_METRIC_DEFINITIONS } from '../work-metrics.js';
+
+/**
+ * True when the kind's `website`-role repository holds a GENERATED website —
+ * template output the platform produced and then deploys.
+ *
+ * The role name alone does not answer that any more: `app` provisions the
+ * `website` role too, but its Work Repository holds the app code the member
+ * linked, forked or copied (FR-2 / README D1), which is exactly what
+ * `builds` records. `repo` is the other kind that generates nothing — it has
+ * no website role at all. Reading the two flags together is what keeps the
+ * deploy invariants below honest for both of them.
+ */
+function generatesWebsite(kind: WorkKind): boolean {
+	const caps = WORK_KIND_CAPABILITIES[kind];
+	return caps.repos.website && !caps.builds;
+}
 
 describe('normalizeWorkKind', () => {
 	it.each(WORK_KINDS)('passes through the known kind %s', (kind) => {
@@ -85,8 +103,14 @@ describe('WORK_KIND_CAPABILITIES', () => {
 		}
 	});
 
-	it('always provisions a data repository — it is the source of truth', () => {
+	it('always provisions a data repository — it is the source of truth (every kind except "app")', () => {
 		for (const kind of WORK_KINDS) {
+			// `app` is the deliberate exception (FR-2): its Work Repository is
+			// the app code itself, and it never provisions the `data` role.
+			// Asserted positively in its own test below.
+			if (kind === 'app') {
+				continue;
+			}
 			expect(WORK_KIND_CAPABILITIES[kind].repos.data).toBe(true);
 		}
 	});
@@ -112,17 +136,18 @@ describe('WORK_KIND_CAPABILITIES', () => {
 		}
 	});
 
-	it('keeps "repo" the only user-selectable kind without a website repository', () => {
-		const withoutWebsite = USER_SELECTABLE_WORK_KINDS.filter((kind) => !WORK_KIND_CAPABILITIES[kind].repos.website);
-		expect(withoutWebsite).toEqual(['repo']);
+	it('only "repo" and "app" lack a website repository the platform generates', () => {
+		const withoutWebsite = USER_SELECTABLE_WORK_KINDS.filter((kind) => !generatesWebsite(kind));
+		expect(withoutWebsite).toEqual(['repo', 'app']);
 	});
 
-	it('never deploys a kind that has no website repository to deploy', () => {
+	it('a kind without a website repository to generate deploys only when it is "app"', () => {
 		for (const kind of WORK_KINDS) {
-			const caps = WORK_KIND_CAPABILITIES[kind];
-			if (!caps.repos.website) {
-				expect(caps.deploy, `kind "${kind}" deploys without a website repo`).toBe(false);
+			if (generatesWebsite(kind)) {
+				continue;
 			}
+			const caps = WORK_KIND_CAPABILITIES[kind];
+			expect(caps.deploy, `kind "${kind}" deploys without a website repo`).toBe(kind === 'app');
 		}
 	});
 });
@@ -247,5 +272,104 @@ describe('the repo work kind', () => {
 		expect(isRepositoryWorkKind(null)).toBe(false);
 		expect(isRepositoryWorkKind('')).toBe(false);
 		expect(isRepositoryWorkKind('repository')).toBe(false);
+	});
+});
+
+/**
+ * The App kind (APW-01, README D1) — a Work whose Work Repository is an
+ * existing GitHub repository the member linked, forked or copied, and which
+ * the platform builds, runs and evolves.
+ */
+describe('the app work kind', () => {
+	it('is a known, user-selectable kind that no longer degrades to "default"', () => {
+		expect(normalizeWorkKind('app')).toBe('app');
+		expect(normalizeWorkKind('APP ')).toBe('app');
+		expect(isUserSelectableWorkKind('app')).toBe(true);
+		expect(USER_SELECTABLE_WORK_KINDS as readonly string[]).toContain('app');
+		expect(WORK_KINDS as readonly string[]).toContain('app');
+	});
+
+	it('does not collide with the repo kind', () => {
+		expect(normalizeWorkKind('repo')).toBe('repo');
+		expect(WORK_KIND_CAPABILITIES.app).not.toEqual(WORK_KIND_CAPABILITIES.repo);
+	});
+
+	it('has deploy, the knowledge base, builds and the App environment on', () => {
+		const caps = WORK_KIND_CAPABILITIES.app;
+		expect(caps.deploy).toBe(true);
+		expect(caps.kb).toBe(true);
+		expect(caps.builds).toBe(true);
+		expect(caps.appEnvironment).toBe(true);
+	});
+
+	it('has nothing item-shaped on — the app code is not generated content', () => {
+		const caps = WORK_KIND_CAPABILITIES.app;
+		expect(caps.items.enabled).toBe(false);
+		expect(caps.taxonomy).toBe(false);
+		expect(caps.comparisons).toBe(false);
+		expect(caps.communityPr).toBe(false);
+		expect(caps.itemImportExport).toBe(false);
+		expect(caps.sourceValidation).toBe(false);
+	});
+
+	it('provisions exactly one repository role — the Work Repository (persisted `website`)', () => {
+		// FR-2: the app-code fork IS the Work Repository, and the `data` role
+		// (which holds a Work's data) is never provisioned for this kind.
+		expect(WORK_KIND_CAPABILITIES.app.repos).toEqual({ data: false, work: false, website: true });
+	});
+
+	it('maps to metrics that describe the app being run', () => {
+		expect(WORK_KIND_CAPABILITIES.app.metrics).toEqual(['agents', 'open-tasks', 'deploy-status', 'days-active']);
+	});
+
+	it('resolves through getWorkCapabilities like every other kind', () => {
+		expect(getWorkCapabilities('app')).toBe(WORK_KIND_CAPABILITIES.app);
+		expect(getWorkCapabilities('APP ')).toBe(WORK_KIND_CAPABILITIES.app);
+	});
+
+	it('isAppWorkKind recognises only the app kind, with the same loose input as normalizeWorkKind', () => {
+		expect(isAppWorkKind('app')).toBe(true);
+		expect(isAppWorkKind('  APP ')).toBe(true);
+		// The kinds that merely contain the word must not match.
+		expect(isAppWorkKind('application')).toBe(false);
+		expect(isAppWorkKind('repo')).toBe(false);
+		expect(isAppWorkKind('awesome-repo')).toBe(false);
+		for (const kind of WORK_KINDS.filter((k) => k !== 'app')) {
+			expect(isAppWorkKind(kind), `kind "${kind}"`).toBe(false);
+		}
+		expect(isAppWorkKind(undefined)).toBe(false);
+		expect(isAppWorkKind(null)).toBe(false);
+		expect(isAppWorkKind('')).toBe(false);
+	});
+});
+
+/**
+ * The two capability flags Resolution R-7 adds: `builds` (APW-05's Builds
+ * surface) and `appEnvironment` (APW-07's App env / dependencies surfaces).
+ * Both exist so those epics read the registry instead of testing
+ * `kind === 'app'` inline, and both are on for `app` ONLY.
+ */
+describe('the builds and appEnvironment capability flags (R-7)', () => {
+	it.each(WORK_KINDS.filter((kind) => kind !== 'app'))('keeps both flags off for the %s kind', (kind) => {
+		const caps = WORK_KIND_CAPABILITIES[kind];
+		expect(caps.builds, `kind "${kind}" claims a Builds surface`).toBe(false);
+		expect(caps.appEnvironment, `kind "${kind}" claims an App environment`).toBe(false);
+	});
+
+	it('turns both flags on for "app", and for no other kind', () => {
+		expect(WORK_KIND_CAPABILITIES.app.builds).toBe(true);
+		expect(WORK_KIND_CAPABILITIES.app.appEnvironment).toBe(true);
+
+		const withBuilds = WORK_KINDS.filter((kind) => WORK_KIND_CAPABILITIES[kind].builds);
+		const withAppEnvironment = WORK_KINDS.filter((kind) => WORK_KIND_CAPABILITIES[kind].appEnvironment);
+		expect(withBuilds).toEqual(['app']);
+		expect(withAppEnvironment).toEqual(['app']);
+	});
+
+	it('keeps both flags off for an unknown kind that falls back to the default set', () => {
+		expect(getWorkCapabilities('storefront').builds).toBe(false);
+		expect(getWorkCapabilities('storefront').appEnvironment).toBe(false);
+		expect(getWorkCapabilities(undefined).builds).toBe(false);
+		expect(getWorkCapabilities(null).appEnvironment).toBe(false);
 	});
 });
