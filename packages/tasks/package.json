@@ -23,6 +23,7 @@
         "dev:trigger": "trigger dev",
         "predeploy:trigger": "pnpm prepare:plugins",
         "deploy:trigger": "trigger deploy",
+        "app-runtime:local-worker": "node dist/tasks/trigger/app-runtime-local-worker.js",
         "test": "vitest run --passWithNoTests",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage"

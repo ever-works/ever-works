@@ -20,6 +20,8 @@ import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
 import {
     WorkRepository,
+    WorkDeploymentRepository,
+    WorkCustomDomainRepository,
     AuthAccountRepository,
     OrganizationRepository,
     TemplateRepository,
@@ -31,7 +33,7 @@ import {
     WorkUpstreamStateRepository,
 } from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
-import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
+import { CACHE_MANAGER, Cache, DistributedTaskLockService } from '@ever-works/agent/cache';
 import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import { WorkContextResponse } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -471,6 +473,25 @@ export class TriggerInternalController implements OnModuleInit {
         // above, exactly as its siblings are.
         @Optional()
         private readonly appSpecService?: AppSpecService,
+        // APW-06 T71 — the three names the isolated App runtime worker
+        // (`packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts`) proxies, because
+        // it owns no `DataSource`. All three are appended LAST + `@Optional()` per the arity rule
+        // above, so every positional `new TriggerInternalController(...)` in the specs keeps
+        // compiling:
+        //   - `WorkDeploymentRepository` — T32's `app-deploy` `onFailure` marks the row
+        //     `ERROR (worker_failed)` through it;
+        //   - `WorkCustomDomainRepository` — `DeployFacadeService`, which the worker constructs
+        //     locally (§6.4:979), takes it NON-optionally;
+        //   - `DistributedTaskLockService` — `app-health-poll`'s guard (§9.2:1248). It injects
+        //     `@InjectRepository(CacheEntry)` non-optionally, so it can only be a proxy in the
+        //     worker; `TriggerInternalModule` provides it and registers `CacheEntry` for it, the
+        //     wiring `DataSyncModule`'s docstring documents as the canonical pattern.
+        @Optional()
+        private readonly workDeploymentRepository?: WorkDeploymentRepository,
+        @Optional()
+        private readonly workCustomDomainRepository?: WorkCustomDomainRepository,
+        @Optional()
+        private readonly distributedTaskLockService?: DistributedTaskLockService,
     ) {}
 
     onModuleInit() {
@@ -618,6 +639,13 @@ export class TriggerInternalController implements OnModuleInit {
             // trio above is: a name that maps to nothing answers a loud
             // "Unknown remote target" instead of pretending.
             AppSpecService: this.appSpecService,
+            // APW-06 T71 — the three names the isolated App runtime worker proxies. Registered
+            // unconditionally, exactly as the App entries above are: a name that maps to `undefined`
+            // answers a loud "Unknown remote target" rather than pretending, which is what an
+            // operator needs when a provider is missing from the module graph.
+            WorkDeploymentRepository: this.workDeploymentRepository,
+            WorkCustomDomainRepository: this.workCustomDomainRepository,
+            DistributedTaskLockService: this.distributedTaskLockService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

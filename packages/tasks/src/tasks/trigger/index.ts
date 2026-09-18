@@ -80,3 +80,20 @@ export * from './app-dependency-provision.task';
 // `AppSpecService` through the internal RPC channel, because FR-90 puts the
 // evaluation, its writes and its `app.spec.applied` event in the API process.
 export * from './app-spec-evaluate.task';
+// APW-06 T32 — the four App cluster tasks, all on APW-06's isolated
+// `app-cluster-io` queue (plan §6.2:942, §9.2:1245-1251). Every one of them
+// boots `TriggerAppRuntimeModule` (T71), which is what arms T20's
+// worker-context flag — the only thing that lets an App cluster call happen
+// anywhere. `app-deploy` runs a Deployment through T25's orchestrator;
+// `app-smoke` and `app-cluster-op` delegate to T70's service and router (both
+// still owed) and refuse by name meanwhile; `app-health-poll` is the
+// every-minute tick, guarded by `DistributedTaskLockService` and owed T27's
+// health service.
+export * from './app-deploy.task';
+export * from './app-smoke.task';
+export * from './app-cluster-op.task';
+export * from './app-health-poll.task';
+// APW-06 T32 — the `app-runtime:local-worker` entry point (plan §9.2:1267-1270).
+// NOT a Trigger task: it is a plain node process the dev machine and the e2e lane
+// start, and it drains the same exported run functions above from a local queue.
+export * from './app-runtime-local-worker';

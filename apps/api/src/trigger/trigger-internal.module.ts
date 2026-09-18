@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { CacheEntry } from '@ever-works/agent/entities';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { KnowledgeBaseModule, MemoryFactsModule, WorkModule } from '@ever-works/agent/services';
@@ -144,7 +147,15 @@ import { AppSpecModule } from '@ever-works/agent/app-spec';
         // App-spec state row, the git facade and the Activity log are wired
         // (APW-02 T28 wired this entry at the packaging owner's request).
         AppSpecModule,
+        // APW-06 T71 — `DistributedTaskLockService` is provided by THIS module (below) for the
+        // controller's remote target of the same name, and it needs its repository: `forFeature`
+        // here is the wiring `apps/api/src/data-sync/data-sync.module.ts` documents as the
+        // canonical pattern. Without it the service fails to instantiate, which is the
+        // `DatabaseModule`-encapsulation trap this branch hit once already
+        // (`packages/agent/src/database/__tests__/database-module-encapsulation.spec.ts`).
+        TypeOrmModule.forFeature([CacheEntry]),
     ],
     controllers: [TriggerInternalController],
+    providers: [DistributedTaskLockService],
 })
 export class TriggerInternalModule {}

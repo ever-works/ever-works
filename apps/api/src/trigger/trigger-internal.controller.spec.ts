@@ -9,6 +9,10 @@ jest.mock('@ever-works/agent/database', () => ({
     AgentRepository: class AgentRepository {},
     AgentRunRepository: class AgentRunRepository {},
     WorkUpstreamStateRepository: class WorkUpstreamStateRepository {},
+    // APW-06 T71 — the two repositories the isolated App runtime worker proxies because it owns no
+    // DataSource. Injection tokens here; the behaviour behind them lives in the agent package.
+    WorkDeploymentRepository: class WorkDeploymentRepository {},
+    WorkCustomDomainRepository: class WorkCustomDomainRepository {},
 }));
 // APW-02 T28 — the controller imports the App upstream trio from the app-works
 // barrel. Loading the real barrel pulls the whole epic's service graph (entities
@@ -58,6 +62,9 @@ jest.mock('@ever-works/agent/conversations', () => ({
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
     CACHE_MANAGER: 'CACHE_MANAGER',
+    // APW-06 T71 — `app-health-poll`'s distributed guard, proxied by the worker
+    // (`app-health-poll.task.ts`). A token here; the lock semantics live in the agent package.
+    DistributedTaskLockService: class DistributedTaskLockService {},
 }));
 jest.mock('@ever-works/agent/work-operations', () => ({
     WorkOperationsService: class WorkOperationsService {},
@@ -186,6 +193,10 @@ describe('TriggerInternalController', () => {
     let workUpstreamStateRepository: any;
     // APW-03 T12/T13 — the App spec service the worker's `app.spec.*` calls reach.
     let appSpecService: any;
+    // APW-06 T71 — the three names the isolated App runtime worker proxies.
+    let workDeploymentRepository: any;
+    let workCustomDomainRepository: any;
+    let distributedTaskLockService: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -278,6 +289,11 @@ describe('TriggerInternalController', () => {
             workUpstreamStateRepository,
             // APW-03 T12/T13 — the App spec service (wired by APW-02 T28).
             appSpecService,
+            // APW-06 T71 — the three names the isolated App runtime worker proxies, appended
+            // LAST + `@Optional()` per the arity rule above.
+            workDeploymentRepository,
+            workCustomDomainRepository,
+            distributedTaskLockService,
         );
         c.onModuleInit();
         return c;
@@ -327,6 +343,26 @@ describe('TriggerInternalController', () => {
         appSpecService = {
             name: 'AppSpecService',
             getEffectiveSpec: jest.fn((workId: string) => ({ workId, status: 'valid' })),
+        };
+        // APW-06 T71 — each double carries ONE real method, for the same reason the APW-02 trio's
+        // do: "registered in the map" is only half the claim, the RPC hop must reach the method.
+        workDeploymentRepository = {
+            name: 'WorkDeploymentRepository',
+            markTerminal: jest.fn((id: string, state: string, fields?: unknown) => ({
+                id,
+                state,
+                fields,
+            })),
+        };
+        workCustomDomainRepository = {
+            name: 'WorkCustomDomainRepository',
+            // The real method (`work-custom-domain.repository.ts:210`), not a plausible-looking
+            // name: this double stands in for the API's own repository over the RPC hop.
+            findByWork: jest.fn((workId: string) => [{ workId, domain: 'app.example.test' }]),
+        };
+        distributedTaskLockService = {
+            name: 'DistributedTaskLockService',
+            isLocked: jest.fn((key: string) => key === 'app-health-poll'),
         };
 
         controller = buildController();
@@ -668,6 +704,105 @@ describe('TriggerInternalController', () => {
                 workId: 'work-1',
                 status: 'valid',
             });
+        });
+    });
+
+    // -------------------------------------------------------------------
+    // APW-06 T71 — the isolated App runtime worker's remote names
+    // -------------------------------------------------------------------
+
+    /**
+     * `packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts` proxies exactly
+     * these three names because it owns no `DataSource`. A name the controller does not carry
+     * answers `Unknown remote target: <name>` — in production, on the run that needed it — so the
+     * registration is pinned here rather than trusted, the same reason the APW-02 trio is.
+     */
+    describe('the APW-06 T71 App runtime remote targets', () => {
+        const T71_TARGETS = [
+            'WorkDeploymentRepository',
+            'WorkCustomDomainRepository',
+            'DistributedTaskLockService',
+        ];
+
+        it('registers all three in remoteMap', () => {
+            const map = (controller as any).remoteMap;
+
+            expect(map.WorkDeploymentRepository).toBe(workDeploymentRepository);
+            expect(map.WorkCustomDomainRepository).toBe(workCustomDomainRepository);
+            expect(map.DistributedTaskLockService).toBe(distributedTaskLockService);
+        });
+
+        it('derives a callable allow-list for each (an unknown method is named)', async () => {
+            for (const name of T71_TARGETS) {
+                await expect(
+                    controller.callRemote(VALID_SECRET, {
+                        name,
+                        method: 'doesNotExist',
+                        args: superjson.serialize([]) as any,
+                    }),
+                ).rejects.toThrow(`Method not in allow-list for ${name}: doesNotExist`);
+            }
+        });
+
+        it('reaches markTerminal on the deployment repository over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'WorkDeploymentRepository',
+                method: 'markTerminal',
+                args: superjson.serialize([
+                    'deployment-1',
+                    'ERROR',
+                    { lastError: 'worker_failed: boom' },
+                ]) as any,
+            });
+
+            expect(workDeploymentRepository.markTerminal).toHaveBeenCalledWith(
+                'deployment-1',
+                'ERROR',
+                { lastError: 'worker_failed: boom' },
+            );
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                id: 'deployment-1',
+                state: 'ERROR',
+                fields: { lastError: 'worker_failed: boom' },
+            });
+        });
+
+        it('reaches isLocked on the distributed lock service over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'DistributedTaskLockService',
+                method: 'isLocked',
+                args: superjson.serialize(['app-health-poll']) as any,
+            });
+
+            expect(distributedTaskLockService.isLocked).toHaveBeenCalledWith('app-health-poll');
+            expect(superjson.deserialize(response.result as any)).toBe(true);
+        });
+
+        /**
+         * The arity rule, asserted structurally instead of described in a comment.
+         *
+         * Nest records `@Optional()` as the **indices** it decorates — `OPTIONAL_DEPS_METADATA`,
+         * whose value in `@nestjs/common` is the literal `'optional:paramtypes'` (the plain
+         * `'optional'` spelling reads as `[]`, which is how this assertion was verified to be
+         * live rather than vacuous). This is the decorator's own metadata, not a restatement of
+         * it. The three indices must be the LAST three constructor parameters: that is what keeps
+         * every positional `new TriggerInternalController(...)` in this file (and any other
+         * caller) compiling.
+         */
+        it('appends the three dependencies LAST and as @Optional()', () => {
+            const paramTypes: unknown[] =
+                Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
+            const optionalIndices: number[] =
+                Reflect.getMetadata('optional:paramtypes', TriggerInternalController) ?? [];
+
+            const last = paramTypes.length - 1;
+
+            expect(paramTypes.length).toBeGreaterThan(3);
+            for (const index of [last - 2, last - 1, last]) {
+                expect(optionalIndices).toContain(index);
+            }
+            // And nothing after them: the three are the tail, so a mid-list insertion cannot pass.
+            expect(Math.max(...optionalIndices)).toBe(last);
         });
     });
 });
