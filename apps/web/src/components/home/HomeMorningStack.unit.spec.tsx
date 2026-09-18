@@ -258,7 +258,9 @@ describe('HomeMorningStack', () => {
         );
         expect(screen.getByTestId('home-glance-failedToday')).toHaveAttribute(
             'href',
-            '/runs?g=day&status=failed',
+            // The Runs ledger is the Activity page's `Runs` view now, so the
+            // counter links straight there instead of via the retired /runs.
+            '/activity?view=runs&g=day&status=failed',
         );
         expect(screen.getByTestId('home-glance-doneToday')).toHaveAttribute('data-tone', 'neutral');
     });

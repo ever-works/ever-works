@@ -142,7 +142,7 @@ describe('feed filters', () => {
 
 describe('feed destinations', () => {
     it('maps each target type onto the product route', () => {
-        expect(feedTargetHref({ type: 'run', id: 'r1' })).toBe('/agents/sessions/r1');
+        expect(feedTargetHref({ type: 'run', id: 'r1' })).toBe('/agents/activity/r1');
         expect(feedTargetHref({ type: 'task', id: 't1' })).toBe('/tasks/t1');
         expect(feedTargetHref({ type: 'mission', id: 'm1' })).toBe('/missions/m1');
         expect(feedTargetHref({ type: 'idea', id: 'i1' })).toBe('/ideas/i1');

@@ -577,7 +577,7 @@ test.describe('Skill marketplace / share / visibility', () => {
         });
         expect(skill.sourceCatalogSlug).toBeNull();
 
-        await page.goto('/agents#skills', { waitUntil: 'domcontentloaded' });
+        await page.goto('/agents/skills', { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle');
         await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
 

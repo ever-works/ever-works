@@ -715,7 +715,7 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
         });
 
         const origin = baseURL ?? 'http://localhost:3000';
-        await page.goto(`${origin}/agents#skills`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${origin}/agents/skills`, { waitUntil: 'domcontentloaded' });
         await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
 
         // Title may render in the Installed grid. Tolerate ordering / dev hydration.

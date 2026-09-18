@@ -18,32 +18,52 @@ import {
     hasFeedFilterParams,
     parseFeedFilters,
 } from '@/components/feed/feed-filters';
-import type { FeedActorSummaryDto, FeedPageDto } from '@ever-works/contracts';
+import type {
+    FeedActorSummaryDto,
+    FeedPageDto,
+    RunLedgerPage,
+    RunWindowStats,
+} from '@ever-works/contracts';
+import { RunsClient } from '@/components/runs/RunsClient';
+import { RunsShortcutSheet, type ShortcutRow } from '@/components/runs/RunsShortcutSheet';
+import { buildRunsSearch, isTypingTarget, type RunsViewState } from '@/components/runs/runs.shared';
+import type { RunsAgentOption } from '@/components/runs/RunsFilters';
 import { toast } from 'sonner';
 import {
     Activity as ActivityIcon,
     ArrowUpRight,
     Download,
+    Keyboard,
     Loader2,
     List,
     CalendarClock,
     Radio,
+    Receipt,
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-
-// `feed` is the Live Feed: the narrated, filterable view of the same
-// activity records the Log lists. Log stays the default.
-type ActivityTab = 'log' | 'schedules' | 'feed';
-
-function isActivityTab(value: string | null): value is ActivityTab {
-    return value === 'log' || value === 'schedules' || value === 'feed';
-}
+import {
+    ACTIVITY_VIEW_KEYS,
+    ACTIVITY_VIEW_PARAM,
+    isActivityView,
+    type ActivityView,
+} from './activity-views';
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
 const KANBAN_LIMIT = 500;
+
+/** The server-rendered payload of the Runs view (AW-09), or its empty frame. */
+export interface ActivityRunsPayload {
+    view: RunsViewState;
+    /** Only the server can tell these apart — see `activity/page.tsx`. */
+    granularityFromUrl: boolean;
+    timeZone: string;
+    page: RunLedgerPage | null;
+    stats: RunWindowStats | null;
+    agents: RunsAgentOption[];
+}
 
 interface ActivityClientProps {
     initialActivities: ActivityLogEntry[];
@@ -51,16 +71,37 @@ interface ActivityClientProps {
     /** Server-rendered Live Feed first page, when the page was opened on `?view=feed`. */
     initialFeedPage?: FeedPageDto | null;
     initialFeedActors?: FeedActorSummaryDto[] | null;
+    /** Server-rendered Runs window, when the page was opened on `?view=runs`. */
+    runs: ActivityRunsPayload;
 }
 
+/**
+ * Activity — ONE page for "what happened in my workspace", across four views:
+ * the operation Log, the Runs ledger, the Live Feed and Schedules.
+ *
+ * This component is the page's single writer of the URL: every view's own
+ * state (the Log's filters and page, the feed's agent/kind filters, the
+ * ledger's window and filters) is mirrored into `?view=` plus that view's own
+ * parameters, and ONLY the active view's parameters are written — so a `status`
+ * that means "the run outcome" on one view can never be read back as "the
+ * operation status" on another.
+ *
+ * It also owns the page's keyboard layer and its ONE shortcut sheet. The
+ * ledger keeps its own view keys (they only make sense there) and hands its
+ * `?`/`/` keys up to this component, so the sheet documents every key the page
+ * answers to instead of only the ledger's.
+ */
 export function ActivityClient({
     initialActivities,
     totalActivities,
     initialFeedPage = null,
     initialFeedActors = null,
+    runs,
 }: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
     const tSchedules = useTranslations('dashboard.schedules');
+    const tRuns = useTranslations('dashboard.runsPage');
+    const tFeed = useTranslations('dashboard.feed');
     const searchParams = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
@@ -103,18 +144,27 @@ export function ActivityClient({
         localStorage.setItem('activity-view-mode', mode);
     };
 
-    // Log | Schedules segmented view. localStorage is the primary
-    // persistence; the `?view=schedules` query param enables shareable
-    // links and is kept in sync by the URL-sync effect below.
+    // Which view. localStorage is the primary persistence; the `?view=` query
+    // param enables shareable links and is kept in sync by the URL-sync effect
+    // below.
     //
-    // Initialise to a deterministic default (the URL ?view= param, else
-    // 'log') so server and first client render agree — the persisted
-    // localStorage value is restored in the mount effect below to avoid
-    // a hydration mismatch.
-    const [activeTab, setActiveTab] = useState<ActivityTab>(() => {
-        const fromUrl = searchParams.get('view');
-        return isActivityTab(fromUrl) ? fromUrl : 'log';
+    // Initialise to a deterministic default (the URL ?view= param, else 'log')
+    // so server and first client render agree — the persisted localStorage
+    // value is restored in the mount effect below to avoid a hydration
+    // mismatch.
+    const [activeView, setActiveView] = useState<ActivityView>(() => {
+        const fromUrl = searchParams.get(ACTIVITY_VIEW_PARAM);
+        return isActivityView(fromUrl) ? fromUrl : 'log';
     });
+
+    // The Runs ledger owns its window, filters and open receipt; it reports
+    // every change here so this component stays the single URL writer. Seeded
+    // from the URL the parser ran on the server, so a shared link paints the
+    // exact window it names.
+    const [runsView, setRunsView] = useState<RunsViewState>(runs.view);
+    const runsSearchRef = useRef<HTMLInputElement>(null);
+    const logSearchRef = useRef<HTMLInputElement>(null);
+    const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
     // The Live Feed owns its own filters and reports them here, so this
     // component stays the single writer of the page URL.
@@ -122,52 +172,92 @@ export function ActivityClient({
         hasFeedFilterParams(searchParams) ? feedFiltersToQuery(parseFeedFilters(searchParams)) : '',
     );
 
-    // Restore the persisted tab after mount (localStorage is unavailable
+    // Restore the persisted view after mount (localStorage is unavailable
     // during SSR). The URL ?view= param always wins when present.
     useEffect(() => {
-        const fromUrl = searchParams.get('view');
-        if (isActivityTab(fromUrl)) return;
+        const fromUrl = searchParams.get(ACTIVITY_VIEW_PARAM);
+        if (isActivityView(fromUrl)) return;
         const stored = localStorage.getItem('activity-tab');
-        if (isActivityTab(stored)) {
-            setActiveTab(stored);
+        if (isActivityView(stored)) {
+            setActiveView(stored);
         }
         // Mount-only restore; intentionally not reactive to searchParams.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleTabChange = (tab: ActivityTab) => {
-        setActiveTab(tab);
+    const handleViewChange = useCallback((next: ActivityView) => {
+        setActiveView(next);
         if (typeof window !== 'undefined') {
-            localStorage.setItem('activity-tab', tab);
+            localStorage.setItem('activity-tab', next);
         }
-    };
+    }, []);
 
-    const isLogTab = activeTab === 'log';
-    const isSchedulesTab = activeTab === 'schedules';
-    const isFeedTab = activeTab === 'feed';
+    const isLogTab = activeView === 'log';
+    const isRunsTab = activeView === 'runs';
+    const isSchedulesTab = activeView === 'schedules';
+    const isFeedTab = activeView === 'feed';
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
-    // Sync filters → URL query params
+    // Sync the ACTIVE view's state → URL query params. The parameters are
+    // rebuilt from scratch on every run, which is what keeps the four views'
+    // vocabularies apart: leaving the Runs view drops `g`/`d`/`agent`/…, so
+    // coming back to the Log can never read a run outcome as an operation
+    // status.
     useEffect(() => {
         if (!hasMountedRef.current) {
             hasMountedRef.current = true;
             return;
         }
         const params = new URLSearchParams();
-        if (activeTab === 'schedules') params.set('view', 'schedules');
-        if (activeTab === 'feed') {
-            params.set('view', 'feed');
+        if (activeView === 'runs') {
+            params.set(ACTIVITY_VIEW_PARAM, 'runs');
+            // The ledger's own view state, as `buildRunsSearch` writes it for
+            // the standalone page — the same URLs, one path prefix different.
+            for (const [key, value] of new URLSearchParams(buildRunsSearch(runsView))) {
+                params.set(key, value);
+            }
+        } else if (activeView === 'feed') {
+            params.set(ACTIVITY_VIEW_PARAM, 'feed');
             for (const [key, value] of new URLSearchParams(feedQuery)) {
                 params.set(key, value);
             }
+        } else if (activeView === 'schedules') {
+            params.set(ACTIVITY_VIEW_PARAM, 'schedules');
+        } else {
+            if (actionType) params.set('actionType', actionType);
+            if (status) params.set('status', status);
+            if (debouncedSearch) params.set('search', debouncedSearch);
+            if (page > 1) params.set('page', String(page));
         }
-        if (actionType) params.set('actionType', actionType);
-        if (status) params.set('status', status);
-        if (debouncedSearch) params.set('search', debouncedSearch);
-        if (page > 1) params.set('page', String(page));
         const query = params.toString();
+
+        // The ledger writes its window into the address bar on every arrow key
+        // and every granularity change. A `router.replace` there would ask the
+        // App Router for a server render of this page that nothing uses (the
+        // ledger's actions refetch the window themselves) and the address bar
+        // would trail the keystroke — the same reason the standalone page used
+        // a same-document write. `location.pathname` is the address bar's own
+        // path, so an `/org/<slug>` prefix is kept.
+        if (activeView === 'runs') {
+            window.history.replaceState(
+                null,
+                '',
+                `${window.location.pathname}${query ? `?${query}` : ''}`,
+            );
+            return;
+        }
         router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-    }, [activeTab, feedQuery, actionType, status, debouncedSearch, page, pathname, router]);
+    }, [
+        activeView,
+        runsView,
+        feedQuery,
+        actionType,
+        status,
+        debouncedSearch,
+        page,
+        pathname,
+        router,
+    ]);
 
     // Debounce search
     useEffect(() => {
@@ -271,7 +361,7 @@ export function ActivityClient({
         setPage(1);
     }, [actionType, status, debouncedSearch]);
 
-    // Fetch for the current page + filters (Log tab only)
+    // Fetch for the current page + filters (Log view only)
     useEffect(() => {
         if (!isLogTab) return;
         void fetchActivities(
@@ -297,8 +387,8 @@ export function ActivityClient({
         }
     }, [isLogTab, viewMode, actionType, status, debouncedSearch, fetchKanbanActivities]);
 
-    // Polling — silent refresh, paused when tab is hidden or when the
-    // Schedules view is active (there are no live activity rows to poll).
+    // Polling — silent refresh, paused when tab is hidden or when a view with
+    // no live log rows is active.
     useEffect(() => {
         if (!isLogTab) return;
         let interval: ReturnType<typeof setInterval>;
@@ -346,6 +436,48 @@ export function ActivityClient({
             document.removeEventListener('visibilitychange', handleVisibility);
         };
     }, [isLogTab, fetchActivities, fetchSummary, page, actionType, status, debouncedSearch]);
+
+    // ── Keyboard layer ────────────────────────────────────────────────
+    // The page's own keys: switch view, focus the visible search box, open the
+    // sheet. The ledger answers `←/→ d w m t j k Enter Esc` itself while it is
+    // the visible view; the Live Feed answers its own keys the same way. Every
+    // key listed in the sheet has an on-screen control.
+    const focusActiveSearch = useCallback(() => {
+        if (activeView === 'runs') {
+            runsSearchRef.current?.focus();
+            return;
+        }
+        if (activeView === 'log') {
+            logSearchRef.current?.focus();
+        }
+        // The Live Feed's only search box lives inside its agent picker dialog,
+        // which the feed itself opens with `a`; Schedules has none.
+    }, [activeView]);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+            if (isTypingTarget(event.target)) return;
+            if (shortcutsOpen) return;
+            if (event.key === '?') {
+                setShortcutsOpen(true);
+                event.preventDefault();
+                return;
+            }
+            if (event.key === '/') {
+                focusActiveSearch();
+                event.preventDefault();
+                return;
+            }
+            const next = ACTIVITY_VIEW_KEYS[event.key];
+            if (next) {
+                handleViewChange(next);
+                event.preventDefault();
+            }
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [focusActiveSearch, handleViewChange, shortcutsOpen]);
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage);
@@ -440,6 +572,26 @@ export function ActivityClient({
         },
     } as const;
 
+    // ── The one shortcut sheet ────────────────────────────────────────
+    // The ledger supplies its own rows (it owns those keys); the page adds the
+    // keys only IT answers to — switching view — and the Live Feed's, which had
+    // never been written down anywhere. Labels come from the namespace that
+    // owns the feature, so nothing is duplicated and nothing drifts.
+    const extraShortcutRows: ShortcutRow[] = [
+        { keys: ['l', 'r', 'f', 's'], label: t('shortcuts.switchView') },
+        { keys: ['a'], label: tFeed('filters.agentsGroup') },
+        { keys: ['x'], label: tFeed('filters.onlyFailed') },
+        { keys: ['1', '…', '5'], label: tFeed('filters.kindsGroup') },
+        { keys: ['Shift', 'L'], label: tFeed('loadOlder') },
+    ];
+
+    const viewTabs = [
+        { key: 'log' as const, icon: List, label: t('viewToggle.log') },
+        { key: 'runs' as const, icon: Receipt, label: t('viewToggle.runs') },
+        { key: 'feed' as const, icon: Radio, label: t('viewToggle.feed') },
+        { key: 'schedules' as const, icon: CalendarClock, label: t('viewToggle.schedules') },
+    ];
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -453,51 +605,27 @@ export function ActivityClient({
                             data-testid="activity-view-toggle"
                             className="flex items-center gap-0.5 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-0.5"
                         >
-                            <button
-                                onClick={() => handleTabChange('log')}
-                                aria-pressed={isLogTab}
-                                aria-label={t('viewToggle.log')}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
-                                    isLogTab
-                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
-                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
-                                }`}
-                            >
-                                <List className="w-3.5 h-3.5" />
-                                <span className="hidden @xs/main:inline">
-                                    {t('viewToggle.log')}
-                                </span>
-                            </button>
-                            <button
-                                onClick={() => handleTabChange('feed')}
-                                aria-pressed={isFeedTab}
-                                aria-label={t('viewToggle.feed')}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
-                                    isFeedTab
-                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
-                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
-                                }`}
-                            >
-                                <Radio className="w-3.5 h-3.5" />
-                                <span className="hidden @xs/main:inline">
-                                    {t('viewToggle.feed')}
-                                </span>
-                            </button>
-                            <button
-                                onClick={() => handleTabChange('schedules')}
-                                aria-pressed={isSchedulesTab}
-                                aria-label={t('viewToggle.schedules')}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
-                                    isSchedulesTab
-                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
-                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
-                                }`}
-                            >
-                                <CalendarClock className="w-3.5 h-3.5" />
-                                <span className="hidden @xs/main:inline">
-                                    {t('viewToggle.schedules')}
-                                </span>
-                            </button>
+                            {viewTabs.map((tab) => {
+                                const Icon = tab.icon;
+                                const active = activeView === tab.key;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => handleViewChange(tab.key)}
+                                        aria-pressed={active}
+                                        aria-label={tab.label}
+                                        data-testid={`activity-view-${tab.key}`}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                                            active
+                                                ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                                : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
+                                        }`}
+                                    >
+                                        <Icon className="w-3.5 h-3.5" />
+                                        <span className="hidden @xs/main:inline">{tab.label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                         {isLogTab && (
                             <>
@@ -516,6 +644,17 @@ export function ActivityClient({
                                 </button>
                             </>
                         )}
+                        {/* The ledger's keyboard button, promoted to the page:
+                            it now opens the sheet for EVERY view hosted here. */}
+                        <button
+                            type="button"
+                            onClick={() => setShortcutsOpen(true)}
+                            aria-label={tRuns('shortcuts.button')}
+                            data-testid="activity-shortcuts-button"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                        >
+                            <Keyboard className="w-4 h-4" aria-hidden />
+                        </button>
                     </>
                 }
             />
@@ -545,8 +684,38 @@ export function ActivityClient({
                     initialPage={initialFeedPage}
                     initialActors={initialFeedActors}
                     onFiltersChange={setFeedQuery}
-                    onOpenActivityLog={() => handleTabChange('log')}
+                    onOpenActivityLog={() => handleViewChange('log')}
                 />
+            )}
+
+            {isRunsTab && (
+                <>
+                    {/* Runs ledger (AW-09) — the executions behind the log, which
+                        is the same data the Agents hub's Activity tab lists as
+                        Sessions. Kept a cross-link rather than a duplicate. */}
+                    <div className="flex justify-end">
+                        <Link
+                            href={ROUTES.DASHBOARD_AGENTS_ACTIVITY}
+                            className="text-xs text-primary hover:underline"
+                            data-testid="runs-open-sessions"
+                        >
+                            {tRuns('openSessions')}
+                        </Link>
+                    </div>
+                    <RunsClient
+                        initialView={runsView}
+                        granularityFromUrl={runs.granularityFromUrl}
+                        timeZone={runs.timeZone}
+                        initialPage={runs.page}
+                        initialStats={runs.stats}
+                        agents={runs.agents}
+                        syncUrl={false}
+                        onViewChange={setRunsView}
+                        searchRef={runsSearchRef}
+                        showShortcutSheet={false}
+                        onShowShortcuts={() => setShortcutsOpen(true)}
+                    />
+                </>
             )}
 
             {isLogTab && (
@@ -600,6 +769,7 @@ export function ActivityClient({
                         onStatusChange={setStatus}
                         search={search}
                         onSearchChange={setSearch}
+                        searchInputRef={logSearchRef}
                         loading={loading}
                         hasActiveFilters={hasActiveFilters}
                         onClearFilters={handleClearFilters}
@@ -668,6 +838,12 @@ export function ActivityClient({
                     )}
                 </>
             )}
+
+            <RunsShortcutSheet
+                open={shortcutsOpen}
+                onClose={() => setShortcutsOpen(false)}
+                extraRows={extraShortcutRows}
+            />
         </div>
     );
 }
