@@ -1,4 +1,12 @@
 export * from './git-provider.interface.js';
+// App Works fork lifecycle (APW-02 T9/T10) — the types the seven optional
+// fork-lifecycle members of `IGitProviderPlugin` consume (`GitProviderRequestError`,
+// `GitForkSyncResult`, `GitForkDivergence`, `GitRepositoryCopyInput`,
+// `GitRepositoryCopyResult`, `GitWorkflowRef`, `GitActionsPermissionsInput`,
+// `GitActionsPermissionsResult`, `GitWebhookInput`). Additive only: no existing
+// git-provider surface changes, so every existing implementation compiles and
+// behaves exactly as before.
+export * from './git-provider.app-forks.js';
 // PR insights (kanban run cockpit M5/M6) — pure CI rollup + diff-cap
 // rules shared by every git-provider implementation and asserted by the
 // conformance suite.

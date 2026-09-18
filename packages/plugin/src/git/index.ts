@@ -55,6 +55,26 @@ export type {
 
 export { isGitProviderPlugin } from '../contracts/capabilities/git-provider.interface.js';
 
+// App Works fork lifecycle (APW-02 T9/T10) — the typed surface of the optional
+// `findExistingFork` / `syncForkBranch` / `getForkDivergence` /
+// `createRepositoryCopy` / `setActionsPermissions` / `createWebhook` /
+// `deleteWebhook` / `createBranchFromSha` / `updateBranchRef` members, plus the
+// `GitProviderRequestError` those methods throw.
+export type {
+	GitProviderErrorReason,
+	GitProviderErrorDetails,
+	GitForkSyncResult,
+	GitForkDivergence,
+	GitRepositoryCopyInput,
+	GitRepositoryCopyResult,
+	GitWorkflowRef,
+	GitActionsPermissionsInput,
+	GitActionsPermissionsResult,
+	GitWebhookInput
+} from '../contracts/capabilities/git-provider.app-forks.js';
+
+export { GitProviderRequestError } from '../contracts/capabilities/git-provider.app-forks.js';
+
 // PR insights (kanban M5/M6) — the pure CI rollup + diff-cap rules every
 // git-provider implementation shares.
 export {

@@ -1,4 +1,14 @@
 import type { IPlugin } from '../plugin.interface.js';
+// App Works fork lifecycle (APW-02 T9/T10) — the types the optional members below consume.
+import type {
+	GitActionsPermissionsInput,
+	GitActionsPermissionsResult,
+	GitForkDivergence,
+	GitForkSyncResult,
+	GitRepositoryCopyInput,
+	GitRepositoryCopyResult,
+	GitWebhookInput
+} from './git-provider.app-forks.js';
 
 export interface GitAuth {
 	readonly username: 'x-access-token' | 'oauth2' | string;
@@ -33,6 +43,55 @@ export interface GitRepository {
 	 * Absent on every other repository read, so existing callers are unaffected.
 	 */
 	readonly forkReadiness?: 'ready' | 'pending';
+
+	// ── Repository facts (APW-02 P1, plan §3.3) ──────────────────────────────
+	//
+	// Nine OPTIONAL reads APW-01/APW-03/APW-05 use to describe an upstream
+	// repository before the platform acts on it: is it forkable, is it archived,
+	// is it empty, what licence does it carry, how big is it, did the provider
+	// redirect us. Additive only — an implementation that reports none of them
+	// still satisfies this interface, and every consumer must treat `undefined`
+	// as "the provider did not report it", never as `false` / `0` / "none".
+
+	/**
+	 * The network root this repository was forked from, when it is a fork.
+	 *
+	 * Read FIRST, before `parent`, when checking whether an existing repository
+	 * belongs to the same fork network (plan §4.3): a fork of a fork has
+	 * `source.fullName` = the upstream everyone shares, while `parent` is only
+	 * the immediate ancestor.
+	 */
+	readonly source?: { readonly owner: string; readonly name: string; readonly fullName: string };
+	/** Provider-reported "forks allowed" switch. `undefined` = not reported. */
+	readonly allowForking?: boolean;
+	/** Archived repositories are read-only upstream: never a fork or copy source. */
+	readonly archived?: boolean;
+	/**
+	 * Provider visibility. `internal` is GitHub Enterprise's third value and is
+	 * NOT private — treating it as one would refuse a repository the caller may
+	 * legitimately use.
+	 */
+	readonly visibility?: 'public' | 'private' | 'internal';
+	/** Stargazers, as reported. A popularity signal only — never an authorisation input. */
+	readonly stars?: number;
+	/** Provider-reported size in KiB, the value `GitRepositoryCopyInput.maxSizeKb` is checked against. */
+	readonly sizeKb?: number;
+	/**
+	 * Provider-detected SPDX id, or `null` when the provider found a licence it
+	 * cannot identify (`NOASSERTION`). APW-03 classifies it; nothing here does.
+	 *
+	 * `undefined` and `null` differ: `undefined` is "not reported", `null` is
+	 * "reported, and it is not a licence we can name".
+	 */
+	readonly licenseSpdx?: string | null;
+	/** True when the default branch has no commit (a repository created but never populated). */
+	readonly empty?: boolean;
+	/**
+	 * The `owner/name` the caller ASKED for, when the provider redirected to a
+	 * different one (a rename). The coordinates on this object are the resolved
+	 * ones; this field is what lets a caller notice the redirect at all.
+	 */
+	readonly movedFrom?: string;
 }
 
 export interface GitBranch {
@@ -734,6 +793,166 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		path: string,
 		token: string
 	): Promise<Array<{ name: string; type: 'file' | 'dir' | 'submodule' | 'symlink'; path: string }> | null>;
+
+	// ── Fork lifecycle (APW-02 T10, plan §3.3) ───────────────────────────────
+	//
+	// Nine OPTIONAL methods: the seven of APW-02 P1 plus APW-09's two branch-ref
+	// moves (CONTRACTS §3 — whichever epic lands first creates them; APW-02 P1
+	// lands in an earlier wave, so they are declared here and implemented in the
+	// GitHub plugin with exactly these signatures).
+	//
+	// Every one of them carries the same calling rule, and it is not a formality:
+	// **the caller MUST materialise the method on the plugin instance before
+	// calling it** (`typeof impl.<method> === 'function'`). The lazy-plugin proxy
+	// over-reports optional methods, so a call that skips that check reaches a
+	// provider that never implemented the method and fails as a provider error
+	// instead of the caller-actionable "this provider does not support it"
+	// (`GitOperationNotSupportedError`, the existing 409 mapping — plan §4.2).
+	//
+	// Each method throws `GitProviderRequestError` on a provider failure; the
+	// absence of the method is the caller's to detect, never the plugin's to
+	// throw.
+
+	/**
+	 * Find a fork of `upstreamOwner/upstreamRepo` that already exists under
+	 * `targetOwner`, or `null` when there is none (FR-10: never fork twice).
+	 *
+	 * The lookup is what keeps a renamed fork from being duplicated, so an
+	 * implementation that cannot search must answer `null` honestly rather than
+	 * guess — the request then proceeds to the provider's fork endpoint, which
+	 * answers with the existing fork instead of creating a second one.
+	 *
+	 * OPTIONAL. Callers MUST materialise `findExistingFork` on the plugin before
+	 * calling it: the lazy-plugin proxy over-reports optional methods, so an
+	 * unmaterialised call fails as a provider error rather than as
+	 * `providerUnsupported`.
+	 */
+	findExistingFork?(
+		upstreamOwner: string,
+		upstreamRepo: string,
+		targetOwner: string,
+		token: string
+	): Promise<GitRepository | null>;
+
+	/**
+	 * Bring a fork's `branch` up to date with the upstream branch it was forked
+	 * from. `conflict` and `unprocessable` are returned, not thrown.
+	 *
+	 * OPTIONAL. Callers MUST materialise `syncForkBranch` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	syncForkBranch?(forkOwner: string, forkRepo: string, branch: string, token: string): Promise<GitForkSyncResult>;
+
+	/**
+	 * How far a fork's branch has drifted from its upstream branch — the read
+	 * behind "your fork is N behind". `upstreamHeadSha` is the upstream head as
+	 * the fork network sees it, not the upstream repository's live head.
+	 *
+	 * OPTIONAL. Callers MUST materialise `getForkDivergence` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	getForkDivergence?(
+		forkOwner: string,
+		forkRepo: string,
+		forkBranch: string,
+		upstreamOwner: string,
+		upstreamBranch: string,
+		token: string
+	): Promise<GitForkDivergence>;
+
+	/**
+	 * Copy one branch of a repository into another repository the platform owns
+	 * — the `private-copy` repository mode. The source is cloned, never forked,
+	 * so no fork relationship is created.
+	 *
+	 * `input.maxSizeKb` is the size the caller already authorised; an
+	 * implementation refuses a larger source before doing any git work.
+	 *
+	 * OPTIONAL. Callers MUST materialise `createRepositoryCopy` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	createRepositoryCopy?(input: GitRepositoryCopyInput, token: string): Promise<GitRepositoryCopyResult>;
+
+	/**
+	 * Apply APW-05's Actions hygiene to a repository: the repo-level Actions
+	 * switch, the workflows to enable, and the active workflows to disable.
+	 *
+	 * Omitted fields mean "leave that alone" — `disableWorkflowsExcept: []` is
+	 * an instruction, `undefined` is not. Implementations report what they
+	 * actually did (including `truncated` when the page cap was reached), and
+	 * stop on a permission failure rather than half-applying the rest silently.
+	 *
+	 * OPTIONAL. Callers MUST materialise `setActionsPermissions` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	setActionsPermissions?(
+		owner: string,
+		repo: string,
+		input: GitActionsPermissionsInput,
+		token: string
+	): Promise<GitActionsPermissionsResult>;
+
+	/**
+	 * Install a webhook on a repository. `created` is `false` when the provider
+	 * reported an existing hook for the same URL and returned it instead of
+	 * creating a second one (the idempotent case).
+	 *
+	 * APW-05 is the only caller (the `app-build-prepare` job installs the signed
+	 * `workflow_run` receiver); adding a hook must never re-create one.
+	 *
+	 * OPTIONAL. Callers MUST materialise `createWebhook` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	createWebhook?(
+		owner: string,
+		repo: string,
+		input: GitWebhookInput,
+		token: string
+	): Promise<{ id: number; created: boolean }>;
+
+	/**
+	 * Remove a webhook by id. Deleting hook `A` MUST NOT delete hook `B` — the
+	 * id is the only address, so a provider that cannot delete by id omits this
+	 * method rather than resolving the id to the wrong hook.
+	 *
+	 * OPTIONAL. Callers MUST materialise `deleteWebhook` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	deleteWebhook?(owner: string, repo: string, hookId: number, token: string): Promise<void>;
+
+	/**
+	 * Create a branch ref pointing at an exact commit sha.
+	 *
+	 * Distinct from `createBranch?`, whose `fromRef` is a branch name: pointing a
+	 * sync or preparation branch at a sha needs this, because deleting and
+	 * recreating the branch would close the pull request that is open on it
+	 * (plan §3.3, APW-09's signature — §3.3 names no return type; `GitBranch` is
+	 * the shape its sibling `createBranch?` returns).
+	 *
+	 * OPTIONAL. Callers MUST materialise `createBranchFromSha` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	createBranchFromSha?(owner: string, repo: string, name: string, sha: string, token: string): Promise<GitBranch>;
+
+	/**
+	 * Move an existing branch ref to a commit sha — **fast-forward only**.
+	 *
+	 * `options.force` is typed `false` on purpose: no force-move exists anywhere
+	 * in this epic, so a supplier of `true` is a compile error rather than a
+	 * silent history rewrite. A provider that answers "not a fast forward" is
+	 * reported as `unprocessable`.
+	 *
+	 * OPTIONAL. Callers MUST materialise `updateBranchRef` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	updateBranchRef?(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		options: { force: false },
+		token: string
+	): Promise<GitBranch>;
 }
 
 export function isGitProviderPlugin(plugin: IPlugin): plugin is IGitProviderPlugin {
