@@ -199,6 +199,21 @@ export interface KubernetesObjectApiLike {
 	): Promise<unknown>;
 }
 
+/**
+ * The parts of a `CustomResourceDefinition` that
+ * {@link KubernetesApiService.crdServed} reads. `spec.versions[].served` is
+ * required by the `apiextensions.k8s.io/v1` schema, so an entry that omits it
+ * is not treated as served.
+ */
+interface CustomResourceDefinitionLike {
+	spec?: { versions?: Array<{ name?: string; served?: boolean }> };
+}
+
+/** The parts of a `StorageClass` that {@link KubernetesApiService.defaultStorageClass} reads. */
+interface StorageClassLike {
+	metadata?: { name?: string; annotations?: Record<string, string> };
+}
+
 /** Options for {@link KubernetesApiService.readPodLog}. */
 export interface PodLogOptions {
 	/** Lines from the end of the log; the API returns the newest `tailLines`. */
@@ -315,6 +330,20 @@ export const defaultClientFactory: KubernetesClientFactory = {
 };
 
 const DEFAULT_CLASS_ANNOTATION = 'ingressclass.kubernetes.io/is-default-class';
+
+/** CRDs are read at `apiextensions.k8s.io/v1` — the only version this service speaks. */
+const CRD_API_VERSION = 'apiextensions.k8s.io/v1';
+
+/**
+ * The annotations that mark a `StorageClass` as the cluster default: the GA
+ * one, and the beta one it replaced. kubelet's own `IsDefaultAnnotation`
+ * accepts both, so a cluster that still carries only the beta annotation must
+ * not look defaultless to us.
+ */
+const DEFAULT_STORAGE_CLASS_ANNOTATIONS: readonly string[] = [
+	'storageclass.kubernetes.io/is-default-class',
+	'storageclass.beta.kubernetes.io/is-default-class'
+];
 
 export class KubernetesApiService {
 	constructor(private readonly factory: KubernetesClientFactory = defaultClientFactory) {}
@@ -818,6 +847,74 @@ export class KubernetesApiService {
 			const scrubbed = scrubError(err);
 			throw new K8sPluginError(scrubbed.code, scrubbed.message, err);
 		}
+	}
+
+	/**
+	 * Is `name`'s CustomResourceDefinition installed **and serving
+	 * `version`**? This is the gate the App-dependency providers use to decide
+	 * whether an operator path exists at all (APW-07 plan §4.9 calls it as
+	 * `crdServed('clusters.postgresql.cnpg.io', 'v1')`).
+	 *
+	 * The CRD is read from `apiextensions.k8s.io/v1` `CustomResourceDefinitions`
+	 * — cluster-scoped, so no namespace — and matched against
+	 * `spec.versions[]`: a version that is absent, or present with
+	 * `served: false`, is **not** served. A 404 is `false` ("not installed" is
+	 * an answer, not an error — same rule as `readObject`).
+	 *
+	 * A non-404 failure (403, unreachable cluster) **throws** a scrubbed
+	 * `K8sPluginError` instead of answering `false`. The caller has to tell
+	 * "the operator is not installed" (→ plain path) apart from "we may not
+	 * look" (→ `statusDetail.operatorSkipped = 'noPermission'`, APW07-G10),
+	 * and a bare `false` would hide the permission problem behind a design
+	 * choice.
+	 */
+	async crdServed(kubeconfigYaml: string, name: string, version: string, contextOverride?: string): Promise<boolean> {
+		const crd = await this.readObject<CustomResourceDefinitionLike>(
+			kubeconfigYaml,
+			CRD_API_VERSION,
+			'CustomResourceDefinition',
+			'', // cluster-scoped
+			name,
+			contextOverride
+		);
+		if (!crd) return false;
+		return (crd.spec?.versions ?? []).some((entry) => entry?.name === version && entry?.served === true);
+	}
+
+	/**
+	 * Name of the cluster's default `StorageClass`, or `null` when the cluster
+	 * has none — the precondition the plain Postgres path fails on with the
+	 * definite reason `noDefaultStorageClass` (APW-07 S18 / ACC-07-20).
+	 *
+	 * A class counts as default only when one of its annotations is exactly
+	 * `'true'` (the GA annotation, or the beta one it replaced), and the
+	 * **first class carrying one** wins. Never "the first class in the list":
+	 * on a cluster with several classes and no default that would hand back an
+	 * arbitrary one instead of reporting the missing default.
+	 *
+	 * As with the other reads here, a non-404 API failure throws a scrubbed
+	 * `K8sPluginError`, so `null` always means "the cluster really has no
+	 * default".
+	 */
+	async defaultStorageClass(kubeconfigYaml: string, contextOverride?: string): Promise<string | null> {
+		const storageClasses = await this.listObjects<StorageClassLike>(
+			kubeconfigYaml,
+			'storage.k8s.io/v1',
+			'StorageClass',
+			'', // cluster-scoped
+			undefined,
+			contextOverride
+		);
+		for (const storageClass of storageClasses) {
+			const name = storageClass?.metadata?.name;
+			if (!name) continue;
+			const annotations = storageClass.metadata?.annotations ?? {};
+			const isDefault = DEFAULT_STORAGE_CLASS_ANNOTATIONS.some(
+				(annotation) => annotations[annotation] === 'true'
+			);
+			if (isDefault) return name;
+		}
+		return null;
 	}
 }
 
