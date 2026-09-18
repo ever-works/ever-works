@@ -95,6 +95,7 @@ import {
     AppDependenciesService,
     type AppDependencyReconcileResult,
 } from '../app-dependencies/app-dependencies.service';
+import { AppSpecAppliedEvent } from '../events/app-spec-applied.event';
 import { AppEnvService, type AppEnvEnsureGeneratedResult } from './app-env.service';
 
 /**
@@ -184,9 +185,9 @@ export class AppEnvListener {
      * event), while `ensureGenerated` is still awaited INSIDE this call — the
      * property ACC-07-01 is measured on.
      */
-    @OnEvent(APP_ENV_SPEC_APPLIED_EVENT, { async: true })
+    @OnEvent(AppSpecAppliedEvent.EVENT_NAME, { async: true })
     async handleAppSpecApplied(
-        event: AppEnvListenerSpecAppliedEvent,
+        event: AppSpecAppliedEvent | AppEnvListenerSpecAppliedEvent,
     ): Promise<AppEnvListenerOutcome> {
         const startedAt = Date.now();
         const workId = typeof event?.workId === 'string' ? event.workId.trim() : '';
