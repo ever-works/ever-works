@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Запуск застосунків",
+            "controlTooltip": "Ever apps і ваші застосунки",
+            "panelTitle": "Запуск застосунків",
+            "sectionPinned": "Закріплені",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Ваші застосунки",
+            "chipCurrent": "Ви тут",
+            "chipBeta": "Бета",
+            "chipDeploying": "Розгортання",
+            "chipLastDeployFailed": "Останнє розгортання не вдалося",
+            "viewAll": "Переглянути всі ({count})",
+            "footerHelper": "Відкривається в новій вкладці. Можливо, потрібно увійти.",
+            "manageLink": "Керувати застосунками",
+            "emptyWorks": "Застосунки, які ви розгорнете, з’являться тут.",
+            "emptyWorksCreateApp": "Створити роботу-застосунок",
+            "emptyWorksGoToWorks": "Перейти до робіт",
+            "allHidden": "Ви приховали всі свої застосунки.",
+            "catalogError": "Не вдалося завантажити Ever apps.",
+            "worksError": "Не вдалося завантажити ваші застосунки.",
+            "retry": "Спробувати ще раз",
+            "controlUnavailable": "App Launcher наразі недоступний.",
+            "emptyActionFailed": "Не вдалося відкрити цю сторінку. Спробуйте ще раз.",
+            "signInPrompt": "Увійдіть з Ever ID, щоб побачити тут свої застосунки.",
+            "signIn": "Увійти"
         }
     },
     "layout": {

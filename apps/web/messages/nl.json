@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "App-launcher",
+            "controlTooltip": "Ever apps en je apps",
+            "panelTitle": "App-launcher",
+            "sectionPinned": "Vastgezet",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Jouw apps",
+            "chipCurrent": "Je bent hier",
+            "chipBeta": "Bèta",
+            "chipDeploying": "Wordt uitgerold",
+            "chipLastDeployFailed": "Laatste uitrol mislukt",
+            "viewAll": "Alle {count} bekijken",
+            "footerHelper": "Opent in een nieuw tabblad. Mogelijk moet je inloggen.",
+            "manageLink": "Apps beheren",
+            "emptyWorks": "Apps die je uitrolt verschijnen hier.",
+            "emptyWorksCreateApp": "Een app-werk maken",
+            "emptyWorksGoToWorks": "Naar Werken",
+            "allHidden": "Je hebt al je apps verborgen.",
+            "catalogError": "Ever apps konden niet worden geladen.",
+            "worksError": "Je apps konden niet worden geladen.",
+            "retry": "Opnieuw proberen",
+            "controlUnavailable": "App Launcher is momenteel niet beschikbaar.",
+            "emptyActionFailed": "Die pagina kon niet worden geopend. Probeer het opnieuw.",
+            "signInPrompt": "Log in met Ever ID om je apps hier te zien.",
+            "signIn": "Inloggen"
         }
     },
     "layout": {

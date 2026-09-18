@@ -8535,6 +8535,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "משגר האפליקציות",
+            "controlTooltip": "Ever apps והאפליקציות שלך",
+            "panelTitle": "משגר האפליקציות",
+            "sectionPinned": "מוצמדים",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "האפליקציות שלך",
+            "chipCurrent": "אתה כאן",
+            "chipBeta": "בטא",
+            "chipDeploying": "מפריס",
+            "chipLastDeployFailed": "הפריסה האחרונה נכשלה",
+            "viewAll": "הצג הכל ({count})",
+            "footerHelper": "נפתח בכרטיסייה חדשה. ייתכן שתצטרך להתחבר.",
+            "manageLink": "ניהול אפליקציות",
+            "emptyWorks": "אפליקציות שתפרוס יופיעו כאן.",
+            "emptyWorksCreateApp": "צור עבודת אפליקציה",
+            "emptyWorksGoToWorks": "עבור לעבודות",
+            "allHidden": "הסתרת את כל האפליקציות שלך.",
+            "catalogError": "לא ניתן היה לטעון את Ever apps.",
+            "worksError": "לא ניתן היה לטעון את האפליקציות שלך.",
+            "retry": "נסה שוב",
+            "controlUnavailable": "App Launcher אינו זמין כעת.",
+            "emptyActionFailed": "לא ניתן היה לפתוח את העמוד. נסה שוב.",
+            "signInPrompt": "התחבר עם Ever ID כדי לראות את האפליקציות שלך כאן.",
+            "signIn": "התחבר"
         }
     },
     "layout": {

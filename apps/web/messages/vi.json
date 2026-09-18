@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Trình khởi chạy ứng dụng",
+            "controlTooltip": "Ever apps và ứng dụng của bạn",
+            "panelTitle": "Trình khởi chạy ứng dụng",
+            "sectionPinned": "Đã ghim",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Ứng dụng của bạn",
+            "chipCurrent": "Bạn đang ở đây",
+            "chipBeta": "Beta",
+            "chipDeploying": "Đang triển khai",
+            "chipLastDeployFailed": "Triển khai lần cuối thất bại",
+            "viewAll": "Xem tất cả ({count})",
+            "footerHelper": "Mở trong tab mới. Bạn có thể cần đăng nhập.",
+            "manageLink": "Quản lý ứng dụng",
+            "emptyWorks": "Ứng dụng bạn triển khai sẽ xuất hiện ở đây.",
+            "emptyWorksCreateApp": "Tạo Công việc Ứng dụng",
+            "emptyWorksGoToWorks": "Đi tới Công việc",
+            "allHidden": "Bạn đã ẩn tất cả ứng dụng của mình.",
+            "catalogError": "Không thể tải Ever apps.",
+            "worksError": "Không thể tải ứng dụng của bạn.",
+            "retry": "Thử lại",
+            "controlUnavailable": "App Launcher hiện không khả dụng.",
+            "emptyActionFailed": "Không thể mở trang đó. Thử lại.",
+            "signInPrompt": "Đăng nhập bằng Ever ID để xem ứng dụng của bạn tại đây.",
+            "signIn": "Đăng nhập"
         }
     },
     "layout": {

@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Peluncur Aplikasi",
+            "controlTooltip": "Ever apps dan aplikasi Anda",
+            "panelTitle": "Peluncur Aplikasi",
+            "sectionPinned": "Disematkan",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Aplikasi Anda",
+            "chipCurrent": "Anda di sini",
+            "chipBeta": "Beta",
+            "chipDeploying": "Menyebarkan",
+            "chipLastDeployFailed": "Penyebaran terakhir gagal",
+            "viewAll": "Lihat semua ({count})",
+            "footerHelper": "Terbuka di tab baru. Anda mungkin perlu masuk.",
+            "manageLink": "Kelola aplikasi",
+            "emptyWorks": "Aplikasi yang Anda sebarkan akan muncul di sini.",
+            "emptyWorksCreateApp": "Buat Karya Aplikasi",
+            "emptyWorksGoToWorks": "Buka Karya",
+            "allHidden": "Anda telah menyembunyikan semua aplikasi Anda.",
+            "catalogError": "Ever apps tidak dapat dimuat.",
+            "worksError": "Aplikasi Anda tidak dapat dimuat.",
+            "retry": "Coba lagi",
+            "controlUnavailable": "App Launcher tidak tersedia saat ini.",
+            "emptyActionFailed": "Tidak dapat membuka halaman itu. Coba lagi.",
+            "signInPrompt": "Masuk dengan Ever ID untuk melihat aplikasi Anda di sini.",
+            "signIn": "Masuk"
         }
     },
     "layout": {

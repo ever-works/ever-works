@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "ตัวเรียกใช้แอป",
+            "controlTooltip": "Ever apps และแอปของคุณ",
+            "panelTitle": "ตัวเรียกใช้แอป",
+            "sectionPinned": "ปักหมุด",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "แอปของคุณ",
+            "chipCurrent": "คุณอยู่ที่นี่",
+            "chipBeta": "เบต้า",
+            "chipDeploying": "กำลังปรับใช้",
+            "chipLastDeployFailed": "การปรับใช้ครั้งล่าสุดล้มเหลว",
+            "viewAll": "ดูทั้งหมด ({count})",
+            "footerHelper": "เปิดในแท็บใหม่ คุณอาจต้องลงชื่อเข้าใช้",
+            "manageLink": "จัดการแอป",
+            "emptyWorks": "แอปที่คุณปรับใช้จะแสดงที่นี่",
+            "emptyWorksCreateApp": "สร้างงานแอป",
+            "emptyWorksGoToWorks": "ไปที่งาน",
+            "allHidden": "คุณซ่อนแอปทั้งหมดแล้ว",
+            "catalogError": "ไม่สามารถโหลด Ever apps ได้",
+            "worksError": "ไม่สามารถโหลดแอปของคุณได้",
+            "retry": "ลองอีกครั้ง",
+            "controlUnavailable": "App Launcher ไม่พร้อมใช้งานในขณะนี้",
+            "emptyActionFailed": "ไม่สามารถเปิดหน้านั้นได้ ลองอีกครั้ง",
+            "signInPrompt": "ลงชื่อเข้าใช้ด้วย Ever ID เพื่อดูแอปของคุณที่นี่",
+            "signIn": "ลงชื่อเข้าใช้"
         }
     },
     "layout": {

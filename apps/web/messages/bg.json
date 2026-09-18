@@ -8535,6 +8535,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Стартиране на приложения",
+            "controlTooltip": "Ever apps и вашите приложения",
+            "panelTitle": "Стартиране на приложения",
+            "sectionPinned": "Закрепени",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Вашите приложения",
+            "chipCurrent": "Вие сте тук",
+            "chipBeta": "Бета",
+            "chipDeploying": "Разполага се",
+            "chipLastDeployFailed": "Последното разполагане е неуспешно",
+            "viewAll": "Виж всички ({count})",
+            "footerHelper": "Отваря се в нов раздел. Може да се наложи да влезете.",
+            "manageLink": "Управление на приложения",
+            "emptyWorks": "Приложенията, които разположите, ще се появят тук.",
+            "emptyWorksCreateApp": "Създай работа за приложение",
+            "emptyWorksGoToWorks": "Към работите",
+            "allHidden": "Скрихте всичките си приложения.",
+            "catalogError": "Ever apps не можаха да се заредят.",
+            "worksError": "Вашите приложения не можаха да се заредят.",
+            "retry": "Опитайте отново",
+            "controlUnavailable": "App Launcher в момента не е наличен.",
+            "emptyActionFailed": "Тази страница не можа да се отвори. Опитайте отново.",
+            "signInPrompt": "Влезте с Ever ID, за да видите приложенията си тук.",
+            "signIn": "Вход"
         }
     },
     "layout": {

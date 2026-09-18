@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Uygulama başlatıcı",
+            "controlTooltip": "Ever apps ve uygulamalarınız",
+            "panelTitle": "Uygulama başlatıcı",
+            "sectionPinned": "Sabitlenenler",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Uygulamalarınız",
+            "chipCurrent": "Buradasınız",
+            "chipBeta": "Beta",
+            "chipDeploying": "Dağıtılıyor",
+            "chipLastDeployFailed": "Son dağıtım başarısız",
+            "viewAll": "Tümünü görüntüle ({count})",
+            "footerHelper": "Yeni sekmede açılır. Giriş yapmanız gerekebilir.",
+            "manageLink": "Uygulamaları yönet",
+            "emptyWorks": "Dağıttığınız uygulamalar burada görünür.",
+            "emptyWorksCreateApp": "Uygulama İşi oluştur",
+            "emptyWorksGoToWorks": "İşler’e git",
+            "allHidden": "Tüm uygulamalarınızı gizlediniz.",
+            "catalogError": "Ever apps yüklenemedi.",
+            "worksError": "Uygulamalarınız yüklenemedi.",
+            "retry": "Tekrar deneyin",
+            "controlUnavailable": "App Launcher şu anda kullanılamıyor.",
+            "emptyActionFailed": "O sayfa açılamadı. Tekrar deneyin.",
+            "signInPrompt": "Uygulamalarınızı burada görmek için Ever ID ile giriş yapın.",
+            "signIn": "Giriş yap"
         }
     },
     "layout": {

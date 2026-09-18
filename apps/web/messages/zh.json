@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "应用启动器",
+            "controlTooltip": "Ever apps 和你的应用",
+            "panelTitle": "应用启动器",
+            "sectionPinned": "已固定",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "你的应用",
+            "chipCurrent": "你在这里",
+            "chipBeta": "测试版",
+            "chipDeploying": "部署中",
+            "chipLastDeployFailed": "上次部署失败",
+            "viewAll": "查看全部 ({count})",
+            "footerHelper": "在新标签页中打开。你可能需要登录。",
+            "manageLink": "管理应用",
+            "emptyWorks": "你部署的应用会显示在这里。",
+            "emptyWorksCreateApp": "创建应用作品",
+            "emptyWorksGoToWorks": "前往作品",
+            "allHidden": "你已隐藏所有应用。",
+            "catalogError": "无法加载 Ever apps。",
+            "worksError": "无法加载你的应用。",
+            "retry": "重试",
+            "controlUnavailable": "App Launcher 目前不可用。",
+            "emptyActionFailed": "无法打开该页面。请重试。",
+            "signInPrompt": "使用 Ever ID 登录以在此查看你的应用。",
+            "signIn": "登录"
         }
     },
     "layout": {

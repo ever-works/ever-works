@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Iniciador de apps",
+            "controlTooltip": "Ever apps e seus apps",
+            "panelTitle": "Iniciador de apps",
+            "sectionPinned": "Fixado",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Seus apps",
+            "chipCurrent": "Você está aqui",
+            "chipBeta": "Beta",
+            "chipDeploying": "Implantando",
+            "chipLastDeployFailed": "A última implantação falhou",
+            "viewAll": "Ver todos ({count})",
+            "footerHelper": "Abre em uma nova aba. Talvez você precise entrar.",
+            "manageLink": "Gerenciar apps",
+            "emptyWorks": "Os apps que você implantar aparecem aqui.",
+            "emptyWorksCreateApp": "Criar um trabalho de app",
+            "emptyWorksGoToWorks": "Ir para Trabalhos",
+            "allHidden": "Você ocultou todos os seus apps.",
+            "catalogError": "Não foi possível carregar o Ever apps.",
+            "worksError": "Não foi possível carregar seus apps.",
+            "retry": "Tentar novamente",
+            "controlUnavailable": "O App Launcher está indisponível no momento.",
+            "emptyActionFailed": "Não foi possível abrir essa página. Tente novamente.",
+            "signInPrompt": "Entre com o Ever ID para ver seus apps aqui.",
+            "signIn": "Entrar"
         }
     },
     "layout": {

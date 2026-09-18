@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "ऐप लॉन्चर",
+            "controlTooltip": "Ever apps और आपके ऐप्स",
+            "panelTitle": "ऐप लॉन्चर",
+            "sectionPinned": "पिन किए गए",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "आपके ऐप्स",
+            "chipCurrent": "आप यहाँ हैं",
+            "chipBeta": "बीटा",
+            "chipDeploying": "तैनात किया जा रहा है",
+            "chipLastDeployFailed": "पिछली तैनाती विफल रही",
+            "viewAll": "सभी {count} देखें",
+            "footerHelper": "नए टैब में खुलता है। आपको साइन इन करना पड़ सकता है।",
+            "manageLink": "ऐप्स प्रबंधित करें",
+            "emptyWorks": "आपके द्वारा तैनात किए गए ऐप्स यहाँ दिखाई देंगे।",
+            "emptyWorksCreateApp": "ऐप कार्य बनाएं",
+            "emptyWorksGoToWorks": "कार्यज़ पर जाएं",
+            "allHidden": "आपने अपने सभी ऐप्स छिपा दिए हैं।",
+            "catalogError": "Ever apps लोड नहीं हो सके।",
+            "worksError": "आपके ऐप्स लोड नहीं हो सके।",
+            "retry": "पुनः प्रयास करें",
+            "controlUnavailable": "App Launcher अभी उपलब्ध नहीं है।",
+            "emptyActionFailed": "वह पृष्ठ खोल नहीं सके। पुनः प्रयास करें।",
+            "signInPrompt": "अपने ऐप्स यहाँ देखने के लिए Ever ID से साइन इन करें।",
+            "signIn": "साइन इन"
         }
     },
     "layout": {

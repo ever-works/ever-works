@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "앱 런처",
+            "controlTooltip": "Ever apps 및 내 앱",
+            "panelTitle": "앱 런처",
+            "sectionPinned": "고정됨",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "내 앱",
+            "chipCurrent": "현재 위치",
+            "chipBeta": "베타",
+            "chipDeploying": "배포 중",
+            "chipLastDeployFailed": "마지막 배포 실패",
+            "viewAll": "모두 보기 ({count})",
+            "footerHelper": "새 탭에서 열립니다. 로그인이 필요할 수 있습니다.",
+            "manageLink": "앱 관리",
+            "emptyWorks": "배포한 앱이 여기에 표시됩니다.",
+            "emptyWorksCreateApp": "앱 워크 생성",
+            "emptyWorksGoToWorks": "워크로 이동",
+            "allHidden": "모든 앱을 숨겼습니다.",
+            "catalogError": "Ever apps를 불러오지 못했습니다.",
+            "worksError": "앱을 불러오지 못했습니다.",
+            "retry": "다시 시도",
+            "controlUnavailable": "App Launcher를 현재 사용할 수 없습니다.",
+            "emptyActionFailed": "해당 페이지를 열 수 없습니다. 다시 시도하세요.",
+            "signInPrompt": "Ever ID로 로그인하면 여기에서 앱을 볼 수 있습니다.",
+            "signIn": "로그인"
         }
     },
     "layout": {

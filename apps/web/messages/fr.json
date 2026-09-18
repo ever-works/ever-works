@@ -8535,6 +8535,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "Lanceur d'applis",
+            "controlTooltip": "Ever apps et vos applis",
+            "panelTitle": "Lanceur d'applis",
+            "sectionPinned": "Épinglé",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Vos applis",
+            "chipCurrent": "Vous êtes ici",
+            "chipBeta": "Bêta",
+            "chipDeploying": "Déploiement en cours",
+            "chipLastDeployFailed": "Le dernier déploiement a échoué",
+            "viewAll": "Voir tout ({count})",
+            "footerHelper": "S’ouvre dans un nouvel onglet. Vous devrez peut-être vous connecter.",
+            "manageLink": "Gérer les applis",
+            "emptyWorks": "Les applis que vous déployez apparaissent ici.",
+            "emptyWorksCreateApp": "Créer un travail d’appli",
+            "emptyWorksGoToWorks": "Aller aux travaux",
+            "allHidden": "Vous avez masqué toutes vos applis.",
+            "catalogError": "Impossible de charger Ever apps.",
+            "worksError": "Impossible de charger vos applis.",
+            "retry": "Réessayer",
+            "controlUnavailable": "App Launcher est indisponible pour le moment.",
+            "emptyActionFailed": "Impossible d’ouvrir cette page. Réessayez.",
+            "signInPrompt": "Connectez-vous avec Ever ID pour voir vos applis ici.",
+            "signIn": "Se connecter"
         }
     },
     "layout": {

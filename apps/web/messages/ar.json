@@ -8535,6 +8535,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "مشغّل التطبيقات",
+            "controlTooltip": "Ever apps وتطبيقاتك",
+            "panelTitle": "مشغّل التطبيقات",
+            "sectionPinned": "مثبتة",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "تطبيقاتك",
+            "chipCurrent": "أنت هنا",
+            "chipBeta": "Beta",
+            "chipDeploying": "جارٍ النشر",
+            "chipLastDeployFailed": "فشل آخر نشر",
+            "viewAll": "عرض الكل ({count})",
+            "footerHelper": "يفتح في علامة تبويب جديدة. قد تحتاج إلى تسجيل الدخول.",
+            "manageLink": "إدارة التطبيقات",
+            "emptyWorks": "التطبيقات التي تنشرها ستظهر هنا.",
+            "emptyWorksCreateApp": "إنشاء عمل تطبيق",
+            "emptyWorksGoToWorks": "الانتقال إلى الأعمال",
+            "allHidden": "لقد أخفيت جميع تطبيقاتك.",
+            "catalogError": "تعذر تحميل Ever apps.",
+            "worksError": "تعذر تحميل تطبيقاتك.",
+            "retry": "إعادة المحاولة",
+            "controlUnavailable": "App Launcher غير متاح الآن.",
+            "emptyActionFailed": "تعذر فتح هذه الصفحة. حاول مرة أخرى.",
+            "signInPrompt": "سجّل الدخول باستخدام Ever ID لرؤية تطبيقاتك هنا.",
+            "signIn": "تسجيل الدخول"
         }
     },
     "layout": {

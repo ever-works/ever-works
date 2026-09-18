@@ -8536,6 +8536,32 @@
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
+        },
+        "appLauncher": {
+            "controlLabel": "アプリランチャー",
+            "controlTooltip": "Ever apps とあなたのアプリ",
+            "panelTitle": "アプリランチャー",
+            "sectionPinned": "ピン留め",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "あなたのアプリ",
+            "chipCurrent": "現在表示中",
+            "chipBeta": "ベータ",
+            "chipDeploying": "デプロイ中",
+            "chipLastDeployFailed": "前回のデプロイに失敗しました",
+            "viewAll": "すべて表示 ({count})",
+            "footerHelper": "新しいタブで開きます。サインインが必要な場合があります。",
+            "manageLink": "アプリを管理",
+            "emptyWorks": "デプロイしたアプリがここに表示されます。",
+            "emptyWorksCreateApp": "アプリワークを作成",
+            "emptyWorksGoToWorks": "ワークへ移動",
+            "allHidden": "すべてのアプリを非表示にしました。",
+            "catalogError": "Ever apps を読み込めませんでした。",
+            "worksError": "アプリを読み込めませんでした。",
+            "retry": "再試行",
+            "controlUnavailable": "App Launcher は現在利用できません。",
+            "emptyActionFailed": "そのページを開けませんでした。もう一度お試しください。",
+            "signInPrompt": "Ever ID でサインインすると、ここにアプリが表示されます。",
+            "signIn": "サインイン"
         }
     },
     "layout": {

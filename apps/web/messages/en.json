@@ -10478,6 +10478,32 @@
                 "show": "Show your workspace",
                 "hide": "Hide your workspace"
             }
+        },
+        "appLauncher": {
+            "controlLabel": "App Launcher",
+            "controlTooltip": "Ever apps and your apps",
+            "panelTitle": "App Launcher",
+            "sectionPinned": "Pinned",
+            "sectionPlatforms": "Ever apps",
+            "sectionWorks": "Your apps",
+            "chipCurrent": "You're here",
+            "chipBeta": "Beta",
+            "chipDeploying": "Deploying",
+            "chipLastDeployFailed": "Last deploy failed",
+            "viewAll": "View all {count}",
+            "footerHelper": "Opens in a new tab. You may need to sign in.",
+            "manageLink": "Manage apps",
+            "emptyWorks": "Apps you deploy show up here.",
+            "emptyWorksCreateApp": "Create an App Work",
+            "emptyWorksGoToWorks": "Go to Works",
+            "allHidden": "You've hidden all your apps.",
+            "catalogError": "Ever apps couldn't be loaded.",
+            "worksError": "Your apps couldn't be loaded.",
+            "retry": "Try again",
+            "controlUnavailable": "App Launcher is unavailable right now.",
+            "emptyActionFailed": "Couldn't open that page. Try again.",
+            "signInPrompt": "Sign in with Ever ID to see your apps here.",
+            "signIn": "Sign in"
         }
     },
     "layout": {
