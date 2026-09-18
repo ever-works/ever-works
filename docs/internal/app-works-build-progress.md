@@ -365,6 +365,22 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · APW-06''s env port catches up with APW-07''s plan — the mismatch T14 had to work around** (`e20313f99`).
+  Three additive, **optional** members on `packages/agent/src/app-runtime/ports.ts`: `fingerprints?: Record<string, string>`
+  on the `resolve` result (plan §4.6.1:429), `dependencyOutputs?: Record<string, Record<string, string>>` on the ephemeral
+  cluster context (§4.6.1:446 — the map APW-06 passes after `provisionEphemeral`, without which a derived reference has no
+  output to resolve against, which is why APW07-G04 added it rather than letting the resolver re-read rows it may not
+  write under R-10), and `'derived'` on `AppRuntimeEnvRecipeEntry.source`, which the contracts already define at
+  §4.6.1:447 — its absence is why a derived entry had to be smuggled through as a one-token template. **Optional
+  everywhere**, so nothing that compiled before can fail now: `type-check` **exit 0**, `app-runtime` plus T14''s two specs
+  **8 suites / 289 tests green**, Prettier clean, `git diff --numstat` **27/1** with the single removed line quoted in the
+  commit — the recipe-source union the change widens.
+  🌟 **Why I wrote it myself:** the agent dispatched for this two rounds earlier had still not touched the file after three
+  rounds of an empty worktree, and the edit is fully specified by the plan — so waiting longer was costing the programme
+  time for no added safety. The genuinely useful remainder of that brief (dropping the resolver''s now-redundant casts, once
+  `tsc` and the specs prove them unnecessary) stays open for the next session, which is the part that actually needed a
+  fresh pair of eyes rather than a copy of the plan.
+
 - **2026-09-18 · T14 closed out, and with it the last of the owed perturbations — both Wave-1 slices are VERIFIED, not merely green.**
   **`1a4369f34`** lands the author''s post-commit refactor on my own verification: T14''s pair **52 tests green**,
   `type-check` **exit 0**, Prettier clean, worktree clean. The `−16` lines are **all lines this task authored today**
