@@ -43,14 +43,16 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * the same shape `TriggerInternalModule` uses for `TasksService`,
  * `TaskWorkspaceService` and AW-20's `RosterProvisioningService`.
  *
- * 🛑 **Routed, not hidden — two API-side registrations this task does not own:**
+ * 🛑 **The two API-side registrations this task does not own — both LANDED** (they
+ * were routed to the APW-02 T27/T28 owner, who added them):
  *
- * 1. `apps/api/src/trigger/trigger-internal.controller.ts` must expose
- *    `AppSpecService` in its `remoteMap` (with `evaluate`), and
- *    `apps/api/src/trigger/trigger-internal.module.ts` must provide it — the
- *    "service's registration for remote calls" half of FR-90. Until that lands the
- *    proxy's call rejects and the run reports `evaluationFailed` with the RPC's own
- *    message: a named, visible failure, never a green run that evaluated nothing.
+ * 1. `apps/api/src/trigger/trigger-internal.controller.ts` exposes
+ *    `AppSpecService` in its `remoteMap` (with `evaluate`) and
+ *    `apps/api/src/trigger/trigger-internal.module.ts` provides it — the
+ *    "service's registration for remote calls" half of FR-90. With it unbound the
+ *    proxy's call would reject and this run would report `evaluationFailed` with
+ *    the RPC's own message: a named, visible failure, never a green run that
+ *    evaluated nothing.
  * 2. The API-side module wiring (`apps/api/src/works/works.module.ts` importing
  *    `AppSpecModule`) is T15's task; this file neither needs nor touches it.
  *
