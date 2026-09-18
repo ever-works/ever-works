@@ -146,6 +146,18 @@ traces and attachments. Values are never committed.
 - **Accounts.** Each live run registers throwaway platform accounts through the API (the Deployed smoke lane's
   approved pattern) and attaches `APW_E2E_GITHUB_USER_TOKEN` as the account's GitHub token. Nothing reuses a person's
   account.
+- **The GitHub connection surface (APW-13 T63 — the decision).** plan §8.8 offers two surfaces and T63 lands **(b)**: a
+  GitHub **OAuth account row**. The **PR lanes** get one from the non-production seeding route
+  `POST /api/e2e/github-connection/seed`, gated on `NODE_ENV !== 'production'` **and** `EVER_WORKS_E2E_FAKES === '1'`
+  **and** `APW_E2E_GITHUB_FAKE_URL` set — it answers `404` otherwise and is not even mounted in production, the same
+  posture as APW-11 T33's launcher seed route. The **live lanes** use the **operator-run OAuth connect** of the machine
+  account, recorded in T20's estate file. Surface **(a)** — a user-scope `x-secret` `accessToken` setting on the GitHub
+  plugin — was **declined**: the plugin is `admin-only` and `plugin-operations.service.ts` refuses user- and work-scope
+  settings on it, so allowing that one field by name widens a security boundary the owner must decide on, not a lane.
+  `connectCustomerGitHub` (`apps/web/e2e/helpers/github-connection.ts`) attaches whichever of the two applies and
+  asserts the platform's own read (`GET /api/git-providers/github/connection` → `connected: true`,
+  `authMethod: 'oauth'`) before the first scenario; a lane whose account has neither fails as **S10** naming the surface
+  it lacks, never as a raw `400` (CONTRACTS §7).
 - **Polling, never sleeping.** Every wait is `expect.poll` (or the harness's `waitForActivity(workId, type, deadline)`)
   with an explicit deadline and interval. `page.waitForTimeout` is banned in these specs.
 - **Watch for failure too.** Each wait also watches the terminal failure events of the same step

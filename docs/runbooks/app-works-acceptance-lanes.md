@@ -102,6 +102,14 @@ pnpm --filter ever-works-web exec playwright test --project=chromium \
 pnpm --filter ever-works-web exec playwright test -c playwright.app-works.config.ts
 ```
 
+**Step 5 reads the same interlocks as step 4, and its setup project is where they bite.** The setup lane
+(`app-works-live.setup.ts`) throws before anything runs if `APW_E2E_RUN_ID` (or `APW_E2E_ALLOWED_BASE_URLS`,
+or `APW_E2E_TOKEN_BUDGET`) is unset — see the refusal table in §3 — and because the setup is a *dependency*
+of the live project, a runner that exports the interlocks only for step 4 gets a wall of
+`Error: APW_E2E_RUN_ID is not set` with no scenario having run. Export them once for the whole shell
+(the workflow's env block is the source of truth for the values) and both steps work. This is worth stating
+because it reads like a broken lane and is in fact the interlock doing its job.
+
 ### Traps that cost real time
 
 - **Windows:** `Start-Process pnpm` does not launch — use `pnpm.cmd`. A failed launch shows up later as
@@ -125,6 +133,15 @@ pnpm --filter ever-works-web exec playwright test -c playwright.app-works.config
       unreachable.
     - `GITHUB_APP_WEBHOOK_SECRET` must reach the **Playwright** process as well as the API, or the four
       intake specs self-skip instead of signing their own deliveries.
+- **The fake GitHub reads `PORT` too, and defaults to 3900 — so a script that has already exported
+  `PORT=3100` for the API silently starts the fake ON THE API'S PORT.** The symptom is maddening and worth
+  recognising by shape: the API logs `Nest application successfully started` and maps `/api/health`, both
+  processes are listening, and **every client gets `404` for `/api/health`** — because on Windows the
+  fake's IPv4 `127.0.0.1` bind wins IPv4 client calls over the API's IPv6 `::` bind, and `SO_REUSEADDR`
+  lets both binds succeed. Meanwhile `:3900` answers nothing, so `APW_E2E_GITHUB_FAKE_URL` points at air.
+  Set `PORT=3900` for the fake's own process (step 1), then `PORT=3100` for the API, and assert the fake
+  answers on **3900** and that **3100 has no owner** before starting the API. Cost: one full battery run
+  that reported a healthy API and then failed four specs on a 404 health check.
 - **A concurrent build of a workspace package can wipe `apps/api/dist` mid-build.** Rebuilding
   `packages/plugin` or `packages/agent` in another process while the API is building produces phantom type
   errors and an empty `dist`; if the API stops starting, rebuild it **after** the package builds finish
@@ -137,7 +154,8 @@ pnpm --filter ever-works-web exec playwright test -c playwright.app-works.config
 | Symptom                                                                                                 | Meaning                                                                                                                    | Action                                                                                                                |
 | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `APW_E2E_RUN_ID is not set`, `… is not in APW_E2E_ALLOWED_BASE_URLS`, `APW_E2E_TOKEN_BUDGET is not set` | one of the seven interlocks refused **before** anything ran. The message names the variable and the plan clause            | set it. All of them are in the workflow's env block — copy from there rather than inventing values                    |
-| `S10: no supported GitHub connection surface for this run account`                                      | the lane has no GitHub connection to act as (FR-56 / plan §8.8), so every create, fork and link scenario is `test.fixme`'d | land T63, or run the lane with the fixtures that need no connection (`flow-github-intake-signed-delivery` needs none) |
+| `S10: no supported GitHub connection surface for this run account`                                      | **since T63 this no longer means "the platform has no surface"** — surface (b) landed and the message names what the *account* lacks: neither a seeded OAuth row nor the operator-run connect. Surface (a) is named as declined | arm the seeding route (`EVER_WORKS_E2E_FAKES=1` **and** `APW_E2E_GITHUB_FAKE_URL`, on the API process) so `connectCustomerGitHub` can seed, or run the lane with the fixtures that need no connection |
+| `neither APW_E2E_USER_CLUSTER_CONTEXT nor APW_E2E_APPS_TIER_CONTEXT is set`                            | interlock 2 (plan §8.5): the **live** lanes place real workloads, so they refuse without an allow-listed kube context                    | set one of the two and hand the lane a cluster you are willing to let it write to. The five PR-lane specs (`playwright.config.ts`) need no cluster — that is the half a laptop can run |
 | A job pauses with a named reason instead of failing                                                     | the credential of record is unusable (member left, access lost, scope withdrawn) — FR-43                                   | hand the credential over from the UI, or re-connect the member's GitHub; nothing upstream was touched                 |
 | `waiting: 'budget'` / the member sees a reset time                                                      | the Work's own budget refused the run (FR-44)                                                                              | wait for the reset, or raise the Work's budget. The row keeps its state and nothing was opened                        |
 | `dispatch_unavailable` on fork readiness                                                                | no App runtime worker is reachable                                                                                         | check the worker's `boot.ok` (§4); in CI, that the step is enabled and the secret is set                              |

@@ -12,23 +12,23 @@
  *   3. **Asserts the GitHub connection surface** (plan §8.8). This is the step
  *      that keeps the epic's promise: "`github-connection.ts` asserts the
  *      resulting state … before the first scenario and fails as S10/S19 naming
- *      the surface", so a lane without a connection fails *here*, by name,
- *      rather than at the first fork call as an unexplained 400.
+ *      the surface", so a lane without a connection fails *here*, by name, rather
+ *      than at the first fork call as an unexplained 400.
  *   4. **Creates the account's Agent** with limited networking and its model
  *      credential (spec FR-65) and records the Agent id.
  *   5. **Writes the estate file** (plan §3.2) — the cleanup step's input.
  *
- * **Until T63 lands there is no supported connection surface**, so step 3 fails
- * with `S10` naming both documented surfaces and T63. That is the intended P0
- * behaviour, not a stub: T14/T15/T16/T30/T31 carry
- * `test.fixme('APW-13 T63: no supported GitHub connection surface')` for exactly
- * this reason (plan §8.8, `plan.md:666-667`), and this project is what turns
- * "the surface is missing" into one named failure instead of five confusing
- * ones. The probe itself is real — it asks the platform's own
+ * **T63 has landed surface (b)** (`POST /api/e2e/github-connection/seed` for the
+ * PR lanes; the operator-run OAuth connect for the live lanes), so this step no
+ * longer refuses with "no surface exists": it refuses only when the run account
+ * has no connection at all, and then it names the two ways to get one plus the
+ * surface the programme declined. The probe itself asks the platform's own
  * `GET /api/git-providers/github/connection` route
- * (`apps/api/src/plugins-capabilities/git-provider/git-provider.controller.ts:32`),
+ * (`apps/api/src/plugins-capabilities/git-provider/git-provider.controller.ts:31`),
  * which reports `connected` plus `authMethod: 'oauth' | 'personal-access-token'`
- * — the two surfaces §8.8 names. Nothing here fabricates a connection.
+ * — and a live lane must report `oauth`, because a `personal-access-token`
+ * connection would be surface (a), which this programme decided against.
+ * Nothing here fabricates a connection.
  */
 
 import { expect, test as setup } from '@playwright/test';
@@ -45,10 +45,26 @@ import {
     writeEstate,
 } from './helpers/app-works-live';
 
-/** The surfaces plan §8.8 offers, as the platform reports them. */
+/**
+ * The surfaces plan §8.8 offers, as the platform reports them, with the one T63
+ * landed marked as landed.
+ *
+ * T63 chose surface **(b)** — the non-production connection-seeding path — and
+ * declined (a), the user-scope `x-secret accessToken` setting on the
+ * `admin-only` GitHub plugin, because widening that boundary is the owner's call
+ * rather than a lane's convenience. The `personal-access-token` entry stays
+ * because the platform can still report it (an installation-level setting), and
+ * a lane that found one would be relying on a surface this programme decided
+ * against — so it is named, and refused, rather than silently accepted.
+ */
 const SURFACE_BY_AUTH_METHOD: Record<string, string> = {
-    oauth: 'a GitHub OAuth account row for the run account (plan §8.8 surface b)',
-    'personal-access-token': 'a user-scope GitHub access token setting (plan §8.8 surface a)',
+    oauth:
+        'a GitHub OAuth account row for the run account (plan §8.8 surface b — ' +
+        'operator-connected for the live lanes, seeded through ' +
+        'POST /api/e2e/github-connection/seed for the PR lanes)',
+    'personal-access-token':
+        'a user-scope GitHub access token setting (plan §8.8 surface a — NOT landed: ' +
+        'T63 chose (b), because allowing that field would widen the admin-only plugin contract)',
 };
 
 interface ConnectionInfo {
@@ -79,11 +95,16 @@ async function assertGitHubConnection(
     if (!info.connected) {
         throw new Error(
             'S10: no supported GitHub connection surface for this run account. ' +
-                'APW-13 T63 has not landed, so neither surface of plan §8.8 exists yet: ' +
-                `${SURFACE_BY_AUTH_METHOD.oauth}, or ${SURFACE_BY_AUTH_METHOD['personal-access-token']}. ` +
-                'Every create, fork and link scenario (T14, T15, T16, T30, T31) carries ' +
-                "test.fixme('APW-13 T63: no supported GitHub connection surface') until it does " +
-                '(plan.md §8.8). Refusing here rather than letting a scenario fail at its first fork call.',
+                'T63 landed surface (b) of plan §8.8, so the surfaces that exist are: ' +
+                `${SURFACE_BY_AUTH_METHOD.oauth} — the live lanes\' operator-run OAuth ` +
+                "connect of the machine account, recorded in T20's estate file " +
+                "(`docs/runbooks/app-works-acceptance-lanes.md`), and the PR lanes' seeding " +
+                'route `POST /api/e2e/github-connection/seed`, which answers `404` unless ' +
+                "`EVER_WORKS_E2E_FAKES=1` and `APW_E2E_GITHUB_FAKE_URL` are set in the API's " +
+                'environment. This account has neither. Surface (a) — ' +
+                `${SURFACE_BY_AUTH_METHOD['personal-access-token']} — is deliberately not ` +
+                'available and is not a fallback. Refusing here rather than letting a scenario ' +
+                'fail at its first fork call.',
         );
     }
 
@@ -91,8 +112,15 @@ async function assertGitHubConnection(
     if (!surface) {
         throw new Error(
             `S10: the platform reports a GitHub connection with authMethod '${info.authMethod}', ` +
-                'which is not one of the two surfaces plan §8.8 documents — record the new surface ' +
-                'in CONTRACTS and ACCEPTANCE §0.5 before a lane relies on it.',
+                'which is not one of the surfaces plan §8.8 documents — record the new surface ' +
+                'in CONTRACTS §7 and ACCEPTANCE §0.5 before a lane relies on it.',
+        );
+    }
+    if (info.authMethod !== 'oauth') {
+        throw new Error(
+            `S10: the run account is connected by '${info.authMethod}', which is ${surface}. ` +
+                'T63 landed surface (b), so a lane must not silently accept a connection that ' +
+                'rests on the surface this programme decided against.',
         );
     }
     return surface;
