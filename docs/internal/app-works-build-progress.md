@@ -365,6 +365,18 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · The count perturbation re-run against a REACHABLE mutation, and it reddens — T14 is now 2 of 4 proven.**
+  Last round''s inert duplicate is replaced by an **awaited extra call inserted before the return** in
+  `app-env-runtime.source.ts`''s `readReadiness` (`await this.readiness.ensureReadyForDeploy(workId);` ahead of the real
+  one), which is a mutation the compiler cannot fold away and the runtime cannot skip. Result: **2 failed / 12 passed**,
+  the named test among them — _"asks ensureReadyForDeploy exactly once per resolve, and never from an ephemeral path
+  (§4.6.1:432-434, GAP-05)"_ — then restored **byte-identically** (hash-checked). So ACC-06-54''s "asks once" is not
+  merely asserted in a test I read, it is **falsifiable**, and the difference between last round''s green and this
+  round''s red is entirely whether the mutation was reachable. Both directions of that pair are now in this log: a
+  mutation that cannot execute proves nothing, and a mutation that can, does. **T14 perturbation tally: 2 of 4** — the
+  depth guard and the once-only readiness read; remaining are the wrong-target placeholder and the value-vs-inputs
+  fingerprint. **T26: 6 of 6.**
+
 - **2026-09-18 · My negative perturbation explained: it was inert, not a missing test.** The round before last I read the
   green result of duplicating `app-env-runtime.source.ts:273` as "either the duplication is observationally inert or the
   count is unpinned". It is the first, and the reason is mechanical: the line is
