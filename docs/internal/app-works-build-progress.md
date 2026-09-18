@@ -365,6 +365,24 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · My negative perturbation explained: it was inert, not a missing test.** The round before last I read the
+  green result of duplicating `app-env-runtime.source.ts:273` as "either the duplication is observationally inert or the
+  count is unpinned". It is the first, and the reason is mechanical: the line is
+  `return (await this.readiness.ensureReadyForDeploy(workId)) ?? null;` — **duplicating a `return` statement produces
+  unreachable code**, so the second copy can never execute and the seam is still called once. The count _is_ pinned, by a
+  test written for exactly that: `app-env-runtime.source.spec.ts:323` — _"asks ensureReadyForDeploy exactly once per
+  resolve, and never from an ephemeral path (§4.6.1:432-434, GAP-05)"_ — with `toHaveBeenCalledTimes(1)` at :328 and
+  :344, plus a `CalledWith(WORK)` at :314. So ACC-06-54's "asks once" is asserted, and my probe proved nothing about it
+  in either direction. 🌟 **This is the third member of one family of false evidence this programme has now caught, and
+  the family is worth naming: a mutation that cannot execute is not a red test.** The first was PowerShell writing a
+  literal `\t` (a parse error read as a passing perturbation), the second was T26's constant-folded `false ? … :` (green
+  because the compiler removed it), and this one is dead code after an early `return`. All three looked like evidence
+  from the exit code alone. **The fix is the same each time and is now the standing rule: after mutating, read the
+  _assertion text_ and confirm the mutation was reachable — a duplicated `return`, a folded branch, or a rejected parse
+  is proof of nothing.** T14's own perturbation tally therefore stays at **1 of 4 proven** (the depth guard), with the
+  count perturbation to be re-run against a _reachable_ mutation (drop the memoisation, or call the seam from a second
+  live path) rather than logged as a pass.
+
 - **2026-09-18 · T26 verified on its author''s evidence, and one of my own perturbations came back NEGATIVE — recorded as such.**
   **APW-02 T26** (committed `ba6496736` + `711a1ddae`; its author confirmed every committed blob is byte-identical to what it
   verified, `git diff HEAD` empty): **110 tests** across the two specs, **228** for the whole `app-works` selection,
