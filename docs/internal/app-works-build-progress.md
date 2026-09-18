@@ -385,6 +385,7 @@ Newest first. One line per meaningful step, with the commit sha when pushed.
   **The integration number to carry forward: 16,838 of 16,844 tests pass on this branch, and the 3 failures + 3 skips
   are fully accounted for (1 ours, now fixed and re-run green; 2 environmental).** This is the first time the branch has
   been measured as a whole rather than in slices, and it is the number a reviewer should ask for.
+  **The neighbouring packages were re-measured the same round, with the in-flight T26 edit to `app-upstream.ts` included**: `@ever-works/contracts` **84 files / 3533 tests** and `tsc --noEmit` clean; `@ever-works/k8s-plugin` **23 files / 762 tests** — the same 762 this epic has held since APW-06 T13, so nothing in this round's landings moved it.
 
 - **2026-09-18 · Eight landings across four epics, and three findings worth more than the code they came with.**
   **APW-07 T13 — `AppEnvService`** (`83ff27690`; `app-env.service.spec.ts` **53 tests**; epic selection **7 suites / 281
