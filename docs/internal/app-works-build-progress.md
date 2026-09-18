@@ -41,23 +41,24 @@ findings once.
 
 ### Wave 1 foundation ledger (what "done" means here)
 
-| Task                | Deliverable                                                                                                                | Test evidence                                                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| contracts           | `packages/contracts/src/apps/` — **11 modules**, 4 specs                                                                   | contracts **3377 / 81 files**, 0 collisions                                                                            |
-| **T1**              | `app-runtime.ts` — 84 exports (12 unions, 38 precondition + 18 failure codes, 52 numbers)                                  | +111 tests, pins proven by 3 perturbations                                                                             |
-| **T4/T5**           | `app-names.ts` + `app-security.ts` — every name/label of plan §4.1, the whole §4.4 table                                   | k8s plugin **242 / 12 files** (was 184/10), one test per §4.4 cell                                                     |
-| **T2**              | `app-deployment.types.ts` (29 types) + the ten **optional** `IDeploymentPlugin` members + `isAppDeploymentPlugin`          | plugin **458 / 32 files** (was 419/31); **vercel 51/2 IDENTICAL** and still builds — no existing plugin needed an edit |
-| **T3**              | `packages/agent/src/app-runtime/{ports,default-ports,index}.ts` — every interface of plan §9.6 + five fail-closed bindings | agent **16 tests**; the `./app-runtime` subpath resolves after a build                                                 |
-| **T6/T7**           | `app-manifest.renderer.ts` (58 exports) + `app-network-policy.renderer.ts` (27)                                            | k8s plugin **358 / 14 files** (was 242/12); 4 perturbations red then reverted; old renderer hash-identical to HEAD     |
-| **APW-11 T1**       | `app-launcher.ts` — 36 exports, 11 constants, 2 fail-closed predicates                                                     | contracts **+45 tests**; pins proven by 4 runtime + 3 compile failures                                                 |
-| APW-03 T1           | `app-spec.types.ts`, `app-spec-issues.ts`, `app-license.types.ts`, `apps-catalog.types.ts`, `work-app-spec.dto.ts`         | contracts **3454 / 82 files**; barrel **34 areas**, 524 runtime exports                                                |
-| T8/T9               | `app-runner.script.ts`, `app-jobs.renderer.ts`, `app-rollout.ts`                                                           | k8s plugin **505 / 17 files**; `status.mapper.ts` + `manifest.renderer.ts` hash-identical to HEAD                      |
-| **APW-11 T2–T5**    | launcher persistence: entity + repository + migration (`1792110000000-CreateAppLauncherPreferences`)                       | diff 242 insertions / **1 deletion**; migration reversible                                                             |
-| **APW-11 T30**      | R-25: `AppLauncherPreference` → `data/account/app-launcher-preferences.jsonl`, `by: 'user'`; `redaction.ts` untouched      | agent **95 / 5 suites**; 4 perturbations red then reverted, 3 hashes restored; zip read back with `jszip`              |
-| **APW06-G26**       | `AppComponentInput.runAsUser?: number` — the contract catches up with APW-03 `schema.md:202`                               | k8s **505 / 17** after a **rebuilt** plugin dist; `tsc --noEmit` exit 0; renderer needed no code change                |
-| **APW-11 T31**      | the five operator switches in the three deploy manifests + `.env.example`; `_ENV` literal per file; switch ships OFF       | manifests **24/24/24** + env **18** insertions, **0 deletions**; guard spec **13 tests**; 3 perturbations red          |
-| **AppPrecondition** | declared in `app-runtime.ts` (plan §3.1:375, §5.1:674) after being referenced-but-absent everywhere under `packages/**`    | contracts **3457 / 82**; `type-check:tests` exit 0; 2 perturbations red (`TS2578` + union removal), hash restored      |
-| **APW-11 T32**      | `app_launcher` badge: `TYPE_TO_I18N` + colour entry, and `appLauncher` in **all 21 locales** (XC-24)                       | badge spec **4 tests** (real `de.json` bundle + a fallback control); 3 perturbations red; bundles 1+0 across 21 files  |
+| Task                | Deliverable                                                                                                                   | Test evidence                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| contracts           | `packages/contracts/src/apps/` — **11 modules**, 4 specs                                                                      | contracts **3377 / 81 files**, 0 collisions                                                                            |
+| **T1**              | `app-runtime.ts` — 84 exports (12 unions, 38 precondition + 18 failure codes, 52 numbers)                                     | +111 tests, pins proven by 3 perturbations                                                                             |
+| **T4/T5**           | `app-names.ts` + `app-security.ts` — every name/label of plan §4.1, the whole §4.4 table                                      | k8s plugin **242 / 12 files** (was 184/10), one test per §4.4 cell                                                     |
+| **T2**              | `app-deployment.types.ts` (29 types) + the ten **optional** `IDeploymentPlugin` members + `isAppDeploymentPlugin`             | plugin **458 / 32 files** (was 419/31); **vercel 51/2 IDENTICAL** and still builds — no existing plugin needed an edit |
+| **T3**              | `packages/agent/src/app-runtime/{ports,default-ports,index}.ts` — every interface of plan §9.6 + five fail-closed bindings    | agent **16 tests**; the `./app-runtime` subpath resolves after a build                                                 |
+| **T6/T7**           | `app-manifest.renderer.ts` (58 exports) + `app-network-policy.renderer.ts` (27)                                               | k8s plugin **358 / 14 files** (was 242/12); 4 perturbations red then reverted; old renderer hash-identical to HEAD     |
+| **APW-11 T1**       | `app-launcher.ts` — 36 exports, 11 constants, 2 fail-closed predicates                                                        | contracts **+45 tests**; pins proven by 4 runtime + 3 compile failures                                                 |
+| APW-03 T1           | `app-spec.types.ts`, `app-spec-issues.ts`, `app-license.types.ts`, `apps-catalog.types.ts`, `work-app-spec.dto.ts`            | contracts **3454 / 82 files**; barrel **34 areas**, 524 runtime exports                                                |
+| T8/T9               | `app-runner.script.ts`, `app-jobs.renderer.ts`, `app-rollout.ts`                                                              | k8s plugin **505 / 17 files**; `status.mapper.ts` + `manifest.renderer.ts` hash-identical to HEAD                      |
+| **APW-11 T2–T5**    | launcher persistence: entity + repository + migration (`1792110000000-CreateAppLauncherPreferences`)                          | diff 242 insertions / **1 deletion**; migration reversible                                                             |
+| **APW-11 T30**      | R-25: `AppLauncherPreference` → `data/account/app-launcher-preferences.jsonl`, `by: 'user'`; `redaction.ts` untouched         | agent **95 / 5 suites**; 4 perturbations red then reverted, 3 hashes restored; zip read back with `jszip`              |
+| **APW06-G26**       | `AppComponentInput.runAsUser?: number` — the contract catches up with APW-03 `schema.md:202`                                  | k8s **505 / 17** after a **rebuilt** plugin dist; `tsc --noEmit` exit 0; renderer needed no code change                |
+| **APW-11 T31**      | the five operator switches in the three deploy manifests + `.env.example`; `_ENV` literal per file; switch ships OFF          | manifests **24/24/24** + env **18** insertions, **0 deletions**; guard spec **13 tests**; 3 perturbations red          |
+| **AppPrecondition** | declared in `app-runtime.ts` (plan §3.1:375, §5.1:674) after being referenced-but-absent everywhere under `packages/**`       | contracts **3457 / 82**; `type-check:tests` exit 0; 2 perturbations red (`TS2578` + union removal), hash restored      |
+| **APW-11 T32**      | `app_launcher` badge: `TYPE_TO_I18N` + colour entry, and `appLauncher` in **all 21 locales** (XC-24)                          | badge spec **4 tests** (real `de.json` bundle + a fallback control); 3 perturbations red; bundles 1+0 across 21 files  |
+| **APW-02 T9/T10**   | git-provider fork capabilities: 9 optional `GitRepository` fields + 9 optional `IGitProviderPlugin` members + plan §3.3 types | plugin **492 / 33** (was 458/32); diffs 219/0 · 8/0 · 20/0; required-member probe went red in the dependant too        |
 
 **Two foundation tasks own a guard worth knowing about:**
 
@@ -290,6 +291,33 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · APW-02 T9 + T10 land: the git-provider contract grows its fork capabilities, additively.**
+  **915 insertions, zero deletions**, five files: nine OPTIONAL fields on `GitRepository` (`source?`, `allowForking?`,
+  `archived?`, `visibility?`, `stars?`, `sizeKb?`, `licenseSpdx?`, `empty?`, `movedFrom?`), nine OPTIONAL members on
+  `IGitProviderPlugin` (`findExistingFork?`, `syncForkBranch?`, `getForkDivergence?`, `createRepositoryCopy?`,
+  `setActionsPermissions?`, `createWebhook?`, `deleteWebhook?`, `createBranchFromSha?`, `updateBranchRef?`), the new
+  `git-provider.app-forks.ts` types of plan §3.3, both re-export barrels, and a 34-test spec. Every added member's
+  JSDoc states the caller must **materialise** it on the plugin instance first — the lazy-plugin proxy over-reports
+  optional methods, so "the member exists" is not "the plugin implements it", and that is a real bug source this
+  contract can prevent.
+  Verified here (not taken on the agent's word): plugin **492 / 33 files** green (was 458/32; the new spec is the
+  +34, and it passes 34/34 run directly), `type-check` exit 0 for plugin and github-plugin, the nine members read
+  back **with `?`** and the nine fields **with `readonly … ?`** straight out of the file, and `git diff --numstat`
+  = 219/0, 8/0, 20/0 plus two new files — so "every existing implementation compiles unchanged" is structural, not
+  a claim. The required-member perturbation (make `findExistingFork` required) was captured red **twice**: the
+  conformance spec (`TS2741`, `TS2344`) and, after a deliberate dist rebuild, the **dependent** github-plugin
+  (`TS2420` on `GitHubPlugin`) — then reverted with sha256 `7E11E7BF…D4E` identical on both sides. That second red
+  is the whole point of the dist-rebuild rule recorded further up this file.
+  Two deliberate differences from plan §3.3, both additive and both reported rather than hidden: the error's
+  `details` bag is a named exported `GitProviderErrorDetails` (same structure), and
+  `createBranchFromSha?` / `updateBranchRef?` return `Promise<GitBranch>` because neither plan §3.3 nor CONTRACTS §3
+  states a return type — if APW-09 wants another one, it changes in both epics at once, since the names and
+  parameters already match.
+  📌 **Handoff: APW-09 T3 must SKIP its interface edit.** CONTRACTS §3 lists `createBranchFromSha` / `updateBranchRef`
+  as APW-09's, but APW-02 needed them first, so they are on the interface now; APW-09's tasks.md already anticipates
+  the split. What remains for APW-09 T3 is the GitHub implementation (`createRef`, `updateRef({ force: false })`),
+  the facade pass-throughs and its own specs. Also reported: `packages/plugins/gitlab` **does not exist** in this
+  repo, so the plan's "gitlab compiles unchanged" is vacuous — the real dependents are github-plugin and agent.
 - **2026-09-18 · two operator-facing facts measured, not assumed.** (1) **`ever-works/platforms` is PRIVATE**, and the
   anonymous raw-host read the launcher's production path depends on returns **404** — GitHub answers 404 rather than
   403 for a private repo, so this looks exactly like "the file is missing" to anyone debugging it later. The public
