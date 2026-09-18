@@ -72,6 +72,11 @@ findings once.
 | **APW-11 T13/T20/T21**      | the fail-closed web flag; the shared hidden-kind list; the no-sign-on copy guard                                              | web `work-kinds` **39**, badge + no-sso **23**; web sweep **423 files / 4075**; 8 perturbations across the three        |
 | **APW-01 T1/T3/T7/T7b/T20** | the `app` kind, its capabilities, the instance setting (API + manifests) and the fail-closed chip                             | contracts **3482**; `config.spec` **325**; apps/api `app-launcher` **143**; 10 perturbations, incl. the half-flip guard |
 | **APW-09 T4**               | the facade's cross-repo pass-throughs and the member token                                                                    | `git.facade` **199**; +269/−0; a wrong positive control was found by the suite itself                                   |
+| **APW-09 T1/T2**            | cross-repo PR fields, the two review reads and the interaction limit; the provisional facade seam retired (aliased)           | plugin **492** (+217/−0 contract); github-plugin **326 → 356**; 8 perturbations red; 1 file touched outside the list    |
+| **APW-03 T7/T8**            | `kind: app` routed to the App spec validator; the stand-alone App spec schema + its public route                              | `works-config` **632 → 661**; apps/api `works-schema` **6**; 6 perturbations; the committed envelope schema was broken  |
+| **APW-06 T13**              | `app-status.reader.ts`, `app-lifecycle.ts`, `app-cluster-check.ts` + the package root's disambiguation                        | k8s **614 → 730 / 23 files**; 6 perturbations + **1 re-run by the coordinator**; a bundler/`tsc` guard asymmetry found  |
+| **APW-02 T23**              | `AppUpstreamStateService` + `AppForkReadyHandler` port — one writer of the state row, one event per transition                | app-works **59 tests** (54 new); 4 perturbations red; the transient failures were **my** moving-target verification     |
+| **APW-11 T14 (route half)** | `GET /api/me/apps` on `bffProxy` — scope carried, one parameter forwarded, status/body passed through                         | web `api/me/apps` **12 tests**; 4 perturbations red; the first spec draft was a **false-green** suite (fixed)           |
 
 **Two foundation tasks own a guard worth knowing about:**
 
@@ -139,6 +144,16 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
   `process.env.API_URL || 'http://localhost:3100'` once), so a spec that sets `process.env.API_URL` in a `beforeEach`
   has no effect on it — assert against the exported constant, or re-import the module. This cost one iteration while
   writing APW-11 T13's spec.
+
+- **🛑 NEVER verify a slice while its author is still working — the file is a moving target and the failure is yours,
+  not the code's.** On 2026-09-18 the APW-02 spec was run mid-author and reported 48 failures (better-sqlite3 inserts),
+  then a `markReady` double-emit and a seven-status lookup. Each matched a perturbation the author had applied and
+  reverted at that instant, and a temporary module-load diagnostic proved the committed module was correct all along
+  (`{"open":["backlog","todo","in_progress","in_review","blocked"],"terminal":["done","cancelled"]}`, resolved from
+  `packages/contracts/src`). The author's own perturbation loop _is_ an in-place edit of the file under test, so
+  concurrent verification measures a revision that exists for seconds. **Rule: wait for the author's completion
+  message, then verify** — and when a spec fails, first ask whether the file changed while the suite ran (mtime vs the
+  run's start) before believing the failure.
 
 - **A full agent-package sweep is not a clean gate in this worktree, for two unrelated reasons.** Running all 820
   suites (`pnpm --filter @ever-works/agent test`, `--maxWorkers=2`) reported **4 failed suites / 2 failed tests**, and
@@ -334,6 +349,76 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 ## 5. Log
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
+
+- **2026-09-18 · five slices land in one round — the App spec is published, the k8s lifecycle exists, the state row
+  gets its writer, the upstream PR surface opens, and the launcher's BFF read carries its scope.**
+  **APW-09 T1/T2 — cross-repository PRs, review reads, interaction limits** (`fb59836fb`; plugin `+217/−0`, github
+  plugin **326 → 356 tests**, facade 199 green). `headOwner`/`headRepo`/`maintainerCanModify`, `headRepoFullName` on
+  all four PR reads, `head` on a list, `totalCommits` on both diff reads, and the three optional members with their
+  element types. `head_repo` is sent only for a same-owner head (G23); a **false** `maintainerCanModify` is sent while
+  an absent one is omitted; unrecognised review states degrade to `commented` so a reviewer is never hidden and an
+  approval never invented; 403/404/empty-204 → `null` for the interaction limit while 5xx/429 still throw, so a broken
+  read is never a silent "cannot tell". 🌟 **The facade's provisional seam was retired by ALIASING, not deleting**: the
+  four local type names it declared are re-exported as `@deprecated` aliases of the contract types, because that module
+  is re-exported from the package root and those names are somebody's import today (NN #27 — additive only).
+  **APW-03 T7/T8 — `kind: app` routed to the App spec, and its schema published** (`49870eebb`; `works-config`
+  **632 → 661 tests**, apps/api `works-schema` 6 green). The whole document (not the `spec` block) goes to
+  `validateAppSpecObject`, whose issue strings reuse the existing `path: message` shape, so a caller that only prints
+  errors needs no App branch. Published at `GET api/schema/app-spec.schema.json` with `$id` equal to the URL it is
+  served from, and the envelope embeds the **same** body as `$defs.appSpec` — one definition, two consumers.
+  🛑 **The committed `works.v2.schema.json` was unusable before this task**: `oneOf` with a catch-all escape branch is
+  unsatisfiable, so ajv rejected every known-kind spec _and accepted_ `replica` under an app component. Fixed
+  additively in the emitter (branches require the `kind` they are keyed on; the escape branch excludes listed kinds);
+  9 `oneOf` branches before and after, no key removed from any branch. Two bugs routed: **`app-spec.validate.ts:2040`
+  passes the VALUE of `kind` to `kindOf`, which expects the OBJECT**, so the document form never derives `rootKind` and
+  `kind_mismatch` never fires (one-line fix, T6's file), and **T3's `validSpec` fixture was not rule-clean** (an
+  undeclared `env` reference and a generated entry without `secret: true`) — surfaced by the routing, fixture fixed,
+  assertions untouched.
+  **APW-06 T13 — status, scale, logs, jobs, namespace, hosts, destroy, cluster check** (`a0f90a991`; k8s
+  **614 → 730 tests**). Every refusal travels as an exported `APP_LIFECYCLE_CODES` member; `probeReadiness`-style
+  fail-closed answers throughout; the status reader never reports `isolationEnforced: true` when nothing reported it,
+  and a verification reference returns components/jobs/smoke/isolation only, per §4.12. The package root was completed
+  here (T13's list stopped at the modules) — 🌟 **and that is where a landmine was found**: `componentSelector` is
+  declared by BOTH `app-names.ts` (a label map) and the status reader (a selector string), and TypeScript drops an
+  ambiguous `export *` name from the root entirely (TS2308 — caught by `type-check`, not by a test). Both are now
+  re-exported explicitly, the T13 spelling as `componentLabelSelector`. **Two perturbations against the entry measured
+  what each guard covers, and the asymmetry is the finding**: deleting the alias export turns the new barrel spec RED,
+  while deleting the explicit incumbent re-export does **not** — the bundler still resolves one candidate and only
+  `tsc` fails. A bundler resolving the other candidate would hand a rendered-object caller a `'k=v'` string, which is
+  why the explicit re-export is not optional. The coordinator also re-ran one of T13's six perturbations
+  independently (making the §4.6 `volume_replicas` guard unreachable turns exactly ACC-06-18 red; restore returned
+  `73F63825…`).
+  **APW-02 T23 — the fork-ready port and the one writer of the state row** (`079df13f1`; app-works **59 tests** green,
+  54 of them this task's). One event per transition, the resolver never chosen here, the conflict comment posted with
+  no `@` (the chat service fans out one agent run per mention), the open labelled Task commented rather than
+  duplicated across exactly the five open statuses. Every collaborator except the repository is `@Optional()` — **T27
+  must import Database/Notifications/TasksDomain or the service degrades to 404s** — and the three provisional tokens
+  are declared but deliberately NOT bound.
+  **APW-11 T14 route half — `GET /api/me/apps`** (`8b7e69553`; 12 tests). Uses **`bffProxy`** rather than T14's literal
+  `serverFetch`: same scope conversion, but a missing/malformed selector answers **400** instead of throwing (so a
+  client bug is not reported as a gateway failure), and it is the wrapper 48 sibling routes already use for exactly
+  this defect class. 🛑 **The first draft of its spec was a false-green suite**: it asserted a header name that does
+  not exist (`x-ever-workspace-scope`; the real one is `x-scope-slug`) and sent a bare slug as the browser selector
+  (the grammar is `personal` | `org:<slug>`), so `fetch` was never reached and the two `502` tests passed for the
+  wrong reason. Fixed, and every helper now asserts the upstream call happened before reading it. Four perturbations
+  red, each restored byte-identically.
+  **📌 A flake that was mine, recorded because "it passes when I re-run it" is not an explanation.** I ran the APW-02
+  spec while its author was still working and saw 48 failures (better-sqlite3 inserts), then 1–2 assertion failures —
+  a `markReady` double-emit and a seven-status lookup. Every one matched a perturbation the agent had applied and
+  reverted at that instant (`firstReady = true`; `[...TASK_BOARD_STATUSES]`), and a temporary module-load diagnostic
+  proved the committed module computes the five open statuses from `packages/contracts/src`. **I was verifying a moving
+  target; the code was never wrong.** Verification now waits for the author to finish.
+  **New findings routed this round (not fixed here):** `WorkUpstreamStateRepository.update()` takes no predicate, so
+  `markReady`'s once-only event is a read-then-write guard — closing plan.md:687 properly needs
+  `markReadyIfUnset(workId, patch)`; `AppJobRunRequest` has no `command`/`args`/`component`, so a manual job runs the
+  live image's own entrypoint; `AppClusterCheck` has no `ingressAddress` though §6.3/§9.10 require it (returned via an
+  extending type, contract untouched); `errors.ts`'s `scrubString` reads a group-less match as a capture group and
+  emits `<offset>[REDACTED]` (production call sites `k8s.plugin.ts:1202-1206`, unasserted by `errors.spec.ts`); §3.1
+  stores readiness/sync reason spellings that are not members of the contracts' closed unions; the §3.1 entity lacks
+  the columns several §6.2 warnings need; `GitHubPlugin` cannot express `'none'` for the interaction limit (204-empty →
+  `null` per G16, so T5's spike record must say so); `AppUpstreamStateRepository` still needs T26's `syncLeaseUntil`;
+  and `apps/api/jest.config.js` cannot load the real `@ever-works/agent/works-config` barrel (ESM-only `p-map`), so
+  T13/T7's API specs stub that one specifier with the real emitters.
 
 - **2026-09-18 · the App Works switch becomes operable end to end, and the facade grows its cross-repo surface.**
   **APW-01 T20 + T7 + the deployment half — one switch, three places, one convention.**
