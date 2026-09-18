@@ -24,6 +24,14 @@
  *   `packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts`: a cross-package
  *   import can only reach the built `@ever-works/agent/app-runtime` subpath, so the marker has to
  *   be on this barrel.
+ * - `./app-license-gate` and `./app-deploy-preconditions.service` — `AppLicenseGate` (plan §5.2)
+ *   and `AppDeployPreconditionsService` (plan §5.1, T21), plus the provisional seams each declares
+ *   (`APP_LICENSE_SERVICE`; `APP_DEPLOY_SPEC_SOURCE`, `APP_DEPLOY_BUILD_SOURCE`,
+ *   `APP_DEPLOY_HOST_SOURCE`, `APP_DEPLOY_DISPATCHER_AVAILABILITY`, and the runtime-state and
+ *   dependency *views* that reuse the tokens other files already own). Exported for the same
+ *   cross-package reason as the marker above: the `app-deploy` task in `packages/tasks` re-runs the
+ *   precondition pass (§5.6 step 1) and the API's deploy route answers from it (§2.2 step 2), and
+ *   both can only reach this folder through the subpath barrel.
  */
 
 export * from './ports';
@@ -31,3 +39,5 @@ export * from './default-ports';
 export * from './worker-context';
 export * from './app-runtime-deletion.service';
 export * from './app-verification-target.service';
+export * from './app-license-gate';
+export * from './app-deploy-preconditions.service';
