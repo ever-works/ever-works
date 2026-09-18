@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { appSpecSchema } from './app-spec.schema';
 
 /**
  * `.works/works.yml` — the versioned schema.
@@ -353,6 +354,19 @@ export const KIND_SPEC_SCHEMAS = {
     'awesome-repo': awesomeRepoSpec,
     repo: repoSpec,
     company: companySpec,
+    /**
+     * An App Work (APW-03 T3, plan §2.2:125) — the App spec of `schema.md`
+     * §5–§20, which is also published stand-alone as
+     * `https://api.ever.works/api/schema/app-spec.schema.json` (§25).
+     *
+     * Strict, like every kind here: a key the App spec does not define is
+     * `unrecognized_keys`, which the App validator maps to `unknown_field`.
+     * `x-` keys are the one exception the App spec allows at any depth
+     * (§2:74-75), and `app-spec.schema.ts` exports `stripExtensionKeys` for the
+     * caller that removes them from a copy before parsing (T7 routes `app`
+     * through that validator rather than through this dispatch).
+     */
+    app: appSpecSchema,
 } as const;
 
 export type KnownSpecKind = keyof typeof KIND_SPEC_SCHEMAS;
