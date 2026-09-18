@@ -53,3 +53,14 @@ export * from './app/app-manifest.renderer.js';
 export * from './app/app-runner.script.js';
 export * from './app/app-jobs.renderer.js';
 export * from './app/app-rollout.js';
+// The kubeconfig guard (APW-06 T11, plan §6.1) — the one way a customer-supplied
+// kubeconfig may be loaded: the unsupported user/cluster fields refused, the
+// server required to be a public https address, and the validated IP pinned so
+// the name cannot be re-resolved between the check and the call. Exported so
+// APW-07 and APW-10 reach it through the package root rather than a deep import.
+export * from './app/app-kubeconfig.guard.js';
+// The deployer (APW-06 T12, plan §5.5–§5.7) — the phase machine and the rollback,
+// applying what the renderers above produce. Its `deployApp` is
+// `IDeploymentPlugin.deployApp`'s exact signature, and `AppDeployerApi` is the
+// five-method port over `KubernetesApiService` that keeps it unit-testable.
+export * from './app/app-deployer.js';
