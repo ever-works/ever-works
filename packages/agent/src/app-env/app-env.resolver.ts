@@ -340,13 +340,23 @@ export interface AppEnvEphemeralClusterResolution {
 }
 
 /**
- * One recipe entry: the contracts union with `secret` materialised and the
- * sources restricted to the four APW-06's port knows (docstring item 1).
+ * One recipe entry: the contracts union with `secret` materialised.
+ *
+ * `source` carries every `AppEnvRecipeSource` member — `derived` included —
+ * because plan §4.6.1:447 makes `AppEnvRecipeEntry`
+ * (`contracts/src/apps/app-env.ts:585-590`) the normative union and APW-05's
+ * `verify-plan.schema.json:202` permits `derived`. The producer below still
+ * emits only `generate | literal | prompted | template` (docstring item 1), so
+ * this is a widened TYPE and no behaviour change — and it retires the
+ * `Exclude<AppEnvRecipeEntry['source'], 'derived'>` this type used to carry,
+ * whose only reason was `AppRuntimeEnvRecipeEntry`
+ * (`packages/agent/src/app-runtime/ports.ts:185-196`) knowing four sources.
+ * That port now declares all five, which turns its `derived` member into a
+ * compile-time requirement of this file rather than a docstring request.
  */
 export type AppEnvRuntimeRecipeEntry = AppEnvRecipeEntry & {
     readonly name: string;
     readonly secret: boolean;
-    readonly source: Exclude<AppEnvRecipeEntry['source'], 'derived'>;
 };
 
 /** The `runner` ephemeral answer — a recipe and **no value at all**. */
