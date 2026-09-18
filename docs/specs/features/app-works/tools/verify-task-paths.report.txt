@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1195 · absent: 1472 · of the absent, another task says it creates them: 603
+present: 1233 · absent: 1434 · of the absent, another task says it creates them: 584
 
-## LANDED SURFACE — marked "new", already in the repository (41)
+## LANDED SURFACE — marked "new", already in the repository (57)
 
 - APW-06-app-runtime T1 — `packages/contracts/src/apps/app-runtime.ts`
 - APW-06-app-runtime T2 — `packages/plugin/src/contracts/capabilities/app-deployment.types.ts`
@@ -26,8 +26,10 @@ present: 1195 · absent: 1472 · of the absent, another task says it creates the
 - APW-06-app-runtime T9 — `packages/plugins/k8s/src/app/app-rollout.ts`
 - APW-06-app-runtime T11 — `packages/plugins/k8s/src/app/app-kubeconfig.guard.ts`
 - APW-06-app-runtime T12 — `packages/plugins/k8s/src/app/app-deployer.ts`
+- APW-06-app-runtime T13 — `packages/plugins/k8s/src/app/app-status.reader.ts`
 - APW-06-app-runtime T28 — `packages/agent/src/events/index.ts`
 - APW-06-app-runtime T63 — `apps/web/e2e/accessibility-axe-deep.spec.ts`
+- APW-09-upstream-pull-requests T1 — `packages/plugins/github/src/__tests__/github-api.service.cross-repo.spec.ts`
 - APW-09-upstream-pull-requests T4 — `packages/agent/src/facades/__tests__/git.facade.member-token.spec.ts`
 - APW-11-app-launcher T1 — `packages/contracts/src/apps/__tests__/app-launcher.spec.ts`
 - APW-11-app-launcher T2 — `packages/agent/src/entities/app-launcher-preference.entity.ts`
@@ -46,7 +48,21 @@ present: 1195 · absent: 1472 · of the absent, another task says it creates the
 - APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.controller.ts`
 - APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.module.ts`
 - APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.controller.spec.ts`
+- APW-11-app-launcher T10 — `packages/app-launcher/src/__tests__/index.spec.ts`
+- APW-11-app-launcher T11 — `packages/app-launcher/src/grid-navigation.ts`
+- APW-11-app-launcher T11 — `packages/app-launcher/src/__tests__/grid-navigation.spec.ts`
+- APW-11-app-launcher T12 — `packages/app-launcher/src/ever-app-launcher.ts`
+- APW-11-app-launcher T12 — `packages/app-launcher/src/__tests__/ever-app-launcher.spec.ts`
 - APW-11-app-launcher T13 — `apps/web/src/lib/feature-flags/app-launcher.unit.spec.ts`
+- APW-11-app-launcher T14 — `apps/web/src/app/api/me/apps/route.ts`
+- APW-11-app-launcher T14 — `apps/web/src/lib/app-launcher/app-launcher-telemetry.ts`
+- APW-11-app-launcher T14 — `apps/web/src/components/app-launcher/AppLauncherButton.unit.spec.tsx`
+- APW-11-app-launcher T16 — `apps/web/src/components/settings/AppLauncherSettings.tsx`
+- APW-11-app-launcher T16 — `apps/web/src/components/settings/AppLauncherSettings.unit.spec.tsx`
+- APW-11-app-launcher T17 — `apps/web/src/components/works/detail/settings/AppLauncherExposureSetting.tsx`
+- APW-11-app-launcher T17 — `apps/web/src/components/works/detail/overview/AppLauncherExposureCard.tsx`
+- APW-11-app-launcher T17 — `apps/web/src/components/works/detail/overview/AppLauncherExposureCard.unit.spec.tsx`
+- APW-11-app-launcher T19 — `apps/web/src/lib/app-launcher/__tests__/app-launcher-messages.unit.spec.ts`
 - APW-11-app-launcher T21 — `apps/web/src/lib/app-launcher/__tests__/no-sso-claims.unit.spec.ts`
 - APW-11-app-launcher T22 — `docs/features/app-launcher.md`
 - APW-11-app-launcher T32 — `apps/web/src/components/activity-log/ActivityTypeBadge.unit.spec.tsx`
@@ -58,34 +74,34 @@ present: 1195 · absent: 1472 · of the absent, another task says it creates the
 | Epic | Named | Landed (marked new, exists) |
 | ---- | ----- | --------------------------- |
 | APW-01-app-work-kind | 69 | 0 |
-| APW-02-fork-lifecycle | 91 | 0 |
-| APW-03-app-spec-and-catalog | 158 | 0 |
+| APW-02-fork-lifecycle | 85 | 0 |
+| APW-03-app-spec-and-catalog | 154 | 0 |
 | APW-04-app-provisioner | 125 | 0 |
 | APW-05-builds | 122 | 0 |
-| APW-06-app-runtime | 167 | 17 |
+| APW-06-app-runtime | 164 | 18 |
 | APW-07-app-env-and-dependencies | 109 | 0 |
 | APW-08-evolve-loop | 125 | 0 |
-| APW-09-upstream-pull-requests | 93 | 1 |
+| APW-09-upstream-pull-requests | 91 | 2 |
 | APW-10-apps-hosting-tier | 150 | 0 |
-| APW-11-app-launcher | 71 | 23 |
+| APW-11-app-launcher | 64 | 37 |
 | APW-12-ever-id | 122 | 0 |
 | APW-13-golden-paths | 111 | 0 |
 
-## ABSENT PATHS (1472) — grouped by epic
+## ABSENT PATHS (1434) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
-- APW-03-app-spec-and-catalog: 158
-- APW-06-app-runtime: 150
+- APW-03-app-spec-and-catalog: 154
 - APW-10-apps-hosting-tier: 150
+- APW-06-app-runtime: 146
 - APW-04-app-provisioner: 125
 - APW-08-evolve-loop: 125
 - APW-12-ever-id: 122
 - APW-05-builds: 122
 - APW-13-golden-paths: 111
 - APW-07-app-env-and-dependencies: 109
-- APW-09-upstream-pull-requests: 92
-- APW-02-fork-lifecycle: 91
+- APW-09-upstream-pull-requests: 89
+- APW-02-fork-lifecycle: 85
 - APW-01-app-work-kind: 69
-- APW-11-app-launcher: 48
+- APW-11-app-launcher: 27
