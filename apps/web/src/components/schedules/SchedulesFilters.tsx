@@ -9,16 +9,21 @@ import {
     hasActiveFilters,
     type SchedulesFilterState,
 } from './schedules-filters.shared';
-import { SOURCE_META, SOURCE_ORDER } from './SchedulesList';
 
 const selectClass =
     'h-8 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 text-xs text-text dark:text-text-dark';
 
 /**
- * Agent / source / status / health / search for the workspace list. Pure
- * presentation: the parent owns the state and mirrors it into the URL, so a
- * filtered list survives a reload and can be shared as a link. The search
- * box reports after a short pause so typing does not fire a request per key.
+ * Agent / status / health / search for the Schedules list. Pure presentation:
+ * the parent owns the state and mirrors it into the URL, so a filtered list
+ * survives a reload and can be shared as a link. The search box reports after
+ * a short pause so typing does not fire a request per key.
+ *
+ * The SOURCE dimension is not here: it is the chip row directly above
+ * (`ScheduleSourceChips`), which shows each source's count and is the only
+ * control that can say "you have none of these" at a glance. One dimension,
+ * one control — the chips write the same `source` parameter this select used
+ * to, so every existing link and bookmark still resolves.
  */
 export function SchedulesFilters({
     value,
@@ -60,29 +65,6 @@ export function SchedulesFilters({
                 {agents.map((agent) => (
                     <option key={agent.id} value={agent.id}>
                         {agent.name}
-                    </option>
-                ))}
-            </select>
-
-            <label className="sr-only" htmlFor="schedules-filter-source">
-                {t('filters.source')}
-            </label>
-            <select
-                id="schedules-filter-source"
-                data-testid="schedules-filter-source"
-                className={selectClass}
-                value={value.source}
-                onChange={(event) =>
-                    onChange({
-                        ...value,
-                        source: event.target.value as SchedulesFilterState['source'],
-                    })
-                }
-            >
-                <option value="">{t('filters.anySource')}</option>
-                {SOURCE_ORDER.map((source) => (
-                    <option key={source} value={source}>
-                        {t(`sourceTypes.${SOURCE_META[source].labelKey}`)}
                     </option>
                 ))}
             </select>

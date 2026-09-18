@@ -142,19 +142,20 @@ describe('DashboardSidebar — navigation consolidation', () => {
         expect(labels.indexOf('navigation.memory')).toBe(labels.indexOf('navigation.teams') + 1);
     });
 
-    it('lists Activity once, and no Runs entry — the ledger is its Runs view now', () => {
+    it('lists Activity once, and neither Runs nor Schedules — both are its views now', () => {
         const { container } = renderSidebar();
         const labels = navLinks(container).map((a) => a.textContent?.trim());
 
         expect(labels.filter((l) => l === 'navigation.activity')).toHaveLength(1);
-        // Runs (AW-09) was its own page above Activity; the Activity merge made
-        // it the Activity page's `Runs` view, so the sidebar entry is gone.
+        // Runs (AW-09) and Schedules were each their own page; both turned out
+        // to be views of the same rows, so their sidebar entries are gone.
         expect(labels).not.toContain('navigation.runs');
+        expect(labels).not.toContain('navigation.schedules');
         expect(linkFor(container, 'navigation.activity')?.getAttribute('href')).toBe('/activity');
     });
 
-    it('keeps Activity lit on the retired /runs path, which still redirects', () => {
-        for (const path of ['/activity', '/runs']) {
+    it('keeps Activity lit on the retired /runs and /schedules paths, which still redirect', () => {
+        for (const path of ['/activity', '/runs', '/schedules']) {
             nav.pathname = path;
             const { container, unmount } = renderSidebar();
             expect(

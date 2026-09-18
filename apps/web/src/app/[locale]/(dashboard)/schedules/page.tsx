@@ -1,48 +1,45 @@
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { getTranslations } from 'next-intl/server';
-import { getSchedulePage, getScheduleHealth } from '@/app/actions/dashboard/schedules';
-import { SchedulesWorkspace } from '@/components/schedules/SchedulesWorkspace';
+import { getLocale } from 'next-intl/server';
+import { redirect } from '@/i18n/navigation';
 import {
     filtersFromSearchParams,
-    pageParamsFor,
+    scheduleFilterParams,
 } from '@/components/schedules/schedules-filters.shared';
 
-export async function generateMetadata(): Promise<Metadata> {
-    const t = await getTranslations('metadata.pages');
-    return { title: t('schedules') };
-}
+type SearchParams = Record<string, string | string[] | undefined>;
 
 /**
- * Schedules workspace. Reads the first page (with the filters in the link)
- * and the health summary on the server, each on its own — one failing never
- * blanks the other.
+ * `/schedules` — RETIRED as a page. The Schedules list is now the **Schedules
+ * view of the Activity page** (`/activity?view=schedules`), because the two
+ * surfaces had grown into the same surface: one list of everything that runs
+ * without you, sitting next to the record of everything that ran. Keeping both
+ * meant two implementations of one list, and only one of them could have the
+ * per-row controls.
+ *
+ * Kept as a redirect rather than deleted so every bookmark, dashboard link,
+ * help article and e2e journey written against `/schedules` keeps working —
+ * and so does the VIEW it named: the whole filter set rides along, so
+ * `/schedules?source=data_sync&status=active&active=1` lands on that exact
+ * list rather than an unfiltered one.
  */
-export default async function SchedulesPage({
+export default async function SchedulesRedirect({
     searchParams,
 }: {
-    searchParams: Promise<Record<string, string | string[] | undefined>>;
+    searchParams?: Promise<SearchParams>;
 }) {
-    const raw = await searchParams;
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(raw ?? {})) {
-        if (typeof value === 'string') params.set(key, value);
+    const params = (await searchParams) ?? {};
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        const first = Array.isArray(value) ? value[0] : value;
+        if (first !== undefined) search.set(key, first);
     }
-    const filters = filtersFromSearchParams(params);
+    // Through the shared parser, so an unknown or malformed value is dropped
+    // here exactly as it would have been by the list itself.
+    const filters = filtersFromSearchParams(search);
 
-    const [pageResponse, healthResponse] = await Promise.all([
-        getSchedulePage(pageParamsFor(filters)).catch(() => ({ ok: false as const })),
-        getScheduleHealth().catch(() => ({ ok: false as const })),
-    ]);
+    const target = new URLSearchParams();
+    target.set('view', 'schedules');
+    for (const [key, value] of scheduleFilterParams(filters)) target.set(key, value);
 
-    return (
-        <Suspense fallback={null}>
-            <SchedulesWorkspace
-                initialPage={pageResponse.ok ? pageResponse.page : null}
-                initialFailed={!pageResponse.ok}
-                initialHealth={healthResponse.ok ? healthResponse.summary : null}
-                initialHealthFailed={!healthResponse.ok}
-            />
-        </Suspense>
-    );
+    const locale = await getLocale();
+    redirect({ href: `/activity?${target.toString()}`, locale });
 }
