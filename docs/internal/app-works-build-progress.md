@@ -365,6 +365,40 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the verification lane, APW-07's contracts, and the last foundation package's spec type-check.**
+  **APW-06 T60 — verification targets** (`6f98b43cb`; k8s **751 → 758**, `app-runtime` **51 → 90**). 🌟 **The four k8s
+  modules needed NO change** — §4.12's verification branch was already landed in Wave 1, and the agent said so instead of
+  editing something for symmetry; their hashes are unchanged, and "a normal render is unchanged" is _also_ asserted
+  directly by a new SHA-256 pin over two golden fixtures. What landed is the agent-side service (1,472 lines) in
+  §4.12's order — prepare namespace + policies → `provisionEphemeral` → `deployApp` — with everything askable asked
+  **before the first write**, so a verification that cannot succeed never leaves a namespace. 🌟 **A real defect the
+  agent found in its OWN code by writing a perturbation for it**: `prepareAppNamespace` was handed the **live** namespace
+  ref, so it would have drawn the running app's namespace and policies instead of the attempt's. Fixed with an explicit
+  `verificationRef`, and the coordinator re-ran that perturbation to confirm the new test catches it. "No WorkDeployment
+  row, no runtime-state write" is proven three ways (a comment-stripped source scan with a known-good control, a
+  constructor-arity pin, a runtime journal) rather than by an injected never-called collaborator — the agent argued the
+  point and the argument is right. A security-shaped finding is left for review rather than silently "fixed":
+  `ew-allow-ingress` is still rendered for a verification ref, which §4.12's rendered list does not include, and the new
+  test pins the 13-object list explicitly so the decision is one visible edit.
+  **APW-07 T1/T2 — the App env and dependency contracts** (`5fffdb7ed`; contracts **3484 → 3531**). 🛑 **Half of T1/T2 was
+  already landed** by APW-03 (`77aed370c`) and the barrel already exported both files, so the agent correctly added NO
+  barrel lines and delivered the delta plus both specs. **The plan contradicts itself on one value**: §3.2:210 lists
+  **eight** dependency statuses, while §4.9a:641 (the 2026-09-17 fix pass) introduces a **ninth** (`awaiting_config`) with
+  the spec diagram and T2 agreeing — resolved in favour of the later, specific section, which **reddened APW-05's
+  `builds.spec.ts` pin**. That pin was corrected and stays EXACT (it names the ninth member and cites both plan lines), so
+  a status added without updating it still fails. One scope stretch, measured and reported rather than hidden: T2's test
+  requires every reason and error code to resolve to an `en.json` key and the file had none, so **57 keys were added**
+  (25 verbatim from the spec, **32 newly authored English strings flagged for T30/translation**), which moves the
+  pre-existing locale parity gap from 33,880 to **35,020** missing paths — exactly 57 × 20 locales.
+  **The last foundation package's spec type-check** (`807735804`). `packages/plugin` had the same hole as `k8s`,
+  `app-launcher` and `contracts`: 23 hidden spec type errors. 🌟 **One was a silent, years-old failure**:
+  `job-runtime.spec.ts` asserted `JobRuntimeId` was exactly five providers with the comment _"if this union is widened
+  without updating the architecture spec … this test fails"_ — and the union HAD gained `'node'`. Nobody saw it, because
+  `expectTypeOf` is checked by `tsc` alone and nothing type-checked that file. Corrected to six with the reasoning in
+  place, and the architecture doc reported as one runtime behind. The other 22 were mechanical (19 readonly-tuple casts
+  replaced by real copies, 3 untyped destructured parameters). The programme's **four foundation packages now all
+  type-check their specs**; 110+ other packages in this repo still do not.
+
 - **2026-09-18 · an App Work can be deleted end to end, and a correction to my own brief.** **APW-06 T58 — runtime removal
   (R-15)** (`0c587e379`; `app-runtime` **16 → 51 tests**). Plan §9.7's order, in one service: APW-07's
   `onAppWorkDeleting` first, then `destroyApp` with `deleteVolumes === deleteStoredData`, then the managed DNS record last
