@@ -1068,6 +1068,22 @@ APW-10's launch gate, tenant data servers and its in-zone dependency tasks T43�
   lives in `packages/agent/src/works-config/schema/__tests__/` because `@ever-works/contracts` has zero dependencies and
   must not import the agent package. Until APW-03 lands, T1's values are the reference and the parity spec is skipped.
 - **Dependency credential rotation and data migration between providers** are out of scope; kept rows record what remains.
+- **Two vocabularies met at the target port (APW07-G28) — the port's four codes are not all card reasons.** §4.8:550-556
+  gives `AppRuntimeTargetPort.prepareDependencyTarget` the `unavailable` set `'target_none' | 'target_not_checked' |
+'namespace_owned_elsewhere' | 'cluster_unreachable'` (APW-06 plan §9.9:1564-1567), while the card's reasons are §8:913's
+  camelCase list. Four of those strings met two vocabularies: `namespace_owned_elsewhere` → **`namespaceNotOwned`** is
+  §4.9:597-602's own mapping ("the definite failure reason **`namespaceNotOwned`**") and `cluster_unreachable` →
+  `clusterUnreachable` already existed, but **`target_none` and `target_not_checked` had no member at all** — and
+  `AppDependenciesService` read a stored reason back through `isAppDependencyReason`, so a stored port code came back as
+  `null` and the card rendered _Failed_ with **no reason**, not merely untranslated copy. `targetNone` and
+  `targetNotChecked` are therefore added to `APP_DEPENDENCY_REASONS`, `APP_DEPENDENCY_STATUS_REASONS` and
+  `APP_DEPENDENCY_REASON_MESSAGE_LEAVES` (both are definite failures of an attempt, so the status list is theirs; neither
+  is an API error code) with one `reasons.*` leaf each, and the service carries **one total mapping** from the port's four
+  codes to the contract's reasons, applied wherever an unavailable target becomes a stored or returned reason — total, so
+  a fifth port code is a compile error rather than a silent `null`. §8:913 above is deliberately left as the plan wrote it;
+  this note is the record. The two new leaves are in `apps/web/messages/en.json` only, like the rest of
+  `dashboard.workDetail.appDependencies.*`; the other 20 bundles are T30's cross-locale pass (APW-11 T19's completeness
+  spec covers `appLauncher` alone).
 - **CONTRACTS additions by this epic**: routes `PUT` / `POST …/provision` / `DELETE /api/works/:id/app-dependencies/:kind`
   (§4); events `app.dependency.released`, `app.dependency.data_deleted` (§6); category `app-dependency`, the
   `providerPluginId` + `providerId` pair and provider ids (§3); and a row requested from APW-10 for

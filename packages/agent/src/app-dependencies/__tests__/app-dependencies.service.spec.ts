@@ -22,7 +22,11 @@
  * - GAP-06 / APW07-G01 — a Work with a declared Postgres and no Deployment
  *   prepares its target **once**, reaches `ready` and dispatches no Deployment;
  * - FR-43 — `cluster_unreachable` is retried, a provider that throws leaves a
- *   retryable row (never a false `ready`), and a definite reason fails at once.
+ *   retryable row (never a false `ready`), and a definite reason fails at once;
+ * - APW07-G28 — a target APW-06's port reports `unavailable` reaches the row and
+ *   the card as the **contract's** reason (`targetNone`, `targetNotChecked`,
+ *   `namespaceNotOwned`, `clusterUnreachable`), never as the port's own
+ *   snake_case discriminant, which `asReason` reads back as `null`.
  *
  * The facade is exercised through the REAL `AppDependencyFacadeService` over a
  * fake registry, so selection order and the explicit-choice rule are properties
@@ -33,7 +37,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
     APP_DEPENDENCY_PROVIDER_IDS,
+    isAppDependencyReason,
     type AppDependencyKind,
+    type AppDependencyReason,
     type AppDependencyTarget,
 } from '@ever-works/contracts';
 import type {
@@ -1211,10 +1217,13 @@ describe('runAttempt', () => {
 
         const result = await h.service.runAttempt(WORK_ID, 'postgres');
 
-        expect(result).toMatchObject({ state: 'failed', reason: 'target_not_checked' });
+        // APW07-G28: the port's `target_not_checked` reaches the card as
+        // `targetNotChecked`, its own member of the closed union — storing the
+        // discriminant verbatim made `asReason` return `null`.
+        expect(result).toMatchObject({ state: 'failed', reason: 'targetNotChecked' });
         expect(h.store.stored('postgres')).toMatchObject({
             status: 'failed',
-            statusReason: 'target_not_checked',
+            statusReason: 'targetNotChecked',
         });
         expect(h.provisionCalls).toEqual([]);
     });
@@ -1225,9 +1234,11 @@ describe('runAttempt', () => {
 
         const result = await h.service.runAttempt(WORK_ID, 'postgres');
 
-        expect(result).toMatchObject({ state: 'failed', reason: 'namespace_owned_elsewhere' });
+        // APW07-G28 / plan §4.9:597-602: `namespace_owned_elsewhere` is spelled
+        // `namespaceNotOwned` on the card — a mapping, not a new member.
+        expect(result).toMatchObject({ state: 'failed', reason: 'namespaceNotOwned' });
         expect(h.store.stored('postgres')).toMatchObject({
-            statusReason: 'namespace_owned_elsewhere',
+            statusReason: 'namespaceNotOwned',
         });
         expect(h.provisionCalls).toEqual([]);
     });
@@ -1241,10 +1252,12 @@ describe('runAttempt', () => {
         const third = await h.service.runAttempt(WORK_ID, 'postgres');
 
         expect([first.transient, second.transient, third.transient]).toEqual([true, true, false]);
+        // APW07-G28: the transient decision stays on the port's own discriminant,
+        // the reason the row carries is the contract's (`clusterUnreachable`).
         expect([first.reason, second.reason, third.reason]).toEqual([
-            'cluster_unreachable',
-            'cluster_unreachable',
-            'cluster_unreachable',
+            'clusterUnreachable',
+            'clusterUnreachable',
+            'clusterUnreachable',
         ]);
         const stored = h.store.stored('postgres');
         expect(stored).toMatchObject({ status: 'failed', attempts: 3 });
@@ -1471,5 +1484,114 @@ describe('AppDependencyFacadeService', () => {
         await expect(
             h.service.configure(WORK_ID, 'postgres', { providerId: 'smtp-external' }),
         ).rejects.toMatchObject({ code: 'providerNotSupported', status: 422 });
+    });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The port's unavailable vocabulary → the card's reasons — APW07-G28
+ * -------------------------------------------------------------------------- */
+
+/**
+ * APW-06's four `AppRuntimeTargetUnavailable` codes (`plan.md` §4.8:550-556,
+ * APW-06 plan §9.9:1564-1567) and the contract reason each must become.
+ *
+ * Two of these are mappings onto members that already existed
+ * (`namespace_owned_elsewhere` → `namespaceNotOwned` is plan §4.9:597-602
+ * verbatim); the other two are the members APW07-G28 added. Before it, the
+ * discriminant was stored verbatim, `asReason` — which reads a stored reason
+ * back through the closed union — returned `null`, and the card read *Failed*
+ * with no reason at all.
+ */
+const PORT_UNAVAILABLE_REASONS: Array<[string, AppDependencyReason]> = [
+    ['target_none', 'targetNone'],
+    ['target_not_checked', 'targetNotChecked'],
+    ['namespace_owned_elsewhere', 'namespaceNotOwned'],
+    ['cluster_unreachable', 'clusterUnreachable'],
+];
+
+describe('AppDependenciesService — the port’s unavailable vocabulary (APW07-G28)', () => {
+    /**
+     * The same pending Postgres row the `runAttempt` block uses (`readyRow` is
+     * scoped to that block, so this one is declared rather than reached for).
+     */
+    const readyRow = () =>
+        row({
+            kind: 'postgres',
+            status: 'pending',
+            declared: { version: '16' },
+        });
+
+    it.each(PORT_UNAVAILABLE_REASONS)(
+        'maps %s to %s on the attempt, in the stored row, and through the card read',
+        async (code, reason) => {
+            const h = harness({ snapshot: snapshot([declared('postgres')]), rows: [readyRow()] });
+            h.setTarget({ unavailable: code });
+
+            const attempt = await h.service.runAttempt(WORK_ID, 'postgres');
+
+            // 1. The attempt answers with the contract reason.
+            expect(attempt).toMatchObject({ state: 'failed', reason });
+            expect(h.prepareCalls).toEqual([WORK_ID]);
+            expect(h.provisionCalls).toEqual([]);
+
+            // 2. The ROW carries the contract reason, never the port's own
+            // discriminant — this is the value a later read rebuilds the card from.
+            const stored = h.store.stored('postgres');
+            expect(stored).toMatchObject({ statusReason: reason });
+            expect(stored?.statusReason).not.toBe(code);
+            expect(isAppDependencyReason(String(stored?.statusReason))).toBe(true);
+
+            // 3. The store → read round trip, which is the regression: `list`
+            // runs the stored string through `asReason`, so a non-member came
+            // back as `null` and the card showed *Failed* with no reason.
+            const [entry] = await h.service.list(WORK_ID);
+            expect(entry?.statusReason).toBe(reason);
+        },
+    );
+
+    it('keeps the mapped reason readable across the store → read round trip (asReason no longer nulls it)', async () => {
+        const h = harness({ snapshot: snapshot([declared('postgres')]), rows: [readyRow()] });
+        h.setTarget({ unavailable: 'target_not_checked' });
+
+        await h.service.runAttempt(WORK_ID, 'postgres');
+
+        // THE regression, asserted first so it is the assertion that reddens: a
+        // card is rebuilt by `list`, which runs the stored string through
+        // `asReason` — and `asReason` drops any string the closed union does not
+        // name, so a stored port code came back as `null` and the card read
+        // *Failed* with no reason at all.
+        const [entry] = await h.service.list(WORK_ID);
+        expect(entry?.statusReason).toBe('targetNotChecked');
+
+        // …which holds only because the row carries the mapped member, never the
+        // port's own discriminant.
+        expect(h.store.stored('postgres')?.statusReason).toBe('targetNotChecked');
+        expect(isAppDependencyReason('target_not_checked')).toBe(false);
+    });
+
+    it('keeps the transient rule on the port’s own discriminant (FR-43)', async () => {
+        const codes = ['target_none', 'target_not_checked', 'namespace_owned_elsewhere'];
+        for (const code of codes) {
+            const h = harness({ snapshot: snapshot([declared('postgres')]), rows: [readyRow()] });
+            h.setTarget({ unavailable: code });
+
+            const first = await h.service.runAttempt(WORK_ID, 'postgres');
+
+            // A definite failure fails at once and is never left retryable…
+            expect([code, first.transient, h.store.stored('postgres')?.status]).toEqual([
+                code,
+                false,
+                'failed',
+            ]);
+        }
+
+        // …while the port's `cluster_unreachable` still is (APW-06 plan §9.9:1566).
+        const h = harness({ snapshot: snapshot([declared('postgres')]), rows: [readyRow()] });
+        h.setTarget({ unavailable: 'cluster_unreachable' });
+        const retryable = await h.service.runAttempt(WORK_ID, 'postgres');
+        expect([retryable.transient, h.store.stored('postgres')?.status]).toEqual([
+            true,
+            'provisioning',
+        ]);
     });
 });

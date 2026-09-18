@@ -1023,7 +1023,10 @@ export class AppDependenciesService {
             if (!this.facade || 'unavailable' in access) {
                 result.failed.push({
                     kind,
-                    reason: 'unavailable' in access ? access.unavailable : 'target_not_checked',
+                    reason:
+                        'unavailable' in access
+                            ? reasonForUnavailableTarget(access.unavailable)
+                            : 'targetNotChecked',
                 });
                 continue;
             }
@@ -1118,10 +1121,13 @@ export class AppDependenciesService {
         const prepared = await this.prepareTarget(workId);
         if ('unavailable' in prepared) {
             // Definite for every reason but an unreachable cluster (FR-43,
-            // plan §4.8:554-556), and the row carries the reason verbatim.
+            // plan §4.8:554-556). The row carries the CONTRACT reason, not the
+            // port's discriminant (APW07-G28): `asReason` reads a stored reason
+            // back through the closed union, so storing `target_not_checked`
+            // verbatim left the card reading *Failed* with no reason at all.
             return this.recordAttemptFailure(
                 row,
-                prepared.unavailable,
+                reasonForUnavailableTarget(prepared.unavailable),
                 prepared.unavailable === 'cluster_unreachable',
             );
         }
@@ -1300,7 +1306,9 @@ export class AppDependenciesService {
      * policies exist first: a provider never waits for and never dispatches a
      * Deployment (GAP-06 / APW07-G01).
      */
-    private async prepareTarget(workId: string): Promise<PreparedTarget | { unavailable: string }> {
+    private async prepareTarget(
+        workId: string,
+    ): Promise<PreparedTarget | { unavailable: AppRuntimeTargetUnavailable }> {
         if (!this.target) {
             return { unavailable: 'target_not_checked' };
         }
@@ -1846,6 +1854,41 @@ function outputRefs(
         name,
         secret: isAppDependencyOutputSecret(kind, name),
     }));
+}
+
+/**
+ * The one mapping from APW-06's port vocabulary to the card's reason vocabulary
+ * — APW07-G28.
+ *
+ * Two sources, because the port and the card genuinely speak differently:
+ *
+ * - The four port codes are APW-06's, per APW-07 plan §4.8:550-556 and APW-06
+ *   plan §9.9:1564-1567 (`AppRuntimeTargetUnavailable` in
+ *   `packages/agent/src/app-runtime/ports.ts`): `target_none` (no target
+ *   chosen), `target_not_checked` (no passing cluster check),
+ *   `namespace_owned_elsewhere` (the ownership check failed) and
+ *   `cluster_unreachable` (the credential or the API could not be used).
+ * - `namespace_owned_elsewhere` → `namespaceNotOwned` is APW-07 plan §4.9:597-602
+ *   verbatim: the provider's old policy check is replaced by "the definite
+ *   failure reason **`namespaceNotOwned`** (APW-06's namespace ownership check
+ *   failed)", and that member already existed in the contract. This is a
+ *   mapping, not a new member.
+ *
+ * A total `Record`, so a fifth port code is a **compile error** here rather than
+ * a silent `null` on the card: `asReason` drops any string the closed union does
+ * not name, and a dropped reason is a card that reads *Failed* and explains
+ * nothing.
+ */
+const TARGET_UNAVAILABLE_REASONS: Record<AppRuntimeTargetUnavailable, AppDependencyReason> = {
+    target_none: 'targetNone',
+    target_not_checked: 'targetNotChecked',
+    namespace_owned_elsewhere: 'namespaceNotOwned',
+    cluster_unreachable: 'clusterUnreachable',
+};
+
+/** The contract reason of one unavailable target — the only way one is stored or returned (APW07-G28). */
+function reasonForUnavailableTarget(unavailable: AppRuntimeTargetUnavailable): AppDependencyReason {
+    return TARGET_UNAVAILABLE_REASONS[unavailable];
 }
 
 /** A stored reason, as the vocabulary's own member or `null` (a raw discriminant is not copy). */

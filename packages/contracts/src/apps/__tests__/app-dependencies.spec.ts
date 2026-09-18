@@ -33,6 +33,7 @@ import {
 	appDependencyBackupStateMessageKey,
 	appDependencyReasonMessageKey,
 	appDependencyStatusMessageKey,
+	isAppDependencyReason,
 	type AppDependencyBackupState,
 	type AppDependencyErrorCode,
 	type AppDependencyKind,
@@ -122,7 +123,14 @@ type SpecAppDependencyReason =
 	| 'confirmationMismatch'
 	| 'deleteInProgress'
 	| 'notGenerated'
-	| 'notAppWork'; // plan.md:913
+	| 'notAppWork'
+	// APW07-G28 — the plan line carries the twenty-four above; the two below are
+	// the card members APW-06's `AppRuntimeTargetUnavailable` needs
+	// (`target_none`, `target_not_checked`), appended in the port's own order.
+	// `namespace_owned_elsewhere` → `namespaceNotOwned` and
+	// `cluster_unreachable` → `clusterUnreachable` needed no new member.
+	| 'targetNone'
+	| 'targetNotChecked'; // plan.md:913 + APW07-G28
 type SpecAppDependencyErrorCode =
 	| 'volumeExpansionUnsupported'
 	| 'sizeShrinkRefused'
@@ -188,7 +196,7 @@ describe('app-dependencies — closed unions match the plan and the spec (tasks.
 			reason,
 			statusReason,
 			errorCode
-		]).toEqual([4, 9, 7, 24, 16, 8, true, true, true, true, true, true]);
+		]).toEqual([4, 9, 7, 26, 18, 8, true, true, true, true, true, true]);
 	});
 
 	it('has no duplicate member in any exported tuple', () => {
@@ -300,16 +308,19 @@ describe('app-dependencies — statuses include awaiting_config (plan §4.9a:641
 });
 
 describe('app-dependencies — reasons and API error codes carry copy (plan §5:798-805, §8:913; APW07-G23)', () => {
-	it('names the twenty-four reasons of plan §8:913, in the plan’s order', () => {
+	it('names the twenty-four reasons of plan §8:913 in the plan’s order, then APW07-G28’s two', () => {
 		expect([...APP_DEPENDENCY_REASONS]).toEqual([...SPEC_REASONS]);
-		expect(APP_DEPENDENCY_REASONS).toHaveLength(24);
+		expect(APP_DEPENDENCY_REASONS).toHaveLength(26);
+		// The plan's twenty-four stay first and in the plan's order — the two
+		// APW07-G28 additions are appended, so nothing already pinned moved.
+		expect([...APP_DEPENDENCY_REASONS.slice(0, 24)]).toEqual([...SPEC_PLAN_REASONS]);
 		// `varchar(48)` in plan §3.2:211.
 		for (const reason of APP_DEPENDENCY_REASONS) {
 			expect(reason.length, `${reason} exceeds the varchar(48) column`).toBeLessThanOrEqual(48);
 		}
 	});
 
-	it('splits the reasons into the sixteen status reasons and the eight API error codes', () => {
+	it('splits the reasons into the eighteen status reasons and the eight API error codes', () => {
 		expect([...APP_DEPENDENCY_ERROR_CODES]).toEqual([...SPEC_ERROR_CODES]);
 		expect([...APP_DEPENDENCY_STATUS_REASONS]).toEqual([...SPEC_STATUS_REASONS]);
 		// The two subsets partition the reason vocabulary: no member is in both, and
@@ -362,6 +373,55 @@ describe('app-dependencies — reasons and API error codes carry copy (plan §5:
 			expect(leaf, `${reason} must name a leaf`).not.toContain('.');
 			expect(leaf, `${reason} leaf must be camelCase`).toMatch(/^[a-z][A-Za-z0-9]*$/);
 			expect(appDependencyReasonMessageKey(reason)).toBe(`dashboard.workDetail.appDependencies.reasons.${leaf}`);
+		}
+	});
+
+	it('carries APW07-G28’s port reasons, mapped from APW-06’s unavailable vocabulary', () => {
+		// APW-06 plan §9.9:1564-1567 and APW-07 plan §4.8:550-556 name the port's
+		// four codes; two of them had no card member, and `asReason` reads a stored
+		// reason back through this closed union, so an unknown string became `null`
+		// and the card read *Failed* with no reason at all.
+		const PORT_REASONS = {
+			target_none: 'targetNone',
+			target_not_checked: 'targetNotChecked',
+			namespace_owned_elsewhere: 'namespaceNotOwned',
+			cluster_unreachable: 'clusterUnreachable'
+		} as const satisfies Record<string, AppDependencyReason>;
+
+		for (const [code, reason] of Object.entries(PORT_REASONS)) {
+			// A member of BOTH lists — a definite failure of an attempt is a card
+			// reason (FR-43) and never an API error code; the two partition the union.
+			expect(APP_DEPENDENCY_REASONS, `${code} → ${reason}`).toContain(reason);
+			expect(APP_DEPENDENCY_STATUS_REASONS, `${code} → ${reason}`).toContain(reason);
+			expect(APP_DEPENDENCY_ERROR_CODES, `${code} → ${reason}`).not.toContain(reason);
+			// The cross-back the service performs on every stored reason: without the
+			// member this is false, which is the silently-dropped reason APW07-G28 fixes.
+			expect(isAppDependencyReason(reason), `${reason} must survive asReason`).toBe(true);
+		}
+
+		// The other two are mappings, not additions — `namespace_owned_elsewhere` →
+		// `namespaceNotOwned` is plan §4.9:597-602 verbatim.
+		expect(APP_DEPENDENCY_REASONS).toContain('namespaceNotOwned');
+		expect(APP_DEPENDENCY_REASONS).toContain('clusterUnreachable');
+		expect(APP_DEPENDENCY_REASONS as readonly string[]).not.toContain('namespace_owned_elsewhere');
+		expect(APP_DEPENDENCY_REASONS as readonly string[]).not.toContain('cluster_unreachable');
+		expect(isAppDependencyReason('namespace_owned_elsewhere')).toBe(false);
+		expect(isAppDependencyReason('target_not_checked')).toBe(false);
+	});
+
+	it('gives each APW07-G28 reason one non-empty leaf under …appDependencies.reasons.* in en.json', () => {
+		const messages = readEnglishMessages();
+
+		for (const reason of ['targetNone', 'targetNotChecked'] as const) {
+			expect(APP_DEPENDENCY_REASON_MESSAGE_LEAVES[reason]).toBe(reason);
+			const key = appDependencyReasonMessageKey(reason);
+			const message = leafAt(messages, key);
+			expect(
+				typeof message,
+				`${reason} has no message under ${key}. Add it to apps/web/messages/en.json — a reason without copy ` +
+					`renders as a raw identifier on a dependency card (APW07-G23).`
+			).toBe('string');
+			expect((message as string).trim().length, `${key} must not be empty`).toBeGreaterThan(0);
 		}
 	});
 });
@@ -704,7 +764,10 @@ const FIXTURE_SHAPE: AppDependencyView = {
 	lastCheckedAt: null
 };
 
-/** plan §8:913, verbatim and in order — the reason vocabulary, restated from the plan. */
+/**
+ * plan §8:913, verbatim and in order, then APW07-G28's two appended members —
+ * the reason vocabulary, restated from the plan.
+ */
 const SPEC_REASONS = [
 	'noDefaultStorageClass',
 	'clusterUnreachable',
@@ -729,8 +792,15 @@ const SPEC_REASONS = [
 	'confirmationMismatch',
 	'deleteInProgress',
 	'notGenerated',
-	'notAppWork'
+	'notAppWork',
+	// APW07-G28: APW-06's `AppRuntimeTargetUnavailable.target_none` and
+	// `.target_not_checked`, which had no card member and so read back as `null`.
+	'targetNone',
+	'targetNotChecked'
 ] as const;
+
+/** `SPEC_REASONS` exactly as plan §8:913 writes it — the twenty-four, unextended. */
+const SPEC_PLAN_REASONS = SPEC_REASONS.slice(0, 24);
 
 /** plan §5:798-802 — the codes the API answers with, restated from the plan. */
 const SPEC_ERROR_CODES = [

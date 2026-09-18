@@ -6961,7 +6961,9 @@
                     "confirmationMismatch": "The name you typed doesn't match.",
                     "deleteInProgress": "This dependency's data is already being deleted.",
                     "notGenerated": "That value isn't generated, so there's nothing to rotate.",
-                    "notAppWork": "This Work isn't an app."
+                    "notAppWork": "This Work isn't an app.",
+                    "targetNone": "This app isn't set to deploy anywhere yet. Choose a deploy target to provision its dependencies.",
+                    "targetNotChecked": "Your cluster hasn't passed its check yet. Check the connection, then try again."
                 }
             },
             "settings": {

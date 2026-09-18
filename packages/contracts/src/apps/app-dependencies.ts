@@ -100,7 +100,7 @@ export type AppDependencyBackupState = (typeof APP_DEPENDENCY_BACKUP_STATES)[num
 
 /**
  * Every reason a dependency row or an API response can carry, verbatim from
- * plan §8:913 and in the plan's order.
+ * plan §8:913 and in the plan's order — then APW07-G28's two additions.
  *
  * The union is wide on purpose: a **status reason** is why a card reads
  * *Failed* or *Degraded* (FR-43's "definite failure ... fails at once with its
@@ -108,6 +108,13 @@ export type AppDependencyBackupState = (typeof APP_DEPENDENCY_BACKUP_STATES)[num
  * one vocabulary because they share one copy subtree —
  * `dashboard.workDetail.appDependencies.reasons.*` — which is what lets a card
  * and a toast render the same sentence for the same cause.
+ *
+ * `targetNone` and `targetNotChecked` are APW07-G28: APW-06's
+ * `AppRuntimeTargetPort` answers `unavailable` in its OWN snake_case vocabulary
+ * (plan §4.8:550-556, APW-06 plan §9.9:1564-1567), and two of its four members
+ * had no card member here. Appended rather than inserted so the plan's
+ * twenty-four stay first and in the plan's order; the plan line itself is not
+ * edited (the gap note records it).
  */
 export const APP_DEPENDENCY_REASONS = [
 	'noDefaultStorageClass',
@@ -133,18 +140,27 @@ export const APP_DEPENDENCY_REASONS = [
 	'confirmationMismatch',
 	'deleteInProgress',
 	'notGenerated',
-	'notAppWork'
+	'notAppWork',
+	// APW07-G28 — the last two of APW-06's four `unavailable` codes, in the
+	// port's own order (`target_none`, `target_not_checked`, then the two that
+	// already had a member: `namespace_owned_elsewhere` → `namespaceNotOwned`,
+	// `cluster_unreachable` → `clusterUnreachable`).
+	'targetNone',
+	'targetNotChecked'
 ] as const;
 
 /** A dependency reason or API error code — plan §8:913. */
 export type AppDependencyReason = (typeof APP_DEPENDENCY_REASONS)[number];
 
 /**
- * The sixteen reasons a **card** shows after a failed or degraded attempt — plan
+ * The eighteen reasons a **card** shows after a failed or degraded attempt — plan
  * §4.9:570-583 (no storage class, unreachable cluster, the ext-provider test
  * reasons, a volume that never became ready, missing extensions, a refused
  * platform data server, and the deadline), §4.9a's relay states and the namespace
- * checks of §4.9's permission list.
+ * checks of §4.9's permission list. `targetNone` and `targetNotChecked` are
+ * APW07-G28's two: a target that was never chosen, and one whose cluster check
+ * has not passed — both are preconditions APW-06's port reports as `unavailable`
+ * rather than failing them itself.
  *
  * A definite failure fails at once with one of these; only a transient one is
  * retried (FR-43).
@@ -165,7 +181,10 @@ export const APP_DEPENDENCY_STATUS_REASONS = [
 	'clusterPermissionMissing',
 	'operatorNamespaceUnknown',
 	'relayIneligible',
-	'relaySuspended'
+	'relaySuspended',
+	// APW07-G28: the port's `target_none` / `target_not_checked`.
+	'targetNone',
+	'targetNotChecked'
 ] as const;
 
 /** A reason a dependency card shows — plan §4.9-§4.9a. */
@@ -224,7 +243,12 @@ export const APP_DEPENDENCY_REASON_MESSAGE_LEAVES = {
 	confirmationMismatch: 'confirmationMismatch',
 	deleteInProgress: 'deleteInProgress',
 	notGenerated: 'notGenerated',
-	notAppWork: 'notAppWork'
+	notAppWork: 'notAppWork',
+	// APW07-G28 — no new copy subtree: the two port preconditions get one leaf
+	// each, exactly like every other reason, and T2's spec pins them against
+	// `apps/web/messages/en.json`.
+	targetNone: 'targetNone',
+	targetNotChecked: 'targetNotChecked'
 } as const satisfies Record<AppDependencyReason, string>;
 
 /** The i18n subtree every dependency reason's copy lives under — plan §8:913. */
@@ -284,10 +308,15 @@ export function appDependencyBackupStateMessageKey(state: AppDependencyBackupSta
 }
 
 /**
- * Is this string one of the twenty-four reasons? A `varchar(48)` column and a
+ * Is this string one of the twenty-six reasons? A `varchar(48)` column and a
  * provider's own `reason: string` both arrive as plain strings, so the closed
  * union needs one place to cross back into it — and a caller that fails this
  * check has an unmapped reason, which is exactly what APW07-G23 exists to catch.
+ *
+ * APW07-G28 is why the check is strict rather than forgiving: a reason that is
+ * not a member reads back as `null`, so a card shows *Failed* with **no** reason
+ * at all. The service therefore maps the port's vocabulary at the write, never
+ * storing a discriminant this function would reject.
  */
 export function isAppDependencyReason(value: string): value is AppDependencyReason {
 	return (APP_DEPENDENCY_REASONS as readonly string[]).includes(value);
