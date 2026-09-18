@@ -358,6 +358,52 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the launcher's settings page, the k8s plugin's App surface, and a verification hole closed in four packages.**
+  **APW-06 T14 — the k8s plugin serves App Work targets** (`fb85796c0`; k8s **734 → 751 tests**). `supportsApps = true`
+  and the nine methods of the deployment interface, each one: target check → **guard** → delegate. The guard is the
+  point (R-5): `assertSupportedKubeconfig` **and** `pinKubeconfigServer` on every credential, with the PINNED YAML being
+  what the modules receive, and `ever-works-apps`/`none` refused on all eight ref-taking methods. Additions only —
+  `git diff -U0` on `k8s.plugin.ts` has **no `-` lines at all** (203/0), and ACC-06-43's snapshot is captured from the
+  pre-change `deploy()`. "Ten methods" turned out to be ten MEMBERS (the flag plus nine methods) — checked against the
+  interface rather than assumed. Six agent perturbations plus one of mine (renaming the guard helper reddens 12
+  delegation cases at once).
+  **APW-11 T16 — Manage apps** (`a6b17ce86`; 20 + 8 + 21 tests across its three spec patterns). Show/Pin/reorder with
+  the 500 ms debounced batch save, the 7th pin disabled with §8's exact copy, the **Showing 200 of {count}** line and
+  the filter past the cap, behind a settings tab that defaults OFF. The action is asserted against the API's own DTO
+  (`GET /me/apps?includeHidden=true&limit=200`, `PUT /me/apps/preferences { changes }`, the 422 `pinLimit` mapping).
+  23 new leaves in all 21 bundles, `added=23 removed=0 changed=0` per file, placeholders intact.
+  🛑 **My own T19 spec was blind to T16's file** — it scanned one directory and assumed a file's FIRST
+  `useTranslations` namespace governed every `t('…')`, which would have false-failed on the one component that imports
+  two. Widened: an explicit five-file list across two directories, each translator VARIABLE mapped to its own
+  namespace, files that render no copy skipped (never counted), and the two files that must contribute named so
+  deleting a `useTranslations` call cannot silently shrink the scan.
+  **🌟 A verification hole found by an agent and closed in three packages.** T14's agent discovered that
+  `packages/plugins/k8s/tsconfig.json` excludes `**/*.spec.ts` and vitest strips types — so **`type-check` exit 0 said
+  nothing about any spec**, and it reported success while its own new spec had a real bad import. The same hole exists
+  in **110+ packages** of this repo. Closed where this programme depends on it: `tsconfig.specs.json` + a two-config
+  `type-check` for `k8s` and (last round) `app-launcher`. Enabling it exposed **10 pre-existing k8s spec type errors**,
+  all fixed without weakening an assertion — and one of them was a **real API defect**: `GenericIngressStrategy`
+  declared `readonly controller = ''`, which TypeScript infers as the LITERAL `''`, so the "register additional
+  strategies" case the spec documents and tests could not compile (TS2416). Fixed at the source with `: string` — an
+  additive widening, since the interface always said `string`.
+  **The convention already existed and nothing ran it**: `packages/contracts` has had `tsconfig.speccheck.json` +
+  `type-check:tests` all along (its header says exactly why), referenced by **no workflow and no script** — so it never
+  ran anywhere. Its own measurement is **0 errors**, and it is now a CI step in the existing contracts job
+  (`.github/workflows/ci.yml`, `node-contract-gate`, inserted textually: 8 insertions / 0 deletions, and the file is
+  prettier-dirty at HEAD so it was deliberately NOT reformatted). `packages/plugin` was measured too: **23 pre-existing
+  spec type errors** in three unrelated specs (vector-store 18, event-source 3, job-runtime 1), so it was left alone and
+  the number recorded rather than half-fixed.
+  **Tooling this round:** the licence check (`scripts/verify-package-licenses.cjs`) exited 1 on every run because four
+  pre-existing packages are MIT where the default is AGPL-3.0, which made it useless as a gate; it now names them as
+  NOTE lines and counts the files it actually checked (121, not the hard-coded 54), with a perturbation proving a NEW
+  package with the wrong licence still fails (`ab3ef5504`, `6293dbd62`). And `sync-locale-parity.mjs` gained a
+  **`--check` mode** (`9ccf683a8`): the script previously only WROTE, so asking whether locales were at parity injected
+  ~34,000 English placeholders — the question could not be asked without changing the answer. Measured: 1,694 en paths
+  missing per locale, 33,880 total, unchanged by this round's work.
+  **Still open in APW-11:** T17 (Work exposure, both surfaces), T18/T20 (e2e — the Playwright `webServer` block is
+  commented out, so those run in CI, not locally), T27, and **FR-63's literal guarantee, which needs an API-side
+  filter/offset** (the landed query DTO has only `includeHidden` + `limit`), recorded for T6/T9.
+
 - **2026-09-18 · 🌟 THE APP LAUNCHER IS REACHABLE END TO END** (`5a938530c`, plus `2d0947821` for the overflow row). The
   element package landed earlier in the round; this is the visible half that makes it a feature rather than a library:
   `AppLauncherButton` (lazy element import in an effect, the plan §6.2 **property** surface, `strings` from

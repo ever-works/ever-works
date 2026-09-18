@@ -259,6 +259,14 @@ jobs:
       - name: Contracts — fleet wire types and the package inventory guard
         run: pnpm --filter @ever-works/contracts test
 
+      # Spec files are excluded from every package's `type-check` tsconfig (and vitest
+      # strips types before running), so `type-check:tests` is the ONLY thing that type-
+      # checks a `.spec.ts` here. The script already existed — `tsconfig.speccheck.json`
+      # says so in its own header — and no workflow ran it, so a broken cast in a spec
+      # stayed invisible until someone tripped over it. Green as of this commit.
+      - name: Contracts — the spec files type-check too
+        run: pnpm --filter @ever-works/contracts type-check:tests
+
       - name: Platform side — the DTOs still accept what a deployed node sends
         run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
 
