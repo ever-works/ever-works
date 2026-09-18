@@ -45,6 +45,14 @@ export class OidcIdentityPlugin implements IPlugin {
 	 * `isPluginCategory` check rejects the manifest, so this plugin is
 	 * discoverable only after T4; the value itself is already exact, and the
 	 * assertion is the one place the type union is narrower than the plan.
+	 *
+	 * **Landed 2026-09-18 (T4).** `'identity'` is now the **last** member of
+	 * `PLUGIN_CATEGORIES`, so the loader's `isPluginCategory` accepts this
+	 * manifest and discovery finds the package instead of skipping it with
+	 * `Invalid category` (T4's report measures it: 103 → 104 plugins). The
+	 * paragraph above is kept because that is what this file had to say while
+	 * the append was missing, and the cast below stays — it resolves to the
+	 * same member, and dropping it would remove an assertion for nothing.
 	 */
 	readonly category: PluginCategory = 'identity' as PluginCategory;
 

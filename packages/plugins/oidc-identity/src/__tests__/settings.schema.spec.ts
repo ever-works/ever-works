@@ -340,6 +340,10 @@ describe('oidc-identity plugin discovery shape', () => {
 		// asserting membership here today would make this spec red until T4 ships,
 		// so the interlock is recorded in the T5 report and proven by the
 		// discovery run quoted there.
+		// T4 shipped: `'identity'` IS in the tuple now (measured: 27 categories,
+		// tail `[app-dependency, build, identity]`), so the interlock this spec
+		// used to describe can finally be *asserted*.
+		expect(isPluginCategory('identity')).toBe(true);
 		expect(isPluginCategory('definitely-not-a-plugin-category')).toBe(false);
 	});
 });
