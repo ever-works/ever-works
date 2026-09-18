@@ -365,6 +365,31 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · Two reporting instruments were lying, and the tracker the owner reads said nothing had been built.**
+  **The task-path meter was blind to one of this tree's two "new file" conventions** (`36abe1c33`). Its "landed
+  surface" column is computed from a single fact — a task marks a path as **new** and that path exists in
+  `git ls-files` — and `isMarkedNew` knew the two parenthesised spellings (`(**new**)`, `(new)`) but not the **prose**
+  one this programme also uses everywhere: `**Create** \`path\``, the convention APW-01, APW-02, APW-03 and APW-07
+  write their `tasks.md` in. Measured before the fix: those four epics read **landed 0** while APW-06 read 24 and
+  APW-11 read 37 — the difference was *which marker an epic's prosaist happened to use*, not how much of it had
+  landed. APW-07 read 0 with twelve of its files committed. After: **63 → 104**, and the number that mattered most in
+  the other direction moved too — "of the absent, another task says it creates them" went **577 → 908**, i.e. 331
+  paths were being reported as *unclaimed* when a `**Create**` task had claimed them all along. **`present 1272 ·
+  absent 1395` are byte-identical across the change**, which is the proof the fix cannot have flattered anything: the
+  marker only decides whether a path *may* be reported as landed, while presence comes from the filesystem. The four
+  `-` lines in the diff are the docstring the change makes false plus the predicate it replaces (same two spellings,
+  **plus** `'**Create**'`), so the tool is strictly widened — nothing it could detect before is undetectable now.
+  **And the tracker the owner actually reads said "Impl: —" for every epic** (`917172e3d`). `TRACKER.md`'s Impl column
+  now reads `In progress` for the **eleven** epics with landed surface (APW-04 and APW-13 remain `—`), each Notes cell
+  carrying the landed task ids, plus a "Branch status 2026-09-18" paragraph naming the branch, its 120 commits over
+  base and the deliberate absence of a PR. The refresh also **corrected a claim in the APW-11 row**: T33's two files
+  are in the repository (the meter sees them), so the row's "T20 and T33 are in flight" became T33 landed / T20 still
+  in flight. 🌟 **Two of the meter's new single-path readings were checked rather than trusted** — APW-05, APW-10 and
+  APW-12 at exactly 1 each — and they are real: the shared contracts surface pre-landed `builds.ts`, `apps-tier.ts`
+  and `ever-id.ts`, so three epics' T1 is *smaller than it reads*. That is exactly the signal the meter exists to
+  give, and it is now in their Notes cells so nobody rebuilds a module that is already there. Spec tree still
+  **CLEAN** (124 files, 1833 links, 549/549 ids) after both edits.
+
 - **2026-09-18 · APW-07's `.env` import parser and the category the dependency capability could not ship without.**
   **APW-07 T12 — `parseAppEnvDotenv`** (`c7d9ae6ca`; `dotenv-parser.spec.ts` **37 tests**, all green). Plan §4.5's
   line-oriented state machine (a regex cannot express "until the closing quote, possibly on a later line", and the
