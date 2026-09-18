@@ -358,6 +358,38 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the launcher's Work-level control and the FR-63 window — the first two APW-11 slices after the launcher
+  itself.** **APW-11 T17 — the Work's exposure, on both surfaces** (`ab74c4bc5`). One shared control
+  (`AppLauncherExposureSetting`) rendered by the Work's settings page **and** by an Overview card, because
+  `canAccessSettings` is MANAGER while the API grants the change to EDITOR — so without the card an editor could never
+  reach it. The save is a dedicated action (`setWorkAppLauncherExposed`-equivalent, +92/−0) that PUTs exactly
+  `{ appLauncherExposed }` and **never** touches the README: that is APW11-G02's trap, where the General form's zod
+  object strips the field and the save rewrites the Work's README, so the toggle would never persist. I verified the API
+  accepts the field myself rather than trusting the report — DTO `update-work.dto.ts:273-279`, write path
+  `work-lifecycle.service.ts:1136-1142`, spec **17/17** — because the whole task is pointless otherwise. Six
+  perturbations, including the G02 trap itself and EDITOR→MANAGER narrowing (which reddens both surfaces).
+  **APW-11 FR-63 — Manage apps can reach past 200** (`3e5d391f0`). The gap T16's round routed rather than papered over:
+  with only `includeHidden`/`limit` on the read, the 240th of 250 items was **unreachable**, and the count line was a
+  client-side reconstruction. Now `meta.total` is a reported fact (eligible count, **before** filter and cap),
+  `launcher-filter.ts` folds text the same way the web does (trim → lowercase → NFD → strip marks → NFC) and filters the
+  **eligible set before the cap**, the DTO gains `q`, and the editor debounces its own 250 ms read and MERGES the rows
+  back so an item past the cap becomes editable. Contracts **3482 → 3484**, agent app-launcher **180 → 193**, apps/api
+  **143 → 150**, settings spec **20 → 26**. My own perturbation — counting `total` AFTER the filter — reddens three
+  cases across two suites (`Expected 250, Received 1`), and the agent's eighth perturbation fired the element package's
+  **bidirectional conformance tripwire** (`TS2345: 'true' is not assignable to 'never'`), which is exactly what that
+  guard was built for two rounds ago.
+  **plan §4.1 says something false and is now incomplete** — it asserts "limit/order are the only paging inputs — no
+  eligible item needs a second endpoint to be reached (spec FR-63)", which cannot hold against a 200 cap, and it never
+  named the field FR-63's `{count}` comes from (`worksTotal` is FR-4's Works-only count). Recorded for the plan's owner;
+  the plan is not this branch's to rewrite.
+  **Two product decisions surfaced, not decided silently:** FR-63 scopes the filter to "past 200", so the box stays
+  inside the truncated block even though `q` works on any read; and a failed filter read reuses the panel's
+  `worksError` copy because no new key could be added while the bundles were owned by the other slice.
+  **Also verified this round:** the k8s plugin's runtime reachability — the loader scans `packages/plugins` and reads a
+  package's built entry, so the App runtime needs `packages/plugins/k8s/dist` (built here; CI's root `pnpm build` covers
+  it via `dependsOn: ["^build"]`, a fresh local worktree needs the explicit build), and the built artifact carries
+  `supportsApps` + all nine delegations + the guard.
+
 - **2026-09-18 · the launcher's settings page, the k8s plugin's App surface, and a verification hole closed in four packages.**
   **APW-06 T14 — the k8s plugin serves App Work targets** (`fb85796c0`; k8s **734 → 751 tests**). `supportsApps = true`
   and the nine methods of the deployment interface, each one: target check → **guard** → delegate. The guard is the
