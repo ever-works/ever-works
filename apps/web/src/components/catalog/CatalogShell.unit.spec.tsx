@@ -186,7 +186,7 @@ describe('CatalogShell', () => {
         expect(playbookSlugs()).toEqual(['weekly-report', 'inbox-triage', 'needs-search']);
         expect(
             within(section('skills')).getByRole('link', { name: 'See all (34)' }),
-        ).toHaveAttribute('href', '/agents#skills');
+        ).toHaveAttribute('href', '/agents/skills');
         expect(within(section('skills')).getByText('Installed')).toBeInTheDocument();
         expect(screen.getByText('2 of 3 work with what you already have.')).toBeInTheDocument();
     });

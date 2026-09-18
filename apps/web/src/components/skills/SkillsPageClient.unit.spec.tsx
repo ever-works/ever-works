@@ -113,13 +113,13 @@ describe('SkillsPageClient', () => {
         expect(routerReplace).toHaveBeenCalledWith('/skills?section=available');
     });
 
-    // Navigation consolidation: the same client renders inside the Agents tab's
-    // Skills block, where its URL updates must stay on `/agents` and keep the
-    // `#skills` anchor so the browser doesn't scroll back to the agent grid.
-    it('rewrites the URL onto basePath + hash when hosted as a block', () => {
-        renderPage({ basePath: '/agents', hash: '#skills' });
+    // The same client renders on the Skills sub-tab of the Agents hub, whose
+    // path is the sub-tab's own — so its URL updates stay there instead of
+    // jumping back to the Agents catalog.
+    it('rewrites the URL onto the host page’s own base path', () => {
+        renderPage({ basePath: '/agents/skills' });
         fireEvent.click(screen.getByRole('tab', { name: 'tabs.custom' }));
-        expect(routerReplace).toHaveBeenCalledWith('/agents?section=custom#skills');
+        expect(routerReplace).toHaveBeenCalledWith('/agents/skills?section=custom');
     });
 
     it('defaults to the standalone /skills base path with no hash', () => {

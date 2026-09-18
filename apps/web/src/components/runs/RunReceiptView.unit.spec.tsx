@@ -237,7 +237,7 @@ describe('RunReceiptView', () => {
         const activity = screen.getByTestId('run-receipt-activity');
         expect(within(activity).getByText('captureCapped')).toBeDefined();
         expect(screen.getByTestId('run-receipt-session-link').getAttribute('href')).toBe(
-            `/agents/sessions/${RUN}`,
+            `/agents/activity/${RUN}`,
         );
 
         rerender(<RunReceiptView receipt={receipt()} showSessionLink={false} />);

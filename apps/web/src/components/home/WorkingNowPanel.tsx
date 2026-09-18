@@ -11,9 +11,9 @@ import { runsTodayHref } from './GlanceCounters';
 import { HomeBlockShell } from './HomeBlockShell';
 import { formatCount, formatElapsed, HOME_COMPOSER_INPUT_ID, homeRunChip } from './home.shared';
 
-/** A run's receipt in the Runs ledger. */
+/** A run's receipt in the Runs ledger — the Activity page's `Runs` view. */
 export function runReceiptHref(runId: string): string {
-    return `${ROUTES.DASHBOARD_RUNS}?${buildRunsSearch({
+    return `${ROUTES.DASHBOARD_ACTIVITY_RUNS}&${buildRunsSearch({
         granularity: 'day',
         date: null,
         filters: {},

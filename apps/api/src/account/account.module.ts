@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { AccountTransferModule } from '@ever-works/agent/account-transfer';
 import {
     BACKUP_ACTIVITY_RECORDER,
@@ -38,7 +38,26 @@ import { TenantJobRuntimeModule } from './tenant-job-runtime/tenant-job-runtime.
  *  - `BACKUP_ACTIVITY_RECORDER` and `BACKUP_NOTIFIER` are two-method
  *    adapters, so the backup service depends on "record this" and "tell the
  *    owner", not on two whole modules.
+ *
+ * ## Why `@Global()` + `exports`
+ *
+ * All three tokens are consumed by `@Optional() @Inject()` sites that live
+ * in ANOTHER module: `WorkspaceBackupService` and `WorkspaceBackupRunner`
+ * are declared in the agent package's `AccountTransferModule`. NestJS
+ * resolves a provider's dependencies from its own module, its imports'
+ * exports and global exports — never upward into an importer — so without
+ * this all three bound to `undefined` and every `POST /api/account/backups`
+ * answered 503 `backup_storage_unconfigured` on a deployment with a
+ * perfectly working storage backend, while no activity row and no
+ * notification was ever written. The controller's own `BACKUP_STORAGE`
+ * injection resolved (it is declared here), which is exactly why the shape
+ * of the failure was "the card says backups are unavailable".
+ *
+ * `subscriptions.module.ts` and `packages/tasks/.../trigger.module.ts` are
+ * `@Global()` for the same reason and say so; this is that convention, not
+ * a new one.
  */
+@Global()
 @Module({
     imports: [
         AccountTransferModule,
@@ -92,5 +111,8 @@ import { TenantJobRuntimeModule } from './tenant-job-runtime/tenant-job-runtime.
             inject: [NotificationService],
         },
     ],
+    // A @Global() module still exposes only what it exports, so the three
+    // tokens are listed explicitly. Nothing else leaves this module.
+    exports: [BACKUP_STORAGE, BACKUP_ACTIVITY_RECORDER, BACKUP_NOTIFIER],
 })
 export class AccountModule {}
