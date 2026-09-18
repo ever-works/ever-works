@@ -10,6 +10,7 @@ import { ImportModule } from '../import/import.module';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
+import { AppWorksModule } from '../app-works/app-works.module';
 import { WorkDetailService } from './work-detail.service';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
@@ -81,6 +82,14 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         CommunityPrModule,
         ComparisonGeneratorModule,
         TemplateCatalogModule,
+        // APW-01 T11/T13 — `WorkLifecycleService.createWork` branches to
+        // `AppWorkCreateService` for `kind: 'app'`, so this module imports the one
+        // that provides and exports it. No cycle is introduced:
+        // `AppWorkCreateService` injects no provider of THIS module (its slug check
+        // goes through `WorkRepository`, which `DatabaseModule` provides), and
+        // `AppWorksModule` imports only `DatabaseModule` + `FacadesModule`, neither
+        // of which imports `WorkModule`.
+        AppWorksModule,
     ],
     providers: [
         WorkOwnershipService,

@@ -80,6 +80,7 @@ import {
 } from '@src/works/repository-work-guard';
 import { ActivityLogService } from '@src/activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '@src/entities/activity-log.types';
+import { AppWorkCreateService } from '@src/app-works/app-work-create.service';
 
 /**
  * APW-11 (App Launcher) — the kind whose exposure default is **on**.
@@ -179,6 +180,15 @@ export class WorkLifecycleService {
         // never depends on this.
         @Optional()
         private readonly activityLog?: ActivityLogService,
+        // Appended LAST, and `@Optional()`, for the positional-spec arity rule
+        // this constructor documents above (APW-01 T13 — the App Work create
+        // path). `WorkModule` imports `AppWorksModule`, so the real service is
+        // injected in production; a positional construction that stops before
+        // this slot keeps working and simply never receives an `app` create —
+        // `createWork` answers `500` with a named message rather than calling
+        // `undefined.create`, because only `kind: 'app'` reaches for it.
+        @Optional()
+        private readonly appWorkCreate?: AppWorkCreateService,
     ) {}
 
     /**
@@ -309,6 +319,27 @@ export class WorkLifecycleService {
         // (quick-create controller, onboarding adapter). Omitted → the
         // column default `'default'` applies, exactly as before.
         const normalizedKind = normalizeCreateWorkKind(createWorkDto.kind);
+
+        // App Work (APW-01 T13, README D1) — a kind of its own, with a create
+        // path of its own. The branch sits FIRST because an App Work shares
+        // nothing with the generated-website path below: it provisions no
+        // website template, no provider repository and no data repository, it
+        // resolves its own deploy target (so `resolveProviderDefaults` — and with
+        // it every onboarding default — is deliberately skipped for the kind),
+        // and it writes the Work row plus its `WorkUpstreamState` row in one
+        // transaction. Falling through to the generator path is exactly the bug
+        // this branch removes: it silently created a generated website for an
+        // `app` request and acted on none of `repositoryMode`, `targetOwner`,
+        // `blueprintId` or `autoProvision`.
+        if (isAppWorkKind(normalizedKind)) {
+            if (!this.appWorkCreate) {
+                throw new ServiceUnavailableException(
+                    'App Works are not available in this deployment: the App Work create service is ' +
+                        'not wired into WorkModule.',
+                );
+            }
+            return this.appWorkCreate.create(createWorkDto, user);
+        }
 
         // Repository Work (self-build slice D, EW-766) — resolve and verify
         // the source repository FIRST so a bad, missing, unreachable or

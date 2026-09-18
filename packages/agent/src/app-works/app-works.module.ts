@@ -1,9 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DatabaseModule } from '../database/database.module';
+import { FacadesModule } from '../facades/facades.module';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import { AppUpstreamStateService } from './app-upstream-state.service';
 import { AppUpstreamSyncDispatcherService } from './app-upstream-sync-dispatcher.service';
+import { AppSourceInspectorService } from './app-source-inspector.service';
+import { AppWorkCreateService } from './app-work-create.service';
 
 /**
  * APW-02 App Works (Fork lifecycle) — the agent-side module.
@@ -66,16 +71,34 @@ import { AppUpstreamSyncDispatcherService } from './app-upstream-sync-dispatcher
         // `@InjectRepository(WorkUpstreamState)` has no provider to inject and
         // the API fails at boot.
         TypeOrmModule.forFeature([WorkUpstreamState]),
+        // APW-01 T12/T13 — `AppSourceInspectorService` reads the Work tables and
+        // `AppWorkCreateService` writes them through `WorkRepository`, so this
+        // module needs the repository wrappers `DatabaseModule` provides and
+        // exports. `FacadesModule` supplies `GitFacadeService` (the only way this
+        // epic talks to a provider) and `DeployFacadeService` (the user-scoped
+        // deploy provider list the create path's step 4 reads). Both are leaf
+        // imports with respect to this module — nothing in either imports it —
+        // which is what keeps `WorkModule`'s `imports: [AppWorksModule]` acyclic.
+        DatabaseModule,
+        FacadesModule,
     ],
     providers: [
         WorkUpstreamStateRepository,
         AppUpstreamStateService,
         AppUpstreamSyncDispatcherService,
+        // APW-01 T12/T13. `DistributedTaskLockService` is provided locally, exactly
+        // as `AppSpecModule` and `CommunityPrModule` provide it: the cache module
+        // is not global, and the create lock (FR-22) is this epic's own use.
+        DistributedTaskLockService,
+        AppSourceInspectorService,
+        AppWorkCreateService,
     ],
     exports: [
         WorkUpstreamStateRepository,
         AppUpstreamStateService,
         AppUpstreamSyncDispatcherService,
+        AppSourceInspectorService,
+        AppWorkCreateService,
     ],
 })
 export class AppWorksModule {}

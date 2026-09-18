@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
+import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In, EntityManager } from 'typeorm';
 import { Work } from '../../entities/work.entity';
 import { Mission } from '../../entities/mission.entity';
 import { User } from '../../entities/user.entity';
@@ -31,7 +31,24 @@ export class WorkRepository {
         private readonly repository: Repository<Work>,
     ) {}
 
-    async create(dto: Partial<Work>, user: User): Promise<Work> {
+    /**
+     * Insert a Work and return the stored row.
+     *
+     * `manager` is the transaction-scoped `EntityManager` a caller already
+     * inside {@link withTransaction} passes down — APW-01's create writes the
+     * Work row and its `work_upstream_states` row together, so both must land
+     * in one transaction or neither. With a `manager` the insert, the save and
+     * the re-read all run on that transaction's connection. The re-read is the
+     * one that matters: on Postgres the injected repository is served by a
+     * different pooled connection, which cannot see the row the open
+     * transaction has not committed yet, so a `create` that wrote through the
+     * manager and re-read through `this.repository` would return `null` for
+     * the row it had just inserted. Callers that pass nothing (every existing
+     * one) keep the previous behaviour exactly.
+     */
+    async create(dto: Partial<Work>, user: User, manager?: EntityManager): Promise<Work> {
+        const works = manager ? manager.getRepository(Work) : this.repository;
+
         let exists = await this.findByOwnerAndSlug({
             userId: user.id,
             owner: dto.owner,
@@ -42,10 +59,10 @@ export class WorkRepository {
             throw new Error('Work already exists');
         }
 
-        let work = this.repository.create(dto);
-        work = await this.repository.save(work);
+        let work = works.create(dto);
+        work = await works.save(work);
 
-        return this.findById(work.id);
+        return this.findById(work.id, manager);
     }
 
     async createOrUpdate(dto: Partial<Work>, user: User): Promise<Work> {
@@ -66,6 +83,20 @@ export class WorkRepository {
         return this.findById(work.id);
     }
 
+    /**
+     * Run `fn` inside a single DB transaction, handing it the tx-scoped
+     * `EntityManager` to pass down to the repository calls that must commit or
+     * roll back together.
+     *
+     * Exposed here rather than by injecting a `DataSource` into the service,
+     * because `DatabaseModule` deliberately exports repository wrappers only
+     * (see `database.module.spec.ts`). Mirrors
+     * `AgentRepository.withTransaction` exactly.
+     */
+    async withTransaction<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
+        return this.repository.manager.transaction(fn);
+    }
+
     async findByOwnerAndSlug({
         userId,
         owner,
@@ -81,8 +112,20 @@ export class WorkRepository {
         });
     }
 
-    async findById(id: string): Promise<Work | null> {
-        return this.repository.findOne({
+    /**
+     * Read one Work with its `user` relation, or `null` when the id is unknown.
+     *
+     * `manager` (see {@link create}) scopes the read to the transaction that is
+     * still open. A re-read through the injected repository runs on another
+     * pooled connection on Postgres and returns `null` for a row that
+     * transaction has not committed yet — which is every row APW-01's create
+     * has just written when it asks for the Work to return. The `where` and
+     * `relations` arguments are unchanged; only the repository the read runs
+     * against depends on the argument.
+     */
+    async findById(id: string, manager?: EntityManager): Promise<Work | null> {
+        const works = manager ? manager.getRepository(Work) : this.repository;
+        return works.findOne({
             where: { id },
             relations: ['user'],
         });
@@ -346,6 +389,65 @@ export class WorkRepository {
     }
 
     /**
+     * APW-01 — the "own App Work on the same repository" idempotency lookup:
+     * every `kind = 'app'` Work of `userId` whose **Work Repository** is
+     * `<owner>/<repo>`, case-insensitively.
+     *
+     * The create path asks this before it forks, copies or links anything: a
+     * member who already has an App Work on that repository gets that Work
+     * back instead of a second one being made from the same source. It is
+     * scoped to one `userId` because "mine already exists" is a question about
+     * the caller's own Works, not about the repository.
+     *
+     * **The Work Repository of an App Work is the `website` role, not
+     * `data`.** `plan.md:240` is the normative record: the App Work's
+     * `sourceRepository` keeps "top-level `owner`/`repo` = the same Work
+     * Repository (the `website` role), because `GitFacadeService.getRepoDir`
+     * clones the top-level pair", and "the app-code fork is recorded under
+     * **`website`**, never `data`". README §1's repository-role note says the
+     * same in the words the UI uses — the `website` role's label is literally
+     * "Work Repository" and it holds the app code, while `data` holds the
+     * Work's data. {@link findAppWorksByDataRepoFullName} reads `website` for
+     * exactly this reason; this method differs from that sibling only in scope
+     * (one `userId`, with no organization binding and no
+     * `githubAppInstalled` notion) and in returning every match rather than
+     * the Works one delivery binds to.
+     *
+     * `sourceRepository` is a `simple-json` column, so `kind` and `userId`
+     * narrow the candidate set in SQL and the role comparison happens in
+     * memory — the same portable split {@link findRepositoryWorksWrapping} and
+     * {@link findAppWorksByDataRepoFullName} use. A row whose `website` owner
+     * or repo is missing or blank never matches: we cannot prove it points at
+     * this repository, and answering "you already have this App Work" for a
+     * row that may not is worse than making a duplicate the member can see.
+     */
+    async findAppWorksByDataRepository(
+        userId: string,
+        owner: string,
+        repo: string,
+    ): Promise<Work[]> {
+        if (!owner || !repo) {
+            return [];
+        }
+
+        const candidates = await this.repository
+            .createQueryBuilder('work')
+            .where('work.kind = :kind', { kind: 'app' })
+            .andWhere('work.userId = :userId', { userId })
+            .getMany();
+
+        const target = `${owner}/${repo}`.toLowerCase();
+
+        return candidates.filter((work) => {
+            const website = work.sourceRepository?.relatedRepositories?.website;
+            if (!website?.owner || !website?.repo) {
+                return false;
+            }
+            return `${website.owner}/${website.repo}`.toLowerCase() === target;
+        });
+    }
+
+    /**
      * Repository Work (self-build slice D, EW-766) — every `repo` Work that
      * wraps `<owner>/<repo>`, case-insensitively, regardless of who owns it.
      *
@@ -388,6 +490,93 @@ export class WorkRepository {
             // row wraps it. `updateWork` refuses to let the column drift.
             return typeof data.owner === 'string' && data.owner.toLowerCase() === targetOwner;
         });
+    }
+
+    /**
+     * Cross-account conflict lookup — every Work that uses `<owner>/<repo>`,
+     * whichever account owns it, together with the repository **role** the
+     * match was found in.
+     *
+     * The on-disk checkout the git facade keeps is keyed by `owner/repo` alone
+     * (`GitFacadeService.getRepoDir`), so a second account registering the same
+     * repository would be handed — and would clobber — the first account's
+     * working copy. The caller only needs a boolean ("another account already
+     * uses this"); the other account's identity is deliberately not part of
+     * the answer, which is why each row carries `userId` and nothing else about
+     * its owner.
+     *
+     * `relation` names the role that matched, because the two kinds keep the
+     * same repository in different places:
+     *
+     *   - `repo` — a Repository Work wraps the third-party repository as its
+     *     **`data`** role (see `applyRepositoryWorkSource`), and `work.owner`
+     *     IS that repository's owner.
+     *   - `app` — an App Work's code repository is its **Work Repository**,
+     *     the `website` role (`plan.md:240`; README §1's repository-role
+     *     note), and `work.owner` is that repository's owner too.
+     *
+     * Both kinds persist the code repository's owner in the indexed `owner`
+     * column, so `LOWER(work.owner) = :owner` narrows the candidate set in SQL
+     * exactly as {@link findRepositoryWorksWrapping} does, and the
+     * `simple-json` role comparison happens in memory. A row must present BOTH
+     * coordinates in the role its kind uses, and both must match
+     * case-insensitively; a blank one never matches, for the same reason
+     * {@link findRepositoryWorksWrapping} refuses to guess. Returns `[]` for a
+     * blank `owner`/`repo` and for an empty `kinds` list — an `IN ()`
+     * predicate is not SQL.
+     */
+    async findWorksUsingRepository(
+        owner: string,
+        repo: string,
+        options: { kinds?: readonly string[] } = {},
+    ): Promise<Array<{ id: string; userId: string; kind: string; relation: 'data' | 'website' }>> {
+        const kinds = options?.kinds ?? ['repo', 'app'];
+        if (!owner || !repo || kinds.length === 0) {
+            return [];
+        }
+
+        const candidates = await this.repository
+            .createQueryBuilder('work')
+            .where('work.kind IN (:...kinds)', { kinds: [...kinds] })
+            .andWhere('LOWER(work.owner) = :owner', { owner: owner.toLowerCase() })
+            .getMany();
+
+        const targetOwner = owner.toLowerCase();
+        const targetRepo = repo.toLowerCase();
+
+        const matches: Array<{
+            id: string;
+            userId: string;
+            kind: string;
+            relation: 'data' | 'website';
+        }> = [];
+
+        for (const work of candidates) {
+            // The role is decided by the kind, never guessed: a `repo` Work's
+            // wrapped repository is `data`, an App Work's Work Repository is
+            // `website`, and any other kind has no role this method can name.
+            const relation: 'data' | 'website' | null =
+                work.kind === 'app' ? 'website' : work.kind === 'repo' ? 'data' : null;
+            if (!relation) {
+                continue;
+            }
+
+            const role = work.sourceRepository?.relatedRepositories?.[relation];
+            if (!role?.owner || !role?.repo) {
+                continue;
+            }
+
+            if (
+                role.owner.toLowerCase() !== targetOwner ||
+                role.repo.toLowerCase() !== targetRepo
+            ) {
+                continue;
+            }
+
+            matches.push({ id: work.id, userId: work.userId, kind: work.kind, relation });
+        }
+
+        return matches;
     }
 
     /**

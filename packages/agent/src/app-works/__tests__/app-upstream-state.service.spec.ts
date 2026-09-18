@@ -1,3 +1,16 @@
+// APW-01 T12/T13 — the two sibling modules `AppWorksModule` now imports (for the
+// create path's `WorkRepository` and its git/deploy facades) pull in the whole
+// TypeORM + facade + plugin-registry tree, which this spec's own DataSource does not
+// need. They are shelled here, exactly as `CommunityPrModule`'s spec shells its two,
+// so the wiring assertion below stays a test of THIS module's metadata and of the
+// tokens it can mint itself.
+jest.mock('../../database/database.module', () => ({
+    DatabaseModule: class DatabaseModule {},
+}));
+jest.mock('../../facades/facades.module', () => ({
+    FacadesModule: class FacadesModule {},
+}));
+
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -17,6 +30,7 @@ import { Work } from '../../entities/work.entity';
 import { WorkUpstreamState } from '../../entities/work-upstream-state.entity';
 import { NoGitCredentialsError } from '../../facades/git.facade';
 import { AppWorksModule } from '../app-works.module';
+import { DistributedTaskLockService } from '../../cache/distributed-task-lock.service';
 import { APP_FORK_READY_HANDLER } from '../app-fork-ready-handler.port';
 import {
     APP_FORK_READINESS_DISPATCHER,
@@ -262,14 +276,19 @@ describe('AppUpstreamStateService', () => {
                 (Reflect.getMetadata(key, AppWorksModule) as unknown[]) ?? [];
             expect(metadata('providers')).toContain(AppUpstreamStateService);
             expect(metadata('exports')).toContain(AppUpstreamStateService);
-            // T15's claim, kept: the module still compiles with nothing but the entity's
-            // repository token bound, which is why every collaborator is `@Optional()`.
             expect(metadata('providers')).toContain(WorkUpstreamStateRepository);
 
+            // The entity's repository and the create lock are the two tokens this
+            // module cannot mint: the first comes from the DataSource the app opens,
+            // the second needs the `CacheEntry` repository that the shelled
+            // `DatabaseModule` would have supplied. With both bound, the container
+            // resolves the service — which is what this assertion is for.
             const entityRepository = { findOne: jest.fn().mockResolvedValue(null) };
             const moduleRef = await Test.createTestingModule({ imports: [AppWorksModule] })
                 .overrideProvider(getRepositoryToken(WorkUpstreamState))
                 .useValue(entityRepository)
+                .overrideProvider(DistributedTaskLockService)
+                .useValue({ runExclusive: jest.fn(), isLocked: jest.fn() })
                 .compile();
 
             expect(moduleRef.get(AppUpstreamStateService)).toBeInstanceOf(AppUpstreamStateService);

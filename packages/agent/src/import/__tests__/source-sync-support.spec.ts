@@ -63,6 +63,17 @@ describe('supportsWorkSourceSync', () => {
         expect(typeof supportsWorkSourceSync(null)).toBe('boolean');
     });
 
+    it('returns false for every APW-01 `app_*` source type (T4)', () => {
+        // `SourceRepository.type` was widened to `ImportSourceType |
+        // AppSourceRepositoryType` (APW-01 plan §3.2), which is why this function's
+        // parameter is now `string | null | undefined`. The whitelist is unchanged,
+        // so an App Work's repository stays unsyncable — an App Work is not an
+        // import source, and there is no import to re-pull from.
+        expect(supportsWorkSourceSync('app_link')).toBe(false);
+        expect(supportsWorkSourceSync('app_fork')).toBe(false);
+        expect(supportsWorkSourceSync('app_private_copy')).toBe(false);
+    });
+
     it('is case-sensitive — uppercase variants are NOT recognised', () => {
         // The Set is keyed on the canonical lowercase ImportSourceType literals;
         // any caller passing the wrong case is rejected.

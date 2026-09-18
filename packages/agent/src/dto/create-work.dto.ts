@@ -4,6 +4,7 @@ import {
     IsDefined,
     IsIn,
     IsNotEmpty,
+    IsObject,
     IsOptional,
     IsString,
     ValidateIf,
@@ -250,6 +251,19 @@ export class CreateWorkDto {
     @IsOptional()
     @IsBoolean()
     autoProvision?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            'App Work only (`kind: "app"`) — write-only answers to the App Blueprint prompts shown on the ' +
+            'preview (spec FR-55, plan §7). Carried on the create request and handed to the App env store ' +
+            'once the App spec exists; never echoed by any read response and never logged.',
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        example: { admin_email: 'ops@example.com' },
+    })
+    @IsOptional()
+    @IsObject()
+    appEnv?: Record<string, string>;
 
     @ApiPropertyOptional({
         description: 'Custom README configuration',

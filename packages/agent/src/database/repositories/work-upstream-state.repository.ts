@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import type { AppRepositoryMode } from '@ever-works/contracts';
+import { Repository, EntityManager } from 'typeorm';
+import type { AppActionsState, AppRepositoryMode, AppUpstreamStatus } from '@ever-works/contracts';
 import { WorkUpstreamState } from '../../entities/work-upstream-state.entity';
 import { serializeOnSingleConnection } from './single-connection-write-queue';
 
@@ -70,7 +70,23 @@ export const UPSTREAM_RECHECK_INTERVAL_MS = 86_400_000;
  */
 export const UPSTREAM_MAX_BATCH = 500;
 
-/** What {@link WorkUpstreamStateRepository.create} needs to write a row. */
+/**
+ * What {@link WorkUpstreamStateRepository.create} needs to write a row.
+ *
+ * ## The four relation-dependent columns are inputs, not patches
+ *
+ * `upstreamStatus`, `actionsState`, `readinessReason` and
+ * `dataRepositoryStatus` are the columns whose correct value depends on the
+ * `relation` the row is created with: plan §4.2 step 10's per-relation table
+ * fixes `upstreamStatus: 'none'` and `actionsState: 'not_applicable'` for a
+ * `link` (FR-31 — hygiene never touches a link), while a `fork` or
+ * `private-copy` row keeps the declared defaults. They are accepted here so
+ * APW-01's create path can write the whole per-relation row in the ONE
+ * transaction that also writes the Work row, rather than creating the row on
+ * the defaults and patching these four with a second, out-of-transaction
+ * UPDATE. Omitting any of them yields exactly the column's declared default,
+ * so every existing caller is byte-identical.
+ */
 export interface CreateWorkUpstreamStateInput {
     readonly workId: string;
     readonly relation: AppRepositoryMode;
@@ -86,6 +102,14 @@ export interface CreateWorkUpstreamStateInput {
     readonly nextSyncAt?: Date | null;
     /** Defaults to "now": the readiness clock the stale sweep measures against. */
     readonly readinessStartedAt?: Date | null;
+    /** `none` for a `link` (APW-02 §3.1); omitted ⇒ the column default `unknown`. */
+    readonly upstreamStatus?: AppUpstreamStatus | null;
+    /** `not_applicable` for a `link` (FR-31: hygiene never touches a link); omitted ⇒ the column default `pending`. */
+    readonly actionsState?: AppActionsState | null;
+    /** A reason code, never a provider message; omitted ⇒ NULL. */
+    readonly readinessReason?: string | null;
+    /** `available` (the default) or `missing`; omitted ⇒ the column default `available`. */
+    readonly dataRepositoryStatus?: 'available' | 'missing' | null;
     readonly tenantId?: string | null;
     readonly organizationId?: string | null;
 }
@@ -126,10 +150,26 @@ export class WorkUpstreamStateRepository {
      * not pass here takes its declared default (`preparing`, `unknown`,
      * `available`, `pending`, the counters `0`) — TypeORM omits an undefined
      * property from the INSERT, so the database applies them, not a second copy
-     * of the defaults in TypeScript.
+     * of the defaults in TypeScript. The four relation-dependent columns
+     * ({@link CreateWorkUpstreamStateInput}) are the one exception: each falls
+     * back to its column's declared default here, so a caller that omits one
+     * still stores exactly what the column default would have written, and a
+     * `link` can be written with `none` / `not_applicable` in this same INSERT.
+     *
+     * `manager` is the transaction-scoped `EntityManager` the caller passes
+     * when this row must commit together with the Work row: APW-01's create
+     * writes both in ONE transaction, and a save through the injected
+     * repository would land on a different pooled connection — outside that
+     * transaction on Postgres, so a rollback of the Work would leave this row
+     * behind. Callers outside a transaction omit the argument and keep the
+     * previous behaviour exactly.
      */
-    async create(input: CreateWorkUpstreamStateInput): Promise<WorkUpstreamState> {
-        const entity = this.repository.create({
+    async create(
+        input: CreateWorkUpstreamStateInput,
+        manager?: EntityManager,
+    ): Promise<WorkUpstreamState> {
+        const states = manager ? manager.getRepository(WorkUpstreamState) : this.repository;
+        const entity = states.create({
             workId: input.workId,
             relation: input.relation,
             dataOwner: input.dataOwner,
@@ -141,11 +181,15 @@ export class WorkUpstreamStateRepository {
             syncSchedule: input.syncSchedule ?? null,
             nextSyncAt: input.nextSyncAt ?? null,
             readinessStartedAt: input.readinessStartedAt ?? new Date(),
+            upstreamStatus: input.upstreamStatus ?? 'unknown',
+            actionsState: input.actionsState ?? 'pending',
+            readinessReason: input.readinessReason ?? null,
+            dataRepositoryStatus: input.dataRepositoryStatus ?? 'available',
             tenantId: input.tenantId ?? null,
             organizationId: input.organizationId ?? null,
         });
 
-        return this.repository.save(entity);
+        return states.save(entity);
     }
 
     /**

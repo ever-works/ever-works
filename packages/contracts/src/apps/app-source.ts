@@ -151,7 +151,7 @@ export interface AppSourceBlock {
  * FR-43 forbids *writing* generator settings into an App Work's file, and
  * removing the field would narrow a shape other readers still type against.
  */
-export interface AppSourceRecord extends Omit<SourceRepository, 'type'> {
+export interface AppSourceRecord<TImportedAt = string> extends Omit<SourceRepository<TImportedAt>, 'type'> {
 	type: AppSourceRepositoryType;
 	/** Present for `fork` and `private-copy`; absent for `link`. */
 	upstream?: AppUpstreamRef;
@@ -161,6 +161,21 @@ export interface AppSourceRecord extends Omit<SourceRepository, 'type'> {
 	blueprintMatchSource?: AppSourceBlueprintMatchSource;
 	/** True only when THIS creation issued the fork request or made the copy (R-4). */
 	createdByThisWork?: boolean;
+	/**
+	 * The member's decline of FR-29a's automatic start (App spec plan.md:240,
+	 * APW-01 plan.md §3.1, §4.2 step 10).
+	 *
+	 * **Written only when the member declined**, so an absent property means "on":
+	 * no migration, no backfill, and no existing caller or stored row changes
+	 * meaning. It is what `AppSourceInitializerService` step 8 reads to skip the
+	 * automatic provisioning start, leaving the Overview's Provisioning card in its
+	 * **Not started** state with a **Provision** button instead. It is never cleared
+	 * automatically.
+	 *
+	 * `boolean` rather than the literal `false` so a future "explicitly on" value is
+	 * expressible without changing this shape (R-26, additive only).
+	 */
+	autoProvision?: boolean;
 }
 
 /**

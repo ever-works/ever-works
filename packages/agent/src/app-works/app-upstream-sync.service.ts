@@ -347,6 +347,20 @@ export class ProviderCallBudget {
         return this.used;
     }
 
+    /**
+     * How many calls this budget still allows (never negative).
+     *
+     * Added for APW-01 T12's inspect budget (FR-7/FR-9, `plan.md:187-194`), which
+     * reuses this class with a different ceiling rather than keeping a second copy
+     * of the same arithmetic: the inspect path's fork scan asks whether at least
+     * `APP_INSPECT_OWNER_MIN_CALLS_REMAINING` calls remain before it starts another
+     * owner. Additive — no existing caller reads it and nothing about `call`,
+     * `exhausted` or the rate-limit observation changes.
+     */
+    get callsRemaining(): number {
+        return Math.max(0, this.limit - this.used);
+    }
+
     /** `true` ⇔ no further call may be made. */
     get exhausted(): boolean {
         return this.used >= this.limit;

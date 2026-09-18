@@ -43,6 +43,22 @@
  *   compare of §4.1 (`requestDivergenceCompare`). Its two job dispatchers are the
  *   **provisional** T23 tokens (T31 owns the real ones), and the setup pull request leg is
  *   T43's.
+ * - `./app-source-catalog.port` — `AppSourceCatalogPort` and `APP_SOURCE_CATALOG_PORT`
+ *   (T11, plan §7): the Apps-catalog seam APW-03 binds and this epic injects
+ *   `@Optional()`. Unbound means "catalog unavailable", never "no match".
+ * - `./app-prompted-values.port` — `AppPromptedValuesPort`,
+ *   `APP_PROMPTED_VALUES_PORT` and its no-op default (T11, plan §7): the write-only
+ *   App env answers of FR-55. Unbound ⇒ the values are logged as dropped, never a
+ *   refusal.
+ * - `./app-source-inspector.service` — `AppSourceInspectorService` (T12, plan §2.2):
+ *   everything the preview and the create path learn about a pasted URL, including the
+ *   15-call provider budget, the refusal reason codes and the deploy-target map. It
+ *   also exports the pure helpers the create path shares with it
+ *   (`resolveAppUpstreamRef`, `resolveAppDeployTargets`,
+ *   `collectAppDeployProviderFacts`, `ProviderCallBudget`).
+ * - `./app-work-create.service` — `AppWorkCreateService` (T13, plan §4.2): the twelve
+ *   steps of an `app`-kind create, the `WorkUpstreamState` row written in the same
+ *   transaction, and the readiness dispatch.
  */
 
 export * from './app-works.module';
@@ -54,3 +70,7 @@ export * from './upstream-schedule';
 export * from './app-upstream-conflict.copy';
 export * from './app-upstream-sync.service';
 export * from './app-upstream-sync-dispatcher.service';
+export * from './app-source-catalog.port';
+export * from './app-prompted-values.port';
+export * from './app-source-inspector.service';
+export * from './app-work-create.service';

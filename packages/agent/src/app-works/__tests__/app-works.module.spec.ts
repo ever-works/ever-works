@@ -1,26 +1,54 @@
+// The two sibling modules `AppWorksModule` imports (APW-01 T12/T13) pull in the
+// whole TypeORM + facade + plugin-registry tree, exactly as `CommunityPrModule`'s
+// spec records for its own two. They are replaced with empty class shells at
+// module scope so this spec stays a test of THIS module's wiring: the metadata
+// assertions below still see the real `AppWorksModule`'s imports, and the compiles
+// then exercise only what this module provides or mints itself. The APW-01
+// services inject every collaborator those modules would supply `@Optional()`, so
+// a shelled module is a supported graph and not a broken one.
+jest.mock('../../database/database.module', () => ({
+    DatabaseModule: class DatabaseModule {},
+}));
+jest.mock('../../facades/facades.module', () => ({
+    FacadesModule: class FacadesModule {},
+}));
+
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { ENTITIES } from '../../database/_entities-inventory';
 import { WorkUpstreamStateRepository } from '../../database/repositories/work-upstream-state.repository';
 import { WorkUpstreamState } from '../../entities/work-upstream-state.entity';
 import { AppWorksModule } from '../app-works.module';
+import { AppSourceInspectorService } from '../app-source-inspector.service';
+import { AppWorkCreateService } from '../app-work-create.service';
+import { DistributedTaskLockService } from '../../cache/distributed-task-lock.service';
 
 /**
  * APW-02 T15 — the App Works module, pinned against a REAL Nest container.
  *
- * The task's Test line is the claim under test: **the module compiles with only
- * its own providers**. Two compiles prove it, and neither of them needs a
- * sibling module:
+ * Two compiles prove the wiring:
  *
- *  1. a bare compile of `AppWorksModule` on its own, with nothing but the
- *     entity's repository token bound (no `DatabaseModule`, no `FacadesModule`,
- *     no root `TypeOrmModule.forRoot`), so a collaborator that later services
- *     will own cannot be quietly required today;
- *  2. a compile beside a real in-memory better-sqlite3 DataSource, which is
- *     what proves the fourth entity registration point of plan §3.1
+ *  1. a compile of `AppWorksModule` on its own, with nothing but the tokens it
+ *     cannot mint itself bound (the entity's repository, which the DataSource
+ *     supplies, and the create lock, whose own `CacheEntry` repository lives in
+ *     the shelled `DatabaseModule`), so a collaborator that later services will
+ *     own cannot be quietly required today;
+ *  2. a compile beside a real in-memory better-sqlite3 DataSource, which is what
+ *     proves the fourth entity registration point of plan §3.1
  *     (`plan.md:261-263`) — `TypeOrmModule.forFeature([WorkUpstreamState])`. A
  *     `forFeature` without the entity, or an entity missing from the inventory,
  *     fails here with "no such table" instead of at API boot.
+ *
+ * ## APW-01 T12/T13 — the two sibling imports this spec now pins
+ *
+ * The epic's inspector and create services read `WorkRepository` and write through
+ * it, and they talk to providers only through the git and deploy facades. Those
+ * live in `DatabaseModule` and `FacadesModule`, and a Nest provider can only
+ * resolve a dependency from the module that **declares** it or from that module's
+ * own imports — so `AppWorksModule` imports both, and the assertion below exists
+ * because dropping either import would take the whole API down at boot with
+ * `UnknownDependenciesException`, invisible to every unit spec that constructs the
+ * service by hand.
  *
  * Every uuid below is obviously synthetic. The table is empty in both compiles:
  * this spec is about wiring, not about the repository's behaviour — that is T14's
@@ -29,6 +57,19 @@ import { AppWorksModule } from '../app-works.module';
 
 /** A uuid that exists in no database, so `findByWorkId` must resolve `null`. */
 const WORK_ID = '00000000-0000-4000-8000-0000000000ff';
+
+/**
+ * The two tokens this module cannot mint itself, supplied for the compiles.
+ *
+ * The entity's repository comes from the DataSource the application opens, and
+ * `DistributedTaskLockService` (APW-01 T13's create lock) needs the `CacheEntry`
+ * repository, which the shelled `DatabaseModule` would have supplied. Both are
+ * replaced with values, so a module that quietly required a collaborator neither it
+ * nor its own imports provide fails HERE rather than at API boot.
+ */
+function lockStub(): { runExclusive: jest.Mock; isLocked: jest.Mock } {
+    return { runExclusive: jest.fn(), isLocked: jest.fn() };
+}
 
 /** A provider entry is either a class or `{ provide, useFactory, inject }`. */
 function tokenOf(provider: unknown): unknown {
@@ -59,20 +100,42 @@ describe('AppWorksModule', () => {
         expect(feature).toBeDefined();
     });
 
-    it('compiles with only its own providers — no sibling module, no root DataSource', async () => {
-        // The entity repository is the ONE token this module cannot mint
-        // itself: it is supplied by the DataSource the application opens. With
-        // it bound as a value, a module that secretly needed `DatabaseModule`,
-        // a facade or a service of a later task would fail to compile here.
+    it('imports the two sibling modules its APW-01 services resolve through', () => {
+        // APW-01 T12/T13: `AppSourceInspectorService` reads `WorkRepository` and
+        // `AppWorkCreateService` writes through it, and both talk to providers
+        // only through `GitFacadeService` / `DeployFacadeService`. A Nest provider
+        // resolves a dependency from the module that declares it or from that
+        // module's own imports, so WITHOUT these two imports the API refuses to
+        // boot with `UnknownDependenciesException` — a failure no hand-constructed
+        // unit spec can see.
+        const names = (metadata('imports') as Array<{ name?: string }>).map((entry) => entry?.name);
+        expect(names).toEqual(expect.arrayContaining(['DatabaseModule', 'FacadesModule']));
+    });
+
+    it('provides and exports both APW-01 services beside the APW-02 trio', () => {
+        for (const service of [AppSourceInspectorService, AppWorkCreateService]) {
+            expect(metadata('providers')).toContain(service);
+            expect(metadata('exports')).toContain(service);
+        }
+    });
+
+    it('compiles in a bare graph once the tokens it cannot mint are bound — no root DataSource', async () => {
         const entityRepository = { findOne: jest.fn().mockResolvedValue(null) };
 
         const moduleRef = await Test.createTestingModule({ imports: [AppWorksModule] })
             .overrideProvider(getRepositoryToken(WorkUpstreamState))
             .useValue(entityRepository)
+            .overrideProvider(DistributedTaskLockService)
+            .useValue(lockStub())
             .compile();
 
         const repository = moduleRef.get(WorkUpstreamStateRepository);
         expect(repository).toBeInstanceOf(WorkUpstreamStateRepository);
+
+        // The two APW-01 services are real instances, not tokens that resolved to
+        // `undefined`: their constructors ran, which is what proves the DI graph.
+        expect(moduleRef.get(AppSourceInspectorService)).toBeInstanceOf(AppSourceInspectorService);
+        expect(moduleRef.get(AppWorkCreateService)).toBeInstanceOf(AppWorkCreateService);
 
         // Injection is by the entity token from `forFeature`, not by class name
         // or by a second provider: a call must arrive at the bound repository.
@@ -94,7 +157,10 @@ describe('AppWorksModule', () => {
                 }),
                 AppWorksModule,
             ],
-        }).compile();
+        })
+            .overrideProvider(DistributedTaskLockService)
+            .useValue(lockStub())
+            .compile();
 
         const repository = moduleRef.get(WorkUpstreamStateRepository);
         expect(repository).toBeInstanceOf(WorkUpstreamStateRepository);
