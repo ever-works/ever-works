@@ -284,6 +284,10 @@
         "./app-spec": {
             "types": "./dist/app-spec/index.d.ts",
             "default": "./dist/app-spec/index.js"
+        },
+        "./upstream-pull-requests": {
+            "types": "./dist/upstream-pull-requests/index.d.ts",
+            "default": "./dist/upstream-pull-requests/index.js"
         }
     },
     "scripts": {
