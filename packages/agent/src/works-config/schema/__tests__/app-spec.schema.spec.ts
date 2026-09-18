@@ -413,13 +413,32 @@ const validSpec = {
             generate: { kind: 'base64', bytes: 32 },
             validate: { length: 44 },
         },
-        { name: 'SHORT_CODE', generate: { kind: 'chars', length: 32, alphabet: 'alnum' } },
+        {
+            name: 'SHORT_CODE',
+            secret: true,
+            generate: { kind: 'chars', length: 32, alphabet: 'alnum' },
+        },
         {
             name: 'GOOGLE_API_CREDENTIALS',
             secret: true,
             prompt: { description: 'OAuth JSON', required: true, example: '{}', group: 'Auth' },
         },
         { name: 'SIGNUP_ENABLED', value: 'true' },
+        /**
+         * The entry `build.args[1].fromEnv` names. §24.1's own `CALENDSO_ENCRYPTION_KEY`
+         * does the same thing, and R11 answers it with the warning §9:175's
+         * comment calls "accepted" — which is why this fixture is valid with one
+         * warning rather than none. T7 routes `kind: app` through the App
+         * validator, so a fixture that referenced a missing entry stopped being
+         * error-free (`reference_unresolved`, R5); the entry belongs in the
+         * document either way.
+         */
+        {
+            name: 'ENCRYPTION_KEY',
+            secret: true,
+            phase: 'both',
+            generate: { kind: 'hex', bytes: 32 },
+        },
     ],
     jobs: [
         {

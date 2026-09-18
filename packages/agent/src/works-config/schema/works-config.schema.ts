@@ -1,5 +1,7 @@
+import type { AppSpecIssue } from '@ever-works/contracts';
 import { z } from 'zod/v4';
 import { appSpecSchema } from './app-spec.schema';
+import { validateAppSpecObject } from './app-spec.validate';
 
 /**
  * `.works/works.yml` — the versioned schema.
@@ -345,6 +347,14 @@ const companySpec = z.looseObject({
  * point of having typed specs at all. Instead the kind is looked up here and
  * validated strictly when known; only a genuinely unrecognised kind takes
  * the passthrough path.
+ *
+ * `app` is the one exception, and it is not dispatched through `safeParse`
+ * below: `validateWorksConfig` hands the document to
+ * {@link validateAppSpecObject} instead, because the App spec's strictness
+ * lives in a layered pipeline (YAML positions, `x-` stripping, R1–R27,
+ * server-only rules) that a bare `safeParse` cannot express. The entry stays
+ * in this map because the published JSON Schema derives its `oneOf` branch
+ * from it (`emit-json-schema.ts`) — one definition, two consumers.
  */
 export const KIND_SPEC_SCHEMAS = {
     website: websiteSpec,
@@ -475,7 +485,45 @@ export function validateWorksConfig(raw: unknown): WorksConfigValidation {
                 ? KIND_SPEC_SCHEMAS[specKind as KnownSpecKind]
                 : undefined;
 
-        if (kindSchema) {
+        if (specKind === 'app') {
+            // ── the App kind takes the App spec validator (APW-03 T7) ──────
+            //
+            // §3:87 gives a Work's Work Repository the `data-repository` mode,
+            // and `plan §2.2:144-148` pins the contract this branch keeps: the
+            // return type, the never-throws guarantee and every other kind's
+            // result are unchanged.
+            //
+            // The **whole document** is handed over, not the `spec` block:
+            // `validateAppSpecObject` auto-detects the two shapes by an own
+            // `spec`, so the document form keeps a nested key that happens to be
+            // called `spec` an ordinary unknown field instead of mistaking it for
+            // the envelope's own `spec`.
+            //
+            // `rootKind` is passed **explicitly** — `result.data.kind`, the root
+            // spelling. It is required rather than redundant: in
+            // `app-spec.validate.ts:2040` the document form reads
+            // `kindOf(obj['kind'])`, i.e. it hands `kindOf` the *value* of `kind`
+            // where that helper expects the object, so the root kind it derives
+            // is always `null` and `kind_mismatch` never fires unless the caller
+            // supplies one. (T6 owns that line; reported, not edited here.)
+            // Passing it also keeps this route's result identical to
+            // `validateAppSpecDocument`'s, which does read the root kind
+            // (`app-spec.validate.ts:1986`).
+            //
+            // No `context` is passed: `validateWorksConfig` holds none. §22:502
+            // makes an absent input **unknown**, so no server-only rule fires
+            // here rather than one firing on a guess (ACC-03-58).
+            const appResult = validateAppSpecObject(result.data, {
+                mode: 'data-repository',
+                rootKind: result.data.kind ?? null,
+            });
+            const appErrors: string[] = [];
+            for (const issue of appResult.issues) {
+                if (issue.severity === 'warning') warnings.push(formatAppSpecIssue(issue));
+                else appErrors.push(formatAppSpecIssue(issue));
+            }
+            if (appErrors.length > 0) return { errors: appErrors, warnings };
+        } else if (kindSchema) {
             const specResult = kindSchema.safeParse({ ...spec, kind: specKind });
             if (!specResult.success) {
                 return {
@@ -499,4 +547,18 @@ function formatIssues(issues: readonly z.core.$ZodIssue[], prefix?: string): str
         const path = [prefix, ...issue.path.map(String)].filter(Boolean).join('.');
         return `${path || '<root>'}: ${issue.message}`;
     });
+}
+
+/**
+ * One App spec issue in the same string shape {@link formatIssues} produces.
+ *
+ * `AppSpecIssue.path` is already rooted (`spec.components[0].replica`), so the
+ * two kinds' strings read alike — the App's is
+ * `spec.components[0].replica: Unknown field `replica`. …` — and a caller that
+ * only prints `errors`/`warnings` needs no App-specific branch. The richer §23
+ * object (with `pointer`, `displayPath` and `params`) is what the App surfaces
+ * render; this is the Work-configuration view of the same finding.
+ */
+function formatAppSpecIssue(issue: AppSpecIssue): string {
+    return `${issue.path || '<root>'}: ${issue.message}`;
 }
