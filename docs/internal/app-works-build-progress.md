@@ -291,6 +291,42 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · three more slices: APW-11 T8 (catalog), APW-02 T16 (GitHub errors + facts), APW-06 T10 (k8s wrappers).**
+  **APW-11 T8 — `PlatformCatalogService`** (schema 518 + service 835 + a 48-test spec, all new). The catalog is read
+  **inside the API process** (APW11-G06), so this is where the fetch and its safety rules live: `_REPO` containment
+  refused at boot, an 8,000 ms timeout, ≤ 24 entries, icons ≤ 16,384 B with SVG deny patterns, 3,600,000 / 30,000 ms
+  TTLs and a `:last-good` entry with no expiry. **The hard-gated override is asserted in both directions** — the
+  production check runs FIRST and returns before either variable is read, which the perturbation proved by reading
+  `catalog.test` where `raw.githubusercontent.com` was expected. Three more perturbations (25th entry, oversize icon,
+  `javascript:`/`http:`/userinfo) each went red and were restored to `4BE50593…` / `F7E35706…`. **A correction made
+  mid-task paid off:** the spec reads the draft fixture **directly** instead of keeping a copy — the fixture's own
+  header says it is this spec's fixture and that the two byte-heavy icons are generated at test time, so a second copy
+  would only have drifted. Two judgement calls recorded rather than buried: `catalogAvailable` is false **only** when
+  nothing can be served (a last-good serve is `true` plus the new `stale: true`, per the contracts comment and
+  ACC-11-07), and the 8,000 ms timeout is pinned as the exported constant plus an `AbortSignal` rather than by waiting
+  eight real seconds.
+  **APW-02 T16 — GitHub errors and repository facts** (`github-errors.ts` 192 lines + two specs of 27 tests each;
+  `github-api.service.ts` +76/−2). All seven plan §4.2 signal rows, including `x-ratelimit-reset` read as **epoch
+  seconds** into the contract's ISO `retryAt`; `empty` probed **only** when `size === 0`, because `empty` from an
+  unknown size is a claim GitHub never made. Four perturbations red, restored to `AFD611EA…` / `7B0B2D21…`.
+  **Honest gaps stated, not invented:** plan §4.2 has no row for a 5xx, a transport failure or an unmatched 403, so
+  those become `unprocessable` with the **real status preserved** (0 when no response arrived) — never `not_found`,
+  never `unauthorized`, never a rate limit a caller would sleep on; and `license?.spdx_id` is followed literally, so a
+  repository with no licence file leaves `licenseSpdx` unreported while `NOASSERTION` becomes `null`. Broadcast for
+  callers: non-404 failures from this path are now `GitProviderRequestError` carrying `status` (plan §4.2's
+  instruction), and every caller was checked.
+  **APW-06 T10 — the k8s API wrappers** (`applyObject`, `readObject`, `listObjects`, `deleteObject`, `readPodLog`,
+  `createSelfSubjectAccessReview`, plus `authorizationV1Api` on the factory). The trap was **which API flavour the
+  package actually exports**: client-node 1.4.0 re-exports the **object-parameter** classes, whose methods resolve to
+  the body, while the legacy positional classes resolve to a `RequestContext` — so a fully mocked suite could pass
+  against the wrong shape, and one test loads the **real** client to prove the factory's constructor really has
+  `createSelfSubjectAccessReview`. A response with no status is `allowed: false`: the permission probe **fails
+  closed**. Five perturbations red, restored to `0AE79591…`. `readObject` omits `metadata.namespace` for an empty
+  namespace, which is what makes cluster-scoped kinds work instead of 404.
+  **Round totals:** 45 commits on the branch, all pushed, nothing merged. Verified suites this round: agent 353 + 180
+    - 210 + 387, k8s 578, github-plugin 226, contracts 3457, web 6, apps/api 61. The **task-path meter** puts landed
+      surface at APW-06 15 paths and APW-11 8 (see §5's meter entry) — the one crisp progress reading this programme has.
+
 - **2026-09-18 · four more verified slices and one guard: APW-06 T11, APW-03 T3, APW-11 T7 and T6, plus T21.**
   **APW-06 T11 — the kubeconfig guard** (`app-kubeconfig.guard.ts` 863 lines + 44 tests; `errors.ts` gains exactly two
   codes). It refuses a kubeconfig's local-execution and file-reading features, requires a public https server and pins
