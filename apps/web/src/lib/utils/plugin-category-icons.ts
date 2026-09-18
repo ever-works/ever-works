@@ -22,6 +22,8 @@ import {
     KeyRound,
     Library,
     Network,
+    // APW-07 T3 — the App dependency category's icon (see the map below).
+    Server,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -70,6 +72,12 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // Domain-model evolution PR-7 — metrics-provider backends
     // (Stripe, PostHog, Google Analytics, custom HTTP) for Goals.
     metrics: Gauge,
+    // APW-07 T3 — App dependency providers (PostgreSQL, Redis, object storage,
+    // SMTP). Same change as the tuple entry in
+    // `packages/plugin/src/contracts/plugin-manifest.types.ts`: these two maps
+    // are `Record<PluginCategory, …>`, so the category and its icon must land
+    // together or apps/web stops compiling.
+    'app-dependency': Server,
 };
 
 /**
@@ -101,6 +109,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     rag: 'RAG Pipelines',
     connector: 'Connectors',
     metrics: 'Metrics',
+    'app-dependency': 'App Dependencies',
 };
 
 // Type-safe assertion that all categories are covered

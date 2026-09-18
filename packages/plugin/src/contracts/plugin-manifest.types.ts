@@ -95,7 +95,16 @@ export const PLUGIN_CATEGORIES = [
 	// `metrics-provider`). First-party plugins: `custom-http` + `stripe`
 	// (PostHog + Google Analytics follow in PR-9). See
 	// `capabilities/metrics-provider.interface.ts`.
-	'metrics'
+	'metrics',
+	// APW-07 T3 — App dependency providers (PostgreSQL, Redis, object storage,
+	// SMTP). Category of `IAppDependencyProvider`; see
+	// `capabilities/app-dependency.interface.ts`. Added by the coordinator on
+	// 2026-09-18, together with the `CATEGORY_ICONS` / `CATEGORY_LABELS` entries
+	// in `apps/web/src/lib/utils/plugin-category-icons.ts` that this tuple feeds:
+	// those maps are `Record<PluginCategory, …>`, so a category appended here
+	// without them is a **build break in apps/web**, not a cosmetic gap. That is
+	// why the capability landed in the previous round and this line did not.
+	'app-dependency'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
