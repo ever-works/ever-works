@@ -311,6 +311,23 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · the launcher's web flag is fail-closed, and resolved once (APW-11 T13).**
+  `isAppLauncherEnabled(distinctId)` combines the API's `features.appLauncherEnabled` (read over HTTP, not from the
+  web process's own environment — APW11-G12) with the `app-launcher` PostHog flag, both capped at 1,500 ms.
+  **It fails CLOSED, deliberately the opposite of its sibling** `lib/feature-flags/work-kinds.ts`, which fails _open_
+  so an OSS deployment with no PostHog keeps every work kind: the launcher is off by default per installation, so
+  every way of being unsure — unreachable, non-200, non-JSON, timeout, thrown error, a flag that does not exist, a
+  PostHog that never answers — resolves to `false`. The one exception is PostHog **not configured**, which abstains
+  rather than refuses, so an OSS deployment still gets its launcher from the installation switch alone. That pair of
+  behaviours is why the spec is a **13-row matrix**, and three perturbations proved the rows bite (each restored to
+  `B046DE35…`): failing open on the config read is 3 red, treating `undefined` as ON is 1 red — the row that
+  separates this helper from the work-kind chips — and making an unconfigured PostHog refuse is 1 red, the OSS case
+  that must keep working. Wired **once**: the dashboard layout computes it inside the existing `Promise.all`, the
+  client shell receives it, and the header takes it as an optional prop defaulting to `false`, so a caller that has
+  not resolved it cannot render a launcher by accident. Web `type-check` exit 0; prettier clean. Deferred and named:
+  the palette context and the settings layout consume the flag when their surfaces land (T15/T16/T17) — the value is
+  already resolved and passed down, so those tasks add a reader, not another fetch.
+
 - **2026-09-18 · the App spec's references and rules, and a seed route the e2e lane can trust.**
   **APW-03 T4/T5** — `app-spec.refs.ts` (1190 lines) and `app-spec.rules.ts` (1958), four new files,
   **5504 insertions, zero deletions**; the `works-config` sweep goes **387 → 550 tests** across 16 suites.
