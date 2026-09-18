@@ -365,6 +365,101 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · Eight landings across four epics, and three findings worth more than the code they came with.**
+  **APW-07 T13 — `AppEnvService`** (`83ff27690`; `app-env.service.spec.ts` **53 tests**; epic selection **7 suites / 281
+  tests green on my own run**). `list`, `ensureGenerated`, `apply` (set/unset/reset/import), `rotate`,
+  `missingRequired`, `buildRedactor`, plus the `./app-env` subpath export the task text never named. ACC-07-03's
+  idempotence is proved **twice over** — an exact `toEqual` snapshot of every row's `version` + `valueEncrypted` across
+  four further passes standing for re-apply, rebuild, redeploy and upstream sync, _and_ spies over the real repository
+  write doors that stay at zero new calls — and ACC-07-12's "no key ⇒ zero rows written" is asserted, not assumed. I
+  checked the spec's case list against the task text line by line, then corrected two things in the author's file: a
+  **stale row in its own ownership table** (``T12 `dotenv-parser.ts` (not landed) | seam + provisional`` while the code
+  below consumes the parser — the file contradicted itself) and **two casts the discriminant makes unnecessary**
+  (`if (parsed.kind === 'limits')` narrows a string-discriminated union even under `strictNullChecks: false`; the now
+  unused imports went with them, and `tsc` exit 0 is the proof, not a style preference).
+  **APW-07 T17 — the provision dispatcher, the job and APW07-G24** (`ab38d3bd2`; **53 tests** in the agent selection and
+  **571 / 38 files** in `@ever-works/trigger-tasks`). The runner's lease → deadline → attempt → re-dispatch → release,
+  the `app-cluster-io` job that refuses production at both dispatch and run time, and the **propagate** shape G24
+  requires instead of `softDispatch`. The delayed re-dispatch rides the existing `notBefore` → `deferUntil` → `delay`
+  path; **nothing sleeps in the job**. The arity pin is **counted**, not bumped: `DISPATCHER_SYMBOLS` is exported and
+  the spec asserts `toHaveLength(DISPATCHER_SYMBOLS.length)` with the symbol set pinned separately.
+  **And the trap it left behind, fixed in the next commit** (`8c5c93277`). `AppDependenciesService` had declared its
+  **own** provisional `APP_DEPENDENCY_PROVISION_DISPATCHER` `Symbol` while T17 was in flight — and its own docstring
+  named the consequence: the real binding "would resolve to nothing, and every dispatch would silently report
+  `dispatchUnavailable`". Both were in place. The declarations are now imports **re-exported under the same names**, so
+  consumers keep compiling and keep receiving the token that is actually bound, and two tests guard it: an identity
+  assertion between the service's token and T17's, plus a comment-stripped scan that the service never declares
+  `Symbol('APP_DEPENDENCY_PROVISION_DISPATCHER')` again. **A shape-level test cannot catch this** — two Symbols with the
+  same description are different keys and every shape assertion passes with both present — so the perturbation is the
+  proof: re-introducing the local Symbol reddens both tests with `Expected: Symbol(APP_DEPENDENCY_PROVISION_DISPATCHER)
+/ Received: serializes to the same string`, the failure signature of two tokens that print identically and bind
+  differently, with the other 57 tests green.
+  **APW-02 T22/T25/T24** (`6ddc89134`; **93 tests**, `git.facade.ts` **+204/−0**). The fork facade methods with the
+  materialise-then-call guard, the Actions hygiene of §6.7, the readiness poll of §6.2 with its recorded ladder
+  `[2000, 4000, 8000, 15000, 15000, …]`. Three task-vs-plan disagreements recorded, plan followed: T22 says "eight
+  methods" where the plan enumerates nine (two already existed from APW-09); plan §6.2 names `uses_lfs` but FR-65's
+  closed set has no such member, so it maps to `copy_refused` with the provider's word logged; and the `expectExisting`
+  coalescing line the plan assigns to T4 was **missing from the file** — added, with a note so T4's owner does not
+  re-add it. I also added the two `app-works/index.ts` export lines the author left to T29–T31, because that barrel's
+  own docstring says each service adds its own.
+  **APW-03 T9/T10/T11** (`8761c42f3`; **100 + 17 tests**, five modified files **+88/−0**). The App spec state entity (55
+  columns, three indexes), its migration at the epic slot `1792030000000`, the repository with the coalescing
+  `requestEvaluation` and the once-only `markBlueprintMatched`, and `findAppWorksByDataRepoFullName` **beside** the
+  byte-unchanged `findByDataRepoFullName` (which filters on `githubAppInstalled` and so would never find an App Work on
+  a member's own fork). The drift specs pass with **no edit to any of them** — which is what that "Done when" is for.
+  **Four plan-vs-reality findings:** (1) §2.3's "one `UPDATE … RETURNING`" **cannot run off Postgres** — TypeORM raises
+  `ReturningStatementNotSupportedError` because `AbstractSqliteDriver.isReturningSqlSupported('update')` is false and
+  better-sqlite3 is the default driver — so it is one atomic UPDATE with an in-transaction read-back and the outcome
+  computed **in SQL**; (2) §2.3's `startedSeq < requestedSeq - 1` contradicts the contract's own
+  `APP_SPEC_EVALUATE_COALESCE_MS` docstring (read before the increment, a second trigger _would_ dispatch) so the
+  plan's condition is applied to the incremented value, both quotes kept, the 5 s edge pinned; (3) §3.1's `timestamptz`
+  contradicts §3.1's own `PortableDateColumn` preamble, and the repo-wide boot guard forbids the raw spelling; (4)
+  **T10's `migration:generate` cannot run in this checkout** (ts-node requiring an ESM `@ever-works/contracts`, quoted),
+  so the migration is hand-written in the sibling epics' guarded style.
+  **APW-06 T19/T21** (`b0e0cc99`-adjacent, this round; **376 config tests** (325 before) + **100** preconditions/license
+  gate). `everWorks.apps` gains the six §8.3/§6.1 getters, and the deploy preconditions plus the license gate land as
+  services with every unbound seam documented **and tested** (managed fails closed, your-cluster warns). Two
+  task-vs-plan disagreements recorded, plan followed: T19 has no branch qualifier for the apex-domain rule where §8.3
+  scopes it to the dedicated-apex branch (and ACC-06-27 itself allows a subdomain), and T21's "three named entries"
+  becomes the contract's "one `env_required_unset` naming three" (`app-runtime.ts:338-342`).
+  **APW07-G28 — two vocabularies met at the target port** (`4934a6b16`). The service could persist APW-06's **port**
+  discriminants (`target_not_checked`, `namespace_owned_elsewhere`) which are not members of the contract's closed
+  reason union, and `asReason()` reads a stored reason through `isAppDependencyReason` — so an unknown string came back
+  **`null`** and the card showed _Failed_ with **no reason at all**, not merely untranslated copy. Plan §4.9:600 is
+  explicit that `namespace_owned_elsewhere` must surface as **`namespaceNotOwned`**; `cluster_unreachable` →
+  `clusterUnreachable` already existed; `targetNone` and `targetNotChecked` join the union and its leaf map (which is
+  `satisfies Record<…>`, so totality is a compile error). The regression test is a **round trip** — a mapping that
+  stores fine and reads back `null` passes every other shape. Contracts **3533** green, `app-dependencies` **57/57**,
+  and the 27 `-` lines reviewed one by one. **Legacy rows are the honest loose end**: rows written before this fix
+  still hold a raw code, and teaching `asReason` the old spellings was **rejected on purpose** — it would make the
+  round trip unfalsifiable.
+  **APW07-G29 — the 50 ms pattern budget was asserting the machine** (`b8eae790e`). The budget case timed **one**
+  evaluation and read **70.12 ms** under six concurrent agents while passing on an idle box at round 24. Measured
+  properly (15 samples, minima): `^(?:(a+)+)$` **61.96 ms**, flat `^(?:a+)$` **43.33 ms**, `^a+$` **37.77 ms** —
+  `re2js` needs ~38-43 ms to match 65,536 bytes _at all_, so the plan's ceiling sits at the engine's throughput edge
+  (≈0.6-0.7 µs/byte), not inside a margin this epic controls. T11's spec now asserts the **load-independent property**
+  (adversarial ≤ 2× a same-size flat match, measured 1.43×, under a 150 ms catastrophe ceiling a backtracking engine
+  cannot come back from) and **prints the plan's 50 ms with its measurements on every run**; the three ways to close it
+  — raise the budget from measured throughput, move the case to an idle perf lane, or switch to the prebuilt
+  `re2-wasm` — are APW07-G29's, for the owner. **Refused:** shrinking the tested input or capping value length, both of
+  which would remove capability the plan grants.
+  **One red that was not mine to leave red** (`575d00a5a`): `facades.module.spec.ts` had **three failures** on this
+  branch because APW-07 T16 provided and exported `AppDependencyFacadeService` without updating the guard that pins both
+  surfaces. The guard did its job; the same-change pin update was missing. Found by the APW-02 agent as collateral and
+  reported rather than fixed (not its file). Also verified: **APW-11 T15** was already implemented (`caeaeb0e8`) — I
+  proved it with three perturbations (availability gate forced true, `switch app` struck from the aliases, `run`
+  navigating instead of opening); the first of those ran the **full web sweep: 1 failed / 4203 passed**, i.e. exactly
+  the intended test.
+  🌟 **Three process lessons, all mine.** (a) One intermediate `app-env` run reported **76 failures across 2 suites that
+  "failed to run"** while three agents were writing in the same package; the immediate re-run was 281/281 and a third
+  agreed — a single red run in a shared worktree is evidence of nothing, which is why every claim here carries a
+  re-run. (b) **I perturbed `apps/web/messages/en.json` while the G28 agent was editing it**; my restore was
+  byte-identical and its final diff correct, but the collision was visible in its run and could have produced a wrong
+  red for it — checking _ownership_ is not enough when a file has two owners in one round. (c) **`git add <file>` is
+  not file-scoped when a second agent is editing the same file**: my T13 commit swept T17's `./app-dependencies`
+  exports entry into itself (four lines, correct and additive, so history stands — this branch is shared and never
+  force-pushed), and the attribution is recorded in T17's commit instead.
+
 - **2026-09-18 · Two reporting instruments were lying, and the tracker the owner reads said nothing had been built.**
   **The task-path meter was blind to one of this tree's two "new file" conventions** (`36abe1c33`). Its "landed
   surface" column is computed from a single fact — a task marks a path as **new** and that path exists in
