@@ -74,12 +74,20 @@ function isRootAnchored(token) {
 }
 
 /**
- * The tree writes the same marker two ways — `(**new**)` 212 times and `(new)`
- * 375 times — so both count. Missing one of them is what makes a checker like
- * this report a thousand "stale" paths that are simply not built yet.
+ * The tree writes the same marker three ways — `(**new**)` 212 times, `(new)`
+ * 375 times, and the prose form `**Create**` (the convention APW-01, APW-02,
+ * APW-03 and APW-07 use throughout: `**Create** \`path\``) — so all three count.
+ * Missing one of them is what makes a checker like this report a thousand
+ * "stale" paths that are simply not built yet, and what made the per-epic
+ * "landed" column read **0 for four epics whose surface had landed**: measured
+ * 2026-09-18, before this line, APW-01/02/03/07 were 0 while APW-06 read 24 and
+ * APW-11 read 37 purely because of which marker their task texts happen to use.
+ * The marker decides only whether a path may be reported as LANDED; `present`
+ * and `absent` are computed from the filesystem either way, so this correction
+ * cannot move those two numbers.
  */
 function isMarkedNew(line) {
-	return line.includes('(**new**)') || line.includes('(new)');
+	return line.includes('(**new**)') || line.includes('(new)') || line.includes('**Create**');
 }
 
 /** Pass 1 — every path the programme says it will create. */
