@@ -154,6 +154,14 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
   concurrent verification measures a revision that exists for seconds. **Rule: wait for the author's completion
   message, then verify** — and when a spec fails, first ask whether the file changed while the suite ran (mtime vs the
   run's start) before believing the failure.
+- **🛑 The same rule has a SECOND half: never PERTURB a file another agent may still write.** Learned the hard way the
+  same day, and it produced a _wrong_ red rather than a false alarm. A perturbation (a deliberate `t('controlLabel')`
+  typo) was applied to `AppLauncherButton.tsx` while its author was still running; the agent read the file with the
+  typo in it and later wrote its own version back, **silently re-planting the perturbation**. The next suite run failed
+  with `expected 'dashboard.appLauncher.controlLabelTypo' to be 'dashboard.appLauncher.controlLabel'` — which reads
+  exactly like a defect in the component. It cost a detour and, worse, would have been recorded as a real finding by
+  anyone reading the log alone. **Rule: interrupt the author, confirm the mtimes have stopped moving, and only then
+  perturb.** A perturbation's restore proof (sha256) is worthless if a concurrent writer can undo it.
 
 - **A full agent-package sweep is not a clean gate in this worktree, for two unrelated reasons.** Running all 820
   suites (`pnpm --filter @ever-works/agent test`, `--maxWorkers=2`) reported **4 failed suites / 2 failed tests**, and
@@ -349,6 +357,36 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 ## 5. Log
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
+
+- **2026-09-18 · 🌟 THE APP LAUNCHER IS REACHABLE END TO END** (`5a938530c`, plus `2d0947821` for the overflow row). The
+  element package landed earlier in the round; this is the visible half that makes it a feature rather than a library:
+  `AppLauncherButton` (lazy element import in an effect, the plan §6.2 **property** surface, `strings` from
+  `useTranslations('dashboard.appLauncher')`, all six events wired, a rejected chunk rendering a **disabled** control
+  instead of throwing), `AppLauncherProvider` (the context that lets the palette open the **same** element the header
+  owns), the header slot **after the Help button**, the `CommandPalette` handing `openAppLauncher` into
+  `PaletteCommandContext`, and the T19 completeness spec. 17 tests green here (14 components + 3 completeness) plus the
+  30 in the palette/registry suites; `apps/web` type-check exit 0.
+  **FR-4's `View all {count}` overflow row** (`2d0947821`) — the gap T10-T12 reported, closed **without a new event**:
+  spec FR-4:137 says the row opens **Manage apps**, so it reports through the existing `:manage` with
+  `section: 'works'`. `{count}` is `meta.worksTotal`, never the tiles that arrived (140 exposed Works → 24 tiles and
+  "View all 140"); the wrong source does not merely print the wrong number, it removes the row.
+  **Four coordinator perturbations, all captured red and restored byte-identically** — the palette gate (provider
+  always exposing an opener), **ACC-11-49** (the scope guard removed from the module cache: one Organization's apps
+  rendering into another's panel, the failure APW11-G04 names), plus two on the T19 spec's inputs (a key dropped from
+  ONE bundle; a `t('…')` typo) — the last of which names the missing key exactly instead of failing in a browser.
+  🛑 **An incident worth the lines, because it produced a WRONG red.** I perturbed `AppLauncherButton.tsx` while the
+  agent that owned it was still running; the agent read the file with my typo in it and later wrote its own version
+  back, silently re-planting the perturbation. The suite then failed with
+  `expected 'dashboard.appLauncher.controlLabelTypo' to be …`, which reads exactly like a defect in the component and
+  was my own leftover. **The rule this file already carries — never verify a slice while its author is still working —
+  has a second half: never PERTURB a file another agent may still write.** Everything above was re-run after the agent
+  was interrupted and the mtimes had stopped moving.
+  **T14's prop: `appLauncherEnabled`, not the task text's `appLauncher`.** The dashboard layout already resolved and
+  passed that name (the earlier flag round), so the header uses it and defaults it to `false`; a second prop meaning the
+  same thing is how two answers drift.
+  Still open in APW-11: T16 (Manage apps page + settings tab — the `ROUTES.DASHBOARD_SETTINGS_APP_LAUNCHER` constant is
+  already in place for it), T17 (the Work exposure setting), T18/T20 (e2e), T27 (static fixtures and the P2 sign-in
+  surface), and the "All hidden" state, which in host-fed mode the element genuinely cannot tell from "no apps".
 
 - **2026-09-18 · the launcher becomes a real element: the package, its strings in 21 locales, its palette entry, and the
   mirror that keeps the element independent of the monorepo.**
