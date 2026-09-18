@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, type Type } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AppLauncherModule as AgentAppLauncherModule } from '@ever-works/agent/app-launcher';
 import { AppLauncherController, AppLauncherPlatformsController } from './app-launcher.controller';
+import { E2eSeedController, isE2eAppLauncherSeedEnabled } from './e2e-seed.controller';
 import { AppLauncherEnabledGuard } from './guards/app-launcher-enabled.guard';
 import { PlatformCatalogService } from './platform-catalog.service';
 
@@ -43,9 +44,36 @@ import { PlatformCatalogService } from './platform-catalog.service';
  * Registered additively in `apps/api/src/api.module.ts`, next to
  * `WorkAgentModule`.
  */
+
+/**
+ * The controllers this module declares, in order: the three launcher surfaces
+ * of plan §4.1/§4.2/§4.3, and — **only when the gate is open at boot** — T33's
+ * non-production seed route (`POST /api/e2e/app-launcher/seed`, plan §9.3).
+ *
+ * Why conditional registration rather than a guard alone: a production process
+ * then has no such path in its router at all, which is a stronger statement
+ * than "the handler refuses" — the route is not merely closed, it was never
+ * mounted. The guard on the controller
+ * (`e2e-seed.controller.ts` → `E2eSeedEnabledGuard`) is the other half: it
+ * re-reads the gate on every request, so flipping `E2E_APP_LAUNCHER_SEED` in a
+ * running non-production process opens and closes the door without a restart,
+ * and a process that booted outside production cannot serve the route once it
+ * is pointed at production traffic.
+ *
+ * `isE2eAppLauncherSeedEnabled()` is production-first
+ * (`packages/agent/src/config/index.ts:824-829`'s shape), so `NODE_ENV=production`
+ * can never take the first branch — and an unset variable takes the second, in
+ * every environment. The order of the two launcher controllers is unchanged and
+ * nothing is removed: this is one appended entry behind one condition.
+ */
+const CONTROLLERS: Type<unknown>[] = [AppLauncherController, AppLauncherPlatformsController];
+if (isE2eAppLauncherSeedEnabled()) {
+    CONTROLLERS.push(E2eSeedController);
+}
+
 @Module({
     imports: [DatabaseModule, AgentAppLauncherModule],
-    controllers: [AppLauncherController, AppLauncherPlatformsController],
+    controllers: CONTROLLERS,
     providers: [AppLauncherEnabledGuard, PlatformCatalogService],
     exports: [PlatformCatalogService],
 })
