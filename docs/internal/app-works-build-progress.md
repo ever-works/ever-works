@@ -365,6 +365,25 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · Why T15 produced nothing: the event it listens for does not exist yet — `app.spec.applied` is referenced only in comments.**
+  After three rounds of an empty worktree from the T15 dispatch (and three earlier from the ports-alignment one, which I then
+  did myself as `e20313f99`), I stopped waiting and went looking for the seam the listener needs. `grep -r "app\.spec\.applied"`
+  across `packages/**/*.ts` returns **three matches, all of them prose**: `app-env.resolver.ts:118` ("`app.spec.applied`
+  (ACC-07-01)"), `app-env.resolver.ts:365` ("called from `app.spec.applied`") and `app-env.resolver.spec.ts:296`. There is no
+  event class, no `EVENT_NAME` constant and no `@OnEvent` subscriber anywhere — while the listeners that do exist in this
+  package follow a real pattern (`@OnEvent(AgentActionProposalDecidedEvent.EVENT_NAME, { async: true })`).
+  **The consequence is a genuine ordering constraint the plan does not state**: T15's emitter is APW-03''s emit side
+  (`app.spec.applied`, produced by T12/T13, neither landed), so a listener written today has nothing to subscribe to and
+  nothing can prove it fires. That is why the dispatch was silent rather than slow — the agent was asked to build against a
+  seam that is not there. **What T15 needs before it can be written and _proven_:** a contracts-level event name for
+  `app.spec.applied` (the same shape every other listener in this package uses) plus a producer, which is APW-03 T12/T13''s
+  side of the boundary. Written down rather than worked around: inventing a private literal here would put a second
+  definition of a platform event in an epic that does not own it — exactly the class of duplicate-seam defect this
+  programme has already had to repair twice (the two `APP_DEPENDENCY_PROVISION_DISPATCHER` Symbols, and the provisional
+  parser T13 declared and then removed).
+  **Also recorded:** both stalls in this session had the same shape — a dispatch handed work whose dependency had not
+  landed — and the fix in each case was to find the missing seam myself, not to dispatch again.
+
 - **2026-09-18 · APW-06''s env port catches up with APW-07''s plan — the mismatch T14 had to work around** (`e20313f99`).
   Three additive, **optional** members on `packages/agent/src/app-runtime/ports.ts`: `fingerprints?: Record<string, string>`
   on the `resolve` result (plan §4.6.1:429), `dependencyOutputs?: Record<string, Record<string, string>>` on the ephemeral
