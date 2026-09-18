@@ -710,7 +710,14 @@ export class ObjectStorageDependencyProvider {
 		const objects = await this.api
 			.listObjects<{
 				metadata?: { name?: string };
-			}>(cluster.kubeconfig, kind.apiVersion, kind.kind, cluster.namespace, `${APP_DEPENDENCY_POLICY_LABEL}=${OBJECT_STORAGE_OBJECT_KIND}`, cluster.context)
+			}>(
+				cluster.kubeconfig,
+				kind.apiVersion,
+				kind.kind,
+				cluster.namespace,
+				`${APP_DEPENDENCY_POLICY_LABEL}=${OBJECT_STORAGE_OBJECT_KIND}`,
+				cluster.context
+			)
 			.catch(() => []);
 
 		const found: AppDependencyObjectRef[] = [];
