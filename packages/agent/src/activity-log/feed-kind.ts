@@ -63,6 +63,15 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.ITEM_ADDED]: 'work',
     [ActivityActionType.ITEM_UPDATED]: 'work',
     [ActivityActionType.ITEM_REMOVED]: 'work',
+    // APW-11 (App Launcher, APW11-G05) — the Work-level **Show in App
+    // Launcher** setting changed. `work` is the deliberate bucket: this is
+    // Work metadata changing, exactly like the `WORK_UPDATED` row beside it.
+    // It is not `delivery` (nothing was generated or deployed) and not
+    // `decision` (nothing is held waiting on a person). Revisiting the
+    // decision means a *different* value in this same table, never an
+    // omission — `feed-kind.spec.ts:14-18` fails on any member without an
+    // entry.
+    [ActivityActionType.APP_LAUNCHER]: 'work',
 
     // Plugins
     [ActivityActionType.PLUGIN_ENABLED]: 'system',

@@ -5,6 +5,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     ServiceUnavailableException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -77,6 +78,42 @@ import {
     hasRepositoryRole,
     isRepositoryWork,
 } from '@src/works/repository-work-guard';
+import { ActivityLogService } from '@src/activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '@src/entities/activity-log.types';
+
+/**
+ * APW-11 (App Launcher) — the kind whose exposure default is **on**.
+ *
+ * The literal is compared against the raw `work.kind` column rather than
+ * through the `WorkKind` union, because `@ever-works/contracts` does not
+ * carry `'app'` in `WORK_KINDS` yet (APW-01 owns that vocabulary). Reading
+ * the column as a string means this file is already correct on the day the
+ * kind lands, and it cannot narrow anything if the vocabulary grows
+ * differently.
+ */
+const APP_WORK_KIND = 'app';
+
+/** Is this Work an App Work (spec FR-19: App Works default to exposed)? */
+function isAppWorkKind(kind: string | null | undefined): boolean {
+    return typeof kind === 'string' && kind.trim().toLowerCase() === APP_WORK_KIND;
+}
+
+/**
+ * APW-11 (plan §4.4, spec FR-61) — everything the exposure write and its
+ * Activity record need, decided once.
+ */
+interface AppLauncherExposureChange {
+    /** Did the `(value, explicit)` pair move? `null → null` did not. */
+    changed: boolean;
+    /** The value to persist: `true`, `false`, or `null` for "kind default". */
+    value: boolean | null;
+    /** Whether the NEW state is an explicit choice (spec FR-61). */
+    explicit: boolean;
+    /** The effective value AFTER the write — the recorded direction. */
+    effective: boolean;
+    /** The effective value BEFORE the write (`metadata.previousEffective`). */
+    previousEffective: boolean;
+}
 
 /**
  * Map a wizard "storage" choice onto the existing `gitProvider` field.
@@ -134,6 +171,14 @@ export class WorkLifecycleService {
         // only the Repository Work create path probes the git provider, so
         // every other positional construction can leave the slot empty.
         private readonly gitFacade: GitFacadeService,
+        // Appended last, and `@Optional()`, for the same reason again (APW-11
+        // T7 — App Launcher exposure): `WorkModule` imports `ActivityLogModule`,
+        // so the real service is injected in production, while an existing
+        // positional construction that stops before this slot keeps working —
+        // it simply records no exposure Activity. The exposure write itself
+        // never depends on this.
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -1080,6 +1125,23 @@ export class WorkLifecycleService {
                 );
             }
 
+            // App Launcher exposure (APW-11 T7, plan §4.4, spec FR-19/FR-60/
+            // FR-61). One Work-level field, and it is the ONLY field this
+            // request writes: the value joins `updateData` only when the
+            // `(value, explicit)` pair actually moved, so a save that leaves
+            // the effective value and the explicit flag alone writes nothing
+            // from this block and records nothing. Edit rights are already
+            // enforced above by `ensureCanEdit` — a viewer never reaches this
+            // line, and no second permission path is introduced (spec FR-20).
+            const exposureChange =
+                updateDto.appLauncherExposed !== undefined
+                    ? this.resolveAppLauncherExposureChange(work, updateDto.appLauncherExposed)
+                    : null;
+
+            if (exposureChange?.changed) {
+                updateData.appLauncherExposed = exposureChange.value;
+            }
+
             const updatedWork = await this.workRepository.update(id, updateData);
 
             if (!updatedWork) {
@@ -1087,6 +1149,17 @@ export class WorkLifecycleService {
             }
 
             updatedWork.owner = updatedWork.getRepoOwner();
+
+            // The record is written once per REAL change and only after the
+            // column is persisted, so the row can never describe a write that
+            // did not happen. A logging failure is reported and swallowed —
+            // the setting is already saved, and turning that into a request
+            // failure would tell the member their choice was lost when it was
+            // not (the same posture `WorksController.updateWork` takes for its
+            // own `work.updated` row).
+            if (exposureChange?.changed) {
+                await this.logAppLauncherExposure(id, user.id, exposureChange);
+            }
 
             // EW-612: when `deployProvider` changes via the dashboard,
             // commit the new value to `.works/works.yml` in the data repo
@@ -1114,6 +1187,92 @@ export class WorkLifecycleService {
             };
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'updating work');
+        }
+    }
+
+    /**
+     * APW-11 (plan §4.4, spec FR-19/FR-61) — decide what a submitted
+     * `appLauncherExposed` means for this Work.
+     *
+     * "Changed" is the PAIR `(storedValue, storedExplicit)` compared with
+     * `(newValue, newExplicit)`, never `storedValue !== newValue`. The two
+     * differ in exactly the cases the spec calls out:
+     *
+     *   - `null → true` on an `app` Work: the effective value was already on,
+     *     and what moved is the **explicit flag** — a real change, recorded;
+     *   - `null → false` on any other kind: the mirror image, also recorded;
+     *   - `null → null`: the pair is identical, so it is a no-op — nothing is
+     *     written and nothing is logged;
+     *   - `true → true`: likewise a no-op.
+     *
+     * The kind default is `true` for an `app` Work and `false` for every
+     * other kind (spec FR-19), and an explicit value always wins — which is
+     * why the effective value is derived from the stored/submitted value
+     * first and only falls back to the kind.
+     */
+    private resolveAppLauncherExposureChange(
+        work: Pick<Work, 'kind' | 'appLauncherExposed'>,
+        nextValue: boolean | null,
+    ): AppLauncherExposureChange {
+        const value: boolean | null = nextValue ?? null;
+        const storedValue: boolean | null = work.appLauncherExposed ?? null;
+        const explicit = value !== null;
+        const storedExplicit = storedValue !== null;
+        const kindDefault = isAppWorkKind(work.kind);
+
+        return {
+            changed: value !== storedValue || explicit !== storedExplicit,
+            value,
+            explicit,
+            effective: value ?? kindDefault,
+            previousEffective: storedValue ?? kindDefault,
+        };
+    }
+
+    /**
+     * APW-11 (plan §4.4, spec FR-21/FR-61) — record one exposure change.
+     *
+     * The row carries the actor (`userId`, the member who made the choice),
+     * the direction through the dotted `action`, whether the new state is
+     * explicit or the kind default, and the effective value it moved to.
+     * `metadata` carries **exactly** `{ explicit, previousEffective }`.
+     *
+     * The summary is a fixed English sentence that names **neither the Work
+     * nor its address** — Activity rows are readable by every member of a
+     * Work, and the launcher's host must never leak into one (spec §5.2,
+     * FR-43). The summary is not localized, like every other Activity row.
+     */
+    private async logAppLauncherExposure(
+        workId: string,
+        userId: string,
+        change: AppLauncherExposureChange,
+    ): Promise<void> {
+        if (!this.activityLog) {
+            return;
+        }
+
+        try {
+            await this.activityLog.log({
+                userId,
+                workId,
+                actionType: ActivityActionType.APP_LAUNCHER,
+                action: change.effective ? 'app.launcher.exposed' : 'app.launcher.hidden',
+                status: ActivityStatus.COMPLETED,
+                summary: change.explicit
+                    ? change.effective
+                        ? 'Show in App Launcher turned on'
+                        : 'Show in App Launcher turned off'
+                    : 'Show in App Launcher reset to the default for this Work kind',
+                metadata: {
+                    explicit: change.explicit,
+                    previousEffective: change.previousEffective,
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to record app_launcher activity for work ${workId}: ${message}`,
+            );
         }
     }
 

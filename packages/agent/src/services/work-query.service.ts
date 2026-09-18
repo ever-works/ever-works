@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, Logger, Optional } from '@nestjs/common';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { WorkMemberRepository } from '@src/database/repositories/work-member.repository';
 import { WorkGenerationHistoryRepository } from '@src/database/repositories/work-generation-history.repository';
@@ -18,7 +18,26 @@ import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 import { WorkDeploymentRepository } from '@src/database/repositories/work-deployment.repository';
 import { DeploymentEnvironment, WorkDeployment } from '@src/entities/work-deployment.entity';
+import { WorkCustomDomainRepository } from '@src/database/repositories/work-custom-domain.repository';
+import { WorkCustomDomain } from '@src/entities/work-custom-domain.entity';
 import type { WorkCurrentHealthDto, WorkStatusProjectionDto } from '@ever-works/contracts/api';
+
+/**
+ * APW-11 (App Launcher) — the kind whose exposure default is **on**.
+ *
+ * Compared against the raw `work.kind` column rather than through the
+ * `WorkKind` union, because `@ever-works/contracts` does not carry `'app'` in
+ * `WORK_KINDS` yet (APW-01 owns that vocabulary). Reading it as a string keeps
+ * this file correct on the day the kind lands and cannot narrow anything.
+ */
+function isAppWorkKind(kind: string | null | undefined): boolean {
+    return typeof kind === 'string' && kind.trim().toLowerCase() === 'app';
+}
+
+/** Is there a usable, non-blank value here (a host or a label)? */
+function hasText(value: unknown): boolean {
+    return typeof value === 'string' && value.trim().length > 0;
+}
 
 // Extended work response type with userRole for API responses
 // Uses Omit to exclude class methods from Work, then adds userRole
@@ -37,7 +56,32 @@ type WorkMethods =
 export type WorkWithRole = Omit<Work, WorkMethods> & {
     userRole: WorkMemberRole;
     websiteRepositoryInitialized?: boolean;
+    /**
+     * APW-11 (App Launcher, plan §4.4) — present on the **Work detail**
+     * payload only, so the exposure toggle renders disabled / read-only
+     * correctly without a second call. The list payload keeps its existing
+     * shape.
+     */
+    appLauncher?: WorkAppLauncherStatus;
 } & WorkStatusProjectionDto;
+
+/**
+ * APW-11 (App Launcher, plan §4.4) — the exposure projection the Work detail
+ * payload carries.
+ *
+ *   - `exposed` — the stored choice: `true`, `false`, or `null` for "no
+ *     explicit choice, follow the kind default".
+ *   - `effectiveExposed` — what the Work actually does today
+ *     (`exposed ?? (kind === 'app')`, spec FR-19).
+ *   - `live` — whether the launcher has an address to open for this Work, so
+ *     the setting is enabled (spec FR-15/FR-23). A not-live Work keeps its
+ *     stored choice and shows the setting disabled.
+ */
+export interface WorkAppLauncherStatus {
+    exposed: boolean | null;
+    effectiveExposed: boolean;
+    live: boolean;
+}
 
 @Injectable()
 export class WorkQueryService {
@@ -51,6 +95,14 @@ export class WorkQueryService {
         private readonly ownershipService: WorkOwnershipService,
         private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
         private readonly workDeploymentRepository: WorkDeploymentRepository,
+        // Appended last, and `@Optional()`, so every existing positional
+        // construction keeps its argument slots (APW-11 T7 — the exposure
+        // projection in the Work detail payload). `DatabaseModule` provides
+        // and exports the repository, so the real one is injected in
+        // production; without it the payload still answers `exposed` /
+        // `effectiveExposed` and simply cannot see a verified custom domain.
+        @Optional()
+        private readonly workCustomDomainRepository?: WorkCustomDomainRepository,
     ) {}
 
     async getWorks(options: { limit?: number; offset?: number; search?: string } = {}, user: User) {
@@ -181,6 +233,20 @@ export class WorkQueryService {
                 DeploymentEnvironment.PRODUCTION,
             );
 
+            // APW-11 (App Launcher, plan §4.4) — the two reads the exposure
+            // projection needs, batched into ONE `Promise.all` and both scoped
+            // to this single Work: the newest `READY` production deployment
+            // ("has a production deployment ever succeeded", spec FR-15) and
+            // this Work's verified production custom domains (FR-16 first
+            // preference). `findLatest` above answers a different question —
+            // what happened most recently — so it is left alone. The same
+            // repository methods T5 added for the launcher service are reused
+            // here rather than re-derived.
+            const [latestReady, verifiedProductionDomains] = await Promise.all([
+                this.findLatestReadyDeployment(work.id),
+                this.findVerifiedProductionDomains(work.id),
+            ]);
+
             // Lazy backfill of the denormalised cache columns
             // (configCache + counts). When a Work pre-dates the
             // caching migration its cache is NULL on first read; we
@@ -220,6 +286,7 @@ export class WorkQueryService {
                 ...work,
                 userRole: accessResult.role,
                 websiteRepositoryInitialized,
+                appLauncher: this.toAppLauncherStatus(work, latestReady, verifiedProductionDomains),
                 ...this.toStatusProjection(work, latestDeployment ?? undefined),
             };
 
@@ -230,6 +297,120 @@ export class WorkQueryService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'getting work');
         }
+    }
+
+    /**
+     * APW-11 (plan §4.4) — one newest `READY` production deployment for this
+     * Work, or `null`.
+     *
+     * Guarded on the method's presence so a context that binds only the older
+     * deployment reads (a narrower test double, an existing positional
+     * construction) still answers the payload instead of throwing on an
+     * undefined call.
+     */
+    private async findLatestReadyDeployment(workId: string): Promise<WorkDeployment | null> {
+        if (typeof this.workDeploymentRepository?.findLatestReadyForWorks !== 'function') {
+            return null;
+        }
+
+        const rows = await this.workDeploymentRepository.findLatestReadyForWorks(
+            [workId],
+            DeploymentEnvironment.PRODUCTION,
+        );
+        return rows?.get(workId) ?? null;
+    }
+
+    /**
+     * APW-11 (plan §4.4) — this Work's verified **production** custom domains,
+     * earliest added first (the order spec FR-16 reads). Empty when the
+     * repository is not bound.
+     */
+    private async findVerifiedProductionDomains(workId: string): Promise<WorkCustomDomain[]> {
+        const repository = this.workCustomDomainRepository;
+        if (typeof repository?.findVerifiedProductionForWorks !== 'function') {
+            return [];
+        }
+
+        const grouped = await repository.findVerifiedProductionForWorks([workId]);
+        return grouped?.get(workId) ?? [];
+    }
+
+    /**
+     * APW-11 (plan §4.4, spec FR-15/FR-19/FR-23) — the exposure projection the
+     * Work detail payload carries.
+     *
+     * `effectiveExposed` is the point of the payload: a Work with no explicit
+     * choice follows its kind, and an App Work's kind default is **on** while
+     * every other kind's is **off** (FR-19). An explicit value always wins,
+     * including after the Work's kind changed.
+     *
+     * `live` is spec FR-15 — a Work is live when it has an address from FR-16
+     * **and** at least one production deployment of it has succeeded — plus
+     * the Work-level half of FR-56 (an archived Work is never live).
+     *
+     * DEFERRED, and reported rather than silently assumed: two inputs a
+     * *launcher* has and this service does not.
+     *
+     *   1. The apex a managed label lives under is resolved by
+     *      `ManagedHostRootResolver` in `packages/agent/src/app-launcher/**`
+     *      (APW-11 T6) — a module this task may not import — so a non-empty
+     *      `managedSubdomain` counts as an address candidate here on its own
+     *      rather than being paired with a root.
+     *   2. FR-56's paused / removed / quarantined App Work states live in
+     *      APW-06's and APW-10's tables, which this service does not read.
+     *
+     * So `live` is correct for the common cases (a `READY` deployment plus a
+     * verified domain, a managed label, or the address that deployment
+     * reported), and can read `true` for an App Work whose runtime state says
+     * otherwise. The launcher's own listing stays the authority on what is
+     * listed; this field only decides whether the setting is offered as
+     * enabled (FR-23).
+     */
+    private toAppLauncherStatus(
+        work: Work,
+        latestReady?: WorkDeployment | null,
+        verifiedProductionDomains?: WorkCustomDomain[] | null,
+    ): WorkAppLauncherStatus {
+        const exposed = work.appLauncherExposed ?? null;
+
+        return {
+            exposed,
+            // `'app'` is compared against the raw column value: the shared
+            // `WorkKind` vocabulary does not carry it yet (APW-01 owns that
+            // list), so reading the string keeps this correct the day it lands.
+            effectiveExposed: exposed ?? isAppWorkKind(work.kind),
+            live: this.isWorkLiveForLauncher(work, latestReady, verifiedProductionDomains),
+        };
+    }
+
+    /** Spec FR-15 + the Work-level half of FR-56, in FR-16's candidate order. */
+    private isWorkLiveForLauncher(
+        work: Work,
+        latestReady?: WorkDeployment | null,
+        verifiedProductionDomains?: WorkCustomDomain[] | null,
+    ): boolean {
+        // A soft-retired Work is not live — the same exclusion T5's launcher
+        // candidate read applies (`status <> 'archived'`).
+        if (work.status === 'archived') {
+            return false;
+        }
+
+        // FR-15: an address alone is not enough. A production deployment must
+        // have succeeded, which is exactly what a `READY` row records, so a
+        // preview-only or never-deployed Work is not live (ACC-11-13).
+        if (!latestReady) {
+            return false;
+        }
+
+        if ((verifiedProductionDomains ?? []).some((row) => hasText(row?.domain))) {
+            return true;
+        }
+
+        if (hasText(work.managedSubdomain)) {
+            return true;
+        }
+
+        return hasText(latestReady.website);
     }
 
     /** Build the immutable last-run and derived current-health read model. */

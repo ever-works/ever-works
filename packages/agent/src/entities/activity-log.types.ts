@@ -408,6 +408,19 @@ export enum ActivityActionType {
     WORKSPACE_BACKUP_CREATED = 'workspace_backup_created',
     WORKSPACE_BACKUP_DOWNLOADED = 'workspace_backup_downloaded',
     WORKSPACE_BACKUP_DELETED = 'workspace_backup_deleted',
+    // APW-11 (App Launcher) — the Work-level **Show in App Launcher**
+    // setting changed. The dotted `action` carries the direction
+    // (`app.launcher.exposed` / `app.launcher.hidden`, Resolution R-2) and
+    // `metadata` carries `{ explicit, previousEffective }`; no field ever
+    // names the Work or its address (spec FR-21, FR-61). Additive member —
+    // `activity_log.actionType` is a plain varchar, so no migration is
+    // needed. Program contract R-34 (Activity completeness) is satisfied by
+    // this member plus its `FEED_KIND_RULES` entry in
+    // `packages/agent/src/activity-log/feed-kind.ts`; the Shared-view
+    // classification needs no edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS`
+    // is the derived complement of the publishable allow-list, so this
+    // member is unpublished by construction.
+    APP_LAUNCHER = 'app_launcher',
 }
 
 /**

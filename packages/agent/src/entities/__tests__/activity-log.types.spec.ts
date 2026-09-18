@@ -135,6 +135,9 @@ describe('activity-log.types', () => {
             ['WORKSPACE_BACKUP_CREATED', 'workspace_backup_created'],
             ['WORKSPACE_BACKUP_DOWNLOADED', 'workspace_backup_downloaded'],
             ['WORKSPACE_BACKUP_DELETED', 'workspace_backup_deleted'],
+            // APW-11 App Launcher (T7) — the Work-level **Show in App
+            // Launcher** setting changed.
+            ['APP_LAUNCHER', 'app_launcher'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -407,7 +410,17 @@ describe('activity-log.types', () => {
             // the only ones this branch lacked. Neither 186 nor 197 is the
             // answer, and 186 + 197 is nonsense — 200 was COUNTED off the merged
             // enum, and must be recounted after every merge.
-            expect(literals).toHaveLength(200);
+            //
+            // +1 app_launcher (APW-11 App Launcher, T7 — the Work-level
+            //    **Show in App Launcher** setting changed) — this branch's own
+            //    addition, disjoint from everything the branches above carry,
+            //    and counted from the merged enum the same way -> 201. Its
+            //    `FEED_KIND_RULES` entry lands in the same change
+            //    (`activity-log/feed-kind.ts`, program contract R-34), and its
+            //    Shared-view classification needs no edit because
+            //    `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
+            //    the publishable allow-list.
+            expect(literals).toHaveLength(201);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {
