@@ -168,13 +168,30 @@ export interface AppRuntimeEnvEphemeralContext {
     /** Null under `build.strategy: image` (§5.8). */
     buildCommitSha: string | null;
     internalUrls: Record<string, string>;
+    /**
+     * The dependency outputs APW-06 passes after
+     * `AppDependenciesService.provisionEphemeral(workId, …)` — APW-07 plan
+     * §4.6.1:446 ("read from **`ctx.dependencyOutputs`**").
+     *
+     * Optional and additive: without it a derived reference in the `cluster`
+     * target has no output to resolve against, which is why APW07-G04 added the
+     * field rather than letting the resolver re-read rows it is forbidden to
+     * write (R-10). A caller that has no ephemeral dependencies simply omits it.
+     */
+    dependencyOutputs?: Record<string, Record<string, string>>;
 }
 
 /** One entry of the value-free recipe an ephemeral `runner` resolution returns. */
 export interface AppRuntimeEnvRecipeEntry {
     name: string;
     secret: boolean;
-    source: 'generate' | 'literal' | 'template' | 'prompted';
+    /**
+     * `derived` is part of `AppEnvRecipeEntry` in
+     * `packages/contracts/src/apps/app-env.ts` (§4.6.1:447) and was missing
+     * here, so a derived entry had to be smuggled through as a one-token
+     * template. Additive: every existing producer still type-checks.
+     */
+    source: 'generate' | 'literal' | 'template' | 'prompted' | 'derived';
     spec: unknown;
 }
 
@@ -186,6 +203,15 @@ export interface AppRuntimeEnvSource {
         ctx: AppRuntimeEnvContext,
     ): Promise<{
         values: Record<string, string>;
+        /**
+         * The per-name change fingerprints of APW-07 plan §2.2, with the same
+         * keys as `values` (§4.6.1:429).
+         *
+         * Optional here so that an APW-06-side fake or an earlier implementation
+         * keeps compiling — but APW-07's implementation always fills it, and
+         * `app-env-runtime.source.spec.ts` asserts a key for every value.
+         */
+        fingerprints?: Record<string, string>;
         secretNames: string[];
         unsetRequired: string[];
         notReadyDependencies: string[];
