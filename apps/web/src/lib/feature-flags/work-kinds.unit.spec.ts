@@ -25,7 +25,7 @@ vi.mock('posthog-node', () => ({
     },
 }));
 
-const ENV_KEYS = ['POSTHOG_API_KEY', 'POSTHOG_HOST'] as const;
+const ENV_KEYS = ['POSTHOG_API_KEY', 'POSTHOG_HOST', 'EVER_WORKS_APP_WORKS_ENABLED'] as const;
 const SAVED: Record<string, string | undefined> = {};
 
 /** Every kind that exists today other than `app` — none of them may close. */
@@ -54,6 +54,7 @@ describe('getDisabledWorkKinds — the fail-CLOSED app chip (APW-01 T7b)', () =>
         for (const key of ENV_KEYS) SAVED[key] = process.env[key];
         delete process.env.POSTHOG_API_KEY;
         delete process.env.POSTHOG_HOST;
+        delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
         isFeatureEnabled.mockReset();
     });
 
@@ -200,5 +201,89 @@ describe('getDisabledWorkKinds — the fail-CLOSED app chip (APW-01 T7b)', () =>
         const { getDisabledWorkKinds } = await load();
 
         await expect(getDisabledWorkKinds(CHIPS)).resolves.toBeInstanceOf(Set);
+    });
+
+    // -----------------------------------------------------------------------
+    // APW-01 T20 — the runtime instance setting decides the no-PostHog case
+    // -----------------------------------------------------------------------
+
+    describe('with NO PostHog configured, the runtime instance setting decides (T20)', () => {
+        it('hides `app` when the setting is unset — "we could not tell" is still OFF', async () => {
+            const { getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds(['app', 'blog']);
+
+            expect(disabled.has('app')).toBe(true);
+            expect(disabled.has('blog')).toBe(false);
+        });
+
+        it('shows `app` when the instance has switched App Works on', async () => {
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+            const { getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds(['app', 'blog']);
+
+            expect(disabled.has('app')).toBe(false);
+            // Every other kind is untouched by the switch.
+            expect(disabled.has('blog')).toBe(false);
+        });
+
+        it.each(['1', 'yes', 'TRUE', 'true ', ''])(
+            'still hides `app` for %p — only the exact string "true" is on',
+            async (value) => {
+                process.env.EVER_WORKS_APP_WORKS_ENABLED = value;
+                const { getDisabledWorkKinds } = await load();
+
+                const disabled = await getDisabledWorkKinds(['app']);
+
+                expect(disabled.has('app')).toBe(true);
+            },
+        );
+
+        it('reads the setting at CALL time, not at import time', async () => {
+            // A container restarted with a different value must behave
+            // correctly without a rebuild, which is the whole reason this is an
+            // environment read inside the function rather than a module-level
+            // constant or a build-time NEXT_PUBLIC_* value.
+            const { getDisabledWorkKinds } = await load();
+
+            const before = await getDisabledWorkKinds(['app']);
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+            const after = await getDisabledWorkKinds(['app']);
+
+            expect(before.has('app')).toBe(true);
+            expect(after.has('app')).toBe(false);
+        });
+
+        it('lets the caller’s gate win over the environment, both ways', async () => {
+            // When the API publishes its own answer, that answer is the truth:
+            // a chip for a surface the API refuses would be a dead end, and a
+            // hidden chip for a surface it serves is a missing feature.
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+            const { getDisabledWorkKinds } = await load();
+
+            const refused = await getDisabledWorkKinds(['app'], 'user-1', {
+                appWorksEnabled: false,
+            });
+            delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            const allowed = await getDisabledWorkKinds(['app'], 'user-1', {
+                appWorksEnabled: true,
+            });
+
+            expect(refused.has('app')).toBe(true);
+            expect(allowed.has('app')).toBe(false);
+        });
+
+        it('leaves every other kind fail-open in exactly the same conditions', async () => {
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+            const { getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds(CHIPS);
+
+            expect(disabled.has('app')).toBe(false);
+            for (const kind of OTHER_KINDS) {
+                expect(disabled.has(kind), `kind "${kind}" must stay fail-open`).toBe(false);
+            }
+        });
     });
 });

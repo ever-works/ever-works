@@ -1,5 +1,6 @@
 import 'server-only';
 import { PostHog } from 'posthog-node';
+import { HIDDEN_WHEN_DISABLED_WORK_KINDS } from '@/lib/work-kinds/flag-gated-kinds';
 
 /**
  * Server-side gating for the dashboard "work kind" chips.
@@ -37,16 +38,12 @@ export const workKindFlagKey = (value: string) => `works-${value}`;
 /**
  * Kinds whose chip fails CLOSED (APW-01 T7b, Resolution R-6).
  *
- * Membership is the ONE thing that decides the semantics above, so the list is
- * exported and deliberately tiny: a kind joins it only while its surface is
- * unfinished and leaking it would be worse than hiding it.
- *
- * APW-01 T20 moves this list behind `apps/web/src/lib/work-kinds/flag-gated-kinds.ts`
- * (`HIDDEN_WHEN_DISABLED_WORK_KINDS`) and lets the runtime instance setting
- * (`EVER_WORKS_APP_WORKS_ENABLED`, the API twin) decide the no-PostHog case;
- * the fail-closed behaviour here is what it builds on.
+ * The list itself now lives in `@/lib/work-kinds/flag-gated-kinds` (T20), which
+ * is importable from client components too, so the fail-closed flag set and the
+ * chip removal cannot drift apart. This name is kept — it reads better at the
+ * call site — and simply re-points at that ONE list.
  */
-export const FAIL_CLOSED_WORK_KINDS = ['app'] as const;
+export const FAIL_CLOSED_WORK_KINDS = HIDDEN_WHEN_DISABLED_WORK_KINDS;
 
 const FAIL_CLOSED: ReadonlySet<string> = new Set<string>(FAIL_CLOSED_WORK_KINDS);
 
@@ -56,13 +53,39 @@ const FAIL_CLOSED: ReadonlySet<string> = new Set<string>(FAIL_CLOSED_WORK_KINDS)
  * APW-01 T7b makes the chip require BOTH halves for a fail-closed kind: the
  * PostHog flag must resolve strictly to `true`, and the API-side App Works
  * switch must not contradict it. `appWorksEnabled: false` therefore always
- * hides the kind — a chip for a surface the API refuses would be a dead end —
- * while an omitted value leaves the decision to the flag alone (the caller has
- * not wired the switch yet; APW-01 T20 wires it).
+ * hides the kind — a chip for a surface the API refuses would be a dead end.
+ *
+ * **T20 gave the omitted case a source of its own** (see
+ * {@link readAppWorksInstanceSetting}): an install with no PostHog at all used
+ * to decide on nothing, so `app` was invisible even where it was switched on.
  */
 export interface WorkKindFlagGate {
     /** `EVER_WORKS_APP_WORKS_ENABLED` as the server resolved it for this request. */
     readonly appWorksEnabled?: boolean;
+}
+
+/**
+ * The runtime instance setting, read at CALL time (APW-01 T20).
+ *
+ * Two things this deliberately is not:
+ *
+ *  - **Not a build-time `NEXT_PUBLIC_*` variable.** A value baked into the bundle
+ *    cannot differ per instance, and the whole point of this switch is that a
+ *    self-hosted install, the PR e2e lane and local development each decide for
+ *    themselves.
+ *  - **Not read at module load.** `getDisabledWorkKinds` is called per request,
+ *    so reading the environment there means a container restarted with a
+ *    different value behaves correctly without a rebuild.
+ *
+ * Exactly `'true'` is on, the same posture as the API's own
+ * `config.appLauncher.isEnabled()` and T31's deploy-manifest spec: a stray `1`
+ * in an environment file is a mistake far more often than an intentional switch,
+ * and this gate hides a surface rather than merely dimming it. When the API
+ * starts publishing its twin on `/api/config`, the caller passes
+ * `gate.appWorksEnabled` and that value wins over this fallback.
+ */
+function readAppWorksInstanceSetting(): boolean {
+    return process.env.EVER_WORKS_APP_WORKS_ENABLED === 'true';
 }
 
 /**
@@ -113,6 +136,17 @@ export async function getDisabledWorkKinds(
     try {
         const client = getClient();
         if (!client) {
+            // APW-01 T20 — with NO PostHog configured at all there is no flag to
+            // consult, so the runtime instance setting decides. Without this the
+            // fail-closed kinds were invisible on every install that has no
+            // PostHog, including local development and the PR e2e lane, even
+            // when the instance had switched the surface on.
+            const instanceEnabled = gate?.appWorksEnabled ?? readAppWorksInstanceSetting();
+            if (instanceEnabled === true) {
+                for (const value of values) {
+                    if (FAIL_CLOSED.has(value)) disabled.delete(value);
+                }
+            }
             return disabled;
         }
 
