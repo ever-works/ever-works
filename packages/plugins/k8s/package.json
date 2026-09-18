@@ -50,7 +50,8 @@
 			"version": "1.0.0",
 			"category": "deployment",
 			"capabilities": [
-				"deployment"
+				"deployment",
+				"app-dependency"
 			],
 			"description": "Deploy works to a Kubernetes cluster",
 			"author": {

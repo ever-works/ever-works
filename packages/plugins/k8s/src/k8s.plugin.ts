@@ -3,6 +3,15 @@ import type {
 	AppClusterCheckRequest,
 	AppDeployHooks,
 	AppDeployResult,
+	AppDependencyBackupStatus,
+	AppDependencyContext,
+	AppDependencyDeprovisionOptions,
+	AppDependencyDeprovisionOutcome,
+	AppDependencyKind,
+	AppDependencyProviderDescriptor,
+	AppDependencyProvisionOutcome,
+	AppDependencySupport,
+	AppDependencyTarget,
 	AppDestroyResult,
 	AppJobResult,
 	AppJobRunRequest,
@@ -48,6 +57,15 @@ import {
 	pullSecretNameFor
 } from './manifest.renderer.js';
 import { parseKubeconfig } from './kubeconfig.parser.js';
+// APW-07 T19 — the in-cluster App dependencies. The plugin is the wiring: it publishes the descriptors and
+// delegates each of the five contract methods to the provider that owns the behaviour, exactly as the App
+// runtime members above delegate to `AppDeployer` / `AppLifecycle` / `AppStatusReader`.
+import { APP_DEPENDENCY_SIZE_DEFAULTS } from './app-dependencies/common.js';
+import {
+	POSTGRES_PROVIDER_DESCRIPTOR,
+	POSTGRES_PROVIDER_ID,
+	PostgresDependencyProvider
+} from './app-dependencies/postgres.provider.js';
 import {
 	appendHostToIngress,
 	buildDnsGuidance,
@@ -332,7 +350,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	readonly name = 'Kubernetes';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'deployment';
-	readonly capabilities: readonly string[] = ['deployment'];
+	/**
+	 * APW-07 T19 (plan §4.9:570): the plugin answers for App dependencies as well as deployments. Appended,
+	 * never replaced — `'deployment'` is what every pre-existing routing decision in the platform selects on.
+	 */
+	readonly capabilities: readonly string[] = ['deployment', 'app-dependency'];
 	readonly providerName = 'kubernetes';
 
 	/**
@@ -342,6 +364,15 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	 * (R-5) — APW-10's `apps-tier` plugin reconciles a `Work` resource in-zone from the same renderer.
 	 */
 	readonly supportsApps = true;
+
+	/**
+	 * APW-07 T19 — the dependency providers this plugin answers for (plan §4.9:570).
+	 *
+	 * One entry today: `k8s-inline-postgres`. T20 (`k8s-inline-redis`) and T21 (`k8s-inline-minio`) append
+	 * theirs to this list, and the AppDependencyFacadeService orders the whole set by `preference` — which is
+	 * why the list is a `readonly` array of descriptors rather than three named fields.
+	 */
+	readonly dependencyProviders: readonly AppDependencyProviderDescriptor[] = [POSTGRES_PROVIDER_DESCRIPTOR];
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
 
@@ -462,6 +493,73 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				default: DEFAULT_MEMORY_LIMIT,
 				description:
 					"Kubernetes quantity, e.g. '2Gi'. Must fit the target node: a limit larger than a node's allocatable memory schedules fine (requests are small) and then OOM-kills the pod climbing toward a ceiling that does not exist."
+			},
+			// APW-07 T19 (plan §4.9:630-633). Declared here because `PluginSettingsService` resolves settings by
+			// iterating THIS schema's keys — a setting the schema does not declare is silently dropped before a
+			// provider could ever read it (the same trap `cpuRequest`/`memoryLimit` above record).
+			appDependencyStorageClass: {
+				type: 'string',
+				title: 'Dependency storage class',
+				description:
+					"StorageClass every in-cluster dependency volume is created on. Leave blank to use the cluster's own default class; a cluster with neither fails Postgres with 'no default storage class'."
+			},
+			appDependencySizes: {
+				type: 'object',
+				title: 'Dependency sizes',
+				description:
+					'Default volume size in GiB per dependency kind. A default for the configure dialog, not a floor — the owner may pick any size at or above the provider minimum before first provisioning (FR-37).',
+				properties: {
+					postgres: {
+						type: 'integer',
+						title: 'Postgres (GiB)',
+						minimum: 1,
+						default: APP_DEPENDENCY_SIZE_DEFAULTS.postgres
+					},
+					objectStorage: {
+						type: 'integer',
+						title: 'Object storage (GiB)',
+						minimum: 1,
+						default: APP_DEPENDENCY_SIZE_DEFAULTS.objectStorage
+					},
+					redis: {
+						type: 'integer',
+						title: 'Redis (GiB)',
+						minimum: 1,
+						default: APP_DEPENDENCY_SIZE_DEFAULTS.redis
+					}
+				}
+			},
+			appDependencyImages: {
+				type: 'object',
+				title: 'Dependency images (admin)',
+				description:
+					'Digest-pinned image overrides per kind and version. Leave a field blank to use the pinned default. A value that is not a sha256 digest is ignored, so a typo can never publish an unpinned image.',
+				'x-adminOnly': true,
+				properties: {
+					postgres: {
+						type: 'object',
+						title: 'Postgres server',
+						properties: {
+							'14': { type: 'string', title: 'Postgres 14' },
+							'15': { type: 'string', title: 'Postgres 15' },
+							'16': { type: 'string', title: 'Postgres 16' },
+							'17': { type: 'string', title: 'Postgres 17' }
+						}
+					},
+					postgresClient: {
+						type: 'object',
+						title: 'Postgres client (extension job)',
+						properties: {
+							'14': { type: 'string', title: 'Postgres 14 client' },
+							'15': { type: 'string', title: 'Postgres 15 client' },
+							'16': { type: 'string', title: 'Postgres 16 client' },
+							'17': { type: 'string', title: 'Postgres 17 client' }
+						}
+					},
+					redis: { type: 'string', title: 'Redis 7' },
+					objectStorage: { type: 'string', title: 'S3-compatible server' },
+					objectStorageClient: { type: 'string', title: 'S3 client (init job)' }
+				}
 			}
 		},
 		// `kubeconfig` is only required when `clusterSource === 'custom-kubeconfig'`
@@ -492,6 +590,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private readonly appStatusReader: AppStatusReader;
 	private readonly appLifecycle: AppLifecycle;
 	private readonly appClusterChecker: AppClusterChecker;
+	/**
+	 * APW-07 T19's provider (plan §4.9:568-633). Built over the same `KubernetesApiService` the App runtime
+	 * members use, so a dependency call and a deploy reach one client.
+	 */
+	private readonly postgresDependencies: PostgresDependencyProvider;
 	/** §6.1 step 2's DNS seam. Unset in production (the guard falls back to `node:dns`). */
 	private readonly clusterAddressResolver?: KubeconfigDnsResolver;
 
@@ -513,6 +616,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		this.appStatusReader = new AppStatusReader(this.api);
 		this.appLifecycle = new AppLifecycle(this.api);
 		this.appClusterChecker = new AppClusterChecker(this.api);
+		this.postgresDependencies = new PostgresDependencyProvider(this.api);
 		this.clusterAddressResolver = opts.clusterAddressResolver;
 	}
 
@@ -1299,6 +1403,97 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		this.assertThisPluginServes(ref);
 		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
 		return this.appLifecycle.publishAppHosts(ref, pinned, hosts);
+	}
+
+	// App dependency members (APW-07 T19) -----------------------------------
+
+	/**
+	 * May this plugin serve `(kind, target)`? (plan §4.7:516-520, §4.8:543-546.)
+	 *
+	 * The answer is the descriptor list's: a pair no descriptor offers is `providerNotSupported` without
+	 * consulting a provider, and a pair one offers is the provider's own answer. The context is accepted
+	 * because the contract passes it — a provider whose *offer* depends on it (`platform-smtp-relay` is
+	 * offered only while its admin settings are complete) needs it, and this one does not.
+	 *
+	 * The target half is what keeps R-5 true for dependencies as well: every descriptor here declares
+	 * `your-cluster` only, so `ever-works-apps` is never served from this plugin.
+	 */
+	async supports(
+		kind: AppDependencyKind,
+		target: AppDependencyTarget,
+		_ctx: AppDependencyContext
+	): Promise<AppDependencySupport> {
+		const descriptor = (this.dependencyProviders ?? []).find(
+			(entry) => entry.kind === kind && (entry.targets ?? []).includes(target)
+		);
+		const provider = descriptor ? this.dependencyProviderFor(descriptor.id) : null;
+		if (!provider) return { supported: false, reason: 'providerNotSupported' };
+		return provider.supports(kind, target);
+	}
+
+	/**
+	 * Provision one dependency (`providerId` selects among this plugin's providers) — plan §4.9.
+	 *
+	 * The credential is **not** re-guarded here, and that is deliberate: §4.8:547-557 makes APW-06's
+	 * `AppRuntimeTargetPort.prepareDependencyTarget(workId)` the one thing that resolves a target, and the job
+	 * builds `ctx.cluster` from it before calling a provider. Re-running §6.1's guard over that YAML would
+	 * re-resolve an address APW-06 has already pinned, which is exactly the double-resolution the guard exists
+	 * to prevent.
+	 */
+	async provision(providerId: string, ctx: AppDependencyContext): Promise<AppDependencyProvisionOutcome> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) {
+			return { state: 'failed', reason: 'providerNotSupported', transient: false, detail: { providerId } };
+		}
+		return provider.provision(providerId, ctx);
+	}
+
+	/** Re-read a dependency's outputs — the `refresh` mode (FR-42). */
+	async getOutputs(providerId: string, ctx: AppDependencyContext): Promise<Record<string, string>> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) {
+			throw new K8sPluginError('NOT_CONFIGURED', `No Kubernetes dependency provider serves '${providerId}'.`);
+		}
+		return provider.getOutputs(providerId, ctx);
+	}
+
+	/**
+	 * Release, or destroy, one dependency (plan §4.9:624-628).
+	 *
+	 * A provider this plugin does not serve answers `released` rather than throwing: the caller is releasing a
+	 * row it already decided to let go, and failing the release because its provider moved would leave the row
+	 * stuck in `deleting` forever.
+	 */
+	async deprovision(
+		providerId: string,
+		ctx: AppDependencyContext,
+		opts: AppDependencyDeprovisionOptions
+	): Promise<AppDependencyDeprovisionOutcome> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) return { state: 'released' };
+		return provider.deprovision(providerId, ctx, opts);
+	}
+
+	/** FR-48/FR-49 — the card's one backup state, read from individual records. */
+	async backupStatus(providerId: string, ctx: AppDependencyContext): Promise<AppDependencyBackupStatus> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) return { state: 'none' };
+		return provider.backupStatus(providerId, ctx);
+	}
+
+	/**
+	 * The provider behind one id, or `null`.
+	 *
+	 * One lookup path for all five members, so "which provider answers" is answered once: the descriptor list is
+	 * the published contract and this map is what implements it. T20/T21 add one entry to the list and one line
+	 * here; until then an id this plugin does not publish is `null` — never a fallback to another provider,
+	 * because provisioning a dependency with an implementation the owner did not choose is the thing
+	 * `AppDependencyFacadeService.select` refuses (plan §4.8:543-544).
+	 */
+	private dependencyProviderFor(providerId: string): PostgresDependencyProvider | null {
+		if (providerId !== POSTGRES_PROVIDER_ID) return null;
+		const published = (this.dependencyProviders ?? []).some((entry) => entry.id === providerId);
+		return published ? this.postgresDependencies : null;
 	}
 
 	/**
