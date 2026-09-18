@@ -104,8 +104,23 @@ setup(
         // 1. The seven interlocks. Interlock 2's kube inputs come from the
         //    environment the lane sets; interlock 6 asserts which variable may carry
         //    a GitHub token at all, before anything attaches one.
+        //
+        //    Interlock 2 needs the context this lane will actually use, and the lane
+        //    declares its contexts in the environment (plan §8.5). The user cluster
+        //    is preferred and the apps tier is the fallback — which additionally
+        //    demands the read-only kubeconfig, so the read-only rule is enforced
+        //    here rather than discovered by the first cluster write. Passing nothing
+        //    is not an option: `assertKubeContext` refuses an absent context, so a
+        //    setup that omitted it could never reach the connection assertion below
+        //    (S10) — which is half of T12's Done-when.
+        const kubeContext =
+            process.env.APW_E2E_USER_CLUSTER_CONTEXT ?? process.env.APW_E2E_APPS_TIER_CONTEXT;
         const id = runId();
         assertLaneMayStart({
+            kube: {
+                context: kubeContext,
+                kubeconfigPath: process.env.APW_E2E_APPS_TIER_READ_KUBECONFIG,
+            },
             proposalBaseOwner: process.env.APW_E2E_PROPOSAL_BASE_OWNER,
             upstreamOwner: process.env.APW_E2E_UPSTREAM_ORG,
             requestedGitHubTokenVariable: process.env.APW_E2E_GITHUB_TOKEN_VARIABLE,

@@ -689,6 +689,38 @@ route whose true contract (curl + node fetch) is 401; concurrent cascading
 team DELETEs can hit a sqlite transaction-serialization 500 (driver
 artifact — the no-resurrection invariant still holds).
 
+## APW-13 P0 — regression pack (T14–T19, added 2026-09-18)
+
+Five specs for ACCEPTANCE §5's regression rows, one per row, all request-level
+(`@playwright/test`'s `request` fixture against the API) so they need no browser
+and no `storageState`. They run in the **default** config's `chromium` project
+beside the rest of the sharded PR suite — the App Works live/kind lanes own
+`playwright.app-works.config.ts` and never collect these.
+
+`[~]` marks a spec whose connection-free half runs for real while the half that
+needs a GitHub connection carries the shared
+`test.fixme('APW-13 T63: no supported GitHub connection surface')` marker
+(plan §8.8), or — for the managed subdomain — the DNS-provider marker the task
+names. A `fixme`'d test is visible in `--list`, counts as skipped, and is
+un-fixme'd by the task that lands its surface.
+
+| Spec (under `apps/web/e2e/`)                 | Status | Covers                 | Runs for real                                                                                                                                                                              | Carries                                                                                                                                                    |
+| -------------------------------------------- | ------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow-repo-work-kind-regression.spec.ts`     | [~]    | ACC-REG-01, ACC-NEG-15 | the 400 refusals a fresh account gets (no URL / non-GitHub URL / no connected account), the 401, the zero-GitHub-call proof via the fake, and the same refusals with the works-app chip on | `test.fixme('APW-13 T63: no supported GitHub connection surface')` — success create, 409 for a second account, generate/deploy/write refusals              |
+| `flow-template-fork-success.spec.ts`         | [~]    | ACC-REG-02             | the fork surface is closed over HTTP (the create refuses the fork fields) and the fake records no fork call                                                                                | `test.fixme('APW-13 T63: no supported GitHub connection surface')` — fork into the user + into an organization, with the user's token on the recorded call |
+| `flow-activity-deploy-and-pr-events.spec.ts` | [~]    | ACC-REG-07             | the Activity read surface every step lands on: a Work step appears as a named row (`actionType` / `action` / `status` / `summary`, no payload), 401 unauthenticated, owner-scoped          | `test.fixme('APW-13 T63: no supported GitHub connection surface')` — template-fork, deploy and PR events                                                   |
+| `flow-github-intake-signed-delivery.spec.ts` | [x]    | ACC-REG-12             | a delivery signed with the CI webhook secret is accepted and dispatched on both receiver routes, and unsigned / wrong-secret / tampered / header-less deliveries are refused               | — (needs no connection: the spec signs its own payload)                                                                                                    |
+| `flow-managed-subdomain-allocation.spec.ts`  | [~]    | ACC-REG-05             | the enforced per-user cap of 3 on the `ever-works` deploy provider, the unallocated read, the six `PUT` refusals, and the DNS-provider boundary a successful allocation stops at           | `test.fixme('APW-13 T18: needs a DNS provider fake')` — a successful allocation and the CNAME it writes                                                    |
+
+Lane switches these specs read (all set by the PR lane for **both** the API and
+Playwright, `plan §8.3` / `tasks.md:201-204`): `EVER_WORKS_E2E_FAKES=1` +
+`APW_E2E_GITHUB_FAKE_URL` (the fake GitHub), `EVER_WORKS_APP_WORKS_ENABLED=true`
+(the works-app chip), `DEPLOY_EVER_WORKS_ENABLED=true` and
+`EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER` (the deploy cap — without the first, the
+platform rewrites `deployProvider: 'ever-works'` to `'vercel'` and the cap is
+unreachable), and `GITHUB_APP_WEBHOOK_SECRET` (the secret the intake spec signs
+with, the same variable the API reads).
+
 ## Pass 15+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
