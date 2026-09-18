@@ -41,6 +41,20 @@
  *   `verification-deploy` handler can bind `APP_VERIFICATION_SPEC_SOURCE` with
  *   `useExisting: AppRenderInputBuilder`. Exported here because T25's orchestrator lives in
  *   `packages/tasks` and can only reach this folder through the subpath barrel.
+ * - `./app-public-smoke.service` — `AppPublicSmokeService` (T23, plan §5.5, FR-36/FR-37): the
+ *   platform's half of the smoke run behind `AppDeployHooks.verifyPublic`, with the four
+ *   classifications, the 600 s / 180 s windows, the 10 s retry, the 1 MiB cap and the
+ *   `≤ 200`-character excerpt, plus the pure helpers T25 and §9.3's health poll read
+ *   (`publicSmokeWindowSeconds`, `smokeChecksFor`, `classifyPublicSmokeError`, `excerpt`,
+ *   `readCapped`). Exported for the same cross-package reason as the entries above.
+ * - `./app-deploy-request.service` — `AppDeployRequestService` (T24, plan §2.2, §5.8): the request
+ *   path — the isolated-worker gate, T21's preconditions, the `build_not_applicable` validation, the
+ *   atomic lock claim, the latest-wins queue and the 2 s-budgeted dispatch — plus its `requestDeploy`
+ *   wrapper for APW-01's `APP_DEPLOY_ROUTE_PORT` (T34 binds it with `useExisting`) and the
+ *   provisional seams it declares (the `APP_DEPLOY_DISPATCHER` token T31 will bind, the
+ *   `work_deployments` store T16 will provide, and the runtime-state *view* that reuses
+ *   `WORK_APP_RUNTIME_STATES`). The API's route and `DeployService` both live outside this package,
+ *   which is why it has to be on the barrel.
  */
 
 export * from './ports';
@@ -51,3 +65,5 @@ export * from './app-verification-target.service';
 export * from './app-license-gate';
 export * from './app-deploy-preconditions.service';
 export * from './app-render-input.builder';
+export * from './app-public-smoke.service';
+export * from './app-deploy-request.service';
