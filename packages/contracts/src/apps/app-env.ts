@@ -315,6 +315,91 @@ export const APP_ENV_IMPORT_OUTCOMES = ['set', 'created', 'skipped', 'refused'] 
 export type AppEnvImportOutcome = (typeof APP_ENV_IMPORT_OUTCOMES)[number];
 
 /* ------------------------------------------------------------------------- *
+ * API error codes and their message keys (plan §5:798-805, §8:907; APW07-G23)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The API-level error codes the Environment routes answer with, and which are
+ * not validation refusals — plan §5:798-802.
+ *
+ * The route each one belongs to is in the plan's error-code sentence; the two
+ * that are easy to misplace are `secureStorageUnavailable`, which is a **503**
+ * because the installation has no encryption key at all (so nothing can be
+ * stored), and `rotateRateLimited`, which is the **429** of the 10-per-hour cap
+ * (FR-13) and not a refusal of the request's content.
+ */
+export const APP_ENV_API_ERROR_CODES = [
+	'generatedValueUseRotate',
+	'neverRotateNotAcknowledged',
+	'rotateConfirmationMismatch',
+	'secureStorageUnavailable',
+	'tooManyValues',
+	'valuesTooLarge',
+	'malformedLine',
+	'rotateRateLimited'
+] as const;
+
+/** An API-level Environment error code — plan §5:798-802. */
+export type AppEnvApiErrorCode = (typeof APP_ENV_API_ERROR_CODES)[number];
+
+/**
+ * Every code that carries copy under `dashboard.workDetail.appEnv.errors.*` —
+ * the eight validation refusals of plan §4.4:409-410 **plus** the eight API
+ * codes above, which is exactly the sixteen leaves plan §8:907 lists.
+ *
+ * The two lists are concatenated rather than re-typed so a refusal code can
+ * never drift out of the error vocabulary: the split is by WHERE the refusal is
+ * produced (validation vs. the route), not by what the person reads.
+ */
+export const APP_ENV_ERROR_CODES = [...APP_ENV_VALIDATION_REFUSAL_CODES, ...APP_ENV_API_ERROR_CODES] as const;
+
+/** An Environment error code, validation or API — plan §8:907. */
+export type AppEnvErrorCode = (typeof APP_ENV_ERROR_CODES)[number];
+
+/**
+ * One `dashboard.workDetail.appEnv.errors.<leaf>` leaf per code, with camelCase,
+ * `.`-free leaves — plan §8:907, the same shape APW-06's
+ * `APP_PRECONDITION_MESSAGE_LEAVES` uses.
+ *
+ * The map is a total `Record` over the union, so a code added without a leaf here
+ * fails to compile, and T1's spec pins every leaf against
+ * `apps/web/messages/en.json` (APW07-G23): a code without copy renders as a raw
+ * identifier on the Environment table.
+ */
+export const APP_ENV_ERROR_MESSAGE_LEAVES = {
+	invalidName: 'invalidName',
+	reservedName: 'reservedName',
+	valueTooLarge: 'valueTooLarge',
+	controlCharacter: 'controlCharacter',
+	lengthMismatch: 'lengthMismatch',
+	tooShort: 'tooShort',
+	tooLong: 'tooLong',
+	patternMismatch: 'patternMismatch',
+	generatedValueUseRotate: 'generatedValueUseRotate',
+	neverRotateNotAcknowledged: 'neverRotateNotAcknowledged',
+	rotateConfirmationMismatch: 'rotateConfirmationMismatch',
+	secureStorageUnavailable: 'secureStorageUnavailable',
+	tooManyValues: 'tooManyValues',
+	valuesTooLarge: 'valuesTooLarge',
+	malformedLine: 'malformedLine',
+	rotateRateLimited: 'rotateRateLimited'
+} as const satisfies Record<AppEnvErrorCode, string>;
+
+/** The i18n subtree every Environment error code's copy lives under — plan §8:907. */
+export const APP_ENV_ERROR_MESSAGE_KEY_PREFIX = 'dashboard.workDetail.appEnv.errors' as const;
+
+/**
+ * The ONE message key of an error code (plan §5:802-805: "carries exactly one
+ * message key").
+ *
+ * Callers render from this resolver rather than building the path themselves, so
+ * there is one implementation of the code→key mapping and the T1 spec can pin it.
+ */
+export function appEnvErrorMessageKey(code: AppEnvErrorCode): string {
+	return `${APP_ENV_ERROR_MESSAGE_KEY_PREFIX}.${APP_ENV_ERROR_MESSAGE_LEAVES[code]}`;
+}
+
+/* ------------------------------------------------------------------------- *
  * Resolution (plan §2.2:110–150)
  * ------------------------------------------------------------------------- */
 

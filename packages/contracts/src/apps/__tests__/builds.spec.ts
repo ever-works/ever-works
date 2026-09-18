@@ -1230,9 +1230,17 @@ describe('app-dependencies.ts — kinds, outputs and statuses (APW-07 plan.md:29
 		expectNoDuplicates('APP_DEPENDENCY_INACTIVE_STATUSES', APP_DEPENDENCY_INACTIVE_STATUSES);
 	});
 
-	it('APP_DEPENDENCY_STATUSES is exactly plan.md:210 and the inactive pair is plan.md:225', () => {
+	it('APP_DEPENDENCY_STATUSES is exactly plan.md:210 plus §4.9a:641, and the inactive pair is plan.md:225', () => {
+		// `awaiting_config` is plan §4.9a:641's pre-provisioning state — "New status
+		// `awaiting_config` … `reconcile` inserts the row in `awaiting_config` for such
+		// a provider and dispatches nothing; no deadline runs" — added by the
+		// 2026-09-17 fix pass, and it is what stops an external provider reaching
+		// `failed deadlineExceeded` inside the 30-second SMTP deadline. APW-07 T2 names
+		// it explicitly ("`APP_DEPENDENCY_STATUSES` incl. `awaitingConfig`"). The pin
+		// stays EXACT: a status added without this list still fails here.
 		expectExactMembers('APP_DEPENDENCY_STATUSES', APP_DEPENDENCY_STATUSES, [
 			'pending',
+			'awaiting_config',
 			'provisioning',
 			'ready',
 			'degraded',

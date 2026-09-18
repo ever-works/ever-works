@@ -42,9 +42,20 @@ export const APP_DEPENDENCY_TARGETS = ['your-cluster', 'ever-works-apps'] as con
 /** A dependency target — plan §4.7:470. */
 export type AppDependencyTarget = (typeof APP_DEPENDENCY_TARGETS)[number];
 
-/** `work_app_dependencies.status` (`varchar(16)`, plan §3.2:210). */
+/**
+ * `work_app_dependencies.status` (`varchar(16)`, plan §3.2:210) — eight members
+ * plus the pre-provisioning state plan §4.9a:641 adds.
+ *
+ * `awaiting_config` sits after `pending` because that is where the state machine
+ * reaches it: `reconcile` inserts such a row instead of dispatching, `PUT
+ * …/:kind` with valid config moves it to `pending`, and no deadline runs
+ * meanwhile (plan §4.9a:641-644, spec.md:433). Without it a provider whose
+ * settings only the owner can supply would reach `failed deadlineExceeded` inside
+ * the 30-second SMTP deadline before the owner could type anything.
+ */
 export const APP_DEPENDENCY_STATUSES = [
 	'pending',
+	'awaiting_config',
 	'provisioning',
 	'ready',
 	'degraded',
@@ -82,6 +93,205 @@ export const APP_DEPENDENCY_BACKUP_STATES = [
 
 /** A dependency's backup state — FR-48 / plan §3.2:221. */
 export type AppDependencyBackupState = (typeof APP_DEPENDENCY_BACKUP_STATES)[number];
+
+/* ------------------------------------------------------------------------- *
+ * Reasons and API error codes (plan §5:798-805, §8:911-913; APW07-G23)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Every reason a dependency row or an API response can carry, verbatim from
+ * plan §8:913 and in the plan's order.
+ *
+ * The union is wide on purpose: a **status reason** is why a card reads
+ * *Failed* or *Degraded* (FR-43's "definite failure ... fails at once with its
+ * reason"), while an **API error code** is what a write answers with. They share
+ * one vocabulary because they share one copy subtree —
+ * `dashboard.workDetail.appDependencies.reasons.*` — which is what lets a card
+ * and a toast render the same sentence for the same cause.
+ */
+export const APP_DEPENDENCY_REASONS = [
+	'noDefaultStorageClass',
+	'clusterUnreachable',
+	'smtpConnectFailed',
+	'smtpTlsFailed',
+	'smtpAuthRefused',
+	'bucketUnreadable',
+	'volumeNotReady',
+	'extensionUnavailable',
+	'platformServerRefused',
+	'deadlineExceeded',
+	'namespaceNotOwned',
+	'namespaceBaselineMissing',
+	'clusterPermissionMissing',
+	'operatorNamespaceUnknown',
+	'volumeExpansionUnsupported',
+	'sizeShrinkRefused',
+	'relayIneligible',
+	'relaySuspended',
+	'providerNotSupported',
+	'dependencyNotDeclared',
+	'confirmationMismatch',
+	'deleteInProgress',
+	'notGenerated',
+	'notAppWork'
+] as const;
+
+/** A dependency reason or API error code — plan §8:913. */
+export type AppDependencyReason = (typeof APP_DEPENDENCY_REASONS)[number];
+
+/**
+ * The sixteen reasons a **card** shows after a failed or degraded attempt — plan
+ * §4.9:570-583 (no storage class, unreachable cluster, the ext-provider test
+ * reasons, a volume that never became ready, missing extensions, a refused
+ * platform data server, and the deadline), §4.9a's relay states and the namespace
+ * checks of §4.9's permission list.
+ *
+ * A definite failure fails at once with one of these; only a transient one is
+ * retried (FR-43).
+ */
+export const APP_DEPENDENCY_STATUS_REASONS = [
+	'noDefaultStorageClass',
+	'clusterUnreachable',
+	'smtpConnectFailed',
+	'smtpTlsFailed',
+	'smtpAuthRefused',
+	'bucketUnreadable',
+	'volumeNotReady',
+	'extensionUnavailable',
+	'platformServerRefused',
+	'deadlineExceeded',
+	'namespaceNotOwned',
+	'namespaceBaselineMissing',
+	'clusterPermissionMissing',
+	'operatorNamespaceUnknown',
+	'relayIneligible',
+	'relaySuspended'
+] as const;
+
+/** A reason a dependency card shows — plan §4.9-§4.9a. */
+export type AppDependencyStatusReason = (typeof APP_DEPENDENCY_STATUS_REASONS)[number];
+
+/**
+ * The eight codes the dependency **routes** answer with — plan §5:798-802.
+ *
+ * `sizeShrinkRefused` (422) and `volumeExpansionUnsupported` (422) are
+ * APW07-G22's two additions to `PUT …/:kind`; `notAppWork` is the 404 a non-`app`
+ * Work gets on every route.
+ */
+export const APP_DEPENDENCY_ERROR_CODES = [
+	'volumeExpansionUnsupported',
+	'sizeShrinkRefused',
+	'providerNotSupported',
+	'dependencyNotDeclared',
+	'confirmationMismatch',
+	'deleteInProgress',
+	'notGenerated',
+	'notAppWork'
+] as const;
+
+/** A dependency API error code — plan §5:798-802. */
+export type AppDependencyErrorCode = (typeof APP_DEPENDENCY_ERROR_CODES)[number];
+
+/**
+ * One `dashboard.workDetail.appDependencies.reasons.<leaf>` leaf per reason, with
+ * camelCase, `.`-free leaves — plan §8:913.
+ *
+ * A total `Record` over the union, so a reason added without a leaf fails to
+ * compile; T2's spec pins every leaf against `apps/web/messages/en.json`, so a
+ * reason added without **copy** fails the suite (APW07-G23).
+ */
+export const APP_DEPENDENCY_REASON_MESSAGE_LEAVES = {
+	noDefaultStorageClass: 'noDefaultStorageClass',
+	clusterUnreachable: 'clusterUnreachable',
+	smtpConnectFailed: 'smtpConnectFailed',
+	smtpTlsFailed: 'smtpTlsFailed',
+	smtpAuthRefused: 'smtpAuthRefused',
+	bucketUnreadable: 'bucketUnreadable',
+	volumeNotReady: 'volumeNotReady',
+	extensionUnavailable: 'extensionUnavailable',
+	platformServerRefused: 'platformServerRefused',
+	deadlineExceeded: 'deadlineExceeded',
+	namespaceNotOwned: 'namespaceNotOwned',
+	namespaceBaselineMissing: 'namespaceBaselineMissing',
+	clusterPermissionMissing: 'clusterPermissionMissing',
+	operatorNamespaceUnknown: 'operatorNamespaceUnknown',
+	volumeExpansionUnsupported: 'volumeExpansionUnsupported',
+	sizeShrinkRefused: 'sizeShrinkRefused',
+	relayIneligible: 'relayIneligible',
+	relaySuspended: 'relaySuspended',
+	providerNotSupported: 'providerNotSupported',
+	dependencyNotDeclared: 'dependencyNotDeclared',
+	confirmationMismatch: 'confirmationMismatch',
+	deleteInProgress: 'deleteInProgress',
+	notGenerated: 'notGenerated',
+	notAppWork: 'notAppWork'
+} as const satisfies Record<AppDependencyReason, string>;
+
+/** The i18n subtree every dependency reason's copy lives under — plan §8:913. */
+export const APP_DEPENDENCY_REASON_MESSAGE_KEY_PREFIX = 'dashboard.workDetail.appDependencies.reasons' as const;
+
+/**
+ * One `dashboard.workDetail.appDependencies.status.<leaf>` leaf per status —
+ * plan §8:911.
+ *
+ * Only nine entries: `notInSpec` is in that plan line too, but it is the copy of
+ * the `inSpec: false` chip ("No longer used by the App spec — data kept", spec
+ * §6.3:526) and not a member of {@link APP_DEPENDENCY_STATUSES}. `awaiting_config`
+ * keeps the camelCase leaf `awaitingConfig` the plan names.
+ */
+export const APP_DEPENDENCY_STATUS_MESSAGE_LEAVES = {
+	pending: 'pending',
+	awaiting_config: 'awaitingConfig',
+	provisioning: 'provisioning',
+	ready: 'ready',
+	degraded: 'degraded',
+	failed: 'failed',
+	kept: 'kept',
+	deleting: 'deleting',
+	deleted: 'deleted'
+} as const satisfies Record<AppDependencyStatus, string>;
+
+/** The i18n subtree every dependency status's copy lives under — plan §8:911. */
+export const APP_DEPENDENCY_STATUS_MESSAGE_KEY_PREFIX = 'dashboard.workDetail.appDependencies.status' as const;
+
+/** One `dashboard.workDetail.appDependencies.backup.<leaf>` leaf per backup state — plan §8:912. */
+export const APP_DEPENDENCY_BACKUP_STATE_MESSAGE_LEAVES = {
+	none: 'none',
+	not_configured: 'notConfigured',
+	healthy: 'healthy',
+	overdue: 'overdue',
+	failing: 'failing',
+	external: 'external',
+	unknown: 'unknown'
+} as const satisfies Record<AppDependencyBackupState, string>;
+
+/** The i18n subtree every backup state's copy lives under — plan §8:912. */
+export const APP_DEPENDENCY_BACKUP_STATE_MESSAGE_KEY_PREFIX = 'dashboard.workDetail.appDependencies.backup' as const;
+
+/** The ONE message key of a dependency reason (plan §5:802-805). */
+export function appDependencyReasonMessageKey(reason: AppDependencyReason): string {
+	return `${APP_DEPENDENCY_REASON_MESSAGE_KEY_PREFIX}.${APP_DEPENDENCY_REASON_MESSAGE_LEAVES[reason]}`;
+}
+
+/** The ONE message key of a dependency status (plan §8:911). */
+export function appDependencyStatusMessageKey(status: AppDependencyStatus): string {
+	return `${APP_DEPENDENCY_STATUS_MESSAGE_KEY_PREFIX}.${APP_DEPENDENCY_STATUS_MESSAGE_LEAVES[status]}`;
+}
+
+/** The ONE message key of a backup state (plan §8:912). */
+export function appDependencyBackupStateMessageKey(state: AppDependencyBackupState): string {
+	return `${APP_DEPENDENCY_BACKUP_STATE_MESSAGE_KEY_PREFIX}.${APP_DEPENDENCY_BACKUP_STATE_MESSAGE_LEAVES[state]}`;
+}
+
+/**
+ * Is this string one of the twenty-four reasons? A `varchar(48)` column and a
+ * provider's own `reason: string` both arrive as plain strings, so the closed
+ * union needs one place to cross back into it — and a caller that fails this
+ * check has an unmapped reason, which is exactly what APW07-G23 exists to catch.
+ */
+export function isAppDependencyReason(value: string): value is AppDependencyReason {
+	return (APP_DEPENDENCY_REASONS as readonly string[]).includes(value);
+}
 
 /**
  * The provider ids that ship (CONTRACTS §3:369).
@@ -337,6 +547,101 @@ export type AppDependencyDeprovisionOutcome = {
 	state: 'released' | 'deleted' | 'pending';
 	remaining?: AppDependencyResourceRefs;
 };
+
+/* ------------------------------------------------------------------------- *
+ * The Dependencies card (plan §5:787-796, §4.9a:645)
+ * ------------------------------------------------------------------------- */
+
+/** Who serves a dependency — plan §5:793. */
+export interface AppDependencyProviderRef {
+	pluginId: string;
+	providerId: string;
+	label: string;
+}
+
+/**
+ * One field of a provider's prompt schema — plan §5:793, §4.7:474.
+ *
+ * `secret` marks an `x-secret` field: it is write-only, so `set` says whether a
+ * value is already stored and the value itself is never returned (FR-5).
+ */
+export interface AppDependencyPromptField {
+	key: string;
+	label: string;
+	secret: boolean;
+	required: boolean;
+	set: boolean;
+}
+
+/** A provider the card may offer for this kind and target — plan §5:793. */
+export interface AppDependencyAvailableProvider {
+	providerId: string;
+	label: string;
+	promptFields: AppDependencyPromptField[];
+}
+
+/** A dependency's backup block — plan §5:794, FR-48. */
+export interface AppDependencyBackupView {
+	policy: AppDependencyBackupPolicy;
+	state: AppDependencyBackupState;
+	lastBackupAt: string | null;
+	checkedAt: string | null;
+}
+
+/** One output the provider produces, by name — **never** its value (plan §5:794, FR-5). */
+export interface AppDependencyOutputRef {
+	name: string;
+	secret: boolean;
+}
+
+/**
+ * `statusDetail`: names and numbers only, ≤ 2 KB, as `simple-json` (plan §3.2:211).
+ *
+ * The `string[]` member is there because a definite failure may name the
+ * extensions that are missing (plan §4.9:583) — it is still names, not values.
+ */
+export type AppDependencyStatusDetail = Record<string, string | number | string[]>;
+
+/**
+ * One Dependencies card — what `GET /api/works/:id/app-dependencies` returns per
+ * dependency (plan §5:792-796), plus §4.9a's `awaitingConfig`.
+ *
+ * **No output or config value is ever on this shape** (plan §5:795, FR-5):
+ * `outputs` names what exists and whether it is secret, `keptResources` lists what
+ * was left behind after a release (FR-45/FR-56), and the prompted `config` of an
+ * external provider is write-only — it is never echoed back, which is why the
+ * card renders `promptFields[].set` instead of a stored secret.
+ *
+ * `awaitingConfig` is deliberately redundant with `status === 'awaiting_config'`:
+ * the card decides whether to render **Configure** from the boolean (plan
+ * §4.9a:645), and the two are pinned to agree by T2's spec.
+ */
+export interface AppDependencyView {
+	kind: AppDependencyKind;
+	/** Does the App spec declare this kind? (FR-35) */
+	declared: boolean;
+	/** The provider serving it. A row always carries one — both columns are NOT NULL (plan §3.2:209). */
+	provider: AppDependencyProviderRef;
+	/** Every provider this App Work's target could offer, with its prompt schema (APW07-G16). */
+	availableProviders: AppDependencyAvailableProvider[];
+	status: AppDependencyStatus;
+	/** Why the card is `failed` / `degraded` / `awaiting_config`; `null` when there is nothing to say. */
+	statusReason: AppDependencyReason | null;
+	statusDetail: AppDependencyStatusDetail | null;
+	/** True exactly when `status === 'awaiting_config'` (plan §4.9a:645). */
+	awaitingConfig: boolean;
+	/** The provider's reported version, e.g. `16` for Postgres. */
+	actualVersion: string | null;
+	sizeGiB: number | null;
+	backup: AppDependencyBackupView;
+	/** False once the kind left the App spec — the "No longer used" card (FR-45). */
+	inSpec: boolean;
+	/** What a release kept, by name — the delete-data dialog lists it (FR-46, plan §4.12). */
+	keptResources: AppDependencyResourceRefs | null;
+	outputs: AppDependencyOutputRef[];
+	lastProvisionedAt: string | null;
+	lastCheckedAt: string | null;
+}
 
 /* ------------------------------------------------------------------------- *
  * Relay (FR-39/FR-61, plan §4.10:672–683)

@@ -6895,6 +6895,75 @@
                 "stopRequested": "Generation cancellation requested",
                 "stopFailed": "Failed to cancel generation"
             },
+            "appEnv": {
+                "errors": {
+                    "invalidName": "Names start with a letter or an underscore and use A–Z, 0–9 and _ only.",
+                    "reservedName": "Names starting with EVER_WORKS_ are reserved for the platform.",
+                    "valueTooLarge": "A value can be at most 65,536 bytes.",
+                    "controlCharacter": "Values can't contain a NUL character.",
+                    "lengthMismatch": "Must be exactly {expected} characters — that one is {actual}.",
+                    "tooShort": "Must be at least {min} characters.",
+                    "tooLong": "Must be at most {max} characters.",
+                    "patternMismatch": "That doesn't match the pattern this app asks for.",
+                    "generatedValueUseRotate": "This value is generated. Rotate it to replace it.",
+                    "neverRotateNotAcknowledged": "This app says this value must never change. Confirm that you understand before rotating.",
+                    "rotateConfirmationMismatch": "The name you typed doesn't match this value's name.",
+                    "secureStorageUnavailable": "Secure storage isn't configured on this installation, so values can't be stored.",
+                    "tooManyValues": "An app can hold at most 300 values.",
+                    "valuesTooLarge": "An app's values can total at most 1 MiB.",
+                    "malformedLine": "Not a valid NAME=value line.",
+                    "rotateRateLimited": "Too many rotations. Try again later."
+                }
+            },
+            "appDependencies": {
+                "status": {
+                    "pending": "Pending",
+                    "awaitingConfig": "Needs your settings",
+                    "provisioning": "Provisioning",
+                    "ready": "Ready",
+                    "degraded": "Degraded",
+                    "failed": "Failed",
+                    "kept": "Kept — no longer managed",
+                    "deleting": "Deleting",
+                    "deleted": "Deleted",
+                    "notInSpec": "No longer used by the App spec — data kept"
+                },
+                "backup": {
+                    "none": "No automatic backups. If this volume is lost, the data is gone.",
+                    "notConfigured": "Backups: not configured",
+                    "healthy": "Backups: last completed {time}",
+                    "overdue": "Backups: overdue — last completed {time}",
+                    "failing": "Backups: last attempt failed",
+                    "external": "Backups: managed by your {kind} provider",
+                    "unknown": "Backups: couldn't check"
+                },
+                "reasons": {
+                    "noDefaultStorageClass": "Your cluster has no default storage class. Choose one in Dependency settings.",
+                    "clusterUnreachable": "Couldn't reach your cluster.",
+                    "smtpConnectFailed": "Couldn't connect to the mail server.",
+                    "smtpTlsFailed": "The mail server's TLS handshake failed.",
+                    "smtpAuthRefused": "Sign-in was refused by the server.",
+                    "bucketUnreadable": "Bucket {bucket} doesn't exist or can't be read.",
+                    "volumeNotReady": "The volume didn't become ready within {minutes} minutes.",
+                    "extensionUnavailable": "Extensions not available: {names}.",
+                    "platformServerRefused": "That server holds Ever Works platform data. Choose another one.",
+                    "deadlineExceeded": "Provisioning didn't finish in time.",
+                    "namespaceNotOwned": "That namespace belongs to another app. Choose another one.",
+                    "namespaceBaselineMissing": "The namespace is missing its baseline limits and policies.",
+                    "clusterPermissionMissing": "Ever Works doesn't have permission to create this dependency in your cluster.",
+                    "operatorNamespaceUnknown": "The operator's namespace isn't set in Dependency settings.",
+                    "volumeExpansionUnsupported": "The storage class {storageClass} can't grow this volume.",
+                    "sizeShrinkRefused": "A dependency's storage can't be shrunk. Delete its data first if you need a smaller one.",
+                    "relayIneligible": "This app can't use the Ever Works mail relay.",
+                    "relaySuspended": "The Ever Works mail relay is suspended.",
+                    "providerNotSupported": "That provider can't serve this dependency.",
+                    "dependencyNotDeclared": "The App spec doesn't declare this dependency.",
+                    "confirmationMismatch": "The name you typed doesn't match.",
+                    "deleteInProgress": "This dependency's data is already being deleted.",
+                    "notGenerated": "That value isn't generated, so there's nothing to rotate.",
+                    "notAppWork": "This Work isn't an app."
+                }
+            },
             "settings": {
                 "tabs": {
                     "general": "General",
