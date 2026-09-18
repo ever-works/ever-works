@@ -40,7 +40,10 @@ import type {
 	GitDiffOptions,
 	GitDiffResult,
 	GitPullRequestStatus,
-	GitWorkflowRun
+	GitWorkflowRun,
+	// App Works fork lifecycle (APW-02 T17/T18).
+	GitForkSyncResult,
+	GitForkDivergence
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 // Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
@@ -250,6 +253,71 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 			token,
 			settings.apiBaseUrl
 		);
+	}
+
+	// IGitProviderPlugin - App Works fork lifecycle (APW-02 T17/T18)
+
+	async findExistingFork(
+		upstreamOwner: string,
+		upstreamRepo: string,
+		targetOwner: string,
+		token: string
+	): Promise<GitRepository | null> {
+		const settings = await this.getSettings();
+		return this.apiService.findExistingFork(upstreamOwner, upstreamRepo, targetOwner, token, settings.apiBaseUrl);
+	}
+
+	async syncForkBranch(
+		forkOwner: string,
+		forkRepo: string,
+		branch: string,
+		token: string
+	): Promise<GitForkSyncResult> {
+		const settings = await this.getSettings();
+		return this.apiService.syncForkBranch(forkOwner, forkRepo, branch, token, settings.apiBaseUrl);
+	}
+
+	async getForkDivergence(
+		forkOwner: string,
+		forkRepo: string,
+		forkBranch: string,
+		upstreamOwner: string,
+		upstreamBranch: string,
+		token: string
+	): Promise<GitForkDivergence> {
+		const settings = await this.getSettings();
+		return this.apiService.getForkDivergence(
+			forkOwner,
+			forkRepo,
+			forkBranch,
+			upstreamOwner,
+			upstreamBranch,
+			token,
+			settings.apiBaseUrl
+		);
+	}
+
+	async createBranchFromSha(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		token: string
+	): Promise<GitBranch> {
+		const settings = await this.getSettings();
+		return this.apiService.createBranchFromSha(owner, repo, name, sha, token, settings.apiBaseUrl);
+	}
+
+	async updateBranchRef(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		options: { force: false },
+		token: string
+	): Promise<GitBranch> {
+		const settings = await this.getSettings();
+		return this.apiService.updateBranchRef(owner, repo, name, sha, options, token, settings.apiBaseUrl);
 	}
 
 	async hasForkRelationship(

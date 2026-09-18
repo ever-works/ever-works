@@ -27,7 +27,10 @@ import type {
 	GitPullRequestCheck,
 	GitPullRequestStatus,
 	GitReviewDecision,
-	GitWorkflowRun
+	GitWorkflowRun,
+	// App Works fork lifecycle (APW-02 T18).
+	GitForkSyncResult,
+	GitForkDivergence
 } from '@ever-works/plugin/git';
 import { capChecks, capDiffFiles, deriveCiState, resolveDiffCaps } from '@ever-works/plugin/git';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
@@ -191,6 +194,119 @@ interface ForkRepositoryPayload {
 		readonly name?: string;
 		readonly full_name: string;
 	} | null;
+}
+
+// ── App Works fork lookup (APW-02 T17, plan §4.3) ────────────────────────────
+//
+// The three-step lookup `findExistingFork` runs: (1) the same-name identity
+// check, (2) the fork network over GraphQL, filtered to the target owner, and
+// (3) the REST fork listing, bounded at three pages. Steps 2 and 3 are the only
+// reason a fork the member RENAMED is found at all (FR-10, S2, ACC-02-03).
+
+/** Forks read per REST page. 100 is GitHub's maximum. */
+const FORK_LOOKUP_PAGE_SIZE = 100;
+
+/**
+ * Pages of `GET /repos/{o}/{r}/forks` the lookup will read before giving up.
+ *
+ * §4.3 bounds the fallback here on purpose: the lookup runs before EVERY fork
+ * request (T52), and a popular upstream has thousands of forks. Three pages
+ * covers the realistic owner, and past them the answer is `null` — the fork
+ * request then proceeds to `POST /forks`, which GitHub answers with the
+ * existing fork rather than creating a second one.
+ */
+const FORK_LOOKUP_MAX_PAGES = 3;
+
+/**
+ * The GraphQL fork query, exactly the argument set plan §4.3 pins:
+ * `forks(first: 100, affiliations: [OWNER, ORGANIZATION_MEMBER])` with
+ * `nameWithOwner` + `owner.login` per node.
+ *
+ * `affiliations` is VIEWER-relative (GitHub: "OWNER will include only
+ * repositories that the current viewer owns"), which is exactly what the
+ * caller wants — the token belongs to the member whose fork we are looking
+ * for — but it also means this step can only ever see forks owned by the
+ * token's own user or by an organization that user belongs to. A fork under
+ * any other owner is found by step 3, or not at all. Verified against
+ * api.github.com on 2026-08-29: `nodejs/node` answered `totalCount: 0` for a
+ * viewer with no fork of it, while the viewer's own fork of a repository it
+ * does own came back as the single node.
+ */
+const FORK_SEARCH_QUERY = `query ($owner: String!, $name: String!) {
+	repository(owner: $owner, name: $name) {
+		forks(first: ${FORK_LOOKUP_PAGE_SIZE}, affiliations: [OWNER, ORGANIZATION_MEMBER]) {
+			nodes {
+				nameWithOwner
+				owner {
+					login
+				}
+			}
+		}
+	}
+}`;
+
+/** One fork of the GraphQL connection, as much of it as the query selects. */
+interface ForkSearchNode {
+	readonly nameWithOwner?: string | null;
+	readonly owner?: { readonly login?: string | null } | null;
+}
+
+/** The GraphQL answer, shaped by whether the repository and its forks exist. */
+interface ForkSearchResponse {
+	readonly repository?: {
+		readonly forks?: { readonly nodes?: ReadonlyArray<ForkSearchNode | null> | null } | null;
+	} | null;
+}
+
+/**
+ * What a lookup is looking for. `targetName` is the repository NAME the caller
+ * asked for — the upstream's own name unless `forkRepository` was given a
+ * different one — and it is only used by step 1, the same-name check.
+ */
+interface ForkLookupTarget {
+	readonly upstreamOwner: string;
+	readonly upstreamRepo: string;
+	readonly targetOwner: string;
+	readonly targetName: string;
+	readonly token: string;
+	readonly baseUrl?: string;
+}
+
+/** Case-insensitive owner comparison; GitHub treats repository casing as cosmetic. */
+function forkOwnerMatches(candidate: string | null | undefined, targetOwner: string): boolean {
+	return typeof candidate === 'string' && candidate.toLowerCase() === targetOwner.toLowerCase();
+}
+
+/** `owner/name` → its two halves, or `null` when it is not a usable full name. */
+function splitNameWithOwner(fullName: string | null | undefined): { owner: string; name: string } | null {
+	if (typeof fullName !== 'string') return null;
+	const separator = fullName.indexOf('/');
+	if (separator <= 0 || separator === fullName.length - 1) return null;
+	return { owner: fullName.slice(0, separator), name: fullName.slice(separator + 1) };
+}
+
+/**
+ * Is this repository really a fork of `upstreamOwner/upstreamRepo`?
+ *
+ * Identity is checked, never just the name: a same-named repository that is not
+ * a fork, or a fork of some other upstream, is NOT "already forked". `source`
+ * is the network root while `parent` is the immediate ancestor, so a fork of a
+ * fork (and a renamed upstream) is recognised through `source` first. The
+ * comparison is case-insensitive because GitHub treats owner/repository casing
+ * as cosmetic. Shared by every step of the lookup so all three agree.
+ */
+function isForkOfUpstream(
+	candidate: {
+		readonly isFork: boolean | null | undefined;
+		readonly sourceFullName?: string | null;
+		readonly parentFullName?: string | null;
+	},
+	upstreamOwner: string,
+	upstreamRepo: string
+): boolean {
+	if (candidate.isFork !== true) return false;
+	const upstream = candidate.sourceFullName ?? candidate.parentFullName ?? '';
+	return upstream.toLowerCase() === `${upstreamOwner}/${upstreamRepo}`.toLowerCase();
 }
 
 export class GitHubApiService {
@@ -576,9 +692,18 @@ export class GitHubApiService {
 		// Already forked is SUCCESS. GitHub answers a repeat fork request with the existing fork,
 		// but resolving it here means the platform does not depend on that (nor spend a request
 		// it may not get), and it can hand back a usable copy immediately.
-		const existing = await this.findExistingFork(octokit, targetOwner, targetName, owner, repo);
+		const existing = await this.findExistingForkFor(octokit, {
+			upstreamOwner: owner,
+			upstreamRepo: repo,
+			targetOwner,
+			targetName,
+			token,
+			baseUrl
+		});
 		if (existing) {
-			return existing;
+			// Whichever step found it, the copy exists and is usable now — the caller
+			// must not be made to wait for a fork that was never requested.
+			return { ...existing, forkReadiness: 'ready' };
 		}
 
 		const { data } = await octokit.rest.repos.createFork({
@@ -623,8 +748,68 @@ export class GitHubApiService {
 	}
 
 	/**
-	 * The existing repository this fork request would target, when it really IS a fork of
-	 * `owner/repo`.
+	 * The fork of `upstreamOwner/upstreamRepo` that already exists under
+	 * `targetOwner`, or `null` when there is none (plan §4.3, FR-10).
+	 *
+	 * A capability, not a helper of the create path: APW-01's inspect calls it
+	 * per candidate owner, and `forkRepository` calls it before every create
+	 * request (T52). A renamed fork is the case it exists for — a same-name check
+	 * alone cannot see one — so the lookup runs all three steps:
+	 *
+	 * 1. `GET /repos/{targetOwner}/{upstreamRepo}` plus the identity check;
+	 * 2. the fork network over GraphQL, filtered to `targetOwner`;
+	 * 3. `GET /repos/{upstream}/forks`, at most {@link FORK_LOOKUP_MAX_PAGES} pages.
+	 *
+	 * Steps 2 and 3 never throw: a provider that cannot search leaves the answer
+	 * `null` — "we could not search" is not "there is no fork" — and the caller
+	 * proceeds to the provider's fork endpoint, which answers with the existing
+	 * fork instead of creating a second one. Only step 1 propagates a failure,
+	 * because it is a plain repository read that failed, and it does so as the
+	 * contract's typed error.
+	 *
+	 * OPTIONAL on `IGitProviderPlugin`, so the four-argument shape is the
+	 * contract's; `baseUrl` is this implementation's GitHub Enterprise endpoint
+	 * and is additive.
+	 */
+	async findExistingFork(
+		upstreamOwner: string,
+		upstreamRepo: string,
+		targetOwner: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitRepository | null> {
+		const octokit = this.createOctokit(token, baseUrl);
+		return this.findExistingForkFor(octokit, {
+			upstreamOwner,
+			upstreamRepo,
+			targetOwner,
+			// Without a fork name the copy lands under the upstream's own name, which is
+			// what step 1 checks. `forkRepository` passes the caller's name instead.
+			targetName: upstreamRepo,
+			token,
+			baseUrl
+		});
+	}
+
+	/**
+	 * The three steps of §4.3, in order, against an Octokit the caller already
+	 * holds (so `forkRepository` does not authenticate twice).
+	 */
+	private async findExistingForkFor(octokit: Octokit, target: ForkLookupTarget): Promise<GitRepository | null> {
+		// 1. Same-name identity check — the pre-APW-02 lookup, unchanged.
+		const sameName = await this.readSameNamedFork(octokit, target);
+		if (sameName) return sameName;
+
+		// 2. The fork network, asked for the target owner's forks.
+		const viaForkNetwork = await this.findForkViaGraphql(octokit, target);
+		if (viaForkNetwork) return viaForkNetwork;
+
+		// 3. The REST fork listing, bounded.
+		return this.findForkViaRestForks(octokit, target);
+	}
+
+	/**
+	 * Step 1 — the same-name identity check.
 	 *
 	 * Identity is checked, never just the name: a same-named repository that is not a fork, or a
 	 * fork of some other upstream, is NOT "already forked" and must still be forked. `source` is
@@ -632,35 +817,162 @@ export class GitHubApiService {
 	 * (and a renamed upstream) is recognised through `source` first. The comparison is
 	 * case-insensitive because GitHub treats owner/repository casing as cosmetic.
 	 */
-	private async findExistingFork(
-		octokit: Octokit,
-		targetOwner: string,
-		targetName: string,
-		owner: string,
-		repo: string
-	): Promise<GitRepository | null> {
+	private async readSameNamedFork(octokit: Octokit, target: ForkLookupTarget): Promise<GitRepository | null> {
 		let data: ForkRepositoryPayload;
 
 		try {
-			const response = await octokit.rest.repos.get({ owner: targetOwner, repo: targetName });
+			const response = await octokit.rest.repos.get({ owner: target.targetOwner, repo: target.targetName });
 			data = response.data as unknown as ForkRepositoryPayload;
 		} catch (err) {
 			if (err instanceof RequestError && err.status === 404) {
 				return null;
 			}
-			throw err;
+			// A repository read that failed for any other reason. Typed, like every
+			// other repository read in this service (plan §4.2), with the permission
+			// `repos.get` needs.
+			throw toGitProviderError(err, 'metadata');
 		}
 
-		if (data.fork !== true) {
-			return null;
-		}
-
-		const upstream = data.source?.full_name ?? data.parent?.full_name ?? '';
-		if (upstream.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) {
+		if (
+			!isForkOfUpstream(
+				{
+					isFork: data.fork,
+					sourceFullName: data.source?.full_name,
+					parentFullName: data.parent?.full_name
+				},
+				target.upstreamOwner,
+				target.upstreamRepo
+			)
+		) {
 			return null;
 		}
 
 		return this.toForkRepository(data, 'ready');
+	}
+
+	/**
+	 * Step 2 — the fork network over GraphQL, filtered to `targetOwner`.
+	 *
+	 * This is the step that finds a fork the member RENAMED: its name is nothing
+	 * like the upstream's, so step 1's `GET /repos/{target}/{upstreamName}` 404s,
+	 * but the fork is still owned by the target and still in the upstream's fork
+	 * network.
+	 *
+	 * A GraphQL failure is not an error the caller must see — §4.3 answers it by
+	 * falling through to step 3 — so the catch below degrades to `null` and lets
+	 * the REST listing try. That covers a server without GraphQL, a schema or
+	 * argument-set change, a scope the token lacks, and a transport failure.
+	 */
+	private async findForkViaGraphql(octokit: Octokit, target: ForkLookupTarget): Promise<GitRepository | null> {
+		let nodes: ReadonlyArray<ForkSearchNode | null>;
+
+		try {
+			const data = await octokit.graphql<ForkSearchResponse>(FORK_SEARCH_QUERY, {
+				owner: target.upstreamOwner,
+				name: target.upstreamRepo
+			});
+			nodes = data?.repository?.forks?.nodes ?? [];
+		} catch {
+			// Deliberately swallowed: see this method's doc comment. The classified
+			// error would name a failure the lookup is designed to survive.
+			return null;
+		}
+
+		const match = nodes.find((node) => forkOwnerMatches(node?.owner?.login, target.targetOwner));
+		if (!match) return null;
+
+		const coordinates = splitNameWithOwner(match.nameWithOwner);
+		if (!coordinates) return null;
+
+		// The match is read back through the REST repository read §4.3 names, so the
+		// caller gets the same repository object (and the same facts) every step
+		// returns — and so the fork identity is confirmed by the provider rather
+		// than taken on trust from a search hit.
+		return this.readForkForLookup(coordinates.owner, coordinates.name, target);
+	}
+
+	/**
+	 * Step 3 — `GET /repos/{upstream}/forks`, newest first, at most
+	 * {@link FORK_LOOKUP_MAX_PAGES} pages.
+	 *
+	 * The fallback for a provider that could not answer step 2 (and the only step
+	 * that can see a fork owned by somebody the token's user does not own or
+	 * belong to). Paging stops at the first page that is not full, and every
+	 * failure — including a rate limit — answers `null` rather than throwing, so
+	 * the fork request can still proceed (§4.3).
+	 */
+	private async findForkViaRestForks(octokit: Octokit, target: ForkLookupTarget): Promise<GitRepository | null> {
+		for (let page = 1; page <= FORK_LOOKUP_MAX_PAGES; page++) {
+			let forks: ReadonlyArray<{ owner?: { login?: string | null } | null; name?: string | null } | null>;
+
+			try {
+				const { data } = await octokit.rest.repos.listForks({
+					owner: target.upstreamOwner,
+					repo: target.upstreamRepo,
+					sort: 'newest',
+					per_page: FORK_LOOKUP_PAGE_SIZE,
+					page
+				});
+				forks = Array.isArray(data) ? data : [];
+			} catch {
+				// Same degradation as step 2: a search that could not run is not an
+				// answer about the fork's existence.
+				return null;
+			}
+
+			const match = forks.find((fork) => forkOwnerMatches(fork?.owner?.login, target.targetOwner));
+			if (match?.name) {
+				const repository = await this.readForkForLookup(
+					match.owner?.login ?? target.targetOwner,
+					match.name,
+					target
+				);
+				if (repository) return repository;
+			}
+
+			// A short page is the last page — no fourth request, and no request at
+			// all once the fork listing is exhausted.
+			if (forks.length < FORK_LOOKUP_PAGE_SIZE) return null;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Read a fork the search found, and hand it back only if the provider still
+	 * says it is a fork of this upstream. A repository that vanished (or was
+	 * renamed again) between the search and the read reads as "not found", never
+	 * as an error: the caller's next move is the same either way.
+	 */
+	private async readForkForLookup(
+		owner: string,
+		name: string,
+		target: ForkLookupTarget
+	): Promise<GitRepository | null> {
+		let repository: GitRepositoryWithPermissions | null;
+
+		try {
+			repository = await this.getRepository(owner, name, target.token, target.baseUrl);
+		} catch {
+			// Includes a rate limit and a permission refusal: the lookup answers
+			// `null` and the fork request proceeds (§4.3), which is strictly better
+			// than failing a request GitHub would have answered with the fork.
+			return null;
+		}
+
+		if (!repository) return null;
+
+		return isForkOfUpstream(
+			{
+				isFork: repository.isFork,
+				sourceFullName: repository.source?.fullName,
+				parentFullName: repository.parent?.fullName
+			},
+			target.upstreamOwner,
+			target.upstreamRepo
+		)
+			? repository
+			: null;
 	}
 
 	/**
@@ -691,6 +1003,133 @@ export class GitHubApiService {
 				: undefined,
 			forkReadiness
 		};
+	}
+
+	/**
+	 * Bring `forkOwner/forkRepo`'s `branch` up to date with the upstream branch it
+	 * was forked from (`POST /repos/{fork}/merge-upstream`, plan §4.3).
+	 *
+	 * `conflict` and `unprocessable` are ANSWERS, not throws: 409 is GitHub saying
+	 * "this needs a pull request", and 422 is "this branch cannot be synced" (a
+	 * branch the upstream renamed away, for instance). The caller renders both
+	 * rather than retrying, which is why they are part of the result type. Every
+	 * other failure — including a permission refusal, which the merge needs
+	 * `contents: write` for — leaves as the contract's typed error.
+	 *
+	 * `merged` is GitHub telling us it had to create a merge commit. APW-02 calls
+	 * this only on a behind-only fork, so a `merged` is a race, recorded as
+	 * fast-forward-equivalent with a warning (plan §4.3); nothing here merges
+	 * anything the caller did not ask for.
+	 */
+	async syncForkBranch(
+		forkOwner: string,
+		forkRepo: string,
+		branch: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitForkSyncResult> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			const { data } = await octokit.rest.repos.mergeUpstream({
+				owner: forkOwner,
+				repo: forkRepo,
+				branch
+			});
+
+			// GitHub types `merge_type` as OPTIONAL. A 200 without one says the branch
+			// was synced but not how, and reading that as `up_to_date` would report
+			// "nothing changed" about a branch that may have just moved — so an
+			// unrecognised or absent `merge_type` reports `merged`, the outcome that
+			// never under-reports a change.
+			const outcome: GitForkSyncResult['outcome'] =
+				data.merge_type === 'fast-forward'
+					? 'fast_forwarded'
+					: data.merge_type === 'none'
+						? 'up_to_date'
+						: 'merged';
+
+			return {
+				outcome,
+				// Only when the provider actually named one: `baseBranch` absent is
+				// "not reported", never an invented branch name.
+				...(typeof data.base_branch === 'string' && data.base_branch !== ''
+					? { baseBranch: data.base_branch }
+					: {})
+			};
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 409) {
+				return { outcome: 'conflict' };
+			}
+			if (err instanceof RequestError && err.status === 422) {
+				return { outcome: 'unprocessable' };
+			}
+			// The merge writes to the fork's branch, so `contents: write` is the
+			// permission a refusal names (plan §4.5).
+			throw toGitProviderError(err, 'contents');
+		}
+	}
+
+	/**
+	 * How far `forkOwner/forkRepo`'s `forkBranch` has drifted from
+	 * `upstreamOwner/upstreamBranch` (`GET /repos/{fork}/compare/{basehead}`,
+	 * plan §4.3).
+	 *
+	 * The `basehead` names the upstream ref with its OWNER — the upstream lives in
+	 * a different repository, so a bare `branch...branch` would compare the fork
+	 * with itself. `ahead_by` / `behind_by` come straight from the comparison.
+	 *
+	 * `base_commit.sha` is the head of the BASE ref as the fork network resolves
+	 * it, which is the upstream head the contract means by `upstreamHeadSha`
+	 * (verified against api.github.com: comparing `main...v20.x` in `nodejs/node`
+	 * reported `main`'s tip as `base_commit`, with `merge_base_commit` a different,
+	 * older commit).
+	 *
+	 * `forkHeadSha` is the one value §4.3's single-call mapping cannot deliver: the
+	 * comparison returns its commits in CHRONOLOGICAL order, so with `per_page: 1`
+	 * the only commit in the list is the OLDEST of the range, and without a page
+	 * limit the list is capped at 250 commits and is not the head either on a large
+	 * comparison. The fork head is therefore read from the fork's own branch ref,
+	 * which is the head by definition.
+	 */
+	async getForkDivergence(
+		forkOwner: string,
+		forkRepo: string,
+		forkBranch: string,
+		upstreamOwner: string,
+		upstreamBranch: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitForkDivergence> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			const { data: comparison } = await octokit.rest.repos.compareCommitsWithBasehead({
+				owner: forkOwner,
+				repo: forkRepo,
+				basehead: `${upstreamOwner}:${upstreamBranch}...${forkBranch}`,
+				// The counts and the base commit are the whole answer; the commit list
+				// and the file list are not read.
+				per_page: 1
+			});
+
+			const { data: head } = await octokit.rest.repos.getBranch({
+				owner: forkOwner,
+				repo: forkRepo,
+				branch: forkBranch
+			});
+
+			return {
+				aheadBy: comparison.ahead_by,
+				behindBy: comparison.behind_by,
+				upstreamHeadSha: comparison.base_commit.sha,
+				forkHeadSha: head.commit.sha
+			};
+		} catch (err) {
+			// A missing branch on either side is GitHub's 404 → `not_found`; a refusal
+			// to read the contents names `contents` (plan §4.2, §4.5).
+			throw toGitProviderError(err, 'contents');
+		}
 	}
 
 	async createRepositoryFromTemplate(
@@ -782,6 +1221,93 @@ export class GitHubApiService {
 			repo,
 			ref: `heads/${name}`
 		});
+	}
+
+	/**
+	 * Create a branch ref pointing at an exact commit sha (APW-09's signature,
+	 * landed here because APW-02 P1 needs it first — plan §3.3).
+	 *
+	 * Distinct from `createBranch`, whose `fromRef` is a branch NAME: pointing the
+	 * upstream-sync branch at the upstream head needs a sha, and deleting and
+	 * recreating the branch instead would close the pull request open on it.
+	 *
+	 * A 409 ("already exists") and a 422 ("Reference already exists" / a bad sha)
+	 * are classified per plan §4.2 as `conflict` / `unprocessable` — the caller
+	 * reads the existing branch rather than racing this call.
+	 */
+	async createBranchFromSha(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitBranch> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		try {
+			const { data } = await octokit.rest.git.createRef({
+				owner,
+				repo,
+				ref: `refs/heads/${name}`,
+				sha
+			});
+
+			return {
+				name,
+				commit: data.object.sha,
+				isDefault: false,
+				isProtected: false
+			};
+		} catch (err) {
+			throw toGitProviderError(err, 'contents');
+		}
+	}
+
+	/**
+	 * Move an existing branch ref to a commit sha — **fast-forward only**.
+	 *
+	 * The request ALWAYS carries `force: false`. There is no force-move in this
+	 * epic (ACC-02-10): a rewritten upstream history must never be pushed over the
+	 * member's branch, so the caller's `{ force: false }` option is not forwarded —
+	 * it exists to keep APW-09's signature (which types it `false`, making `true` a
+	 * compile error rather than a silent rewrite). A 422 "not a fast forward" is
+	 * therefore classified as `unprocessable` and is not retried.
+	 */
+	async updateBranchRef(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		options: { force: false },
+		token: string,
+		baseUrl?: string
+	): Promise<GitBranch> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		// `options` is deliberately unread: the only value its type allows is `false`,
+		// and the request below hard-codes that, so nothing a caller passes can turn
+		// this into a history rewrite.
+		void options;
+
+		try {
+			const { data } = await octokit.rest.git.updateRef({
+				owner,
+				repo,
+				ref: `heads/${name}`,
+				sha,
+				force: false
+			});
+
+			return {
+				name,
+				commit: data.object.sha,
+				isDefault: false,
+				isProtected: false
+			};
+		} catch (err) {
+			throw toGitProviderError(err, 'contents');
+		}
 	}
 
 	async getLatestCommit(
