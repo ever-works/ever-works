@@ -715,8 +715,9 @@ one._
       **Modify** `<e2e-upstream-org>/app-fixture-injection` (T26) — every payload address is the **placeholder** base
       address `https://canary.invalid` until the harness rewrites it in the per-run generated copy; the repository's
       `git grep -nE 'https?://'` lists only placeholders and public documentation links.
-      **Test**: `apps/web/e2e/helpers/__tests__/canary-sink.unit.spec.ts` (T11) against a local instance; the T26 review
-      confirms no real address is committed.
+      **Test**: `apps/web/e2e/helpers/__tests__/app-works-evidence.unit.spec.ts` (T11) against a local instance; the T26 review
+      confirms no real address is committed. **Corrected 2026-09-18:** this line named `canary-sink.unit.spec.ts`, a file
+      that was never created — T11's own Test line names the evidence spec, and the six FR-61 cases are green there.
       **Done when**: the sink answers a recorded request and the fixture repository contains no real sink address.
 
 - [ ] **T63. The GitHub connection surface (spec FR-56; unblocks T14, T15, T16, T30, T31).**

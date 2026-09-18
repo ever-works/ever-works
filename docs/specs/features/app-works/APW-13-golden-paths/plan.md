@@ -816,7 +816,7 @@ If `<e2e-fork-org>/cal-diy` is a **private** copy, its Build minutes are billed;
 | Catalog repository `scripts/__tests__/verification-status.test.mjs` | the state machine of spec §5.3 as a table test                                                                                                                 |
 | Fixture repository `test/*.test.mjs`                                | route table, migration ordering, bootstrap decision (`sawPublicApp` false on 404 and on a different marker)                                                    |
 | `apps/web/e2e/helpers/__tests__/github-connection.unit.spec.ts`     | every surface §8.8 offers asserts the platform state it claims; an admin-only refusal is reported as the named surface, never as a raw 400 (FR-56)             |
-| `apps/web/e2e/helpers/__tests__/canary-sink.unit.spec.ts`           | the read API's paging follows `receivedAt`, a `truncated` page is followed, `authorization` is never returned, and a wrong token is `401`/`403` (FR-61)        |
+| `apps/web/e2e/helpers/__tests__/app-works-evidence.unit.spec.ts`     | the read API's paging follows `receivedAt`, a `truncated` page is followed, `authorization` is never returned, and a wrong token is `401`/`403` (FR-61). **Corrected 2026-09-18:** this row named `canary-sink.unit.spec.ts`, which was never created — T11's own Test line names the evidence spec, and the six FR-61 canary cases are green there |
 | Catalog repository `scripts/__tests__/evidence-schema.test.mjs`     | every field the status rules read (`license.class`, `passCount`, `upstream.kind`) is required by the schema, so a file that omits one fails validation (FR-57) |
 
 The existing [`apps/web/vitest.config.ts`](../../../../../apps/web/vitest.config.ts) only includes
