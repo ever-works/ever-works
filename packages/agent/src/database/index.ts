@@ -141,3 +141,12 @@ export * from './repositories/work-app-dependency.repository';
 // `DatabaseModule` itself wires, and its drift check fails on an entry that is
 // not a provider there.
 export * from './repositories/work-app-spec-state.repository';
+// APW-05 Builds — the Builds of one App Work (the per-Work number sequence, the
+// run-identity upsert, the sweep's silent and orphaned-secret scans) and the
+// per-App-Work preparation row the consumer stamps a Build from. Both are
+// feature-owned and wired by the App Works module, so they are exported here
+// rather than listed in `_repository-inventory.ts` — that file is only for the
+// repositories `DatabaseModule` itself wires, and its drift check fails on an
+// entry that is not a provider there.
+export * from './repositories/app-build.repository';
+export * from './repositories/app-build-preparation.repository';

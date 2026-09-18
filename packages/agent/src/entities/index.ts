@@ -242,3 +242,7 @@ export * from './work-app-dependency.entity';
 // effective spec at a commit, the Blueprint it came from and the licence
 // classification, plus the sequence columns the evaluation coalesces on.
 export * from './work-app-spec-state.entity';
+// APW-05 Builds — one row per Build of an App Work (numbered per Work), plus
+// the per-App-Work preparation state that is derived, never API-written.
+export * from './work-build.entity';
+export * from './work-build-preparation.entity';

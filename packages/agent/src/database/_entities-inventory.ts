@@ -191,6 +191,10 @@ import { WorkAppDependency } from '../entities/work-app-dependency.entity';
 // APW-03 App spec & catalog — the per-App-Work spec state row (head reading,
 // effective spec, Blueprint and licence classification).
 import { WorkAppSpecState } from '../entities/work-app-spec-state.entity';
+// APW-05 Builds — one row per Build of an App Work (per-Work numbering), and
+// the per-App-Work preparation state that is derived, never API-written.
+import { WorkBuild } from '../entities/work-build.entity';
+import { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
 
 import {
     PluginEntity,
@@ -493,4 +497,8 @@ export const ENTITIES = [
     // APW-03 App spec & catalog — the App spec state of one App Work, and the
     // row every evaluation and licence classification coalesces on.
     WorkAppSpecState,
+    // APW-05 Builds — every Build of an App Work, and the per-App-Work
+    // preparation row the consumer stamps a push/pull-request Build from.
+    WorkBuild,
+    WorkBuildPreparation,
 ];

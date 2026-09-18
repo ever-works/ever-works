@@ -249,6 +249,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkAppSpecState',
     'WorkBudget',
     'WorkBudgetAlertState',
+    // APW-05 Builds — one row per Build of an App Work (per-Work numbering),
+    // and the per-App-Work preparation state that is derived, never API-written.
+    'WorkBuild',
+    'WorkBuildPreparation',
     'WorkBuildRequest',
     'WorkCustomDomain',
     'WorkDeployment',
