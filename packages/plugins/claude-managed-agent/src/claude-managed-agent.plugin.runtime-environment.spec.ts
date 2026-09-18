@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RuntimeEnvironmentData, StepExecutionContext } from '@ever-works/plugin';
+// App Provisioner (APW-04 T1) — the pure resolver behind the enforced
+// `limited` policy asserted through the sandbox path at the end of this file.
+import { resolveEnvironmentNetworking } from './utils/runtime-environment.js';
 
 /**
  * Environments — end-to-end plugin spec: an execContext WITH
@@ -197,5 +200,96 @@ describe('ClaudeManagedAgentPlugin — runtimeEnvironment consumption', () => {
 			networking: { type: 'unrestricted' }
 		});
 		expect(sendUserMessageMock).toHaveBeenCalledTimes(3);
+	});
+});
+
+/**
+ * APW-04 T1 — the provisioning half of the same property (ACC-04-05, unit
+ * half; plan §7.3).
+ *
+ * `limited` networking is a SECURITY control on this path: the App
+ * Provisioner runs over code the platform did not write, so the assertions
+ * below are about what the sandbox CANNOT reach as much as what it can. The
+ * host list below is the plan's §7.3 posture plus three entries that must
+ * never survive into the policy: a cloud metadata address, `localhost`, and
+ * an `.internal` suffix.
+ */
+const SANDBOX_RUNTIME_ENVIRONMENT: RuntimeEnvironmentData = {
+	id: 'env-sandbox',
+	name: 'Provisioning sandbox',
+	slug: 'provisioning-sandbox',
+	pipPackages: [],
+	npmPackages: [],
+	networkingMode: 'limited',
+	allowedHosts: [
+		'github.com',
+		'codeload.github.com',
+		'registry.npmjs.org',
+		'169.254.169.254',
+		'localhost',
+		'metadata.internal'
+	],
+	allowPackageManagers: true
+};
+
+const SANDBOX_INPUT = {
+	userId: 'user-1',
+	workId: 'work-1',
+	system: 'PROVISION-APP SKILL BODY',
+	prompt: 'brief (already fenced)',
+	runtimeEnvironment: SANDBOX_RUNTIME_ENVIRONMENT,
+	attachedRepos: [
+		{
+			url: 'https://github.com/ever-works/fixture-app.git',
+			branch: 'task/provision',
+			mountDir: 'repo'
+		}
+	]
+};
+
+describe('ClaudeManagedAgentPlugin — restricted-network sandbox runtime (APW-04 T1)', () => {
+	it('declares the enforcement flag AND the runner the provisioning path needs', () => {
+		const plugin = new ClaudeManagedAgentPlugin();
+
+		// Both halves are required: plan §7.3 — "a pipeline with the flag but
+		// no runner is not a provisioning runtime".
+		expect(plugin.enforcesRuntimeNetworking).toBe(true);
+		expect(typeof plugin.runSandboxSession).toBe('function');
+	});
+
+	it('turns the §7.3 provisioning Environment into an enforced limited policy with MCP servers off', async () => {
+		const plugin = new ClaudeManagedAgentPlugin();
+		listAllEventsMock.mockReset().mockResolvedValue([
+			{ id: 'agent-msg', type: 'agent.message', content: [{ type: 'text', text: 'provisioned' }] },
+			{ id: 'idle-1', type: 'session.status_idle', stop_reason: { type: 'end_turn' } }
+		]);
+
+		const result = await plugin.runSandboxSession(SANDBOX_INPUT);
+
+		expect(result.status).toBe('completed');
+		expect(createEnvironmentMock).toHaveBeenCalledWith({
+			name: 'Ever Works Environment',
+			networking: {
+				type: 'limited',
+				// The three valid hosts survive; the metadata address, the
+				// loopback name and the internal suffix are dropped by the
+				// shared allow-list validator before the policy is built.
+				allowed_hosts: ['github.com', 'codeload.github.com', 'registry.npmjs.org'],
+				allow_package_managers: true,
+				allow_mcp_servers: false
+			}
+		});
+	});
+
+	it('control: an unrestricted Environment is NOT mapped to a limited policy', () => {
+		// Known-good control for the assertion above — without it, a resolver
+		// that returned `limited` for everything would pass this file.
+		expect(
+			resolveEnvironmentNetworking({
+				...SANDBOX_RUNTIME_ENVIRONMENT,
+				networkingMode: 'unrestricted',
+				allowedHosts: null
+			})
+		).toEqual({ type: 'unrestricted' });
 	});
 });

@@ -300,6 +300,94 @@ export interface IPipelinePlugin<TStepId extends string = string> extends IPlugi
 	// --- Optional: lifecycle ---
 	cancel?(): Promise<void>;
 	getState?(): PipelineState | null;
+
+	// --- Optional: restricted-network sandbox sessions (APW-04 T1) ---
+
+	/**
+	 * Pipeline network enforcement — `true` only when the plugin turns
+	 * `runtimeEnvironment.networkingMode = 'limited'` into an ENFORCED
+	 * sandbox policy (not advisory), i.e. the session it opens cannot
+	 * reach a host outside `allowedHosts`.
+	 *
+	 * Additive and optional: a pipeline that omits it is simply not a
+	 * restricted-network runtime, and every existing pipeline is
+	 * unaffected. Consumers (the App Provisioner, APW-04) select a
+	 * pipeline by this flag plus {@link runSandboxSession}, never by
+	 * plugin id — a plugin that declares the flag but implements no
+	 * runner is not a provisioning runtime.
+	 */
+	readonly enforcesRuntimeNetworking?: boolean;
+
+	/**
+	 * Sandbox session runner — a pipeline that declares
+	 * {@link enforcesRuntimeNetworking} opens ONE restricted session for
+	 * a caller that is not a Work generation (the App Provisioner,
+	 * APW-04).
+	 *
+	 * Contract (additive — nothing in {@link execute} is narrowed by it):
+	 * - it runs on an EPHEMERAL agent + environment, so a per-run
+	 *   restricted policy can never be written onto a persistent
+	 *   control plane;
+	 * - `input.system` is the session's system prompt (the Skill body)
+	 *   and `input.prompt` is the already-fenced brief;
+	 * - a sandbox session NEVER pauses for a custom tool, so a provider
+	 *   `requires_action` idle event returns
+	 *   `{ status: 'failed', failureCode: 'requiresAction' }` instead of
+	 *   throwing or waiting;
+	 * - it holds no platform tool and no credential: the caller does the
+	 *   pushing, outside the session.
+	 */
+	runSandboxSession?(input: SandboxSessionInput, signal?: AbortSignal): Promise<SandboxSessionResult>;
+}
+
+/**
+ * One restricted sandbox session request (APW-04 plan §2.6). Every field
+ * is data-only so the request survives an RPC boundary unchanged.
+ */
+export interface SandboxSessionInput {
+	/** Settings scope + attribution. */
+	readonly userId: string;
+	/** Settings scope only — never a generation target. */
+	readonly workId: string;
+	/** The Skill body (APW-04 plan §7.2) — the session's system prompt. */
+	readonly system: string;
+	/** The brief (APW-04 plan §7.5), already fenced. */
+	readonly prompt: string;
+	/** The pre-resolved runtime Environment (APW-04 plan §7.3). */
+	readonly runtimeEnvironment: RuntimeEnvironmentData;
+	/** At most one entry, `mountDir` `repo`, token-free (plan §2.6, §7.3). */
+	readonly attachedRepos?: readonly AttachedRepoResource[];
+	/** Remaining token allowance for the session, in USD (plan §6.4). */
+	readonly budgetUsd?: number;
+	/** Wall clock ceiling — `analysisRunMs` / `iterateRunMs` (FR-14). */
+	readonly timeoutMs?: number;
+	/** Session title. */
+	readonly label?: string;
+}
+
+/**
+ * The terminal state of a sandbox session (APW-04 plan §2.6). `failed`
+ * is the only status that carries a `failureCode`.
+ */
+export interface SandboxSessionResult {
+	readonly status: 'completed' | 'failed' | 'cancelled' | 'timeout' | 'budget-exhausted';
+	/** Only with `status: 'failed'`. */
+	readonly failureCode?: 'requiresAction' | 'noAgentMessage' | 'provider';
+	/**
+	 * The LAST assistant message; the caller takes the last
+	 * `provision-output` block out of it. `null` when the session
+	 * produced none.
+	 */
+	readonly finalText: string | null;
+	/**
+	 * Billed tokens. `inputTokens` counts every billed input token —
+	 * `input_tokens` PLUS both cache counters the sessions API reports
+	 * separately — so `inputTokens + outputTokens` equals the shared
+	 * `toManagedSessionTokenUsage(...).totalTokens` seam and a caller
+	 * that only sees this shape cannot under-report cache-heavy runs.
+	 */
+	readonly usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
+	readonly sessionId?: string;
 }
 
 /**
