@@ -18,6 +18,8 @@ export type K8sPluginErrorCode =
 	| 'REGISTRY_AUTH_FAILED'
 	| 'APPLY_FAILED'
 	| 'ROLLOUT_TIMEOUT'
+	| 'KUBECONFIG_UNSUPPORTED'
+	| 'CLUSTER_ADDRESS_NOT_PUBLIC'
 	| 'UNKNOWN';
 
 export class K8sPluginError extends Error {
