@@ -138,8 +138,11 @@ export const DASHBOARD_SCREENS: readonly PaletteScreen[] = [
         title: (t) => t('dashboard.sidebar.navigation.plugins'),
     },
     {
+        // The Schedules list lives on the Activity page now; the entry stays
+        // (people search for "schedules", not for "activity") but points at the
+        // view that owns it instead of at a redirect.
         id: 'schedules',
-        href: ROUTES.DASHBOARD_SCHEDULES,
+        href: ROUTES.DASHBOARD_ACTIVITY_SCHEDULES,
         icon: CalendarClock,
         title: (t) => t('dashboard.sidebar.navigation.schedules'),
     },

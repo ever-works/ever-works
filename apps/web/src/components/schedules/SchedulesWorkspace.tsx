@@ -1,28 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, List, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { CalendarClock, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Link } from '@/i18n/navigation';
-import { ROUTES } from '@/lib/constants';
 import { getSchedulePage, getScheduleHealth } from '@/app/actions/dashboard/schedules';
 import type { ScheduleEntry, ScheduleHealthSummary, SchedulePage } from '@/lib/api/schedules';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ScheduleHealthBanner } from './ScheduleHealthBanner';
 import { ScheduleWorkspaceRow } from './ScheduleWorkspaceRow';
+import { SchedulesCreateMenu } from './SchedulesCreateMenu';
 import { SchedulesDegradedNotice } from './SchedulesDegradedNotice';
 import { SchedulesEmptyState } from './SchedulesEmptyState';
 import { SchedulesFilters } from './SchedulesFilters';
+import { ScheduleSourceChips } from './ScheduleSourceChips';
 import {
     EMPTY_SCHEDULE_FILTERS,
     filtersFromSearchParams,
     hasActiveFilters,
     pageParamsFor,
+    scheduleFilterParams,
     type SchedulesFilterState,
 } from './schedules-filters.shared';
 
-/** Re-read the list at least this often while the page is open (FR-10). */
+/** Re-read the list at least this often while the list is open (FR-10). */
 const REFRESH_MS = 60_000;
 /** Never re-read more pages than this on a background refresh. */
 const MAX_REFRESH_PAGES = 10;
@@ -34,36 +35,58 @@ function offsetFrom(page: SchedulePage | null): number {
 }
 
 /**
- * The Schedules workspace — every Schedule the workspace owns, from every
- * source, on one paged list with health and row controls.
+ * The Schedules list — every Schedule the workspace owns, from every source,
+ * on one paged list with filters, health and row controls.
  *
- * It reads the same projection as the Activity page's Schedules tab (which
- * stays exactly as it is) through the paged endpoint. The list, the health
- * banner and each failure load and fail independently; filters live in the
- * URL; the list re-reads every 60 seconds and whenever the tab regains focus.
+ * It reads the paged projection through `getSchedulePage`. The list, the health
+ * banner and each failure load and fail independently; the list re-reads every
+ * 60 seconds and whenever the tab regains focus.
+ *
+ * WHERE IT LIVES: this was the `/schedules` page, and it is now the Schedules
+ * view of the Activity page — one surface instead of two near-identical ones.
+ * The filters are therefore the HOST's to own: with `syncUrl={false}` the list
+ * reports every filter change through `onFiltersChange` and writes nothing
+ * itself, because a page that hosts several views has exactly one writer for
+ * its address bar (and the host has to keep `?view=schedules` in the URL while
+ * this component's own `router.replace` would drop it).
  */
 export function SchedulesWorkspace({
     initialPage,
     initialHealth,
     initialFailed = false,
     initialHealthFailed = false,
+    syncUrl = true,
+    filters: hostFilters,
+    onFiltersChange,
+    createTriggerRef,
 }: {
     initialPage: SchedulePage | null;
     initialHealth: ScheduleHealthSummary | null;
     initialFailed?: boolean;
     initialHealthFailed?: boolean;
+    /** False when the host page owns the URL (the Activity page's Schedules view). */
+    syncUrl?: boolean;
+    /** The host's filter state; required with `syncUrl={false}`. */
+    filters?: SchedulesFilterState;
+    /** The host's single URL writer. Required with `syncUrl={false}`. */
+    onFiltersChange?: (filters: SchedulesFilterState) => void;
+    /** Lets the "Create" menu open the inbound-trigger dialog below the list. */
+    createTriggerRef?: RefObject<(() => void) | null>;
 }) {
     const t = useTranslations('dashboard.schedules');
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const filters = useMemo(
+    const urlFilters = useMemo(
         () =>
             filtersFromSearchParams(
                 searchParams ? new URLSearchParams(searchParams.toString()) : null,
             ),
         [searchParams],
     );
+    // One source of truth per mode: the host's state when embedded, the address
+    // bar when this list is the page.
+    const filters = hostFilters ?? urlFilters;
 
     const [items, setItems] = useState<ScheduleEntry[]>(initialPage?.items ?? []);
     const [page, setPage] = useState<SchedulePage | null>(initialPage);
@@ -165,21 +188,18 @@ export function SchedulesWorkspace({
 
     const setFilters = useCallback(
         (next: SchedulesFilterState) => {
-            const params = new URLSearchParams(searchParams?.toString() ?? '');
-            for (const [key, value] of [
-                ['source', next.source],
-                ['status', next.status],
-                ['health', next.health],
-                ['agent', next.agent],
-                ['q', next.q],
-            ] as const) {
-                if (value) params.set(key, value);
-                else params.delete(key);
+            if (!syncUrl) {
+                onFiltersChange?.(next);
+                return;
             }
+            const params = new URLSearchParams(searchParams?.toString() ?? '');
+            const owned = ['source', 'status', 'health', 'agent', 'active', 'q'];
+            for (const key of owned) params.delete(key);
+            for (const [key, value] of scheduleFilterParams(next)) params.set(key, value);
             const query = params.toString();
             router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
         },
-        [pathname, router, searchParams],
+        [pathname, router, searchParams, syncUrl, onFiltersChange],
     );
 
     const loadMore = async () => {
@@ -210,21 +230,19 @@ export function SchedulesWorkspace({
         void loadHealth();
     };
 
+    // A SECTION header, not a page header: this list is the Schedules view of
+    // the Activity page, whose own `h1` is above it. The subtitle and the icon
+    // tile are the ones the standalone page carried; the button that used to
+    // link back to Activity is now "Create", because linking to the page this
+    // list already lives on was a self-link.
     const header = (
         <PageHeader
             icon={CalendarClock}
+            as="h2"
             title={t('title')}
             subtitle={t('pageSubtitle')}
             tone="primary"
-            actions={
-                <Link
-                    href={ROUTES.DASHBOARD_ACTIVITY}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text hover:bg-surface-secondary dark:border-border-dark dark:text-text-dark dark:hover:bg-surface-secondary-dark"
-                >
-                    <List className="h-3.5 w-3.5" />
-                    {t('backToActivity')}
-                </Link>
-            }
+            actions={<SchedulesCreateMenu onNewTrigger={() => createTriggerRef?.current?.()} />}
         />
     );
 
@@ -267,6 +285,14 @@ export function SchedulesWorkspace({
                 <SchedulesEmptyState variant="nothing" />
             ) : (
                 <>
+                    <ScheduleSourceChips
+                        value={filters}
+                        counts={page?.unfilteredCountsBySourceType ?? page?.countsBySourceType}
+                        total={page?.unfilteredTotal ?? items.length}
+                        onSourceChange={(source) => setFilters({ ...filters, source })}
+                        onActiveOnlyChange={(activeOnly) => setFilters({ ...filters, activeOnly })}
+                    />
+
                     <SchedulesFilters value={filters} agents={agents} onChange={setFilters} />
 
                     {page && (
