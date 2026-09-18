@@ -180,6 +180,35 @@ for (const [epic, counts] of perEpic) {
 	counts.named = total;
 }
 
+/**
+ * Landed **tasks** per epic — the number the ledger's §3 table quotes, and the one
+ * the report could not answer until now.
+ *
+ * A task counts once when *any* of the paths it marks new already exists, because the
+ * question this answers is "has this task's surface started to land", not "how much of
+ * it has". That is deliberately the weaker reading: an epic can land twenty contract
+ * tasks and still have no working feature (§3 says so in as many words), so this is a
+ * surfaces count and never an effort count. The distinct-id set is built from the
+ * landed rows, so a task with three landed paths counts once.
+ *
+ * Deriving it here rather than in a throwaway script is the point: the ledger's table
+ * is quoted in handovers and reviews, and a reader must be able to reproduce every
+ * number in it with this one command.
+ */
+const landedTasksByEpic = new Map();
+for (const row of mislabelled) {
+	if (!landedTasksByEpic.has(row.epic)) landedTasksByEpic.set(row.epic, new Set());
+	landedTasksByEpic.get(row.epic).add(row.id);
+}
+
+/** Every task heading the tree declares — the denominator for the landed-task share. */
+const tasksByEpic = new Map();
+for (const epic of epics) {
+	const lines = readFileSync(join(SPEC_ROOT, epic, 'tasks.md'), 'utf8').split('\n');
+	tasksByEpic.set(epic, lines.filter((line) => /^- \[[ x]\] \*\*T[0-9]/.test(line)).length);
+}
+const landedTaskTotal = [...landedTasksByEpic.values()].reduce((sum, ids) => sum + ids.size, 0);
+
 console.log('App Works — task-path meter');
 console.log(`epics parsed       : ${epics.length}`);
 console.log(`tasks parsed       : ${taskCount}`);
@@ -217,12 +246,16 @@ const report = [
 	'',
 	`## PER EPIC — named / already present / landed (${epics.length} epics)`,
 	'',
-	'| Epic | Named | Landed (marked new, exists) |',
-	'| ---- | ----- | --------------------------- |',
+	'| Epic | Named | Landed paths (marked new, exists) | Landed tasks | Tasks |',
+	'| ---- | ----- | --------------------------------- | ------------ | ----- |',
 	...epics.map((epic) => {
 		const c = perEpic.get(epic);
-		return `| ${epic} | ${c.named} | ${c.landed} |`;
+		const tasks = landedTasksByEpic.get(epic)?.size ?? 0;
+		return `| ${epic} | ${c.named} | ${c.landed} | ${tasks} | ${tasksByEpic.get(epic) ?? 0} |`;
 	}),
+	'',
+	`Landed tasks **${landedTaskTotal} of ${taskCount}** — a task counts once when any path it marks new exists,` +
+		' so this is a surfaces count and never an effort count (see the ledger\'s §3 for why that distinction matters).',
 	'',
 	`## ABSENT PATHS (${stale.length + notYetBuilt.length}) — grouped by epic`,
 	'',
