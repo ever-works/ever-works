@@ -110,6 +110,27 @@ export {
     type AppRuntimeEphemeralEnvContext,
 } from './app-env-runtime.source';
 
+// APW-07 T15 — the `app.spec.applied` listener (plan §2.1:84-92, §7:866-867).
+//
+// The class is exported because a module owner REGISTERS it (`providers`), and
+// Nest only scans a provided class's prototypes for `@OnEvent` metadata — an
+// unprovided listener is never subscribed. It is deliberately absent from
+// `app-env.module.ts`, whose own comment fixes what that module binds; the
+// registration site is named in the file docstring and routed in T15's report.
+//
+// `APP_ENV_SPEC_APPLIED_EVENT` / `AppEnvListenerSpecAppliedEvent` are exported
+// for the same reason the six provisional tokens above are: they are this tree's
+// one stand-in for APW-03's not-yet-landed `AppSpecAppliedEvent`, and a second
+// literal of the same event name is exactly the duplicate-seam defect the epic
+// has had to repair twice (T17's two dispatcher Symbols, T12/T13's parser).
+export {
+    APP_ENV_SPEC_APPLIED_EVENT,
+    AppEnvListener,
+    type AppEnvListenerOutcome,
+    type AppEnvListenerSkipReason,
+    type AppEnvListenerSpecAppliedEvent,
+} from './app-env.listener';
+
 // APW-07 T12 — the `.env` grammar, re-exported so a consumer of
 // `@ever-works/agent/app-env` reaches the parser T13's `apply({ import })`
 // consumes without a second entry point.
