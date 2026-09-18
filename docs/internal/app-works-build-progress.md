@@ -366,41 +366,40 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
 - **2026-09-18 · APW-07's persistence layer and APW-06's cluster-access facade — the two seams the last rounds left open
-  are now satisfied by real services.** **APW-07 T5-T8 — the App env and dependency tables** (`e5d1b5cb2`; agent 114 tests
-    - drift 54 + api migration 28). `work_app_env_values` (**15 columns**) and `work_app_dependencies` (**29 columns**),
-      both diffed column-by-column against plan §3.1/§3.2 and matching exactly, with the indexes the plan names — including
-      the **partial** unique index `(workId, kind) WHERE status NOT IN ('kept','deleted')`, which the entity deliberately
-      does NOT express as a decorator because `synchronize` would synthesise a non-partial duplicate that then refuses the
-      second `kept` row; the migration carries it in three driver spellings. `claimLease` is a bound compare-and-set with no
-      `now()`/`interval` in its SQL, and the version bumps happen **in SQL** rather than by read-modify-write. My own
-      perturbation on a claim none of the agent's eight covered: breaking the FK's `onDelete: 'CASCADE'` reddens with
-      `Expected: "CASCADE" / Received: "NO ACTION"` — a cascade broken here is how a deleted App Work leaves orphaned env
-      envelopes, or refuses to delete at all. One deviation is recorded with both versions quoted: **the plan writes
-      `timestamp`, the implementation uses `TimestampColumn` (bigint epoch ms)**, following the APW-02 and APW-06 precedent,
-      because better-sqlite3 — the default `DATABASE_TYPE`, CI and e2e — has no `timestamp` type and the lease CAS must bind
-      numbers. Also recorded: the migration id sits below APW-11's on this branch (the epic-slot rule wins, and TypeORM
-      filters pending migrations by NAME, not by "later than the last applied"), and T8's `_repository-inventory.ts` step is
-      deliberately NOT taken because it would fail the drift spec that asserts the inventory _is_ `DatabaseModule`'s provider
-      list.
-      **APW-06 T20 — the App runtime facade** (`8e26675e0`; `app-runtime` **90 → 137**, +`facades.module` 146). Cluster access
-      resolved **by capability only** (R-5) in one place, with the per-target credential rules and `custom-kubeconfig`
-      refused for every other cluster source; `APP_CLUSTER_IO_IN_API` on **every method call** while the process is not a
-      marked cluster worker (APW06-G02 — the service is constructed wherever `FacadesModule` is imported, so it must not
-      refuse at construction); and the Work's `deployProvider` normalised through the deploy facade's own
-      `resolveProviderId()`, so the legacy `'ever-works' → 'k8s'` alias has **one spelling** and this file adds no executable
-      `'k8s'` literal (verified: 0, two doc mentions only). 🌟 **The two provisional seams from rounds 20 and 21 are now
-      satisfied by the real service** — pinned at compile time by module-scope identity functions and exercised at runtime —
-      **without editing either neighbour file**, which was the whole point of declaring them as seams. 🌟 **The perturbation
-      pass caught a test that passed for the wrong reason** and the agent reported it instead of quietly fixing it: its first
-      `your-cluster` case still passed with the apps-tier rule removed, because a downstream credential/plugin-id check
-      masked it; the fake now returns the tier plugin's own id and asserts the deploy collaborator was never called. My own
-      perturbation (forcing the tier gate open) reddens `refuses while the policy is closed, without resolving a plugin or a
+  are now satisfied by real services.** **APW-07 T5-T8 — the App env and dependency tables** (`e5d1b5cb2`; agent 114 tests - drift 54 + api migration 28). `work_app_env_values` (**15 columns**) and `work_app_dependencies` (**29 columns**),
+  both diffed column-by-column against plan §3.1/§3.2 and matching exactly, with the indexes the plan names — including
+  the **partial** unique index `(workId, kind) WHERE status NOT IN ('kept','deleted')`, which the entity deliberately
+  does NOT express as a decorator because `synchronize` would synthesise a non-partial duplicate that then refuses the
+  second `kept` row; the migration carries it in three driver spellings. `claimLease` is a bound compare-and-set with no
+  `now()`/`interval` in its SQL, and the version bumps happen **in SQL** rather than by read-modify-write. My own
+  perturbation on a claim none of the agent's eight covered: breaking the FK's `onDelete: 'CASCADE'` reddens with
+  `Expected: "CASCADE" / Received: "NO ACTION"` — a cascade broken here is how a deleted App Work leaves orphaned env
+  envelopes, or refuses to delete at all. One deviation is recorded with both versions quoted: **the plan writes
+  `timestamp`, the implementation uses `TimestampColumn` (bigint epoch ms)**, following the APW-02 and APW-06 precedent,
+  because better-sqlite3 — the default `DATABASE_TYPE`, CI and e2e — has no `timestamp` type and the lease CAS must bind
+  numbers. Also recorded: the migration id sits below APW-11's on this branch (the epic-slot rule wins, and TypeORM
+  filters pending migrations by NAME, not by "later than the last applied"), and T8's `_repository-inventory.ts` step is
+  deliberately NOT taken because it would fail the drift spec that asserts the inventory _is_ `DatabaseModule`'s provider
+  list.
+  **APW-06 T20 — the App runtime facade** (`8e26675e0`; `app-runtime` **90 → 137**, +`facades.module` 146). Cluster access
+  resolved **by capability only** (R-5) in one place, with the per-target credential rules and `custom-kubeconfig`
+  refused for every other cluster source; `APP_CLUSTER_IO_IN_API` on **every method call** while the process is not a
+  marked cluster worker (APW06-G02 — the service is constructed wherever `FacadesModule` is imported, so it must not
+  refuse at construction); and the Work's `deployProvider` normalised through the deploy facade's own
+  `resolveProviderId()`, so the legacy `'ever-works' → 'k8s'` alias has **one spelling** and this file adds no executable
+  `'k8s'` literal (verified: 0, two doc mentions only). 🌟 **The two provisional seams from rounds 20 and 21 are now
+  satisfied by the real service** — pinned at compile time by module-scope identity functions and exercised at runtime —
+  **without editing either neighbour file**, which was the whole point of declaring them as seams. 🌟 **The perturbation
+  pass caught a test that passed for the wrong reason** and the agent reported it instead of quietly fixing it: its first
+  `your-cluster` case still passed with the apps-tier rule removed, because a downstream credential/plugin-id check
+  masked it; the fake now returns the tier plugin's own id and asserts the deploy collaborator was never called. My own
+  perturbation (forcing the tier gate open) reddens `refuses while the policy is closed, without resolving a plugin or a
 credential`.
-      **Two gaps reported rather than papered over:** `readNamespaceExpiry` is left unbound — no `IDeploymentPlugin` member
-      exposes a namespace-annotation read, so a verification's `expiresAt` reads empty until T2 adds one contract member
-      (T60 tolerates it by design, so no call site changes); and **T71's worker module must export `WorkRepository` and
-      provide `DeployFacadeService`**, or the worker cannot serve cluster access at all. Every collaborator is `@Optional()`,
-      so the failure mode is a named refusal rather than a crash — but §6.4's table stays unsatisfied until T71 lands.
+  **Two gaps reported rather than papered over:** `readNamespaceExpiry` is left unbound — no `IDeploymentPlugin` member
+  exposes a namespace-annotation read, so a verification's `expiresAt` reads empty until T2 adds one contract member
+  (T60 tolerates it by design, so no call site changes); and **T71's worker module must export `WorkRepository` and
+  provide `DeployFacadeService`**, or the worker cannot serve cluster access at all. Every collaborator is `@Optional()`,
+  so the failure mode is a named refusal rather than a crash — but §6.4's table stays unsatisfied until T71 lands.
 
 - **2026-09-18 · the verification lane, APW-07's contracts, and the last foundation package's spec type-check.**
   **APW-06 T60 — verification targets** (`6f98b43cb`; k8s **751 → 758**, `app-runtime` **51 → 90**). 🌟 **The four k8s
