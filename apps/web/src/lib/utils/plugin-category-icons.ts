@@ -26,6 +26,8 @@ import {
     Server,
     // APW-05 T2 — the build category's icon (see the map below).
     Hammer,
+    // APW-12 T4 — the identity category's icon (see the map below).
+    Fingerprint,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -85,6 +87,12 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // `packages/plugin/src/contracts/plugin-manifest.types.ts` and its two map
     // entries here are one change.
     build: Hammer,
+    // APW-12 T4 — identity providers (the Ever ID relying party,
+    // `oidc-identity`). Same rule as the two lines above: the `identity`
+    // category in `packages/plugin/src/contracts/plugin-manifest.types.ts` and
+    // its two map entries here are one change — these maps are
+    // `Record<PluginCategory, …>`, so a missing entry stops apps/web compiling.
+    identity: Fingerprint,
 };
 
 /**
@@ -119,6 +127,10 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     'app-dependency': 'App Dependencies',
     // APW-05 T2 — the `build` category (see the icon map above).
     build: 'Builds',
+    // APW-12 T4 — the `identity` category (see the icon map above). Plain
+    // English like every other label in this map: the file reads no i18n
+    // bundle, so there is no locale leaf to add beside it.
+    identity: 'Identity Providers',
 };
 
 // Type-safe assertion that all categories are covered

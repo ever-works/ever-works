@@ -120,7 +120,15 @@ export const PLUGIN_CAPABILITIES = {
 	// (APW-05 T16); see `capabilities/build.interface.ts`. Resolution R-13 keeps
 	// `build` a CAPABILITY while the strategy (`dockerfile` / `image` / `auto` /
 	// `none`) stays the App spec's own choice.
-	BUILD: 'build'
+	BUILD: 'build',
+	// App Works (APW-12 T4) — the Ever ID relying-party capability. The
+	// `oidc-identity` plugin declares it (APW-12 T5/T6), and it is consumed only
+	// through `IdentityProviderFacadeService` (APW-12 plan §4.4); see
+	// `capabilities/identity-provider.interface.ts`. Appended after `build`, and
+	// landed in the same change as the `identity` category in
+	// `plugin-manifest.types.ts` — a plugin contract with no category to be
+	// discovered under is a manifest the loader rejects.
+	IDENTITY_PROVIDER: 'identity-provider'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

@@ -150,6 +150,20 @@ const EXISTING_CATEGORIES = [
 	'app-dependency'
 ] as const;
 
+/**
+ * Every capability and category a LATER epic appended behind `build`, in the
+ * map's / tuple's own order — APW-12 T4 added `identity-provider` and `identity`.
+ *
+ * This spec owns `build`; these two lists exist so its append-only assertions stay
+ * statements about *this* change rather than about the tuple's current tail. An
+ * epic that appends behind `build` extends them in the same change (APW-07 T3's
+ * spec below does the same for its own list). Leaving them behind does not make
+ * the assertions weaker, it makes them FAIL on a legitimate append — which is
+ * exactly how the "last category is `build`" pin here was found.
+ */
+const LATER_CAPABILITIES: readonly string[] = ['identity-provider'];
+const LATER_CATEGORIES: readonly PluginCategory[] = ['identity'];
+
 /** The four strategies of Resolution R-13, in the plan's order (plan §4.1:585–589). */
 const EVERY_STRATEGY: readonly BuildStrategy[] = ['dockerfile', 'image', 'auto', 'none'];
 
@@ -357,9 +371,15 @@ describe('the build capability (APW-05 T2, plan §4.2:753–757)', () => {
 			expect(isValidPluginCapability(capability), capability).toBe(true);
 		}
 
-		// Exactly one member was added, and it is the new one.
+		// Exactly one member was added *by this change*, and it is the new one.
 		expect(capabilities.filter((entry) => entry === 'build')).toHaveLength(1);
-		expect(capabilities).toHaveLength(EXISTING_CAPABILITIES.length + 1);
+		// …and everything a later epic appended behind it is present and valid, so the
+		// count below stays an exact total rather than a number that drifts.
+		for (const capability of LATER_CAPABILITIES) {
+			expect(capabilities, capability).toContain(capability);
+			expect(isValidPluginCapability(capability), capability).toBe(true);
+		}
+		expect(capabilities).toHaveLength(EXISTING_CAPABILITIES.length + 1 + LATER_CAPABILITIES.length);
 
 		// The array the guard reads is derived from the map, so it follows.
 		expect(ALL_PLUGIN_CAPABILITIES).toContain('build');
@@ -370,14 +390,20 @@ describe('the build capability (APW-05 T2, plan §4.2:753–757)', () => {
 		expect(PLUGIN_CATEGORIES).toContain('build');
 
 		// The append-only guarantee, asserted rather than assumed: every pre-existing
-		// member is still there, in the same relative order, exactly once.
-		const remaining = PLUGIN_CATEGORIES.filter((entry) => entry !== 'build');
+		// member is still there, in the same relative order, exactly once. `remaining`
+		// drops `build` and whatever a later epic appended behind it, so the equality
+		// stays a statement about the members that existed before this change.
+		const remaining = PLUGIN_CATEGORIES.filter((entry) => entry !== 'build' && !LATER_CATEGORIES.includes(entry));
 		expect(remaining).toEqual([...EXISTING_CATEGORIES]);
 		expect(new Set(PLUGIN_CATEGORIES).size).toBe(PLUGIN_CATEGORIES.length);
 
-		// …and the new member is LAST, which is what "append" means here: a category
-		// inserted in the middle would renumber every index a consumer persisted.
-		expect(PLUGIN_CATEGORIES[PLUGIN_CATEGORIES.length - 1]).toBe('build');
+		// …and the new member sits immediately after the block that preceded it, which
+		// is what "append" means here: a category inserted in the middle would renumber
+		// every index a consumer persisted. Pinned as an index and as a slice — the
+		// durable form — rather than as "it is the last entry", which stopped being true
+		// the first time a later epic appended behind it (APW-12 T4's `identity`).
+		expect(PLUGIN_CATEGORIES.indexOf('build')).toBe(EXISTING_CATEGORIES.length);
+		expect(PLUGIN_CATEGORIES.slice(0, EXISTING_CATEGORIES.length)).toEqual([...EXISTING_CATEGORIES]);
 
 		// The derived union follows the tuple.
 		const asCategory: PluginCategory = 'build';

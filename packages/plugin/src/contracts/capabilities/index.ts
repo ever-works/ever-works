@@ -102,3 +102,11 @@ export * from './app-dependency.interface.js';
 // `AppBuildVerificationResult` / `BUILD_SERVICE_DEFAULTS` are re-exported from
 // `@ever-works/contracts` (APW-05 T1) rather than redeclared (Resolution R-1).
 export * from './build.interface.js';
+// App Works (APW-12 T4) — the `identity-provider` capability: `IIdentityProviderPlugin`
+// (the seven methods the OpenID Connect relying party implements), the seven
+// `IdentityProviderCheck` ids **Test connection** renders, the verified token claim
+// shapes and the closed `IdentityTokenRejectedError` code set. Additive: no existing
+// capability, category or contract changes, and the category `'identity'` that goes
+// with it (@see plugin-manifest.types.ts) lands in the same change; a plugin that
+// never declares `identity-provider` compiles and behaves exactly as before.
+export * from './identity-provider.interface.js';

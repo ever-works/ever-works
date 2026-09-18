@@ -110,14 +110,15 @@ const PRE_APW07_CATEGORIES = [
 /**
  * Every category present BESIDES `app-dependency`, in the tuple's own order: the
  * block above followed by whatever a later epic appended — APW-05 T2 added
- * `build`, the last entry.
+ * `build`, then APW-12 T4 added `identity` (the `identity-provider` capability),
+ * the last entry.
  *
  * The epic that appends a category extends this list in the same change (and its
  * own spec pins where its member sits). Leaving it behind does not make the
  * append-only assertion below weaker, it makes it FAIL on a legitimate append,
  * which is exactly how this line was found.
  */
-const EXISTING_CATEGORIES = [...PRE_APW07_CATEGORIES, 'build'] as const;
+const EXISTING_CATEGORIES = [...PRE_APW07_CATEGORIES, 'build', 'identity'] as const;
 
 describe('the app-dependency capability (APW-07 T3)', () => {
 	it('names the capability exactly as the plan does', () => {

@@ -113,7 +113,18 @@ export const PLUGIN_CATEGORIES = [
 	// `apps/web/src/lib/utils/plugin-category-icons.ts`, because those two maps
 	// are `Record<PluginCategory, …>` and a category without them breaks the
 	// apps/web type-check.
-	'build'
+	'build',
+	// APW-12 T4 — the Ever ID relying party: identity providers (plan §4.1,
+	// `capabilities/identity-provider.interface.ts`). First-party plugin:
+	// `oidc-identity` (APW-12 T5/T6). Appended **last**, and — like the two lines
+	// above — landed in the same change as its `CATEGORY_ICONS` / `CATEGORY_LABELS`
+	// entries in `apps/web/src/lib/utils/plugin-category-icons.ts`, because those
+	// two maps are `Record<PluginCategory, …>` and a category without them breaks
+	// the apps/web type-check. The append-only property this tuple is held to is
+	// pinned by `__tests__/app-dependency-capability.spec.ts` (the pre-APW-07 slice
+	// and its order) and by `__tests__/identity-provider.interface.spec.ts` (where
+	// this member sits); a mid-tuple insertion still fails both.
+	'identity'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
