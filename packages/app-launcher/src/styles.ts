@@ -272,7 +272,10 @@ export const EVER_APP_LAUNCHER_STYLES = `
 .retry,
 .empty-action,
 .manage,
-.sign-in {
+.sign-in,
+/* FR-4's overflow row — same shape as the footer's Manage apps link, because it
+   does the same thing: it opens the full list. */
+.view-all {
 	align-self: flex-start;
 	padding: 6px 10px;
 	border: 1px solid var(--ever-app-launcher-border);
@@ -288,7 +291,8 @@ export const EVER_APP_LAUNCHER_STYLES = `
 .retry:focus-visible,
 .empty-action:focus-visible,
 .manage:focus-visible,
-.sign-in:focus-visible {
+.sign-in:focus-visible,
+.view-all:focus-visible {
 	outline: 2px solid var(--ever-app-launcher-accent);
 	outline-offset: 2px;
 }

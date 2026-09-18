@@ -12,6 +12,7 @@ import type {
 	LauncherEmptyActionDetail,
 	LauncherErrorSection,
 	LauncherItemActivateDetail,
+	LauncherManageDetail,
 	LauncherRetrySection,
 	LauncherStrings,
 	LauncherTheme
@@ -421,7 +422,7 @@ export class EverAppLauncher extends LitElement {
 	private _renderWorksExtra(workTileCount: number): TemplateResult | typeof nothing {
 		if (this.error === 'apps') return this._renderError('works', 'works', this._strings.worksError);
 		if (this._isColdLoading()) return nothing;
-		if (workTileCount > 0) return nothing;
+		if (workTileCount > 0) return this._renderOverflow(workTileCount);
 
 		const action: AppLauncherEmptyAction = this._appWorksAvailable() ? 'createAppWork' : 'goToWorks';
 		return html`
@@ -438,6 +439,50 @@ export class EverAppLauncher extends LitElement {
 			</button>
 		`;
 	}
+
+	/**
+	 * FR-4's overflow row: **View all {count}**, where `{count}` is
+	 * `meta.worksTotal` — the number of Works the scope holds, not the number the
+	 * panel shows (spec FR-4:193, ACC-11-14: 140 exposed Works render 24 tiles
+	 * **and** `View all 140`).
+	 *
+	 * **It opens Manage apps**, which is what spec FR-4:137 says the row does, so
+	 * it reports through the SAME `:manage` event the footer link uses — with
+	 * `section: 'works'`, because that is the list the person wants to see more of.
+	 * No new event was invented for it: the element still never navigates, and the
+	 * host has one handler for "the person asked for the full list".
+	 *
+	 * Rendered only when the scope really holds more than the panel received, so a
+	 * complete list gets no row that would lead to a page showing the same thing.
+	 */
+	private _renderOverflow(workTileCount: number): TemplateResult | typeof nothing {
+		const total = this.data?.meta.worksTotal ?? 0;
+		if (total <= workTileCount) return nothing;
+		const label = this._strings.viewAll.replace('{count}', String(total));
+		return html`
+			<button
+				class="view-all"
+				part="view-all"
+				type="button"
+				role="menuitem"
+				data-count=${total}
+				@click=${this._onViewAll}
+			>
+				${label}
+			</button>
+		`;
+	}
+
+	/** See {@link _renderOverflow} — one report, the host's existing handler. */
+	private _onViewAll = (): void => {
+		this.dispatchEvent(
+			new CustomEvent<LauncherManageDetail>('ever-app-launcher:manage', {
+				detail: { section: 'works' },
+				bubbles: true,
+				composed: true
+			})
+		);
+	};
 
 	// -----------------------------------------------------------------------
 	// Derived state

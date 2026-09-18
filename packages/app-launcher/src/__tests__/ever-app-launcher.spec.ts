@@ -724,6 +724,66 @@ describe('<ever-app-launcher>', () => {
 		});
 	});
 
+	/**
+	 * FR-4's overflow row and ACC-11-14: with 140 exposed live Works the panel
+	 * renders its 24 tiles **and** `View all 140`. The cap itself is the
+	 * registry's (`orderLauncherItems`, APW-11 T4) — the element renders what it
+	 * was handed and reads the real total from `meta.worksTotal`, which is the
+	 * only number that can be right: counting what arrived would say "View all
+	 * 24" and lead to a page showing the same 24.
+	 */
+	describe('the overflow row (FR-4, ACC-11-14)', () => {
+		const works = (count: number): AppLauncherItem[] =>
+			Array.from({ length: count }, (_value, index) =>
+				item({
+					key: `work:w${index}`,
+					kind: 'work',
+					section: 'works',
+					name: `Work ${index}`,
+					url: `https://work-${index}.example.com`,
+					order: index
+				})
+			);
+
+		it('renders View all {count} from meta.worksTotal, not from the tiles it received', async () => {
+			const element = await mount({
+				data: response(works(24), { worksTotal: 140 })
+			});
+			await open(element);
+
+			const row = query<HTMLElement>(element, '.view-all');
+			expect(row).not.toBeNull();
+			expect(row?.textContent?.trim()).toBe('View all 140');
+			expect(tiles(element)).toHaveLength(24);
+		});
+
+		it('reports the overflow through the SAME manage event, and never navigates', async () => {
+			const element = await mount({ data: response(works(2), { worksTotal: 140 }) });
+			await open(element);
+			const before = document.location.href;
+			const seen = once<CustomEvent>(element, 'ever-app-launcher:manage');
+
+			(query<HTMLElement>(element, '.view-all') as HTMLElement).click();
+			const event = await seen;
+
+			// `section: 'works'` — the list the person asked to see more of.
+			expect(event.detail).toEqual({ section: 'works' });
+			expect(document.location.href).toBe(before);
+		});
+
+		it('renders no row when the scope holds nothing more than the panel shows', async () => {
+			const element = await mount({ data: response(works(3), { worksTotal: 3 }) });
+			await open(element);
+			expect(query<HTMLElement>(element, '.view-all')).toBeNull();
+
+			// …and none while the apps half failed, where the row would sit under an
+			// error it cannot explain.
+			const failed = await mount({ data: response(works(2), { worksTotal: 140 }), error: 'apps' });
+			await open(failed);
+			expect(query<HTMLElement>(failed, '.view-all')).toBeNull();
+		});
+	});
+
 	describe('manage and sign-in events (plan §6.2)', () => {
 		it('reports Manage apps without navigating itself', async () => {
 			const element = await mount({ data: FULL_PANEL });
