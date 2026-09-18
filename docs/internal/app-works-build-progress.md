@@ -365,6 +365,60 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · APW-07's `.env` import parser and the category the dependency capability could not ship without.**
+  **APW-07 T12 — `parseAppEnvDotenv`** (`c7d9ae6ca`; `dotenv-parser.spec.ts` **37 tests**, all green). Plan §4.5's
+  line-oriented state machine (a regex cannot express "until the closing quote, possibly on a later line", and the
+  paste is unauthenticated member input where backtracking is the enemy), FR-28/29/30, ACC-07-11. The 12-line
+  fixture `tasks.md:176-177` names was **already in the worktree, untracked and with no consumer** — T12 had never
+  landed — so it is adopted unchanged rather than re-invented, and it is the same file T13's service spec reads.
+  🌟 **The spec found two real bugs while it was being written**, which is what a spec is for: the line counter
+  advanced **one line too far** (`+= newlines + 1` where `newlines` already counts the terminator), so the fixture's
+  line 7 was reported as line 13 — every line number after the first was wrong, and a line number is the member's
+  only handle on a refused paste; and `resolveDuplicates` emitted entries in **winner order** rather than the
+  first-occurrence order its own docstring promised (`A=1\nB=2\nA=3` gave `[B, A]`). Both are kept caught: the
+  line-counter mutation is perturbation A below and reddens 9 tests. **Two further "failures" were my test's
+  expectations being wrong, not the parser's behaviour**, and they are recorded in the commit so nobody "fixes" the
+  parser to match them: the fixture's line 7 **contains an `=`** (it is prose — `this line is not a NAME=value
+line`), so it refuses as `invalidName`, not `malformedLine`; and an unterminated single quote leaves its physical
+  remainder as a second refused line (`[1, 2]`). ACC-07-11 fixes the count and the line number, not the reason —
+  **T13 had pinned `malformedLine` and has been told.**
+  **Design points worth reading:** the 64 KiB/500-line ceilings answer as their **own shape**
+  (`{ kind: 'limits', code, limit, actual }`), not as `refused` rows, because a paste that is too big has no line to
+  blame and **must not be half-applied** — a caller handed a partial `entries` list would store part of it and report
+  success; both codes are **existing** `APP_ENV_API_ERROR_CODES` (`valuesTooLarge`, `tooManyValues`), so the route
+  answers 422 with copy it already has, where a new code would have been a member-facing error with no message key
+  (G23). **`kind: 'parsed' | 'limits'` exists because `ok` cannot narrow**: this package compiles with
+  `strictNullChecks: false`, which widens a `true`/`false` property to `boolean` — the first draft discriminated on
+  `ok` and neither `ts-jest` nor any consumer could narrow it (the agent's own report hit the same wall, and it
+  diagnosed "a string discriminant is needed" one step before the workaround of casting at every call site).
+  Refusal messages name the **line** and the rule and never the name or the value (FR-30), asserted three ways: spies
+  on all five `console` methods, a comment-stripped source scan for `console.`/`logger` (the technique
+  `generators.spec.ts:530-554` uses), and an assertion that no message contains the pasted secret while the accepted
+  value **is** returned. **One branch is unreachable and is documented as such**: `valueTooLarge` inside a quoted
+  value cannot fire while `APP_ENV_DOTENV_MAX_BYTES <= APP_ENV_VALUE_MAX_BYTES` (unescaping never grows a value), so
+  the spec asserts **that inequality** instead of pretending to cover the branch — raising the paste ceiling now
+  fails a test with the reason attached rather than leaving an untested path behind.
+  **Perturbations** (rule #28; parser SHA256 `1AB979C2…D18816` byte-identical after each): line counter (+1) → 9
+  tests; `export ` prefix not stripped; single-quote multi-line allowed; trailing junk accepted after a closing
+  quote; the 64 KiB ceiling removed; duplicates first-wins; BOM not stripped; inline ` #` comment kept in the value —
+  **eight for eight caught by the intended test**, every red a real assertion failure.
+
+- **2026-09-18 · APW-07 T3 — the `app-dependency` category, and the two web maps it forces** (`546923f27`; plugin
+  **492 → 498**, web `type-check` exit 0). T16 landed the capability and its interface last round but deliberately
+  left the category out: `PLUGIN_CATEGORIES` feeds **two total `Record<PluginCategory, …>` maps** in apps/web
+  (`CATEGORY_ICONS`, `CATEGORY_LABELS`), so a tuple entry without them is a **build break in apps/web**, not a
+  cosmetic gap. Tuple + `Server` icon + `'App Dependencies'` label landed together, plus the spec that makes the
+  append-only guarantee assertable: the 46 capability values and 24 categories are a **snapshot scraped from the
+  pre-T3 files**, not hand-written — the first hand-written draft conflated capability values with category names
+  (`form` for `form-schema-provider`, `metrics` for `metrics-provider`) and listed `app-deployment`, which is not a
+  capability, and failed on its own snapshot. **Three perturbations, each red in the single intended test with the
+  other 497 green** (category removed entirely; a pre-existing category renamed away; a pre-existing category
+  duplicated). 🌟 **The first attempt at those three was discarded and the reason is the lesson:** the mutations were
+  built with PowerShell `-replace` and a ``"`n\t…"`` replacement string, where `\t` is **not** an escape — it wrote
+  a literal backslash-t into the tuple, so all three "reds" were oxc `PARSE_ERROR` collection failures with `Tests no
+tests`. **Every one of them would have passed as perturbation evidence if only the exit code had been read**; the
+  redo uses Node (real tabs), asserts both anchors are unique before mutating, and captures the assertion text.
+
 - **2026-09-18 · APW-07's env crypto/generators/validator and its dependency service — plus the verification expiry read that
   no contract member exposed.** **APW-07 T9-T11** (`69b3abb3b`; app-env-crypto 30, generators 58, validation 57 tests — the
   `app-env-crypto generators` pattern is **17 suites / 335** with pre-existing suites). The `enc::v1::` envelope over
