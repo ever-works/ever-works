@@ -322,6 +322,65 @@ rule requires. The remaining restore point is the `pg-nightly-20260917020000` ba
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-18 · four slices land: the `app` kind, the validator, the deployer, and three GitHub capabilities.**
+  **APW-01 T1/T3/T7b — the `app` Work kind** (contracts **3457 → 3482 tests**). `'app'` is appended after `'repo'` —
+  the kind it is most often confused with, because that one _mirrors_ a repository and this one _runs_ it — with
+  `isAppWorkKind()`, the two new capability flags `builds`/`appEnvironment` (false for the directory default and for
+  all seven existing kinds, so no existing answer moved), and the `app` entry appended last. The web chip is the
+  exception the epic's R-6 demands: `FAIL_CLOSED_WORK_KINDS = ['app']` with a pre-seeded disabled set, while every
+  other kind keeps the exact fail-open path that keeps an OSS fork working — and the perturbation that emptied the
+  list turned 7 web tests red while all 9 fail-open rows stayed green, so "scoped to one kind" is asserted, not
+  claimed.
+  🛑 **A LANDMINE WAS DEFUSED RATHER THAN REPORTED.** Rebuilding `@ever-works/contracts` — which CI does — turned the
+  **web type-check red in two files**, because `apps/web` resolves contracts from a stale `dist`: the presentation map
+  needed an `app` entry and the badge needed a `dashboard.workKind.app` message key. Both landed here (T23's scope,
+  taken early): a fuchsia `AppWindow` presentation, the one tone the other nine do not use, and the label in **all
+  21 bundles** as real translations. The insertion is verified per file at `dashboard.workKind.app` and asserted
+  **not** to have leaked into `dashboard.newPage.chips` — a different block holding the same kind labels, which the
+  first attempt did land in (the fix was a JSON-path-tracking inserter; the check is what caught it).
+  Reported for the spec owner, not changed in code: **FR-2 and plan §1.1/§1.2 contradict each other on
+  `app.repos.website`** — FR-2 and §3.2's code block say `true` ("the app-code fork IS the work repository"), while
+  §1.1/§1.2 and T3's pin wording assume `false`. FR-2 was followed because the API and APW-01's own tasks select a
+  kind's write/deploy repository through `repos.website`, so `false` would leave `app` with no repository role.
+  **APW-03 T6 — positioned validation** (`app-spec.issues.ts` + `app-spec.validate.ts`, **4301 insertions**; the
+  `works-config` sweep **550 → 632 tests**). The structural pipeline, the pointer map, the issue builder with a
+  **closed** interpolation allow-list (params are names, never values), the 200-issue cap, the newer-version
+  downgrade, and never-throws. The rule set runs whenever the document parses: exactly four inputs suppress it, each
+  asserted, while **seven non-fatal structural faults are asserted not to**. 🌟 **A perturbation that stayed GREEN
+  exposed two real bugs** — the deferred `cron` pointers were suppressed with the pruned set, so T5's `cron_invalid`
+  could never be reported, and two document walks were handed the `Document` instead of `document.contents`, so
+  `duplicate_key` and `yaml_alias_limit` always fell back to the root pointer. One task-text case cannot be satisfied
+  as written (`blueprint` mode reporting `blueprint_mode_forbidden_key`): schema.md §3:89's correction, the contracts
+  tuple and T58 all say that code is gone, so the corrected behaviour is implemented, `blueprint-draft` is an
+  additive **alias**, and the correction is pinned as a contrast case.
+  **APW-06 T12 — the deployer** (`app-deployer.ts` 2078 lines + 1502 lines of spec; k8s package **578 → 614 tests**).
+  Capture → prepare → pre-deploy jobs → rollout → first-deploy jobs → in-cluster smoke → publish → public smoke →
+  post-deploy jobs → cron → GC, with rollback from the capture. Every phase name and failure code comes from the
+  contract; the isolation probe has no phase of its own and runs **inside** the smoke phase, asserted by the order of
+  the applied objects. Cancellation is honoured between phases **and on every rollout poll** — the second is what a
+  boundary-only implementation misses — and the 2-hour cap is evaluated at every poll too. Four perturbations red
+  (`638B12E3…`, re-proven on the final revision at `54367C51…`). The deployer calls the **pure**
+  `assertSupportedKubeconfig` before its first write, so T11's source scan stays green.
+  **APW-02 T19/T20/T21 — repository copy, Actions permissions, webhooks** (github-plugin **255 → 326 tests**). Four
+  perturbations red, restored to `715FA1CF…` / `FEE4B3AA…`; the webhook-URL one is the best of them because removing
+  the guard actually **created a hook** for a loopback URL. Five deviations are recorded rather than hidden, two of
+  which need other owners: plan §4.3's "remove the directory in `finally`" cannot use `IGitOperations` (its
+  `removeLocalDir` resolves a _different, shared_ checkout directory, so calling it would delete someone else's
+  working copy — the additive fix is a `removeDir?(dir)` contract member), and the plan's refusal codes have no field
+  in `GitProviderErrorDetails`, so they travel in `error.message` with `reason: 'unprocessable'` — **T23/T24 and
+  APW-05 must read `message` to tell `too_large` from `uses_lfs`**, which plan §6.2 step 2 requires.
+  🛑 **GITHUB'S SECRET SCANNING BLOCKED A PUSH, and the fix was to rewrite two unpushed commits.** A test fixture
+  contained a literal Stripe-shaped key (`sk_live_…`), which is exactly what a secret scanner is for; the remote
+  refused the ref update and offered an unblock URL, which would have kept the literal in history. Instead both
+  fixtures now **build** their token shapes at runtime (the rules read the shape, so a constructed string is an
+  equivalent fixture and a better citizen), and the two unpushed commits were squashed with a `--fixup` +
+  `--autosquash` rebase so no commit in history carries it — verified with `git log -S`, which reports **zero**
+  commits mentioning it. Two lessons for the programme's agents: a "test secret" is still a secret to CI, and a
+  blocked push is a rewrite-it signal, not an unblock-it signal.
+  **Branch health after all six landings:** apps/api **481 suites / 7367 tests, exit 0**; contracts 3482; agent
+  `works-config` 632; k8s 614; github-plugin 326; web 423 files / 4075 tests (before this round's `work-kinds`
+  spec); agent targeted suites green.
+
 - **2026-09-18 · the launcher's web flag is fail-closed, and resolved once (APW-11 T13).**
   `isAppLauncherEnabled(distinctId)` combines the API's `features.appLauncherEnabled` (read over HTTP, not from the
   web process's own environment — APW11-G12) with the `app-launcher` PostHog flag, both capped at 1,500 ms.

@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1179 · absent: 1488 · of the absent, another task says it creates them: 608
+present: 1192 · absent: 1475 · of the absent, another task says it creates them: 604
 
-## LANDED SURFACE — marked "new", already in the repository (38)
+## LANDED SURFACE — marked "new", already in the repository (40)
 
 - APW-06-app-runtime T1 — `packages/contracts/src/apps/app-runtime.ts`
 - APW-06-app-runtime T2 — `packages/plugin/src/contracts/capabilities/app-deployment.types.ts`
@@ -25,6 +25,7 @@ present: 1179 · absent: 1488 · of the absent, another task says it creates the
 - APW-06-app-runtime T8 — `packages/plugins/k8s/src/app/app-jobs.renderer.ts`
 - APW-06-app-runtime T9 — `packages/plugins/k8s/src/app/app-rollout.ts`
 - APW-06-app-runtime T11 — `packages/plugins/k8s/src/app/app-kubeconfig.guard.ts`
+- APW-06-app-runtime T12 — `packages/plugins/k8s/src/app/app-deployer.ts`
 - APW-06-app-runtime T28 — `packages/agent/src/events/index.ts`
 - APW-06-app-runtime T63 — `apps/web/e2e/accessibility-axe-deep.spec.ts`
 - APW-11-app-launcher T1 — `packages/contracts/src/apps/__tests__/app-launcher.spec.ts`
@@ -44,6 +45,7 @@ present: 1179 · absent: 1488 · of the absent, another task says it creates the
 - APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.controller.ts`
 - APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.module.ts`
 - APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.controller.spec.ts`
+- APW-11-app-launcher T13 — `apps/web/src/lib/feature-flags/app-launcher.unit.spec.ts`
 - APW-11-app-launcher T21 — `apps/web/src/lib/app-launcher/__tests__/no-sso-claims.unit.spec.ts`
 - APW-11-app-launcher T22 — `docs/features/app-launcher.md`
 - APW-11-app-launcher T32 — `apps/web/src/components/activity-log/ActivityTypeBadge.unit.spec.tsx`
@@ -54,27 +56,27 @@ present: 1179 · absent: 1488 · of the absent, another task says it creates the
 
 | Epic | Named | Landed (marked new, exists) |
 | ---- | ----- | --------------------------- |
-| APW-01-app-work-kind | 72 | 0 |
-| APW-02-fork-lifecycle | 92 | 0 |
-| APW-03-app-spec-and-catalog | 161 | 0 |
+| APW-01-app-work-kind | 71 | 0 |
+| APW-02-fork-lifecycle | 91 | 0 |
+| APW-03-app-spec-and-catalog | 158 | 0 |
 | APW-04-app-provisioner | 125 | 0 |
 | APW-05-builds | 122 | 0 |
-| APW-06-app-runtime | 172 | 16 |
+| APW-06-app-runtime | 167 | 17 |
 | APW-07-app-env-and-dependencies | 109 | 0 |
 | APW-08-evolve-loop | 125 | 0 |
 | APW-09-upstream-pull-requests | 93 | 0 |
 | APW-10-apps-hosting-tier | 150 | 0 |
-| APW-11-app-launcher | 72 | 22 |
+| APW-11-app-launcher | 71 | 23 |
 | APW-12-ever-id | 122 | 0 |
 | APW-13-golden-paths | 111 | 0 |
 
-## ABSENT PATHS (1488) — grouped by epic
+## ABSENT PATHS (1475) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
-- APW-03-app-spec-and-catalog: 161
-- APW-06-app-runtime: 156
+- APW-03-app-spec-and-catalog: 158
+- APW-06-app-runtime: 150
 - APW-10-apps-hosting-tier: 150
 - APW-04-app-provisioner: 125
 - APW-08-evolve-loop: 125
@@ -83,6 +85,6 @@ in the repository would be noise. Pass `--full` to print every path to stdout in
 - APW-13-golden-paths: 111
 - APW-07-app-env-and-dependencies: 109
 - APW-09-upstream-pull-requests: 93
-- APW-02-fork-lifecycle: 92
-- APW-01-app-work-kind: 72
-- APW-11-app-launcher: 50
+- APW-02-fork-lifecycle: 91
+- APW-01-app-work-kind: 71
+- APW-11-app-launcher: 48
