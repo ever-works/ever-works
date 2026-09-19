@@ -1,7 +1,16 @@
 // Mock the agent runtime tree at module scope so importing the controller does
 // not pull in the agent's NestJS DI graph (database, entities, services, etc.).
-jest.mock('@ever-works/agent/dto', () => ({}));
-jest.mock('@ever-works/agent/items-generator', () => ({}));
+//
+// APW-01 T18 added the two constructor stubs: `quickCreateWork` builds a
+// `CreateWorkDto` and a `CreateItemsGeneratorDto` with `new`, so a bare `{}` made
+// the quick-create half of the app-kind coverage unreachable (`new undefined()`).
+// Nothing else about either mock changed.
+jest.mock('@ever-works/agent/dto', () => ({
+    CreateWorkDto: class CreateWorkDto {},
+}));
+jest.mock('@ever-works/agent/items-generator', () => ({
+    CreateItemsGeneratorDto: class CreateItemsGeneratorDto {},
+}));
 jest.mock('@ever-works/agent/services', () => ({}));
 jest.mock('@ever-works/agent/comparison-generator', () => ({}));
 jest.mock('@ever-works/agent/template-catalog', () => ({}));
@@ -25,13 +34,39 @@ jest.mock('@ever-works/agent/entities', () => ({
 }));
 jest.mock('@ever-works/agent/subscriptions', () => ({}));
 jest.mock('@ever-works/agent/activity-log', () => ({}));
-jest.mock('../auth', () => ({
-    AuthService: class {},
-    AuthSessionGuard: class {},
-    CurrentUser: () => () => undefined,
-}));
+// APW-01 T18 — nothing else is mocked for the App Work block: the assertions there
+// are driven by the REAL `AppWorkCreateService`, imported by path (the
+// `@ever-works/agent/app-works` barrel would drag the whole agent module graph in, and
+// is not the module the route loads either).
+jest.mock('../auth', () => {
+    // APW-01 T18 — `CurrentUser` is the REAL decorator, rebuilt, rather than the
+    // `() => () => undefined` the original mock returned: a parameter decorator that
+    // registers nothing erases the route's own parameter metadata, which the App Work
+    // block reads to prove the handler takes no client input. `AuthService` and
+    // `AuthSessionGuard` are untouched stubs, and every existing test in this file
+    // passes its `auth` argument explicitly, so nothing else changes.
+    const { createParamDecorator } = jest.requireActual('@nestjs/common');
+    return {
+        AuthService: class {},
+        AuthSessionGuard: class {},
+        CurrentUser: createParamDecorator(
+            (
+                _data: unknown,
+                ctx: { switchToHttp: () => { getRequest: () => { user?: unknown } } },
+            ) => ctx.switchToHttp().getRequest().user,
+        ),
+    };
+});
 
+import { ValidationPipe } from '@nestjs/common';
+import { ROUTE_ARGS_METADATA, CUSTOM_ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { WorksController } from './works.controller';
+// APW-01 T18 — the REAL `AppWorkCreateService`, imported by path rather than through
+// `@ever-works/agent/app-works`: that barrel is not what this route's module loads for
+// the create path (`WorkModule` gets it through `AppWorksModule`) and it drags the
+// agent's whole Nest module graph into a controller spec. This one file is the create
+// path the endpoint reaches.
+import { AppWorkCreateService } from '../../../../packages/agent/src/app-works/app-work-create.service';
 import {
     getWorkCategoriesTagsCacheKey,
     getWorkConfigCacheKey,
@@ -127,19 +162,27 @@ function makeStubs(): Stubs {
     };
 }
 
-function makeController(s: Stubs): WorksController {
+/**
+ * Build the controller over the stubs.
+ *
+ * APW-01 T18 added the optional second argument: the App Work cases need the
+ * **real** create path behind `POST works` (and behind `POST works/quick-create`),
+ * because the refusals they assert are the create path's own. Omitting it keeps
+ * every existing call site on the mock, byte for byte.
+ */
+function makeController(s: Stubs, lifecycleService?: unknown): WorksController {
     return new WorksController(
         s.cacheManager as any,
         s.cacheEntryRepository as any,
         s.workQueryService as any,
-        {
+        (lifecycleService ?? {
             createWork: s.workLifecycleService.createWork,
             updateWork: s.workLifecycleService.updateWork,
             deleteWork: s.workLifecycleService.deleteWork,
             // syncFromDataRepository / generationService methods are unused in the
             // CRUD subset covered by this spec; provide placeholders to satisfy DI.
             syncFromDataRepository: jest.fn(),
-        } as any,
+        }) as any,
         {
             generateItems: jest.fn(),
             updateItemsGenerator: jest.fn(),
@@ -663,6 +706,290 @@ describe('WorksController — core CRUD endpoints', () => {
             await expect(controller.deleteWork(auth, 'w-1', {} as any)).resolves.toEqual({
                 status: 'deleted',
             });
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // APW-01 T18 — the create endpoint's App Work coverage
+    // -----------------------------------------------------------------------
+    describe('App Work create (APW-01 T18)', () => {
+        const APP_URL = 'https://github.com/upstream/widgets';
+        const originalFlag = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+
+        /** A creatable `app` body: the mode and the owner are the two fields T18 adds. */
+        const appBody = (overrides: Record<string, unknown> = {}) => ({
+            slug: 'widgets',
+            name: 'Widgets',
+            description: 'A widgets app',
+            kind: 'app',
+            repositoryUrl: APP_URL,
+            repositoryMode: 'fork',
+            targetOwner: 'acme',
+            ...overrides,
+        });
+
+        /**
+         * The seam `POST works` calls, bound to the **real** create path.
+         *
+         * `WorkLifecycleService.createWork` normalises the kind and then delegates to
+         * `AppWorkCreateService.create(dto, user)` — the one-line `app` branch T13 added
+         * (`work-lifecycle.service.ts:334-341`). That class cannot be imported into this
+         * app's jest environment: it reaches `p-map` and `github-slugger` (ESM-only
+         * packages) through the generators, which jest cannot parse — which is why this
+         * spec hand-builds the controller in the first place. Binding the seam to the
+         * service that branch calls keeps **production code**, not a copy of it, behind
+         * every refusal asserted below; the delegation itself is T13's and is what
+         * `packages/agent/src/services/work.module.spec.ts` pins (the module must import
+         * `AppWorksModule` for the branch to resolve at all).
+         */
+        function makeAppCreatePath() {
+            const gitFacade = { getRepository: jest.fn() };
+            const workRepository = {
+                create: jest.fn(),
+                withTransaction: jest.fn(),
+                existsByUserAndSlug: jest.fn().mockResolvedValue(false),
+                findAppWorksByDataRepository: jest.fn().mockResolvedValue([]),
+            };
+            const appWorkCreate = new AppWorkCreateService(
+                // Never reached: every refusal below happens before the inspection.
+                { inspect: jest.fn() } as never,
+                { runExclusive: jest.fn() } as never,
+                gitFacade as never,
+                {} as never,
+                workRepository as never,
+                { create: jest.fn() } as never,
+            );
+
+            return {
+                // The lifecycle seam, with the same `(dto, user)` shape the controller
+                // calls it through.
+                lifecycle: {
+                    createWork: (dto: unknown, user: unknown) =>
+                        appWorkCreate.create(dto as never, user as never),
+                },
+                workRepository,
+                gitFacade,
+                appWorkCreate,
+            };
+        }
+
+        beforeEach(() => {
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+        });
+
+        afterEach(() => {
+            if (originalFlag === undefined) {
+                delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            } else {
+                process.env.EVER_WORKS_APP_WORKS_ENABLED = originalFlag;
+            }
+        });
+
+        it('documents the 409 and 503 an app create adds to POST works', () => {
+            const responses = Reflect.getMetadata(
+                'swagger/apiResponse',
+                WorksController.prototype.createWork,
+            ) as Record<string, { description?: string }>;
+
+            expect(Object.keys(responses).sort()).toEqual(['200', '400', '409', '503']);
+            expect(responses['409'].description).toContain('create_in_progress');
+            expect(responses['409'].description).toContain('app_work_exists');
+            expect(responses['503'].description).toContain('rate_limited');
+        });
+
+        it('carries an app body with its mode and owner through to the service', async () => {
+            const dto = appBody();
+            s.workLifecycleService.createWork.mockResolvedValue({
+                status: 'success',
+                work: { id: 'w-app' },
+            });
+
+            const result = await controller.createWork(auth, dto as any);
+
+            expect(s.workLifecycleService.createWork).toHaveBeenCalledTimes(1);
+            expect(s.workLifecycleService.createWork).toHaveBeenCalledWith(dto, { id: 'user-1' });
+            expect(result).toEqual({ status: 'success', work: { id: 'w-app' } });
+        });
+
+        it('refuses an app body with no repositoryMode at the pipe, naming the field', async () => {
+            // The platform's own pipe (`apps/api/src/main.ts:199-205`) over the DTO the
+            // request is validated against — the real one, not a double: the rejected
+            // field has to be `repositoryMode` because that is what §3.3 declares.
+            const { CreateWorkDto } = jest.requireActual<
+                typeof import('../../../../packages/agent/src/dto/create-work.dto')
+            >('../../../../packages/agent/src/dto/create-work.dto');
+            const pipe = new ValidationPipe({
+                whitelist: true,
+                transform: true,
+                forbidNonWhitelisted: true,
+            });
+            const { repositoryMode: _omitted, ...body } = appBody();
+
+            await expect(
+                pipe.transform(body, { type: 'body', metatype: CreateWorkDto }),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { message: expect.arrayContaining(['repositoryMode must be defined']) },
+            });
+        });
+
+        it('refuses the same body at the create path — which repeats the rule — before any row', async () => {
+            const { lifecycle, workRepository } = makeAppCreatePath();
+            const controllerWithRealPath = makeController(s, lifecycle);
+            const { repositoryMode: _omitted, ...body } = appBody();
+
+            await expect(
+                (controllerWithRealPath as any).createWork(auth, body),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { message: 'repositoryMode must be defined' },
+            });
+
+            expect(workRepository.create).not.toHaveBeenCalled();
+            expect(workRepository.withTransaction).not.toHaveBeenCalled();
+        });
+
+        it('refuses an app create with the instance setting off, before any row and any provider call', async () => {
+            delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            const { lifecycle, workRepository, gitFacade } = makeAppCreatePath();
+            const controllerWithRealPath = makeController(s, lifecycle);
+
+            await expect(
+                (controllerWithRealPath as any).createWork(auth, appBody()),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: {
+                    status: 'error',
+                    code: 'app_works_disabled',
+                    message: 'Creating App Works is turned off on this installation.',
+                },
+            });
+
+            expect(workRepository.create).not.toHaveBeenCalled();
+            expect(gitFacade.getRepository).not.toHaveBeenCalled();
+        });
+
+        it('takes no client input at all, so no header can change that refusal', () => {
+            // ACC-01-13's "whichever client calls it" is a property of the ROUTE: the
+            // handler is handed a session and a body and nothing else, so there is no
+            // User-Agent, no client header and no IP for a decision to depend on.
+            //
+            // Nest keys the parameter metadata by class + method name, and the key names
+            // the parameter's kind: `3:<index>` is `RouteParamtypes.BODY`, and a custom
+            // decorator's key ends with `__customRouteArgs__:<index>` (Nest builds the
+            // prefix from a uid). `@Headers()`, `@Req()`, `@Ip()`, `@Query()` and
+            // `@Param()` would each have to appear here under their own number, and the
+            // handler declares exactly two parameters.
+            const args = Reflect.getMetadata(
+                ROUTE_ARGS_METADATA,
+                WorksController,
+                'createWork',
+            ) as Record<string, { index: number }>;
+
+            expect(WorksController.prototype.createWork.length).toBe(2);
+            expect(Object.keys(args)).toHaveLength(2);
+            expect(Object.keys(args).filter((key) => key.startsWith('3:'))).toEqual(['3:1']);
+            expect(
+                Object.keys(args).filter((key) => key.endsWith(`${CUSTOM_ROUTE_ARGS_METADATA}:0`)),
+            ).toHaveLength(1);
+        });
+
+        it('forwards kind app from quick-create with neither a URL nor a mode', async () => {
+            // quick-create carries no `repositoryUrl` and no `repositoryMode`
+            // (`QuickCreateWorkDto` has neither), which is why the kind can never be
+            // created through it; what this asserts is the shape it forwards.
+            s.authService.getUser.mockResolvedValue({ id: 'user-1' });
+            s.workLifecycleService.createWork.mockResolvedValue({
+                status: 'success',
+                work: { id: 'w-q' },
+            });
+            // The generation leg is not what this test is about — it is the step that runs
+            // after a create succeeded, and `makeController` leaves it bare.
+            (controller as any).workGenerationService = {
+                generateItems: jest.fn().mockResolvedValue({ historyId: 'g-1', message: 'ok' }),
+            };
+
+            await (controller as any).quickCreateWork(auth, {
+                slug: 'widgets',
+                name: 'Widgets',
+                description: 'A widgets app',
+                prompt: 'build me widgets',
+                kind: 'app',
+            });
+
+            const forwarded = s.workLifecycleService.createWork.mock.calls[0][0];
+            expect(forwarded.kind).toBe('app');
+            expect(forwarded.repositoryUrl).toBeUndefined();
+            expect(forwarded.repositoryMode).toBeUndefined();
+            expect(forwarded.targetOwner).toBeUndefined();
+        });
+
+        it('refuses quick-create with kind app before any row, from the real create path', async () => {
+            const { lifecycle, workRepository } = makeAppCreatePath();
+            const controllerWithRealPath = makeController(s, lifecycle);
+
+            await expect(
+                (controllerWithRealPath as any).quickCreateWork(auth, {
+                    slug: 'widgets',
+                    name: 'Widgets',
+                    description: 'A widgets app',
+                    prompt: 'build me widgets',
+                    kind: 'app',
+                }),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { status: 'error', code: 'invalid_url' },
+            });
+
+            expect(workRepository.create).not.toHaveBeenCalled();
+            expect(workRepository.findAppWorksByDataRepository).not.toHaveBeenCalled();
+        });
+
+        it('drops a repositoryUrl the quick-create body carries — the route has no such field', async () => {
+            const { lifecycle, workRepository } = makeAppCreatePath();
+            const controllerWithRealPath = makeController(s, lifecycle);
+
+            // `QuickCreateWorkDto` declares no `repositoryUrl`, and the handler builds its
+            // `CreateWorkDto` field by field, so a URL on the body is dropped before the
+            // create path ever sees it. The refusal is therefore the missing URL — and an
+            // app-kind quick-create can never get as far as the missing mode.
+            await expect(
+                (controllerWithRealPath as any).quickCreateWork(auth, {
+                    slug: 'widgets',
+                    name: 'Widgets',
+                    description: 'A widgets app',
+                    prompt: 'build me widgets',
+                    kind: 'app',
+                    repositoryUrl: APP_URL,
+                }),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { status: 'error', code: 'invalid_url' },
+            });
+
+            expect(workRepository.create).not.toHaveBeenCalled();
+        });
+
+        it('refuses the quick-create shape at the create path with the mode rule once a URL is present', async () => {
+            const { appWorkCreate, workRepository } = makeAppCreatePath();
+            const forwarded = {
+                slug: 'widgets',
+                name: 'Widgets',
+                description: 'A widgets app',
+                kind: 'app',
+                repositoryUrl: APP_URL,
+            };
+
+            // This is the shape the route forwards, plus the URL it cannot carry: the
+            // mode the quick-create body has no field for is what refuses it.
+            await expect(
+                appWorkCreate.create(forwarded as never, {} as never),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { message: 'repositoryMode must be defined' },
+            });
+
+            expect(workRepository.create).not.toHaveBeenCalled();
         });
     });
 });

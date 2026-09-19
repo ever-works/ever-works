@@ -25,9 +25,17 @@ import { EventIngestModule } from '@ever-works/agent/ingest';
 // Campaign activation (roadmap 14.1) — composition module over Works,
 // Goals, Agent templates and Tasks; provides CampaignActivationService.
 import { CampaignsModule } from '@ever-works/agent/campaigns';
+// APW-01 T17 — the App source inspection route. `AppWorksModule` is the only
+// module that provides and exports `AppSourceInspectorService` (T12), so this
+// import is what makes the controller's constructor resolvable at boot. It is
+// the same module `WorkModule` already imports for the create path, and Nest
+// instantiates a module once per graph, so the API still has exactly one
+// inspector — the same instance the create path's step 6 calls.
+import { AppWorksModule as AgentAppWorksModule } from '@ever-works/agent/app-works';
 
 // Controllers
 import { WorksController } from './works.controller';
+import { AppSourceController } from './app-source.controller';
 import { WorkRunsController } from './work-runs.controller';
 import { WorkPullRequestsController } from './work-pull-requests.controller';
 import { MembersController } from './members.controller';
@@ -85,6 +93,13 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // Campaign activation (roadmap 14.1) — CampaignActivationService
         // for POST /api/works/from-campaign-template.
         CampaignsModule,
+        // APW-01 T17 — `AppSourceInspectorService` for
+        // `POST /api/works/app-source/inspect`. The inspector's own
+        // collaborators (`GitFacadeService`, `WorkRepository`,
+        // `DeployFacadeService`, the two unbound ports) come with it: this
+        // module does not re-provide them, so the route and the create path
+        // read the same inspection.
+        AgentAppWorksModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -134,6 +149,10 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
     ],
     controllers: [
         WorksController,
+        // APW-01 T17 — `POST /api/works/app-source/inspect`, the App source
+        // preview the create form and the create path both depend on. Static
+        // and three segments deep, so no `works/:id/...` handler can shadow it.
+        AppSourceController,
         // Wave 4 M3 — per-Work AgentRun summary counts.
         WorkRunsController,
         // Wave 7 feature h (v1) — open PRs across the Work's repos.

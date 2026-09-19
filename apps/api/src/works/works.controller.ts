@@ -339,6 +339,27 @@ export class WorksController {
     @ApiOperation({ summary: 'Create work', description: 'Create a new work' })
     @ApiResponse({ status: 200, description: 'Work created successfully' })
     @ApiResponse({ status: 400, description: 'Invalid input data' })
+    // APW-01 T18 — the two statuses an `app`-kind create adds to this route
+    // (plan §4.2, `plan.md:492-619`). Documentation only: every one of these
+    // is thrown by `AppWorkCreateService` through
+    // `WorkLifecycleService.createWork`, and the body is always
+    // `{ status: 'error', code, message, details? }`.
+    @ApiResponse({
+        status: 409,
+        description:
+            'An App Work create conflicted with something that already exists: `create_in_progress` (the ' +
+            'same upstream is being created right now, plan §4.2 step 7), `in_use_by_another_account` (that ' +
+            'repository is already another account’s App Work, step 6), `app_work_exists` (+ ' +
+            '`details.workId` / `details.workName` when it is the caller’s own, step 8) or ' +
+            '`copy_name_unavailable` (every candidate name for the private copy is taken, step 9).',
+    })
+    @ApiResponse({
+        status: 503,
+        description:
+            'A provider-side problem the caller retries rather than fixes: `rate_limited` (with ' +
+            '`details.retryAfter`, plan §4.2 step 6) or `target_owner_unavailable` (the fork request could ' +
+            'not be completed, step 9).',
+    })
     async createWork(@CurrentUser() auth: AuthenticatedUser, @Body() createWorkDto: CreateWorkDto) {
         const user = await this.authService.getUser(auth.userId);
         return this.workLifecycleService.createWork(createWorkDto, user);
