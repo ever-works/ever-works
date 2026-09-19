@@ -97,3 +97,11 @@ export * from './app-health-poll.task';
 // NOT a Trigger task: it is a plain node process the dev machine and the e2e lane
 // start, and it drains the same exported run functions above from a local queue.
 export * from './app-runtime-local-worker';
+// APW-05 T19 — one prepare of one App Work (plan §7.2). The job that turns a
+// build REQUEST into a build PREPARATION: the workflow file and the branch
+// protection through the plugin, the build values as repository secrets, the
+// §3.1b preparation row, and the requested Builds blocked or dispatched. The
+// runner itself is API-side (it writes rows and publishes events), so the task
+// resolves it over the internal RPC channel — see the file's header for the two
+// registrations that live outside this package.
+export * from './app-build-prepare.task';

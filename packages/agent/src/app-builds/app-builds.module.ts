@@ -1,21 +1,25 @@
 import { Module } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
+import { DatabaseModule } from '../database/database.module';
 import { AppBuildPreparationRepository } from '../database/repositories/app-build-preparation.repository';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import { WorkBuild } from '../entities/work-build.entity';
 import { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
 import { UsageModule } from '../usage/usage.module';
 import { AppBuildPullTokenService } from './app-build-pull-token.service';
-import { AppBuildsService } from './app-builds.service';
+import { AppBuildPrepareRunner } from './app-build-prepare.runner';
+import { APP_BUILD_PREPARE_RUNNER, AppBuildsService } from './app-builds.service';
 
 /**
- * APW-05 T17 — the Builds module.
+ * APW-05 T17 — the Builds module (T19 adds the prepare runner — see below).
  *
- * It provides and exports the two services and the two repositories this epic
- * owns; everything else this service needs is injected `@Optional()` behind a
- * token this epic does not yet have a binder for, so the module compiles and boots
- * on its own (see `AppBuildsService`'s docstring).
+ * It provides and exports the three services, the two repositories and T19's
+ * prepare runner this epic owns; everything else this service needs is injected
+ * `@Optional()` behind a token this epic does not yet have a binder for, so the
+ * module compiles and boots on its own (see `AppBuildsService`'s docstring).
  *
  * ## `TypeOrmModule.forFeature` is the fifth registration point
  *
@@ -38,7 +42,7 @@ import { AppBuildsService } from './app-builds.service';
  * ## What is deliberately NOT bound here
  *
  * `APP_BUILD_PLUGIN_RESOLVER` (T16), `APP_BUILD_PREPARE_DISPATCHER` /
- * `APP_BUILD_WATCH_DISPATCHER` and the two runners (T18-T20),
+ * `APP_BUILD_WATCH_DISPATCHER` (T18), `APP_BUILD_WATCH_RUNNER` (T20),
  * `APP_BUILD_WORK_SOURCE`, `APP_BUILD_SPEC_SOURCE` (APW-03),
  * `APP_BUILD_RUNNER_RECIPE_SOURCE` (APW-07), `APP_BUILD_PLATFORM_SETTINGS_WRITER`
  * (§4.12), `APP_BUILD_EDIT_ACCESS` and `APP_PROVISION_EVENTS_PORT` (APW-04) all
@@ -47,7 +51,35 @@ import { AppBuildsService } from './app-builds.service';
  * for exactly this reason. Each absence has a documented, fail-closed behaviour —
  * `null` plugin ⇒ `pullTokenUnavailable` / no provider call; unbound dispatcher ⇒
  * §7.1's in-process fallback; unbound fingerprints ⇒ `staleInputs`; unbound edit
- * port ⇒ `canEdit: false`.
+ * port ⇒ `canEdit: false`. T19's prepare runner answers three of the same
+ * absences in its own vocabulary, so the two lists agree: `null` plugin ⇒
+ * `pluginUnavailable` and no provider call; unbound APW-07 resolver ⇒
+ * `buildValuesUnavailable`, never a zero-secret sync; unbound work or spec source
+ * ⇒ `workUnavailable` / `specUnavailable`.
+ *
+ * ## T19 — the prepare runner joins them, and its token is bound
+ *
+ * `AppBuildPrepareRunner` is provided and exported beside the service, because
+ * §7.1's null-dispatch fallback is only real when the runner is resolvable: with
+ * the token unbound, `AppBuildsService.dispatchPrepare` would return `false`,
+ * run nothing, and leave every requested Build `queued` forever behind a log
+ * line. Binding it is therefore not "making an unconfigured installation look
+ * configured" — it IS the implementation; its COLLABORATORS are what stay
+ * unbound, and the runner fails closed without them by name.
+ *
+ * The token is bound through a `ModuleRef` factory rather than
+ * `useExisting: AppBuildPrepareRunner`, and that is load-bearing: the runner
+ * injects `AppBuildsService`, which injects
+ * `@Optional() @Inject(APP_BUILD_PREPARE_RUNNER)`, so a plain alias would be a
+ * provider cycle Nest refuses to bootstrap. The lookup happens at call time,
+ * which costs nothing because a dispatch is already asynchronous — the same
+ * de-cycling shape `app-env.resolver.ts:97-116` documents for
+ * `APP_ENV_ENSURE_GENERATED`.
+ *
+ * `DatabaseModule` is imported for `CacheEntry`'s repository, which
+ * `DistributedTaskLockService` injects non-optionally; the lock itself is
+ * provided locally exactly as `AppSpecModule`, `AppWorksModule` and
+ * `CommunityPrModule` provide it.
  */
 @Module({
     imports: [
@@ -55,6 +87,10 @@ import { AppBuildsService } from './app-builds.service';
         // the DataSource the application opened; without it the repositories'
         // `@InjectRepository` has no provider and the API fails at boot.
         TypeOrmModule.forFeature([WorkBuild, WorkBuildPreparation]),
+        // The repository wrappers `DatabaseModule` provides and exports — the
+        // `cache_entries` repository `DistributedTaskLockService` needs above all,
+        // since it injects `@InjectRepository(CacheEntry)` non-optionally.
+        DatabaseModule,
         // The single Activity + event writer of §7.8 needs `ActivityLogService`; the
         // receipt of §7.3 needs `PluginUsageService`. Both modules are leaf imports
         // with respect to this one — neither imports it — so nothing here can become
@@ -65,14 +101,26 @@ import { AppBuildsService } from './app-builds.service';
     providers: [
         AppBuildRepository,
         AppBuildPreparationRepository,
+        // §7.2's `app-build-prepare:<workId>` lock, held for the job's passes.
+        DistributedTaskLockService,
         AppBuildsService,
         AppBuildPullTokenService,
+        AppBuildPrepareRunner,
+        {
+            provide: APP_BUILD_PREPARE_RUNNER,
+            useFactory: (ref: ModuleRef) => ({
+                run: async (payload: unknown) =>
+                    (await ref.get(AppBuildPrepareRunner)).run(payload as never),
+            }),
+            inject: [ModuleRef],
+        },
     ],
     exports: [
         AppBuildRepository,
         AppBuildPreparationRepository,
         AppBuildsService,
         AppBuildPullTokenService,
+        AppBuildPrepareRunner,
     ],
 })
 export class AppBuildsModule {}
