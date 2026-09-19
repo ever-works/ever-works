@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1617 · absent: 1050 · of the absent, another task says it creates them: 713
+present: 1623 · absent: 1044 · of the absent, another task says it creates them: 711
 
-## LANDED SURFACE — marked "new", already in the repository (237)
+## LANDED SURFACE — marked "new", already in the repository (239)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -215,6 +215,8 @@ present: 1617 · absent: 1050 · of the absent, another task says it creates the
 - APW-12-ever-id T6 — `packages/plugins/oidc-identity/src/discovery.ts`
 - APW-12-ever-id T6 — `packages/plugins/oidc-identity/src/__tests__/test-connection.spec.ts`
 - APW-12-ever-id T7 — `packages/plugins/oidc-identity/src/__tests__/authorization-request.spec.ts`
+- APW-12-ever-id T8 — `packages/plugins/oidc-identity/src/testing/fake-oidc-provider.ts`
+- APW-12-ever-id T8 — `packages/plugins/oidc-identity/src/__tests__/access-token.spec.ts`
 - APW-13-golden-paths T1 — `apps/web/e2e/fakes/github-fake/fixtures/README.md`
 - APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/server.mjs`
 - APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/__tests__/server.unit.spec.ts`
@@ -255,7 +257,7 @@ present: 1617 · absent: 1050 · of the absent, another task says it creates the
 | ---- | ----- | --------------------------------- | ------------ | ----- |
 | APW-01-app-work-kind | 58 | 9 | 6 | 44 |
 | APW-02-fork-lifecycle | 47 | 19 | 15 | 53 |
-| APW-03-app-spec-and-catalog | 129 | 17 | 13 | 59 |
+| APW-03-app-spec-and-catalog | 125 | 17 | 13 | 59 |
 | APW-04-app-provisioner | 122 | 12 | 5 | 60 |
 | APW-05-builds | 74 | 13 | 13 | 48 |
 | APW-06-app-runtime | 144 | 49 | 27 | 73 |
@@ -264,21 +266,21 @@ present: 1617 · absent: 1050 · of the absent, another task says it creates the
 | APW-09-upstream-pull-requests | 91 | 4 | 4 | 46 |
 | APW-10-apps-hosting-tier | 149 | 4 | 2 | 53 |
 | APW-11-app-launcher | 72 | 47 | 21 | 33 |
-| APW-12-ever-id | 121 | 7 | 5 | 53 |
+| APW-12-ever-id | 121 | 9 | 6 | 53 |
 | APW-13-golden-paths | 92 | 33 | 24 | 73 |
 
-Landed tasks **156 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
+Landed tasks **157 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
 
-## ABSENT PATHS (1050) — grouped by epic
+## ABSENT PATHS (1044) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
 - APW-10-apps-hosting-tier: 145
 - APW-08-evolve-loop: 120
-- APW-12-ever-id: 114
-- APW-03-app-spec-and-catalog: 112
+- APW-12-ever-id: 112
 - APW-04-app-provisioner: 110
+- APW-03-app-spec-and-catalog: 108
 - APW-06-app-runtime: 95
 - APW-09-upstream-pull-requests: 87
 - APW-05-builds: 61
