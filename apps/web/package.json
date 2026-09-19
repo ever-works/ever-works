@@ -18,6 +18,7 @@
         "help:check": "node scripts/build-help-catalog.mjs --check",
         "boundary:check": "node scripts/check-server-client-boundary.mjs --skip-component-renders",
         "boundary:check:all": "node scripts/check-server-client-boundary.mjs",
+        "boundary:barrels": "node scripts/check-server-client-boundary.mjs --follow-barrels --skip-component-renders",
         "boundary:test": "node --test scripts/check-server-client-boundary.spec.mjs",
         "type-check": "tsc --noEmit",
         "start": "next start",

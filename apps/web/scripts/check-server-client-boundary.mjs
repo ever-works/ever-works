@@ -715,7 +715,7 @@ function walk(rootDir) {
 // The check
 // ---------------------------------------------------------------------------
 
-export function analyze({ root, tsconfig } = {}) {
+export function analyze({ root, tsconfig, followBarrels = false } = {}) {
     // The default root is resolved **relative to this script**, not to the
     // current working directory.
     //
@@ -763,20 +763,52 @@ export function analyze({ root, tsconfig } = {}) {
             if (statement.bindings.length === 0) continue;
             const target = project.resolveSpecifier(statement.specifier, file);
             if (!target) continue;
-            if (!project.isClient(target)) continue;
 
-            const bindings = statement.bindings.join(', ');
-            if (isAllowlisted(file, target, statement.bindings)) continue;
-            project.stats.crossBoundary += 1;
+            // (a) The imported module carries the directive itself.
+            if (project.isClient(target)) {
+                const bindings = statement.bindings.join(', ');
+                if (isAllowlisted(file, target, statement.bindings)) continue;
+                project.stats.crossBoundary += 1;
+                violations.push({
+                    file,
+                    line: statement.line,
+                    bindings,
+                    target,
+                    hint: reexportHint(project, target, statement.bindings),
+                    bindingList: statement.bindings,
+                    statementLine: statement.line,
+                    statementEndLine: statement.endLine,
+                });
+                continue;
+            }
+
+            // (b) One or more barrels deep, opt-in because it is the noisier rule.
+            if (!followBarrels) continue;
+            const wanted = statement.bindings.map(importedName).filter(Boolean);
+            if (wanted.length !== statement.bindings.length) continue; // a namespace import
+            const route = clientOriginThroughBarrels(project, target, wanted);
+            if (!route) continue;
+            if (isAllowlisted(file, route.target, route.bindings)) continue;
+            project.stats.barrelCrossBoundary = (project.stats.barrelCrossBoundary ?? 0) + 1;
             violations.push({
                 file,
                 line: statement.line,
-                bindings,
-                target,
-                hint: reexportHint(project, target, statement.bindings),
-                bindingList: statement.bindings,
+                bindings: statement.bindings.join(', '),
+                target: route.target,
+                barrel: route.via ?? displayPath(target),
+                hint: [
+                    `the value crosses the boundary through ${route.hops} barrel re-export` +
+                        `${route.hops === 1 ? '' : 's'} starting at ${displayPath(target)}` +
+                        `${route.star ? ' (`export *`, so which names come from the client module cannot be decided statically)' : ''}`,
+                    route.star
+                        ? 'import the binding directly from a server-safe module, or move it out of the client module'
+                        : `\`${route.bindings.join(', ')}\` is re-exported from the client module ${displayPath(route.target)} — import it where it lives, or give the barrel a server-safe source`,
+                ],
+                bindingList: route.star ? statement.bindings : route.bindings,
                 statementLine: statement.line,
                 statementEndLine: statement.endLine,
+                viaBarrel: displayPath(target),
+                barrelHops: route.hops,
             });
         }
     }
@@ -804,6 +836,129 @@ function reexportHint(project, clientTarget, bindings) {
         }
     }
     return hints;
+}
+
+/**
+ * The name an `import` binding asks the SOURCE module for.
+ *
+ * `import { a as b } from 'x'` → `a` (`b` is only the local alias), so a barrel
+ * lookup must be done under the name the barrel is expected to EXPORT.
+ * A namespace import (`* as ns`) asks for the whole module object and cannot be
+ * attributed to one exported name, so it answers `null` and the caller skips it
+ * rather than guessing.
+ */
+function importedName(binding) {
+    if (binding === '*' || binding.startsWith('* as ')) return null;
+    const asMatch = /^(.+?)\s+as\s+([A-Za-z_$][\w$]*)$/.exec(binding);
+    return asMatch ? asMatch[1] : binding;
+}
+
+/** The name an `export … from` binding ADVERTISES to importers. */
+function exportedName(binding) {
+    if (binding === '*') return '*';
+    if (binding.startsWith('* as ')) return binding.slice('* as '.length);
+    const asMatch = /^(.+?)\s+as\s+([A-Za-z_$][\w$]*)$/.exec(binding);
+    return asMatch ? asMatch[2] : binding;
+}
+
+/** How far a barrel chain is followed before the tool gives up and says nothing. */
+const MAX_BARREL_HOPS = 3;
+
+/**
+ * Does `modulePath` itself DECLARE `name`? Used only for the `export *` case.
+ *
+ * `export * from './x'` re-exports whatever `./x` declares, so an importer's
+ * `import { sanitizeText } from './utils'` COULD be coming from a client module
+ * that the barrel star-re-exports. It usually is not: a utils barrel typically
+ * star-re-exports several modules, and the name is declared by a plain sibling.
+ *
+ * The first version of this mode skipped that check and reported four **false
+ * positives** on this very tree — `sanitizeText` (declared in the plain
+ * `./sanitize.ts`), `isValidRedirectUrl` and `addSessionTokenToUrl` (both in the
+ * plain `./url.ts`) were all attributed to the one client module in the barrel,
+ * `./refresh-page.ts`, which declares only `pageIntervalRefresh`. Over-reporting
+ * in a guard is not harmless: it is how a real signal gets ignored. So an
+ * `export *` route is claimed only when the client module genuinely declares the
+ * name.
+ *
+ * Regex-based on purpose: this file parses module BOUNDARIES, and a full
+ * declaration parser would be a second compiler to keep correct. The three
+ * patterns cover every form this repo uses, and a miss here only ever means a
+ * quieter report, never a wrong one.
+ */
+function moduleDeclaresName(project, modulePath, name) {
+    let source;
+    try {
+        source = project.read(modulePath);
+    } catch {
+        return false;
+    }
+
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return [
+        new RegExp(`\\bexport\\s+(?:async\\s+)?(?:function|const|let|var|class)\\s+${escaped}\\b`),
+        new RegExp(`\\bexport\\s*\\{[^}]*\\b${escaped}\\b[^}]*\\}`),
+        new RegExp(`\\bexport\\s+default\\s+${escaped}\\b`),
+    ].some((pattern) => pattern.test(source));
+}
+
+/**
+ * The one remaining hiding place for the C22/C27 defect, and it is opt-in
+ * (`--follow-barrels`) because the honest answer on a real tree is noisier.
+ *
+ * Both instances found so far imported the value **directly** from the client
+ * module, which the default rule catches. A value can also cross the boundary
+ * through a **barrel**: a plain module (no directive) that does
+ * `export { X } from './client-module'`, or `export * from './client-module'`.
+ * The importing module is then server-labelled, its target is server-labelled,
+ * the direct rule stays silent — and the server render still receives a client
+ * reference, because the boundary is the module that CARRIES the directive, not
+ * the one that re-exports it.
+ *
+ * `wanted` holds the names as the module at `modulePath` is expected to export
+ * them. Answers `{ target, bindings, star, hops }` for the first client module
+ * found, or `null`.
+ *
+ * Deliberate limits, stated rather than hidden: an explicit re-export wins over
+ * an `export *` in the same barrel (the tool does not resolve that precedence),
+ * a namespace import is never attributed, and a chain longer than
+ * `MAX_BARREL_HOPS` is dropped — a silent miss, but a bounded one.
+ */
+function clientOriginThroughBarrels(project, modulePath, wanted, seen = new Set(), depth = 0) {
+    if (depth >= MAX_BARREL_HOPS || seen.has(modulePath) || wanted.length === 0) return null;
+    seen.add(modulePath);
+
+    for (const statement of project.moduleStatements(modulePath)) {
+        if (statement.form !== 'export' || statement.typeOnly) continue;
+        const target = project.resolveSpecifier(statement.specifier, modulePath);
+        if (!target) continue;
+
+        const star = statement.bindings.includes('*');
+        const pairs = statement.bindings.map((binding) => ({
+            exported: exportedName(binding),
+            source: importedName(binding),
+        }));
+        // `export *` re-exports whatever the target declares — so for a star the
+        // name is only claimed when the target really declares it (see
+        // `moduleDeclaresName`, which exists because the first version of this
+        // mode reported four false positives without it).
+        const matched = star
+            ? wanted
+                  .filter((name) => moduleDeclaresName(project, target, name))
+                  .map((name) => ({ exported: name, source: name }))
+            : pairs.filter((pair) => wanted.includes(pair.exported));
+        if (matched.length === 0) continue;
+
+        const nextWanted = matched.map((pair) => pair.source).filter(Boolean);
+        if (project.isClient(target)) {
+            return { target, bindings: nextWanted, star, hops: depth + 1 };
+        }
+
+        const deeper = clientOriginThroughBarrels(project, target, nextWanted, seen, depth + 1);
+        if (deeper) return { ...deeper, hops: deeper.hops + 1 };
+    }
+
+    return null;
 }
 
 function isAllowlisted(file, target, bindings) {
@@ -875,6 +1030,7 @@ function parseArgs(argv) {
         stats: false,
         verbose: false,
         skipComponentRenders: false,
+        followBarrels: false,
         help: false,
         root: undefined,
         tsconfig: undefined,
@@ -885,6 +1041,7 @@ function parseArgs(argv) {
         else if (arg === '--stats') options.stats = true;
         else if (arg === '--verbose' || arg === '-v') options.verbose = true;
         else if (arg === '--skip-component-renders') options.skipComponentRenders = true;
+        else if (arg === '--follow-barrels') options.followBarrels = true;
         else if (arg === '--help' || arg === '-h') options.help = true;
         else if (arg === '--root') options.root = argv[(i += 1)];
         else if (arg.startsWith('--root=')) options.root = arg.slice('--root='.length);
@@ -907,6 +1064,10 @@ const USAGE = `Usage: node apps/web/scripts/check-server-client-boundary.mjs [op
                      exclusively as JSX element names (the one usage that is
                      always legal across the boundary). Opt-in; the default
                      report is the full value-import rule.
+  --follow-barrels   ALSO report a value that crosses the boundary through one or
+                     more barrel re-exports (\`export { X } from './client'\`, or
+                     \`export * from './client'\`), up to 3 hops. Opt-in and NOT
+                     part of the gate: the default rule stays the direct one.
   --stats            print scan statistics to stderr
   -h, --help         show this message
 
@@ -960,6 +1121,8 @@ function main(argv) {
         bindings: v.bindings,
         target: displayPath(v.target),
         hint: v.hint,
+        viaBarrel: v.viaBarrel,
+        barrelHops: v.barrelHops,
     }));
 
     if (options.json) {
@@ -978,7 +1141,8 @@ function main(argv) {
     } else {
         for (const v of printable) {
             process.stdout.write(
-                `${v.file}:${v.line} imports ${v.bindings} from client module ${v.target}\n`,
+                `${v.file}:${v.line} imports ${v.bindings} from client module ${v.target}` +
+                    `${v.viaBarrel ? ` via barrel ${v.viaBarrel} (${v.barrelHops} hop${v.barrelHops === 1 ? '' : 's'})` : ''}\n`,
             );
             if (options.verbose) {
                 for (const hint of v.hint) process.stdout.write(`    \u21b3 note: ${hint}\n`);

@@ -635,7 +635,7 @@ export const value = formatLabel('x');
 // KNOWN BLIND SPOT — pinned so a future change to it is a deliberate one
 // ---------------------------------------------------------------------------
 
-test('KNOWN BLIND SPOT: a server barrel re-exporting a client module is not followed', (t) => {
+test('KNOWN BLIND SPOT: a server barrel re-exporting a client module is not followed by default', (t) => {
     const fixture = makeFixture(t, {
         'lib/labels.tsx': CLIENT_MODULE,
         'lib/index.ts': `export { formatLabel } from './labels';
@@ -650,7 +650,157 @@ export const value = formatLabel('x');
     assert.equal(
         result.status,
         0,
-        'barrels are not chased: re-exporting Client Components from an index is legal and everywhere',
+        'barrels are not chased by DEFAULT: re-exporting Client Components from an index is legal and everywhere',
     );
     assert.deepEqual(result.json, []);
+
+    // The blind spot is closable on demand. Pinned in both directions so neither
+    // the default's silence nor the flag's report can change unnoticed.
+    const chased = json(fixture.src, ['--follow-barrels']);
+    assert.equal(chased.status, 1, '--follow-barrels must report the same route');
+    assert.equal(chased.json.length, 1);
+    assert.deepEqual(chased.json[0], {
+        file: fixture.path('app/page.tsx'),
+        line: 1,
+        bindings: 'formatLabel',
+        target: fixture.path('lib/labels.tsx'),
+    });
+});
+
+// ---------------------------------------------------------------------------
+// --follow-barrels — the opt-in rule that closes the C22/C27 blind spot
+// ---------------------------------------------------------------------------
+
+test('(barrel-1) a named re-export through a barrel is reported when asked', (t) => {
+    const fixture = makeFixture(t, {
+        'lib/labels.tsx': CLIENT_MODULE,
+        'lib/barrel.ts': `export { formatLabel } from './labels';
+`,
+        'app/page.tsx': `import { formatLabel } from '../lib/barrel';
+
+export const value = formatLabel('x');
+`,
+    });
+
+    const result = json(fixture.src, ['--follow-barrels']);
+    assert.equal(result.status, 1);
+    assert.equal(result.json.length, 1);
+    assert.equal(result.json[0].target, fixture.path('lib/labels.tsx'));
+    assert.equal(result.json[0].line, 1);
+});
+
+test('(barrel-2) an ALIASED re-export is followed by the name each side uses', (t) => {
+    const fixture = makeFixture(t, {
+        // The client module exports `formatLabel`; the barrel advertises it as
+        // `renderLabel`, and the importer asks for `renderLabel`.
+        'lib/labels.tsx': CLIENT_MODULE,
+        'lib/barrel.ts': `export { formatLabel as renderLabel } from './labels';
+`,
+        'app/page.tsx': `import { renderLabel } from '../lib/barrel';
+
+export const value = renderLabel('x');
+`,
+    });
+
+    const result = json(fixture.src, ['--follow-barrels']);
+    assert.equal(result.status, 1, 'the alias mapping must be followed');
+    assert.equal(result.json.length, 1);
+    assert.equal(result.json[0].target, fixture.path('lib/labels.tsx'));
+});
+
+test('(barrel-3) TWO barrels deep is still reported', (t) => {
+    const fixture = makeFixture(t, {
+        'lib/labels.tsx': CLIENT_MODULE,
+        'lib/inner.ts': `export { formatLabel } from './labels';
+`,
+        'lib/outer.ts': `export { formatLabel } from './inner';
+`,
+        'app/page.tsx': `import { formatLabel } from '../lib/outer';
+
+export const value = formatLabel('x');
+`,
+    });
+
+    const result = json(fixture.src, ['--follow-barrels']);
+    assert.equal(result.status, 1);
+    assert.equal(result.json.length, 1);
+    assert.equal(result.json[0].target, fixture.path('lib/labels.tsx'));
+});
+
+test('(barrel-4) `export *` is claimed ONLY when the client module declares the name', (t) => {
+    // This is the false positive the first version of the mode produced on the
+    // real tree: a utils barrel star-re-exports several modules, one of them a
+    // client module, and a name declared by a PLAIN SIBLING was attributed to the
+    // client module (`sanitizeText` → `./refresh-page.ts`, which declares only
+    // `pageIntervalRefresh`). Over-reporting is how a real signal gets ignored, so
+    // the star case verifies the declaration.
+    //
+    // Note the client module here is written inline and declares a DIFFERENT name
+    // from the plain sibling: reusing `CLIENT_MODULE` would declare `formatLabel`
+    // too and quietly turn this case into its own positive control.
+    const files = {
+        'lib/client-only.tsx': `'use client';
+
+export function clientOnly(value: string): string {
+    return value;
+}
+`,
+        'lib/plain.ts': `export function formatLabel(value: string): string {
+    return value;
+}
+`,
+        'lib/index.ts': `export * from './client-only';
+export * from './plain';
+`,
+    };
+
+    const notDeclaredByClient = makeFixture(t, {
+        ...files,
+        'app/plain-user.tsx': `import { formatLabel } from '../lib';
+
+export const value = formatLabel('x');
+`,
+    });
+
+    const result = json(notDeclaredByClient.src, ['--follow-barrels']);
+    assert.deepEqual(
+        result.json,
+        [],
+        'a name the client module does NOT declare is not a client value, even through a star barrel',
+    );
+    assert.equal(result.status, 0);
+
+    // Positive control in the same fixture shape: the name the client module DOES
+    // declare is still reported through the same star barrel.
+    const declaredByClient = makeFixture(t, {
+        ...files,
+        'app/uses-client-only.tsx': `import { clientOnly } from '../lib';
+
+export const value = clientOnly('x');
+`,
+    });
+
+    const positive = json(declaredByClient.src, ['--follow-barrels']);
+    assert.equal(positive.status, 1, 'the star route must still be reported when it is real');
+    assert.equal(positive.json.length, 1);
+    assert.equal(positive.json[0].target, declaredByClient.path('lib/client-only.tsx'));
+});
+
+test('(barrel-5) a NAMESPACE import from a barrel is not attributed (documented limit)', (t) => {
+    const fixture = makeFixture(t, {
+        'lib/labels.tsx': CLIENT_MODULE,
+        'lib/barrel.ts': `export { formatLabel } from './labels';
+`,
+        'app/page.tsx': `import * as utils from '../lib/barrel';
+
+export const value = utils.formatLabel('x');
+`,
+    });
+
+    const result = json(fixture.src, ['--follow-barrels']);
+    assert.equal(
+        result.status,
+        0,
+        'a namespace import asks for the whole module object, so no single name can be attributed',
+    );
 });
