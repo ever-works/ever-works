@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { CalendarClock, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { getSchedulePage, getScheduleHealth } from '@/app/actions/dashboard/schedules';
 import type { ScheduleEntry, ScheduleHealthSummary, SchedulePage } from '@/lib/api/schedules';
-import { PageHeader } from '@/components/common/PageHeader';
+import { ActivityViewHeader } from '@/components/activity-log/ActivityViewHeader';
 import { ScheduleHealthBanner } from './ScheduleHealthBanner';
 import { ScheduleWorkspaceRow } from './ScheduleWorkspaceRow';
 import { SchedulesCreateMenu } from './SchedulesCreateMenu';
@@ -250,19 +250,16 @@ export function SchedulesWorkspace({
         void loadHealth();
     };
 
-    // A SECTION header, not a page header: this list is the Schedules view of
-    // the Activity page, whose own `h1` is above it. The subtitle and the icon
-    // tile are the ones the standalone page carried; the button that used to
-    // link back to Activity is now "Create", because linking to the page this
-    // list already lives on was a self-link.
+    // The SECTION header every Activity view carries — the Live Feed's own,
+    // small enough to sit under the page's `h1` instead of competing with it.
+    // The button on its right is "Create"; the one that used to link back to
+    // Activity is gone, because linking to the page this list already lives on
+    // was a self-link.
     const header = (
-        <PageHeader
-            icon={CalendarClock}
-            as="h2"
+        <ActivityViewHeader
             title={t('title')}
             subtitle={t('pageSubtitle')}
-            tone="primary"
-            actions={<SchedulesCreateMenu onNewTrigger={() => createTriggerRef?.current?.()} />}
+            aside={<SchedulesCreateMenu onNewTrigger={() => createTriggerRef?.current?.()} />}
         />
     );
 
