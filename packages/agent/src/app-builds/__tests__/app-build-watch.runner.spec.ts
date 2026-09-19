@@ -207,24 +207,28 @@ function rowsRepository(store: Map<string, WorkBuild>): Repository<WorkBuild> {
                         }
                         // `… WHERE id = :id AND (status NOT IN (:...terminal) OR "completedAt" IS NULL)`
                         //
-                        // The predicate is EVALUATED from the text it was given, not
-                        // assumed: a claim whose SQL says something else is either
-                        // honoured (the `IS NOT NULL` variant, which is what a mutant
-                        // writes) or REFUSED loudly below. A fake that quietly kept
-                        // enforcing the original predicate would make an
-                        // exactly-once mutant pass for the wrong reason.
+                        // The predicate is EVALUATED from the text it was given, arm by
+                        // arm, and not assumed: it holds when EITHER arm does, so the
+                        // clock arm's own text decides whether a terminal row is claimed
+                        // (`IS NULL` — the owner's cancel, ACC-05-09 — or `IS NOT NULL`,
+                        // which is what a mutant writes). A shape neither arm models is
+                        // refused LOUDLY: a fake that quietly kept enforcing the original
+                        // predicate would let an exactly-once mutant pass for the wrong
+                        // reason.
                         if (sql.includes('status NOT IN')) {
                             const inTerminal = (params.terminal as string[]).includes(row.status);
-                            const nullClock = sql.includes('completedAt IS NULL');
-                            const setClock = sql.includes('completedAt IS NOT NULL');
-                            if (!nullClock && !setClock) {
+                            const nullArm = sql.includes('completedAt IS NULL');
+                            const setArm = sql.includes('completedAt IS NOT NULL');
+                            if (!nullArm && !setArm) {
                                 throw new Error(
                                     `rowsRepository: the terminal claim's predicate cannot be modelled: ${sql}`,
                                 );
                             }
-                            const refuses = (inTerminal && nullClock) || (!inTerminal && setClock);
-                            if (refuses) return { affected: 0 };
-                            continue;
+                            const clockArm = nullArm ? !row.completedAt : Boolean(row.completedAt);
+                            if (!inTerminal || clockArm) {
+                                continue;
+                            }
+                            return { affected: 0 };
                         }
                         if (sql !== 'id = :id') {
                             throw new Error(`rowsRepository: unrecognised claim predicate: ${sql}`);
