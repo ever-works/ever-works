@@ -6,6 +6,23 @@
  * first out of the module it imports from `src/index.ts`.
  */
 export { default, OidcIdentityPlugin } from './oidc-identity.plugin.js';
+// APW-12 T7 — the FR-9/FR-11/FR-2 numbers the sign-in flow enforces, exported so a
+// spec can pin them against `EVER_ID_LIMITS` off disk (the pattern T6 used for
+// FR-13's three numbers) and so the API's `/client-config` (FR-39) reads the scope
+// string from the place the request is built with it.
+export {
+	OIDC_CODE_VERIFIER_BYTES,
+	OIDC_CODE_VERIFIER_LENGTH,
+	OIDC_DEFAULT_CLOCK_SKEW_SECONDS,
+	OIDC_ID_TOKEN_MAX_AGE_SECONDS,
+	OIDC_NONCE_BYTES,
+	OIDC_STATE_BYTES,
+	OIDC_SUBJECT_MAX_LENGTH
+} from './oidc-identity.plugin.js';
+// APW-12 T7 — the sign-in scopes (plan §4.2, FR-38): `openid email profile`, and
+// never `offline_access`.
+export { OIDC_NEVER_REQUESTED_SCOPES, OIDC_SIGN_IN_SCOPE, OIDC_SIGN_IN_SCOPES, isSignInScope } from './scopes.js';
+export type { OidcNeverRequestedScope, OidcSignInScope } from './scopes.js';
 export {
 	OIDC_IDENTITY_SETTING_KEYS,
 	oidcIdentityHttpsUrlPattern,
@@ -37,13 +54,17 @@ export {
 	OIDC_OUTBOUND_RETRY_DELAY_MS,
 	OIDC_OUTBOUND_TIMEOUT_MS,
 	OidcDiscoveryReader,
-	OidcProviderUnavailableError
+	OidcProviderUnavailableError,
+	// APW-12 T7 — FR-15's single-attempt request, for the one call that is never
+	// retried (the token endpoint, plan §4.2's `authorizationCodeGrant` half).
+	fetchJsonOnce
 } from './discovery.js';
 export type {
 	OidcDiscoveryDocument,
 	OidcDiscoveryFailure,
 	OidcDiscoveryRead,
 	OidcFetchImpl,
+	OidcFetchInit,
 	OidcHttpResponse,
 	OidcOutboundFailure,
 	OidcProviderUnavailableReason,

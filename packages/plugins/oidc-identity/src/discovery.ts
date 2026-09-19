@@ -169,6 +169,25 @@ export interface OidcHttpResponse {
 }
 
 /**
+ * What this module hands the fetch seam.
+ *
+ * `signal` and `headers` are what T6 needed; `method` and `body` were added by
+ * **T7**, because the code exchange is the one call that is not a GET — and a
+ * spec that cannot see the request it is asserting on cannot prove FR-15's
+ * `client_secret_basic`, the four form fields of RFC 6749 §4.1.3 or the absence
+ * of a retry. Both are optional and both default to a bodyless GET, so every
+ * T6 fake that ignores them keeps compiling and keeps its behaviour.
+ */
+export interface OidcFetchInit {
+	readonly signal: AbortSignal;
+	readonly headers: Record<string, string>;
+	/** The HTTP method; the callers that pass one pass `POST`. Defaults to a GET. */
+	readonly method?: string;
+	/** The already-encoded request body, sent only when present. */
+	readonly body?: string;
+}
+
+/**
  * The seam every outbound call goes through.
  *
  * Optional everywhere it is used, and defaulting to the runtime's `fetch`: the
@@ -177,19 +196,31 @@ export interface OidcHttpResponse {
  * `new PluginClass()`), so an injected fetch is a test's business and never a
  * production requirement.
  */
-export type OidcFetchImpl = (
-	url: string,
-	init: { readonly signal: AbortSignal; readonly headers: Record<string, string> }
-) => Promise<OidcHttpResponse>;
+export type OidcFetchImpl = (url: string, init: OidcFetchInit) => Promise<OidcHttpResponse>;
 
 /** The runtime `fetch`, adapted to {@link OidcFetchImpl} so no call site casts. */
 export const oidcDefaultFetch: OidcFetchImpl = (url, init) => fetch(url, init);
 
-/** One JSON GET. */
+/** One JSON request. */
 export interface OidcOutboundRequest {
 	readonly url: string;
 	/** Extra headers; `accept: application/json` is always sent. */
 	readonly headers?: Record<string, string>;
+	/**
+	 * The HTTP method. Absent means a GET — the discovery read and the key fetch
+	 * (FR-3, FR-13). T7's code exchange passes `POST`, the one call that is not.
+	 */
+	readonly method?: string;
+	/** The request body, encoded by the caller; sent only when present. */
+	readonly body?: string;
+	/**
+	 * Sent as `content-type` when a body is sent.
+	 *
+	 * The token endpoint of RFC 6749 §4.1.3 takes
+	 * `application/x-www-form-urlencoded`; a provider that checks the header — as
+	 * ZITADEL and Keycloak both do — answers `415` without it.
+	 */
+	readonly contentType?: string;
 }
 
 /** Every injectable knob of an outbound call. */
@@ -226,6 +257,44 @@ export interface OidcOutboundResult {
 	readonly failure?: OidcOutboundFailure;
 	/** How many attempts were started — 1 or 2 (FR-15). */
 	readonly attempts: number;
+}
+
+/**
+ * One request, **never retried** — FR-15's "the code exchange is never retried".
+ *
+ * Same per-attempt bound as {@link fetchJsonWithOneRetry}
+ * ({@link OIDC_OUTBOUND_TIMEOUT_MS}, on a `setTimeout` so an injected clock and
+ * vitest's fake timers can drive it) and the same never-rejects contract, but a
+ * single attempt by construction rather than by option: a security-relevant
+ * "no second try" is safer as a different function than as a flag a caller can
+ * pass wrongly. FR-15 gives the token endpoint 5,000 ms and one attempt, and
+ * this is that rule.
+ *
+ * `deadlineAt` is honoured when a caller passes one, and reports how many
+ * attempts had started when the bound was reached — `1` once the request is in
+ * flight, `0` if it never was.
+ */
+export async function fetchJsonOnce(
+	request: OidcOutboundRequest,
+	options: OidcOutboundOptions = {}
+): Promise<OidcOutboundResult> {
+	const now = options.now ?? Date.now;
+	const startedAt = now();
+	const attempts = { count: 0 };
+	const work = (async (): Promise<OidcOutboundResult> => {
+		attempts.count += 1;
+		return {
+			...(await readJsonOnce(
+				request,
+				options.fetchImpl ?? oidcDefaultFetch,
+				options.timeoutMs ?? OIDC_OUTBOUND_TIMEOUT_MS
+			)),
+			attempts: attempts.count
+		};
+	})();
+	if (options.deadlineAt === undefined) return work;
+	const remaining = Math.max(0, options.deadlineAt - startedAt);
+	return settleWithin(work, remaining, () => ({ ok: false, failure: 'timeout', attempts: attempts.count }));
 }
 
 /**
@@ -314,7 +383,13 @@ async function readJsonOnce(
 	try {
 		const response = await fetchImpl(request.url, {
 			signal: controller.signal,
-			headers: { accept: 'application/json', ...request.headers }
+			method: request.method ?? 'GET',
+			...(request.body === undefined ? {} : { body: request.body }),
+			headers: {
+				accept: 'application/json',
+				...(request.contentType === undefined ? {} : { 'content-type': request.contentType }),
+				...request.headers
+			}
 		});
 		if (!response || typeof response.status !== 'number' || response.ok !== true) {
 			return { ok: false, failure: 'httpStatus', status: response?.status };
