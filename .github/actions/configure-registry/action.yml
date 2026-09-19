@@ -159,8 +159,8 @@ runs:
           #
           # This sets the DEFAULT registry only. It does not affect publishing: publish-cli.yml
           # publishes from apps/*/dist (a different npm prefix, so this file is not read at all),
-          # and publish-plugins.yml passes an explicit --registry to every `pnpm publish`, which
-          # is a CLI flag and outranks any .npmrc.
+          # and publish-plugins.yml runs on a GitHub-hosted runner without this action; its release
+          # script passes an explicit --registry to every `npm publish`, which outranks any .npmrc.
           echo "registry=$REGISTRY" >> .npmrc
           echo "registry \"$REGISTRY\"" >> .yarnrc
           # No-op in this pnpm repo (there is no yarn.lock), kept so the action keeps working if
