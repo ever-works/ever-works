@@ -1,44 +1,55 @@
-# Changesets — Ever Works plugin releases (EW-693)
+# Changesets — Ever Works npm package releases (EW-693)
 
-Each distributable plugin under `packages/plugins/*` versions
-independently per [EW-693 / FR-7](../docs/specs/features/dynamic-plugin-distribution/spec.md#3-functional-requirements).
+Every package in the npm release — `@ever-works/contracts`, the plugin SDK
+`@ever-works/plugin` and each distributable plugin under `packages/plugins/*`
+— versions independently per
+[EW-693 / FR-7](../docs/specs/features/dynamic-plugin-distribution/spec.md#3-functional-requirements).
 A plugin release does **not** require a platform release.
 
-## Quick start
+## How versions are cut (since 2026-09)
+
+**You usually do nothing.** `.github/workflows/publish-plugins.yml` runs
+`scripts/release-npm-packages.mjs` on every push to `main` (every production
+build). For each package it fingerprints exactly what `npm pack` would ship
+and compares it with the newest published version:
+
+- unchanged → nothing is published;
+- changed → the next **patch** is published automatically (`1.0.4` → `1.0.5`);
+- `package.json` ahead of everything published (a deliberate bump) → that
+  version is published.
+
+Both npmjs.org and GitHub Packages get the same tarball, publicly.
+
+## When you do need a changeset
+
+Only for a deliberate **minor** or **major** bump (a new SDK capability, a
+breaking plugin change):
 
 ```bash
-# 1. Add a changeset describing your plugin change
-pnpm changeset
-
-# 2. Inspect: a markdown file appears under .changeset/
-# Add a one-line summary and pick patch/minor/major per plugin.
-
-# 3. CI handles the rest:
-#    - pnpm changeset version  → bumps versions + writes CHANGELOG.md
-#    - pnpm changeset publish  → publishes to npm + GitHub Packages
-#    Triggered by .github/workflows/publish-plugins.yml on push to main
-#    or manual workflow_dispatch.
+pnpm changeset            # pick the package(s) and minor/major, write a summary
+pnpm changeset version    # applies it: bumps package.json + writes CHANGELOG.md
 ```
+
+Commit both in the same PR. Once it reaches `main`, the release script sees
+`package.json` ahead of the registry and publishes that version.
 
 ## Defaults pinned in `config.json`
 
-- `access: restricted` — plugins publish as **PRIVATE** packages on npm.
-  The user explicitly directed this (2026-06-03): no plugin goes public
-  without case-by-case authorisation. To flip a single plugin to
-  public, override `"access": "public"` on the changeset markdown OR
-  set `publishConfig.access` on that plugin's `package.json` and add
-  a reviewer note.
+- `access: public` — the platform is open source; every package publishes
+  publicly (it was `restricted` from 2026-06-03 until 2026-09).
 - `commit: false` — changesets are NOT auto-committed; they're part of
   the PR.
 - `baseBranch: develop` — release cascade matches the platform release
   flow (`develop → stage → main`).
 - `updateInternalDependencies: patch` — when a workspace dep bumps,
   consuming packages get a patch bump.
-- `ignore` — internal apps (`ever-works-*`) and platform-internal
-  packages (`@ever-works/agent`, `@ever-works/contracts`, …) version
-  with the platform, **not** independently. `@ever-works/plugin` is
-  intentionally NOT in `ignore` — it ships to npm as the SDK consumed
-  by 3rd-party plugin authors.
+- `ignore` — internal apps (`ever-works-*`, `@ever-works/cli`) and
+  platform-internal packages (`@ever-works/agent`, …) version with the
+  platform, **not** independently. `@ever-works/plugin` and
+  `@ever-works/contracts` are intentionally NOT ignored: they ship to npm
+  (the SDK for 3rd-party plugin authors, and the types it and a dozen
+  plugins depend on at runtime). Changesets refuses to load a config that
+  ignores a package that non-ignored packages depend on.
 
 ## Why per-plugin versioning?
 
@@ -61,5 +72,5 @@ correctly per plugin.
 - Spec: `docs/specs/features/dynamic-plugin-distribution/spec.md` — FR-7.
 - Plan: `docs/specs/features/dynamic-plugin-distribution/plan.md` — Phase 3.
 - Tasks: T9 — this config; T10 — `private:false` + `publishConfig`;
-  T11 — `.github/workflows/publish-plugins.yml`; T12 — orchestrator
-  script.
+  T11 — `.github/workflows/publish-plugins.yml`; T12 — release script
+  (now `scripts/release-npm-packages.mjs`).

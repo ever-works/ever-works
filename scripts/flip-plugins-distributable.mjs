@@ -6,7 +6,7 @@
  *
  *   "private": false,
  *   "publishConfig": {
- *     "access": "restricted",
+ *     "access": "public",
  *     "registry": "https://registry.npmjs.org"
  *   },
  *
@@ -16,10 +16,10 @@
  *   node scripts/flip-plugins-distributable.mjs --dry-run  # preview only
  *
  * Distributable = the manifest's resolved `distribution` is `registry`
- * (mirrors `resolvePluginDistribution` from the SDK). Per user
- * directive 2026-06-03, plugins ship as PRIVATE — `publishConfig.access`
- * is hard-coded to `restricted`; flip it to `public` per plugin only
- * after explicit authorisation.
+ * (mirrors `resolvePluginDistribution` from the SDK). Plugins shipped as
+ * private packages from 2026-06-03 until the platform went open source;
+ * since 2026-09 every distributable plugin publishes PUBLICLY, and
+ * scripts/release-npm-packages.mjs enforces that at publish time too.
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
@@ -40,7 +40,7 @@ function resolveDistribution(manifest) {
 }
 
 const expectedPublishConfig = {
-	access: 'restricted',
+	access: 'public',
 	registry: 'https://registry.npmjs.org'
 };
 
