@@ -7035,6 +7035,7 @@
                     "general": "General",
                     "members": "Members",
                     "budgets": "Budgets",
+                    "appSpec": "App spec",
                     "navigationLabel": "Settings tabs"
                 },
                 "budgets": {

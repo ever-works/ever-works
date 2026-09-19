@@ -165,6 +165,11 @@ export const ROUTES = {
     DASHBOARD_WORK_SETTINGS_GENERAL: (id: string) => `/works/${id}/settings`,
     DASHBOARD_WORK_SETTINGS_MEMBERS: (id: string) => `/works/${id}/settings/members`,
     DASHBOARD_WORK_SETTINGS_BUDGETS: (id: string) => `/works/${id}/settings/budgets-usage`,
+    // APW-03 T16 (ACC-03-39) — the fourth Settings sub-tab, offered only to an
+    // App Work (`useWorkDetail().work.kind === 'app'`; plan §5.1:603-607). The
+    // route itself is T17's page; this constant exists so the tab, the page and
+    // `recheckAppSpecAction`'s `revalidatePath` all build the same href.
+    DASHBOARD_WORK_SETTINGS_APP_SPEC: (id: string) => `/works/${id}/settings/app-spec`,
     DASHBOARD_WORK_PLUGINS: (id: string) => `/works/${id}/plugins`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
