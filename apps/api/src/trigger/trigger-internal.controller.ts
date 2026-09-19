@@ -100,6 +100,11 @@ import {
     AppUpstreamSyncDispatcherService,
 } from '@ever-works/agent/app-works';
 import { AppSpecService } from '@ever-works/agent/app-spec';
+// APW-05 T19 + C7 — the `app-build-prepare` runner the worker proxies. The class,
+// not the port of the same name on `./app-builds.service`: the port is T17's
+// provisional seam (`run(payload)`) and is deliberately NOT what the RPC channel
+// publishes, so a worker cannot reach the service's internals through it.
+import { AppBuildPrepareRunner } from '@ever-works/agent/app-builds';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -492,6 +497,15 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly workCustomDomainRepository?: WorkCustomDomainRepository,
         @Optional()
         private readonly distributedTaskLockService?: DistributedTaskLockService,
+        // APW-05 T19 + C7 — the `app-build-prepare` job's runner, so the worker's
+        // RPC call lands here, where the `DataSource` and the Activity writer are.
+        // Appended LAST + `@Optional()` per the arity rule above, exactly as its
+        // siblings are: an unconfigured installation answers the loud
+        // `Unknown remote target: AppBuildPrepareRunner` rather than pretending,
+        // and every positional `new TriggerInternalController(...)` in the specs
+        // keeps compiling.
+        @Optional()
+        private readonly appBuildPrepareRunner?: AppBuildPrepareRunner,
     ) {}
 
     onModuleInit() {
@@ -646,6 +660,11 @@ export class TriggerInternalController implements OnModuleInit {
             WorkDeploymentRepository: this.workDeploymentRepository,
             WorkCustomDomainRepository: this.workCustomDomainRepository,
             DistributedTaskLockService: this.distributedTaskLockService,
+            // APW-05 T19 + C7 — the worker half of `app-build-prepare`. Registered
+            // unconditionally for the same reason every App entry above is: a name
+            // that maps to `undefined` answers a loud "Unknown remote target"
+            // instead of pretending the prepare ran.
+            AppBuildPrepareRunner: this.appBuildPrepareRunner,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

@@ -31,6 +31,14 @@ jest.mock('@ever-works/agent/app-spec', () => ({
     AppSpecService: class AppSpecService {},
     AppSpecModule: class AppSpecModule {},
 }));
+// APW-05 T19 + C7 — same rationale again: the app-builds barrel reaches the build
+// and preparation entities, the Activity writer and the git facade, none of which
+// this suite needs in order to assert that the remote target is registered and
+// reachable. The classes are injection tokens here only.
+jest.mock('@ever-works/agent/app-builds', () => ({
+    AppBuildPrepareRunner: class AppBuildPrepareRunner {},
+    AppBuildsModule: class AppBuildsModule {},
+}));
 // FU-2 post-CI fix: trigger-internal.controller.ts imports the
 // AgentScheduleDispatcherService from `@ever-works/agent/agents` and
 // TaskRecurrenceDispatcherService from `@ever-works/agent/tasks-domain`
@@ -197,6 +205,9 @@ describe('TriggerInternalController', () => {
     let workDeploymentRepository: any;
     let workCustomDomainRepository: any;
     let distributedTaskLockService: any;
+    // APW-05 T19 + C7 — the `app-build-prepare` job's runner, the name the worker
+    // proxies because it owns no `DataSource`.
+    let appBuildPrepareRunner: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -294,6 +305,9 @@ describe('TriggerInternalController', () => {
             workDeploymentRepository,
             workCustomDomainRepository,
             distributedTaskLockService,
+            // APW-05 T19 + C7 — the `app-build-prepare` runner, appended LAST + `@Optional()`
+            // per the arity rule above.
+            appBuildPrepareRunner,
         );
         c.onModuleInit();
         return c;
@@ -363,6 +377,16 @@ describe('TriggerInternalController', () => {
         distributedTaskLockService = {
             name: 'DistributedTaskLockService',
             isLocked: jest.fn((key: string) => key === 'app-health-poll'),
+        };
+        // APW-05 T19 + C7 — the real method the RPC hop must reach (`run`, the one
+        // member `AppBuildPrepareRunnerSeam` declares), not a plausible-looking name.
+        appBuildPrepareRunner = {
+            name: 'AppBuildPrepareRunner',
+            run: jest.fn((payload: { workId: string; reason: string }) => ({
+                status: 'prepared',
+                workId: payload.workId,
+                reason: payload.reason,
+            })),
         };
 
         controller = buildController();
@@ -803,6 +827,64 @@ describe('TriggerInternalController', () => {
             }
             // And nothing after them: the three are the tail, so a mid-list insertion cannot pass.
             expect(Math.max(...optionalIndices)).toBe(last);
+        });
+    });
+
+    // -------------------------------------------------------------------
+    // APW-05 T19 + C7 — the `app-build-prepare` job's remote target
+    // -------------------------------------------------------------------
+
+    /**
+     * `packages/tasks/src/tasks/trigger/app-build-prepare.task.ts` proxies exactly this
+     * name, because a Trigger worker owns no `DataSource` and the prepare writes rows,
+     * takes the §7.2 lock and publishes Activity. T19 landed the runner, the job and
+     * the module binding, and reported this registration by name: with the name absent
+     * here the proxy's call rejects and the run reports `status: 'failed'`,
+     * `reason: 'runnerUnavailable'` — visible, but the QUEUED path would never work,
+     * and §7.1's in-process fallback would hide the gap on the local stack only.
+     */
+    describe('the APW-05 T19 app-build-prepare remote target', () => {
+        it('registers AppBuildPrepareRunner so the queued prepare can run at all', () => {
+            expect((controller as any).remoteMap.AppBuildPrepareRunner).toBe(appBuildPrepareRunner);
+        });
+
+        it('reaches `run` — the one member the task’s seam declares — over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppBuildPrepareRunner',
+                method: 'run',
+                args: superjson.serialize([
+                    { workId: 'work-1', buildId: 'build-1', reason: 'specApplied' },
+                ]) as any,
+            });
+
+            expect(appBuildPrepareRunner.run).toHaveBeenCalledWith({
+                workId: 'work-1',
+                buildId: 'build-1',
+                reason: 'specApplied',
+            });
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                status: 'prepared',
+                workId: 'work-1',
+                reason: 'specApplied',
+            });
+        });
+
+        it('derives a callable allow-list holding `run` and naming an unknown method', async () => {
+            // Half the claim is that the name is registered; the other half is that the
+            // ONE method the worker calls is callable through it and that the entry is not
+            // a blanket proxy for the runner's internals. The allow-list is a `Set` per
+            // service (`buildMethodAllowList`), so it is read as one.
+            expect([
+                ...((controller as any).allowedMethods.AppBuildPrepareRunner as Set<string>),
+            ]).toEqual(['run']);
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppBuildPrepareRunner',
+                    method: 'doesNotExist',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow('Method not in allow-list for AppBuildPrepareRunner: doesNotExist');
         });
     });
 });

@@ -28,6 +28,16 @@ import { AppWorksModule } from '../app-works/app-works.module';
 // APW-03 T12/T13 — the App spec service, exposed through the remote-proxy
 // controller (APW-02 T28 wired the entry).
 import { AppSpecModule } from '@ever-works/agent/app-spec';
+// APW-05 T19 + C7 — the App Builds module, so the `app-build-prepare` job's
+// runner is resolvable in the API process, where the `DataSource`, the lock's
+// `cache_entries` row and the Activity writer live. The task resolves the runner
+// over the internal RPC channel (`app-build-prepare.task.ts`), because a Trigger
+// worker owns no `DataSource`; this import is the API half of that pair. Without
+// it the controller's constructor cannot take the runner and every dispatch
+// reports `runnerUnavailable` while §7.1's in-process fallback hides the gap on
+// the local stack only. `AppBuildsModule` imports `DatabaseModule` itself, which
+// is what its `DistributedTaskLockService` needs.
+import { AppBuildsModule } from '@ever-works/agent/app-builds';
 
 @Module({
     imports: [
@@ -147,6 +157,15 @@ import { AppSpecModule } from '@ever-works/agent/app-spec';
         // App-spec state row, the git facade and the Activity log are wired
         // (APW-02 T28 wired this entry at the packaging owner's request).
         AppSpecModule,
+        // APW-05 T19 + C7 — exposes `AppBuildPrepareRunner` through the remote-proxy
+        // controller, so the `app-build-prepare` job can run the §7.2 prepare where the
+        // `DataSource` is. T19 landed the runner, the job and its module binding, and
+        // reported this registration by name: with the token unbound in the worker and
+        // the name absent here, the proxy's call rejects and the run reports
+        // `status: 'failed'`, `reason: 'runnerUnavailable'` — a named failure, but the
+        // queued path would never work. Appended as its own import rather than folded
+        // into AppWorksModule because the two epics' modules are separate graphs.
+        AppBuildsModule,
         // APW-06 T71 — `DistributedTaskLockService` is provided by THIS module (below) for the
         // controller's remote target of the same name, and it needs its repository: `forFeature`
         // here is the wiring `apps/api/src/data-sync/data-sync.module.ts` documents as the
