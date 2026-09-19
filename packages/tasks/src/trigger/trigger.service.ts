@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable, Logger } from '@nestjs/common';
-import { configure, runs } from '@trigger.dev/sdk';
+import { configure, runs, tasks } from '@trigger.dev/sdk';
 import { config } from '@ever-works/agent/config';
 import {
     WorkGenerationPayload,
@@ -36,6 +36,16 @@ import {
     // APW-03 T13 — the `app-spec-evaluate` payload, re-exported by the agent
     // package's tasks barrel. (APW-02 T28 wires the dispatch below.)
     AppSpecEvaluatePayload,
+    // APW-05 T18 — the two Build dispatchers, their payloads and the runtime-neutral
+    // job ids they are enqueued under (plan §7.1:1312-1319). The ids come from the
+    // agent barrel rather than being re-typed here, so the dispatch site and the task
+    // modules can never disagree about the string on the wire.
+    AppBuildPreparePayload,
+    AppBuildPrepareDispatcher,
+    AppBuildWatchPayload,
+    AppBuildWatchDispatcher,
+    APP_BUILD_PREPARE_TASK_ID,
+    APP_BUILD_WATCH_TASK_ID,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -64,6 +74,12 @@ import { workspaceBackupTask } from '../tasks/trigger/workspace-backup.task';
 import { appDependencyProvisionTask } from '../tasks/trigger/app-dependency-provision.task';
 // APW-03 T13's job — dispatched by `dispatchAppSpecEvaluate` below (APW-02 T28).
 import { appSpecEvaluateTask } from '../tasks/trigger/app-spec-evaluate.task';
+// APW-05 T18 — the `app-build-prepare` job, reached by ID below rather than through its
+// handle, so a TYPE-only import is all this file needs from it: the generic type argument
+// on `tasks.trigger<…>` is what keeps the payload checked at compile time. The job id
+// itself comes from `@ever-works/agent/tasks` (`APP_BUILD_PREPARE_TASK_ID`), which is the
+// same string that module registers its task under.
+import type { appBuildPrepareTask } from '../tasks/trigger/app-build-prepare.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -105,6 +121,9 @@ export interface TriggerTenantStamp {
  */
 export const triggerTenantStampStorage = new AsyncLocalStorage<TriggerTenantStamp>();
 
+// APW-05 T18 — the two Build dispatchers below. They carry the same `string | null`
+// contract and the same tenant stamping as every sibling here; `null` is what §7.1's
+// in-process fallback keys on.
 @Injectable()
 export class TriggerService
     implements
@@ -122,7 +141,9 @@ export class TriggerService
         KbReembedWorkDispatcher,
         WorkspaceBackupDispatcher,
         MemoryFactEmbedDispatcher,
-        AppDependencyProvisionDispatcher
+        AppDependencyProvisionDispatcher,
+        AppBuildPrepareDispatcher,
+        AppBuildWatchDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -1124,5 +1145,105 @@ export class TriggerService
         }
 
         return handle.id;
+    }
+
+    /**
+     * APW-05 T18 — the `app-build-prepare` job (plan §7.1:1312-1319, §7.2).
+     *
+     * `AppBuildsService.requestPrepare(workId, reason, buildId?)` is the single producer
+     * (§7.2:1366-1369): the `app.spec.applied` listener, Rebuild, a verification request and
+     * a pull-token save all reach the job through this method, and §7.2's coalescing pass is
+     * the same payload with `reason: 'coalesced'`.
+     *
+     * The shape is `dispatchWorkspaceBackup`'s — and the `null` means the opposite thing.
+     * There it is a hard failure the caller reports; here it is §7.1's documented fallback:
+     * `AppBuildsService.dispatchPrepare` runs `AppBuildPrepareRunner.run(payload)` **in
+     * process**, unawaited, under the same `app-build-prepare:<workId>` lock
+     * (§7.1:1321-1331, `APW05-G20`). So this method must never throw — a rejection would
+     * turn the local e2e stack's only working path into a failed request, and Rebuild's
+     * 2-second budget (FR-41) belongs to the caller, not here.
+     *
+     * ## Why this method dispatches by ID rather than through the task handle
+     *
+     * Its sibling below has no task module in this tree yet — T20 owns
+     * `tasks/trigger/app-build-watch.task.ts` — so the id-based `tasks.trigger(id, payload,
+     * options)` form is the only dispatch both halves of the pair can share, and one
+     * mechanism for a pair beats two that can drift. Nothing is lost on the prepare side:
+     * the explicit `typeof appBuildPrepareTask` type argument keeps the payload and the
+     * return shape compile-checked against T19's own `task<'app-build-prepare', …>`
+     * declaration, exactly as `dispatchers/agent-task-dispatchers.ts` does it.
+     *
+     * `concurrencyKey` is per Work — the queue-side half of §7.2's
+     * `app-build-prepare:<workId>` key. The real mutual exclusion is the job's own
+     * `DistributedTaskLockService` pass (a dispatch that cannot take the lock exits as
+     * `skipped`); serialising the queue only stops a coalesced burst from queueing three
+     * passes that would each find nothing to do.
+     */
+    async dispatchAppBuildPrepare(payload: AppBuildPreparePayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof appBuildPrepareTask>(
+                APP_BUILD_PREPARE_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'app-build-prepare',
+                        `work:${payload.workId}`,
+                        // Absent on §7.2's coalesced dispatch, which carries no Build: a
+                        // `build:undefined` tag would be dashboard noise.
+                        ...(payload.buildId ? [`build:${payload.buildId}`] : []),
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-build-prepare:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-build-prepare task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * APW-05 T18 — the `app-build-watch` job (plan §7.1:1315, §7.3).
+     *
+     * One dispatch is one observation of one Build. `AppBuildsService.dispatchWatch` calls it
+     * from the webhook consumer on `requested` / `in_progress` / `completed` deliveries and
+     * from §7.4's two-minute sweep; a `null` runs `AppBuildWatchRunner.run(payload)` **in
+     * process**, unawaited, capped at 10 concurrent runs per API process, with the excess
+     * left to the next sweep tick (§7.1:1321-1331). As above, `null` is a deferral and never
+     * a failure — a throw here would surface inside a webhook handler, which is the one
+     * place an observation must not be able to fail a delivery ack.
+     *
+     * Duplicated and late dispatches are harmless by construction: §7.3:1386-1388's
+     * `watchLeaseUntil` claim (0 rows updated ⇒ exit) is what makes an in-process run and a
+     * dispatched one mutually exclusive, and the terminal transition is guarded by its own
+     * conditional update. `concurrencyKey` keeps the queue side of that honest too.
+     */
+    async dispatchAppBuildWatch(payload: AppBuildWatchPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger(
+                APP_BUILD_WATCH_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: ['app-build-watch', `build:${payload.buildId}`],
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-build-watch:${payload.buildId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-build-watch task', error as Error);
+            return null;
+        }
     }
 }

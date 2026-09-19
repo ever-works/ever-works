@@ -1,4 +1,6 @@
 import type { IJobRuntimeProvider, JobRuntimeDispatchers } from '@ever-works/plugin';
+import { APP_BUILD_PREPARE_DISPATCHER } from '../app-build-prepare-dispatcher';
+import { APP_BUILD_WATCH_DISPATCHER } from '../app-build-watch-dispatcher';
 import { APP_DEPENDENCY_PROVISION_DISPATCHER } from '../app-dependency-provision-dispatcher';
 import { APP_SPEC_EVALUATE_DISPATCHER } from '../app-spec-evaluate-dispatcher';
 import { KB_BACKFILL_SKELETON_DISPATCHER } from '../kb-backfill-skeleton-dispatcher';
@@ -139,10 +141,11 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
         it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = DISPATCHER_SYMBOLS.length)', () => {
             const providers = buildJobRuntimeProviders();
             // COUNTED off the live `DISPATCHER_SYMBOLS` list, never a magic
-            // number: the count has moved three times in this file's life (11 →
+            // number: the count has moved four times in this file's life (11 →
             // 13 on develop, → 14 with AW-22's WORKSPACE_BACKUP_DISPATCHER, → 15
             // with APW-07's APP_DEPENDENCY_PROVISION_DISPATCHER, → 16 with
-            // APW-03 T13's APP_SPEC_EVALUATE_DISPATCHER), and a literal
+            // APW-03 T13's APP_SPEC_EVALUATE_DISPATCHER, → 18 with APW-05 T18's
+            // two Build dispatchers), and a literal
             // here is exactly what let a merge add a dispatcher without the
             // provider count following it. The explicit symbol-set assertion
             // below is what pins the MEMBERSHIP; this pins the ARITY against
@@ -159,13 +162,15 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 16-symbol list is the actual invariant we care about — it is
+            // 18-symbol list is the actual invariant we care about — it is
             // also what keeps `DISPATCHER_SYMBOLS` itself from silently
             // losing an entry (the arity assertion above would still pass).
-            // Sixteen since APW-03 T13 added `APP_SPEC_EVALUATE_DISPATCHER`
-            // (fifteen before it — COUNTED off `DISPATCHER_SYMBOLS`, never
+            // Eighteen since APW-05 T18 added the two Build dispatchers
+            // (sixteen before them — COUNTED off `DISPATCHER_SYMBOLS`, never
             // added up from a branch's own number).
             const expected = new Set<symbol>([
+                APP_BUILD_PREPARE_DISPATCHER,
+                APP_BUILD_WATCH_DISPATCHER,
                 APP_DEPENDENCY_PROVISION_DISPATCHER,
                 APP_SPEC_EVALUATE_DISPATCHER,
                 KB_BACKFILL_SKELETON_DISPATCHER,

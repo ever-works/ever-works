@@ -27,6 +27,17 @@
  */
 
 export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
+    // APW-05 T18 — the two Build dispatchers (plan §7.1:1312-1319): one enqueues
+    // `app-build-prepare`, one enqueues `app-build-watch`. A `null` from either
+    // means "no runtime took it" and runs the matching runner in process.
+    'APP_BUILD_PREPARE_DISPATCHER',
+    // APW-05 T18 — the runtime-neutral id of the prepare job
+    // (`packages/tasks/src/tasks/trigger/app-build-prepare.task.ts` registers it).
+    'APP_BUILD_PREPARE_TASK_ID',
+    'APP_BUILD_WATCH_DISPATCHER',
+    // APW-05 T18 — the runtime-neutral id of the watch job, declared by T18 and
+    // registered by T20's `app-build-watch.task.ts`.
+    'APP_BUILD_WATCH_TASK_ID',
     // APW-07 T17 — the `app-dependency-provision` dispatcher symbol. The
     // service's own provisional declaration of the same NAME is a different
     // Symbol; this barrel entry is the one `job-runtime.providers.ts` binds

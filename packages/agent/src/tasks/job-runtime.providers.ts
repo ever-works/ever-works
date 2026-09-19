@@ -1,5 +1,7 @@
 import type { Provider } from '@nestjs/common';
 import type { IJobRuntimeProvider } from '@ever-works/plugin';
+import { APP_BUILD_PREPARE_DISPATCHER } from './app-build-prepare-dispatcher';
+import { APP_BUILD_WATCH_DISPATCHER } from './app-build-watch-dispatcher';
 import { APP_DEPENDENCY_PROVISION_DISPATCHER } from './app-dependency-provision-dispatcher';
 import { APP_SPEC_EVALUATE_DISPATCHER } from './app-spec-evaluate-dispatcher';
 import { KB_BACKFILL_SKELETON_DISPATCHER } from './kb-backfill-skeleton-dispatcher';
@@ -145,6 +147,11 @@ export class InMemoryJobRuntimeProviderRegistry implements JobRuntimeProviderReg
  * next to it stays as the deliberate cross-check.
  */
 export const DISPATCHER_SYMBOLS: readonly symbol[] = [
+    // APW-05 T18 — the two Build dispatchers. Bound like every other dispatcher;
+    // `null` (no runtime registered) is what `AppBuildsService` reads as "run the
+    // prepare / watch runner in process" per plan §7.1:1321-1331 and APW05-G20.
+    APP_BUILD_PREPARE_DISPATCHER,
+    APP_BUILD_WATCH_DISPATCHER,
     APP_DEPENDENCY_PROVISION_DISPATCHER,
     // APW-03 T13 — evaluates one App Work's App spec. Bound like every other
     // dispatcher; `null` (no runtime) makes the CALLER run the handler
@@ -188,11 +195,13 @@ export const DISPATCHER_SYMBOLS: readonly symbol[] = [
  * Provider arity is pinned by COUNTING {@link DISPATCHER_SYMBOLS} (the
  * original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER`, develop's
  * `ROSTER_PROVISION_DISPATCHER`, AW-22's `WORKSPACE_BACKUP_DISPATCHER`,
- * APW-07's `APP_DEPENDENCY_PROVISION_DISPATCHER` and APW-03 T13's
- * `APP_SPEC_EVALUATE_DISPATCHER` — every one of them is
- * verified by `__tests__/job-runtime.providers.spec.ts`, which asserts
- * `providers.length === DISPATCHER_SYMBOLS.length`). COUNT the array after
- * every merge rather than adding two branches' numbers together.
+ * APW-07's `APP_DEPENDENCY_PROVISION_DISPATCHER`, APW-03 T13's
+ * `APP_SPEC_EVALUATE_DISPATCHER` and APW-05 T18's
+ * `APP_BUILD_PREPARE_DISPATCHER` + `APP_BUILD_WATCH_DISPATCHER` — every one of
+ * them is verified by `__tests__/job-runtime.providers.spec.ts`, which asserts
+ * `providers.length === DISPATCHER_SYMBOLS.length`). The array holds **18**
+ * entries at APW-05 T18, COUNTED off the array itself rather than added up from
+ * a branch's own number — do the same after every merge.
  *
  * @param opts Optional `symbols` filter — when supplied, only those
  *   tokens are bound (the rest stay wherever the operator's module
