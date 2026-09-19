@@ -63,6 +63,22 @@ import { AppWorkCreateService } from './app-work-create.service';
  * as the state service's are: T31 owns the real `APP_UPSTREAM_SYNC_DISPATCHER` /
  * `APP_FORK_READINESS_DISPATCHER` declarations and bindings, and a placeholder here would
  * make a tick that queues nothing look like a tick that queued something.
+ *
+ * ## APW-09 T43 — why the credential of record is NOT provided here (additive)
+ *
+ * `UPSTREAM_CREDENTIAL_STORE` (FR-43) is bound by the epic that owns it,
+ * `upstream-pull-requests/upstream-pull-requests.module.ts`, which imports this
+ * module for the `WorkUpstreamStateRepository` this file already provides and
+ * exports. Binding it *here* was tried and is not shippable: the store itself
+ * injects only this repository, but `UpstreamCredentialService` injects
+ * `WorkRepository` **non-optionally**, and this module is compiled bare by two
+ * specs that shell `DatabaseModule` (`app-works.module.spec.ts`,
+ * `app-upstream-state.service.spec.ts`) precisely so that a collaborator a later
+ * service quietly requires fails there rather than at API boot. It failed there,
+ * as designed; the fix is the epic's own module, which imports `DatabaseModule`
+ * for real, not a widened shell in someone else's spec. Nothing in this file
+ * changes as a result, and the epic's token crosses back in through this
+ * module's `exports`.
  */
 @Module({
     imports: [

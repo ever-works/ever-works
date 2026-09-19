@@ -37,7 +37,14 @@ describe('WorkUpstreamState entity', () => {
     const column = (name: string) => columns.find((entry) => entry.propertyName === name);
     const propertyNames = columns.map((entry) => entry.propertyName);
 
-    /** The 55 columns of plan §3.1:210-256, verbatim and complete. */
+    /**
+     * The 55 columns of plan §3.1:210-256, verbatim and complete.
+     *
+     * APW-09 T43's credential column is NOT in this list on purpose — the list
+     * is the plan's, and the epic's additive column is asserted beside it in
+     * {@link APW09_COLUMNS} below, so "the plan's 55" and "what this row carries
+     * today" stay two separate, checkable claims.
+     */
     const PLAN_COLUMNS = [
         'id',
         'workId',
@@ -96,6 +103,16 @@ describe('WorkUpstreamState entity', () => {
         'updatedAt',
     ];
 
+    /**
+     * The one column APW-09 T43 (FR-43, XC-18) adds to the plan's list: the
+     * member whose connection is the App Work's credential of record once a
+     * handover records one. Kept apart from {@link PLAN_COLUMNS} so that list
+     * stays the plan's verbatim 55, and asserted together with it below so the
+     * entity and the migration
+     * (`1792090000000-AddWorkUpstreamCredentialMember`) cannot drift apart.
+     */
+    const APW09_COLUMNS = ['credentialMemberUserId'];
+
     /** Every time column the plan gives a `bigint ts`. */
     const TIMESTAMP_COLUMNS = [
         'readinessStartedAt',
@@ -119,12 +136,14 @@ describe('WorkUpstreamState entity', () => {
             expect(table?.name).toBe('work_upstream_states');
         });
 
-        it('declares exactly the 55 columns of plan §3.1, and nothing else', () => {
+        it('declares exactly the 55 columns of plan §3.1 plus APW-09 T43’s credential column, and nothing else', () => {
             // The count and the set are both pinned: a column added here without
-            // the plan (and therefore without the migration) is a schema the
-            // entity believes in and the database does not have.
-            expect(columns).toHaveLength(55);
-            expect([...propertyNames].sort()).toEqual([...PLAN_COLUMNS].sort());
+            // its migration is a schema the entity believes in and the database
+            // does not have. The 55 are the plan's; the one APW-09 T43 adds is
+            // named separately (APW09_COLUMNS) so the plan's own count stays a
+            // separate, checkable claim.
+            expect(columns).toHaveLength(56);
+            expect([...propertyNames].sort()).toEqual([...PLAN_COLUMNS, ...APW09_COLUMNS].sort());
         });
 
         it('carries the required coordinates NOT NULL and the optional ones nullable', () => {
@@ -172,9 +191,21 @@ describe('WorkUpstreamState entity', () => {
                 'actionsCheckedAt',
                 'tenantId',
                 'organizationId',
+                // APW-09 T43 — a handover's record; NULL until one happens.
+                'credentialMemberUserId',
             ]) {
                 expect(column(name)?.options.nullable).toBe(true);
             }
+        });
+
+        it('carries the APW-09 T43 credential column as a nullable uuid with no default', () => {
+            // Nullable is what makes the column addable to a non-empty table (the
+            // API boots with `DATABASE_AUTOMIGRATE=true`), and the absent default
+            // is what keeps NULL meaning "no handover" rather than "the empty
+            // uuid". Both are pinned by the migration's own spec as well.
+            expect(column('credentialMemberUserId')?.options.type).toBe('uuid');
+            expect(column('credentialMemberUserId')?.options.nullable).toBe(true);
+            expect(column('credentialMemberUserId')?.options.default).toBeUndefined();
         });
 
         it('keeps readinessStartedAt NOT NULL, so the sweeper always has a clock', () => {

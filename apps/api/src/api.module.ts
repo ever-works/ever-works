@@ -105,6 +105,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 // agent package's AppUpstreamStateService, and each refusal travels as §4.1's
 // `{ status: 'error', code, message, details? }` body.
 import { AppWorksModule } from './app-works/app-works.module';
+// APW-09 T43 (FR-43, XC-18) — the credential of record: the read, the pause, the
+// handover, and the durable store the handover writes. Agent-side, so the whole
+// epic's later routes reach it by importing the agent module directly.
+import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requests';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -373,6 +377,16 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // AppWorksModule, which is what `TriggerInternalModule` imports for its
         // remote-proxy targets (T27/T28). Nothing above or below moves.
         AppWorksModule,
+        // APW-09 T43 (FR-43, XC-18) — additive: the credential of record. The
+        // module provides `UpstreamCredentialService` and the durable store a
+        // handover writes, and binds `UPSTREAM_CREDENTIAL_STORE` to it, so a
+        // handover records on `work_upstream_states.credentialMemberUserId`
+        // instead of failing closed with `handover_unavailable`. Its controller
+        // route (T43's `POST /api/works/:id/upstream/credential/handover`) is
+        // APW-09's own remaining work; the module is registered here so the
+        // binding is in the graph the API boots with. Nothing above or below
+        // moves.
+        UpstreamPullRequestsModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,
         // OnboardingModule, GitHubAppModule) and the public

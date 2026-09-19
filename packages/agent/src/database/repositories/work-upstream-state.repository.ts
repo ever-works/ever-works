@@ -209,6 +209,50 @@ export class WorkUpstreamStateRepository {
     }
 
     /**
+     * FR-43 (APW-09 T43) — the member a handover recorded as this App Work's
+     * **credential of record**, or `null`.
+     *
+     * `null` carries exactly one meaning for the caller — "no handover has been
+     * recorded" — and this method deliberately cannot tell the two ways it
+     * arrives there: a Work whose state row does not exist has never had a
+     * handover either, and the credential of record is then the Work's creator
+     * (`UpstreamCredentialService.readRecordMember`,
+     * `upstream-credential.service.ts:518-528`). Throwing for the missing row
+     * would turn "the creator's connection" into a job failure, which is the
+     * pause the rule exists to avoid.
+     *
+     * The read is this repository's own door ({@link findByWorkId}), so the row
+     * it answers with is the row `update` patches.
+     */
+    async findCredentialMemberUserId(workId: string): Promise<string | null> {
+        const row = await this.findByWorkId(workId);
+
+        return row?.credentialMemberUserId ?? null;
+    }
+
+    /**
+     * FR-43 — record `memberUserId` as this App Work's credential of record, for
+     * background work not yet started.
+     *
+     * The write is {@link update}'s conditional UPDATE, keyed by `workId` alone:
+     * the Work is the scope of this row (`uq_work_upstream_states_work`), and
+     * `tenantId` / `organizationId` are carried stamps, never predicates — a
+     * credential write moves no row between scopes and rewrites neither column,
+     * so an App Work that belongs to another organization is reachable only by
+     * its own id and only through whatever door resolved that id for the caller
+     * (`WorkRepository.findByIdForAccess` plus membership, the layer the
+     * visibility rule lives in — see `AppUpstreamStateService.requireVisibleAppWork`).
+     *
+     * `false` therefore means what it means there — there was no state row to
+     * patch — and the caller must NOT report a handover it did not durably
+     * record. Nothing upstream is edited, closed or rewritten by this write: the
+     * column names a member and nothing else (FR-43).
+     */
+    async setCredentialMemberUserId(workId: string, memberUserId: string): Promise<boolean> {
+        return this.update(workId, { credentialMemberUserId: memberUserId });
+    }
+
+    /**
      * Claim up to `limit` rows whose `nextSyncAt` has arrived, oldest slot
      * first, and stamp each one before returning it (`plan.md:266-267`).
      *

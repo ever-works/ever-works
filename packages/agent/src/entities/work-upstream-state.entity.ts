@@ -76,6 +76,18 @@ import { TimestampColumn } from './_types';
  *
  * Exported as `data/works/upstream-states.jsonl`, reached through the parent
  * Work ids; no column is redacted (`plan.md:203`, T45).
+ *
+ * ## APW-09 T43 — one column joins the plan's 55 (additive)
+ *
+ * `credentialMemberUserId` (FR-43) is the **only** column here that plan §3.1
+ * does not list: APW-09's T43 asks for the credential of record to live on
+ * "APW-02's upstream state where it already carries one" (`tasks.md:789`), and
+ * until 2026-09-19 the row carried none, so a handover failed closed with
+ * `handover_unavailable`. It is nullable with no default, so every row that
+ * exists on both drivers is unchanged by its arrival and no backfill is owed
+ * (see the column's own docstring). Nothing else about this table moves: the
+ * three index names, the single `@ManyToOne` and the scope columns are exactly
+ * as the plan fixes them.
  */
 @Entity({ name: 'work_upstream_states' })
 @Index('uq_work_upstream_states_work', ['workId'], { unique: true })
@@ -291,6 +303,31 @@ export class WorkUpstreamState {
 
     @TimestampColumn({ nullable: true })
     actionsCheckedAt?: Date | null;
+
+    // APW-09 T43 (FR-43, XC-18) — the App Work's credential of record.
+    /**
+     * The member whose connection is the **credential of record** for this App
+     * Work's background work, once a handover has recorded one.
+     *
+     * NULL means **no handover has been recorded**, and the credential of record
+     * is then the Work's creator (`Work.userId`) — the member APW-01 FR-15 made
+     * the fork with (decision D2). A handover (`spec.md:343-352`) writes this
+     * column and nothing else: the member it names is re-read by every
+     * background job that acts without a member present (scheduled sync, Actions
+     * hygiene, build polling, upstream pull request status polling), which is
+     * what FR-43's "never a different member's connection" means in practice.
+     *
+     * The default is NULL and it stays NULL for every row that exists today —
+     * nobody has handed anything over yet, and inventing the creator's id here
+     * would make "no handover" and "handed over to the creator" the same row.
+     * The read is `WorkUpstreamStateRepository.findCredentialMemberUserId`; NULL
+     * from a Work that has no state row at all reads the same way, which is why
+     * the derivation is a fallback and not an error.
+     *
+     * Migration: `apps/api/src/migrations/1792090000000-AddWorkUpstreamCredentialMember.ts`.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    credentialMemberUserId?: string | null;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs, plain
     // columns with no relation (see the class docstring).

@@ -214,6 +214,111 @@ describe('WorkUpstreamStateRepository', () => {
         });
     });
 
+    describe('the credential of record (APW-09 T43, FR-43)', () => {
+        // Two Organizations, so "one Work's row" and "another Organization's
+        // Work" are two different rows in every assertion below.
+        const ORG_A = '44444444-4444-4444-8444-444444444444';
+        const ORG_B = '55555555-5555-4555-8555-555555555555';
+        const MEMBER_ONE = '66666666-6666-4666-8666-666666666666';
+        const MEMBER_TWO = '77777777-7777-4777-8777-777777777777';
+
+        it('reads nothing for a Work that has no state row at all', async () => {
+            await expect(repository.findCredentialMemberUserId(WORK_A)).resolves.toBeNull();
+        });
+
+        it('leaves a freshly created row with no credential — a handover is the only writer', async () => {
+            await repository.create({
+                workId: WORK_A,
+                relation: 'fork',
+                dataOwner: 'ever-works',
+                dataRepo: 'demo',
+                dataDefaultBranch: 'main',
+                organizationId: ORG_A,
+            });
+
+            await expect(repository.findCredentialMemberUserId(WORK_A)).resolves.toBeNull();
+            expect((await stored(WORK_A)).credentialMemberUserId ?? null).toBeNull();
+        });
+
+        it('round-trips a handover through the row, not through the object it returned', async () => {
+            await seed(WORK_A);
+
+            await expect(repository.setCredentialMemberUserId(WORK_A, MEMBER_ONE)).resolves.toBe(
+                true,
+            );
+
+            await expect(repository.findCredentialMemberUserId(WORK_A)).resolves.toBe(MEMBER_ONE);
+            expect((await stored(WORK_A)).credentialMemberUserId).toBe(MEMBER_ONE);
+        });
+
+        it('answers the member of the Work asked about, never another Work’s', async () => {
+            // The read is scoped by `workId` and by nothing else: swapping two
+            // stored records must swap the two answers.
+            await seed(WORK_A, { credentialMemberUserId: MEMBER_ONE });
+            await seed(WORK_B, { credentialMemberUserId: MEMBER_TWO });
+
+            await expect(repository.findCredentialMemberUserId(WORK_A)).resolves.toBe(MEMBER_ONE);
+            await expect(repository.findCredentialMemberUserId(WORK_B)).resolves.toBe(MEMBER_TWO);
+        });
+
+        it('moves the record on a second handover', async () => {
+            await seed(WORK_A, { credentialMemberUserId: MEMBER_ONE });
+
+            await repository.setCredentialMemberUserId(WORK_A, MEMBER_TWO);
+
+            await expect(repository.findCredentialMemberUserId(WORK_A)).resolves.toBe(MEMBER_TWO);
+            expect((await stored(WORK_A)).credentialMemberUserId).toBe(MEMBER_TWO);
+        });
+
+        it('refuses to record a handover on a Work that has no state row, and creates none', async () => {
+            // The repository's own scope rule, measured: the credential write is
+            // an UPDATE keyed by `workId`, so it can only ever move a row that
+            // already belongs to that exact App Work. There is no insert path —
+            // a Work of another Organization therefore cannot be handed a
+            // credential by naming its id.
+            await expect(repository.setCredentialMemberUserId(WORK_C, MEMBER_ONE)).resolves.toBe(
+                false,
+            );
+
+            expect(await repository.findCredentialMemberUserId(WORK_C)).toBeNull();
+            expect(await repository.findByWorkId(WORK_C)).toBeNull();
+        });
+
+        it('scopes the write to the one Work named, and reaches no other Work — including another Organization’s', async () => {
+            await seed(WORK_A, { organizationId: ORG_A });
+            await seed(WORK_B, { organizationId: ORG_B, credentialMemberUserId: MEMBER_TWO });
+
+            await repository.setCredentialMemberUserId(WORK_A, MEMBER_ONE);
+
+            expect((await stored(WORK_A)).credentialMemberUserId).toBe(MEMBER_ONE);
+            // The other Work — stamped with the other Organization — is exactly
+            // as it was, credential included.
+            const other = await stored(WORK_B);
+            expect(other.credentialMemberUserId).toBe(MEMBER_TWO);
+            expect(other.organizationId).toBe(ORG_B);
+        });
+
+        it('carries the tenant and organization stamps through a credential write, and rewrites neither', async () => {
+            // The scope columns are carried stamps on this row, never predicates
+            // and never patch targets: `findByWorkId` / `update` filter on
+            // `workId` alone (the Work is the scope — `uq_work_upstream_states_work`),
+            // and the visibility rule that decides WHO may hand over lives one
+            // layer up (`WorkRepository.findByIdForAccess` plus membership, read
+            // by `AppUpstreamStateService.requireVisibleAppWork` and the
+            // credential service's own `hasEditAccess`). Pinned here so a later
+            // change to this repository cannot silently move a row between
+            // Organizations as a side effect of a handover.
+            await seed(WORK_A, { tenantId: 'tenant-1', organizationId: ORG_A });
+
+            await repository.setCredentialMemberUserId(WORK_A, MEMBER_ONE);
+
+            const row = await stored(WORK_A);
+            expect(row.credentialMemberUserId).toBe(MEMBER_ONE);
+            expect(row.tenantId).toBe('tenant-1');
+            expect(row.organizationId).toBe(ORG_A);
+        });
+    });
+
     describe('claimDue (plan §3.1, §6.6)', () => {
         it('claims only rows whose slot has arrived', async () => {
             await seed(WORK_A, { nextSyncAt: new Date(NOW - MINUTE) });

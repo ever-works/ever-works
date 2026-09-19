@@ -71,18 +71,40 @@ import { GitFacadeService } from '../facades/git.facade';
  * never re-authors an existing pull request: this service performs **no**
  * provider call at all, so neither can happen here.
  *
- * ## The handover's record has no home yet — and says so instead of pretending
+ * ## The handover's record lives on APW-02's state row, and the store is bound
  *
  * {@link UPSTREAM_CREDENTIAL_STORE} is the durable record a handover writes.
  * `tasks.md:789` states the record "is APW-02's upstream state where it already
- * carries one"; the state row does not carry one
- * (`packages/agent/src/entities/work-upstream-state.entity.ts:84-308` has no
- * credential column) and `packages/agent/src/entities/**` +
- * `packages/agent/src/database/**` are owned elsewhere, so the column and its
- * migration are not added by this task. Until the binding lands, a handover
- * **fails closed** with the named refusal `handover_unavailable` — it never
- * reports a success it did not durably record. The read, the pause and the
- * publishing path below are complete without it.
+ * carries one"; until 2026-09-19 the state row carried none
+ * (`packages/agent/src/entities/work-upstream-state.entity.ts` had no credential
+ * column), so the handover **failed closed** with the named refusal
+ * `handover_unavailable` — it never reported a success it had not durably
+ * recorded. Both halves of that gap are now closed, additively:
+ *
+ *   - the column is `work_upstream_states.credentialMemberUserId` (nullable,
+ *     no default, so every existing row is unchanged), created by
+ *     `apps/api/src/migrations/1792090000000-AddWorkUpstreamCredentialMember.ts`;
+ *   - the token is bound to
+ *     `upstream-pull-requests/upstream-credential.store.ts`
+ *     (`UpstreamCredentialStateStore`, reading and writing through
+ *     `WorkUpstreamStateRepository.findCredentialMemberUserId` /
+ *     `setCredentialMemberUserId`) by this epic's own
+ *     `UpstreamPullRequestsModule`, which imports APW-02's `AppWorksModule` for
+ *     that repository and `DatabaseModule` / `FacadesModule` for the
+ *     collaborators this service injects — and which is registered in
+ *     `apps/api/src/api.module.ts`, so the binding is in the graph the API boots
+ *     with rather than in a module nothing imports. It is not a line in
+ *     `AppWorksModule` on purpose: `WorkRepository` is injected here
+ *     **non-optionally**, and that module is compiled bare by two specs that
+ *     shell `DatabaseModule` precisely so a collaborator a later service quietly
+ *     requires fails there — which it did, on the first attempt.
+ *
+ * A handover therefore records, and the next background job reads what it wrote
+ * — from the row, not from memory. The refusal stays reachable and stays honest:
+ * a hand-rolled construction that passes no store, and the store's own refusal
+ * when the Work has no state row to record on
+ * (`UpstreamCredentialStateStore.write`), both keep a handover from being
+ * reported as done when it was not.
  */
 
 /**
@@ -131,26 +153,39 @@ export const UPSTREAM_CREDENTIAL_I18N = {
 } as const;
 
 /**
- * The durable record of a handover — **provisional, and deliberately unbound**.
+ * The durable record of a handover — **bound in the real graph**.
  *
  * `write` records the member whose connection becomes the credential of record
  * for background work not yet started; `read` answers that member, or `null`
- * when no handover has been recorded. The store the epic will bind is APW-02's
- * upstream state row once it carries the member id (see the class docstring:
- * the column does not exist yet and this task may not add it).
+ * when no handover has been recorded. The store is APW-02's upstream state row,
+ * which now carries the member id in its `credentialMemberUserId` column
+ * (`apps/api/src/migrations/1792090000000-AddWorkUpstreamCredentialMember.ts`);
+ * `UpstreamCredentialStateStore` is the implementation, and this epic's
+ * `UpstreamPullRequestsModule` binds this token to it.
  *
- * 🛑 **The swap is mandatory, not cosmetic.** While this token is unbound the
- * handover refuses by name (`handover_unavailable`) rather than writing to
- * memory: a handover that vanished on the next process start would leave two
- * members each believing they are the credential of record, which is worse
- * than the pause it was meant to clear.
+ * 🛑 **Memory is still not an option.** The record has to outlive the process
+ * that performed the handover: a handover that vanished on the next process
+ * start would leave two members each believing they are the credential of
+ * record, which is worse than the pause it was meant to clear. So an unbound
+ * token is a refusal by name (`handover_unavailable`), and a bound store that
+ * cannot write the row refuses too — it throws rather than answering `void` over
+ * a handover it did not record.
  */
 export interface UpstreamCredentialRecordStore {
     read(workId: string): Promise<string | null>;
     write(workId: string, memberUserId: string): Promise<void>;
 }
 
-/** DI token for {@link UpstreamCredentialRecordStore}. */
+/**
+ * DI token for {@link UpstreamCredentialRecordStore}.
+ *
+ * Bound by this epic's `UpstreamPullRequestsModule` to
+ * `UpstreamCredentialStateStore`, the row implementation in
+ * `./upstream-credential.store.ts` (T43's binding). It stays
+ * `@Optional()` at the injection site, so a hand-rolled construction — a unit
+ * test, a lean CLI context — can still pass no store and get the named refusal
+ * instead of a crash.
+ */
 export const UPSTREAM_CREDENTIAL_STORE = Symbol('UPSTREAM_CREDENTIAL_STORE');
 
 /** Which member the record names, and why. */
