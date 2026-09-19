@@ -774,6 +774,25 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         // Step 2 — the strategy gate. `image`/`none` never produce a Build; `auto`
         // is not a strategy any Wave-1 provider supports (R-13), so a requested
         // Build is blocked and the checks, when declared, are still written.
+        // 🛑 MEASURED GAP, reported not fixed (2026-09-17, T42). §7.2 step 2's first
+        // clause is broader than the block below: "`strategy` `image`/`none` → **no
+        // Build**". `checksOnly` gives an `image`/`none` prepare its checks-only
+        // file and skips the secret sync, but a `queued` manual Build of the Work is
+        // still dispatched by step 6. Measured with `store.builds = [queued manual]`
+        // and an `image` + checks spec, through this runner: `startBuild` calls = 1,
+        // `buildsDispatched` = 1, `buildsBlocked` = 0, `dispatchWatch` calls = 1. So
+        // the Build is dispatched (its `dispatchedAt` is stamped; the row keeps
+        // `queued`, which is what a dispatch does — the status moves when the run is
+        // observed) where §7.2 step 2 says it must not run at all. Reachable when the
+        // App spec moves to `image`/`none` while a Build is already queued (the API
+        // refuses a NEW Build for those strategies: `AppBuildsService.requestRebuild`
+        // → `nothingToBuild`, and `recordProviderRun` → `strategyNotBuilt`), so it is
+        // a race rather than the normal path — and blocking it needs a
+        // `blockedReason` for §7.2 step 2's first clause.
+        // `APP_BUILD_BLOCKED_REASONS` has no `nothingToBuild` (that is the API's 422
+        // code, not a Build state); the closest member is `strategyNotSupported`,
+        // which today means "no Wave-1 provider supports this". Adding it here would
+        // change landed T19 behaviour, so it is routed.
         const checksOnly = strategy === 'image' || strategy === 'none';
         const nothingToDeliver =
             checksOnly && checks.length === 0 && !this.platformWroteAWorkflow(row);
@@ -801,7 +820,19 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             return skipped('pluginUnavailable');
         }
 
-        const secretSyncRuns = !verification && !checksOnly;
+        // T42 (plan §7.2 step 2, §4.14): a checks-only preparation runs
+        // `prepareRepository` **without secret sync** for `image`, `none` **and**
+        // `auto`-with-checks. `image`/`none` cannot build at all, and an `auto` Work
+        // with checks is the same shape — its requested Build is blocked
+        // `strategyNotSupported` above, and §4.14's observation groups the three
+        // ("`image`, `none` or `auto` (checks-only runs)"). A sync that nobody's
+        // Build can read is a set of repository secrets written for a run that never
+        // happens, so it does not run: `values: []` and an EMPTY
+        // `previouslyWrittenSecretNames` — an empty values list with a populated
+        // previous list is a DELETION instruction (§4.7:916-917, FR-18), which is
+        // why the two travel together.
+        const checksOnlyDelivery = checksOnly || (strategy === 'auto' && checks.length > 0);
+        const secretSyncRuns = !verification && !checksOnlyDelivery;
         const values: BuildValue[] = [];
         if (secretSyncRuns) {
             // Step 3 — APW-07's build values (§4.7). A required value with no value

@@ -890,6 +890,120 @@ describe('AppBuildsService (APW-05 T17)', () => {
         });
     });
 
+    /**
+     * APW-05 T42 — the check minutes on a pull request Build's receipt (R-9).
+     *
+     * ACC-05-29's last clause: "the pull request Build's status is unchanged by
+     * either result"; FR-69: "a check's result never changes a Build's status or
+     * deployability ... The runner minutes of check jobs are shown on the pull
+     * request Build's receipt as a separate line"; and T42's own Test line: "a pull
+     * request Build with 3 check minutes records `checksBillableMinutes: 3` inside
+     * `units` and the Build's status and `deployable` are identical with checks
+     * green or red".
+     *
+     * **What "green or red" is, at this seam.** A check's own outcome never reaches
+     * `BuildSnapshot` — that IS FR-69 — so the only thing a red check can change in
+     * an observation is the **workflow run's** `conclusion` (GitHub reports the run
+     * as failed when a required check failed, while the `build` job succeeded and
+     * `status` stays `succeeded`, which is what `run-observer.ts` maps). The two
+     * runs below are therefore identical except for that conclusion, and both must
+     * land on the same row and the same verdict.
+     *
+     * **What "inside `units`" is.** `units` is the run's `billableMinutes`, and
+     * `checksBillableMinutes` is a subset of it (`build.interface.ts:313-318`) — a
+     * separate line on the receipt, never added on top. Both numbers are asserted,
+     * so a change that started adding them together would red here.
+     */
+    describe('finalize — the check minutes on a pull request Build (T42, R-9, ACC-05-29, FR-69)', () => {
+        /** One pull-request run with 3 check minutes out of 5, green or red. */
+        async function pullRequestOutcome(conclusion: 'success' | 'failure') {
+            const harness = makeHarness();
+            harness.seedPreparation({
+                buildInputsHash: PREPARED_HASH,
+                secretsSyncedAt: new Date('2026-09-17T09:00:00.000Z'),
+                buildSecretNames: ['APP_SECRET'],
+            });
+
+            const created = await harness.service.recordProviderRun(
+                WORK_ID,
+                runRef({ event: 'pull_request', status: 'in_progress', pullRequestNumber: 12 }),
+                'event',
+            );
+            if (!created.accepted) throw new Error('unreachable');
+            expect(harness.row(created.build.id).trigger).toBe('pull_request');
+
+            await harness.service.applySnapshot(
+                created.build.id,
+                snapshot({ trigger: 'pull_request' }),
+            );
+            const settled = await harness.service.applySnapshot(
+                created.build.id,
+                succeededSnapshot({
+                    trigger: 'pull_request',
+                    // 5 runner minutes in total, 3 of them in the checks matrix.
+                    billableMinutes: 5,
+                    checksBillableMinutes: 3,
+                    // The workflow run's own conclusion — `failure` when a required
+                    // check failed, while the build job itself succeeded. It is the
+                    // ONLY thing a red check can change in an observation, and the
+                    // assertions below are that it changes nothing here (FR-69).
+                    conclusion,
+                }),
+            );
+
+            return { harness, row: settled ?? harness.row(created.build.id) };
+        }
+
+        it('records checksBillableMinutes inside units, and neither conclusion moves the Build', async () => {
+            const green = await pullRequestOutcome('success');
+            const red = await pullRequestOutcome('failure');
+
+            // The row: identical either way, which is ACC-05-29's "the pull request
+            // Build's status is unchanged by either result".
+            expect(green.row.status).toBe('succeeded');
+            expect(red.row.status).toBe(green.row.status);
+            expect(red.row.deployable).toBe(green.row.deployable);
+            expect(red.row.notDeployableReason).toBe(green.row.notDeployableReason);
+            // Non-vacuity: the verdict is the real one for a pull request Build —
+            // not deployable because of where it came from, never because of a check.
+            expect(green.row.deployable).toBe(false);
+            expect(green.row.notDeployableReason).toBe('pullRequest');
+            expect(red.row.notDeployableReason).not.toBe('notSucceeded');
+
+            // The receipt: one row, `units` = the run's minutes, and the check
+            // minutes as a separate line inside them.
+            expect(green.harness.usage).toHaveLength(1);
+            expect(red.harness.usage).toHaveLength(1);
+            expect(green.harness.usage[0]).toMatchObject({
+                operation: 'build.run',
+                payer: 'workspace',
+                costCents: 0,
+                outcome: 'ok',
+                units: 5,
+                metadata: {
+                    buildId: green.row.id,
+                    checksBillableMinutes: 3,
+                },
+            });
+            expect(green.harness.usage[0].units).toBe(green.row.billableMinutes);
+            expect(green.harness.usage[0].units ?? 0).toBeGreaterThanOrEqual(3);
+            // A red check still bills its own minutes — and still bills nothing extra.
+            expect(red.harness.usage[0]).toMatchObject({ units: 5, outcome: 'ok' });
+            expect(red.harness.usage[0].metadata).toMatchObject({ checksBillableMinutes: 3 });
+            expect(red.row.checksBillableMinutes).toBe(3);
+
+            // And the drawer shows the same two numbers off the row (FR-69's
+            // "separate line"), for either conclusion.
+            const detail = await green.harness.service.getDetail(WORK_ID, green.row.id);
+            expect(detail?.receipt).toEqual({
+                billableMinutes: 5,
+                checksBillableMinutes: 3,
+                payer: 'workspace',
+                costKnown: true,
+            });
+        });
+    });
+
     describe('publish — the ONE Activity + event writer (APW05-G05)', () => {
         it('writes app_build Activity rows whose metadata carries no value and no excerpt', async () => {
             const harness = makeHarness();

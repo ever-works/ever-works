@@ -24,6 +24,7 @@ import { isBranchProtected, type BranchProtectionPort, type BranchProtectionVerd
  * | `createdByAppWork === false` (a Link relation)                 | pull request, always (R-4)               |
  * | Protected (reviews, status checks, ruleset, or a 403)          | pull request                             |
  * | Otherwise                                                      | direct commit onto the tracked branch    |
+ * | **No workflow content** (T42: no build and no check remains)   | pull request — the removal of §4.6 step 8, never a direct commit (FR-70) |
  *
  * The pull request path reuses **one** pull request: `ever-works/build-workflow` is
  * created from the tracked head when absent, the commit lands on it, and a stored
@@ -69,12 +70,37 @@ export const WORKFLOW_COMMIT_MESSAGE_ADD = 'Add Ever Works build workflow';
 /** The commit message of a file the platform is changing (plan §4.6 step 2). */
 export const WORKFLOW_COMMIT_MESSAGE_UPDATE = 'Update Ever Works build workflow';
 
+/** The commit message of the removal T42 proposes (plan §4.6 step 8, FR-70). */
+export const WORKFLOW_COMMIT_MESSAGE_REMOVE = 'Remove Ever Works build workflow';
+
 /** The pull request title (plan §4.6 step 3). */
 export const WORKFLOW_PULL_REQUEST_TITLE = 'Add Ever Works build workflow';
+
+/**
+ * The removal pull request's title (T42, plan §4.6 step 8, FR-70).
+ *
+ * Not {@link WORKFLOW_PULL_REQUEST_TITLE}: a reviewer opening "Add Ever Works
+ * build workflow" and finding every job deleted would be reading the wrong
+ * sentence, and `ever-works/build-workflow` may already carry the open pull
+ * request this one updates.
+ */
+export const WORKFLOW_REMOVAL_PULL_REQUEST_TITLE = 'Remove the Ever Works build workflow';
 
 /** The pull request body — what a reviewer is looking at, and what not to do with it. */
 export const WORKFLOW_PULL_REQUEST_BODY =
 	'Ever Works generated this workflow from the App spec. It builds the image for this App Work on GitHub-hosted runners and publishes it to GHCR. Hand edits to this file are never overwritten: Ever Works proposes its changes as pull requests.';
+
+/**
+ * The removal pull request's body (T42, FR-70).
+ *
+ * It says what merging does, in the file's own terms, because the platform cannot
+ * delete a file itself: the `RepositoryWriter` T9 is bound to has no deletion
+ * member (plan §4.1:749–751 fixes its four), so the removal travels as the empty
+ * bytes §4.6 step 8 calls "removing the jobs" — and the owner who would rather
+ * delete the file outright is told so.
+ */
+export const WORKFLOW_REMOVAL_PULL_REQUEST_BODY =
+	'Ever Works generated this workflow from the App spec. The App spec no longer declares a build or a check, so this pull request removes every job from it. Merge it to remove the workflow, or delete the file outright — Ever Works never writes to the tracked branch to remove a file.';
 
 /**
  * How many direct-write attempts are made in total (plan §4.6 step 2: "A
@@ -181,12 +207,44 @@ function commitFile(path: string, content: string) {
 	return { path, content, encoding: 'utf-8' as const };
 }
 
+/** The three strings one delivery commits and opens its pull request with. */
+interface DeliveryCopy {
+	readonly commitMessage: string;
+	readonly title: string;
+	readonly body: string;
+}
+
+/** Writing or updating the file §4.6 steps 2–3 deliver. */
+const DELIVERY_COPY: DeliveryCopy = {
+	commitMessage: WORKFLOW_COMMIT_MESSAGE_UPDATE,
+	title: WORKFLOW_PULL_REQUEST_TITLE,
+	body: WORKFLOW_PULL_REQUEST_BODY
+};
+
+/** Proposing the removal of §4.6 step 8, whose diff takes the file's jobs away (FR-70). */
+const REMOVAL_COPY: DeliveryCopy = {
+	commitMessage: WORKFLOW_COMMIT_MESSAGE_REMOVE,
+	title: WORKFLOW_REMOVAL_PULL_REQUEST_TITLE,
+	body: WORKFLOW_REMOVAL_PULL_REQUEST_BODY
+};
+
 /**
  * Deliver the generated workflow (plan §4.6).
  *
  * `protection` is the branch-rules port; leave it out when the caller has no
  * protection read (a fork the platform owns, a spec), in which case only
  * `createdByAppWork` and hand-edit detection decide the path.
+ *
+ * **Empty content is T42's removal request** (plan §4.6 step 8, FR-70): the
+ * generator answers `''` when neither a build nor a check remains, and
+ *
+ *   - with no file on the tracked branch there is nothing to remove — no write, no
+ *     pull request, `unchanged` (and no stored hash: nothing was proven);
+ *   - with one, the removal is **proposed by pull request** and never committed to
+ *     the tracked branch: §4.6 step 8's "never deleted directly". The branch
+ *     protections of steps 1–2 are not consulted, because there is no direct path
+ *     to protect; `createdByAppWork` and the hand-edit verdict still decide the
+ *     state the caller stores (§3.1b).
  */
 export async function writeWorkflow(
 	input: WorkflowWriteInput,
@@ -206,6 +264,13 @@ export async function writeWorkflow(
 	}
 	const handEdited =
 		existsOnTrackedBranch && currentSha256 !== input.lastWrittenWorkflowSha256 && currentSha256 !== contentSha256;
+
+	// Step 8 — the removal of a file whose jobs are all gone (T42, FR-70).
+	const removal = input.content === '';
+	if (removal) {
+		if (!existsOnTrackedBranch) return { state: 'unchanged', storedWorkflowSha256: null };
+		return pullRequestDelivery(input, writer, path, contentSha256, handEdited, REMOVAL_COPY);
+	}
 
 	// Step 7 then step 1 — a Link relation always takes the pull request path, and a
 	// protected branch does too; `handEdited` forces it as well (FR-9).
@@ -271,7 +336,8 @@ async function pullRequestDelivery(
 	writer: RepositoryWriter,
 	path: string,
 	contentSha256: string,
-	handEdited: boolean
+	handEdited: boolean,
+	copy: DeliveryCopy = DELIVERY_COPY
 ): Promise<WorkflowWriteResult> {
 	const { trackedBranch } = input.repository;
 	const reusedNumber = input.pullRequestNumber ?? null;
@@ -286,7 +352,7 @@ async function pullRequestDelivery(
 			const { commitSha } = await writer.commitFiles({
 				branch: branch.name,
 				baseSha: branch.commit,
-				message: WORKFLOW_COMMIT_MESSAGE_UPDATE,
+				message: copy.commitMessage,
 				files: [commitFile(path, input.content)]
 			});
 			const readBack = await readBackMatches(writer, path, commitSha, contentSha256);
@@ -303,10 +369,10 @@ async function pullRequestDelivery(
 		}
 
 		const pullRequest = await writer.createPullRequest({
-			title: WORKFLOW_PULL_REQUEST_TITLE,
+			title: copy.title,
 			head: APP_BUILD_WORKFLOW_BRANCH,
 			base: trackedBranch,
-			body: WORKFLOW_PULL_REQUEST_BODY
+			body: copy.body
 		});
 		return {
 			state: handEdited ? 'editedByHand' : 'pullRequestOpened',

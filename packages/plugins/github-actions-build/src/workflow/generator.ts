@@ -71,6 +71,39 @@ import { EMBEDDED_VERIFY_RUNNER_SCRIPT } from './verify-runner.sh.js';
  * change as well as the bytes (plan §4.5: "A check command change therefore
  * changes the file and its fingerprint").
  *
+ * ## The checks-only file (T42, R-9, FR-70)
+ *
+ * `image` and `none` never produce a Build (plan §7.2 step 2: "`strategy`
+ * `image`/`none` → no Build"), so a file generated for one of them must not carry
+ * a `build` job — and §4.14 fixes what it carries instead, exactly: "the header,
+ * `on: pull_request` only (no `push`, no `workflow_dispatch`), `permissions: {}`,
+ * the same concurrency block and the `checks` job — nothing else". That is
+ * {@link checksOnlyWorkflow}, reached through {@link checksOnlyFile}. With no
+ * check left there is no workflow content at all, and this function answers the
+ * empty string: §4.6 step 8's "with no checks, nothing is written", which
+ * `src/repo/workflow-writer.ts` turns into a removal proposed by pull request
+ * (FR-70, ACC-05-30).
+ *
+ * Two details of that file are deliberate and are why they are listed here:
+ *
+ *   - **No `run-name`.** §4.14's "nothing else" and the normative draft
+ *     `docs/specs/features/app-works/APW-05-builds/golden-draft/checks.ever-works-build.yml`
+ *     (which carries `run-name` in every other draft and none here) agree: nothing
+ *     correlates a checks-only run to a Build, because §4.14's observation records
+ *     none for this strategy.
+ *   - **Its concurrency group is the draft's, not the full file's** — the one
+ *     place where §4.14's prose ("the same concurrency block") and §4.14's own
+ *     draft disagree. The draft wins, on a measurement: the full file's group names
+ *     `inputs.ew_mode` and `inputs.ew_build_id`, and the `inputs` context exists
+ *     only for `workflow_dispatch`/`workflow_call`, so a checks-only file that
+ *     carried it would be a file GitHub may refuse. `actionlint` v1.7.12 agrees —
+ *     on the shared block it exits 1 with
+ *     `checks-only.yml:11:15: property "ew_mode" is not defined in object type {}`
+ *     (and `:11:66` for `ew_build_id`); on the draft's group it exits 0. Both
+ *     blocks come from ONE helper, {@link concurrencyLines}, so they cannot drift;
+ *     `generator.spec.ts` pins each shape from both sides. Routed as a finding
+ *     against §4.14's sentence, which is the artefact that should be corrected.
+ *
  * ## What this generator deliberately does not emit
  *
  *   - **An attestation step.** Plan §4.5 says a private repository never gets "the
@@ -273,12 +306,45 @@ export function workflowHeader(inputsHash: string): string[] {
 }
 
 /**
+ * True when no Build is possible for this App Work, so the file it gets is the
+ * checks-only file of §4.14 — or nothing at all (T42, FR-70).
+ *
+ * The decision is the **strategy**, and it is read from the normalised build block
+ * the canonical inputs already carry:
+ *
+ *   - `image` and `none` are §7.2 step 2's "no Build" strategies;
+ *   - a **missing** build block (outside the bootstrap file, which has no App spec
+ *     at all) is the same thing, because `app-build-prepare.runner.ts` resolves
+ *     `spec.build.strategy` with `?? 'none'` — a Work with no `build` block is a
+ *     `none` Work, and a file that carries a `verify` job and a
+ *     `workflow_dispatch` trigger for it would contradict §4.14's "nothing else";
+ *   - `dockerfile` and `auto` are not: a `dockerfile` Work builds, and an `auto`
+ *     Work keeps the file it has (`auto` is refused by every Wave-1 provider,
+ *     R-13, and its requested Build is blocked `strategyNotSupported` — but the
+ *     strategy is not one §4.14 gives the checks-only file to).
+ */
+export function checksOnlyFile(input: WorkflowGeneratorInput): boolean {
+	if (input.bootstrap === true) return false;
+	const strategy = input.build?.strategy ?? null;
+	return strategy === null || strategy === 'image' || strategy === 'none';
+}
+
+/**
  * Generate the workflow file (plan §2.4).
  *
  * Byte-stable by construction: every branch below is a pure function of
  * {@link WorkflowGeneratorInput}, and the two unordered collections (build args,
  * services) are emitted in their declared order while the fingerprint sorts them
  * again for the hash.
+ *
+ * Three shapes come out of it, and the first is T42's:
+ *
+ *   1. **the checks-only file** ({@link checksOnlyFile}) — §4.14, or the empty
+ *      string when no check is left (§4.6 step 8);
+ *   2. **the bootstrap file** (`bootstrap: true`) — dispatch-only, `verify` alone
+ *      (§4.6 step 0);
+ *   3. **the full file** — `build`, `verify` and, when the App spec declares any,
+ *      `checks`.
  */
 export function generateWorkflow(input: WorkflowGeneratorInput): string {
 	const verifyRunnerScript = input.verifyRunnerScript ?? EMBEDDED_VERIFY_RUNNER_SCRIPT;
@@ -290,6 +356,17 @@ export function generateWorkflow(input: WorkflowGeneratorInput): string {
 	const image = buildImageRepository(canonical.repository);
 	const runnerLabel = canonical.runner.label;
 	const secretNames = secretNamesFor(input.values);
+	// T41's rule, hoisted: a bootstrap file carries no check (§4.6 step 0), and
+	// nothing else filters the list.
+	const checks = bootstrap ? [] : (input.checks ?? []);
+
+	// T42 (plan §4.14, §4.6 step 8, FR-70): an `image`/`none` Work gets the checks
+	// and nothing else — or, with no check left, no workflow content at all.
+	if (checksOnlyFile(input)) {
+		if (checks.length === 0) return '';
+		return checksOnlyWorkflow({ inputHash, trackedBranch: canonical.trackedBranch, checks, runnerLabel });
+	}
+
 	const lines: string[] = [...workflowHeader(inputHash)];
 
 	lines.push('name: Ever Works build');
@@ -330,13 +407,7 @@ export function generateWorkflow(input: WorkflowGeneratorInput): string {
 
 	// Top-level permissions stay empty: every grant is per job, so FR-12 is a grep.
 	lines.push('permissions: {}');
-	lines.push('concurrency:');
-	lines.push(
-		`  group: ${yamlString(
-			"${{ inputs.ew_mode == 'verify' && format('verify-{0}', inputs.ew_build_id) || format('ever-works-build-{0}', github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name) }}"
-		)}`
-	);
-	lines.push(`  cancel-in-progress: \${{ github.event_name == 'pull_request' }}`);
+	lines.push(...concurrencyLines('dispatch'));
 
 	lines.push('jobs:');
 	if (!bootstrap && build) {
@@ -347,11 +418,119 @@ export function generateWorkflow(input: WorkflowGeneratorInput): string {
 	// verify → checks) and only for a file that has an App spec with checks in it.
 	// A bootstrap file carries no check: §4.6 step 0 is dispatched for a
 	// verification, and §4.14 gives checks the pull-request trigger alone.
-	const checks = bootstrap ? [] : (input.checks ?? []);
 	if (checks.length > 0) {
 		lines.push(...checksJob({ checks, trackedBranch: canonical.trackedBranch, runnerLabel }));
 	}
 
+	return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Which shape of concurrency block a file gets.
+ *
+ * The two differ for one reason and only one: **the `inputs` context exists only
+ * for `workflow_dispatch` / `workflow_call`**. A dispatch-bearing file may name
+ * `inputs.ew_mode` and `inputs.ew_build_id`; T42's checks-only file must not, and
+ * `actionlint` v1.7.12 refuses a file that does
+ * (`property "ew_mode" is not defined in object type {}`).
+ */
+export type ConcurrencyShape = 'dispatch' | 'checksOnly';
+
+/**
+ * The concurrency block — ONE definition, one call site per shape.
+ *
+ * | Shape        | The file                          | `group`                                                                     |
+ * | ------------ | --------------------------------- | --------------------------------------------------------------------------- |
+ * | `dispatch`   | the full file and the bootstrap   | the `inputs.ew_mode == 'verify'`-aware group of §2.4 / §4.6 step 0          |
+ * | `checksOnly` | T42's checks-only file (§4.14)    | the normative draft's group: `ever-works-build-${{ … }}` with no `inputs.`  |
+ *
+ * 🛑 **A routed conflict, resolved in the draft's favour (measured 2026-09-17).**
+ * §4.14's prose says the checks-only file carries "the same concurrency block",
+ * while §4.14's own normative draft
+ * (`docs/specs/features/app-works/APW-05-builds/golden-draft/checks.ever-works-build.yml`)
+ * gives it a **different** group — and the draft wins, because the two plan
+ * artefacts already disagree and only the draft describes a file that can run:
+ * with no `workflow_dispatch` there is no `inputs` object, so the shared block is
+ * meaningless at best. `actionlint` v1.7.12 on the shared block, measured:
+ * `checks-only.yml:11:15: property "ew_mode" is not defined in object type {}` and
+ * `:11:66` for `ew_build_id`, exit 1; on the block below, exit 0. The full file's
+ * block is unchanged, byte for byte.
+ *
+ * The draft line this reproduces, verbatim in value (and quoted by the package's
+ * single {@link yamlString} rule, as every other interpolated value here is):
+ *
+ *     group: ever-works-build-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('push-{0}', github.sha) }}
+ *     cancel-in-progress: true
+ */
+function concurrencyLines(shape: ConcurrencyShape): string[] {
+	if (shape === 'checksOnly') {
+		return [
+			'concurrency:',
+			`  group: ${yamlString(
+				"ever-works-build-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('push-{0}', github.sha) }}"
+			)}`,
+			// `true` as the draft has it: a checks-only file runs for pull requests
+			// only, so a newer run of the same pull request always supersedes the one
+			// in flight — which is what the full file's `github.event_name ==
+			// 'pull_request'` expression amounts to for that trigger set.
+			'  cancel-in-progress: true'
+		];
+	}
+	return [
+		'concurrency:',
+		`  group: ${yamlString(
+			"${{ inputs.ew_mode == 'verify' && format('verify-{0}', inputs.ew_build_id) || format('ever-works-build-{0}', github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name) }}"
+		)}`,
+		`  cancel-in-progress: \${{ github.event_name == 'pull_request' }}`
+	];
+}
+
+/**
+ * T42 — the checks-only file of §4.14 (R-9, FR-70).
+ *
+ * §4.14: "the file carries the header, `on: pull_request` only (no `push`, no
+ * `workflow_dispatch`), `permissions: {}`, the same concurrency block and the
+ * `checks` job — nothing else." The `checks` job is T41's, imported and emitted
+ * through the same call the full file makes, so the two files cannot disagree
+ * about a matrix row, a permission or the same-repository guard.
+ *
+ * The pull-request trigger repeats the full file's `branches`/`types` (FR-11,
+ * `opened`, `synchronize`, `reopened`) and the guard that keeps a fork's pull
+ * request from running anything is the job's own `if:` — the same expression the
+ * `build` job uses (`checks-job.ts`).
+ *
+ * **The two deviations from §4.14's sentence, and why each is the draft's.**
+ *
+ *   - **The concurrency block is the checks-only one**, not the full file's — see
+ *     {@link concurrencyLines} for the measurement and the reasoning.
+ *   - **No `run-name`.** §4.14's "nothing else", and the normative draft
+ *     `golden-draft/checks.ever-works-build.yml` omits it while carrying it in
+ *     every other draft. Nothing needs a run title here — §4.14's observation
+ *     records no Build for an `image`/`none` Work, so no `display_title` is
+ *     correlated.
+ */
+function checksOnlyWorkflow(input: {
+	readonly inputHash: string;
+	readonly trackedBranch: string;
+	readonly checks: readonly WorkflowCheckInput[];
+	readonly runnerLabel: string;
+}): string {
+	const lines: string[] = [...workflowHeader(input.inputHash)];
+	lines.push('name: Ever Works build');
+	lines.push('on:');
+	lines.push('  pull_request:');
+	lines.push(`    branches: [${yamlString(input.trackedBranch)}]`);
+	lines.push('    types: [opened, synchronize, reopened]');
+	lines.push('permissions: {}');
+	lines.push(...concurrencyLines('checksOnly'));
+	lines.push('jobs:');
+	lines.push(
+		...checksJob({
+			checks: input.checks,
+			trackedBranch: input.trackedBranch,
+			runnerLabel: input.runnerLabel
+		})
+	);
 	return `${lines.join('\n')}\n`;
 }
 

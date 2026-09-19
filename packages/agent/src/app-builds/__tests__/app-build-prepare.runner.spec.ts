@@ -1196,3 +1196,131 @@ describe('an unconfigured installation answers a named skip', () => {
         expect(harness.lock.runExclusive).not.toHaveBeenCalled();
     });
 });
+
+/* -------------------------------------------------------------------------- *
+ * T42 — the checks-only prepare (R-9, plan §7.2 step 2, §4.14, ACC-05-30)
+ * -------------------------------------------------------------------------- */
+
+/** An `image` Work with `SPEC`'s one check, and a `none` one — ACC-05-30's two strategies. */
+function checksOnlySpec(strategy: 'image' | 'none', checks = SPEC.checks): AppSpec {
+    return {
+        ...SPEC,
+        build:
+            strategy === 'image'
+                ? ({ strategy: 'image' } as AppSpec['build'])
+                : ({ strategy: 'none' } as AppSpec['build']),
+        checks,
+    } as AppSpec;
+}
+
+describe('the checks-only prepare (T42, R-9, ACC-05-30)', () => {
+    it.each(['image', 'none'] as const)(
+        'an `%s` Work with a check calls prepareRepository with zero values and creates no Build',
+        async (strategy) => {
+            const harness = createHarness({ spec: checksOnlySpec(strategy) });
+
+            const result = await harness.runner.run(payload('specApplied'));
+
+            // ACC-05-30's first half: the checks go to the plugin...
+            expect(result.status).toBe('prepared');
+            expect(harness.plugin.prepareRepository).toHaveBeenCalledTimes(1);
+            expect(harness.prepareCall().checks).toEqual([
+                { name: 'lint', command: 'npm run lint', required: true, timeoutSeconds: 900 },
+            ]);
+            // ...with zero values, and never a previous-name list that an empty
+            // `values` would turn into a deletion instruction (§4.7, FR-18).
+            expect(harness.prepareCall()).toMatchObject({
+                values: [],
+                previouslyWrittenSecretNames: [],
+            });
+            // The build values are not even resolved: no secret is written for a
+            // Work that has no Build to read one.
+            expect(harness.env.resolveForBuild).not.toHaveBeenCalled();
+            expect(result.secretsSynced).toBe(false);
+            expect(harness.upserts).toHaveLength(1);
+            expect(harness.upserts[0]).not.toHaveProperty('buildInputsHash');
+            expect(harness.upserts[0]).not.toHaveProperty('buildSecretNames');
+            expect(harness.upserts[0]).not.toHaveProperty('secretsSyncedAt');
+            // ACC-05-30's second half, at this seam: nothing is created, adopted or
+            // dispatched — no Build row, no `startBuild`, no watch.
+            expect(harness.plugin.startBuild).not.toHaveBeenCalled();
+            expect(harness.service.dispatchWatch).not.toHaveBeenCalled();
+            expect(harness.store.builds).toHaveLength(0);
+            expect(result.buildsDispatched).toBe(0);
+            expect(result.buildsBlocked).toBe(0);
+        },
+    );
+
+    it('an `image` Work whose check is removed still prepares, so the file can be proposed for removal (ACC-05-30)', async () => {
+        // §4.6 step 8 / FR-70: with no checks left, nothing is written — and an
+        // existing checks-only file the platform wrote is replaced by a pull
+        // request removing the jobs. That delivery only happens because this
+        // prepare is NOT skipped: `platformWroteAWorkflow(row)` is what separates
+        // "there is something to remove" from `nothingToPrepare`.
+        const harness = createHarness({ spec: checksOnlySpec('image', []) });
+        harness.store.row = preparationRow({
+            workflowSha256: 'd'.repeat(64),
+            workflowState: 'committed',
+        });
+
+        const result = await harness.runner.run(payload('specApplied'));
+
+        expect(result.status).toBe('prepared');
+        expect(result.reason).toBeNull();
+        expect(harness.plugin.prepareRepository).toHaveBeenCalledTimes(1);
+        expect(harness.prepareCall()).toMatchObject({
+            values: [],
+            previouslyWrittenSecretNames: [],
+            checks: [],
+        });
+        expect(harness.env.resolveForBuild).not.toHaveBeenCalled();
+        expect(harness.plugin.startBuild).not.toHaveBeenCalled();
+
+        // The control: with no file the platform ever wrote, the same spec is
+        // `nothingToPrepare` — nothing to write and nothing to remove.
+        const bare = createHarness({ spec: checksOnlySpec('image', []) });
+        expect(await bare.runner.run(payload('specApplied'))).toMatchObject({
+            status: 'skipped',
+            reason: 'nothingToPrepare',
+        });
+        expect(bare.plugin.prepareRepository).not.toHaveBeenCalled();
+    });
+
+    it('an `auto` Work with a check is checks-only too: no secret sync, still no dispatch (R-13, §4.14)', async () => {
+        const harness = createHarness({
+            spec: { ...SPEC, build: { ...SPEC.build!, strategy: 'auto' } } as AppSpec,
+        });
+        harness.store.builds = [buildRow({ number: 1, status: 'queued' })];
+
+        const result = await harness.runner.run(payload('specApplied', 'build-1'));
+
+        // §4.14's observation groups `auto` with `image`/`none` as a checks-only
+        // run, and §7.2 step 2 blocks its requested Build — so the sync does not
+        // run for it either: no value is written for a Build that cannot start.
+        expect(harness.env.resolveForBuild).not.toHaveBeenCalled();
+        expect(harness.prepareCall()).toMatchObject({
+            values: [],
+            previouslyWrittenSecretNames: [],
+        });
+        expect(harness.prepareCall().checks).toHaveLength(1);
+        expect(harness.upserts[0]).not.toHaveProperty('buildSecretNames');
+        expect(harness.upserts[0]).not.toHaveProperty('secretsSyncedAt');
+        expect(result.secretsSynced).toBe(false);
+        // Unchanged from T19: the requested Build is blocked, not dispatched.
+        expect(harness.store.builds[0]).toMatchObject({
+            status: 'blocked',
+            blockedReason: 'strategyNotSupported',
+        });
+        expect(harness.plugin.startBuild).not.toHaveBeenCalled();
+        expect(result.buildsDispatched).toBe(0);
+
+        // The control: `auto` with NO check keeps the sync it had before T42 —
+        // only a checks-only run skips it.
+        const withoutChecks = createHarness({
+            spec: { ...SPEC, build: { ...SPEC.build!, strategy: 'auto' }, checks: [] } as AppSpec,
+        });
+        await withoutChecks.runner.run(payload('specApplied'));
+        expect(withoutChecks.env.resolveForBuild).toHaveBeenCalledTimes(1);
+        expect(withoutChecks.prepareCall().values).toHaveLength(1);
+    });
+});
