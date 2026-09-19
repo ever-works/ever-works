@@ -14,34 +14,50 @@ one story per epic (the newest id on 2026-09-17 was EW-816). The draft bodies to
 then replace every `EW-TBD` in the table below with the returned keys and keep the epic → story mapping. Never
 put a guessed number in this column.
 
-**Branch status 2026-09-19** — the implementation work lives on `feat/app-works-implementation`
-(HEAD `8ef2f0de6`, **270 commits** ahead of its base `plan/any-repo-as-work` @ `a183ecd70`), pushed and **not merged**:
+**Branch status 2026-09-19 (late)** — the implementation work lives on `feat/app-works-implementation`
+(HEAD `c6ee9d899`, **342 commits** ahead of its base `plan/any-repo-as-work` @ `a183ecd70`), pushed and **not merged**:
 no pull request exists, deliberately — the owner reviews the branch first.
 
 **Where the programme stands.** The Impl column reads `In progress` for **all thirteen epics**. The task-path meter
-(`tools/verify-task-paths.mjs`) puts **1 577** root-anchored paths in the repository, **221** paths a task marks as its
-own (up from 186), and **144 of 699** task headings with landed surface — **20.6 %** of tasks and **23.1 %** of the
-957 paths tasks promise to create. Thinnest: APW-08 (1 task), APW-10 (2), APW-09 (3) and APW-12 (3); thickest:
-APW-06 (27), APW-11 (21), APW-07 (20) and APW-13 (20). Every epic's Notes cell carries its landed task ids, and the ledger
-`docs/internal/app-works-build-progress.md` is the authority for what each landing proved: §3 is the per-epic
+(`tools/verify-task-paths.mjs`) puts **1 634** root-anchored paths in the repository, **244** paths a task marks as its
+own (up from 186), and **161 of 699** task headings with landed surface — **23.0 %** of tasks and **25.8 %** of the
+947 paths tasks promise to create. Thinnest: APW-08 (1 task), APW-10 (3), APW-09 (4) and APW-04 (5); thickest:
+APW-06 (27), APW-13 (24), APW-11 (21) and APW-07 (20). Every epic's Notes cell carries its landed task ids, and the
+ledger `docs/internal/app-works-build-progress.md` is the authority for what each landing proved: §3 is the per-epic
 table (**refreshed from the meter, so it is reproducible with one command**), §5 the routed-findings register
-(spec drift D1–D16, code findings C1–C8 — **C7 and C8 closed this round**) and §6 the dated log.
+(spec drift D1–D19, code findings **C1–C34**, with C14/C16/C18/C19/C22/C23/C27 now closed and C32–C34 opened by a
+lane) and §6 the dated log.
+
+⚠️ **Two metering caveats worth reading before quoting those numbers.** The meter counts a path as *landed* only when
+a task text marks it **new**, so a slice can ship ten files and register none of them (APW-03 T17 did exactly that,
+which is why an epic's `named` count can *fall* while its `landed` rises). And it decides "exists" from `git ls-files`,
+so nothing counts until it is **committed**.
 
 **APW-13's P0 is complete**, which is what the other epics' PR lanes were waiting for (R-38): the fake GitHub
 (43 recorded fixtures), the helpers and their specs, `vitest.e2e-harness.config.ts` (T4), the acceptance config
 and its setup (T12), the five regression lanes (T14–T18), the harness unit lane and the operator runbook (T56).
-The lanes were run **against a live local stack** — fake GitHub, a real API on in-memory SQLite, a prod-built web —
-and reported **20 passed / 4 skipped**, the four skips being exactly the three T63 fixmes and T18's DNS-provider
-fixme. In CI (`.github/workflows/e2e.yml`, 33 jobs) the harness steps execute; the shards that failed in run
-`35385453583` did so because **the API could not boot at all** in that pin — `UnknownDependenciesException:
-LauncherDelegatedCorsMiddleware`, the defect `46fe5ac19` fixed — and the ledger's §5.3 carries the full correction,
-including why the earlier "API OOM" reading of that same log was wrong (it quoted the workflow's own comment).
+The lanes have been run repeatedly **against a live local stack** — fake GitHub, a real API on in-memory SQLite, a
+prod-built web — and the suite keeps growing: the harness lane is now **232 tests**, the App Works lane specs run
+green at `--workers=1`, and the armed register-work lanes are **26 passed exit 0** since C14 was fixed (the fake had
+been answering `GET /user` 200 for every token, which made the intended credential gate unreachable and every such
+assertion unfalsifiable). In CI (`.github/workflows/e2e.yml`, 33 shards) a run is **queued on `6dcfa473b` — the first
+pin in this programme's history to carry BOTH React-Server-Component crash fixes** (C22 on the create page, C27 on the
+Work detail page); the earlier shard reds were the API-boot defect (`46fe5ac19`) and then that crash class itself.
+`ci.yml` on the previous tip finished **14 of 15 jobs green** with exactly one red — `run test on all packages` =
+**C16**, proven pre-existing by a base-commit worktree run and **already fixed upstream on `origin/develop`**
+(`08044d343`; this branch is 189 commits behind develop, 342 ahead of its base).
 
 **The acceptance lanes have still never run end to end against a Blueprint** (they need the nightly lane and an
-estate with cluster access), so "20.6 % landed" is a measure of code in the repository, not of proven behaviour.
+estate with cluster access), so "23.0 % landed" is a measure of code in the repository, not of proven behaviour.
 What _is_ proven against a live stack keeps growing: APW-01's inspect route boots and answers (401 unauthenticated,
-404 on a wrong path, 0 DI failures) and APW-05's `app-build-prepare` runner really executes over the internal RPC
-hop (`201 {"status":"skipped","reason":"workUnavailable",…}`) rather than only inside a unit test.
+404 on a wrong path, 0 DI failures); APW-05's `app-build-prepare` runner really executes over the internal RPC hop
+(`201 {"status":"skipped","reason":"workUnavailable",…}`); the Work detail page renders, with C27's fix proven by a
+request-time A/B (`digest: '2265010250'` **3× before / 0× after** in the web server's own log); and all four of
+APW-12's sign-in methods are green against a real fake provider. **Three of the batch's findings exist only because a
+lane was run**: **C32** — nothing calls `AppSpecService.initialize`, so no App spec state row can exist and the page
+is a 404 for every Work; **C33** — a viewer is locked out of the whole Settings area, contradicting FR-76's "a viewer
+can read the App spec"; and **C34** — the App spec poll route answered an empty 500 instead of the house `400` when a
+caller omitted the browser's workspace selector (fixed; the poll itself was never broken).
 
 | ID     | Epic                                           | Wave      | Spec  | Impl        | Jira   | Branch / PR | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ------ | ---------------------------------------------- | --------- | ----- | ----------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
