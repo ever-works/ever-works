@@ -204,6 +204,130 @@ describe('getDisabledWorkKinds — the fail-CLOSED app chip (APW-01 T7b)', () =>
     });
 
     // -----------------------------------------------------------------------
+    // The `/new` + `/works/new` server-render crash: `values` is NOT always an
+    // array, and the fail-CLOSED set must not be seeded FROM it.
+    // -----------------------------------------------------------------------
+
+    describe('a `values` that is not an array cannot 500 the page', () => {
+        /**
+         * The shape a server component ACTUALLY receives when it imports a plain
+         * value from a `'use client'` module: an opaque client reference with no
+         * array methods, so `.filter` is `undefined`. That call sat before any
+         * `try`/`catch`, which is what turned it into a 500 rather than a
+         * degraded chip row.
+         */
+        const CLIENT_REFERENCE = {
+            $$typeof: Symbol.for('react.client.reference'),
+            name: 'ALL_NEW_CHIP_VALUES',
+        };
+        /** The other half of the same failure mode: an opaque reference that THROWS on access. */
+        const OPAQUE_REFERENCE = new Proxy(function clientRef() {} as unknown as object, {
+            get() {
+                throw new Error('Attempted to access a client reference from the server');
+            },
+        });
+
+        /** Values a caller can reach this with, once TypeScript's array type is a lie. */
+        const NOT_ARRAYS: ReadonlyArray<readonly [string, unknown]> = [
+            ['a client reference object', CLIENT_REFERENCE],
+            ['an opaque reference that throws on access', OPAQUE_REFERENCE],
+            ['undefined', undefined],
+            ['null', null],
+            ['a bare string', 'website'],
+            ['a number', 42],
+        ];
+
+        const asValues = (value: unknown) => value as unknown as readonly string[];
+
+        it.each(NOT_ARRAYS)('returns a Set instead of throwing for %s', async (_label, value) => {
+            const { getDisabledWorkKinds } = await load();
+
+            const result = getDisabledWorkKinds(asValues(value));
+
+            await expect(result).resolves.toBeInstanceOf(Set);
+        });
+
+        it.each(NOT_ARRAYS)(
+            'keeps EVERY fail-CLOSED kind disabled for %s',
+            async (_label, value) => {
+                const { FAIL_CLOSED_WORK_KINDS, getDisabledWorkKinds } = await load();
+
+                const disabled = await getDisabledWorkKinds(asValues(value));
+
+                for (const kind of FAIL_CLOSED_WORK_KINDS) {
+                    expect(disabled.has(kind), `"${kind}" must stay disabled`).toBe(true);
+                }
+            },
+        );
+
+        it('keeps ordinary kinds enabled — nothing is falsely closed — and asks no flag', async () => {
+            const { FAIL_CLOSED_WORK_KINDS, getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds(asValues(CLIENT_REFERENCE));
+
+            // Exactly the fail-closed set and nothing else: a non-array input
+            // yields no candidates, so no ordinary kind can be closed and the
+            // flag service is never consulted.
+            expect([...disabled]).toEqual([...FAIL_CLOSED_WORK_KINDS]);
+            for (const kind of OTHER_KINDS) {
+                expect(disabled.has(kind), `kind "${kind}" must stay enabled`).toBe(false);
+            }
+            expect(isFeatureEnabled).not.toHaveBeenCalled();
+        });
+
+        it('does not re-enable the fail-CLOSED kinds even when PostHog is live and would say yes', async () => {
+            // Seeding the disabled set FROM `values` made the guarantee depend on
+            // the input, so a caller that passed something broken got a set in
+            // which `app` was ENABLED — the opposite of fail-closed. With a
+            // client configured the flag is never even asked about a fail-closed
+            // kind that was not offered.
+            process.env.POSTHOG_API_KEY = 'ph-key';
+            isFeatureEnabled.mockResolvedValue(true);
+            const { getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds(asValues(CLIENT_REFERENCE));
+
+            expect(disabled.has('app')).toBe(true);
+            expect(isFeatureEnabled).not.toHaveBeenCalled();
+        });
+
+        it('keeps the fail-CLOSED kinds disabled for an EMPTY array — the same bug without a bad type', async () => {
+            const { getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds([]);
+
+            expect(disabled.has('app')).toBe(true);
+            expect([...disabled]).toEqual(['app']);
+        });
+
+        it('keeps the fail-CLOSED kinds disabled for an array that omits them', async () => {
+            const { getDisabledWorkKinds } = await load();
+
+            const disabled = await getDisabledWorkKinds(['website', 'blog']);
+
+            expect(disabled.has('app')).toBe(true);
+            // …while the ordinary kinds it DID name stay fail-open.
+            expect(disabled.has('website')).toBe(false);
+            expect(disabled.has('blog')).toBe(false);
+        });
+
+        it('still lets an explicit `true` + instance setting clear the fail-CLOSED kinds, non-array or not', async () => {
+            // The seeding change must not make the fail-closed kinds
+            // UNREACHABLE: the documented re-enable path is untouched.
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+            const { getDisabledWorkKinds } = await load();
+
+            const viaArray = await getDisabledWorkKinds(['app', 'blog']);
+            const viaNonArray = await getDisabledWorkKinds(asValues(CLIENT_REFERENCE));
+
+            expect(viaArray.has('app')).toBe(false);
+            // A non-array carries no `app` to enable, so it stays disabled —
+            // that is the correct direction for a fail-CLOSED kind.
+            expect(viaNonArray.has('app')).toBe(true);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // APW-01 T20 — the runtime instance setting decides the no-PostHog case
     // -----------------------------------------------------------------------
 

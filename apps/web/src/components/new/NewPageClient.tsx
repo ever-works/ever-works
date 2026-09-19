@@ -32,6 +32,7 @@ import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
 import { RegisterCompanyDialog } from '@/components/organizations/RegisterCompanyDialog';
 import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
+import { CHIP_ORDER, ALL_NEW_CHIP_VALUES, type ChipType } from '@/lib/work-kinds/chip-values';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -66,51 +67,19 @@ import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
  * get the full main column on first land. Users can reopen it from
  * the layout's chat handle if they want it back.
  */
-export type ChipType =
-    | 'mission'
-    | 'idea'
-    | 'agent'
-    | 'task'
-    | 'website'
-    | 'landing-page'
-    | 'blog'
-    | 'directory'
-    | 'awesome-repo'
-    | 'repo'
-    | 'company';
-
-// Spec §6.3 order:
-// `Mission · Idea · Website · Landing Page · Store · Blog · Directory
-//  · Awesome Repo · Knowledge Base · Company`.
+// `ChipType`, `CHIP_ORDER` and `ALL_NEW_CHIP_VALUES` now live in
+// `@/lib/work-kinds/chip-values` — a module with NO `'use client'` directive —
+// and are IMPORTED above. They moved because this module IS a client module, and
+// `app/[locale]/(dashboard)/new/page.tsx` (a server component) imports
+// `ALL_NEW_CHIP_VALUES`: a server component that imports a plain value across a
+// client boundary receives a client reference, not the array, which threw
+// `TypeError: a.filter is not a function` out of the server render and 500'd
+// `/new` and `/works/new`.
 //
-// Live chips below stay in their current order (mission first, ideas
-// second, then content chips). `Company` joins at the end of the live
-// chip list per the spec, sitting next to the inert `store` chip which
-// is appended afterwards.
-const CHIP_ORDER: ChipType[] = [
-    'mission',
-    'idea',
-    'agent',
-    'task',
-    'website',
-    'landing-page',
-    'blog',
-    'directory',
-    'awesome-repo',
-    // Self-build slice D (EW-766) — an existing code repository as a Work.
-    'repo',
-    'company',
-];
-
-/**
- * Every chip value whose availability is gated by a `works-<value>`
- * PostHog feature flag (fail-open — see
- * `@/lib/feature-flags/work-kinds`). Includes the live chips (which now
- * cover `company`, graduated in EW-662 Phase 10) plus the inert baseline
- * `store` so the server page can resolve one flag set covering the whole
- * catalog.
- */
-export const ALL_NEW_CHIP_VALUES: ReadonlyArray<ChipType | 'store'> = [...CHIP_ORDER, 'store'];
+// The two names this module used to EXPORT are re-exported below, unchanged and
+// pointing at the one definition, so every existing consumer and spec keeps
+// working.
+export { ALL_NEW_CHIP_VALUES, type ChipType };
 
 const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     mission: Target,

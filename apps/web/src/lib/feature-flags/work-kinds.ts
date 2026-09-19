@@ -121,17 +121,45 @@ function getClient(): PostHog | null {
  * `false` — plus, for the fail-CLOSED kinds, every value whose flag did not
  * resolve strictly to `true`. Fails open on every other outcome (no key,
  * error, timeout, missing/undefined flag). NEVER throws.
+ *
+ * Two things changed here after the `/new` + `/works/new` server-render crash,
+ * and both are load-bearing:
+ *
+ *  - The fail-CLOSED kinds are now seeded from
+ *    {@link HIDDEN_WHEN_DISABLED_WORK_KINDS} itself, not from the fail-closed
+ *    members of `values`. Seeding FROM the input made the guarantee depend on
+ *    the input: a caller that passed `[]`, a subset, or something that is not an
+ *    array at all silently received a set in which `app` was ENABLED — the exact
+ *    opposite of fail-closed.
+ *  - A `values` that is not an array is treated as EMPTY rather than iterated.
+ *    That is a real input, not a hypothetical one: a server component importing
+ *    this value from a `'use client'` module receives a client reference — an
+ *    opaque placeholder — while TypeScript still types it as the array.
+ *    `values.filter(…)` on it threw `TypeError: a.filter is not a function`
+ *    during server render and 500'd both pages.
  */
 export async function getDisabledWorkKinds(
     values: readonly string[],
     distinctId?: string,
     gate?: WorkKindFlagGate,
 ): Promise<Set<string>> {
+    // A NON-array `values` is an observed input, not a hypothetical one: the
+    // server pages used to pass the array they imported from a `'use client'`
+    // module, and a server component receives a *client reference* there.
+    // TypeScript cannot see that — the importing module types the binding as the
+    // array — so the shape is checked at runtime and everything below runs over
+    // `[]` when the check fails.
+    const candidates: readonly string[] = Array.isArray(values) ? values : [];
+
     // Fail-CLOSED kinds start disabled: every path below (no client, error,
     // timeout, partial set) must leave them out of the picker, so the choice
     // is made here — before any evaluation — and only an explicit `true`
-    // clears it.
-    const disabled = new Set<string>(values.filter((value) => FAIL_CLOSED.has(value)));
+    // clears it. Seeded from the LIST rather than from `values`, so a caller
+    // cannot weaken the guarantee by passing a short (or broken) argument.
+    const disabled = new Set<string>([
+        ...HIDDEN_WHEN_DISABLED_WORK_KINDS,
+        ...candidates.filter((value) => FAIL_CLOSED.has(value)),
+    ]);
 
     try {
         const client = getClient();
@@ -143,7 +171,7 @@ export async function getDisabledWorkKinds(
             // when the instance had switched the surface on.
             const instanceEnabled = gate?.appWorksEnabled ?? readAppWorksInstanceSetting();
             if (instanceEnabled === true) {
-                for (const value of values) {
+                for (const value of candidates) {
                     if (FAIL_CLOSED.has(value)) disabled.delete(value);
                 }
             }
@@ -152,7 +180,7 @@ export async function getDisabledWorkKinds(
 
         const id = distinctId ?? 'anonymous';
         const evaluate = Promise.all(
-            values.map(async (value) => {
+            candidates.map(async (value) => {
                 const enabled = await client.isFeatureEnabled(workKindFlagKey(value), id, {
                     sendFeatureFlagEvents: false,
                 });
