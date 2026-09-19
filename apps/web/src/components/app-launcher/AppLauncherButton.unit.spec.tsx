@@ -87,11 +87,23 @@ interface LauncherStub extends HTMLElement {
 
 let clock = 1_700_000_000_000;
 
-/** The palette's call site: it only ever sees `openAppLauncher`. */
-let paletteOpener: (() => void) | undefined;
+/**
+ * The palette's call site: it only ever sees `openAppLauncher`.
+ *
+ * Captured on an **object**, not in a module-level `let`: the React Compiler ESLint rule
+ * refuses a reassignment of an outer variable from inside a component ("Cannot reassign
+ * variables declared outside of the component/hook" — the error this file produced in
+ * CI). A property write captures the same value without a binding write, so every
+ * assertion below still reads exactly what the component saw.
+ */
+const captured: { paletteOpener?: () => void } = {};
 
 function PaletteProbe() {
-    paletteOpener = useAppLauncher().openAppLauncher;
+    // Same scoped suppression as `AppLauncherProvider.unit.spec.tsx`, for the same reason:
+    // `react-hooks/immutability` guards values the compiler may memoize inside component code,
+    // and this probe exists only to hand the context value to this spec's assertions.
+    // eslint-disable-next-line react-hooks/immutability -- unit-spec probe: captures the opener for assertions
+    captured.paletteOpener = useAppLauncher().openAppLauncher;
     return null;
 }
 
@@ -230,7 +242,7 @@ beforeEach(() => {
     captureMock.mockReset();
     fetchMock.mockReset();
     elementImport.fail = false;
-    paletteOpener = undefined;
+    captured.paletteOpener = undefined;
     clock = 1_700_000_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => clock);
     vi.stubGlobal('fetch', fetchMock);
@@ -461,9 +473,9 @@ describe('AppLauncherButton (plan §6.4)', () => {
 
         // The palette's path: `openAppLauncher()` takes no argument, so the
         // provider's registration is the only thing that can mark the source.
-        expect(paletteOpener).toBeTypeOf('function');
+        expect(captured.paletteOpener).toBeTypeOf('function');
         await act(async () => {
-            paletteOpener?.();
+            captured.paletteOpener?.();
         });
         expect(element.show).toHaveBeenCalledTimes(1);
         // The real element emits `:open` from inside `show()`.

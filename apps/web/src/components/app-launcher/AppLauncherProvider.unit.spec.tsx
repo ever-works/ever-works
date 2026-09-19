@@ -18,11 +18,27 @@ import { AppLauncherProvider, useAppLauncher } from './AppLauncherProvider';
  * keystroke).
  */
 
-/** Reads the context and exposes it to the spec — the palette's own call site. */
-let seen: ReturnType<typeof useAppLauncher> | null = null;
+/**
+ * Reads the context and exposes it to the spec — the palette's own call site.
+ *
+ * The capture lives on an **object** rather than in a module-level `let`, because the
+ * React Compiler ESLint rule refuses a reassignment of an outer variable from inside a
+ * component ("Cannot reassign variables declared outside of the component/hook" — the
+ * error this file produced in CI). Writing a property is the same capture without a
+ * binding write, so the spec still asserts on the exact value the component saw and no
+ * assertion changes.
+ */
+const captured: { seen: ReturnType<typeof useAppLauncher> | null } = { seen: null };
 
 function PaletteProbe() {
-    seen = useAppLauncher();
+    // 🛑 Scoped suppression, and the reason is the rule's own domain: `react-hooks/immutability`
+    // protects values the compiler may memoize inside COMPONENT code. This probe renders only in
+    // this unit spec and exists to hand the context value to the assertions below — there is no
+    // memoization to protect and no component behaviour to change. The alternative (asserting
+    // through the DOM) cannot express these three claims: that the value is `null`-safe outside
+    // the shell, that it is the ONE registered opener, and that its identity survives a rerender.
+    // eslint-disable-next-line react-hooks/immutability -- unit-spec probe: captures the context for assertions
+    captured.seen = useAppLauncher();
     return null;
 }
 
@@ -39,12 +55,12 @@ function RegisterProbe({ open }: { open: (() => void) | null }) {
 describe('AppLauncherProvider', () => {
     it('answers with no opener and a callable registrar outside the dashboard shell, and never throws', () => {
         expect(() => render(<PaletteProbe />)).not.toThrow();
-        expect(seen).not.toBeNull();
-        expect(seen?.openAppLauncher).toBeUndefined();
+        expect(captured.seen).not.toBeNull();
+        expect(captured.seen?.openAppLauncher).toBeUndefined();
         // A control rendered without the provider must not be able to break the
         // header from its own registration effect.
-        expect(() => seen?.registerOpenAppLauncher(() => undefined)).not.toThrow();
-        expect(() => seen?.registerOpenAppLauncher(null)).not.toThrow();
+        expect(() => captured.seen?.registerOpenAppLauncher(() => undefined)).not.toThrow();
+        expect(() => captured.seen?.registerOpenAppLauncher(null)).not.toThrow();
     });
 
     it('exposes the registered opener, and only that one', () => {
@@ -56,8 +72,8 @@ describe('AppLauncherProvider', () => {
             </AppLauncherProvider>,
         );
 
-        expect(seen?.openAppLauncher).toBeTypeOf('function');
-        act(() => seen?.openAppLauncher?.());
+        expect(captured.seen?.openAppLauncher).toBeTypeOf('function');
+        act(() => captured.seen?.openAppLauncher?.());
         expect(open).toHaveBeenCalledTimes(1);
     });
 
@@ -69,7 +85,7 @@ describe('AppLauncherProvider', () => {
                 <RegisterProbe open={open} />
             </AppLauncherProvider>,
         );
-        expect(seen?.openAppLauncher).toBeTypeOf('function');
+        expect(captured.seen?.openAppLauncher).toBeTypeOf('function');
 
         // The control unmounting is what clears the registration, so the palette
         // can never call into an element that is gone.
@@ -79,7 +95,7 @@ describe('AppLauncherProvider', () => {
                 <RegisterProbe open={null} />
             </AppLauncherProvider>,
         );
-        expect(seen?.openAppLauncher).toBeUndefined();
+        expect(captured.seen?.openAppLauncher).toBeUndefined();
     });
 
     it('keeps both members stable while the opener is unchanged', () => {
@@ -90,7 +106,7 @@ describe('AppLauncherProvider', () => {
                 <RegisterProbe open={open} />
             </AppLauncherProvider>,
         );
-        const first = seen;
+        const first = captured.seen;
 
         rerender(
             <AppLauncherProvider>
@@ -99,8 +115,8 @@ describe('AppLauncherProvider', () => {
             </AppLauncherProvider>,
         );
 
-        expect(seen?.openAppLauncher).toBe(first?.openAppLauncher);
-        expect(seen?.registerOpenAppLauncher).toBe(first?.registerOpenAppLauncher);
+        expect(captured.seen?.openAppLauncher).toBe(first?.openAppLauncher);
+        expect(captured.seen?.registerOpenAppLauncher).toBe(first?.registerOpenAppLauncher);
     });
 
     it('renders its children', () => {
