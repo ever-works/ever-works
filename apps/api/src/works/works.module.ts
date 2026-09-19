@@ -32,10 +32,21 @@ import { CampaignsModule } from '@ever-works/agent/campaigns';
 // instantiates a module once per graph, so the API still has exactly one
 // inspector — the same instance the create path's step 6 calls.
 import { AppWorksModule as AgentAppWorksModule } from '@ever-works/agent/app-works';
+// APW-03 T15 — the two App-spec routes. `AppSpecModule` (T12) provides and
+// exports `AppSpecService` and `WorkAppSpecStateRepository`, so this import is
+// what makes `WorkAppSpecController`'s constructor resolvable at boot: the
+// controller does not re-provide either, so the route, APW-01's create path and
+// the evaluation job all read and write ONE state row through ONE service.
+import { AppSpecModule as AgentAppSpecModule } from '@ever-works/agent/app-spec';
 
 // Controllers
 import { WorksController } from './works.controller';
 import { AppSourceController } from './app-source.controller';
+// APW-03 T15 — `GET /api/works/:id/app-spec` and
+// `POST /api/works/:id/app-spec/validate`, the two App-spec routes of plan
+// §4.1. Both are four segments deep under `api/works`, so no `works/:id/...`
+// handler can shadow them.
+import { WorkAppSpecController } from './work-app-spec.controller';
 import { WorkRunsController } from './work-runs.controller';
 import { WorkPullRequestsController } from './work-pull-requests.controller';
 import { MembersController } from './members.controller';
@@ -100,6 +111,13 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // module does not re-provide them, so the route and the create path
         // read the same inspection.
         AgentAppWorksModule,
+        // APW-03 T15 — `AppSpecService` for `GET /api/works/:id/app-spec` and
+        // `POST /api/works/:id/app-spec/validate`. It brings its own
+        // collaborators (`WorkAppSpecStateRepository`, `GitFacadeService`,
+        // `DistributedTaskLockService`, `ActivityLogModule`), so this module
+        // re-provides none of them — the routes and the evaluation job therefore
+        // share one service instance and one repository.
+        AgentAppSpecModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -153,6 +171,8 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // preview the create form and the create path both depend on. Static
         // and three segments deep, so no `works/:id/...` handler can shadow it.
         AppSourceController,
+        // APW-03 T15 — the App spec tab's two routes.
+        WorkAppSpecController,
         // Wave 4 M3 — per-Work AgentRun summary counts.
         WorkRunsController,
         // Wave 7 feature h (v1) — open PRs across the Work's repos.
