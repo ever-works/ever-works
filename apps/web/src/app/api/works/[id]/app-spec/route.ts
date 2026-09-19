@@ -37,7 +37,25 @@ import { ApiResponseError } from '@/lib/api/server-api';
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     // Security: require an authenticated session before proxying to the App spec
     // API, rather than relying on the API's own tenant isolation alone.
-    const user = await getAuthFromCookie();
+    //
+    // The workspace-scope resolution happens INSIDE `getAuthFromCookie()`, and it
+    // fails closed when the browser's per-tab selector is absent or does not
+    // parse (`applyBffWorkspaceScope` throw → `Invalid workspace scope`). That
+    // throw used to escape this function entirely, because the call sits BEFORE
+    // the try below — so a caller without the selector got an EMPTY 500 where
+    // every `bffProxy`-built route answers the documented
+    // `400 { error: 'Invalid workspace scope' }` (`lib/api/bff-proxy.ts:147-152`).
+    // Measured on a lane: no selector → 500, `x-ever-workspace: personal` → 404
+    // from the API, anonymous → 401. Catching it here keeps this hand-written
+    // route on the house convention instead of a second vocabulary for the same
+    // condition.
+    let user;
+    try {
+        user = await getAuthFromCookie();
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
+
     if (!user) {
         return NextResponse.json({ status: 'error', code: 'unauthorized' }, { status: 401 });
     }
