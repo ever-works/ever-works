@@ -6,6 +6,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { getActivityLog, getActivitySummary } from '@/app/actions/activity-log';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { ActivityTable } from '@/components/activity-log/ActivityTable';
+import { ActivityViewHeader } from '@/components/activity-log/ActivityViewHeader';
 import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
 import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState';
 import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
@@ -736,16 +737,21 @@ export function ActivityClient({
                 <>
                     {/* Runs ledger (AW-09) — the executions behind the log, which
                         is the same data the Agents hub's Activity tab lists as
-                        Sessions. Kept a cross-link rather than a duplicate. */}
-                    <div className="flex justify-end">
-                        <Link
-                            href={ROUTES.DASHBOARD_AGENTS_ACTIVITY}
-                            className="text-xs text-primary hover:underline"
-                            data-testid="runs-open-sessions"
-                        >
-                            {tRuns('openSessions')}
-                        </Link>
-                    </div>
+                        Sessions. The cross-link to it rides in the heading's
+                        aside slot rather than floating on its own row. */}
+                    <ActivityViewHeader
+                        title={tRuns('title')}
+                        subtitle={tRuns('subtitle')}
+                        aside={
+                            <Link
+                                href={ROUTES.DASHBOARD_AGENTS_ACTIVITY}
+                                className="text-xs text-primary hover:underline"
+                                data-testid="runs-open-sessions"
+                            >
+                                {tRuns('openSessions')}
+                            </Link>
+                        }
+                    />
                     <RunsClient
                         initialView={runsView}
                         granularityFromUrl={runs.granularityFromUrl}
@@ -764,6 +770,13 @@ export function ActivityClient({
 
             {isLogTab && (
                 <>
+                    {/* The operation log — the view that gave this page its name,
+                        so its heading says which part of Activity it is rather
+                        than repeating "Activity". */}
+                    <ActivityViewHeader
+                        title={t('logHeading.title')}
+                        subtitle={t('logHeading.subtitle')}
+                    />
                     <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
                         {summaryCards.map((card) => {
                             const isActive = status === card.key;

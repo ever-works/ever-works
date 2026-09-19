@@ -24,8 +24,9 @@ vi.mock('@/app/actions/dashboard/schedules', () => ({
 }));
 
 // The shell is under test, not its children — each renders only what the
-// assertions below read.
-vi.mock('@/components/common/PageHeader', () => ({ PageHeader: () => null }));
+// assertions below read. The heading is NOT mocked: it is the shared
+// `ActivityViewHeader` every Activity view carries, and the assertion below
+// pins that this list still renders its own.
 vi.mock('./ScheduleHealthBanner', () => ({ ScheduleHealthBanner: () => null }));
 vi.mock('./SchedulesFilters', () => ({ SchedulesFilters: () => null }));
 vi.mock('./SchedulesDegradedNotice', () => ({ SchedulesDegradedNotice: () => null }));
@@ -121,6 +122,22 @@ describe('SchedulesWorkspace — a superseded read never replaces a newer one', 
         vi.clearAllMocks();
         searchParams = new URLSearchParams();
         vi.mocked(getScheduleHealth).mockResolvedValue({ ok: false } as never);
+    });
+
+    it('heads the list with the shared view header, not a second page title', () => {
+        // The page's own `h1` is "Activity". This heading is a SECTION heading
+        // at the Live Feed's weight — a second big title for a view the reader
+        // has already chosen is noise, not orientation.
+        render(<SchedulesWorkspace initialPage={pageOf(['A ROW'])} initialHealth={null} />);
+
+        const heading = screen.getByRole('heading', {
+            level: 2,
+            name: 'dashboard.schedules.title',
+        });
+        expect(heading.className).toContain('text-base');
+        expect(screen.getByText('dashboard.schedules.pageSubtitle')).toBeTruthy();
+        // Nothing here renders an h1 of its own.
+        expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
     });
 
     function mount(initial: SchedulePage) {
