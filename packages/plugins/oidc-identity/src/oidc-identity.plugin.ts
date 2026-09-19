@@ -170,7 +170,7 @@ export class OidcIdentityPlugin implements IPlugin {
 		// without a reload — which is what FR-5's 60-second bound needs.
 		this.context = context;
 		context.logger.log(
-			'OpenID Connect identity (Ever ID) plugin loaded — discovery, key cache and Test connection are live; the sign-in flow lands in APW-12 T7'
+			'OpenID Connect identity (Ever ID) plugin loaded — discovery, key cache and Test connection have landed; the sign-in flow lands in APW-12 T7'
 		);
 	}
 
