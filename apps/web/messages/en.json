@@ -4124,6 +4124,10 @@
             },
             "shortcuts": {
                 "switchView": "Switch view"
+            },
+            "logHeading": {
+                "title": "Activity log",
+                "subtitle": "Everything the platform recorded, newest first."
             }
         },
         "feed": {
