@@ -117,15 +117,16 @@ Each job follows the same pattern:
 
 ### Multi-Registry Push
 
-Each image is tagged for three registries:
+Each image is tagged for two registries:
 
-| Registry                  | Tag Pattern                                            | Priority                                |
-| ------------------------- | ------------------------------------------------------ | --------------------------------------- |
-| GitHub Container Registry | `ghcr.io/ever-works/ever-works-api:latest`             | Primary (always succeeds)               |
-| Docker Hub                | `everco/ever-works-api:latest`                         | Secondary (`continue-on-error: true`)   |
-| DigitalOcean Registry     | `registry.digitalocean.com/ever/ever-works-api:latest` | Deployment target (`continue-on-error`) |
+| Registry                  | Tag Pattern                                            | Priority                                          |
+| ------------------------- | ------------------------------------------------------ | ------------------------------------------------- |
+| GitHub Container Registry | `ghcr.io/ever-works/ever-works-api:latest`             | Primary (always succeeds)                         |
+| DigitalOcean Registry     | `registry.digitalocean.com/ever/ever-works-api:latest` | Legacy deployment target (`vars.DO_ENABLED` only) |
 
-GHCR is the primary registry (authentication via `GITHUB_TOKEN`). Docker Hub and DigitalOcean registries use `continue-on-error: true` so builds succeed even if one push fails.
+GHCR is the primary registry (authentication via `GITHUB_TOKEN`).
+
+**Docker Hub** is not pushed from these workflows. `docker-hub-publish.yml` runs after every completed `k8s-build` and copies the `ghcr.io/ever-works/<image>:sha-<commit>` image to `everco/<image>` (`-stage` / `-dev` for those branches) with the tags `latest`, the release version and `sha-<commit>` — the exact image the clusters run, no rebuild. It fails loudly; the `continue-on-error` Docker Hub push that used to live in the build workflows never succeeded (the repository had no Docker Hub secrets).
 
 ### Build Caching
 
@@ -229,7 +230,7 @@ flowchart TD
     B --> B1["Format check, Build, Test"]
     B1 --> C["Docker Build"]
     C --> C1["Build API + Web images"]
-    C1 --> C2["Push to GHCR, DockerHub,<br/>DO Registry"]
+    C1 --> C2["Push to GHCR,<br/>DO Registry"]
     C2 --> D["Deploy to DO"]
     D --> D1["Update K8s secrets"]
     D1 --> D2["Apply manifests"]
@@ -240,7 +241,7 @@ flowchart TD
 
 | Category         | Secrets                                                                                                                                                               |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Docker Hub**   | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`                                                                                                                               |
+| **Docker Hub**   | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (repository secrets, used only by `docker-hub-publish.yml`)                                                                   |
 | **DigitalOcean** | `DIGITALOCEAN_ACCESS_TOKEN`                                                                                                                                           |
 | **TLS**          | `INGRESS_API_CERT`, `INGRESS_API_CERT_KEY`, `INGRESS_WEBAPP_CERT`, `INGRESS_WEBAPP_CERT_KEY`                                                                          |
 | **Database**     | `DATABASE_TYPE`, `DATABASE_URL`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_SSL_MODE`, `DATABASE_CA_CERT` |

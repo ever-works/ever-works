@@ -35,13 +35,17 @@ name: Publish Images to Docker Hub
 # secrets are visible to them, and those sites are private.
 #   DOCKERHUB_USERNAME  Docker Hub account (or org name, for an Organization
 #                       Access Token) with write access to the namespace.
-#   DOCKERHUB_TOKEN     Personal Access Token (Read & Write) or Organization
-#                       Access Token for that namespace.
+#   DOCKERHUB_TOKEN     Organization Access Token (org scope "repository
+#                       create" + image push on everco/ever-works*), or a
+#                       Personal Access Token (Read, Write, Delete) of an
+#                       Owner/Editor of the org. A Read & Write PAT can push
+#                       but not pre-create repositories through the Hub API.
 # Variables (optional):
 #   DOCKERHUB_NAMESPACE        defaults to `everco`.
 #   DOCKERHUB_PUBLISH_ENABLED  set to `false` to switch the mirror off.
 #
-# Runbook: Workspace/knowledge/infrastructure/EVER_WORKS_DOCKER_HUB.md
+# Docs: docs/devops/github-workflows-deep-dive.md (Docker Hub Publish Workflow)
+# Internal runbook: Workspace/knowledge/infrastructure/EVER_WORKS_DOCKER_HUB.md
 
 on:
   # `workflow_run` only fires from the copy of this file on the DEFAULT branch
@@ -69,11 +73,13 @@ permissions:
   contents: read
   packages: read
 
-# One publish at a time per branch, never cancelled: a cancelled run is a
-# release that silently never reaches Docker Hub. k8s-build completes hours
-# apart, so the one-pending-run limit of a concurrency group is not a concern.
+# One publish at a time per branch, never cancelled mid-run. A group keeps only
+# one PENDING run, so runs that will publish nothing — k8s-build runs that were
+# cancelled or skipped (every superseded pending develop build ends that way,
+# often minutes apart) — get a throwaway group of their own and can never
+# displace a real publish waiting in the branch group.
 concurrency:
-  group: docker-hub-publish-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  group: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.conclusion != 'failure') && format('docker-hub-publish-noop-{0}', github.run_id) || format('docker-hub-publish-{0}', github.event.workflow_run.head_branch || github.ref_name) }}
   cancel-in-progress: false
 
 env:
@@ -85,11 +91,15 @@ jobs:
     # GitHub-hosted on purpose: this job only talks to api.github.com and holds
     # no build. The self-hosted pools are reserved for work that needs them.
     runs-on: ubuntu-latest
+    # A `failure` still runs: k8s-build's matrix is fail-fast: false, so the
+    # legs that succeeded did publish their sha tag.
     if: >-
       vars.DOCKERHUB_PUBLISH_ENABLED != 'false' &&
       (github.event_name == 'workflow_dispatch' ||
-       github.event.workflow_run.event == 'push' ||
-       github.event.workflow_run.event == 'workflow_dispatch')
+       ((github.event.workflow_run.event == 'push' ||
+         github.event.workflow_run.event == 'workflow_dispatch') &&
+        (github.event.workflow_run.conclusion == 'success' ||
+         github.event.workflow_run.conclusion == 'failure')))
     outputs:
       sha: ${{ steps.r.outputs.sha }}
       suffix: ${{ steps.r.outputs.suffix }}
@@ -109,8 +119,17 @@ jobs:
           DISPATCH_BRANCH: ${{ github.ref_name }}
           DISPATCH_SHA: ${{ inputs.sha }}
           DISPATCH_MOVE_LATEST: ${{ inputs.move_latest }}
+          HAS_USERNAME: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+          HAS_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' }}
         run: |
           set -euo pipefail
+
+          # Checked once, here, so a missing credential is one clear error
+          # instead of four identical ones across the matrix.
+          if [ "${HAS_USERNAME}" != "true" ] || [ "${HAS_TOKEN}" != "true" ]; then
+            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are not set on ${GITHUB_REPOSITORY}. Add them as REPOSITORY secrets (not org secrets) — see the header of .github/workflows/docker-hub-publish.yml — or set the repository variable DOCKERHUB_PUBLISH_ENABLED=false to switch this workflow off."
+            exit 1
+          fi
 
           if [ "${EVENT}" = "workflow_run" ]; then
             BRANCH="${RUN_BRANCH}"
@@ -199,16 +218,6 @@ jobs:
       UPSTREAM_OK: ${{ needs.resolve.outputs.upstream_ok }}
       IMAGE: ${{ matrix.image }}
     steps:
-      - name: Require Docker Hub credentials
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          if [ -z "${DOCKERHUB_USERNAME}" ] || [ -z "${DOCKERHUB_TOKEN}" ]; then
-            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are not set on ${GITHUB_REPOSITORY}. Add them as REPOSITORY secrets (not org secrets) — see the header of .github/workflows/docker-hub-publish.yml — or set the variable DOCKERHUB_PUBLISH_ENABLED=false to switch this workflow off."
-            exit 1
-          fi
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
 
@@ -231,14 +240,32 @@ jobs:
           set -euo pipefail
           OWNER="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           SRC="ghcr.io/${OWNER}/${IMAGE}:sha-${SHA}"
-          if ! DIGEST="$(docker buildx imagetools inspect "${SRC}" --format '{{json .Manifest}}' | jq -er '.digest')"; then
-            if [ "${UPSTREAM_OK}" = "true" ]; then
-              echo "::error::${SRC} does not exist although k8s-build succeeded for ${SHA}."
-              exit 1
+          # Only a definite "not found" may skip an image, and only when its
+          # k8s-build leg failed. Anything else (403 on the token exchange,
+          # 5xx, timeout) is retried and then fails the job: skipping on it
+          # would drop an image that was built, behind a green run.
+          DIGEST=""
+          for attempt in 1 2 3; do
+            if OUT="$(docker buildx imagetools inspect "${SRC}" --format '{{json .Manifest}}' 2>&1)" \
+               && DIGEST="$(printf '%s' "${OUT}" | jq -er '.digest')"; then
+              break
             fi
-            echo "::warning::${SRC} does not exist — its k8s-build leg failed. Skipping ${IMAGE}."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            DIGEST=""
+            if printf '%s' "${OUT}" | grep -q ': not found$'; then
+              if [ "${UPSTREAM_OK}" = "true" ]; then
+                echo "::error::${SRC} does not exist although k8s-build succeeded for ${SHA}."
+                exit 1
+              fi
+              echo "::warning::${SRC} does not exist — its k8s-build leg failed. Skipping ${IMAGE}."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::warning::Inspecting ${SRC} failed (attempt ${attempt}/3): ${OUT}"
+            sleep $((attempt * 15))
+          done
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::Could not inspect ${SRC} after 3 attempts."
+            exit 1
           fi
           echo "src=${SRC}" >> "$GITHUB_OUTPUT"
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"

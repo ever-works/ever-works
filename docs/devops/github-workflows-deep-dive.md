@@ -36,6 +36,8 @@ image builds, Kubernetes deployments, CLI publishing, and Trigger.dev deployment
 | `release-trigger-stage.yml`                     | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging                            |
 | `release-trigger-prod.yml`                      | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod                               |
 | `publish-cli.yml`                               | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages                                  |
+| `docker-hub-publish.yml`                        | Publish Images to Docker Hub          | After every k8s-build, manual   | Copy the k8s-build images to Docker Hub (`everco`)    |
+| `publish-plugins.yml`                           | Publish Plugins                       | Push to main, manual            | Publish SDK, contracts and plugins to npm + GH Pkgs   |
 
 ## Pipeline Flow
 
@@ -155,17 +157,40 @@ a digest mismatch or a repository that is not anonymously visible are hard error
 the org level, see the workflow header). **Variables:** `DOCKERHUB_NAMESPACE` (default
 `everco`), `DOCKERHUB_PUBLISH_ENABLED` (`false` switches it off).
 
+One-time setup: add the two repository secrets (an `everco` Organization Access Token with
+"repository create" + push, username `everco`; or a Read/Write/Delete PAT of an Owner/Editor of
+`everco`), keep `everco`'s default repository privacy at Public, then backfill with
+`gh workflow run docker-hub-publish.yml --ref <develop|stage|main>`.
+
 ## npm Package Publish Workflow (`publish-plugins.yml`)
 
 Publishes `@ever-works/contracts`, `@ever-works/plugin` and every distributable plugin to
 **npmjs.org** (with provenance) and **GitHub Packages**, publicly, on every push to `main`.
 `scripts/release-npm-packages.mjs` fingerprints what each package would ship: an unchanged
 package is skipped, a changed one gets the next patch automatically (or its `package.json`
-version, when that was bumped on purpose). Manual dispatch offers `plan` / `dry-run` /
-`publish`.
+version, when that was bumped on purpose — including by a pending changeset: the script reads
+`.changeset/*.md` itself and bumps only the packages a changeset names; `pnpm changeset version`
+is never run, because it would bump every plugin that peer-depends on the SDK to a major). Both registries receive the same tarball; sibling `@ever-works/*`
+dependencies are published as caret ranges.
 
-**Secrets Used:** `NPM_TOKEN` (npm granular token, 90-day maximum — rotate on 401/404),
-`GITHUB_TOKEN`.
+- **Manual dispatch:** `plan` (decide versions only) and `dry-run` run from any branch;
+  `publish` is refused anywhere but `main`.
+- **Every released package needs a `files` allow-list** (`"files": ["dist"]`). Without one
+  npm ships sources, tests and turbo's per-run build log, the fingerprint changes on every
+  build, and the package is refused.
+- **Private packages.** A package still private on npmjs.org is published without changing
+  its access: since 2026-07-31 an access change needs an interactive 2FA step no CI token can
+  pass. The job summary lists them with the one-time commands (`npm login`, then
+  `npm access set status=public <name>`). GitHub Packages has no API for visibility at all —
+  flip a package under _Package settings → Change visibility_; the summary lists the ones
+  still private.
+
+**Secrets Used:** `NPM_TOKEN` — an npm granular access token, read and write on the
+`@ever-works` scope, "bypass 2FA", at most 90 days (npm's cap for write tokens; classic tokens
+were revoked on 2025-12-09). Rotate it when the job fails with 401 or `E404 PUT`. npm tries
+trusted publishing (OIDC) first, so packages configured with
+`npm trust github <name> --file publish-plugins.yml --repo ever-works/ever-works --allow-publish`
+need no token at all. `GITHUB_TOKEN` covers GitHub Packages.
 
 ## Kubernetes Deploy Workflows
 

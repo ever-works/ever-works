@@ -79,8 +79,11 @@ for (const entry of readdirSync(pluginsDir, { withFileTypes: true })) {
 		!currentPub ||
 		currentPub.access !== expectedPublishConfig.access ||
 		currentPub.registry !== expectedPublishConfig.registry;
+	// Without a `files` allow-list npm ships sources, tests and turbo's per-run
+	// build log, and scripts/release-npm-packages.mjs refuses the package.
+	const needsFiles = !Array.isArray(pkg.files) || pkg.files.length === 0;
 
-	if (!needsPrivateFlip && !needsPubConfig) {
+	if (!needsPrivateFlip && !needsPubConfig && !needsFiles) {
 		alreadyCount += 1;
 		report.push({ name: pkg.name, action: 'already correct', dist });
 		continue;
@@ -97,6 +100,7 @@ for (const entry of readdirSync(pluginsDir, { withFileTypes: true })) {
 
 	pkg.private = false;
 	pkg.publishConfig = { ...expectedPublishConfig };
+	if (needsFiles) pkg.files = ['dist'];
 
 	const serialized = JSON.stringify(pkg, null, '\t') + '\n';
 	if (dryRun) {

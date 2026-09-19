@@ -27,11 +27,23 @@ breaking plugin change):
 
 ```bash
 pnpm changeset            # pick the package(s) and minor/major, write a summary
-pnpm changeset version    # applies it: bumps package.json + writes CHANGELOG.md
 ```
 
-Commit both in the same PR. Once it reaches `main`, the release script sees
-`package.json` ahead of the registry and publishes that version.
+Commit the generated `.changeset/*.md` file in your PR — that is all. The
+release script reads pending changesets itself and raises the version of the
+packages a changeset **names** (and only those) by the declared bump, e.g.
+`@ever-works/plugin` 1.1.0 + `minor` → 1.2.0.
+
+> **Do not run `pnpm changeset version` in this repo.** Plugins declare the
+> SDK as a `workspace:*` peer dependency, and Changesets bumps every peer
+> dependent to a **major** when the SDK takes a minor: one additive SDK change
+> would turn ~36 plugins into `2.0.0`, and npm never lets a published version
+> number be taken back.
+
+After the bumped version is released, consume the changeset in a follow-up PR:
+delete the file and set the package's `package.json` version to the released
+one (otherwise a later changeset of the same type for the same package is
+already satisfied and would not bump again).
 
 ## Defaults pinned in `config.json`
 

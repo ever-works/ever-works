@@ -72,11 +72,11 @@ The `envsubst` command replaces `${VARIABLE}` placeholders in the manifest with 
 
 Images are pushed to three registries during CI, with DigitalOcean serving as one of the deployment sources:
 
-| Registry       | Image Pattern                                          |
-| -------------- | ------------------------------------------------------ |
-| GHCR (primary) | `ghcr.io/ever-works/ever-works-api:latest`             |
-| Docker Hub     | `everco/ever-works-api:latest`                         |
-| DigitalOcean   | `registry.digitalocean.com/ever/ever-works-api:latest` |
+| Registry       | Image Pattern                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| GHCR (primary) | `ghcr.io/ever-works/ever-works-api:latest`                                                                 |
+| Docker Hub     | `everco/ever-works-api:latest` (copied from GHCR by `docker-hub-publish.yml`, not pushed by this pipeline) |
+| DigitalOcean   | `registry.digitalocean.com/ever/ever-works-api:latest`                                                     |
 
 Registry authentication uses `doctl registry login` with short-lived (3600s) credentials.
 

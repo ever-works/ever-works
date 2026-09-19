@@ -22,7 +22,9 @@
  *     registry that is missing it).
  *   - Otherwise a new version is cut: the package.json version when it is
  *     ahead of everything published (a deliberate minor/major bump, by hand or
- *     via Changesets), else the next PATCH of the highest published version.
+ *     by a pending .changeset/*.md that names the package — applied here, NOT
+ *     via `changeset version`, which would major-bump every SDK peer
+ *     dependent), else the next PATCH of the highest published version.
  *   So an unchanged package is never republished, a changed one always is,
  *   and package.json keeps owning major.minor.
  *
@@ -52,12 +54,23 @@
  *
  * Exit code 1 when any package failed to reach any selected registry.
  *
- * Runbook: Workspace/knowledge/infrastructure/EVER_WORKS_NPM.md
+ * Docs: docs/devops/github-workflows-deep-dive.md (npm Package Publish Workflow);
+ * internal runbook: Workspace/knowledge/infrastructure/EVER_WORKS_NPM.md
  */
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	appendFileSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -140,32 +153,83 @@ export function maxStable(versions) {
 	return best;
 }
 
+/** Apply a changeset bump type to a version. */
+export function bumpVersion(version, type) {
+	const p = parseSemver(version);
+	if (!p) throw new Error(`Cannot bump non-semver version ${version}`);
+	if (type === 'major') return `${p.major + 1}.0.0`;
+	if (type === 'minor') return `${p.major}.${p.minor + 1}.0`;
+	if (type === 'patch') return incPatch(version);
+	return version;
+}
+
+const BUMP_RANK = { none: 0, patch: 1, minor: 2, major: 3 };
+
+/**
+ * Bumps declared by pending (committed, not yet versioned) changesets:
+ * package name → highest bump type any changeset names for it. Only the
+ * packages a changeset NAMES are bumped. `pnpm changeset version` would also
+ * bump every dependent — and every PEER dependent to a MAJOR when the SDK
+ * takes a minor — which is not what an additive SDK change means.
+ *
+ * @param {Array<string>} contents  raw .changeset/*.md files (README excluded)
+ */
+export function parseChangesetBumps(contents) {
+	const bumps = new Map();
+	for (const text of contents) {
+		const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+		if (!m) continue;
+		for (const line of m[1].split(/\r?\n/)) {
+			const e = /^\s*['"]?([^'":]+?)['"]?\s*:\s*['"]?(major|minor|patch|none)['"]?\s*$/.exec(line);
+			if (!e) continue;
+			const [, name, type] = e;
+			if (BUMP_RANK[type] > BUMP_RANK[bumps.get(name) ?? 'none']) bumps.set(name, type);
+		}
+	}
+	return bumps;
+}
+
+function readChangesetBumps() {
+	const dir = join(REPO_ROOT, '.changeset');
+	if (!existsSync(dir)) return new Map();
+	const files = readdirSync(dir).filter((f) => f.endsWith('.md') && f.toLowerCase() !== 'readme.md');
+	return parseChangesetBumps(files.map((f) => readFileSync(join(dir, f), 'utf8')));
+}
+
 // ─── version decision ───────────────────────────────────────────────────────
 
 /**
  * @param {object}   input
  * @param {string}   input.repoVersion   package.json version (after any Changesets bump)
  * @param {string}   input.fingerprint   content fingerprint of what would ship now
- * @param {Array<{versions: Record<string, object>}>} input.registries
- *        readable registry states; `versions` maps version → published manifest
+ * @param {Array<{versions: Record<string, object>, burned?: string[]}>} input.registries
+ *        readable registry states; `versions` maps version → published manifest,
+ *        `burned` lists versions that were published once and then unpublished
+ *        (npm never lets such a number be used again)
  * @returns {{version: string, reason: string, changed: boolean}}
  */
 export function resolveTargetVersion({ repoVersion, fingerprint, registries }) {
 	if (!parseSemver(repoVersion)) throw new Error(`package.json version "${repoVersion}" is not semver`);
 	const published = new Set();
 	for (const r of registries) for (const v of Object.keys(r.versions ?? {})) published.add(v);
+	const taken = new Set(published);
+	for (const r of registries) for (const v of r.burned ?? []) taken.add(v);
 	const highest = maxStable([...published]);
 
 	if (highest) {
 		const sameContent = registries.some(
 			(r) => r.versions?.[highest]?.everworksRelease?.contentHash === fingerprint
 		);
-		if (sameContent) {
+		// A number unpublished on any registry can never be (re)published there,
+		// so reusing it would fail on that registry forever: cut a new one.
+		const burnedSomewhere = registries.some((r) => (r.burned ?? []).includes(highest));
+		if (sameContent && !burnedSomewhere) {
 			return { version: highest, reason: `unchanged since ${highest}`, changed: false };
 		}
 	}
 
-	if (!published.has(repoVersion) && (highest === null || compareSemver(repoVersion, highest) > 0)) {
+	const ahead = highest === null || compareSemver(repoVersion, highest) > 0;
+	if (ahead && !taken.has(repoVersion)) {
 		return {
 			version: repoVersion,
 			reason: highest ? `package.json ${repoVersion} is ahead of published ${highest}` : 'first release',
@@ -173,9 +237,10 @@ export function resolveTargetVersion({ repoVersion, fingerprint, registries }) {
 		};
 	}
 
-	const base = highest ?? repoVersion;
+	// A deliberate bump whose own number is burned continues on its line.
+	const base = ahead ? repoVersion : highest;
 	let next = incPatch(base);
-	while (published.has(next)) next = incPatch(next);
+	while (taken.has(next)) next = incPatch(next);
 	return { version: next, reason: `content changed since ${base}`, changed: true };
 }
 
@@ -457,33 +522,51 @@ async function fetchWithRetry(url, init, attempts = 3) {
 }
 
 /**
+ * Versions and burned version numbers out of a packument. npm drops an
+ * unpublished version from `versions` but keeps it in `time` (and a fully
+ * unpublished package lists them under `time.unpublished.versions`), and it
+ * never accepts that number again.
+ */
+export function parsePackument(body) {
+	const versions = body?.versions ?? {};
+	const time = body?.time ?? {};
+	const burned = new Set(Array.isArray(time.unpublished?.versions) ? time.unpublished.versions : []);
+	for (const key of Object.keys(time)) {
+		if (key === 'created' || key === 'modified' || key === 'unpublished') continue;
+		if (!versions[key]) burned.add(key);
+	}
+	return { versions, burned: [...burned] };
+}
+
+/**
  * What a registry holds for a package.
- * @returns {Promise<{readable: boolean, versions: Record<string, object>, restricted?: boolean, error?: string}>}
+ * @returns {Promise<{readable: boolean, versions: Record<string, object>, burned: string[], restricted?: boolean, assumedAbsent?: boolean, error?: string}>}
  */
 async function readRegistry(registry, name, token) {
 	const url = `${registry.url}/${encodeName(name)}`;
 	const headers = { accept: 'application/json' };
 	const get = (auth) =>
 		fetchWithRetry(url, { headers: auth ? { ...headers, authorization: `Bearer ${token}` } : headers });
+	const empty = { versions: {}, burned: [] };
 
 	// npmjs.org: read anonymously first, so a restricted package is detectable
-	// (anonymous 404, authenticated 200) and can be flipped to public.
+	// (anonymous 404, authenticated 200).
 	if (registry.id === 'npm') {
 		const anon = await get(false);
-		if (anon.ok) return { readable: true, versions: (await anon.json()).versions ?? {}, restricted: false };
-		if (anon.status !== 404) return { readable: false, versions: {}, error: `HTTP ${anon.status}` };
-		if (!token) return { readable: true, versions: {}, restricted: false, assumedAbsent: true };
+		if (anon.ok) return { readable: true, ...parsePackument(await anon.json()), restricted: false };
+		if (anon.status !== 404) return { readable: false, ...empty, error: `HTTP ${anon.status}` };
+		if (!token) return { readable: true, ...empty, restricted: false, assumedAbsent: true };
 		const authed = await get(true);
-		if (authed.ok) return { readable: true, versions: (await authed.json()).versions ?? {}, restricted: true };
-		if (authed.status === 404) return { readable: true, versions: {}, restricted: false };
-		return { readable: false, versions: {}, error: `HTTP ${authed.status} (NPM_TOKEN rejected?)` };
+		if (authed.ok) return { readable: true, ...parsePackument(await authed.json()), restricted: true };
+		if (authed.status === 404) return { readable: true, ...empty, restricted: false };
+		return { readable: false, ...empty, error: `HTTP ${authed.status} (NPM_TOKEN rejected?)` };
 	}
 
-	if (!token) return { readable: false, versions: {}, error: `${registry.tokenEnv} not set` };
+	if (!token) return { readable: false, ...empty, error: `${registry.tokenEnv} not set` };
 	const res = await get(true);
-	if (res.ok) return { readable: true, versions: (await res.json()).versions ?? {} };
-	if (res.status === 404) return { readable: true, versions: {} };
-	return { readable: false, versions: {}, error: `HTTP ${res.status}` };
+	if (res.ok) return { readable: true, ...parsePackument(await res.json()) };
+	if (res.status === 404) return { readable: true, ...empty };
+	return { readable: false, ...empty, error: `HTTP ${res.status}` };
 }
 
 /**
@@ -522,19 +605,22 @@ function lastLines(text, n) {
 }
 
 /**
- * `npm pack` the package with the release manifest swapped in, restoring the
- * source package.json afterwards (it is never left modified, even on error).
+ * `npm pack` the release: the exact files `npm pack` listed for the source
+ * package are copied into a staging directory next to the release manifest
+ * and packed from there. The source tree is never written to, so an
+ * interrupted run cannot leave a rewritten package.json behind.
  */
-function packWithManifest(absDir, manifest, dest) {
-	const pkgJsonPath = join(absDir, 'package.json');
-	const original = readFileSync(pkgJsonPath);
-	try {
-		writeFileSync(pkgJsonPath, `${JSON.stringify(manifest, null, '\t')}\n`);
-		const out = run('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', dest], { cwd: absDir });
-		return join(dest, JSON.parse(out.slice(out.indexOf('[')))[0].filename);
-	} finally {
-		writeFileSync(pkgJsonPath, original);
+function packWithManifest(absDir, files, manifest, dest) {
+	const stage = mkdtempSync(join(dest, 'stage-'));
+	for (const f of files) {
+		if (f.path === 'package.json') continue;
+		const to = join(stage, f.path);
+		mkdirSync(dirname(to), { recursive: true });
+		copyFileSync(join(absDir, f.path), to);
 	}
+	writeFileSync(join(stage, 'package.json'), `${JSON.stringify(manifest, null, '\t')}\n`);
+	const out = run('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', dest], { cwd: stage });
+	return join(dest, JSON.parse(out.slice(out.indexOf('[')))[0].filename);
 }
 
 /** Files `npm pack` would ship, with their content hashes (package.json excluded). */
@@ -655,9 +741,24 @@ async function main() {
 	const selected = opts.registries.map((id) => REGISTRIES[id]);
 
 	const { release, workspaceNames } = discoverPackages(console);
+	// The version each package.json declares, raised by any pending changeset
+	// that names the package (see parseChangesetBumps).
+	const changesetBumps = readChangesetBumps();
+	for (const p of release) {
+		const type = changesetBumps.get(p.name);
+		if (type && type !== 'none') {
+			const bumped = bumpVersion(p.json.version, type);
+			console.log(`  changeset: ${p.name} ${p.json.version} → ${bumped} (${type})`);
+			p.json = { ...p.json, version: bumped };
+		}
+	}
 	const ordered = topoSort(release);
 	const releaseNames = new Set(ordered.map((p) => p.name));
-	const targets = opts.filter ? ordered.filter((p) => p.name.includes(opts.filter)) : ordered;
+	/** --filter narrows what is PUBLISHED; every package is still resolved, so a
+	 *  selected plugin gets its dependencies' real released versions and is
+	 *  blocked where a dependency is missing, exactly as in a full run. */
+	const isSelected = (p) => !opts.filter || p.name.includes(opts.filter);
+	const targets = ordered.filter(isSelected);
 	const mode = opts.plan ? 'PLAN' : opts.dryRun ? 'DRY RUN' : 'PUBLISH';
 	console.log(
 		`\nEver Works npm release — ${targets.length}/${ordered.length} package(s) → ${selected.map((r) => r.id).join(' + ')} [${mode}]` +
@@ -678,13 +779,22 @@ async function main() {
 	let failures = 0;
 
 	try {
-		for (const pkg of targets) {
+		for (const pkg of ordered) {
 			const absDir = join(REPO_ROOT, pkg.dir);
+			const chosen = isSelected(pkg);
 			const row = { name: pkg.name, version: '', reason: '', actions: [], errors: [] };
-			rows.push(row);
+			if (chosen) rows.push(row);
 			try {
-				// 1. What would ship, and its fingerprint.
+				// 1. What would ship, and its fingerprint. Without a `files`
+				//    allow-list npm ships the whole directory — sources, tests and
+				//    turbo's per-run build log — so the fingerprint would change on
+				//    every build and every push to main would cut a new version.
+				if (!Array.isArray(pkg.json.files) || pkg.json.files.length === 0) {
+					throw new Error('package.json has no "files" allow-list (add "files": ["dist"])');
+				}
 				const files = packedFiles(absDir);
+				const stray = files.filter((f) => /^(\.turbo|node_modules|src)\//.test(f.path)).map((f) => f.path);
+				if (stray.length) throw new Error(`would ship build/source files: ${stray.slice(0, 3).join(', ')}`);
 				const shipped = new Set(files.map((f) => f.path));
 				const absentEntries = entryPointTargets(pkg.json).filter((t) => !shipped.has(t));
 				if (absentEntries.length) {
@@ -752,15 +862,20 @@ async function main() {
 				/** Registries that will NOT hold decision.version when this package is done. */
 				const miss = new Set(
 					selected
-						.filter((r) => !states[r.id].versions[decision.version] && !need.includes(r))
+						.filter((r) => !states[r.id].versions[decision.version] && (!chosen || !need.includes(r)))
 						.map((r) => r.id)
 				);
 				const restrictedOnNpm = states.npm?.restricted === true;
-				if (restrictedOnNpm) {
+				if (restrictedOnNpm && chosen) {
 					restrictedOnNpmList.push(pkg.name);
 					row.actions.push('⚠ still private on npm');
 				}
 
+				if (!chosen) {
+					// Resolved only, for its dependents; a filtered run never publishes it.
+					missing.set(pkg.name, miss);
+					continue;
+				}
 				if (opts.plan) {
 					row.actions.push(...need.map((r) => `would publish → ${r.id}`));
 					if (!need.length && !row.errors.length) row.actions.push('up to date');
@@ -782,7 +897,7 @@ async function main() {
 						commit: env.GITHUB_SHA ?? null,
 						source: `${repositoryUrl}/tree/${env.GITHUB_SHA ?? 'main'}/${pkg.dir}`
 					};
-					const tarball = packWithManifest(absDir, manifest, tmp);
+					const tarball = packWithManifest(absDir, files, manifest, tmp);
 
 					for (const r of need) {
 						const scope = pkg.name.startsWith('@') ? pkg.name.split('/')[0] : null;
@@ -808,8 +923,17 @@ async function main() {
 							row.actions.push(`${opts.dryRun ? 'dry-run: ' : ''}published → ${r.id}`);
 						} catch (err) {
 							const msg = describeExecError(err);
-							// Lost a race with another publisher of the same version.
+							// "Already published" only counts when the registry really
+							// holds this version with this content: a burned number or a
+							// failed save (E409) must not pass as success.
+							let confirmed = false;
 							if (/previously published|cannot publish over|EPUBLISHCONFLICT|E409/i.test(msg)) {
+								const again = await readRegistry(r, pkg.name, env[r.tokenEnv]);
+								await hydrateReleaseInfo(again, r, decision.version, env[r.tokenEnv]);
+								confirmed =
+									again.versions?.[decision.version]?.everworksRelease?.contentHash === fingerprint;
+							}
+							if (confirmed) {
 								row.actions.push(`already on ${r.id}`);
 							} else {
 								miss.add(r.id);
@@ -825,13 +949,15 @@ async function main() {
 				row.errors.push(String(err?.message ?? err));
 				missing.set(pkg.name, new Set(selected.map((r) => r.id)));
 			} finally {
-				// `finally`, so the plan branch's `continue` is counted and logged too.
-				if (row.errors.length) failures++;
-				console.log(
-					`${row.errors.length ? '✖' : '✔'} ${pkg.name.padEnd(48)} ${(row.version || '-').padEnd(10)} ${row.actions.join('; ') || '-'}` +
-						(row.reason ? `  (${row.reason})` : '') +
-						row.errors.map((e) => `\n    ${e}`).join('')
-				);
+				// `finally`, so the `continue`s above are counted and logged too.
+				if (chosen) {
+					if (row.errors.length) failures++;
+					console.log(
+						`${row.errors.length ? '✖' : '✔'} ${pkg.name.padEnd(48)} ${(row.version || '-').padEnd(10)} ${row.actions.join('; ') || '-'}` +
+							(row.reason ? `  (${row.reason})` : '') +
+							row.errors.map((e) => `\n    ${e}`).join('')
+					);
+				}
 			}
 		}
 	} finally {
@@ -840,7 +966,7 @@ async function main() {
 
 	if (restrictedOnNpmList.length) {
 		console.log(
-			`::warning::${restrictedOnNpmList.length} package(s) are still PRIVATE on npmjs.org. CI cannot change that (npm requires an interactive 2FA step for access changes): run the one-time flip in Workspace/knowledge/infrastructure/EVER_WORKS_NPM.md.`
+			`::warning::${restrictedOnNpmList.length} package(s) are still PRIVATE on npmjs.org. CI cannot change that (npm requires an interactive 2FA step for access changes): the job summary lists the one-time commands (docs/devops/github-workflows-deep-dive.md).`
 		);
 	}
 

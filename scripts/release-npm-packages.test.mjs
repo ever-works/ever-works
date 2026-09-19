@@ -10,12 +10,15 @@ import { gzipSync } from 'node:zlib';
 
 import {
 	buildPublishManifest,
+	bumpVersion,
 	compareSemver,
 	computeFingerprint,
 	entryPointTargets,
 	incPatch,
 	maxStable,
 	normalizeManifestForFingerprint,
+	parseChangesetBumps,
+	parsePackument,
 	readPackageJsonFromTarball,
 	resolveDistribution,
 	resolveTargetVersion,
@@ -117,6 +120,31 @@ describe('resolveTargetVersion', () => {
 			registries: [{ versions: { '1.0.2': released('a'), '2.0.0-beta.1': released('b') } }]
 		});
 		assert.equal(d.version, '1.0.3');
+	});
+
+	it('never reuses a version number that was published and then unpublished', () => {
+		const d = resolveTargetVersion({
+			repoVersion: '1.0.0',
+			fingerprint: 'new',
+			registries: [{ versions: { '1.0.3': released('a') }, burned: ['1.0.4', '1.0.5'] }]
+		});
+		assert.equal(d.version, '1.0.6');
+		const ahead = resolveTargetVersion({
+			repoVersion: '1.2.0',
+			fingerprint: 'new',
+			registries: [{ versions: { '1.1.0': released('a') }, burned: ['1.2.0'] }]
+		});
+		assert.equal(ahead.version, '1.2.1');
+	});
+
+	it('does not reuse a same-content version that is burned on another registry', () => {
+		const d = resolveTargetVersion({
+			repoVersion: '1.0.0',
+			fingerprint: 'F',
+			registries: [{ versions: {}, burned: ['1.0.5'] }, { versions: { '1.0.5': released('F') } }]
+		});
+		assert.equal(d.version, '1.0.6');
+		assert.equal(d.changed, true);
 	});
 
 	it('rejects a non-semver package.json version', () => {
@@ -306,6 +334,50 @@ describe('topoSort', () => {
 
 	it('rejects a cycle', () => {
 		assert.throws(() => topoSort([pkg('a', { b: '1' }), pkg('b', { a: '1' })]), /cycle/);
+	});
+});
+
+describe('changesets', () => {
+	it('bumps a version by type', () => {
+		assert.equal(bumpVersion('1.1.0', 'minor'), '1.2.0');
+		assert.equal(bumpVersion('1.1.3', 'major'), '2.0.0');
+		assert.equal(bumpVersion('1.1.3', 'patch'), '1.1.4');
+		assert.equal(bumpVersion('1.1.3', 'none'), '1.1.3');
+	});
+
+	it('reads only the packages a changeset names, keeping the highest bump', () => {
+		const bumps = parseChangesetBumps([
+			// The changeset committed in this repo on 2026-09-14.
+			"---\n'@ever-works/plugin': minor\n---\n\nAI provider plugins may now declare `reasoningSupport(modelId)`.\n",
+			'---\r\n"@ever-works/openai-plugin": patch\r\n"@ever-works/plugin": patch\r\n---\r\n\r\nFix.\r\n',
+			'---\n"@ever-works/grok-plugin": major\n---\n'
+		]);
+		assert.deepEqual(Object.fromEntries(bumps), {
+			'@ever-works/plugin': 'minor',
+			'@ever-works/openai-plugin': 'patch',
+			'@ever-works/grok-plugin': 'major'
+		});
+	});
+
+	it('ignores files without frontmatter and prose lines', () => {
+		assert.equal(parseChangesetBumps(['# Changesets\n\nfoo: minor\n', '---\n---\n']).size, 0);
+	});
+});
+
+describe('parsePackument', () => {
+	it('lists unpublished versions as burned', () => {
+		const p = parsePackument({
+			versions: { '1.0.0': {}, '1.0.2': {} },
+			time: { created: 'x', modified: 'y', '1.0.0': 'a', '1.0.1': 'b', '1.0.2': 'c' }
+		});
+		assert.deepEqual(Object.keys(p.versions), ['1.0.0', '1.0.2']);
+		assert.deepEqual(p.burned, ['1.0.1']);
+	});
+
+	it('handles a fully unpublished package', () => {
+		const p = parsePackument({ time: { unpublished: { versions: ['1.0.0', '1.0.1'] } } });
+		assert.deepEqual(p.versions, {});
+		assert.deepEqual(p.burned.sort(), ['1.0.0', '1.0.1']);
 	});
 });
 
