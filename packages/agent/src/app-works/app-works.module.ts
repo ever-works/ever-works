@@ -1,14 +1,24 @@
-import { Module } from '@nestjs/common';
+import { Module, type FactoryProvider } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
-import { AppUpstreamStateService } from './app-upstream-state.service';
+import {
+    APP_FORK_READINESS_DISPATCHER,
+    AppUpstreamStateService,
+    type AppForkReadinessDispatcher,
+    type AppForkReadinessJobPayload,
+} from './app-upstream-state.service';
 import { AppUpstreamSyncDispatcherService } from './app-upstream-sync-dispatcher.service';
 import { AppSourceInspectorService } from './app-source-inspector.service';
 import { AppWorkCreateService } from './app-work-create.service';
+import { AppActionsHygieneService } from './app-actions-hygiene.service';
+import {
+    JOB_RUNTIME_PROVIDER_REGISTRY,
+    type JobRuntimeProviderRegistry,
+} from '../tasks/job-runtime.providers';
 
 /**
  * APW-02 App Works (Fork lifecycle) — the agent-side module.
@@ -79,7 +89,97 @@ import { AppWorkCreateService } from './app-work-create.service';
  * for real, not a widened shell in someone else's spec. Nothing in this file
  * changes as a result, and the epic's token crosses back in through this
  * module's `exports`.
+ *
+ * ## C10 — the readiness dispatcher IS bound here now (additive)
+ *
+ * `docs/internal/app-works-build-progress.md` §5.2 row C10 recorded the gap this
+ * section closes: `APP_FORK_READINESS_DISPATCHER` had **no `provide:` anywhere**,
+ * so `AppWorkCreateService.dispatchReadiness` and
+ * `AppUpstreamStateService.retryReadiness` both found their `@Optional()`
+ * injection `undefined`, answered `readinessReason = 'dispatch_unavailable'`, and
+ * an App Work could never reach `ready` in any environment.
+ *
+ * 🛑 **Why the binding is in THIS module and not in
+ * `apps/api/src/app-works/app-works.module.ts`, whose docstring names the
+ * dispatchers as owed there.** Nest resolves a provider's dependencies from the
+ * module that **declares** it plus that module's own imports.
+ * `AppWorkCreateService` and `AppUpstreamStateService` are declared *here*; the
+ * API's module **imports** this one, so a provider it declares reaches this
+ * module's services only if this module imports *it* — which would be the cycle
+ * `WorkModule`'s `imports: [AppWorksModule]` already documents. The token
+ * therefore has to be bound on this side of that edge (or by a `@Global()`
+ * module), and a binding anywhere else would be structurally invisible to both
+ * call sites — which is exactly the failure C10 measured.
+ *
+ * The note T28 left above still stands for its own token: T31's planned
+ * `APP_UPSTREAM_SYNC_DISPATCHER` binding is *not* this file's to add, and this
+ * section binds the readiness token only because C10 is the gap that keeps an App
+ * Work from ever becoming `ready`.
+ *
+ * What the binding resolves: the **active job runtime's** dispatchers view
+ * (`JOB_RUNTIME_PROVIDER_REGISTRY`, EW-685), whose `dispatchAppForkReadiness`
+ * enqueues the `app-fork-readiness` job (`TriggerService`, wired by the same
+ * slice). Two properties are load-bearing and both are pinned by
+ * `__tests__/app-fork-readiness-wiring.spec.ts`:
+ *
+ *   - the injection is **optional** (`OptionalFactoryDependency`), so this module
+ *     still compiles in the bare graph its own spec builds, and a process with no
+ *     job runtime registered is a supported installation rather than a boot
+ *     failure;
+ *   - `dispatch` answers **`null`** whenever no runtime is registered or the
+ *     runtime does not implement the method — the same fail-closed answer both
+ *     call sites already had, which records `dispatch_unavailable` on the row and
+ *     leaves it to APW-02's sweeper. This binding makes the dispatch *possible*;
+ *     it does not invent a run id for a dispatch that did not happen.
+ *
+ * The readiness **run** itself (`AppForkReadinessService`, T24) is provided
+ * API-side, beside the facades it reads providers through, and exposed to the
+ * worker as `AppForkReadinessRunner` — see that file's docstring for why its
+ * `deps.sleep` function cannot cross the internal channel.
  */
+
+/**
+ * The method the active job runtime exposes for this job.
+ *
+ * Named once so the binding and its spec cannot drift: `TriggerService`
+ * implements it (`packages/tasks/src/trigger/trigger.service.ts`) and
+ * `TriggerService` **is** the dispatchers view its providers hand out.
+ */
+const FORK_READINESS_DISPATCH_METHOD = 'dispatchAppForkReadiness' as const;
+
+/**
+ * C10's binding, built by a function so the spec can drive the factory directly
+ * with a fake registry (the shape `buildJobRuntimeProviders` is tested with) as
+ * well as through a real container.
+ *
+ * The registry is injected **optionally** (`OptionalFactoryDependency`), which is
+ * what lets this module compile where no job runtime exists at all — the agent
+ * package's own module spec, a CLI context, a worker that never registers the
+ * Trigger provider. `dispatch` then answers `null`: C10's documented fail-closed
+ * path, not a new failure mode.
+ */
+export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
+    return {
+        provide: APP_FORK_READINESS_DISPATCHER,
+        useFactory: (registry?: JobRuntimeProviderRegistry | null): AppForkReadinessDispatcher => ({
+            dispatch: async (payload: AppForkReadinessJobPayload): Promise<string | null> => {
+                const dispatchers = registry?.getActive()?.dispatchers as
+                    | Record<string, unknown>
+                    | undefined;
+                const dispatch = dispatchers?.[FORK_READINESS_DISPATCH_METHOD];
+                if (typeof dispatch !== 'function') {
+                    return null;
+                }
+                const runId = await (
+                    dispatch as (p: AppForkReadinessJobPayload) => Promise<string | null>
+                ).call(dispatchers, payload);
+                return runId ?? null;
+            },
+        }),
+        inject: [{ token: JOB_RUNTIME_PROVIDER_REGISTRY, optional: true }],
+    };
+}
+
 @Module({
     imports: [
         // The epic's own table. `forFeature` is what registers the entity with
@@ -108,6 +208,16 @@ import { AppWorkCreateService } from './app-work-create.service';
         DistributedTaskLockService,
         AppSourceInspectorService,
         AppWorkCreateService,
+        // C10 — T24's hygiene service joined the graph with the readiness service
+        // (`AppForkReadinessService` injects it NON-optionally), and it is provided
+        // here because `WorkUpstreamStateRepository`, its only required
+        // collaborator, is this module's own provider. Its other three
+        // collaborators stay `@Optional()`, so the bare compile this module's spec
+        // builds still resolves.
+        AppActionsHygieneService,
+        // C10 — the binding that makes a readiness dispatch leave the process. See
+        // the docstring above for why it lives here and what `null` means.
+        buildAppForkReadinessDispatcherProvider(),
     ],
     exports: [
         WorkUpstreamStateRepository,
@@ -115,6 +225,12 @@ import { AppWorkCreateService } from './app-work-create.service';
         AppUpstreamSyncDispatcherService,
         AppSourceInspectorService,
         AppWorkCreateService,
+        // C10 — exported so the API-side module can provide T24's readiness service
+        // (and the RPC runner in front of it) without re-declaring the hygiene
+        // service, and so any future consumer of this module resolves the SAME
+        // dispatcher instance the two call sites use.
+        AppActionsHygieneService,
+        APP_FORK_READINESS_DISPATCHER,
     ],
 })
 export class AppWorksModule {}

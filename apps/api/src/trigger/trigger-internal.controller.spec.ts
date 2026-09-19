@@ -23,6 +23,11 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/app-works', () => ({
     AppUpstreamStateService: class AppUpstreamStateService {},
     AppUpstreamSyncDispatcherService: class AppUpstreamSyncDispatcherService {},
+    // C10 — the readiness job's RPC target, stubbed for the same reason: the runner
+    // reaches the readiness service, the state entity and the git facade, none of
+    // which this suite needs in order to assert that the remote target is registered
+    // and callable.
+    AppForkReadinessRunner: class AppForkReadinessRunner {},
 }));
 // APW-03 T12/T13 (wired by APW-02 T28) — same rationale: the app-spec barrel
 // reaches the spec state entity and the git facade, neither of which this suite
@@ -211,6 +216,9 @@ describe('TriggerInternalController', () => {
     let appBuildPrepareRunner: any;
     // APW-05 T20 + C17 — the pp-build-watch job's runner, the second half of the pair.
     let appBuildWatchRunner: any;
+    // C10 — the `app-fork-readiness` job's runner: the readiness run writes the state
+    // row, so it runs API-side and the worker proxies it by name.
+    let appForkReadinessRunner: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -313,6 +321,9 @@ describe('TriggerInternalController', () => {
             appBuildPrepareRunner,
             // APW-05 T20 + C17 — and the `app-build-watch` runner after it, same rule.
             appBuildWatchRunner,
+            // C10 — the `app-fork-readiness` runner, appended LAST + `@Optional()` per the
+            // arity rule above.
+            appForkReadinessRunner,
         );
         c.onModuleInit();
         return c;
@@ -399,6 +410,21 @@ describe('TriggerInternalController', () => {
                 status: 'observed',
                 buildId: payload.buildId,
                 reason: payload.reason,
+            })),
+        };
+        // C10 — the real method the RPC hop must reach (`run`, the one member the
+        // worker's seam declares). The readiness run writes the state row, so it is the
+        // API process that performs it.
+        appForkReadinessRunner = {
+            name: 'AppForkReadinessRunner',
+            run: jest.fn((payload: { workId: string; attempt?: number; reason?: string }) => ({
+                workId: payload.workId,
+                attempt: payload.attempt ?? 1,
+                outcome: 'not_found',
+                reason: 'state_not_found',
+                probes: 0,
+                sleeps: [],
+                elapsedMs: 0,
             })),
         };
 
@@ -947,6 +973,77 @@ describe('TriggerInternalController', () => {
                     args: superjson.serialize([]) as any,
                 }),
             ).rejects.toThrow('Method not in allow-list for AppBuildWatchRunner: doesNotExist');
+        });
+    });
+
+    // -------------------------------------------------------------------
+    // C10 — the `app-fork-readiness` job's remote target
+    // -------------------------------------------------------------------
+
+    /**
+     * `packages/tasks/src/tasks/trigger/app-fork-readiness.task.ts` proxies exactly this
+     * name, and for a reason none of its siblings share: `AppForkReadinessService.run`
+     * takes a `deps.sleep` **function**, and `createRemoteProxy` serialises arguments
+     * with SuperJSON (`remote-proxy.ts:93-96`), which cannot carry one. The runner
+     * supplies the real timer API-side, so the worker's payload is the only thing that
+     * crosses the hop — and `run` is the whole surface it needs.
+     *
+     * This is the half C10 measured as missing: before it there was no
+     * `app-fork-readiness` job at all, so a fork create left the row at
+     * `readinessReason = 'dispatch_unavailable'` and an App Work could never reach
+     * `ready`. A missing entry is not silent — it is
+     * `Unknown remote target: AppForkReadinessRunner` on the run that needed it — which
+     * is why the registration and the callability are asserted together here.
+     */
+    describe('the C10 app-fork-readiness remote target', () => {
+        it('registers AppForkReadinessRunner so the queued readiness run can happen at all', () => {
+            expect((controller as any).remoteMap.AppForkReadinessRunner).toBe(
+                appForkReadinessRunner,
+            );
+        });
+
+        it('reaches `run` — the one member the task’s seam declares — over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppForkReadinessRunner',
+                method: 'run',
+                args: superjson.serialize([
+                    { workId: 'work-1', attempt: 1, reason: 'initial' },
+                ]) as any,
+            });
+
+            expect(appForkReadinessRunner.run).toHaveBeenCalledWith({
+                workId: 'work-1',
+                attempt: 1,
+                reason: 'initial',
+            });
+            // The service's own answer, passed through untouched: a readiness attempt
+            // that finds no state row is `not_found`/`state_not_found`, NOT a transport
+            // failure and not a green run.
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                workId: 'work-1',
+                attempt: 1,
+                outcome: 'not_found',
+                reason: 'state_not_found',
+                probes: 0,
+                sleeps: [],
+                elapsedMs: 0,
+            });
+        });
+
+        it('derives a callable allow-list holding `run` and naming an unknown method', async () => {
+            // The allow-list is what keeps the entry from being a blanket proxy for the
+            // runner's internals (C-05's half of the RPC contract).
+            expect([
+                ...((controller as any).allowedMethods.AppForkReadinessRunner as Set<string>),
+            ]).toEqual(['run']);
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppForkReadinessRunner',
+                    method: 'doesNotExist',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow('Method not in allow-list for AppForkReadinessRunner: doesNotExist');
         });
     });
 });

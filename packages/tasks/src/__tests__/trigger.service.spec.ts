@@ -94,6 +94,14 @@ vi.mock('../tasks/trigger/kb-org-overlay-fanout.task', () => ({
 vi.mock('../tasks/trigger/app-spec-evaluate.task', () => ({
     appSpecEvaluateTask: { trigger: appSpecEvaluateTriggerMock },
 }));
+// C10 — the `app-fork-readiness` job, reached by id (its own module declares both the
+// id and the task handle, so ONE mock covers the pair and the id is pinned as a real
+// literal here — a mock that echoed a made-up value would hide a drift between this
+// service and the task module).
+vi.mock('../tasks/trigger/app-fork-readiness.task', () => ({
+    APP_FORK_READINESS_TASK_ID: 'app-fork-readiness',
+    appForkReadinessTask: { id: 'app-fork-readiness' },
+}));
 
 import { TriggerService } from '../trigger/trigger.service';
 
@@ -481,6 +489,74 @@ describe('TriggerService', () => {
             const out = await service.dispatchAppBuildWatch(payload);
 
             expect(out).toBeNull();
+        });
+    });
+
+    describe('dispatchAppForkReadiness', () => {
+        // C10 — the enqueue half of the readiness chain. `AppWorkCreateService` and
+        // `AppUpstreamStateService` reach this method through the
+        // `APP_FORK_READINESS_DISPATCHER` binding, and `null` is their documented
+        // fail-closed answer (the row keeps `dispatch_unavailable` and APW-02's sweeper
+        // re-dispatches) — so this method must resolve `null`, never throw.
+        const payload = {
+            workId: 'w1',
+            attempt: 1,
+            reason: 'initial' as const,
+            providerId: 'github',
+        };
+
+        it('returns null when trigger is disabled', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            const out = await service.dispatchAppForkReadiness(payload);
+
+            expect(out).toBeNull();
+            expect(tasksTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('returns null when the secret key is missing (nothing is enqueued)', async () => {
+            triggerConfig.getSecretKey.mockReturnValue('');
+            const out = await service.dispatchAppForkReadiness(payload);
+
+            expect(out).toBeNull();
+            expect(tasksTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('enqueues app-fork-readiness with the work + reason tags and the per-Work key', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_readiness_1' });
+
+            const out = await service.dispatchAppForkReadiness(payload);
+
+            expect(out).toBe('run_readiness_1');
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'app-fork-readiness',
+                payload,
+                expect.objectContaining({
+                    tags: ['app-fork-readiness', 'work:w1', 'trigger:initial'],
+                    machine: 'small-1x',
+                    // §6.2's per-Work key: two readiness runs for one Work would race
+                    // over the same row; the queue side is serialised, and the run's own
+                    // `beginAttempt` claim is the real guard.
+                    concurrencyKey: 'app-fork-readiness:w1',
+                }),
+            );
+        });
+
+        it('tags an untagged payload as `trigger:initial` and returns null when the SDK throws', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_readiness_2' });
+
+            await expect(service.dispatchAppForkReadiness({ workId: 'w1' })).resolves.toBe(
+                'run_readiness_2',
+            );
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'app-fork-readiness',
+                { workId: 'w1' },
+                expect.objectContaining({
+                    tags: expect.arrayContaining(['app-fork-readiness', 'trigger:initial']),
+                }),
+            );
+
+            tasksTriggerMock.mockRejectedValue(new Error('fetch failed'));
+            await expect(service.dispatchAppForkReadiness(payload)).resolves.toBeNull();
         });
     });
 

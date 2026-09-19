@@ -96,6 +96,7 @@ import {
     PaygService,
 } from '@ever-works/agent/subscriptions';
 import {
+    AppForkReadinessRunner,
     AppUpstreamStateService,
     AppUpstreamSyncDispatcherService,
 } from '@ever-works/agent/app-works';
@@ -513,6 +514,14 @@ export class TriggerInternalController implements OnModuleInit {
         // AppBuildWatchRunner` rather than pretending an observation happened.
         @Optional()
         private readonly appBuildWatchRunner?: AppBuildWatchRunner,
+        // C10 — the `app-fork-readiness` job's runner, so the worker's RPC call lands
+        // where the `DataSource` and the state row are. This is the half C10 measured as
+        // missing: the job did not exist at all, so with the name absent the worker's
+        // proxy would answer the loud `Unknown remote target: AppForkReadinessRunner`
+        // rather than pretending a readiness run happened. Appended LAST + `@Optional()`
+        // per the arity rule above, exactly as its siblings are.
+        @Optional()
+        private readonly appForkReadinessRunner?: AppForkReadinessRunner,
     ) {}
 
     onModuleInit() {
@@ -674,6 +683,14 @@ export class TriggerInternalController implements OnModuleInit {
             AppBuildPrepareRunner: this.appBuildPrepareRunner,
             // APW-05 T20 + C17 — and the worker half of `app-build-watch`, same rule.
             AppBuildWatchRunner: this.appBuildWatchRunner,
+            // C10 — and the worker half of `app-fork-readiness`. Registered
+            // unconditionally for the same reason every App entry above is: a name that
+            // maps to `undefined` answers a loud "Unknown remote target" instead of
+            // pretending the readiness run happened. The run is resolved here because a
+            // Trigger worker owns no `DataSource` and the readiness poll writes the state
+            // row (FR-17…FR-24a) — the service's own `deps.sleep` cannot cross this hop,
+            // which is what `AppForkReadinessRunner` exists to bridge.
+            AppForkReadinessRunner: this.appForkReadinessRunner,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

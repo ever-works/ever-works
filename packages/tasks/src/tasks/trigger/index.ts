@@ -113,3 +113,11 @@ export * from './app-build-prepare.task';
 // API-side, so the task resolves it over the internal RPC channel — see the
 // file's header for the two registrations that live outside this package.
 export * from './app-build-watch.task';
+// C10 — one readiness run of one App Work (APW-02 plan §6.2). The job that turns
+// a fork REQUEST into a READY repository: the private-copy push, FR-18's poll
+// schedule, Actions hygiene and the setup hand-off. It resolves
+// `AppForkReadinessRunner` over the internal RPC channel because the run writes
+// the state row and a Trigger worker owns no `DataSource`; the dispatcher that
+// queues it (`APP_FORK_READINESS_DISPATCHER`) is bound in the agent-side
+// `AppWorksModule` — see the file's header for both registrations.
+export * from './app-fork-readiness.task';

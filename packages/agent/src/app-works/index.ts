@@ -28,6 +28,11 @@
  *   of plan §6.2 and its recorded sleep ladder. Its `APP_PROVISION_EVENTS_PORT` consumer
  *   half is **provisional** until APW-04 lands, and carries the mandatory-swap note on
  *   its declaration.
+ * - `./app-fork-readiness.runner` — `AppForkReadinessRunner` and
+ *   `APP_FORK_READINESS_JOB_ID` (C10): the serialisable, `remoteMap`-facing seam in
+ *   front of T24's service, because its `deps.sleep` function cannot cross the
+ *   SuperJSON remote proxy. The API-side module provides it and the
+ *   `app-fork-readiness` Trigger task proxies it by name.
  * - `./upstream-schedule` — `computeNextUpstreamSync` and the four-field reader of
  *   `upstreamSync` (T26, plan §6.4): the schedule, `enabled`, `branch` and `mode`, with
  *   the documented defaults, the hourly clamp and the stable per-Work jitter.
@@ -66,6 +71,7 @@ export * from './app-upstream-state.service';
 export * from './app-fork-ready-handler.port';
 export * from './app-actions-hygiene.service';
 export * from './app-fork-readiness.service';
+export * from './app-fork-readiness.runner';
 export * from './upstream-schedule';
 export * from './app-upstream-conflict.copy';
 export * from './app-upstream-sync.service';

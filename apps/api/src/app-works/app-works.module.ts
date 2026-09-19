@@ -3,7 +3,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
-import { AppWorksModule as AgentAppWorksModule } from '@ever-works/agent/app-works';
+import {
+    AppForkReadinessRunner,
+    AppForkReadinessService,
+    AppWorksModule as AgentAppWorksModule,
+} from '@ever-works/agent/app-works';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AppUpstreamController } from './app-upstream.controller';
 
@@ -65,6 +69,35 @@ import { AppUpstreamController } from './app-upstream.controller';
  * one dispatcher whichever door is used.
  *
  * Registered additively in `apps/api/src/api.module.ts`, next to `AppLauncherModule`.
+ *
+ * ## C10 — T24's readiness service and its RPC runner are provided here (additive)
+ *
+ * The paragraph above still holds for the tokens it names: this module binds no
+ * `APP_FORK_READINESS_DISPATCHER` placeholder, because that token is injected by
+ * services declared in the **agent** module and a provider declared here cannot be
+ * seen by them (see that module's C10 section for the visibility rule and why the
+ * binding therefore lives there).
+ *
+ * What this module now provides is the readiness **run**: `AppForkReadinessService`
+ * (T24) plus `AppForkReadinessRunner` (C10), the serialisable seam the
+ * `app-fork-readiness` Trigger task proxies. They are provided here — rather than
+ * in the agent module beside the state service — for a reason this module's own
+ * import list already fixes: `AppForkReadinessService` injects `GitFacadeService`
+ * **non-optionally** (readiness probes and the private-copy push are provider
+ * calls), and `FacadesModule` is imported here for real. Providing it agent-side
+ * would additionally require the two specs that compile the agent module against
+ * a *shelled* `FacadesModule` (`app-works.module.spec.ts`,
+ * `app-upstream-state.service.spec.ts`) to invent a git facade for a service they
+ * are not about.
+ *
+ * `AppActionsHygieneService`, the service's other required collaborator, is
+ * re-exported by `AgentAppWorksModule` and resolves from there.
+ *
+ * `TriggerInternalModule` imports this module for the upstream trio, and that one
+ * import is also what makes the runner resolvable for the controller's
+ * `remoteMap` entry `AppForkReadinessRunner` — with the entry absent the worker's
+ * proxy answers the loud `Unknown remote target: AppForkReadinessRunner` instead
+ * of pretending a readiness run happened.
  */
 @Module({
     imports: [
@@ -76,6 +109,7 @@ import { AppUpstreamController } from './app-upstream.controller';
         ActivityLogModule,
     ],
     controllers: [AppUpstreamController],
-    exports: [AgentAppWorksModule],
+    providers: [AppForkReadinessService, AppForkReadinessRunner],
+    exports: [AgentAppWorksModule, AppForkReadinessService, AppForkReadinessRunner],
 })
 export class AppWorksModule {}

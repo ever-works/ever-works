@@ -80,7 +80,20 @@ import { appSpecEvaluateTask } from '../tasks/trigger/app-spec-evaluate.task';
 // itself comes from `@ever-works/agent/tasks` (`APP_BUILD_PREPARE_TASK_ID`), which is the
 // same string that module registers its task under.
 import type { appBuildPrepareTask } from '../tasks/trigger/app-build-prepare.task';
+// C10 — the `app-fork-readiness` job (APW-02 plan §6.1/§6.2). Both the id and the type
+// come from the task module itself here: T31's planned agent-side
+// `app-fork-readiness.types.ts` has not landed, and unlike the Build pair there is no
+// second declaration to keep in step — the id is imported, never re-typed, so the
+// dispatch site and the `task({ id })` registration cannot disagree.
+import {
+    APP_FORK_READINESS_TASK_ID,
+    type appForkReadinessTask,
+} from '../tasks/trigger/app-fork-readiness.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
+// C10 — the readiness payload and dispatcher contract T23 declared (provisionally) in
+// `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
+// payload is API-side, and this file only needs the shape the SDK call is checked against.
+import type { AppForkReadinessJobPayload } from '@ever-works/agent/app-works';
 
 /**
  * EW-742 P3.2 T22 (stamping) — minimal stamp payload set on the
@@ -1243,6 +1256,63 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch app-build-watch task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * C10 — the `app-fork-readiness` job (APW-02 plan §6.1:655, §6.2).
+     *
+     * This is the enqueue half of the gap `docs/internal/app-works-build-progress.md`
+     * §5.2 row C10 measured: `AppWorkCreateService.dispatchReadiness` (the create path)
+     * and `AppUpstreamStateService.retryReadiness` (**Try again**, FR-19) both inject
+     * `APP_FORK_READINESS_DISPATCHER` `@Optional()`, and with the token unbound in every
+     * module they logged "no readiness dispatcher is bound" and left the row at
+     * `dispatch_unavailable` — so an App Work could never reach `ready` anywhere.
+     *
+     * The **agent** `AppWorksModule` now binds that token to the active runtime's
+     * `dispatchers.dispatchAppForkReadiness` (this method, named by
+     * `FORK_READINESS_DISPATCH_METHOD` there), which is what makes the dispatch leave the
+     * process.
+     *
+     * ## Shape — `dispatchAppBuildPrepare`'s, and `null` means the same deferral
+     *
+     * A `null` return is not a failure here either: the two call sites record
+     * `readinessReason = 'dispatch_unavailable'` on the row and APW-02's sweeper
+     * re-dispatches, which is the documented fail-closed path when no job runtime is
+     * configured (the local e2e stack, a CLI context). The dispatch must therefore
+     * resolve `null` rather than throw — a rejection would surface inside the create
+     * request and turn "the queue is not configured" into a failed create.
+     *
+     * `concurrencyKey` is per Work: two readiness runs for one Work would race over the
+     * same row. The real mutual exclusion is the run's own attempt claim
+     * (`beginAttempt`, which exits `already_ready`), so serialising the queue only stops
+     * a create + Try again pair from queueing two polls that would each find nothing to
+     * do.
+     */
+    async dispatchAppForkReadiness(payload: AppForkReadinessJobPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof appForkReadinessTask>(
+                APP_FORK_READINESS_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'app-fork-readiness',
+                        `work:${payload.workId}`,
+                        `trigger:${payload.reason ?? 'initial'}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-fork-readiness:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-fork-readiness task', error as Error);
             return null;
         }
     }
