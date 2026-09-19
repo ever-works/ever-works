@@ -367,6 +367,28 @@ export const ROUTES = {
     API_OAUTH_READ_PACKAGES_CALLBACK: '/api/oauth/:providerId/callback/plugins/read-packages',
 } as const;
 
+/**
+ * Destination of the original `Ctrl/Cmd+K`, kept reachable as the command
+ * palette's "Search Works" entry.
+ *
+ * ## Why it lives here and not in the hook that first used it
+ *
+ * It was declared in `@/lib/hooks/use-keyboard-shortcuts` — a **`'use client'`**
+ * module — and two consumers need it from different sides of the React
+ * boundary: that client hook, and `@/components/command-palette/registry/commands`
+ * (the command registry, which carries no directive of its own). A plain value
+ * imported into a module that renders on the **server** arrives as a *client
+ * reference* rather than the string, which is the defect class C22 and C27
+ * recorded. Keeping the constant in a module with **no `'use client'`** makes it
+ * a real string on both sides, and nothing is taken away: the hook still exports
+ * the same name (it re-exports this one), so every existing consumer and spec is
+ * unchanged.
+ *
+ * `apps/web/scripts/check-server-client-boundary.mjs` is the mechanical guard for
+ * the whole class.
+ */
+export const WORKS_SEARCH_HREF = `${ROUTES.DASHBOARD_WORKS}?focus=search`;
+
 export const routeWithParams = (route: string, params: Record<string, string>) => {
     Object.entries(params).forEach(([key, value]) => {
         route = route.replace(`:${key}`, value);

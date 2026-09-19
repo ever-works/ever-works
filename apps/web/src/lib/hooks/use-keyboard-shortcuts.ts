@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from '@/i18n/navigation';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, WORKS_SEARCH_HREF } from '@/lib/constants';
 import { isModKey, SHORTCUT_PRIORITY, SHORTCUT_SCOPE } from '@/lib/keyboard/shortcut-registry';
 import { useShortcut } from './use-shortcut';
 
@@ -15,8 +15,16 @@ interface KeyboardShortcutsOptions {
     onOpenPalette?: (source: 'shortcut' | 'slash') => void;
 }
 
-/** Destination of the original `Ctrl/Cmd+K`, kept reachable as the "Search Works" command. */
-export const WORKS_SEARCH_HREF = `${ROUTES.DASHBOARD_WORKS}?focus=search`;
+// `WORKS_SEARCH_HREF` now lives in `@/lib/constants` — a module with NO
+// `'use client'` directive — and is IMPORTED above. It moved because this module
+// IS a client module and the command-palette registry needs the same string from
+// the other side of the boundary, where a value imported from a client module
+// arrives as a client REFERENCE, not the string (the C22/C27 defect class).
+//
+// The name this module used to DECLARE is re-exported below, unchanged and
+// pointing at the one definition, so every existing consumer and spec keeps
+// working.
+export { WORKS_SEARCH_HREF };
 
 /**
  * Global keyboard shortcuts for the dashboard, registered through the shared

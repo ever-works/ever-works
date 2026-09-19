@@ -19,8 +19,12 @@ import {
     Target,
     Users,
 } from 'lucide-react';
-import { ROUTES } from '@/lib/constants';
-import { WORKS_SEARCH_HREF } from '@/lib/hooks/use-keyboard-shortcuts';
+// `WORKS_SEARCH_HREF` is imported from `@/lib/constants`, NOT from the
+// `'use client'` hook module it used to live in: this file carries no directive of
+// its own, and a value imported into a module that can render on the server
+// arrives as a client REFERENCE rather than the string (the C22/C27 defect class).
+// The hook still exports the same name, so its own consumers are unchanged.
+import { ROUTES, WORKS_SEARCH_HREF } from '@/lib/constants';
 import { getWorkIdFromPath, replaceWorkIdInPath } from '@/lib/utils/work-route';
 import type { PaletteCommand, PaletteCommandContext } from './types';
 
