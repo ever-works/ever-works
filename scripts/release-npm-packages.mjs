@@ -706,23 +706,24 @@ function parseArgs(argv) {
 	return opts;
 }
 
-async function githubVisibility(names) {
-	const token = process.env.GITHUB_TOKEN;
-	const owner = process.env.GITHUB_REPOSITORY_OWNER ?? process.env.GITHUB_REPOSITORY?.split('/')[0];
-	if (!token || !owner) return [];
+/**
+ * Packages that are not publicly visible on GitHub Packages. The REST API that
+ * reports `visibility` is not readable with the workflow's GITHUB_TOKEN (the
+ * first production run got nothing back), so this asks the way the public
+ * does: a package's page answers 302 (to its repository-linked page) when it
+ * is public and 404 when it is private — or missing.
+ */
+export async function githubVisibility(names) {
+	const owner = process.env.GITHUB_REPOSITORY_OWNER ?? process.env.GITHUB_REPOSITORY?.split('/')[0] ?? 'ever-works';
 	const privateOnes = [];
 	for (const name of names) {
 		const bare = name.replace(/^@[^/]+\//, '');
 		try {
 			const res = await fetchWithRetry(
-				`https://api.github.com/orgs/${owner}/packages/npm/${encodeURIComponent(bare)}`,
-				{
-					headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json' }
-				}
+				`https://github.com/orgs/${owner}/packages/npm/package/${encodeURIComponent(bare)}`,
+				{ redirect: 'manual' }
 			);
-			if (!res.ok) continue;
-			const body = await res.json();
-			if (body.visibility && body.visibility !== 'public') {
+			if (res.status === 404) {
 				privateOnes.push({ name, url: `https://github.com/orgs/${owner}/packages/npm/${bare}/settings` });
 			}
 		} catch {
