@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2667 · package-relative skipped: 202
 
-present: 1585 · absent: 1082 · of the absent, another task says it creates them: 730
+present: 1615 · absent: 1052 · of the absent, another task says it creates them: 714
 
-## LANDED SURFACE — marked "new", already in the repository (226)
+## LANDED SURFACE — marked "new", already in the repository (236)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -38,6 +38,7 @@ present: 1585 · absent: 1082 · of the absent, another task says it creates the
 - APW-02-fork-lifecycle T27 — `apps/api/src/app-works/app-works.module.ts`
 - APW-02-fork-lifecycle T28 — `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts`
 - APW-02-fork-lifecycle T30 — `apps/web/src/components/works/app/AppUpstreamCard.tsx`
+- APW-02-fork-lifecycle T32 — `packages/tasks/src/tasks/trigger/app-fork-readiness.task.ts`
 - APW-03-app-spec-and-catalog T2 — `packages/agent/src/events/app-spec-applied.event.ts`
 - APW-03-app-spec-and-catalog T3 — `packages/agent/src/works-config/schema/app-spec.schema.ts`
 - APW-03-app-spec-and-catalog T4 — `packages/agent/src/works-config/schema/app-spec.refs.ts`
@@ -51,6 +52,10 @@ present: 1585 · absent: 1082 · of the absent, another task says it creates the
 - APW-03-app-spec-and-catalog T12 — `packages/agent/src/app-spec/app-spec.service.ts`
 - APW-03-app-spec-and-catalog T12 — `packages/agent/src/app-spec/app-spec-hash.ts`
 - APW-03-app-spec-and-catalog T13 — `packages/agent/src/tasks/app-spec-evaluate.types.ts`
+- APW-03-app-spec-and-catalog T15 — `apps/api/src/works/work-app-spec.controller.ts`
+- APW-03-app-spec-and-catalog T15 — `apps/api/src/works/dto/app-spec.dto.ts`
+- APW-03-app-spec-and-catalog T16 — `apps/web/src/lib/api/work-app-spec.ts`
+- APW-03-app-spec-and-catalog T16 — `apps/web/src/components/works/detail/settings/SettingsSubTabs.unit.spec.tsx`
 - APW-04-app-provisioner T2 — `packages/agent/src/agents/repo-agent-template.reader.ts`
 - APW-04-app-provisioner T2 — `packages/agent/src/agents/__tests__/agent-templates.repo-template.spec.ts`
 - APW-04-app-provisioner T6 — `packages/contracts/src/apps/app-provisioning.ts`
@@ -207,6 +212,8 @@ present: 1585 · absent: 1082 · of the absent, another task says it creates the
 - APW-12-ever-id T4 — `packages/plugin/src/contracts/capabilities/identity-provider.interface.ts`
 - APW-12-ever-id T4 — `packages/plugin/src/contracts/__tests__/identity-provider.interface.spec.ts`
 - APW-12-ever-id T5 — `packages/plugins/oidc-identity/src/__tests__/settings.schema.spec.ts`
+- APW-12-ever-id T6 — `packages/plugins/oidc-identity/src/discovery.ts`
+- APW-12-ever-id T6 — `packages/plugins/oidc-identity/src/__tests__/test-connection.spec.ts`
 - APW-13-golden-paths T1 — `apps/web/e2e/fakes/github-fake/fixtures/README.md`
 - APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/server.mjs`
 - APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/__tests__/server.unit.spec.ts`
@@ -233,6 +240,9 @@ present: 1585 · absent: 1082 · of the absent, another task says it creates the
 - APW-13-golden-paths T18 — `apps/web/e2e/flow-managed-subdomain-allocation.spec.ts`
 - APW-13-golden-paths T30 — `apps/web/e2e/flow-app-work-create-from-url.spec.ts`
 - APW-13-golden-paths T31 — `apps/web/e2e/flow-app-work-fork-lifecycle.spec.ts`
+- APW-13-golden-paths T32 — `apps/web/e2e/sec-pin-app-works-license-gate.spec.ts`
+- APW-13-golden-paths T33 — `apps/web/e2e/flow-app-work-delete-retains.spec.ts`
+- APW-13-golden-paths T33 — `apps/web/e2e/flow-app-work-target-none.spec.ts`
 - APW-13-golden-paths T56 — `docs/runbooks/app-works-acceptance-lanes.md`
 - APW-13-golden-paths T63 — `apps/web/e2e/helpers/github-connection.ts`
 - APW-13-golden-paths T63 — `apps/web/e2e/helpers/__tests__/github-connection.unit.spec.ts`
@@ -243,36 +253,36 @@ present: 1585 · absent: 1082 · of the absent, another task says it creates the
 | Epic | Named | Landed paths (marked new, exists) | Landed tasks | Tasks |
 | ---- | ----- | --------------------------------- | ------------ | ----- |
 | APW-01-app-work-kind | 58 | 9 | 6 | 44 |
-| APW-02-fork-lifecycle | 47 | 18 | 14 | 53 |
-| APW-03-app-spec-and-catalog | 139 | 13 | 11 | 59 |
+| APW-02-fork-lifecycle | 47 | 19 | 15 | 53 |
+| APW-03-app-spec-and-catalog | 129 | 17 | 13 | 59 |
 | APW-04-app-provisioner | 122 | 12 | 5 | 60 |
 | APW-05-builds | 74 | 13 | 13 | 48 |
 | APW-06-app-runtime | 144 | 49 | 27 | 73 |
-| APW-07-app-env-and-dependencies | 67 | 21 | 20 | 48 |
+| APW-07-app-env-and-dependencies | 66 | 21 | 20 | 48 |
 | APW-08-evolve-loop | 122 | 2 | 1 | 56 |
 | APW-09-upstream-pull-requests | 91 | 4 | 4 | 46 |
-| APW-10-apps-hosting-tier | 150 | 4 | 2 | 53 |
+| APW-10-apps-hosting-tier | 149 | 4 | 2 | 53 |
 | APW-11-app-launcher | 72 | 47 | 21 | 33 |
-| APW-12-ever-id | 122 | 4 | 3 | 53 |
-| APW-13-golden-paths | 100 | 30 | 22 | 73 |
+| APW-12-ever-id | 122 | 6 | 4 | 53 |
+| APW-13-golden-paths | 92 | 33 | 24 | 73 |
 
-Landed tasks **149 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
+Landed tasks **155 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
 
-## ABSENT PATHS (1082) — grouped by epic
+## ABSENT PATHS (1052) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
-- APW-10-apps-hosting-tier: 146
-- APW-03-app-spec-and-catalog: 126
+- APW-10-apps-hosting-tier: 145
 - APW-08-evolve-loop: 120
-- APW-12-ever-id: 118
+- APW-12-ever-id: 116
+- APW-03-app-spec-and-catalog: 112
 - APW-04-app-provisioner: 110
 - APW-06-app-runtime: 95
 - APW-09-upstream-pull-requests: 87
-- APW-13-golden-paths: 70
 - APW-05-builds: 61
+- APW-13-golden-paths: 59
 - APW-01-app-work-kind: 49
-- APW-07-app-env-and-dependencies: 46
-- APW-02-fork-lifecycle: 29
+- APW-07-app-env-and-dependencies: 45
+- APW-02-fork-lifecycle: 28
 - APW-11-app-launcher: 25
