@@ -59,9 +59,14 @@ import { buildJobRuntimeProviders } from '../../tasks/job-runtime.providers';
  * The three seams that make the table honest:
  *
  * - `rows` mimics the two conditional claims the service issues through
- *   `createQueryBuilder` by matching the recorded `where`/`andWhere` fragments.
- *   The claims ARE the idempotency mechanism, so a fake that ignored them would
- *   make the "exactly once" cases pass for the wrong reason.
+ *   `createQueryBuilder` by **evaluating** the recorded `where`/`andWhere`
+ *   fragments arm by arm. The claims ARE the idempotency mechanism, so a fake
+ *   that ignored them would make the "exactly once" cases pass for the wrong
+ *   reason — and a fake that **re-stated** them instead of reading them (C19)
+ *   makes those same cases blind to a change in the service's own predicate,
+ *   which is worse: they would keep passing against a `claimTerminal` that no
+ *   longer claims exactly once. A predicate shape the fake does not model is
+ *   refused loudly (see `execute` below), so a mutant reds instead of passing.
  * - `builds` implements the four `AppBuildRepository` members the service calls,
  *   with the number arithmetic and the `(plugin, runId, attempt)` identity the real
  *   one has.
@@ -268,22 +273,51 @@ function makeHarness(options: HarnessOptions = {}): Harness {
                     const row = id ? store.get(id) : undefined;
                     if (!row || !state.set) return { affected: 0 };
 
-                    // `UPDATE … SET "startedAt" = :t WHERE id = :id AND "startedAt" IS NULL`
-                    if (state.wheres.some((w) => w.sql === 'startedAt IS NULL')) {
-                        if (row.startedAt) return { affected: 0 };
-                        store.set(id, { ...row, ...state.set });
-                        return { affected: 1 };
-                    }
-                    // `… AND (status NOT IN (:...terminal) OR completedAt IS NULL)`
-                    const terminal = state.wheres.find((w) => w.sql.includes('status NOT IN'));
-                    if (terminal) {
-                        const terminalStatuses: string[] = terminal.params.terminal;
-                        if (terminalStatuses.includes(row.status) && row.completedAt) {
+                    // Every arm of the WHERE is EVALUATED from the text it was
+                    // handed, arm by arm — never re-stated.
+                    //
+                    // C19. This fake used to answer the terminal claim by
+                    // restating the service's rule in its own words
+                    // (`terminal.includes(row.status) && row.completedAt`), which
+                    // makes the two "exactly once" cases above BLIND to the thing
+                    // they exist to pin: change `claimTerminal`'s predicate and
+                    // the fake keeps answering with the old rule, so the cases
+                    // stay green while the service no longer claims exactly once.
+                    // A fake that cannot lose is not evidence. So the predicate
+                    // is read instead: the clock arm is whatever the SQL says
+                    // (`IS NULL` — the owner's cancel, ACC-05-09 — or `IS NOT
+                    // NULL`, which is what a mutant writes), and a shape neither
+                    // arm models is refused LOUDLY rather than silently answered
+                    // by the retired rule.
+                    for (const { sql, params } of state.wheres) {
+                        // `… WHERE id = :id` — the row identity, not a predicate.
+                        if (sql === 'id = :id') continue;
+                        // `… AND "startedAt" IS NULL`
+                        if (sql === 'startedAt IS NULL') {
+                            if (row.startedAt) return { affected: 0 };
+                            continue;
+                        }
+                        // `… AND (status NOT IN (:...terminal) OR completedAt IS NULL)`
+                        //
+                        // The predicate holds when EITHER arm does, so a terminal
+                        // row is claimed only when the clock arm also says so.
+                        if (sql.includes('status NOT IN')) {
+                            const inTerminal = (params.terminal as string[]).includes(row.status);
+                            const nullArm = sql.includes('completedAt IS NULL');
+                            const setArm = sql.includes('completedAt IS NOT NULL');
+                            if (!nullArm && !setArm) {
+                                throw new Error(
+                                    "rowsRepository: the terminal claim's predicate cannot be " +
+                                        `modelled: ${sql}`,
+                                );
+                            }
+                            const clockArm = nullArm ? !row.completedAt : Boolean(row.completedAt);
+                            if (!inTerminal || clockArm) continue;
                             return { affected: 0 };
                         }
-                        store.set(id, { ...row, ...state.set });
-                        return { affected: 1 };
+                        throw new Error(`rowsRepository: unrecognised claim predicate: ${sql}`);
                     }
+
                     store.set(id, { ...row, ...state.set });
                     return { affected: 1 };
                 },
@@ -624,17 +658,38 @@ function succeededSnapshot(overrides: Partial<BuildSnapshot> = {}): BuildSnapsho
 describe('AppBuildsService (APW-05 T17)', () => {
     describe('requestRebuild — FR-41/FR-42 (ACC-05-08)', () => {
         it('returns inside the 2-second budget even when the dispatcher is slow', async () => {
+            // 🛑 SLOWER than the budget on purpose. A dispatcher that resolved
+            // inside 2 s would let an `await this.dispatchPrepare(...)` mutant
+            // pass this test, which is exactly the regression FR-41's budget
+            // exists to catch.
+            //
+            // C18. The slowness used to be a bare `setTimeout(resolve, 3_000)`
+            // whose `unref()` was taken to make it safe. It did not: the timer —
+            // and the dispatch promise chain behind it — outlived this case and
+            // resumed during whichever case happened to be running three
+            // seconds later. It was the only async work in this file that
+            // survives its own test, and a case that leaves work running is a
+            // case whose result no longer depends only on itself. The gate below
+            // is released, and awaited, INSIDE this test instead: the dispatcher
+            // is just as slow, the budget assertion is unchanged, and nothing
+            // this case started is still running when it ends.
+            //
+            // The 8-second fallback is deliberate: an `await
+            // this.dispatchPrepare(...)` mutant then reddens with
+            // `expect(elapsed).toBeLessThan(2_000)` receiving ~8 000, which names
+            // the regression, instead of deadlocking into a bare 30-second jest
+            // timeout that names nothing.
+            let releaseDispatcher!: () => void;
+            const dispatcherGate = new Promise<void>((resolve) => {
+                releaseDispatcher = resolve;
+            });
+            const gateFallback = setTimeout(releaseDispatcher, 8_000);
+            let dispatcherSettled = false;
+
             const harness = makeHarness({
                 prepareDispatcher: async () => {
-                    // 🛑 SLOWER than the budget on purpose. A dispatcher that resolved
-                    // inside 2 s would let an `await this.dispatchPrepare(...)` mutant
-                    // pass this test, which is exactly the regression FR-41's budget
-                    // exists to catch. The timer is unref'd so the dangling dispatch
-                    // cannot hold the worker open.
-                    await new Promise((resolve) => {
-                        const timer = setTimeout(resolve, 3_000);
-                        timer.unref?.();
-                    });
+                    await dispatcherGate;
+                    dispatcherSettled = true;
                     return 'run-slow';
                 },
             });
@@ -644,10 +699,26 @@ describe('AppBuildsService (APW-05 T17)', () => {
             const elapsed = Date.now() - started;
 
             expect(result.ok).toBe(true);
+            // FR-41: the request must answer inside its 2-second budget even
+            // though the dispatch behind it is still pending.
             expect(elapsed).toBeLessThan(2_000);
             // The dispatch DID happen — it is merely not awaited past the insert.
             expect(harness.dispatchedPrepare).toHaveLength(1);
             expect(harness.dispatchedPrepare[0].reason).toBe('rebuild');
+            // …and the MECHANISM, not only the clock. `elapsed < 2 s` alone cannot
+            // tell "the dispatch is not awaited" from "the dispatcher happened to
+            // be fast", and it is the one kind of assertion here that measures the
+            // machine rather than the code. This one measures the code: the
+            // request came back while the dispatcher was still pending.
+            expect(dispatcherSettled).toBe(false);
+
+            // Contain it: release the dispatcher and let it settle before the
+            // case ends, so no work this test started is still running when the
+            // next one begins — and clear the fallback, so the containment does
+            // not become the very leak this change removes.
+            releaseDispatcher();
+            clearTimeout(gateFallback);
+            await waitFor(() => dispatcherSettled, 5_000);
         });
 
         it('falls back in process exactly once when the prepare dispatcher returns null (APW05-G20)', async () => {
@@ -665,6 +736,8 @@ describe('AppBuildsService (APW-05 T17)', () => {
             const started = Date.now();
             const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
             expect(result.ok).toBe(true);
+            // FR-41: the request must answer inside its 2-second budget even
+            // while the in-process fallback it kicked off is still running.
             expect(Date.now() - started).toBeLessThan(2_000);
 
             // A second request while the first in-process run is still in flight is

@@ -23,6 +23,48 @@
  *      planted fault of the §8.3 vocabulary taking precedence over the handler.
  *   4. a recorded call for every request, and a JSON 404 otherwise.
  *
+ * ---------------------------------------------------------------------------
+ * The `_control` API, for a spec author
+ * ---------------------------------------------------------------------------
+ *
+ * The fake's own API — the only way a spec arranges a refusal, reads back what
+ * the platform did, or clears state between scenarios. It is dispatched FIRST,
+ * so it is never faulted, never recorded as a GitHub call and never matched by
+ * `route` patterns below. Full shapes live in `control.mjs` / `state.mjs`; the
+ * census, so a spec author need not read either:
+ *
+ *   - `POST /_control/seed`   — `{ repositories[], users[], organizations[],
+ *     catalog, blueprints }`. Idempotent; unknown keys are ignored. A `users[]`
+ *     entry maps a token **value** to a login once, which is what gives later
+ *     requests an identity.
+ *   - `POST /_control/fault`  — `{ route, behaviour, method?, token?,
+ *     tokenValue?, status?, body?, seconds?, times? }`. Answers `200` with the
+ *     still-planted faults; an unknown `behaviour` answers `500` naming it.
+ *     Behaviours: `delay`, `never-ready`, `rate-limit`, `server-error`,
+ *     `auth-refused`, `conflict`.
+ *   - `GET  /_control/calls`  — every recorded call: `{ method, path,
+ *     tokenIdentity, authenticated, faultApplied, status, at }`. The identity,
+ *     never the value; `faultApplied` names the behaviour a planted fault
+ *     answered with, which is how a spec proves its fault was the one that
+ *     fired.
+ *   - `GET  /_control/faults` — the faults still armed, in match order.
+ *   - `GET  /_control/state`  — repositories, user logins, organizations,
+ *     catalog, blueprints.
+ *   - `POST /_control/reset`  — clears repositories, users, catalog, blueprints,
+ *     the call log and the fault queue. Keeps the git root.
+ *
+ * **"The next matching call only" — the semantics that decide where a plant
+ * goes.** A fault is planted with `times` (default **1**) and matched in plant
+ * order; each request that matches takes one application, and the fault is
+ * dropped from the queue when its last one is spent. A spec must therefore
+ * plant **immediately before the case that needs it**, in that case's own setup
+ * — never once in `global-setup` and never for a whole file, because the next
+ * matching call from *anywhere* (another case, another worker, another spec
+ * file — the fake is one process shared by them all) consumes it. "Matching" is
+ * the `route` method+pathname, narrowed by `token` (identity) and/or
+ * `tokenValue` (the presented token); to refuse one token and leave every other
+ * caller alone, narrow by `tokenValue`.
+ *
  * Exported (`createFakeGitHub`, `startFakeGitHub`) so the unit specs of T2/T3
  * can drive it on an ephemeral port without shelling out to a second process.
  */
@@ -130,7 +172,14 @@ function faultResponse(fault) {
         case 'auth-refused':
             return {
                 status: fault.status ?? 401,
-                body: fault.body ?? { message: 'Bad credentials' },
+                // GitHub's own 401 envelope, verbatim: a spec asserting "the
+                // dead token was refused by GitHub" gets the body GitHub sends,
+                // not a paraphrase of it.
+                body: fault.body ?? {
+                    message: 'Bad credentials',
+                    documentation_url: 'https://docs.github.com/rest',
+                    status: '401',
+                },
             };
         case 'conflict':
             return {
@@ -229,7 +278,8 @@ export function createFakeGitHub(options = {}) {
         const method = (req.method ?? 'GET').toUpperCase();
         const rawBody = await readRawBody(req);
         origin = `http://${req.headers.host ?? `127.0.0.1:${requestedPort}`}`;
-        const identity = identityForToken(state, tokenFromHeaders(req.headers));
+        const presentedToken = tokenFromHeaders(req.headers);
+        const identity = identityForToken(state, presentedToken);
 
         // 1. The fake's own control API.
         const firstMatch = matchRoute(method, pathname);
@@ -265,15 +315,23 @@ export function createFakeGitHub(options = {}) {
         }
 
         // 3. A planted fault answers before the handler it targets.
-        const fault = takeFault(state, { method, pathname, tokenIdentity: identity });
+        const fault = takeFault(state, {
+            method,
+            pathname,
+            tokenIdentity: identity,
+            tokenValue: presentedToken,
+        });
         if (fault) {
+            const response = faultResponse(fault);
             recordCall(state, {
                 method,
                 path: pathname,
                 tokenIdentity: identity,
                 faultApplied: fault.behaviour,
+                // The status the fault answered with, so `/_control/calls`
+                // proves *what* the fault said and not merely that one fired.
+                status: response.status,
             });
-            const response = faultResponse(fault);
             sendJson(res, response.status, response.body, response.headers);
             return;
         }

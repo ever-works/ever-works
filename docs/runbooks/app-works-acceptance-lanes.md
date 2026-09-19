@@ -110,6 +110,42 @@ of the live project, a runner that exports the interlocks only for step 4 gets a
 (the workflow's env block is the source of truth for the values) and both steps work. This is worth stating
 because it reads like a broken lane and is in fact the interlock doing its job.
 
+### The fake's `_control` API — what a spec author may call
+
+Added 2026-09-19 (C14). The fake had these endpoints from the start but documented them only in
+`apps/web/e2e/fakes/github-fake/{control,state}.mjs`, which is not where a spec author looks when a case
+"cannot be exercised". The census, so nobody has to open the source to arm a refusal:
+
+| Endpoint                | Body / answer                                                                                                                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /_control/seed`   | `{ repositories[], users[], organizations[], catalog, blueprints }`. Idempotent; unknown keys ignored. A `users[]` entry maps a token **value** to a login once, which is what gives later requests an identity.                                        |
+| `POST /_control/fault`  | `{ route, behaviour, method?, token?, tokenValue?, status?, body?, seconds?, times? }` → `200 { faults[] }`. Behaviours: `delay`, `never-ready`, `rate-limit`, `server-error`, `auth-refused`, `conflict`. An unknown `behaviour` is a `500` naming it. |
+| `GET  /_control/calls`  | `{ calls[], count }` — `{ method, path, tokenIdentity, authenticated, faultApplied, status, at }` per request. The **identity**, never the value.                                                                                                       |
+| `GET  /_control/faults` | `{ faults[] }` — what is still armed, in match order.                                                                                                                                                                                                   |
+| `GET  /_control/state`  | The seeded repositories, user logins, organizations, catalog and Blueprints.                                                                                                                                                                            |
+| `POST /_control/reset`  | Clears repositories, users, catalog, Blueprints, the call log and the fault queue. Keeps the git root.                                                                                                                                                  |
+
+**"The next matching call only" — the semantics that decide where a plant goes.** A fault is planted
+with `times` (default **1**) and matched in plant order; each matching request takes one application and
+the fault is dropped when its last one is spent. So a spec must plant **in the case's own setup,
+immediately before the request under test** — never once in `global-setup`, never once for a file. The
+fake is **one process shared by every worker and every spec file**, so the next matching call from
+anywhere consumes it. "Matching" is the `route` method+pathname, narrowed by:
+
+- `token` — the token **identity** the fake resolved (a login, or the literal `anonymous` / `unknown`).
+  Use it when the case is about a _member's_ credential, which the fake has seeded.
+- `tokenValue` — the token **value** the caller presents. Use it for a **dead** credential: the fake
+  never seeded it, so it collapses to the identity `unknown` and an identity-narrowed fault cannot tell
+  it apart from any other unknown token — nor survive a second lane arming its own. `apps/web/e2e/helpers/github-fake-control.ts`
+  wraps both (`armDeadTokenRefusal` / `assertDeadTokenRefusalProven`) and is the recommended entry point.
+
+⚠️ **`GET /user` answers 200 for every token by default** (it is the `user` fixture route). A case that
+means to prove "this credential is dead, so this surface refuses" must arm `auth-refused` for it;
+otherwise the identity resolves and the request fails later at a _different_ gate — for
+`POST /api/register-work` that is `gh_repo_access_denied` from `assertRepoAccess`, not
+`gh_credential_invalid` from `resolveGitHubIdentity`. Both are `403`, so only the typed `code` tells
+them apart.
+
 ### Traps that cost real time
 
 - **Windows:** `Start-Process pnpm` does not launch — use `pnpm.cmd`. A failed launch shows up later as

@@ -263,9 +263,27 @@ export function recordCall(state, entry) {
 
 /**
  * Plant a fault. `route` is matched against the request pathname: an exact
- * match, or a trailing `*` wildcard (`/repos/*`). `token` narrows the fault to
- * one token **identity**, which is what APW-01's "401 for the member's token,
- * then restored" case needs (plan §8.3).
+ * match, or a trailing `*` wildcard (`/repos/*`).
+ *
+ * **Narrowing, and which one a case wants.** Two optional keys say *whose* call
+ * the fault is about, and either may be used alone or together:
+ *
+ *   - `token` — the token **identity** the fake resolved (a login, or the
+ *     literal `anonymous` / `unknown` it fell back to). This is what APW-01's
+ *     "401 for the member's token, then restored" case needs (plan §8.3).
+ *   - `tokenValue` — the token **value** the caller presented. This is what a
+ *     **dead credential** needs, and it is the one case `token` cannot express:
+ *     a revoked token has no identity, because the fake never seeded it, so
+ *     every such token collapses to the single identity `unknown` and an
+ *     identity-narrowed fault cannot tell two of them apart (nor survive two
+ *     spec files arming at once — the fault is one-shot and the first matching
+ *     call takes it). `tokenValue` pins the fault to the exact token, so a
+ *     second lane arming its own dead token cannot steal it.
+ *
+ * A planted `tokenValue` is echoed back by `GET /_control/faults` — it is a
+ * fixture literal, exactly as `/_control/seed`'s `users[].token` is. The
+ * surface that must never carry a value is the **call log** (`recordCall`), and
+ * it still records the identity only.
  */
 export function addFault(state, fault) {
     if (!FAULT_BEHAVIOURS.includes(fault.behaviour)) {
@@ -277,6 +295,7 @@ export function addFault(state, fault) {
         route: fault.route ?? '*',
         method: fault.method ? String(fault.method).toUpperCase() : null,
         token: fault.token ?? null,
+        tokenValue: fault.tokenValue ?? null,
         behaviour: fault.behaviour,
         status: fault.status ?? null,
         body: fault.body ?? null,
@@ -299,16 +318,22 @@ function routeMatches(fault, method, pathname) {
  * Take the next applicable fault for this request, decrementing its remaining
  * applications and dropping it once spent. Returns `null` when no fault
  * applies, so a route runs normally.
+ *
+ * `tokenIdentity` is matched against a fault's `token`; `tokenValue` against its
+ * `tokenValue`. A fault that declares a narrowing key only matches a request
+ * that supplies the same value, so a fault narrowed to a token value never
+ * fires for a request whose value the caller did not pass.
  */
 export function takeFault(
     state,
-    { method, pathname, tokenIdentity, behaviours = RESPONSE_BEHAVIOURS },
+    { method, pathname, tokenIdentity, tokenValue, behaviours = RESPONSE_BEHAVIOURS },
 ) {
     for (let index = 0; index < state.faults.length; index++) {
         const fault = state.faults[index];
         if (!behaviours.includes(fault.behaviour)) continue;
         if (fault.remaining <= 0) continue;
         if (fault.token && fault.token !== tokenIdentity) continue;
+        if (fault.tokenValue && fault.tokenValue !== tokenValue) continue;
         if (!routeMatches(fault, method, pathname)) continue;
         fault.remaining -= 1;
         if (fault.remaining <= 0) state.faults.splice(index, 1);

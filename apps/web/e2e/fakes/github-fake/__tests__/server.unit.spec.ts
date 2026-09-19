@@ -358,6 +358,84 @@ describe('T2 — per-token faults', () => {
     });
 });
 
+/**
+ * C14 — a fault narrowed to the token **value**.
+ *
+ * `GET /user` answers the `user` fixture 200 for every token, which is what
+ * makes the fake faithful about a *working* credential and useless about a
+ * **dead** one. A dead credential is not a seeded identity: the fake never saw
+ * it, so it collapses to the single identity `unknown`, and an
+ * identity-narrowed fault cannot distinguish it from any other unknown token —
+ * nor survive two lanes arming at once, because a fault is one-shot. These
+ * cases pin the `tokenValue` narrowing that closes that gap, and the GitHub 401
+ * envelope the refusal answers with.
+ */
+describe('T2 — per-token-VALUE faults (a dead credential has no identity)', () => {
+    const DEAD_TOKEN = 'ghp_e2e_dead_token_000';
+    const OTHER_UNSEEDED_TOKEN = 'ghp_e2e_other_dead_token_000';
+
+    it('refuses the named token by value and leaves another unseeded token alone', async () => {
+        await control('/_control/fault', {
+            route: '/user',
+            behaviour: 'auth-refused',
+            tokenValue: DEAD_TOKEN,
+        });
+
+        // ⚠️ The UNTOUCHED token is probed FIRST, and that order is the test.
+        // A fault is one-shot, so probing the named token first would spend it
+        // and the second call would answer 200 whether or not the narrowing
+        // exists — a green mutant. Asking about the wrong token while the fault
+        // is still armed is the only order in which the answer means anything.
+        const untouched = await api('GET', '/user', { token: OTHER_UNSEEDED_TOKEN });
+        expect(
+            untouched.status,
+            'a different unseeded token shares the identity `unknown` and must NOT be refused — ' +
+                'that discrimination is the whole point of narrowing by value',
+        ).toBe(200);
+
+        const refused = await api('GET', '/user', { token: DEAD_TOKEN });
+        expect(refused.status, 'the named token is refused').toBe(401);
+        expect(refused.body.message).toBe('Bad credentials');
+    });
+
+    it('answers auth-refused with GitHub’s own 401 envelope', async () => {
+        await control('/_control/fault', {
+            route: '/user',
+            behaviour: 'auth-refused',
+            tokenValue: DEAD_TOKEN,
+        });
+
+        const refused = await api('GET', '/user', { token: DEAD_TOKEN });
+        expect(refused.status).toBe(401);
+        expect(refused.body).toMatchObject({
+            message: 'Bad credentials',
+            documentation_url: 'https://docs.github.com/rest',
+            status: '401',
+        });
+    });
+
+    it('records the refusal, its status and the identity in /_control/calls', async () => {
+        await control('/_control/fault', {
+            route: '/user',
+            behaviour: 'auth-refused',
+            tokenValue: DEAD_TOKEN,
+        });
+        await api('GET', '/user', { token: DEAD_TOKEN });
+
+        const listed = await api('GET', '/_control/calls');
+        const faulted = listed.body.calls.find(
+            (call: Json) => call.faultApplied === 'auth-refused',
+        );
+        expect(faulted, 'the faulted call is recorded').toBeTruthy();
+        expect(faulted.status, 'the status the fault answered with is recorded').toBe(401);
+        expect(faulted.tokenIdentity).toBe('unknown');
+        expect(
+            JSON.stringify(listed.body.calls),
+            'the token VALUE must still never appear in the call log',
+        ).not.toContain(DEAD_TOKEN);
+    });
+});
+
 describe('T2 — the seeded PR-lane catalog serves its consumers', () => {
     it('serves APW-02: forks list, fork creation and the fork readiness gate', async () => {
         const forks = await api('GET', '/repos/ever-works/templates/forks', { token: USER_TOKEN });
