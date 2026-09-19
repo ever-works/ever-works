@@ -29,9 +29,16 @@
  * rather than a literal because a second spelling of `'openid email profile'`
  * is a second thing that can drift.
  *
+ * **T8** added the two scopes on the verifying side —
+ * {@link OIDC_DELEGATED_READ_SCOPE} (`apps:read`, FR-44) and
+ * {@link OIDC_SESSION_EXCHANGE_SCOPE} (`ever-works:session`, FR-39/FR-40) — for
+ * the same reason, one step further along the flow: `verifyAccessToken` is handed
+ * `requiredScopes` by its caller, and the caller and the provider's registration
+ * have to spell them identically.
+ *
  * Nothing here is a secret and nothing here is provider-specific: the same three
- * scopes are what any OpenID Connect relying party asks for, which is why this
- * file names no issuer.
+ * sign-in scopes are what any OpenID Connect relying party asks for, which is why
+ * this file names no issuer.
  */
 
 /**
@@ -65,6 +72,38 @@ export const OIDC_NEVER_REQUESTED_SCOPES = ['offline_access'] as const;
 
 /** One of {@link OIDC_NEVER_REQUESTED_SCOPES}. */
 export type OidcNeverRequestedScope = (typeof OIDC_NEVER_REQUESTED_SCOPES)[number];
+
+/**
+ * APW-12 **T8** — the two scopes Ever Works *verifies* rather than requests.
+ *
+ * They are the other side of the same wire vocabulary: a sign-in **asks** for
+ * `openid email profile`, and a token that arrives from Ever ID is **checked**
+ * against one of these. Both spellings live in this file because a scope string
+ * three components have to agree on is exactly the thing that should have one
+ * definition — FR-40's exchange scope is read by the local client, by the API
+ * endpoint that verifies the token and by the provider's own registration, and
+ * FR-44's delegated scope by the App Launcher, the marked endpoint and the
+ * provider.
+ *
+ * The values are `EVER_ID_SCOPES` in `packages/contracts/src/apps/ever-id.ts`,
+ * transcribed rather than imported for the reason this package depends on
+ * `@ever-works/plugin` alone (see `discovery.ts`), and
+ * `src/__tests__/access-token.spec.ts` reads that file off disk and asserts the
+ * two agree.
+ */
+export const OIDC_DELEGATED_READ_SCOPE = 'apps:read';
+
+/**
+ * FR-39/FR-40 — the scope a local client's access token must carry to be
+ * exchanged for an Ever Works session (`EVER_ID_SCOPES.SESSION_EXCHANGE`).
+ */
+export const OIDC_SESSION_EXCHANGE_SCOPE = 'ever-works:session';
+
+/** The two scopes {@link OIDC_DELEGATED_READ_SCOPE} and {@link OIDC_SESSION_EXCHANGE_SCOPE} name, in one list. */
+export const OIDC_TOKEN_SCOPES = [OIDC_DELEGATED_READ_SCOPE, OIDC_SESSION_EXCHANGE_SCOPE] as const;
+
+/** Union of {@link OIDC_TOKEN_SCOPES}. */
+export type OidcTokenScope = (typeof OIDC_TOKEN_SCOPES)[number];
 
 /**
  * Is `value` exactly the sign-in scope set — the three of

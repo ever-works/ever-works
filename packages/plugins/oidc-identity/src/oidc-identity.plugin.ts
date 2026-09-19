@@ -1,13 +1,19 @@
 import { randomBytes } from 'node:crypto';
 
 import type {
+	HealthCheckDetail,
 	IdentityProviderCheck,
+	IIdentityProviderPlugin,
 	IPlugin,
 	JsonSchema,
 	PluginCategory,
 	PluginContext,
+	PluginHealthCheck,
+	PluginHealthStatus,
 	PluginManifest,
-	VerifiedIdTokenClaims
+	VerifiedAccessTokenClaims,
+	VerifiedIdTokenClaims,
+	VerifiedLogoutTokenClaims
 } from '@ever-works/plugin';
 import { IdentityTokenRejectedError } from '@ever-works/plugin';
 import {
@@ -22,6 +28,8 @@ import type { ServerMetadata } from 'openid-client';
 import {
 	OIDC_DISCOVERY_CACHE_SECONDS,
 	OIDC_IDENTITY_SIGNING_ALGS,
+	OIDC_JWKS_CACHE_SECONDS,
+	OIDC_JWKS_MAX_STALE_SECONDS,
 	OIDC_OUTBOUND_TIMEOUT_MS,
 	OidcDiscoveryReader,
 	OidcProviderUnavailableError,
@@ -122,6 +130,73 @@ export const OIDC_ID_TOKEN_MAX_AGE_SECONDS = 600;
 export const OIDC_SUBJECT_MAX_LENGTH = 255;
 
 /**
+ * FR-2 — the audience a delegated or exchanged access token must carry when an
+ * administrator configured none (`EVER_ID_DEFAULT_API_AUDIENCE`; plan §4.2's
+ * `apiAudience` row, APW-11 §2.4).
+ *
+ * Until T8 this literal lived only inside `getPublicConfig`; it is a constant here
+ * because two methods now read the same default — that projection and
+ * {@link OidcIdentityPlugin.verifyAccessToken}'s audience rule — and a default
+ * spelled twice is a default that can drift between what the web is told and what
+ * a token is checked against.
+ */
+export const OIDC_DEFAULT_API_AUDIENCE = 'ever-works';
+
+/**
+ * FR-45 — a delegated token's lifetime (`exp` − `iat`) is **at most 3,600 seconds**
+ * (`EVER_ID_LIMITS.delegatedTokenMaxLifetimeSeconds`; plan §4.3's "Access token
+ * (delegated)" row).
+ *
+ * Exported although `verifyAccessToken` takes the ceiling as an argument rather
+ * than applying a constant: the number belongs to the caller's token family, and
+ * this is the value that family is capped at. A client that mints a longer-lived
+ * token is refused with `lifetimeTooLong` (ACC-12-35).
+ */
+export const OIDC_ACCESS_TOKEN_MAX_LIFETIME_SECONDS = 3_600;
+
+/**
+ * FR-40 — an exchange token's `iat` may be **no older than 300 seconds**
+ * (`EVER_ID_LIMITS.exchangeTokenMaxAgeSeconds`).
+ *
+ * Passed by the local-client exchange as `maxAgeSeconds`; a plain delegated read
+ * (FR-45) passes none, because that row has no age rule — its bound is the
+ * lifetime ceiling above.
+ */
+export const OIDC_ACCESS_TOKEN_MAX_AGE_SECONDS = 300;
+
+/**
+ * FR-33 — a sign-out notice's `iat` may be **no older than 300 seconds**
+ * (`EVER_ID_LIMITS.logoutTokenMaxAgeSeconds`).
+ *
+ * Unlike the two numbers above this one is not a caller's choice: FR-33 fixes it
+ * for every back-channel logout notice, so {@link OidcIdentityPlugin.verifyLogoutToken}
+ * applies it itself.
+ */
+export const OIDC_LOGOUT_TOKEN_MAX_AGE_SECONDS = 300;
+
+/**
+ * FR-33 — a `jti` must not have been seen in the last **600 seconds**
+ * (`EVER_ID_LIMITS.replayWindowSeconds`).
+ *
+ * Exported although this plugin deliberately does **not** enforce it: the window
+ * needs a store, plan §4.1 leaves it with the caller ("the caller keeps the
+ * 600-second replay window, not the plugin"), and T13's replay service is where it
+ * lives. The constant is here so the one number has one spelling in this package
+ * — the alternative is a literal in the API that nothing cross-checks.
+ */
+export const OIDC_LOGOUT_TOKEN_REPLAY_WINDOW_SECONDS = 600;
+
+/**
+ * FR-33 — the `events` member a back-channel logout notice must carry
+ * (OpenID Connect Back-Channel Logout 1.0 §2.4's event identifier).
+ *
+ * One spelling, because three things have to agree on it: this plugin's
+ * acceptance rule, the fake provider that mints notices, and any future caller
+ * that has to explain a refusal.
+ */
+export const OIDC_BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
+
+/**
  * The seams a spec (or a future caller) may inject.
  *
  * All three are optional and all three default to the runtime: the plugin loader
@@ -149,10 +224,10 @@ export interface OidcIdentityPluginOptions {
 }
 
 /**
- * APW-12 T5 — the `oidc-identity` plugin, **scaffold only**.
+ * APW-12 T5 — the `oidc-identity` plugin, scaffolded as an identity and completed
+ * by T6, T7 and T8 (see the history paragraph below).
  *
- * What exists here is the identity the platform's discovery path needs and
- * nothing more:
+ * What the scaffold itself had to get right, and what every later task kept:
  *
  *   - the manifest the `everworks.plugin` block in `package.json` also declares
  *     (they must agree — `packages/agent/src/plugins/services/plugin-manifest-validator.service.ts`
@@ -165,23 +240,29 @@ export interface OidcIdentityPluginOptions {
  *     accepts a class only when `onLoad` and `onUnload` sit on its prototype, so
  *     an arrow-function property would make this plugin undiscoverable.
  *
- * What does NOT exist yet, deliberately: three of the five sign-in methods of
- * `IIdentityProviderPlugin` — `verifyAccessToken`, `verifyLogoutToken` and
- * `buildEndSessionUrl` — and `healthCheck`, which T8 writes. T6 landed the two
- * configuration methods — `testConnection` (FR-3) and `getPublicConfig` (FR-2) —
- * plus the discovery reader and the key cache they and the flow share
+ * What did NOT exist before **T8**, and why the docstring is kept as history: three
+ * of the seven methods of `IIdentityProviderPlugin` — `verifyAccessToken`,
+ * `verifyLogoutToken` and `buildEndSessionUrl` — and `healthCheck`. T6 landed the
+ * two configuration methods — `testConnection` (FR-3) and `getPublicConfig`
+ * (FR-2) — plus the discovery reader and the key cache they and the flow share
  * (`src/discovery.ts`, `src/jwks-cache.ts`); **T7** landed the two sign-in
  * methods, `buildAuthorizationRequest` (FR-8/FR-9/FR-10) and
  * `exchangeAuthorizationCode` (FR-11/FR-12/FR-19's single completion is the
- * caller's), plus `src/scopes.ts`. The capability string below is the plan §4.2
- * contract — the manifest is fixed — and the class still does not claim the
- * interface: it implements `IPlugin` and five of the seven methods, so
+ * caller's), plus `src/scopes.ts`. **T8** landed the three token/sign-out methods
+ * (FR-40/FR-45's access tokens, FR-33's sign-out notice, FR-36's end-session
+ * address) and `healthCheck`, so the class now claims the interface below rather
+ * than five of its seven methods — and
  * `isIdentityProviderPlugin` (`packages/plugin/src/contracts/capabilities/identity-provider.interface.ts:284`)
- * keeps answering `false` for it — which is what keeps the façade (plan §4.4)
- * fail-closed for the two methods T8 has not written yet. Until then the plugin
- * is inert: `autoEnable: false`, so it is discovered and listed disabled.
+ * answers `true` for it, which is what it was written to answer once every method
+ * exists.
+ *
+ * Claiming `IIdentityProviderPlugin` in the `implements` clause is not decoration:
+ * it makes `tsc` refuse a member whose name, arity or nullability has drifted from
+ * plan §4.1, which is the failure the guard above cannot see. What it does **not**
+ * change is the plugin's posture: `autoEnable: false`, so the installation still
+ * opts in explicitly (FR-5's kill switch is the plugin toggle, plan §9.2).
  */
-export class OidcIdentityPlugin implements IPlugin {
+export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 	readonly id = 'oidc-identity';
 	readonly name = 'OpenID Connect identity (Ever ID)';
 	readonly version = '1.0.0';
@@ -260,7 +341,7 @@ export class OidcIdentityPlugin implements IPlugin {
 		// without a reload — which is what FR-5's 60-second bound needs.
 		this.context = context;
 		context.logger.log(
-			'OpenID Connect identity (Ever ID) plugin loaded — discovery, key cache, Test connection and the sign-in flow have landed; the token verifiers land in APW-12 T8'
+			'OpenID Connect identity (Ever ID) plugin loaded — discovery, key cache, Test connection, the sign-in flow and the token verifiers (access, logout, end-session) are all available'
 		);
 	}
 
@@ -360,7 +441,7 @@ export class OidcIdentityPlugin implements IPlugin {
 			issuer: settings.issuerUrl,
 			displayName: nonEmpty(settings.displayName) ?? 'Ever ID',
 			localClients: localClientsOf(settings.localClients),
-			apiAudience: nonEmpty(settings.apiAudience) ?? 'ever-works',
+			apiAudience: nonEmpty(settings.apiAudience) ?? OIDC_DEFAULT_API_AUDIENCE,
 			// FR-2's default is on, so only an explicit `false` turns sign-up off.
 			signUpAllowed: settings.signUpAllowed !== false
 		};
@@ -524,7 +605,7 @@ export class OidcIdentityPlugin implements IPlugin {
 			throw new IdentityTokenRejectedError('badIssuer');
 		}
 
-		const document = await this.discoveryForExchange(settings.issuerUrl);
+		const document = await this.discoveryForVerification(settings.issuerUrl);
 		const tokenEndpoint = nonEmpty(document.token_endpoint);
 		const jwksUri = nonEmpty(document.jwks_uri);
 		if (tokenEndpoint === undefined || jwksUri === undefined) {
@@ -534,7 +615,7 @@ export class OidcIdentityPlugin implements IPlugin {
 		}
 
 		const idToken = await this.redeemAuthorizationCode(input, settings, tokenEndpoint);
-		const verification = await this.verifyIdTokenSignature(idToken, jwksUri);
+		const verification = await this.verifyProviderSignature(idToken, jwksUri);
 
 		return idTokenClaims(verification.payload, {
 			issuer: document.issuer,
@@ -547,6 +628,315 @@ export class OidcIdentityPlugin implements IPlugin {
 			nowSeconds: Math.floor(this.now() / 1_000),
 			maxAuthAgeSeconds: input.maxAuthAgeSeconds
 		});
+	}
+
+	/**
+	 * FR-40 (the local-client exchange) and FR-45 (the App Launcher's delegated
+	 * read) — verify an Ever ID access token and answer the claims both callers
+	 * branch on.
+	 *
+	 * The rules, in the order they are applied, and where each one comes from:
+	 *
+	 *   1. **the settings resolve** — as in {@link exchangeAuthorizationCode}, an
+	 *      unconfigured integration answers `providerUnavailable`, the only code
+	 *      this method has for "the plugin cannot ask the provider anything";
+	 *   2. **the discovery document** (FR-14's cache and issuer-drift refusal) and
+	 *      its `jwks_uri` — the same read the exchange performs, and the same
+	 *      `providerUnavailable` when the document names no key set;
+	 *   3. **the signature and the algorithm** through T6's key cache, including
+	 *      FR-13's ladder and its fail-closed end (`badAlg`, `badSignature`,
+	 *      `providerUnavailable`);
+	 *   4. **FR-11's issuer rule**, which FR-45 makes a rule for access tokens too:
+	 *      `iss` equals the discovery issuer **and** is allow-listed (`badIssuer`);
+	 *   5. **the audience** — `aud` contains the configured API audience, or plan
+	 *      §4.2's `ever-works` default (`badAudience`);
+	 *   6. **the scopes** — every entry of `requiredScopes` is present (`missingScope`,
+	 *      FR-46's code: a valid token that lacks the scope its caller needs);
+	 *   7. **the times** — a readable `exp` that has not passed (with the skew), an
+	 *      `iat` no later than now plus the skew, and an `iat` no older than
+	 *      `maxAgeSeconds` when the caller gives one (`expired`, `notYetValid`,
+	 *      `tooOld`);
+	 *   8. **the lifetime ceiling** — `exp − iat ≤ maxLifetimeSeconds`
+	 *      (`lifetimeTooLong`; ACC-12-35's "lifetime over 3,600 seconds");
+	 *   9. **the authorised party** — when `allowedAuthorizedParties` is given (the
+	 *      exchange path, FR-40), `azp` must be one of them
+	 *      (`badAuthorizedParty`); absent, the claim is not read at all, which is
+	 *      FR-45's rule set exactly.
+	 *
+	 * ## The two arguments that make one method serve both token families
+	 *
+	 * The contract has one `verifyAccessToken` and two rules of §4.3: the delegated
+	 * read passes `{ requiredScopes: ['apps:read'], maxLifetimeSeconds: 3_600 }`
+	 * (FR-44/FR-45), the exchange passes
+	 * `{ requiredScopes: ['ever-works:session'], maxLifetimeSeconds: 3_600, maxAgeSeconds: 300, allowedAuthorizedParties: <the configured local client ids> }`
+	 * (FR-40). Nothing here decides which family a token belongs to — that is the
+	 * caller's, and it is a decision about *why* the token is being presented, not
+	 * about the token.
+	 *
+	 * ## What is deliberately left to the caller
+	 *
+	 * **The `jti` replay window** (FR-40/FR-33's 600 seconds). The parsed `jti` is
+	 * returned and never enforced: it needs a store with a unique index, which is
+	 * T13's `ever-id-replay.service.ts`, and a plugin that held that state in
+	 * process memory would enforce a different window per replica. Plan §4.1 says
+	 * the same thing from the contract side ("the caller keeps the 600-second replay
+	 * window, not the plugin").
+	 *
+	 * **Whether the subject is a connected identity of an active account** — FR-40's
+	 * last clause and FR-45's. That is a database question and it belongs to the
+	 * services that own those rows.
+	 *
+	 * A refusal never partially succeeds: no claim of a refused token is returned.
+	 */
+	async verifyAccessToken(
+		token: string,
+		input: {
+			requiredScopes: string[];
+			maxLifetimeSeconds: number;
+			maxAgeSeconds?: number;
+			allowedAuthorizedParties?: string[];
+		}
+	): Promise<VerifiedAccessTokenClaims> {
+		const resolved = await this.resolveSettings();
+		if (!resolved.ok) throw new IdentityTokenRejectedError('providerUnavailable');
+		const settings = resolved.settings;
+
+		const document = await this.discoveryForVerification(settings.issuerUrl);
+		const jwksUri = nonEmpty(document.jwks_uri);
+		if (jwksUri === undefined) throw new IdentityTokenRejectedError('providerUnavailable');
+
+		const verification = await this.verifyProviderSignature(token, jwksUri);
+
+		return accessTokenClaims(verification.payload, {
+			issuer: document.issuer,
+			// FR-2's default when an administrator configured no allow-list: the one
+			// issuer this installation accepts is its own.
+			allowedIssuers: settings.allowedIssuers ?? [settings.issuerUrl],
+			apiAudience: nonEmpty(settings.apiAudience) ?? OIDC_DEFAULT_API_AUDIENCE,
+			requiredScopes: input.requiredScopes,
+			maxLifetimeSeconds: input.maxLifetimeSeconds,
+			maxAgeSeconds: input.maxAgeSeconds,
+			allowedAuthorizedParties: input.allowedAuthorizedParties,
+			skewSeconds: settings.clockSkewSeconds ?? OIDC_DEFAULT_CLOCK_SKEW_SECONDS,
+			nowSeconds: Math.floor(this.now() / 1_000)
+		});
+	}
+
+	/**
+	 * FR-33 — verify a back-channel logout notice and answer the three claims the
+	 * session teardown keys on.
+	 *
+	 * Validated exactly like an ID token (FR-33's "validated like FR-11 and FR-13":
+	 * the algorithm allow-list, the signature against Ever ID's published keys,
+	 * FR-13's ladder, FR-11's issuer rule, and the times), plus FR-33's own five:
+	 *
+	 *   - the **back-channel logout event** is present ({@link OIDC_BACKCHANNEL_LOGOUT_EVENT});
+	 *   - **no `nonce`** — the claim's mere presence is refused
+	 *     (`nonceInLogoutToken`), because a notice is not an authentication and a
+	 *     token that can be replayed as one is a token that should never verify;
+	 *   - **`sid` or `sub`**, at least one, or there is no session to end
+	 *     (`badLogoutEvent`);
+	 *   - **`jti` required** (`badLogoutEvent`) — without it the 600-second replay
+	 *     window has no key, and a notice that cannot be bounded must be refused
+	 *     rather than treated as new;
+	 *   - **`iat` within the skew and no older than 300 seconds** (`notYetValid`,
+	 *     `tooOld`).
+	 *
+	 * ## `exp`, and the one place a logout token differs from an ID token
+	 *
+	 * Plan §4.3's ID-token row requires a readable `exp`; FR-33's logout-token row
+	 * does not mention one, and OpenID Connect Back-Channel Logout 1.0 §2.4 does not
+	 * put `exp` in the claim set a logout token **must** carry (`iss`, `aud`, `iat`,
+	 * `jti`, `events`). FR-53 makes that difference load-bearing: a provider that
+	 * publishes a standards-compliant notice would have every sign-out refused as
+	 * `expired` if this method demanded an `exp` the provider never promised, and a
+	 * refused sign-out is a session that stays open. So `exp` is **checked when it
+	 * is there** and not required, and the freshness bound FR-33 does state — `iat`
+	 * within the skew and no older than 300 seconds — is enforced either way. This
+	 * is a deliberate reading and is pinned by a case in
+	 * `src/__tests__/logout-token.spec.ts` in both directions.
+	 *
+	 * ## What is deliberately left to the caller
+	 *
+	 * The `jti` **replay window** (FR-33's 600 seconds; see
+	 * {@link verifyAccessToken}) and everything that happens to a session once this
+	 * method has answered — FR-34's "ends the sessions carrying it", FR-35's "never
+	 * ends a session opened by another method" and the 5-second bound are the
+	 * API's, not a token verifier's.
+	 */
+	async verifyLogoutToken(token: string): Promise<VerifiedLogoutTokenClaims> {
+		const resolved = await this.resolveSettings();
+		if (!resolved.ok) throw new IdentityTokenRejectedError('providerUnavailable');
+		const settings = resolved.settings;
+
+		const document = await this.discoveryForVerification(settings.issuerUrl);
+		const jwksUri = nonEmpty(document.jwks_uri);
+		if (jwksUri === undefined) throw new IdentityTokenRejectedError('providerUnavailable');
+
+		const verification = await this.verifyProviderSignature(token, jwksUri);
+
+		return logoutTokenClaims(verification.payload, {
+			issuer: document.issuer,
+			allowedIssuers: settings.allowedIssuers ?? [settings.issuerUrl],
+			skewSeconds: settings.clockSkewSeconds ?? OIDC_DEFAULT_CLOCK_SKEW_SECONDS,
+			nowSeconds: Math.floor(this.now() / 1_000)
+		});
+	}
+
+	/**
+	 * FR-36 — the address that ends the person's Ever ID session, or **`null`** when
+	 * the provider publishes no end-session endpoint.
+	 *
+	 * The `null` is the one answer in this plugin that is neither a set of claims
+	 * nor a refusal, and it means one thing only: the discovery document the plugin
+	 * already read has no `end_session_endpoint`, so there is nowhere to send the
+	 * person and the caller renders "sign out of Ever Works" alone. It is **not**
+	 * an error path — inventing a URL, or answering the issuer's address and hoping,
+	 * would send a browser somewhere the provider never agreed to serve.
+	 *
+	 * What is sent, and what is not:
+	 *
+	 *   - `client_id` — how the provider knows which relying party is asking. The
+	 *     alternative identifier, `id_token_hint`, is deliberately **not** sent:
+	 *     FR-31 forbids this platform from storing an Ever ID token, so there is no
+	 *     ID token to hint with, and OpenID Connect RP-Initiated Logout 1.0 names
+	 *     `client_id` as the parameter to use in exactly that case.
+	 *   - `post_logout_redirect_uri` — copied **byte for byte**, the same rule
+	 *     FR-10 puts on the authorization request's `redirect_uri` and for the same
+	 *     reason: the address an administrator registered is the address that
+	 *     travels, never one this package rebuilt.
+	 *   - `state` — carried verbatim. "Validated" in FR-36 is about the value the
+	 *     API sealed into the sign-out transaction (plan §3.4/§3.5, T13's seal
+	 *     service) being the value that comes back; the plugin neither mints nor
+	 *     checks it, and must not, because it holds no per-session state.
+	 *
+	 * Errors are {@link OidcProviderUnavailableError} — T6's availability
+	 * vocabulary, exactly as in {@link buildAuthorizationRequest} — rather than an
+	 * `IdentityTokenRejectedError`: nothing here verifies a token, and a caller
+	 * needs to know which configuration or document problem stopped the sign-out:
+	 * `notConfigured`, `discoveryFailed`, `issuerDrift`, or `discoveryIncomplete`
+	 * (an `end_session_endpoint` that is published but is not a URL).
+	 */
+	async buildEndSessionUrl(input: { postLogoutRedirectUri: string; state: string }): Promise<string | null> {
+		const resolved = await this.resolveSettings();
+		if (!resolved.ok) throw new OidcProviderUnavailableError('notConfigured');
+		const settings = resolved.settings;
+
+		const document = await this.readerFor(settings.issuerUrl).get();
+		const endpoint = nonEmpty(document.end_session_endpoint);
+		if (endpoint === undefined) return null;
+
+		let url: URL;
+		try {
+			url = new URL(endpoint);
+		} catch {
+			// A published but unusable endpoint is the same class of problem as a
+			// missing one and gets a different answer: a provider whose document
+			// carries `end_session_endpoint: "not a url"` is misconfigured, and the
+			// caller should say so rather than silently degrade.
+			throw new OidcProviderUnavailableError('discoveryIncomplete');
+		}
+
+		url.searchParams.set('client_id', settings.clientId);
+		url.searchParams.set('post_logout_redirect_uri', input.postLogoutRedirectUri);
+		url.searchParams.set('state', input.state);
+		return url.toString();
+	}
+
+	/**
+	 * Plan §9.2's plugin health view, in the platform's own lifecycle shape
+	 * (`PluginHealthCheck`, `packages/plugin/src/contracts/lifecycle.types.ts:24`).
+	 *
+	 * The three states, and why each one is the honest answer:
+	 *
+	 *   - **`unhealthy`** — an administrator's configuration could not be read (a
+	 *     required setting is missing or blank), or FR-14/FR-5's availability record
+	 *     says the provider was last seen unusable. The second is a real outage of
+	 *     this capability: sign-in is off until a **Test connection** passes.
+	 *   - **`healthy`** — the settings resolve and this process has successfully
+	 *     read the discovery document or the key set.
+	 *   - **`unknown`** — the settings resolve but nothing has been read yet. A
+	 *     plugin that has not been called is not a broken plugin, and reporting
+	 *     `unhealthy` for it would make every installation that does not use Ever ID
+	 *     render a red health row (the plugin ships `autoEnable: false`).
+	 *
+	 * Everything it answers is a **name, a closed code or a number** (FR-16): the
+	 * check ids are this file's own, the unavailability reason is
+	 * {@link OidcProviderUnavailableReason}'s closed set, the timestamps are epoch
+	 * milliseconds, and no message carries the issuer, the client id, the client
+	 * secret or any part of a token. `duration` is measured on the injected clock
+	 * around the one await this method performs, so a caller (and a spec) can see
+	 * how long the settings read took.
+	 */
+	async healthCheck(): Promise<PluginHealthCheck> {
+		const startedAt = this.now();
+		const configured = (await this.resolveSettings()).ok;
+		const discoveryRefreshedAt = this.discoveryReader?.lastRefreshedAt ?? null;
+		const jwksRefreshedAt = this.jwksRefreshedAtMs;
+
+		const unavailable = configured && this.unavailableSinceMs !== null;
+		const overall: PluginHealthStatus =
+			!configured || unavailable
+				? 'unhealthy'
+				: discoveryRefreshedAt !== null || jwksRefreshedAt !== null
+					? 'healthy'
+					: 'unknown';
+
+		const checks: HealthCheckDetail[] = [
+			{
+				name: 'configuration',
+				status: configured ? 'healthy' : 'unhealthy',
+				message: configured
+					? 'The issuer, client id and client secret are set.'
+					: 'Not configured: a required setting (issuer, client id or client secret) is missing.'
+			},
+			{
+				name: 'availability',
+				status: unavailable ? 'unhealthy' : configured ? 'healthy' : 'unknown',
+				message: unavailable
+					? `The provider was last seen unusable (${this.unavailableReason ?? 'discoveryFailed'}); sign-in stays off until Test connection passes.`
+					: 'No unusable run has been recorded.',
+				data: {
+					unavailableSince:
+						this.unavailableSinceMs === null ? null : new Date(this.unavailableSinceMs).toISOString(),
+					unavailableReason: this.unavailableReason,
+					discoveryCacheSeconds: OIDC_DISCOVERY_CACHE_SECONDS
+				}
+			},
+			{
+				name: 'discovery',
+				status: discoveryRefreshedAt === null ? 'unknown' : 'healthy',
+				message:
+					discoveryRefreshedAt === null
+						? 'The discovery document has not been read by this process yet.'
+						: 'The discovery document has been read by this process.',
+				data: {
+					refreshedAt: discoveryRefreshedAt === null ? null : new Date(discoveryRefreshedAt).toISOString(),
+					cacheSeconds: OIDC_DISCOVERY_CACHE_SECONDS
+				}
+			},
+			{
+				name: 'keys',
+				status: jwksRefreshedAt === null ? 'unknown' : 'healthy',
+				message:
+					jwksRefreshedAt === null
+						? 'No signing key set has been fetched by this process yet.'
+						: 'A signing key set has been fetched by this process.',
+				data: {
+					refreshedAt: jwksRefreshedAt === null ? null : new Date(jwksRefreshedAt).toISOString(),
+					cacheSeconds: OIDC_JWKS_CACHE_SECONDS,
+					maxStaleSeconds: OIDC_JWKS_MAX_STALE_SECONDS
+				}
+			}
+		];
+
+		return {
+			status: overall,
+			message: healthMessage(overall, this.unavailableReason),
+			checks,
+			checkedAt: this.now(),
+			duration: this.now() - startedAt
+		};
 	}
 
 	/**
@@ -615,11 +1005,16 @@ export class OidcIdentityPlugin implements IPlugin {
 	}
 
 	/**
-	 * The discovery document the exchange runs against, with T6's availability
-	 * errors translated to the one refusal type this method's caller branches on
-	 * (see {@link exchangeAuthorizationCode}'s error contract).
+	 * The discovery document the exchange and T8's two verifiers run against, with
+	 * T6's availability errors translated to the one refusal type their callers
+	 * branch on (see {@link exchangeAuthorizationCode}'s error contract).
+	 *
+	 * Named for the verification path rather than the exchange since T8: the read is
+	 * the same one FR-14's cache and issuer-drift refusal describe, and an access
+	 * token or a sign-out notice needs the same document for the same reason — the
+	 * `jwks_uri` and the issuer its claims are compared against.
 	 */
-	private async discoveryForExchange(issuerUrl: string): Promise<OidcDiscoveryDocument> {
+	private async discoveryForVerification(issuerUrl: string): Promise<OidcDiscoveryDocument> {
 		try {
 			return await this.readerFor(issuerUrl).get();
 		} catch (error) {
@@ -691,6 +1086,13 @@ export class OidcIdentityPlugin implements IPlugin {
 	 * and the signature, with the cache's own ladder (600 s, 30 s, 21,600 s) and
 	 * its `providerUnavailable` end.
 	 *
+	 * **One implementation for all three token kinds.** T7 wrote it for the ID token
+	 * and named it for one; T8's `verifyAccessToken` and `verifyLogoutToken` call the
+	 * same method, because "the algorithm is one of RS256/ES256/EdDSA and the
+	 * signature verifies against a key Ever ID published, inside FR-13's ladder" is
+	 * one rule and FR-45/FR-33 both adopt it by reference ("validated like FR-11 and
+	 * FR-13"). A second copy would be a second place for the ladder to drift.
+	 *
 	 * Both of T6's error types become `IdentityTokenRejectedError`: `badAlg` and
 	 * `badSignature` keep their code, and anything the cache could not answer
 	 * because the provider is unreachable or its keys are stale is
@@ -699,9 +1101,9 @@ export class OidcIdentityPlugin implements IPlugin {
 	 * disguised as a provider outage — no claims are returned either way, which is
 	 * what fail-closed means here.
 	 */
-	private async verifyIdTokenSignature(idToken: string, jwksUri: string): Promise<OidcJwksVerification> {
+	private async verifyProviderSignature(compactJws: string, jwksUri: string): Promise<OidcJwksVerification> {
 		try {
-			return await this.jwksFor(jwksUri).verify(idToken);
+			return await this.jwksFor(jwksUri).verify(compactJws);
 		} catch (error) {
 			if (error instanceof OidcJwksVerificationError) throw new IdentityTokenRejectedError(error.code);
 			if (error instanceof OidcProviderUnavailableError) {
@@ -918,15 +1320,19 @@ function idTokenOf(body: unknown): string | null {
  * `iat`'s two bounds are not symmetric: the skew widens the future edge, while
  * the 600-second past edge (`idTokenMaxAgeSeconds`) is a fixed freshness rule
  * that no skew setting relaxes.
+ *
+ * **T8 note, and the one thing that changed here.** The issuer rule, the
+ * `exp`/`iat` rules and the subject rule are now the shared functions below
+ * ({@link trustedIssuer}, {@link tokenTimes}, {@link subjectOf}), so this reader
+ * and {@link accessTokenClaims} / {@link logoutTokenClaims} cannot disagree about
+ * them — FR-45 and FR-33 adopt these rules by reference. The statements are in the
+ * **same order** as before, so which code a token that breaks two rules at once
+ * reports is unchanged, and every claim-level case in
+ * `src/__tests__/id-token.spec.ts` passes untouched.
  */
 function idTokenClaims(payload: Record<string, unknown>, rules: IdTokenRules): VerifiedIdTokenClaims {
-	const issuer = payload.iss;
 	// FR-11: `iss` equals the configured issuer **and is allow-listed** (plan §4.3).
-	// The first half is what binds the token to the document the keys came from; the
-	// second is what makes a planned provider move reversible (FR-2).
-	if (typeof issuer !== 'string' || issuer !== rules.issuer || !rules.allowedIssuers.includes(issuer)) {
-		throw new IdentityTokenRejectedError('badIssuer');
-	}
+	const issuer = trustedIssuer(payload, rules);
 
 	const audiences = audiencesOf(payload.aud);
 	if (audiences === null || !audiences.includes(rules.clientId)) {
@@ -936,19 +1342,9 @@ function idTokenClaims(payload: Record<string, unknown>, rules: IdTokenRules): V
 		throw new IdentityTokenRejectedError('badAuthorizedParty');
 	}
 
-	const expiresAt = secondsClaim(payload.exp);
-	if (expiresAt === null || expiresAt <= rules.nowSeconds - rules.skewSeconds) {
-		// FR-11: "`exp` is later than now minus the skew" — strict, so a token that
-		// expired exactly `skew` seconds ago is refused.
-		throw new IdentityTokenRejectedError('expired');
-	}
-
-	const issuedAt = secondsClaim(payload.iat);
-	if (issuedAt === null) throw new IdentityTokenRejectedError('tooOld');
-	if (issuedAt > rules.nowSeconds + rules.skewSeconds) throw new IdentityTokenRejectedError('notYetValid');
-	if (issuedAt < rules.nowSeconds - OIDC_ID_TOKEN_MAX_AGE_SECONDS) {
-		throw new IdentityTokenRejectedError('tooOld');
-	}
+	// FR-11: "`exp` is later than now minus the skew", then `iat`'s two bounds, the
+	// past one being the 600-second freshness window FR-11 states for this reader.
+	tokenTimes(payload, rules, OIDC_ID_TOKEN_MAX_AGE_SECONDS);
 
 	// FR-11's nonce rule: the value the transaction sealed must be the value that
 	// came back, byte for byte. A token with no `nonce` at all is a token that
@@ -956,10 +1352,7 @@ function idTokenClaims(payload: Record<string, unknown>, rules: IdTokenRules): V
 	// separate branch.
 	if (payload.nonce !== rules.expectedNonce) throw new IdentityTokenRejectedError('badNonce');
 
-	const subject = payload.sub;
-	if (typeof subject !== 'string' || subject.length < 1 || subject.length > OIDC_SUBJECT_MAX_LENGTH) {
-		throw new IdentityTokenRejectedError('badSignature');
-	}
+	const subject = subjectOf(payload);
 
 	const authTime = secondsClaim(payload.auth_time);
 	if (rules.maxAuthAgeSeconds !== undefined) {
@@ -985,21 +1378,334 @@ function idTokenClaims(payload: Record<string, unknown>, rules: IdTokenRules): V
 }
 
 /** The rules {@link idTokenClaims} applies — everything it needs that the token itself does not carry. */
-interface IdTokenRules {
-	/** The issuer the discovery document advertises and the settings configured (FR-11, FR-12, FR-14). */
-	readonly issuer: string;
+interface IdTokenRules extends SharedTokenRules {
 	/** The relying party's client id (FR-2): the audience the ID token must carry. */
 	readonly clientId: string;
-	/** FR-2's 1–3 accepted issuer strings; defaults to `[issuerUrl]`. */
-	readonly allowedIssuers: readonly string[];
 	/** FR-9's `nonce`, as the transaction sealed it. */
 	readonly expectedNonce: string;
+	/** FR-25's connect bound, when the caller asked for one. */
+	readonly maxAuthAgeSeconds?: number | undefined;
+}
+
+/**
+ * The rules every token this plugin verifies shares — the clauses of FR-11 that
+ * are not about a particular token's claims, and that plan §4.3 states once for
+ * all three rows ("Issuer", and the shared half of "times").
+ *
+ * They live in one interface and one set of functions because FR-45 ("its
+ * signature and issuer validate as in FR-11 and FR-13") and FR-33 ("validated like
+ * FR-11 and FR-13") **adopt** the ID token's rules by reference. A second copy of
+ * "iss equals the discovery issuer and is allow-listed" is a second place for the
+ * allow-list to be forgotten — the same reasoning T7 applied to the sign-in scope
+ * string, and the reason this file has one issuer rule rather than three.
+ */
+interface SharedTokenRules {
+	/** The issuer the discovery document advertises and the settings configured (FR-11, FR-12, FR-14). */
+	readonly issuer: string;
+	/** FR-2's 1–3 accepted issuer strings; defaults to `[issuerUrl]`. */
+	readonly allowedIssuers: readonly string[];
 	/** The injected clock, in whole seconds since the epoch. */
 	readonly nowSeconds: number;
 	/** FR-2's tolerance, 0–120 seconds. */
 	readonly skewSeconds: number;
-	/** FR-25's connect bound, when the caller asked for one. */
-	readonly maxAuthAgeSeconds?: number | undefined;
+}
+
+/**
+ * FR-11's issuer rule, shared by all three token readers: `iss` equals the issuer
+ * the discovery document advertises **and** is allow-listed (plan §4.3's "Issuer"
+ * row, FR-12's exactness).
+ *
+ * The first half binds the token to the provider whose keys verified it; the
+ * second is what makes a planned provider move reversible (FR-2, R-28). They are
+ * one function because they are one rule about one claim: a reader that remembered
+ * only the first would accept a token from an issuer an administrator removed.
+ */
+function trustedIssuer(payload: Record<string, unknown>, rules: SharedTokenRules): string {
+	const issuer = payload.iss;
+	if (typeof issuer !== 'string' || issuer !== rules.issuer || !rules.allowedIssuers.includes(issuer)) {
+		throw new IdentityTokenRejectedError('badIssuer');
+	}
+	return issuer;
+}
+
+/**
+ * The `exp` half of plan §4.3's time rules — `exp` later than now minus the skew —
+ * or `null` when the token carries no readable `exp`.
+ *
+ * FR-11's clause is strict: a token that expired exactly `skew` seconds ago is
+ * refused, and that reading is kept for all three readers.
+ *
+ * The one difference between the readers is **not** here but in what they do with
+ * the `null`: an ID token and an access token must carry a readable `exp`
+ * (FR-11's clause, FR-45's "`exp` has not passed"), while a logout token need not
+ * — FR-33 states an `iat` age bound instead, and OpenID Connect Back-Channel
+ * Logout 1.0 §2.4 does not put `exp` in the claim set a logout token must carry
+ * (see {@link logoutTokenClaims}, and FR-53's "works with any standards-compliant
+ * provider"). A logout token that *does* carry an expired `exp` is refused here.
+ */
+function assertNotExpired(payload: Record<string, unknown>, rules: SharedTokenRules): number | null {
+	const expiresAt = secondsClaim(payload.exp);
+	if (expiresAt !== null && expiresAt <= rules.nowSeconds - rules.skewSeconds) {
+		throw new IdentityTokenRejectedError('expired');
+	}
+	return expiresAt;
+}
+
+/**
+ * FR-11/plan §4.3's `iat` rule: readable, no later than now plus the skew, and no
+ * older than `maxAgeSeconds` when the caller's rule set gives one.
+ *
+ * `iat`'s two bounds are not symmetric — the skew widens the future edge, while
+ * the past edge is a fixed freshness rule that no skew setting relaxes — and the
+ * past edge is a parameter because the three rows disagree about it: 600 seconds
+ * for an ID token (FR-11), 300 for an exchange token and a sign-out notice
+ * (FR-40, FR-33), and none at all for a delegated read (FR-45).
+ */
+function assertIssuedAt(payload: Record<string, unknown>, rules: SharedTokenRules, maxAgeSeconds?: number): number {
+	const issuedAt = secondsClaim(payload.iat);
+	// A claim that is missing or is not a number cannot be shown to be inside its
+	// window, and "we could not check it" is not a pass.
+	if (issuedAt === null) throw new IdentityTokenRejectedError('tooOld');
+	if (issuedAt > rules.nowSeconds + rules.skewSeconds) throw new IdentityTokenRejectedError('notYetValid');
+	if (maxAgeSeconds !== undefined && issuedAt < rules.nowSeconds - maxAgeSeconds) {
+		throw new IdentityTokenRejectedError('tooOld');
+	}
+	return issuedAt;
+}
+
+/**
+ * {@link assertNotExpired} plus {@link assertIssuedAt} — the pair of time rules
+ * every token that **must** carry an `exp` obeys, in that order.
+ *
+ * The order is FR-11's (`exp` first, then `iat`) and it is observable, which is
+ * the point: a token that is both expired and ancient reports `expired`, the fact
+ * an operator can act on first.
+ */
+function tokenTimes(
+	payload: Record<string, unknown>,
+	rules: SharedTokenRules,
+	maxAgeSeconds?: number
+): { issuedAt: number; expiresAt: number } {
+	const expiresAt = assertNotExpired(payload, rules);
+	if (expiresAt === null) throw new IdentityTokenRejectedError('expired');
+	return { issuedAt: assertIssuedAt(payload, rules, maxAgeSeconds), expiresAt };
+}
+
+/**
+ * `sub` as 1–255 characters (FR-11's last clause), for the two readers that
+ * require one.
+ *
+ * A malformed subject answers `badSignature`: the closed vocabulary has no code
+ * for it, and `badSignature` is this package's established reading of "this is not
+ * a token we can accept" — `jwks-cache.ts:182` uses it for a value that is not a
+ * compact JWS at all and `:202` for a payload that will not parse. Reported as a
+ * finding for T4/T25: a dedicated code would say more.
+ */
+function subjectOf(payload: Record<string, unknown>): string {
+	const subject = payload.sub;
+	if (typeof subject !== 'string' || subject.length < 1 || subject.length > OIDC_SUBJECT_MAX_LENGTH) {
+		throw new IdentityTokenRejectedError('badSignature');
+	}
+	return subject;
+}
+
+/**
+ * The `scope` claim as a list — RFC 6749 §3.3's space-delimited string, which is
+ * also what RFC 9068 puts in an access token.
+ *
+ * A value this function cannot read answers an **empty list** rather than throwing
+ * a structural code, because of what the claim is used for: a token with no
+ * readable scope cannot satisfy a `requiredScopes` entry, so it answers
+ * `missingScope` — the code FR-46 names for "a valid token that lacks the scope
+ * its caller needs" — instead of a code that would say less. Duplicates are
+ * dropped: a scope set is a set, and `scope: "apps:read apps:read"` grants nothing
+ * the same string with one copy does not.
+ */
+function scopesOf(value: unknown): string[] {
+	if (typeof value !== 'string') return [];
+	return [...new Set(value.split(/\s+/u).filter((scope) => scope.length > 0))];
+}
+
+/**
+ * The rules {@link accessTokenClaims} applies — FR-40's and FR-45's rows of plan
+ * §4.3, with the numbers that separate them left to the caller.
+ *
+ * The client id is **absent** on purpose: an access token is minted for the API
+ * audience, not for the relying-party client, and a check against `clientId` here
+ * would refuse every token a provider correctly minted for a local client.
+ */
+interface AccessTokenRules extends SharedTokenRules {
+	/** FR-2's `apiAudience`, default {@link OIDC_DEFAULT_API_AUDIENCE}. */
+	readonly apiAudience: string;
+	/** The scopes the caller's endpoint requires (FR-40's exchange scope, FR-46's delegated scope). */
+	readonly requiredScopes: readonly string[];
+	/** FR-45's ceiling on `exp − iat`. */
+	readonly maxLifetimeSeconds: number;
+	/** FR-40's 300-second age bound; absent for FR-45's delegated read, which has none. */
+	readonly maxAgeSeconds?: number | undefined;
+	/** FR-40's local-client allow-list. Absent means the claim is not read at all (FR-45). */
+	readonly allowedAuthorizedParties?: readonly string[] | undefined;
+}
+
+/**
+ * FR-40 and FR-45 — the access-token rules of plan §4.3, applied to a payload
+ * whose signature and algorithm have already been verified.
+ *
+ * The order is the one {@link OidcIdentityPlugin.verifyAccessToken} documents, and
+ * it runs cheapest-and-most-fundamental first: issuer, audience, scopes, times,
+ * lifetime ceiling, authorised party, subject. Every refusal names the rule that
+ * failed and nothing else (FR-16), and no refusal returns a claim.
+ *
+ * Two readings worth stating, because neither is spelled out in the table:
+ *
+ *   - **`azp` is checked only when the caller gives an allow-list.** FR-40 says
+ *     "its authorised party is one of the configured local-client IDs"; FR-45 says
+ *     nothing about `azp`, and a delegated token is minted for a different party.
+ *     Reading FR-45 as "no `azp` rule" is the literal reading, and adding one would
+ *     refuse tokens the spec accepts. An allow-list that is present but **empty**
+ *     refuses every token — the fail-closed reading of "this installation has
+ *     configured no local client".
+ *   - **an unreadable `jti` is `null`, never a refusal.** The contract says so
+ *     (`VerifiedAccessTokenClaims.jti`: "or `null` when the provider sent none"),
+ *     and the 600-second window it feeds is the caller's (FR-40, T13's replay
+ *     service).
+ */
+function accessTokenClaims(payload: Record<string, unknown>, rules: AccessTokenRules): VerifiedAccessTokenClaims {
+	const issuer = trustedIssuer(payload, rules);
+
+	// FR-45 / plan §4.3: the token was minted for this API, not for a browser.
+	const audiences = audiencesOf(payload.aud);
+	if (audiences === null || !audiences.includes(rules.apiAudience)) {
+		throw new IdentityTokenRejectedError('badAudience');
+	}
+
+	// FR-44 / FR-46: every scope the caller's endpoint requires must be present.
+	const scopes = scopesOf(payload.scope);
+	if (rules.requiredScopes.some((scope) => !scopes.includes(scope))) {
+		throw new IdentityTokenRejectedError('missingScope');
+	}
+
+	const { issuedAt, expiresAt } = tokenTimes(payload, rules, rules.maxAgeSeconds);
+
+	// FR-45: the lifetime ceiling ACC-12-35 names, read as a bound on the token's
+	// own window (`exp − iat`) rather than on its remaining life, so the refusal
+	// does not depend on when the token happens to be presented.
+	if (expiresAt - issuedAt > rules.maxLifetimeSeconds) {
+		throw new IdentityTokenRejectedError('lifetimeTooLong');
+	}
+
+	const authorizedParty = nonEmpty(payload.azp) ?? null;
+	if (
+		rules.allowedAuthorizedParties !== undefined &&
+		(authorizedParty === null || !rules.allowedAuthorizedParties.includes(authorizedParty))
+	) {
+		// FR-40: a token minted for a client an administrator did not configure is
+		// refused, and so is one that names no party at all — "unlisted" includes
+		// "absent", because there is nothing to compare.
+		throw new IdentityTokenRejectedError('badAuthorizedParty');
+	}
+
+	return {
+		issuer,
+		subject: subjectOf(payload),
+		audience: audiences,
+		scopes,
+		authorizedParty,
+		issuedAt,
+		expiresAt,
+		jti: nonEmpty(payload.jti) ?? null
+	};
+}
+
+/**
+ * FR-33 — the back-channel logout rules, applied to a payload whose signature and
+ * algorithm have already been verified.
+ *
+ * The order is FR-33's own sentence: the issuer rule it inherits from FR-11, then
+ * `iat` ("within the skew and no older than 300 seconds"), then "the back-channel
+ * logout event present", then "no `nonce`", then "`sid` or `sub` present", then
+ * `jti`.
+ *
+ * Three readings this function had to make, each documented where it is applied:
+ * `exp` is checked when present and **not required** (see
+ * {@link assertNotExpired}); "no `nonce`" is about the claim's **presence**, not
+ * its value; and a missing `jti` is `badLogoutEvent` rather than a new notice —
+ * the contract says exactly that (`VerifiedLogoutTokenClaims.jti`: "a logout token
+ * without a `jti` is rejected as `badLogoutEvent` rather than treated as new").
+ */
+function logoutTokenClaims(payload: Record<string, unknown>, rules: SharedTokenRules): VerifiedLogoutTokenClaims {
+	const issuer = trustedIssuer(payload, rules);
+
+	// FR-33's `iat` bound, and an `exp` the provider may or may not have sent.
+	assertNotExpired(payload, rules);
+	assertIssuedAt(payload, rules, OIDC_LOGOUT_TOKEN_MAX_AGE_SECONDS);
+
+	// FR-33: the event claim. Read as "the member is present on an object", which
+	// is what OpenID Connect Back-Channel Logout 1.0 §2.4 defines; its value is an
+	// empty JSON object in every implementation, so its contents are not read.
+	const events = payload.events;
+	if (typeof events !== 'object' || events === null || Array.isArray(events)) {
+		throw new IdentityTokenRejectedError('badLogoutEvent');
+	}
+	if (!Object.prototype.hasOwnProperty.call(events, OIDC_BACKCHANNEL_LOGOUT_EVENT)) {
+		throw new IdentityTokenRejectedError('badLogoutEvent');
+	}
+
+	// FR-33: **no** `nonce`. Presence, not truthiness — a notice is not an
+	// authentication, and a value a provider echoed (or an attacker added) must not
+	// be able to make one look like an ID token. An explicit `nonce: null` is still
+	// the claim being present, so it is refused too.
+	if (payload.nonce !== undefined) throw new IdentityTokenRejectedError('nonceInLogoutToken');
+
+	const subject = optionalSubjectOf(payload.sub);
+	const sid = nonEmpty(payload.sid) ?? null;
+	if (subject === null && sid === null) {
+		// FR-33: "`sid` or `sub` present". With neither there is no session this
+		// notice could end, and accepting it would let a notice that names nobody
+		// count as a successful sign-out.
+		throw new IdentityTokenRejectedError('badLogoutEvent');
+	}
+
+	// FR-33's replay key. Required: the 600-second window is keyed on it, and a
+	// notice that cannot be bounded must be refused rather than treated as new.
+	const jti = nonEmpty(payload.jti);
+	if (jti === undefined) throw new IdentityTokenRejectedError('badLogoutEvent');
+
+	return { issuer, subject, sid, jti };
+}
+
+/**
+ * `sub` as a usable 1–255-character string when it is present, or `null` when the
+ * notice carries none — or carries one that is blank or too long to be a subject.
+ *
+ * Unlike {@link subjectOf}, a malformed subject here is **not** a refusal: FR-33
+ * allows either `sub` or `sid`, so a notice with an unusable `sub` and a good `sid`
+ * is still a notice about a session this platform can end, and the claim's content
+ * never reaches a row (FR-31). "Unusable" is read the way every other optional
+ * string in this file is (`nonEmpty`): blank is absent, and the value is trimmed.
+ */
+function optionalSubjectOf(value: unknown): string | null {
+	const subject = nonEmpty(value);
+	if (subject === undefined) return null;
+	return subject.length <= OIDC_SUBJECT_MAX_LENGTH ? subject : null;
+}
+
+/**
+ * The one-line health message for a status — a closed sentence per state, never a
+ * value an administrator configured (FR-16's no-material rule, read as far as not
+ * echoing the issuer or a client id into a health response).
+ */
+function healthMessage(status: PluginHealthStatus, reason: OidcProviderUnavailableReason | null): string {
+	switch (status) {
+		case 'healthy':
+			return 'Ever ID is configured and this process has read the provider.';
+		case 'unhealthy':
+			return `Ever ID is unavailable (${reason ?? 'notConfigured'}); Test connection must pass before sign-in works again.`;
+		case 'degraded':
+			return 'Ever ID is degraded.';
+		default:
+			return 'Ever ID has not been read by this process yet.';
+	}
 }
 
 /**

@@ -18,6 +18,11 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js",
 			"require": "./dist/index.cjs"
+		},
+		"./testing": {
+			"types": "./dist/testing/fake-oidc-provider.d.ts",
+			"import": "./dist/testing/fake-oidc-provider.js",
+			"require": "./dist/testing/fake-oidc-provider.cjs"
 		}
 	},
 	"files": [

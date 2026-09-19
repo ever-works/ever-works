@@ -10,19 +10,43 @@ export { default, OidcIdentityPlugin } from './oidc-identity.plugin.js';
 // spec can pin them against `EVER_ID_LIMITS` off disk (the pattern T6 used for
 // FR-13's three numbers) and so the API's `/client-config` (FR-39) reads the scope
 // string from the place the request is built with it.
+// APW-12 T8 — extended with the four numbers and the one event identifier the
+// token verifiers enforce (FR-40's 300-second age, FR-45's 3,600-second lifetime
+// ceiling, FR-33's 300-second notice age and 600-second replay window, and the
+// back-channel-logout event), plus FR-2's default API audience, which
+// `getPublicConfig` and `verifyAccessToken` now read from one constant. Every one
+// of them is part of the package's published surface on purpose: the numbers are
+// plan §4.3's and the API passes two of them straight back in as `maxAgeSeconds` /
+// `maxLifetimeSeconds`, so a caller that had to spell `3600` itself would be a
+// second place for the ceiling to live.
 export {
+	OIDC_ACCESS_TOKEN_MAX_AGE_SECONDS,
+	OIDC_ACCESS_TOKEN_MAX_LIFETIME_SECONDS,
+	OIDC_BACKCHANNEL_LOGOUT_EVENT,
 	OIDC_CODE_VERIFIER_BYTES,
 	OIDC_CODE_VERIFIER_LENGTH,
+	OIDC_DEFAULT_API_AUDIENCE,
 	OIDC_DEFAULT_CLOCK_SKEW_SECONDS,
 	OIDC_ID_TOKEN_MAX_AGE_SECONDS,
+	OIDC_LOGOUT_TOKEN_MAX_AGE_SECONDS,
+	OIDC_LOGOUT_TOKEN_REPLAY_WINDOW_SECONDS,
 	OIDC_NONCE_BYTES,
 	OIDC_STATE_BYTES,
 	OIDC_SUBJECT_MAX_LENGTH
 } from './oidc-identity.plugin.js';
 // APW-12 T7 — the sign-in scopes (plan §4.2, FR-38): `openid email profile`, and
-// never `offline_access`.
-export { OIDC_NEVER_REQUESTED_SCOPES, OIDC_SIGN_IN_SCOPE, OIDC_SIGN_IN_SCOPES, isSignInScope } from './scopes.js';
-export type { OidcNeverRequestedScope, OidcSignInScope } from './scopes.js';
+// never `offline_access`. APW-12 T8 — the two scopes a **token** is verified
+// against (FR-44's `apps:read`, FR-39/FR-40's `ever-works:session`).
+export {
+	OIDC_DELEGATED_READ_SCOPE,
+	OIDC_NEVER_REQUESTED_SCOPES,
+	OIDC_SESSION_EXCHANGE_SCOPE,
+	OIDC_SIGN_IN_SCOPE,
+	OIDC_SIGN_IN_SCOPES,
+	OIDC_TOKEN_SCOPES,
+	isSignInScope
+} from './scopes.js';
+export type { OidcNeverRequestedScope, OidcSignInScope, OidcTokenScope } from './scopes.js';
 export {
 	OIDC_IDENTITY_SETTING_KEYS,
 	oidcIdentityHttpsUrlPattern,
@@ -42,8 +66,9 @@ export type {
 // module nothing here reaches is a module the published package does not have
 // (measured before this export — `jwks-cache.ts` was absent from `dist/index.js`
 // while its spec was green against the source). Nothing test-only is exported
-// here: T8's fake provider goes to a `./testing` subpath (plan §10.4), and T6's
-// fixtures stay inside their spec files.
+// here: T8's fake provider ships from the `./testing` subpath (plan §10.4) and is
+// **deliberately not** re-exported from this file, which is what keeps it out of
+// the main bundle; T6's fixtures stay inside their spec files.
 export {
 	OIDC_DISCOVERY_CACHE_SECONDS,
 	OIDC_IDENTITY_SIGNING_ALGS,
