@@ -59,6 +59,20 @@ import { UsageOutcome, UsagePayer } from '../entities/_types';
 import { WorkBuild } from '../entities/work-build.entity';
 import { APP_BUILD_EVENT_CLASSES, type AppBuildEventClass } from '../events/app-build.events';
 import { PluginUsageService } from '../usage/plugin-usage.service';
+// APW-05 T18 — the two dispatcher ports and their DI tokens, IMPORTED from the files
+// that own them. This import is the swap: while this module declared its own
+// `Symbol('…')` for either name, the `buildJobRuntimeProviders()` binding of the
+// owner's token never reached the `@Optional()` injections below, because a Nest token
+// is compared by identity (see the block above `dispatchPrepare`). They are re-exported
+// a few lines down so every existing import path keeps working.
+import {
+    APP_BUILD_PREPARE_DISPATCHER,
+    type AppBuildPrepareDispatcher,
+} from '../tasks/app-build-prepare-dispatcher';
+import {
+    APP_BUILD_WATCH_DISPATCHER,
+    type AppBuildWatchDispatcher,
+} from '../tasks/app-build-watch-dispatcher';
 import {
     evaluateBuildVerdict,
     fingerprintsToValues,
@@ -115,30 +129,33 @@ export interface AppBuildWatchJobPayload {
 // identity: two `Symbol()`s that happen to share a name are two different
 // tokens. If the owner lands its own declaration and one of these blocks is left
 // in place, the owner's binding will not reach this injection.
+//
+// ✅ **AND THAT IS EXACTLY WHAT HAPPENED, for the two dispatchers — closed here.**
+// T18 landed `…/tasks/app-build-prepare-dispatcher.ts` and
+// `…/tasks/app-build-watch-dispatcher.ts` while this file still declared its own
+// `Symbol('APP_BUILD_PREPARE_DISPATCHER')` / `Symbol('APP_BUILD_WATCH_DISPATCHER')`,
+// and `buildJobRuntimeProviders()` binds the OWNER's symbols, so both `@Optional()`
+// injections below stayed `undefined`: every prepare and watch took §7.1's
+// in-process fallback, silently, with no error anywhere — the failure this comment
+// predicted, and the reason a same-named token is worse than a missing one. The two
+// names now come from the owner's files (imported for identity, re-exported so every
+// existing import path keeps working) and no local `Symbol()` for them remains.
 
 /**
- * _Provisional — T18 (`packages/agent/src/tasks/app-build-prepare-dispatcher.ts`)._
+ * APW-05 T18 — the two dispatcher ports and their tokens, **owned by
+ * `packages/agent/src/tasks/app-build-{prepare,watch}-dispatcher.ts`** and
+ * re-exported here so nothing that imports them from this file or from the
+ * `@ever-works/agent/app-builds` barrel has to move.
  *
- * Both dispatchers follow `work-import-dispatcher.ts` and answer
- * `Promise<string | null>`: `null` means "no runtime took it", which is what the
- * in-process fallback keys on (`plan.md:1317-1319`, `APW05-G20`). The older
- * `kb-reembed-work-dispatcher.ts` shape, which throws instead, is deliberately
- * not the model here.
+ * The imported interface is the owner's, so it is structurally the same port this
+ * block used to declare: `dispatchAppBuildPrepare` / `dispatchAppBuildWatch`
+ * answering `Promise<string | null>`, where `null` means "no runtime took it" — the
+ * signal the in-process fallback keys on (`plan.md:1317-1319`, `APW05-G20`). The
+ * payload types are assignable in both directions (the owner's `reason` is the
+ * wider `string`), so the call sites below are unchanged.
  */
-export interface AppBuildPrepareDispatcher {
-    dispatchAppBuildPrepare(payload: AppBuildPrepareJobPayload): Promise<string | null>;
-}
-
-/** DI token for {@link AppBuildPrepareDispatcher} — owned by T18. */
-export const APP_BUILD_PREPARE_DISPATCHER = Symbol('APP_BUILD_PREPARE_DISPATCHER');
-
-/** _Provisional — T18 (`…/app-build-watch-dispatcher.ts`)._ */
-export interface AppBuildWatchDispatcher {
-    dispatchAppBuildWatch(payload: AppBuildWatchJobPayload): Promise<string | null>;
-}
-
-/** DI token for {@link AppBuildWatchDispatcher} — owned by T18. */
-export const APP_BUILD_WATCH_DISPATCHER = Symbol('APP_BUILD_WATCH_DISPATCHER');
+export { APP_BUILD_PREPARE_DISPATCHER, APP_BUILD_WATCH_DISPATCHER };
+export type { AppBuildPrepareDispatcher, AppBuildWatchDispatcher };
 
 /** _Provisional — T19 (`…/app-build-prepare.runner.ts`): the in-process half of §7.1._ */
 export interface AppBuildPrepareRunner {

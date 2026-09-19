@@ -43,6 +43,10 @@ import {
     type AppBuildPluginResolver,
     type AppBuildRebuildResult,
 } from '../app-builds.service';
+// APW-05 T18 — the factory that binds the dispatcher tokens in the real graph. Imported so
+// the swap can be asserted against the binding the application actually uses instead of
+// against a comment about it.
+import { buildJobRuntimeProviders } from '../../tasks/job-runtime.providers';
 
 /**
  * APW-05 T17 — `AppBuildsService` (plan §7.1, §7.2, §7.5, §7.8, §5.1, §4.10).
@@ -1607,3 +1611,38 @@ function runRef(overrides: Partial<BuildRunRef> = {}): BuildRunRef {
         ...overrides,
     };
 }
+
+/**
+ * APW-05 T18 + T17 — **the two dispatcher tokens this service injects are the OWNER's
+ * tokens**, not two more `Symbol()`s that merely share a description.
+ *
+ * This is the closure of the finding T18 routed, and it is the reason a "provisional
+ * seam" needs this test rather than the comment that promised the swap: while
+ * `app-builds.service.ts` declared its own
+ * `Symbol('APP_BUILD_PREPARE_DISPATCHER')`, `buildJobRuntimeProviders()`'s binding of
+ * T18's token could not reach the `@Optional()` injection — so `dispatchPrepare` and
+ * `dispatchWatch` fell back **in process, always, silently**, and no test could see it
+ * because the fallback is a legitimate, working path. A Nest token is compared by
+ * identity; this asserts the identity against the real binding.
+ */
+describe('APW-05 T18 — the dispatcher tokens are the ones the runtime binds', () => {
+    it('exports exactly the tokens buildJobRuntimeProviders() provides', () => {
+        const bound = buildJobRuntimeProviders().map(
+            (provider) => (provider as { provide: unknown }).provide,
+        );
+
+        expect(bound).toContain(APP_BUILD_PREPARE_DISPATCHER);
+        expect(bound).toContain(APP_BUILD_WATCH_DISPATCHER);
+    });
+
+    it('carries an owner’s token that is distinct from a same-named Symbol', () => {
+        // The negative control: if either name ever goes back to a local `Symbol(...)`,
+        // this pair fails while the assertions above still pass — which is exactly the
+        // half-fixed state the finding described.
+        expect(APP_BUILD_PREPARE_DISPATCHER).not.toBe(
+            Symbol('APP_BUILD_PREPARE_DISPATCHER') as unknown,
+        );
+        expect(APP_BUILD_PREPARE_DISPATCHER.description).toBe('APP_BUILD_PREPARE_DISPATCHER');
+        expect(APP_BUILD_WATCH_DISPATCHER.description).toBe('APP_BUILD_WATCH_DISPATCHER');
+    });
+});
