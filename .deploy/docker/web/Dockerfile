@@ -30,9 +30,15 @@ ENV NEXT_BUILD_OUTPUT=standalone
 ENV CI=true
 
 # NEXT_PUBLIC_* must be present BEFORE `next build` runs because Next.js
-# inlines them into the client bundle at build time. The docker-build
-# workflows pass them via `--build-arg`; unset values resolve to empty
-# strings and the PostHog browser SDK degrades to a no-op gracefully.
+# inlines them into the client bundle at build time. Unset values resolve to
+# empty strings and the PostHog browser SDK degrades to a no-op gracefully.
+#
+# The images Ever Works PUBLISHES are built WITHOUT these two: they are public
+# (GHCR, Docker Hub) and a baked key would send every self-hoster's browser
+# analytics to the Ever Works PostHog project. To enable PostHog on your own
+# install, build from source with YOUR project key:
+#   docker build -f .deploy/docker/web/Dockerfile --build-arg NEXT_PUBLIC_POSTHOG_KEY=phc_... .
+# (plus --build-arg NEXT_PUBLIC_POSTHOG_HOST=... when not https://us.i.posthog.com).
 ARG NEXT_PUBLIC_POSTHOG_KEY=
 ARG NEXT_PUBLIC_POSTHOG_HOST=
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY

@@ -253,6 +253,8 @@ docker pull everco/ever-works-api:0.134.8
 
 **GHCR** additionally carries `:latest`, built separately by `.github/workflows/docker-build-publish-prod.yml` (which also pushes to a DigitalOcean registry when that legacy path is enabled). The Compose files pull that `:latest` from GHCR, and that tag moves. For a deployment you intend to keep, pin something immutable: `.github/workflows/k8s-build.yml` also pushes a `sha-<commit>` tag for all four images to GHCR and then retags a moving `:prod` / `:stage` / `:dev` alias onto it, so `ghcr.io/ever-works/ever-works-api:sha-<commit>` is a stable target. Pinning by digest works too.
 
+No published image carries an analytics key, so browser analytics (PostHog) is off in every pre-built web image. Next.js bakes `NEXT_PUBLIC_*` values into the client bundle at build time, so a runtime environment variable cannot switch it on. To use your own PostHog project, build the web image from source with `--build-arg NEXT_PUBLIC_POSTHOG_KEY=phc_...` (see `.deploy/docker/web/Dockerfile`). Server-side PostHog (`POSTHOG_API_KEY`) is read at runtime as usual.
+
 One non-obvious detail: the dev and stage environments use _separate image names_ (`ever-works-api-dev`, `ever-works-mcp-stage`, …), not different tags on the prod image.
 
 ### The MCP server container

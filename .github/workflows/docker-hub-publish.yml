@@ -18,8 +18,8 @@ name: Publish Images to Docker Hub
 #   - the 3-4 h production build is not repeated on the shared runner pool;
 #   - no deploy lane depends on Docker Hub: a Docker Hub outage turns THIS
 #     workflow red and nothing else.
-# The public web image also stays free of our analytics key: k8s-build does
-# not bake NEXT_PUBLIC_POSTHOG_KEY in, while `docker-build-publish-*.yml` does.
+# The public web image carries no analytics key: neither k8s-build nor
+# `docker-build-publish-*.yml` bakes NEXT_PUBLIC_POSTHOG_KEY into the bundle.
 #
 # 🛑 FAILS LOUDLY. Until 2026-09 the `docker-build-publish-*.yml` lanes pushed
 # to Docker Hub with `continue-on-error: true` while no DOCKERHUB_* secret
