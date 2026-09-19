@@ -105,3 +105,11 @@ export * from './app-runtime-local-worker';
 // resolves it over the internal RPC channel — see the file's header for the two
 // registrations that live outside this package.
 export * from './app-build-prepare.task';
+// APW-05 T20 — one OBSERVATION of one Build (plan §7.3). It claims §7.3's
+// two-minute `watchLeaseUntil`, reads the run through the build plugin, re-stamps
+// the preparation values the run actually read (`APW05-G03`), finalises the
+// terminal transition through §7.8's one writer, removes a verification Build's
+// per-run prompted-value secret (§4.10) and releases the lease. The runner is
+// API-side, so the task resolves it over the internal RPC channel — see the
+// file's header for the two registrations that live outside this package.
+export * from './app-build-watch.task';

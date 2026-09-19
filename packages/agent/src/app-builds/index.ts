@@ -40,6 +40,16 @@
  *   helpers (`selectBuildRunner`, `appBuildWorkflowStateFor`,
  *   `unionMinusRemoved`, `mapPluginBlockedReason`, `appBuildBlock`,
  *   `appBuildChecks`, `declaredBuildMemoryGiB`) its spec pins.
+ * - `./app-build-watch.runner` — `AppBuildWatchRunner` (T20), §7.3's observation
+ *   of one Build: §7.3:1386-1388's two-minute `watchLeaseUntil` claim, the
+ *   `IBuildPlugin.getBuild` read with APW-07's redactor (FR-38), the §3.1b
+ *   re-stamp the first `startedAt` triggers (`APW05-G03`), the lease release, and
+ *   §4.10's per-run verification-secret deletion (`APW05-G11`). Every transition
+ *   it observes is written by T17's `applySnapshot`/`finalize`/`publish` — this
+ *   runner writes no status and emits no event of its own. It also carries
+ *   §7.1's ten-run in-process cap (`APP_BUILD_WATCH_MAX_CONCURRENT_RUNS`), the
+ *   lease length, the skip reasons of an unconfigured installation and
+ *   `repositoryCoordinates`.
  * - `./app-builds.module` — `AppBuildsModule`, what `apps/api`'s App Builds module
  *   will import.
  */
@@ -87,3 +97,30 @@ export {
     type AppBuildRunnerChoice,
     type AppBuildRunnerDecision,
 } from './app-build-prepare.runner';
+
+// 🛑 The same collision as above, for T20's runner, resolved the same way. T17's
+// provisional PORT `AppBuildWatchRunner` (`app-builds.service.ts:168-174`, the
+// `run(payload)` §7.1's null-dispatch fallback calls) and this file's CLASS of
+// the same name are two different things, and `export *` from both modules is
+// the ambiguity TypeScript refuses outright (TS2308) — so the CLASS is named
+// explicitly here, exactly as `AppBuildPrepareRunner` is above, and the port
+// stays reachable from `./app-builds.service` (which the module and the class
+// both import directly).
+//
+// The names the runner file publishes beside the class are listed in full rather
+// than exported wholesale for the same reason T19's list is exhaustive: an
+// `export *` here would collide again the moment either port grows a member, and
+// an explicit list makes the next collision a compile error in THIS file rather
+// than a surprising ambiguity somewhere downstream.
+export {
+    APP_BUILD_WATCH_JOB_ID,
+    APP_BUILD_WATCH_LEASE_MS,
+    APP_BUILD_WATCH_MAX_CONCURRENT_RUNS,
+    APP_BUILD_WATCH_SKIP_REASONS,
+    AppBuildWatchRunner,
+    repositoryCoordinates,
+    type AppBuildWatchPluginBinding,
+    type AppBuildWatchPluginResolver,
+    type AppBuildWatchRunResult,
+    type AppBuildWatchSkipReason,
+} from './app-build-watch.runner';
