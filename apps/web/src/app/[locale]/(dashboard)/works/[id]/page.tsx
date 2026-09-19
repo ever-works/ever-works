@@ -8,10 +8,15 @@ import { WorkStats } from '@/components/works/detail/overview/WorkStats';
 import { WorkConfig } from '@/components/works/detail/overview/WorkConfig';
 import { WorkMissions } from '@/components/works/detail/overview/WorkMissions';
 import { AppLauncherExposureCard } from '@/components/works/detail/overview/AppLauncherExposureCard';
-import {
-    AppUpstreamCard,
-    showUpstreamCardOnOverview,
-} from '@/components/works/app/AppUpstreamCard';
+import { AppUpstreamCard } from '@/components/works/app/AppUpstreamCard';
+// The predicate is CALLED in this page's render body, so it must come from a
+// module a server component may import: `AppUpstreamCard` is a client module
+// (`'use client'`), and importing the function through it handed this page a
+// client reference instead of the function, which threw out of the server
+// render and replaced `/works/<id>` with Next's error boundary. The component
+// itself stays imported from there — a component MAY cross the boundary; a
+// plain function called on the server may not.
+import { showUpstreamCardOnOverview } from '@/lib/works/app-upstream-visibility';
 import { BudgetSummarySection } from '@/components/dashboard/BudgetSummarySection';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { getAuthFromRequest } from '@/lib/auth';

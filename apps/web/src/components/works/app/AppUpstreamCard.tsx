@@ -16,6 +16,7 @@ import type {
 } from '@ever-works/contracts';
 import { AppUpstreamWarnings } from './AppUpstreamWarnings';
 import { formatUpstreamAge, UpstreamDivergenceBadge } from './UpstreamDivergenceBadge';
+import { showUpstreamCardOnOverview } from '@/lib/works/app-upstream-visibility';
 
 /**
  * APW-02 T30 — the Upstream card (plan §5.2, `plan.md:629-640`; spec §6.1,
@@ -80,27 +81,22 @@ export const UPSTREAM_READINESS_COPY_KEYS = {
     failed: 'readiness.failed',
 } as const satisfies Record<AppReadinessState, string>;
 
-/**
- * Whether the Overview renders this card at all (plan §5.1,
- * `plan.md:624-627`).
- *
- * Two conditions, both required: a repository with an upstream
- * (`fork` or `private-copy` — a `link` App Work has none) **and** a readiness
- * APW-01's card no longer owns (`ready` or `waiting_for_setup_pr`). Every other
- * state stays on APW-01's card, which is the one that explains a `preparing`,
- * `timed_out` or `failed` repository.
- */
-export function showUpstreamCardOnOverview(state: AppUpstreamStateResponse | null): boolean {
-    if (!state) {
-        return false;
-    }
-
-    const hasUpstream = state.relation === 'fork' || state.relation === 'private-copy';
-    const readinessSettled =
-        state.readiness.state === 'ready' || state.readiness.state === 'waiting_for_setup_pr';
-
-    return hasUpstream && readinessSettled;
-}
+// `showUpstreamCardOnOverview` now lives in
+// `@/lib/works/app-upstream-visibility` — a module with NO `'use client'`
+// directive — and is IMPORTED above. It moved because this module IS a client
+// module, and `app/[locale]/(dashboard)/works/[id]/page.tsx` (a server
+// component) CALLS the predicate in its render body: a server component that
+// imports a plain function across a client boundary receives a client
+// reference, not the function, so the call threw
+// `Attempted to call showUpstreamCardOnOverview() from the server but … it is
+// on the client` and Next.js answered `/works/<id>` with its error boundary for
+// every Work (measured digest `2265010250`). Same class as the `/new` crash
+// C22 fixed.
+//
+// The name this module used to EXPORT is re-exported below, unchanged and
+// pointing at the one definition, so every existing consumer and spec keeps
+// working.
+export { showUpstreamCardOnOverview };
 
 /**
  * **Try again** is offered for exactly the two states the API can act on and the
