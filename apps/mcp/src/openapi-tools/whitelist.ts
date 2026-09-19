@@ -48,6 +48,13 @@ export const WHITELIST: WhitelistEntry[] = [
 		method: 'POST',
 		path: '/api/works/{id}/delete',
 		toolName: 'delete_work',
+		// APW-01 T39 (FR-40b, Resolution R-15): the App Work delete surface adds two
+		// fields whose only purpose is to authorise DESTROYING the App Work's stored
+		// data (volumes and App dependencies) — `delete_stored_data` and its typed
+		// `confirm_slug`. Neither is advertised as a tool argument and neither is
+		// forwarded, so no agent can destroy stored data through MCP; the route stays
+		// useful without them (deleting the Work keeps the data).
+		omitArgs: ['delete_stored_data', 'confirm_slug'],
 		annotations: { destructiveHint: true }
 	},
 	{

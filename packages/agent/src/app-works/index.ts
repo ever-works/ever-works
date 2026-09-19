@@ -64,6 +64,11 @@
  * - `./app-work-create.service` — `AppWorkCreateService` (T13, plan §4.2): the twelve
  *   steps of an `app`-kind create, the `WorkUpstreamState` row written in the same
  *   transaction, and the readiness dispatch.
+ * - `./app-work-deletion.port` — `AppWorkDeletionPort` and `APP_WORK_DELETION_PORT`
+ *   (T39, plan §7): the App runtime's deletion seam. APW-06's
+ *   `AppRuntimeDeletionService` binds it; `WorkLifecycleService` injects it
+ *   `@Optional()`, and unbound means "no App runtime exists yet", so an App Work's
+ *   delete keeps today's behaviour (the row goes now) until APW-06 merges.
  */
 
 export * from './app-works.module';
@@ -80,3 +85,4 @@ export * from './app-source-catalog.port';
 export * from './app-prompted-values.port';
 export * from './app-source-inspector.service';
 export * from './app-work-create.service';
+export * from './app-work-deletion.port';

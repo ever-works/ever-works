@@ -21,6 +21,7 @@ import type {
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    AppDeployTargetChoice,
 } from '@ever-works/contracts';
 import {
     INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
@@ -696,6 +697,42 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
         return {
             success: false,
             error: error instanceof Error ? error.message : t('updateFailed'),
+        };
+    }
+}
+
+/**
+ * APW-01 T39 (FR-34, plan §7 `:952-953`) — the App Work's deploy target, as the
+ * delete dialog needs it.
+ *
+ * `GET /api/works/:id/app-target` belongs to **APW-06**, which is not merged: the
+ * route answers `404` today. That is a documented non-answer, not a fault, so it is
+ * reported as `none` — which HIDES the **Also delete stored data** checkbox, because
+ * a Work that deploys nowhere has no stored data to delete (FR-40a). Any other
+ * failure (a `403`, a `500`, an unreachable API) is a real fault and answers
+ * `success: false`, so the dialog never mistakes a broken read for "no target".
+ *
+ * A Server Action rather than a client fetch: `DeleteComponent` is a client
+ * component and the API client is `server-only`.
+ */
+export async function getAppDeleteTarget(workId: string): Promise<{
+    success: boolean;
+    target?: AppDeployTargetChoice;
+    error?: string;
+}> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const { target } = await workAPI.getAppTarget(workId);
+        return { success: true, target };
+    } catch (error) {
+        console.error('Failed to read the App Work deploy target:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to read the deploy target',
         };
     }
 }

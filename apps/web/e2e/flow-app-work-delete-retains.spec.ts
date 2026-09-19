@@ -35,20 +35,23 @@
  *   - **The fork survives, and the delete writes nothing to GitHub at all.** With the
  *     unticked defaults — the body NEG-07 describes — `POST /api/works/:id/delete`
  *     answers `200 {"status":"success","slug":"…","message":"Work '…' and associated
- *     repositories have been deleted","deleted_repositories":[]}`, and the fake's
- *     `/_control/state` reports the fork byte-identical afterwards (`fork: true`, `parent`
- *     intact, `archived: false`, `ready: true`, `default_branch: "main"`) while
- *     `/_control/calls` records **zero** calls of any kind during the delete. That is this
- *     file's core claim and it is asserted below.
- *   - **The app-specific delete surface is not in this build.** The route's DTO refuses
- *     both of the case's fields — `{"delete_stored_data":true}` and `{"confirm_slug":"…"}`
- *     each answer `400 ["property … should not exist"]` — so the **Also delete stored
- *     data** interlock (slug typing, dependency list, R-15) has no server side yet, and the
- *     refusal leaves the Work in place (asserted: the Work is still readable after the
- *     `400`). The response the case quotes, `200 { deleting: true }`, is not produced:
- *     the row is gone at once (`GET /api/works/:id` → `404`), so the **Deleting…** row it
- *     describes cannot be observed. Both are APW-01 T39 / APW-06 FR-60 and are reported
- *     below as `fixme`s that name the measurement.
+ *     repositories have been deleted. Kept: …","deleted_repositories":[]}`, and the
+ *     fake's `/_control/state` reports the fork byte-identical afterwards (`fork: true`,
+ *     `parent` intact, `archived: false`, `ready: true`, `default_branch: "main"`) while
+ *     `/_control/calls` records **zero** calls of any kind during the delete. That is
+ *     this file's core claim and it is asserted below.
+ *   - **The app delete surface is now in this build (APW-01 T39).** `delete_stored_data`
+ *     is accepted by the route's DTO, and the typed-slug interlock of FR-40b is enforced
+ *     **by the server**: `{"delete_stored_data": true}` with no `confirm_slug`, and with
+ *     a non-matching one, each answer `422 { code: 'confirmation_mismatch' }` and leave
+ *     the Work and the fork in place. The matching pair proceeds.
+ *   - **An explicit `delete_data_repository: true` no longer reaches for a DERIVED
+ *     name.** Before T39 the same call issued one HTTP removal for the fabricated
+ *     `<slug>-data` repository (measured 2026-09-19, the platform reaching for a name it
+ *     never created); it now targets the **fork's own coordinates** and nothing else, and
+ *     the derived name appears in no call at all. The fake implements no repository-root
+ *     removal route, so that one call is answered `404` — reported as a finding, not
+ *     hidden.
  *   - **`GET /api/me/apps` no longer lists it** — asserted, with the App Launcher's own
  *     switch: the route answers `404` unless `EVER_WORKS_APP_LAUNCHER_ENABLED=true`
  *     (`app-launcher-enabled.guard.ts:77`, ACC-E2E-12's documented off state), so that
@@ -429,7 +432,7 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
         ).toBe(404);
     });
 
-    test('the app delete options are refused, and a refused delete deletes nothing', async ({
+    test('the stored-data flag is refused without its typed slug, and a refused delete deletes nothing', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -437,13 +440,13 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
         const work = await createForkWork(request, user.access_token, 'options');
 
         // NEG-07's **Also delete stored data** is `delete_stored_data` + `confirm_slug`
-        // (APW-01 FR-40a). This build's route DTO carries neither field, and refuses the
-        // whole body rather than ignoring the flag — which is the safe answer: a flag the
-        // server does not understand must never be treated as consent.
+        // (APW-01 FR-40a/FR-40b). The flag alone, and the flag with a slug that is not
+        // this Work's, are each refused by the SERVER — a flag the server cannot see
+        // confirmed is never treated as consent.
         for (const body of [
             { delete_stored_data: true },
-            { confirm_slug: work.slug },
-            { delete_stored_data: true, confirm_slug: work.slug },
+            { delete_stored_data: true, confirm_slug: 'not-this-work' },
+            { delete_stored_data: true, confirm_slug: '' },
         ]) {
             const refused = await deleteWorkViaAPI(request, {
                 token: user.access_token,
@@ -454,15 +457,14 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
                 refused.status,
                 `POST /api/works/:id/delete ${JSON.stringify(body)} answered ` +
                     `${refused.status}: ${refused.text.slice(0, 300)}`,
-            ).toBe(400);
-            for (const field of Object.keys(body)) {
-                expect(refused.text, `the refusal names the unknown property "${field}"`).toContain(
-                    `property ${field} should not exist`,
-                );
-            }
+            ).toBe(422);
+            expect(
+                (refused.json as { code?: string }).code,
+                'the refusal is the FR-40b code, not a generic 422',
+            ).toBe('confirmation_mismatch');
 
-            // "A refused delete deletes nothing" — the Work is still there, and so is the
-            // fork (the refusal happens in the validation pipe, before any handler).
+            // "A refused delete deletes nothing" — the Work is still there, and so is
+            // the fork.
             const read = await request.get(`${API_BASE}/api/works/${work.workId}`, {
                 headers: authedHeaders(user.access_token),
             });
@@ -470,9 +472,26 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
             const fork = await forkState(request, LANE_LOGIN, work.forkName);
             expect(fork?.archived, 'and leaves the fork untouched').toBe(false);
         }
+
+        // The matching pair — the flag AND the Work's own slug — is accepted, and the
+        // Work goes: this lane has no bound App runtime (APW-06 owns it), so the
+        // deletion completes in the request.
+        const accepted = await deleteWorkViaAPI(request, {
+            token: user.access_token,
+            workId: work.workId,
+            body: { delete_stored_data: true, confirm_slug: work.slug },
+        });
+        expect(
+            accepted.status,
+            `the matching pair is accepted: ${accepted.text.slice(0, 300)}`,
+        ).toBe(200);
+        const read = await request.get(`${API_BASE}/api/works/${work.workId}`, {
+            headers: authedHeaders(user.access_token),
+        });
+        expect(read.status()).toBe(404);
     });
 
-    test('the explicit delete-data flag reaches GitHub with a derived name, never the fork', async ({
+    test('the explicit delete-data flag reaches GitHub with the FORK and never a derived name', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -480,16 +499,13 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
         const work = await createForkWork(request, user.access_token, 'explicit');
 
         const callsBefore = (await fakeGitHubCalls(request)) ?? [];
-        // The legacy flag is not one of CONTRACTS §4's App Work fields, so the typed wrapper
-        // (`deleteWorkViaAPI`, whose body carries NEG-07's two) cannot express it: the call
-        // goes through the same `rawApi` path every wrapper uses, with the legacy body.
+        // The fork box of NEG-07 is `delete_data_repository` (APW-01 plan §3.3 `:445`,
+        // §5.2 `:748`). It is unticked in the case's own body; what is asserted here is
+        // what the platform does when it IS ticked — because until T39 the same flag
+        // made it issue an HTTP removal for a DERIVED `<slug>-data` name the platform
+        // never created.
         const deleted = await rawApi(request, 'POST', `/api/works/${work.workId}/delete`, {
             token: user.access_token,
-            // The legacy flag, which this build's route *does* accept (unlike the two
-            // NEG-07 fields above). It is not one of the case's boxes: the case's boxes are
-            // unticked, and the default path is asserted in the first test. What is
-            // asserted here is what the platform actually does when the flag is on —
-            // because it issues a real HTTP deletion against a DERIVED repository name.
             body: { delete_data_repository: true },
         });
         expect(deleted.status, `delete body=${deleted.text.slice(0, 300)}`).toBe(200);
@@ -505,25 +521,76 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
         ).toBe(1);
         const target = deletionCalls[0]?.path ?? '';
         expect(
-            target.endsWith(`-data`),
-            `the removal targets the DERIVED "<slug>-data" name, not the fork ` +
+            target.endsWith(`/${work.forkName}`),
+            `the removal targets the FORK's own coordinates, which this Work created ` +
                 `(target=${target}, fork=/${LANE_LOGIN}/${work.forkName})`,
         ).toBe(true);
         expect(
-            target.includes(work.forkName) && target.endsWith(`/${work.forkName}`),
-            'and never the fork’s own coordinates',
+            target.includes('-data'),
+            'and never a DERIVED "<slug>-data" name the platform never created ' +
+                `(target=${target})`,
         ).toBe(false);
         expect(
             deletionCalls[0]?.status,
             'the fake implements no repository-root removal route, so the call is answered 404 ' +
                 `— reported as a finding (calls=${describeCalls(deletionCalls)})`,
         ).toBe(404);
+    });
 
-        // The fork survives even this path.
-        const fork = await forkState(request, LANE_LOGIN, work.forkName);
-        expect(fork, 'the fork still exists').toBeTruthy();
-        expect(fork?.archived).toBe(false);
-        expect(fork?.parent).toBe(`${UPSTREAM_OWNER}/${work.upstreamName}`);
+    test('a link is never deleted: the request is refused 400 and the linked repository is untouched', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        await connectCustomerGitHub(request, user.access_token);
+
+        // A `link` App Work registers the member's OWN repository as its Work
+        // Repository — the platform never created it (APW-01 FR-37). `link` needs push
+        // access, which the lane's account has on nothing under the upstream owner:
+        // `apw-e2e-user/templates` is the checked-in fixture's own repository, and
+        // linking it is exactly the case this asserts.
+        expect(await seedFakeGitHub(request)).toBe(true);
+        const slug = `apw13-t33-link-${stamp()}`.toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const created = await createAppWork(request, {
+            token: user.access_token,
+            body: appWorkCreateBody({
+                name: slug,
+                slug,
+                description: 'APW-13 T33 link',
+                organization: false,
+                repositoryUrl: repoUrl(LANE_LOGIN, 'templates'),
+                repositoryMode: 'link',
+            }),
+        });
+        expect(created.status, `link create body=${created.text.slice(0, 300)}`).toBe(200);
+        const workId = ((created.json ?? {}) as CreatedView).work?.id ?? '';
+        expect(workId).not.toBe('');
+
+        const callsBefore = (await fakeGitHubCalls(request)) ?? [];
+        const refused = await rawApi(request, 'POST', `/api/works/${workId}/delete`, {
+            token: user.access_token,
+            body: { delete_data_repository: true },
+        });
+        expect(
+            refused.status,
+            `a link's repository is never deleted: ${refused.text.slice(0, 300)}`,
+        ).toBe(400);
+
+        const deletionCalls = ((await fakeGitHubCalls(request)) ?? [])
+            .slice(callsBefore.length)
+            .filter((call) => (call.method ?? '').toUpperCase() === HTTP_DELETION_VERB);
+        expect(
+            deletionCalls.length,
+            `the refusal issues no removal at all (calls=${describeCalls(deletionCalls)})`,
+        ).toBe(0);
+        expect(
+            deletionCalls.filter((call) => (call.path ?? '').includes(`/${LANE_LOGIN}/templates`))
+                .length,
+            'and above all no removal of the linked repository itself',
+        ).toBe(0);
+        const read = await request.get(`${API_BASE}/api/works/${workId}`, {
+            headers: authedHeaders(user.access_token),
+        });
+        expect(read.status(), 'and leaves the Work in place').toBe(200);
     });
 
     test('GET /api/me/apps no longer lists the deleted App Work', async ({ request }) => {
@@ -588,27 +655,31 @@ test.describe('ACC-NEG-07 — deleting an App Work keeps the fork', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The halves this build cannot produce (each with the measurement that says so)
+// The halves that still need another epic (T39's own server half is asserted above)
 // ---------------------------------------------------------------------------
 
-test.describe('ACC-NEG-07 — what this build cannot produce yet', () => {
+test.describe('ACC-NEG-07 — the halves that need APW-06 / APW-07, and T39’s server half', () => {
     /**
      * NEG-07's first half: `200 { deleting: true }`, the row kept and reading **Deleting…**
      * until APW-06 completes the removal, then gone.
      *
-     * Measured on this lane (2026-09-19): the delete answers
-     * `200 {status:"success", slug, message, deleted_repositories: []}` — there is no
-     * `deleting` field to read — and `GET /api/works/:id` answers `404` immediately after,
-     * so the row the case says "remains until APW-06 completes the removal" is never
-     * present. The route (`works/works.controller.ts:1677-1703`) calls
-     * `WorkLifecycleService.deleteWork`, which removes the row itself
-     * (`packages/agent/src/services/work-lifecycle.service.ts:1645`) and returns the legacy
-     * `{status, slug, message, deleted_repositories}` shape.
+     * Measured on this lane (2026-09-19, after APW-01 T39): the `deleting` field and the
+     * pending branch now EXIST (`WorkLifecycleService.deleteWork` answers
+     * `200 { status: 'pending', deleting: true }` and keeps the row whenever
+     * `APP_WORK_DELETION_PORT` reports `pending`), but the token is **unbound in the real
+     * graph** — APW-06's `AppRuntimeDeletionService` binds it, and this lane runs no App
+     * runtime. Unbound is taken as `done` by T39's own rule, so the lane still answers
+     * `200 {status:"success", …}` and `GET /api/works/:id` answers `404` immediately after:
+     * the row the case says "remains until APW-06 completes the removal" is not present
+     * here, and the **Deleting…** surface it reads is APW-06's. The pending path itself is
+     * asserted against a bound port in
+     * `packages/agent/src/services/__tests__/work-lifecycle.app-kind.spec.ts`.
      */
     test.fixme(
-        'APW-01 T39 / APW-06 FR-60: `200 { deleting: true }` and the "Deleting…" row need the ' +
-            'app delete surface — this build answers {status:"success", slug, message, ' +
-            'deleted_repositories:[]} and the row is 404 immediately (measured 2026-09-19)',
+        'APW-06 FR-60: the `200 { deleting: true }` + "Deleting…" row need the App runtime ' +
+            'that BINDS APP_WORK_DELETION_PORT — unbound (this lane) is taken as done, so the ' +
+            'row is 404 immediately (measured 2026-09-19). The pending path is unit-asserted ' +
+            'in work-lifecycle.app-kind.spec.ts',
         async ({ request }: { request: APIRequestContext }) => {
             const user = await registerUserViaAPI(request);
             await connectCustomerGitHub(request, user.access_token);
@@ -635,33 +706,42 @@ test.describe('ACC-NEG-07 — what this build cannot produce yet', () => {
 
     /**
      * NEG-07's UI clauses: both boxes exist, unticked by default; ticking the fork box
-     * requires typing `owner/name`, and ticking the stored-data box requires the slug and
-     * lists every dependency.
+     * requires typing `owner/name`, and ticking the stored-data box requires the slug.
      *
-     * Measured on this tree (2026-09-19): the settings dialog this lane renders is the
-     * legacy one (`apps/web/src/components/works/detail/settings/DeleteComponent.tsx`
-     * offers `delete_data_repository` / `delete_markdown_repository` /
-     * `delete_website_repository` and requires the Work's **name**), and neither box's copy
-     * exists anywhere in `apps/web/src` (`git grep -n "Also delete my fork"` → no match).
-     * The API half is asserted green above: both of the case's fields are refused `400`.
+     * **Un-fixme'd by APW-01 T39 (2026-09-19).** The server half now exists and is asserted
+     * green above and here: the route accepts `delete_stored_data` and `confirm_slug` and
+     * enforces the typed interlock with `422 confirmation_mismatch`. The dialog half is in
+     * `apps/web/src/components/works/detail/settings/DeleteComponent.tsx` — for `kind: app`
+     * it renders **Also delete my fork {fullName} on GitHub** (or the private-copy wording)
+     * with a typed `owner/name`, and **Also delete stored data** with a typed slug, both
+     * unticked by default, sending each field only when its own confirmation matches; its
+     * unit spec asserts all of that. What is NOT reachable from this lane is the label
+     * text and the dependency list APW-07 owns, so the case's own note — "asserted in the
+     * UI; never exercised by automation" — still stands for those two, and is reported
+     * rather than implied.
      */
-    test.fixme(
-        'APW-01 T39: the two boxes (**Also delete my fork {fullName}**, **Also delete stored ' +
-            'data**) and their typed interlocks are not in this tree — the settings dialog is ' +
-            'the legacy three-checkbox one and the API refuses both fields 400 (measured 2026-09-19)',
-        async ({ request }: { request: APIRequestContext }) => {
-            const user = await registerUserViaAPI(request);
-            await connectCustomerGitHub(request, user.access_token);
-            const work = await createForkWork(request, user.access_token, 'boxes');
+    test('the stored-data interlock is enforced by the server, and the work survives a mismatch', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        await connectCustomerGitHub(request, user.access_token);
+        const work = await createForkWork(request, user.access_token, 'boxes');
 
-            const refused = await deleteWorkViaAPI(request, {
-                token: user.access_token,
-                workId: work.workId,
-                body: { delete_stored_data: true, confirm_slug: work.slug },
-            });
-            expect(refused.status).toBe(200);
-        },
-    );
+        const mismatched = await deleteWorkViaAPI(request, {
+            token: user.access_token,
+            workId: work.workId,
+            body: { delete_stored_data: true, confirm_slug: `${work.slug}-typo` },
+        });
+        expect(mismatched.status).toBe(422);
+        expect((mismatched.json as { code?: string }).code).toBe('confirmation_mismatch');
+
+        const matched = await deleteWorkViaAPI(request, {
+            token: user.access_token,
+            workId: work.workId,
+            body: { delete_stored_data: true, confirm_slug: work.slug },
+        });
+        expect(matched.status, `body=${matched.text.slice(0, 200)}`).toBe(200);
+    });
 
     /**
      * NEG-07's data clauses: the stored data is kept unless the box is ticked and the slug

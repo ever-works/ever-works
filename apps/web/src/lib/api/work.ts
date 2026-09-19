@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import { serverFetch, serverMutation } from './server-api';
+import { serverFetch, serverMutation, ApiResponseError } from './server-api';
 import {
     GenerateStatusType,
     WorkScheduleCadence,
@@ -33,6 +33,7 @@ import type {
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    AppDeployTargetChoice,
 } from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -193,6 +194,19 @@ export interface DeleteWorkDto {
     delete_data_repository?: boolean;
     delete_markdown_repository?: boolean;
     delete_website_repository?: boolean;
+    /**
+     * APW-01 T39 (FR-40a, Resolution R-15) — **Also delete stored data**, App Works
+     * only: the App's volumes and App dependencies go with the Work. Sent `true` by
+     * `DeleteComponent` only when the box is ticked AND the member typed the Work's
+     * slug (FR-40b). The API refuses `true` without `confirm_slug` with
+     * `422 confirmation_mismatch`, and the MCP `delete_work` tool omits both fields.
+     */
+    delete_stored_data?: boolean;
+    /**
+     * APW-01 T39 (FR-40b) — the App Work's **slug**, typed by the member. The
+     * server-side half of the typed confirmation.
+     */
+    confirm_slug?: string;
 }
 
 export interface GenerateWorkDetailDto {
@@ -424,6 +438,12 @@ export interface DeleteWorkResponse {
     slug: string;
     message: string;
     deleted_repositories?: string[];
+    /**
+     * APW-01 T39 (FR-40a, ACC-NEG-07) — `true` when the App runtime took the removal
+     * over: the Work stays (it reads **Deleting…**) until it reports back. Absent on
+     * every other outcome.
+     */
+    deleting?: boolean;
 }
 
 export interface WorkDetails {
@@ -968,6 +988,30 @@ export const workAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    // ── App delete (APW-01 T39, FR-34/FR-40a) ────────────────────────────────
+
+    /**
+     * **The App Work's deploy target** — APW-06's `GET /api/works/:id/app-target`,
+     * read by the delete dialog to decide whether **Also delete stored data** is
+     * offered at all (`none` means there is nothing to delete stored data *from*, so
+     * the checkbox is hidden).
+     *
+     * APW-06 is not merged yet, so this route answers `404` today. That is a
+     * **documented non-answer, not a failure** (FR-34, plan §7 `:952-953`): the
+     * caller treats it as `none`. Anything else — a 403, a 500, an unreachable
+     * API — is rethrown, so a real fault cannot be mistaken for "no target".
+     */
+    getAppTarget: async (id: string): Promise<{ target: AppDeployTargetChoice }> => {
+        try {
+            return await serverFetch<{ target: AppDeployTargetChoice }>(`/works/${id}/app-target`);
+        } catch (error) {
+            if (error instanceof ApiResponseError && error.statusCode === 404) {
+                return { target: 'none' };
+            }
+            throw error;
+        }
     },
 
     // Import methods
