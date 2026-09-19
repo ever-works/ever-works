@@ -37,6 +37,7 @@ jest.mock('@ever-works/agent/app-spec', () => ({
 // reachable. The classes are injection tokens here only.
 jest.mock('@ever-works/agent/app-builds', () => ({
     AppBuildPrepareRunner: class AppBuildPrepareRunner {},
+    AppBuildWatchRunner: class AppBuildWatchRunner {},
     AppBuildsModule: class AppBuildsModule {},
 }));
 // FU-2 post-CI fix: trigger-internal.controller.ts imports the
@@ -208,6 +209,8 @@ describe('TriggerInternalController', () => {
     // APW-05 T19 + C7 — the `app-build-prepare` job's runner, the name the worker
     // proxies because it owns no `DataSource`.
     let appBuildPrepareRunner: any;
+    // APW-05 T20 + C17 — the pp-build-watch job's runner, the second half of the pair.
+    let appBuildWatchRunner: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -308,6 +311,8 @@ describe('TriggerInternalController', () => {
             // APW-05 T19 + C7 — the `app-build-prepare` runner, appended LAST + `@Optional()`
             // per the arity rule above.
             appBuildPrepareRunner,
+            // APW-05 T20 + C17 — and the `app-build-watch` runner after it, same rule.
+            appBuildWatchRunner,
         );
         c.onModuleInit();
         return c;
@@ -385,6 +390,14 @@ describe('TriggerInternalController', () => {
             run: jest.fn((payload: { workId: string; reason: string }) => ({
                 status: 'prepared',
                 workId: payload.workId,
+                reason: payload.reason,
+            })),
+        };
+        appBuildWatchRunner = {
+            name: 'AppBuildWatchRunner',
+            run: jest.fn((payload: { buildId: string; reason: string }) => ({
+                status: 'observed',
+                buildId: payload.buildId,
                 reason: payload.reason,
             })),
         };
@@ -885,6 +898,55 @@ describe('TriggerInternalController', () => {
                     args: superjson.serialize([]) as any,
                 }),
             ).rejects.toThrow('Method not in allow-list for AppBuildPrepareRunner: doesNotExist');
+        });
+    });
+
+    /**
+     * APW-05 T20 + C17 — the same two claims for the watch half.
+     *
+     * The watch job resolves its runner over this channel for the same reason the prepare
+     * job does (a Trigger worker owns no `DataSource`, and an observation writes rows,
+     * publishes the `app.build.*` events and deletes the per-run prompted secret), so the
+     * name must be registered AND callable. A missing entry is not silent — it is
+     * `Unknown remote target: AppBuildWatchRunner` on the run that needed it — but it would
+     * only be discovered when a Build needed observing, which is the kind of gap this
+     * programme pins in a spec instead of waiting for.
+     */
+    describe('the APW-05 T20 app-build-watch remote target', () => {
+        it('registers AppBuildWatchRunner so the queued observation can run at all', () => {
+            expect((controller as any).remoteMap.AppBuildWatchRunner).toBe(appBuildWatchRunner);
+        });
+
+        it('reaches `run` — the one member the task’s seam declares — over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppBuildWatchRunner',
+                method: 'run',
+                args: superjson.serialize([{ buildId: 'build-1', reason: 'event' }]) as any,
+            });
+
+            expect(appBuildWatchRunner.run).toHaveBeenCalledWith({
+                buildId: 'build-1',
+                reason: 'event',
+            });
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                status: 'observed',
+                buildId: 'build-1',
+                reason: 'event',
+            });
+        });
+
+        it('derives a callable allow-list holding `run` and naming an unknown method', async () => {
+            expect([
+                ...((controller as any).allowedMethods.AppBuildWatchRunner as Set<string>),
+            ]).toEqual(['run']);
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppBuildWatchRunner',
+                    method: 'doesNotExist',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow('Method not in allow-list for AppBuildWatchRunner: doesNotExist');
         });
     });
 });

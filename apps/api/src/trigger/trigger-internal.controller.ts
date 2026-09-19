@@ -104,7 +104,8 @@ import { AppSpecService } from '@ever-works/agent/app-spec';
 // not the port of the same name on `./app-builds.service`: the port is T17's
 // provisional seam (`run(payload)`) and is deliberately NOT what the RPC channel
 // publishes, so a worker cannot reach the service's internals through it.
-import { AppBuildPrepareRunner } from '@ever-works/agent/app-builds';
+// APW-05 T20 + C17 adds its `app-build-watch` sibling from the same barrel.
+import { AppBuildPrepareRunner, AppBuildWatchRunner } from '@ever-works/agent/app-builds';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -506,6 +507,12 @@ export class TriggerInternalController implements OnModuleInit {
         // keeps compiling.
         @Optional()
         private readonly appBuildPrepareRunner?: AppBuildPrepareRunner,
+        // APW-05 T20 + C17 — the `app-build-watch` job's runner, the second half of the
+        // same pair. Appended LAST + `@Optional()` per the arity rule above: with the name
+        // absent the worker's proxy answers the loud `Unknown remote target:
+        // AppBuildWatchRunner` rather than pretending an observation happened.
+        @Optional()
+        private readonly appBuildWatchRunner?: AppBuildWatchRunner,
     ) {}
 
     onModuleInit() {
@@ -665,6 +672,8 @@ export class TriggerInternalController implements OnModuleInit {
             // that maps to `undefined` answers a loud "Unknown remote target"
             // instead of pretending the prepare ran.
             AppBuildPrepareRunner: this.appBuildPrepareRunner,
+            // APW-05 T20 + C17 — and the worker half of `app-build-watch`, same rule.
+            AppBuildWatchRunner: this.appBuildWatchRunner,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

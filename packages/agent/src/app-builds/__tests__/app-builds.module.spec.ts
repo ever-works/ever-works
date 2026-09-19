@@ -8,7 +8,12 @@ import { WorkBuild } from '../../entities/work-build.entity';
 import { WorkBuildPreparation } from '../../entities/work-build-preparation.entity';
 import { AppBuildPrepareRunner, APP_BUILD_PREPARE_JOB_ID } from '../app-build-prepare.runner';
 import { AppBuildsModule } from '../app-builds.module';
-import { APP_BUILD_PREPARE_RUNNER, AppBuildsService } from '../app-builds.service';
+import {
+    APP_BUILD_WATCH_RUNNER,
+    APP_BUILD_PREPARE_RUNNER,
+    AppBuildsService,
+} from '../app-builds.service';
+import { AppBuildWatchRunner } from '../app-build-watch.runner';
 
 /**
  * APW-05 T19 — the Builds module, pinned against a REAL Nest container.
@@ -64,6 +69,23 @@ describe('AppBuildsModule', () => {
         // a provider cycle Nest refuses to bootstrap.
         const binding = metadata('providers').find(
             (provider) => tokenOf(provider) === APP_BUILD_PREPARE_RUNNER,
+        ) as { useExisting?: unknown; useFactory?: unknown } | undefined;
+        expect(binding).toBeDefined();
+        expect(typeof binding?.useFactory).toBe('function');
+        expect(binding?.useExisting).toBeUndefined();
+    });
+
+    it('provides and exports the watch runner, and binds its token the same way', () => {
+        // APW-05 T20 + C17 — the watch half of the same pair. Without this binding
+        // `dispatchWatch`'s `this.watchRunner?.run(...)` is `undefined?.run(...)`: the
+        // fallback is skipped, the Build is never observed by this process, and the
+        // sweep re-offers it later — which is why the defect is invisible rather than
+        // loud. The binding is asserted here as well as in the controller spec because
+        // the two halves fail independently.
+        expect(metadata('providers')).toContain(AppBuildWatchRunner);
+        expect(metadata('exports')).toContain(AppBuildWatchRunner);
+        const binding = metadata('providers').find(
+            (provider) => tokenOf(provider) === APP_BUILD_WATCH_RUNNER,
         ) as { useExisting?: unknown; useFactory?: unknown } | undefined;
         expect(binding).toBeDefined();
         expect(typeof binding?.useFactory).toBe('function');
@@ -136,6 +158,40 @@ describe('AppBuildsModule', () => {
             buildsBlocked: 0,
             error: null,
         });
+
+        await moduleRef.close();
+    });
+
+    it('resolves the watch runner through its bound token against a real DataSource', async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [
+                TypeOrmModule.forRoot({
+                    type: 'better-sqlite3',
+                    database: ':memory:',
+                    entities: ENTITIES,
+                    synchronize: true,
+                    logging: false,
+                }),
+                AppBuildsModule,
+            ],
+        }).compile();
+
+        expect(moduleRef.get(AppBuildWatchRunner)).toBeInstanceOf(AppBuildWatchRunner);
+
+        const watch = moduleRef.get(APP_BUILD_WATCH_RUNNER) as {
+            run(payload: { buildId: string; reason: string }): Promise<Record<string, unknown>>;
+        };
+        expect(typeof watch.run).toBe('function');
+
+        // The same shape of proof the prepare runner gets: the ModuleRef lookup happens at
+        // CALL time, so this line is what shows the de-cycling works in a real container —
+        // and the answer is the runner's own fail-closed one rather than a thrown cycle.
+        const watched = await watch.run({
+            buildId: '00000000-0000-4000-8000-000000000001',
+            reason: 'event',
+        });
+        expect(watched.status).toBe('skipped');
+        expect(watched.reason).toBe('buildUnavailable');
 
         await moduleRef.close();
     });

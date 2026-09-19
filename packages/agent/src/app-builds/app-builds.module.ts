@@ -11,7 +11,12 @@ import { WorkBuildPreparation } from '../entities/work-build-preparation.entity'
 import { UsageModule } from '../usage/usage.module';
 import { AppBuildPullTokenService } from './app-build-pull-token.service';
 import { AppBuildPrepareRunner } from './app-build-prepare.runner';
-import { APP_BUILD_PREPARE_RUNNER, AppBuildsService } from './app-builds.service';
+import { AppBuildWatchRunner } from './app-build-watch.runner';
+import {
+    APP_BUILD_PREPARE_RUNNER,
+    APP_BUILD_WATCH_RUNNER,
+    AppBuildsService,
+} from './app-builds.service';
 
 /**
  * APW-05 T17 — the Builds module (T19 adds the prepare runner — see below).
@@ -114,6 +119,23 @@ import { APP_BUILD_PREPARE_RUNNER, AppBuildsService } from './app-builds.service
             }),
             inject: [ModuleRef],
         },
+        // APW-05 T20 + C17 — the same binding for the watch half, and for exactly the same
+        // reason (see the prepare block above and the class docstring): §7.1's fallback is
+        // `this.watchRunner?.run(payload)`, so with `APP_BUILD_WATCH_RUNNER` unbound the
+        // `@Optional()` injection stays `undefined` and a watch whose job runtime is absent
+        // is **silently dropped** — the sweep re-offers it later, which is why the defect is
+        // invisible rather than loud. Same de-cycling shape: `AppBuildWatchRunner` injects
+        // `AppBuildsService`, which injects this token, so `useExisting` would be a cycle and
+        // the lookup happens at call time.
+        AppBuildWatchRunner,
+        {
+            provide: APP_BUILD_WATCH_RUNNER,
+            useFactory: (ref: ModuleRef) => ({
+                run: async (payload: unknown) =>
+                    (await ref.get(AppBuildWatchRunner)).run(payload as never),
+            }),
+            inject: [ModuleRef],
+        },
     ],
     exports: [
         AppBuildRepository,
@@ -121,6 +143,7 @@ import { APP_BUILD_PREPARE_RUNNER, AppBuildsService } from './app-builds.service
         AppBuildsService,
         AppBuildPullTokenService,
         AppBuildPrepareRunner,
+        AppBuildWatchRunner,
     ],
 })
 export class AppBuildsModule {}
