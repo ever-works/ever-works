@@ -19,6 +19,9 @@
 			"require": "./dist/index.cjs"
 		}
 	},
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -101,7 +104,7 @@
 	},
 	"private": false,
 	"publishConfig": {
-		"access": "restricted",
+		"access": "public",
 		"registry": "https://registry.npmjs.org"
 	}
 }
