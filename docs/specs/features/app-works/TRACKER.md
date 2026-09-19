@@ -28,9 +28,9 @@ table (**refreshed from the meter, so it is reproducible with one command**), §
 (spec drift D1–D19, code findings **C1–C34**, with C14/C16/C18/C19/C22/C23/C27 now closed and C32–C34 opened by a
 lane) and §6 the dated log.
 
-⚠️ **Two metering caveats worth reading before quoting those numbers.** The meter counts a path as *landed* only when
+⚠️ **Two metering caveats worth reading before quoting those numbers.** The meter counts a path as _landed_ only when
 a task text marks it **new**, so a slice can ship ten files and register none of them (APW-03 T17 did exactly that,
-which is why an epic's `named` count can *fall* while its `landed` rises). And it decides "exists" from `git ls-files`,
+which is why an epic's `named` count can _fall_ while its `landed` rises). And it decides "exists" from `git ls-files`,
 so nothing counts until it is **committed**.
 
 **APW-13's P0 is complete**, which is what the other epics' PR lanes were waiting for (R-38): the fake GitHub
