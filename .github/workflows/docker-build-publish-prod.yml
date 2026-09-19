@@ -1,5 +1,10 @@
 name: Build and Publish Docker Images Prod
 
+# Docker Hub (`everco/*`) is NOT published from this workflow. It is published by
+# docker-hub-publish.yml, which copies the exact image k8s-build.yml deployed
+# (no rebuild, no analytics key baked in) and fails loudly instead of the
+# `continue-on-error` push that used to live here and never once succeeded.
+
 on:
   push:
     branches: [main]
@@ -47,7 +52,6 @@ jobs:
           platforms: linux/amd64
           tags: |
             ghcr.io/ever-works/ever-works-api:latest
-            everco/ever-works-api:latest
             registry.digitalocean.com/ever/ever-works-api:latest
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-api:latest
           cache-to: type=inline
@@ -64,23 +68,11 @@ jobs:
         run: |
           sudo docker image list
 
-      - name: Login to DockerHub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
-        continue-on-error: true
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push to Docker Hub Registry
-        continue-on-error: true
-        run: |
-          docker push everco/ever-works-api:latest
-
       # DigitalOcean is the registry k8s pulls the runtime image from, so the
       # doctl auth + DO push below are FATAL (no continue-on-error): a silent
       # failure would ship a stale :latest as a "green" build (incident
       # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
-      # DockerHub/CW mirrors above stay best-effort by design.
+      # CW mirror below stays best-effort by design.
       - name: Install doctl
         if: ${{ vars.DO_ENABLED == 'true' }}
 
@@ -148,7 +140,6 @@ jobs:
           platforms: linux/amd64
           tags: |
             ghcr.io/ever-works/ever-works-web:latest
-            everco/ever-works-web:latest
             registry.digitalocean.com/ever/ever-works-web:latest
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-web:latest
           cache-to: type=inline
@@ -170,23 +161,11 @@ jobs:
         run: |
           sudo docker image list
 
-      - name: Login to DockerHub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
-        continue-on-error: true
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push to Docker Hub Registry
-        continue-on-error: true
-        run: |
-          docker push everco/ever-works-web:latest
-
       # DigitalOcean is the registry k8s pulls the runtime image from, so the
       # doctl auth + DO push below are FATAL (no continue-on-error): a silent
       # failure would ship a stale :latest as a "green" build (incident
       # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
-      # DockerHub/CW mirrors above stay best-effort by design.
+      # CW mirror below stays best-effort by design.
       - name: Install doctl
         if: ${{ vars.DO_ENABLED == 'true' }}
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2

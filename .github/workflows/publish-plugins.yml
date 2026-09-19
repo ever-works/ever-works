@@ -1,49 +1,62 @@
 name: Publish Plugins
 
-# EW-693 â€” Dynamic plugin distribution publish pipeline.
+# Publishes the Ever Works npm packages on EVERY production build:
+#   - @ever-works/contracts   shared types the SDK and several plugins depend on
+#   - @ever-works/plugin      the plugin SDK third-party plugin authors build on
+#   - @ever-works/*-plugin    every distributable plugin in packages/plugins/*
+#                             (manifest distribution=registry, not "private": true)
+# to BOTH registries, as PUBLIC packages (the platform is open source):
+#   1. npmjs.org        https://www.npmjs.com/org/ever-works  (with provenance)
+#   2. GitHub Packages  https://github.com/orgs/ever-works/packages
 #
-# Builds the plugin SDK + every distributable plugin, then publishes
-# each one (independently versioned via Changesets) to BOTH:
-#   1. npmjs.org      â€” `npm publish --access restricted`
-#                        (per user directive 2026-06-03, all packages
-#                         ship PRIVATE until each is explicitly cleared.)
-#   2. GitHub Packages â€” `npm publish --registry=https://npm.pkg.github.com`
+# 🛑 WHY PUSH TO MAIN, NOT A TAG. Until 2026-09 this ran only on a
+# `plugin-v*` / `@ever-works/*@*` tag that nothing ever pushed, and published
+# whatever version sat in each package.json — which nobody bumps. It ran
+# exactly once, by hand, on 2026-06-06, so both registries served June code
+# for three months. Now every push to `main` runs it, and
+# scripts/release-npm-packages.mjs decides versions from CONTENT: an unchanged
+# package is skipped, a changed one gets the next patch (or the package.json
+# version, when that was bumped on purpose). No human step is left to forget.
 #
-# Triggers:
-#   - push to main with a tag matching `plugin-v*` (cuts a real release).
-#   - workflow_dispatch (manual). Supports `dry_run` for safe previews
-#     and `skip_github_packages` for npm-only publishes.
+# Credentials:
+#   NPM_TOKEN     repo secret — npm granular access token with read+write on the
+#                 @ever-works packages (+ "bypass 2FA"). npm caps write tokens at
+#                 90 days, so it WILL expire: when this job fails with 401/404
+#                 on npmjs.org, rotate it (runbook below). Packages that have npm
+#                 trusted publishing configured for this workflow publish via
+#                 OIDC instead and do not need it.
+#   GITHUB_TOKEN  automatic; `packages: write` for GitHub Packages.
 #
-# Credentials (set as repo secrets):
-#   - NPM_TOKEN         â€” npmjs.org automation token, restricted scope.
-#   - GITHUB_TOKEN      â€” provided automatically; needs `packages:write`.
+# GitHub Packages has NO API to change a package's visibility. A package it
+# has never seen before is created PRIVATE; the job summary lists every one
+# that is still private, with its settings link, so it can be flipped by hand.
 #
-# Local equivalents:
-#   pnpm publish:plugins:dry           # dry-run via the orchestrator script.
-#   pnpm publish:plugins               # real publish to npm.
+# Manual run: Actions → Publish Plugins → Run workflow. `plan` only decides
+# versions; `dry-run` also packs and runs `npm publish --dry-run`.
 #
-# Spec: docs/specs/features/dynamic-plugin-distribution/{spec,plan,tasks}.md
-# Mirrors the auth pattern of .github/workflows/publish-cli.yml.
+# Local equivalent: pnpm build:plugins && pnpm publish:plugins:dry
+# Docs: docs/devops/github-workflows-deep-dive.md (npm Package Publish Workflow)
+# Internal runbook: Workspace/knowledge/infrastructure/EVER_WORKS_NPM.md
 
 on:
   push:
-    tags:
-      - 'plugin-v*'
-      - '@ever-works/*@*'
+    branches: [main]
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Dry run (no actual publish to either registry)'
+      mode:
+        description: 'plan = decide versions only; dry-run = also pack + npm publish --dry-run; publish = for real'
         required: true
-        type: boolean
-        default: true
-      skip_github_packages:
-        description: 'Skip GitHub Packages publish (npmjs.org only)'
+        type: choice
+        options: [plan, dry-run, publish]
+        default: plan
+      registries:
+        description: 'Target registries'
         required: true
-        type: boolean
-        default: false
+        type: choice
+        options: ['npm,github', npm, github]
+        default: 'npm,github'
       filter:
-        description: 'Plugin name substring filter (empty = all distributable)'
+        description: 'Only packages whose name contains this (empty = all)'
         required: false
         type: string
         default: ''
@@ -51,15 +64,33 @@ on:
 permissions:
   contents: read
 
+# Real publishes are serialised and never cancelled mid-run: two concurrent
+# runs would both decide the same "next patch" and race to publish it. A group
+# still keeps only ONE pending run (a newer one replaces it), so every run that
+# cannot publish (plan / dry-run previews, and a publish dispatched off main,
+# which the job refuses) gets a group of its own and can never displace a
+# pending release.
+# A replaced pending release is not lost: the next push to main publishes the
+# same or newer content.
+concurrency:
+  group: ${{ (github.event_name == 'workflow_dispatch' && (inputs.mode != 'publish' || github.ref != 'refs/heads/main')) && format('publish-npm-preview-{0}', github.run_id) || 'publish-npm-packages' }}
+  cancel-in-progress: false
+
 jobs:
-  build:
-    name: Build packages
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+  release:
+    name: Release npm packages
+    # GitHub-hosted ON PURPOSE: npm provenance and npm trusted publishing both
+    # refuse self-hosted runners, and this job needs no cluster network.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      # OIDC token for npm provenance / trusted publishing.
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3
@@ -72,185 +103,48 @@ jobs:
           node-version: 22.x
           cache: 'pnpm'
 
-      # Resolve dependencies through the internal Verdaccio cache when this job runs
-      # on the in-network ARC pool, so the install does not re-pull the tree from the
-      # public registry. Falls back to npmjs automatically when the VIP does not answer.
-      - name: Configure Registry
-        uses: ./.github/actions/configure-registry
-        with:
-          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
-          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
-          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
-          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+      # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 22 ships npm 10.
+      - name: Use npm 11
+        run: npm install -g npm@11 && npm --version
+
+      # `latest` on both registries must only ever carry production code.
+      - name: Refuse a real publish off main
+        env:
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'publish' }}
+        run: |
+          if [ "${MODE}" = "publish" ] && [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error::mode=publish only runs from main (this run is on ${GITHUB_REF}). Use plan or dry-run elsewhere."
+            exit 1
+          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build plugin SDK + every plugin
+      - name: Release script unit tests
+        run: node --test scripts/release-npm-packages.test.mjs
+
+      # Pending changesets are NOT applied with `pnpm changeset version` here:
+      # Changesets force-bumps every peer dependent to a MAJOR when the SDK
+      # takes a minor, which would publish ~36 plugins as 2.0.0 for an additive
+      # SDK change. The release script reads .changeset/*.md itself and bumps
+      # only the packages a changeset names.
+      - name: Build contracts, plugin SDK and every plugin
         run: pnpm build:plugins
 
-      - name: List distributable plugins (debug)
-        run: |
-          node -e "
-          const fs = require('fs');
-          const path = require('path');
-          const dir = 'packages/plugins';
-          const resolve = m =>
-            m.distribution ?? (m.systemPlugin === true ? 'core' : 'registry');
-          for (const name of fs.readdirSync(dir)) {
-            const pkgPath = path.join(dir, name, 'package.json');
-            if (!fs.existsSync(pkgPath)) continue;
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            const m = pkg.everworks?.plugin ?? {};
-            const dist = resolve(m);
-            console.log(\`\${dist.padEnd(10)} \${pkg.name}@\${pkg.version} (private:\${pkg.private})\`);
-          }
-          "
-
-      - name: Upload built packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: plugins-dist
-          path: |
-            packages/plugin/dist/
-            packages/plugins/*/dist/
-            packages/plugins/*/package.json
-            packages/plugin/package.json
-
-  publish-npm:
-    name: Publish to npmjs.org
-    needs: build
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
-    # Push of a plugin-* tag, OR manual dispatch.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && (
-        startsWith(github.ref, 'refs/tags/plugin-v') ||
-        startsWith(github.ref, 'refs/tags/@ever-works/')
-      ))
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3
-        with:
-          version: 10.33.3
-
-      - name: Setup Node.js (npmjs.org auth)
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22.x
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'pnpm'
-
-      # Resolve dependencies through the internal Verdaccio cache when this job runs
-      # on the in-network ARC pool, so the install does not re-pull the tree from the
-      # public registry. Falls back to npmjs automatically when the VIP does not answer.
-      - name: Configure Registry
-        uses: ./.github/actions/configure-registry
-        with:
-          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
-          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
-          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
-          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Restore built packages
-        uses: actions/download-artifact@v8
-        with:
-          name: plugins-dist
-          path: .
-
-      - name: Configure npm token
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+      - name: Release
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish distributable plugins (npmjs.org)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'publish' }}
+          REGISTRIES: ${{ github.event_name == 'workflow_dispatch' && inputs.registries || 'npm,github' }}
+          FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.filter || '' }}
         run: |
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-          FILTER="${{ github.event.inputs.filter || '' }}"
-          ARGS=()
-          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
-          if [ -n "$FILTER" ]; then ARGS+=(--filter "$FILTER"); fi
-          node scripts/publish-plugins.mjs --registry=https://registry.npmjs.org "${ARGS[@]}"
-
-  publish-github-packages:
-    name: Publish to GitHub Packages
-    needs: build
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
-    if: |
-      github.event_name == 'push' && (
-        startsWith(github.ref, 'refs/tags/plugin-v') ||
-        startsWith(github.ref, 'refs/tags/@ever-works/')
-      ) ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.skip_github_packages != 'true')
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3
-        with:
-          version: 10.33.3
-
-      - name: Setup Node.js (GitHub Packages auth)
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22.x
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@ever-works'
-          cache: 'pnpm'
-
-      # Resolve dependencies through the internal Verdaccio cache when this job runs
-      # on the in-network ARC pool, so the install does not re-pull the tree from the
-      # public registry. Falls back to npmjs automatically when the VIP does not answer.
-      - name: Configure Registry
-        uses: ./.github/actions/configure-registry
-        with:
-          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
-          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
-          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
-          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Restore built packages
-        uses: actions/download-artifact@v8
-        with:
-          name: plugins-dist
-          path: .
-
-      - name: Configure GitHub Packages token
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
-          echo "@ever-works:registry=https://npm.pkg.github.com" >> ~/.npmrc
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish distributable plugins (GitHub Packages)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-          FILTER="${{ github.event.inputs.filter || '' }}"
-          ARGS=()
-          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
-          if [ -n "$FILTER" ]; then ARGS+=(--filter "$FILTER"); fi
-          node scripts/publish-plugins.mjs --registry=https://npm.pkg.github.com "${ARGS[@]}"
-
+          ARGS=("--registries=${REGISTRIES}")
+          case "${MODE}" in
+            plan) ARGS+=(--plan) ;;
+            dry-run) ARGS+=(--dry-run) ;;
+            publish) ;;
+            *) echo "::error::Unknown mode '${MODE}'"; exit 1 ;;
+          esac
+          if [ -n "${FILTER}" ]; then ARGS+=("--filter=${FILTER}"); fi
+          node scripts/release-npm-packages.mjs "${ARGS[@]}"

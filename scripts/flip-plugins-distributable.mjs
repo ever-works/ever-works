@@ -6,7 +6,7 @@
  *
  *   "private": false,
  *   "publishConfig": {
- *     "access": "restricted",
+ *     "access": "public",
  *     "registry": "https://registry.npmjs.org"
  *   },
  *
@@ -16,10 +16,10 @@
  *   node scripts/flip-plugins-distributable.mjs --dry-run  # preview only
  *
  * Distributable = the manifest's resolved `distribution` is `registry`
- * (mirrors `resolvePluginDistribution` from the SDK). Per user
- * directive 2026-06-03, plugins ship as PRIVATE — `publishConfig.access`
- * is hard-coded to `restricted`; flip it to `public` per plugin only
- * after explicit authorisation.
+ * (mirrors `resolvePluginDistribution` from the SDK). Plugins shipped as
+ * private packages from 2026-06-03 until the platform went open source;
+ * since 2026-09 every distributable plugin publishes PUBLICLY, and
+ * scripts/release-npm-packages.mjs enforces that at publish time too.
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
@@ -40,7 +40,7 @@ function resolveDistribution(manifest) {
 }
 
 const expectedPublishConfig = {
-	access: 'restricted',
+	access: 'public',
 	registry: 'https://registry.npmjs.org'
 };
 
@@ -79,8 +79,11 @@ for (const entry of readdirSync(pluginsDir, { withFileTypes: true })) {
 		!currentPub ||
 		currentPub.access !== expectedPublishConfig.access ||
 		currentPub.registry !== expectedPublishConfig.registry;
+	// Without a `files` allow-list npm ships sources, tests and turbo's per-run
+	// build log, and scripts/release-npm-packages.mjs refuses the package.
+	const needsFiles = !Array.isArray(pkg.files) || pkg.files.length === 0;
 
-	if (!needsPrivateFlip && !needsPubConfig) {
+	if (!needsPrivateFlip && !needsPubConfig && !needsFiles) {
 		alreadyCount += 1;
 		report.push({ name: pkg.name, action: 'already correct', dist });
 		continue;
@@ -97,6 +100,7 @@ for (const entry of readdirSync(pluginsDir, { withFileTypes: true })) {
 
 	pkg.private = false;
 	pkg.publishConfig = { ...expectedPublishConfig };
+	if (needsFiles) pkg.files = ['dist'];
 
 	const serialized = JSON.stringify(pkg, null, '\t') + '\n';
 	if (dryRun) {
