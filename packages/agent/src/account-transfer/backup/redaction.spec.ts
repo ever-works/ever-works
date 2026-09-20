@@ -4,9 +4,11 @@ import ts from 'typescript';
 import { BACKUP_DOMAIN_SPECS } from './collectors/domain-specs';
 import {
     BACKUP_BENIGN_COLUMNS,
+    BACKUP_BENIGN_ENTITY_COLUMNS,
     BACKUP_DROPPED_ENTITIES,
     BACKUP_EXCLUSIONS,
     isBenignColumn,
+    isBenignEntityColumn,
     isDroppedColumn,
     isRedactedColumn,
     redactRow,
@@ -196,7 +198,27 @@ describe('workspace backup redaction', () => {
             expect(JSON.stringify(row)).not.toContain(botToken);
         });
 
-        it('keeps the NAMES of a plugin’s secret settings and none of their values', () => {
+        /**
+         * EW-818 CHANGED THIS TEST, and the change has a cost worth stating.
+         *
+         * `settings` used to export in full — it is the non-secret half of the
+         * pair by design, with `secretSettings` beside it for the rest. But
+         * the design is a convention, not a constraint: the DTO is
+         * `@IsObject()` on a `Record<string, unknown>` whose transform only
+         * strips `__proto__`-style keys, `plugin-operations.service.ts` merges
+         * the caller's object verbatim with no `x-secret` filter, and a plugin
+         * can write an OAuth token back through `ctx.updateSettings` without
+         * marking it secret. A credential CAN be in there.
+         *
+         * So it is redacted, and the price is real: an owner reading their own
+         * archive no longer sees `model: 'default'`, only that a `model` key
+         * was set. That is a deliberate fail-closed call on a column whose
+         * contents are usually harmless, and it is the one judgement in
+         * EW-818 a reviewer should push back on if they disagree — reversing
+         * it means deleting `'settings'` from the two plugin entries in
+         * `ENTITY_SECRET_COLUMNS` and restoring the old expectation here.
+         */
+        it('keeps the NAMES of a plugin’s settings and secret settings, and no values', () => {
             const row = redactRow('UserPluginEntity', {
                 id: 'up1',
                 pluginId: 'some-provider',
@@ -207,9 +229,10 @@ describe('workspace backup redaction', () => {
             expect(row).toEqual({
                 id: 'up1',
                 pluginId: 'some-provider',
-                settings: { model: 'default' },
                 // The names are exactly what tells an owner which connections
-                // will need a credential re-entered after a restore.
+                // will need a credential re-entered after a restore — now for
+                // both halves of the pair.
+                settings: { model: { wasSet: true } },
                 secretSettings: { apiKey: { wasSet: true }, organizationKey: { wasSet: true } },
             });
             expect(JSON.stringify(row)).not.toContain(secretLiteral);
@@ -515,6 +538,45 @@ describe('workspace backup redaction', () => {
                 expect(redactSecretBag(value)).toEqual({});
             }
         });
+
+        /**
+         * The shape a bag column ACTUALLY gets, which is not always the one
+         * `redactRow`'s comment promises.
+         *
+         * `BackupRowSource.page` reads with `getRawMany()` and `strip()` only
+         * renames the `entity_` prefix off the keys — neither parses JSON. A
+         * `simple-json` column is stored as text, so what reaches `redactRow`
+         * is the JSON STRING, not an object, and the bag branch never runs:
+         * the owner gets `{ wasSet: true }` and learns that something was set
+         * but not WHICH fields to re-credential. A Postgres `json`/`jsonb`
+         * column is parsed by the driver and does get the keyed bag. Same
+         * rule, two shapes, decided by the column type and the driver.
+         *
+         * Pinned rather than fixed here: it fails CLOSED (less is published,
+         * never more), and changing it means parsing untrusted stored text in
+         * the redaction path, which is a decision with its own risks and not
+         * one to make inside a guard change. EW-818.
+         */
+        it('gives a raw JSON string the opaque shape, not the keyed bag', () => {
+            const raw = JSON.stringify({ apiKey: 'sk_live_x', region: 'eu' });
+
+            // Same column, same rule, two shapes — decided entirely by whether
+            // the value arrived parsed. The secret is gone from both; only the
+            // KEY NAMES differ, and they are what tells an owner what to
+            // re-credential.
+            expect(redactRow('ModelAccount', { credentials: raw })).toEqual({
+                credentials: { wasSet: true },
+            });
+            expect(redactRow('ModelAccount', { credentials: JSON.parse(raw) })).toEqual({
+                credentials: { apiKey: { wasSet: true }, region: { wasSet: true } },
+            });
+
+            // And the EW-818 column behaves the same way, which is the point:
+            // adding the rule closed the leak, it did not buy the key names.
+            expect(redactRow('TenantEmailAddress', { providerSettings: raw })).toEqual({
+                providerSettings: { wasSet: true },
+            });
+        });
     });
 
     describe('the exclusions list the manifest publishes', () => {
@@ -567,6 +629,8 @@ describe('workspace backup redaction', () => {
          * rule still fails it.
          */
         const KNOWN_STALE_COLUMN_RULES: Readonly<Record<string, string>> = Object.freeze({
+            'SharedView.token':
+                'Surfaced by scoping the extractor to the class body (EW-818): `token` is a field of the `SharedViewTokenEnvelope` INTERFACE declared above `export class SharedView`, not a column, and reading the whole file had been counting it as one. The entity stores `tokenHash` (a sha256 hex) and `tokenEncrypted` (an `@EncryptedJsonColumn`, so family 3 covers it); the plaintext token is never on the row. So the rule protects nothing and nothing escapes through it.',
             'Invoice.providerCustomerId':
                 'The invoice mirror has never had a customer column: the creating migration (1784300000000-CreateBillingProfilesAndInvoices) gives `invoices` only `provider` and `providerInvoiceId`, and a mirrored invoice is attributed through `userId`. The provider customer id lives on `BillingProfile`, where it is dropped.',
             'UsageLedgerEntry.providerMeterId':
@@ -576,8 +640,24 @@ describe('workspace backup redaction', () => {
         });
         // `    someColumn?: Type` / `    someColumn: Type` — the property
         // declarations TypeORM turns into columns. Relations and methods do
-        // not match, and neither do commented-out lines.
-        const PROPERTY = /^\s{4}(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??\s*:/;
+        // not match, and neither do commented-out lines. The declared type is
+        // captured too, because family 5 below is about the TYPE, not the name.
+        const PROPERTY = /^\s{4}(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??\s*:\s*(.*)$/;
+        /**
+         * Family 5 — a free-form bag. `Record<string, unknown>` is the type
+         * the codebase uses for "whatever the caller sent", and a caller who
+         * can put anything in can put a credential in. Families 1–4 all read
+         * a NAME or a DECORATOR, so none of them can see one:
+         * `TenantEmailAddress.providerSettings` is a plain `simple-json`
+         * column, documented as holding a webhook secret, and it shipped to
+         * `data/communication/email-addresses.jsonl` in the clear through
+         * every one of them (EW-818).
+         *
+         * A declared interface or DTO is NOT this — someone chose those
+         * fields and can be asked about them. This family is only for the
+         * columns where nobody chose.
+         */
+        const FREE_FORM_RECORD = /Record<\s*string\s*,\s*(?:unknown|any)\s*>/;
         /** `    @SomeDecorator` / `    @SomeDecorator({ … })` on its own line. */
         const DECORATOR = /^\s{4}@([A-Za-z_][A-Za-z0-9_]*)/;
 
@@ -587,6 +667,8 @@ describe('workspace backup redaction', () => {
             readonly file: string;
             /** Decorators attached to this property, nearest-first. */
             readonly decorators: readonly string[];
+            /** The declared type, as written — what family 5 reads. */
+            readonly type: string;
         }
 
         /**
@@ -611,7 +693,24 @@ describe('workspace backup redaction', () => {
                     if (!entityMatch) continue;
                     const entity = entityMatch[1];
                     let pending: string[] = [];
+                    // Only the CLASS BODY. An entity file routinely declares the
+                    // interfaces its JSON columns are typed with ABOVE the class, at
+                    // the same indentation, and reading the whole file attributed
+                    // those to the entity — inventing columns that do not exist.
+                    // `GoalMetricSource.params` is an interface field 245 lines above
+                    // `export class Goal`; it arrived here as `Goal.params` and was
+                    // very nearly given a redaction rule, which would have protected
+                    // nothing. That is precisely the failure
+                    // `KNOWN_STALE_COLUMN_RULES` exists to record, arriving through
+                    // the guard itself. Anything after the class's closing brace is
+                    // excluded for the same reason.
+                    let insideClass = false;
                     for (const line of source.split('\n')) {
+                        if (!insideClass) {
+                            if (/^export class [A-Za-z0-9_]+/.test(line)) insideClass = true;
+                            continue;
+                        }
+                        if (line === '}') break;
                         const decorator = DECORATOR.exec(line);
                         if (decorator) {
                             pending.unshift(decorator[1]);
@@ -619,7 +718,13 @@ describe('workspace backup redaction', () => {
                         }
                         const property = PROPERTY.exec(line);
                         if (!property) continue;
-                        found.push({ entity, column: property[1], file, decorators: pending });
+                        found.push({
+                            entity,
+                            column: property[1],
+                            file,
+                            decorators: pending,
+                            type: property[2],
+                        });
                         pending = [];
                     }
                 }
@@ -643,6 +748,11 @@ describe('workspace backup redaction', () => {
                             if (isDroppedColumn(entity, column)) return false;
                             if (isRedactedColumn(entity, column)) return false;
                             if (isBenignColumn(column)) return false;
+                            // The per-ENTITY exemption, for names like
+                            // `metadata` that appear on ten exported entities
+                            // and must not be waved through on all of them at
+                            // once.
+                            if (isBenignEntityColumn(entity, column)) return false;
                             return true;
                         })
                         .map(({ entity, column }) => `${entity}.${column}`),
@@ -697,6 +807,34 @@ describe('workspace backup redaction', () => {
                 ]),
             );
             expect(unhandled(encrypted)).toEqual([]);
+        });
+
+        it('has a rule or a reviewed exemption for every free-form record column', () => {
+            // Scoped to the entities the archive actually exports. A
+            // free-form bag on a table nobody backs up is not this guard's
+            // business, and widening it to every entity in the repo would
+            // bury the ones that matter in noise.
+            const exported = new Set(
+                BACKUP_DOMAIN_SPECS.flatMap((domain) => domain.files.map((file) => file.entity)),
+            );
+            const bags = collectProperties().filter(
+                (p) => exported.has(p.entity) && FREE_FORM_RECORD.test(p.type),
+            );
+
+            // A silent zero would make the family useless — and unlike the
+            // others, this one reads a regex against the declared TYPE, which
+            // a formatter could reflow onto the next line. If this count
+            // collapses, the extractor broke, not the risk.
+            expect(bags.length).toBeGreaterThan(15);
+            expect(bags.map((p) => `${p.entity}.${p.column}`)).toEqual(
+                expect.arrayContaining(['TenantEmailAddress.providerSettings']),
+            );
+
+            // If this fails, decide in `redaction.ts`: redact the value to
+            // `{ wasSet }` (keeps the field NAMES, which is what tells an
+            // owner what to re-credential), drop the column, or add it to
+            // BACKUP_BENIGN_COLUMNS with the reason it cannot carry a secret.
+            expect(unhandled(bags)).toEqual([]);
         });
 
         it('has a rule for every payment-provider identifier in the billing domain', () => {
@@ -848,6 +986,37 @@ describe('workspace backup redaction', () => {
             expect(missing).toEqual([]);
         });
 
+        it('names a declared column and gives a reason, in every per-entity exemption', () => {
+            // BACKUP_BENIGN_ENTITY_COLUMNS is the only table here that lets a
+            // value through UNCHANGED, so it gets the strictest guard: the
+            // entity must be one the archive exports, the column must be
+            // declared on it, and the reason must be a real sentence rather
+            // than a placeholder. An exemption pointing at a renamed column
+            // would otherwise sit there looking like a decision while the
+            // column it was written for goes out unguarded under its new name.
+            const declared = new Set(collectProperties().map((p) => `${p.entity}.${p.column}`));
+            const exported = new Set(
+                BACKUP_DOMAIN_SPECS.flatMap((domain) => domain.files.map((file) => file.entity)),
+            );
+
+            const problems: string[] = [];
+            for (const [entity, columns] of Object.entries(BACKUP_BENIGN_ENTITY_COLUMNS)) {
+                if (!exported.has(entity)) {
+                    problems.push(`${entity}: exempted but the archive does not export it`);
+                }
+                for (const [column, reason] of Object.entries(columns)) {
+                    if (!declared.has(`${entity}.${column}`)) {
+                        problems.push(`${entity}.${column}: not declared on that entity`);
+                    }
+                    if (reason.trim().length < 20) {
+                        problems.push(`${entity}.${column}: reason is not a reason`);
+                    }
+                }
+            }
+
+            expect(problems).toEqual([]);
+        });
+
         it('keeps the known-stale list to rules that are still rules and still stale', () => {
             // The allow-list may not outlive its evidence. An entry whose rule
             // is gone, or whose column now exists, has to come out of it.
@@ -911,7 +1080,16 @@ describe('workspace backup redaction', () => {
             expect(ENCRYPTED_NAMED.test(column)).toBe(false);
             expect(
                 unhandled([
-                    { entity, column, file: 'x.entity.ts', decorators: ['EncryptedJsonColumn'] },
+                    {
+                        entity,
+                        column,
+                        file: 'x.entity.ts',
+                        decorators: ['EncryptedJsonColumn'],
+                        // A declared shape, deliberately: this fixture is the
+                        // third family's guard, and a free-form type would
+                        // make family 5 catch it instead and prove nothing.
+                        type: 'CampaignPayload',
+                    },
                 ]),
             ).toEqual([`${entity}.${column}`]);
         });

@@ -103,10 +103,17 @@ describe('AccountTransferModule + barrel re-exports', () => {
                     'BACKUP_EXCLUSIONS',
                     'BACKUP_DROPPED_ENTITIES',
                     'BACKUP_BENIGN_COLUMNS',
+                    // EW-818. The per-ENTITY exemption map and its predicate,
+                    // for free-form bag columns whose NAME is too ordinary to
+                    // exempt globally — `metadata` is declared on ten exported
+                    // entities, and one entry in the name-keyed map above
+                    // would wave all ten through at once.
+                    'BACKUP_BENIGN_ENTITY_COLUMNS',
                     'shouldDropEntirely',
                     'isRedactedColumn',
                     'isDroppedColumn',
                     'isBenignColumn',
+                    'isBenignEntityColumn',
                     'redactSecretBag',
                     'redactRow',
                     // Collectors — the fifteen domains and the one engine
