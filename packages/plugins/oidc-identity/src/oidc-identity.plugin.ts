@@ -221,6 +221,16 @@ export interface OidcIdentityPluginOptions {
 	readonly now?: () => number;
 	/** The randomness seam, in bytes; defaults to `node:crypto`'s `randomBytes`. */
 	readonly randomBytes?: (length: number) => Uint8Array;
+	/**
+	 * The deployment environment, for the ONE rule that depends on it: whether a
+	 * non-TLS (`http://localhost`) issuer is usable at all
+	 * ({@link allowsInsecureIssuer}). Defaults to `process.env.NODE_ENV` read at call
+	 * time, so a spec that flips the variable does not have to construct the
+	 * plugin again. A spec that wants the refusing branch passes any value that is
+	 * not in {@link NON_PRODUCTION_NODE_ENVS} — `nodeEnv: 'production'` is the
+	 * readable one.
+	 */
+	readonly nodeEnv?: string;
 }
 
 /**
@@ -328,11 +338,13 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 	private readonly fetchImpl?: OidcFetchImpl;
 	private readonly now: () => number;
 	private readonly randomBytes?: (length: number) => Uint8Array;
+	private readonly nodeEnv?: string;
 
 	constructor(options: OidcIdentityPluginOptions = {}) {
 		this.fetchImpl = options.fetchImpl;
 		this.now = options.now ?? Date.now;
 		this.randomBytes = options.randomBytes;
+		this.nodeEnv = options.nodeEnv;
 	}
 
 	async onLoad(context: PluginContext): Promise<void> {
@@ -992,6 +1004,31 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 			(key) => typeof raw[key] !== 'string' || (raw[key] as string).trim() === ''
 		);
 		if (missing.length > 0) return { ok: false, missing: [...missing] };
+
+		// FR-2's remaining half, which `settings.schema.ts` says is a runtime check
+		// and which did not exist anywhere in this plugin until now. JSON Schema is
+		// static, so the schema admits `http://localhost` / `http://127.0.0.1`
+		// unconditionally; the rule that `http` is refused OUTSIDE development can
+		// only be applied here, where the process knows what it is.
+		//
+		// This is the chokepoint: every public method resolves settings through this
+		// one function, so refusing here refuses discovery, the key fetch, the code
+		// exchange, both token verifiers, `testConnection` and the sign-in URL
+		// builder in one place. A non-TLS issuer in production means the id_token,
+		// the client secret on the token request and the key set all cross the
+		// network in clear text; `notConfigured` is the correct fail-closed answer
+		// for that, and it is the same answer the settings-missing path gives, so no
+		// caller has to learn a new error.
+		//
+		// The field name (never the value) is logged so an administrator can see WHY
+		// a configured integration reports "not configured" — FR-4's "field names
+		// only" and FR-16's no-material rule.
+		if (isInsecureIssuer((raw as { issuerUrl?: string }).issuerUrl ?? '') && !allowsInsecureIssuer(this.nodeEnv)) {
+			this.context?.logger?.error?.(
+				'OpenID Connect identity (Ever ID): `issuerUrl` is a non-TLS (http://) address and NODE_ENV is production. Refusing the integration — an http issuer would send the ID token, the client secret and the key set in clear text. Configure an https issuer.'
+			);
+			return { ok: false, missing: ['issuerUrl'] };
+		}
 		return { ok: true, settings: raw as unknown as OidcIdentitySettings };
 	}
 
@@ -1164,11 +1201,24 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 			ClientSecretBasic(settings.clientSecret)
 		);
 		if (isInsecureIssuer(settings.issuerUrl)) {
-			// `http://localhost` is the one non-TLS issuer the settings schema accepts,
-			// and outside production (settings.schema.ts:41-42). `openid-client`
-			// refuses a non-TLS endpoint unless it is told this is deliberate — and the
-			// schema is where that decision was already made, so this mirrors it rather
-			// than second-guessing it.
+			// `http://localhost` / `http://127.0.0.1` is the one non-TLS issuer the
+			// settings schema accepts, and `openid-client` refuses a non-TLS endpoint
+			// unless it is told the choice was deliberate.
+			//
+			// The comment that used to stand here claimed the schema had already
+			// answered “is this production?”, citing `settings.schema.ts:41-42`. It had
+			// not: that file's own docstring says the `NODE_ENV` half “belongs with the
+			// discovery work in T6”, and T6 never wrote it — so this call switched TLS
+			// enforcement off in EVERY environment, and the comment was what stopped a
+			// reviewer from looking. The gate now exists, in {@link resolveSettings}
+			// (the chokepoint) and again here.
+			//
+			// Kept here as well as there because this is the line with the consequence:
+			// if a future caller ever builds a Configuration without going through
+			// `resolveSettings`, the refusal must still hold.
+			if (!allowsInsecureIssuer(this.nodeEnv)) {
+				throw new OidcProviderUnavailableError('notConfigured');
+			}
 			allowInsecureRequests(configuration);
 		}
 		return configuration;
@@ -1270,6 +1320,35 @@ function encodeBase64Url(bytes: Uint8Array): string {
  * by the discovery reader's own `invalidIssuer`, which is where a bad address
  * belongs.
  */
+/**
+ * The environments in which a non-TLS issuer may be used, named explicitly.
+ *
+ * Deliberately an allow-list rather than `NODE_ENV !== 'production'`. The check
+ * this backs only ever *relaxes* a rule — it decides whether TLS enforcement may
+ * be switched off — and a deny-list gets that backwards: an unset, empty or
+ * misspelt `NODE_ENV` (`prodcution`, `PRODUCTION `, a container that simply never
+ * set it) would read as “not production” and quietly relax the rule on the one
+ * deployment that most needs it. With an allow-list, the same typo fails CLOSED:
+ * the value is not `development` or `test`, so the issuer is refused.
+ *
+ * `test` is a member because Vitest sets `NODE_ENV=test` and this package's own
+ * specs run a fake provider on `http://127.0.0.1:<port>`
+ * (`testing/fake-oidc-provider.ts`).
+ */
+const NON_PRODUCTION_NODE_ENVS: ReadonlySet<string> = new Set(['development', 'test']);
+
+/**
+ * Is this process one where a non-TLS (`http://localhost`) issuer is allowed?
+ *
+ * The runtime half of FR-2's issuer rule — the half `settings.schema.ts` says is
+ * a `NODE_ENV` check and which did not exist in this plugin before. See
+ * {@link NON_PRODUCTION_NODE_ENVS} for why it is an allow-list and not
+ * `!== 'production'`.
+ */
+function allowsInsecureIssuer(nodeEnv: string | undefined): boolean {
+	return NON_PRODUCTION_NODE_ENVS.has((nodeEnv ?? process.env.NODE_ENV ?? '').trim().toLowerCase());
+}
+
 function isInsecureIssuer(issuerUrl: string): boolean {
 	try {
 		return new URL(issuerUrl).protocol === 'http:';

@@ -932,7 +932,20 @@ describe('AppUpstreamSyncService — the rename, the licence and the fast-forwar
         expect(harness.calls.syncForkBranch).toHaveLength(0);
     });
 
-    it('proceeds with the fast-forward when no licence service is bound (§6.3 step 6)', async () => {
+    it('REFUSES the fast-forward when no licence service is bound (FR-37 fails CLOSED)', async () => {
+        // This case asserted `fast_forwarded` until 2026-09-21, citing `plan.md`'s
+        // “absent ⇒ proceed” default. That default was measured to be the ONLY answer the
+        // gate ever gave: `APP_UPSTREAM_LICENSE_SERVICE` is provided by no Nest module
+        // anywhere in the tree, so `noLicenseService: true` is not an edge case — it is
+        // production. FR-37 exists to stop upstream code whose licence got worse being
+        // fast-forwarded into a member's repository unreviewed, and a gate that answers
+        // “proceed” whenever it cannot run does not do that.
+        //
+        // The two “I don't know” paths now agree: absent service and throwing service both
+        // take the pull-request path (the throwing case is the `it` directly above, which
+        // has always been `pull_request_opened` / `license_worse`). The case is kept, with
+        // its expectation inverted, because it is the only place that pins what an absent
+        // licence service means.
         const harness = makeHarness({
             noLicenseService: true,
             handlers: {
@@ -948,7 +961,10 @@ describe('AppUpstreamSyncService — the rename, the licence and the fast-forwar
 
         const result = await runSync(harness);
 
-        expect(result.result).toBe('fast_forwarded');
+        expect(result.result).toBe('pull_request_opened');
+        expect(result.reason).toBe('license_worse');
+        // Nothing was fast-forwarded: the refusal happens before the sync call.
+        expect(harness.calls.syncForkBranch).toHaveLength(0);
         // The re-evaluation is not requestable either — and that is logged, not fatal.
         expect(result.licenseRequested).toBe(false);
     });

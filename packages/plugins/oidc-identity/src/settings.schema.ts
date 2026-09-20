@@ -30,7 +30,18 @@ import type { JsonSchema } from '@ever-works/plugin';
  *     static, so the schema carries the half that does not depend on the
  *     environment — `https` anywhere, `http` only for `localhost`/`127.0.0.1` —
  *     while the plan's remaining half (`http` is refused outside development)
- *     is a `NODE_ENV` check that belongs with the discovery work in T6.
+ *     is a `NODE_ENV` check.
+ *
+ *     **That runtime half now exists** (2026-09-21), in
+ *     `oidc-identity.plugin.ts`: `allowsInsecureIssuer` is an allow-list of
+ *     `development` / `test`, applied in `resolveSettings` (the chokepoint every
+ *     public method goes through, so a refused issuer refuses discovery, the key
+ *     fetch, the code exchange, both verifiers and `testConnection` together) and
+ *     again where `allowInsecureRequests` is called. Until then the sentence above
+ *     said T6 owned the check, T6 never wrote it, and a comment at the
+ *     `allowInsecureRequests` call site asserted the gate as though it were in
+ *     place — which is what kept it unnoticed. Do not restate a gate here without
+ *     naming the function that enforces it.
  */
 
 /**

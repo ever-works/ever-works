@@ -248,13 +248,33 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
         return server;
     }
 
-    /** A one-attempt request: `windowSeconds: 1` keeps a failing case from retrying for real. */
+    /**
+     * The ingress address the windowed cases pin, matching what `TestSmoke.resolveHostAddresses`
+     * answers for `app.example.com`. A documentation-range address (RFC 5737 TEST-NET-2), so it
+     * can never be a real host if a case ever escapes the seam.
+     */
+    const CLOCKED_INGRESS_IP = '198.51.100.4';
+
+    /**
+     * A one-attempt request: `windowSeconds: 1` keeps a failing case from retrying for real.
+     *
+     * `ingressAddresses` defaults to `['127.0.0.1']` because every live server in this file
+     * listens on `127.0.0.1` (`LiveServer.start` → `listen(0, '127.0.0.1')`), and because an
+     * EMPTY list is no longer a skipped gate — since 2026-09-21 it is a refusal
+     * (`dnsVerdict` answers `pointing: false`, `attempt` fails every check
+     * `dns_not_pointing`). Supplying the address here is what the real caller does
+     * (`app-health.service.ts:1232`), so the cases below go on testing what they were written
+     * to test — latency, classification, redaction, retries — instead of tripping the DNS
+     * gate. The cases that are ABOUT the gate pass their own `ingressAddresses` and override
+     * this.
+     */
     function request(overrides: Partial<AppPublicSmokeRequest> = {}): AppPublicSmokeRequest {
         return {
             workId: '11111111-1111-4111-8111-111111111111',
             urls: ['http://127.0.0.1:1/'],
             checks: [check()],
             windowSeconds: 1,
+            ingressAddresses: ['127.0.0.1'],
             ...overrides,
         };
     }
@@ -562,6 +582,12 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
 
         it('classifies a mismatched certificate `tls_not_ready` through the real fetch seam', async () => {
             const smoke = new TestSmoke();
+            // The URL below is a NAME, and `request()`'s default expectation is `127.0.0.1`
+            // (every live server in this file listens there). Resolve the name to it so the
+            // DNS gate — §5.5's FIRST classification step, and a refusal since 2026-09-21 when
+            // it cannot be satisfied — passes and this case reaches the TLS classification it
+            // is about.
+            smoke.addresses = ['127.0.0.1'];
             smoke.failWith = fetchFailure(
                 'ERR_TLS_CERT_ALTNAME_INVALID',
                 'Hostname/IP does not match certificate',
@@ -711,7 +737,17 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             expect(run.warnings[0].message).toContain('but resolved to nothing');
         });
 
-        it('makes no DNS judgement when no ingress address was supplied', async () => {
+        it('REFUSES the checks when no ingress address was supplied, rather than dialling unverified', async () => {
+            // This case asserted the opposite until 2026-09-21 — `run.dns` null, no
+            // resolution, `passed: true`. That was the vulnerability, not the contract: an
+            // empty `ingressAddresses` is the DEFAULT (the field is optional, and
+            // `app-health.service.ts:1232` supplies `[]` whenever the ingress address is not
+            // yet known), so the one configuration that switched the DNS gate off was the one
+            // every un-provisioned Work was in, and a cluster-privileged worker then dialled
+            // whatever the member's host resolved to.
+            //
+            // The case is kept, with its expectation inverted and the reason stated, because
+            // it is the only place that pins what an absent expectation list means.
             const server = await serve((_request, response) => {
                 response.writeHead(200);
                 response.end('up');
@@ -720,12 +756,34 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
             smoke.addresses = ['203.0.113.7'];
 
             const run = await smoke.run(
-                request({ urls: [server.url], checks: [check({ name: 'home' })] }),
+                request({
+                    urls: [server.url],
+                    checks: [check({ name: 'home' })],
+                    // Explicitly empty — this case IS the empty-list rule, and `request()`'s
+                    // default supplies an address for every other case.
+                    ingressAddresses: [],
+                }),
             );
 
-            expect(run.dns).toBeNull();
-            expect(smoke.resolved).toEqual([]);
-            expect(run.passed).toBe(true);
+            expect(run.dns).not.toBeNull();
+            expect(run.dns?.pointing).toBe(false);
+            expect(run.dns?.expected).toEqual([]);
+            expect(run.passed).toBe(false);
+            expect(run.checks[0].classification).toBe('dns_not_pointing');
+            expect(run.checks[0].failedExpectation).toContain('no ingress address was supplied');
+            // Nothing was dialled: the refusal happens before the first request.
+            expect(smoke.fetches).toEqual([]);
+        });
+
+        it('routes the service default fetch through the SSRF guard, not the bare global', () => {
+            // The seam itself, asserted structurally: `AppPublicSmokeService`'s own
+            // `fetchImpl` (the one a worker gets when it does NOT override the seam) must
+            // refuse a private address. `TestSmoke` overrides the seam, so this case reads
+            // the base class's default rather than a subclass's.
+            const service = new AppPublicSmokeService();
+            const impl = (service as unknown as { fetchImpl: typeof fetch }).fetchImpl;
+
+            return expect(impl('http://169.254.169.254/latest/meta-data/')).rejects.toThrow();
         });
     });
 
@@ -797,6 +855,11 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
         } {
             const smoke = new TestSmoke();
             smoke.clock = 1_000_000;
+            // `app.example.com` is a NAME, so the DNS verdict resolves it through the seam.
+            // Both halves are supplied so the gate passes and these cases go on measuring the
+            // window and the retry cadence: an empty `ingressAddresses` is a refusal since
+            // 2026-09-21, and a name that resolves to nothing is `dns_not_pointing`.
+            smoke.addresses = [CLOCKED_INGRESS_IP];
             let call = 0;
             smoke.setFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
                 smoke.fetches.push({ url: String(input), init });
@@ -815,6 +878,7 @@ describe('AppPublicSmokeService (APW-06 T23)', () => {
                         workId: '11111111-1111-4111-8111-111111111111',
                         urls: ['https://app.example.com/'],
                         checks: [check({ name: 'home', expect: { status: [200] } })],
+                        ingressAddresses: [CLOCKED_INGRESS_IP],
                         ...overrides,
                     }),
             };

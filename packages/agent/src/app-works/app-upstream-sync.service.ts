@@ -1391,10 +1391,22 @@ export class AppUpstreamSyncService {
      * Ask APW-03 whether upstream's head changes the licence class **for the worse**
      * (FR-37).
      *
-     * Absent ⇒ `false` ("proceed", `plan.md:731-732`). Present but throwing ⇒ `true`,
-     * and that direction is deliberate: a gate that cannot answer has not said yes, and
-     * the cost of being wrong the other way is a fast-forward nobody reviewed onto a
-     * licence the member may not be allowed to run.
+     * **Both “I don't know” answers are the safe one: `true`.** A gate that cannot
+     * answer has not said yes, and the cost of being wrong the other way is a
+     * fast-forward nobody reviewed onto a licence the member may not be allowed to
+     * run — which is the exact outcome FR-37 exists to prevent.
+     *
+     * The absent branch used to return `false` (“proceed”), citing `plan.md`'s
+     * default. Measured 2026-09-20: `APP_UPSTREAM_LICENSE_SERVICE` is provided by no
+     * Nest module anywhere in the tree, so `this.licenses` is `undefined` on **every**
+     * production run — meaning that default was not a rare fallback, it was the only
+     * answer the gate ever gave, and FR-37 was off. The two branches now agree:
+     * unknown ⇒ take the pull-request path.
+     *
+     * The visible consequence, stated rather than hidden: until that token is bound,
+     * every sync of a Work whose upstream moved opens a pull request instead of
+     * fast-forwarding. That is slower and it is correct; the way to get the
+     * fast-forward back is to BIND the licence service, not to loosen the gate.
      */
     private async licenseIsWorse(
         context: RunContext,
@@ -1402,7 +1414,12 @@ export class AppUpstreamSyncService {
         headSha: string,
     ): Promise<boolean> {
         if (!this.licenses || typeof this.licenses.previewUpstream !== 'function') {
-            return false;
+            // Unknown, not “fine” — see this method's docstring. `APP_UPSTREAM_LICENSE_SERVICE`
+            // is bound nowhere today, so this is the branch production actually takes.
+            this.logger.warn(
+                `App upstream sync: no licence service is wired (APP_UPSTREAM_LICENSE_SERVICE is bound in no module), so the FR-37 licence check for work ${context.workId} cannot run; the sync takes the pull-request path rather than fast-forwarding unasked.`,
+            );
+            return true;
         }
         try {
             const preview = await this.licenses.previewUpstream(

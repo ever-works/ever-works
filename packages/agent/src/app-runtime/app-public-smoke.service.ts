@@ -134,6 +134,12 @@ import {
     APP_SMOKE_RETRY_S,
 } from '@ever-works/contracts';
 import type { AppSmokeInput, AppSmokeRun, CheckResult } from '@ever-works/plugin';
+// The repository's own SSRF guard — see {@link AppPublicSmokeService.fetchImpl}. Imported from
+// the agent-side re-export (`../utils/ssrf-guard`) rather than
+// `@ever-works/plugin/helpers/ssrf-guard`, because `packages/plugin/src/helpers/index.ts:6`
+// deliberately does not re-export it from the barrel and this package already owns the
+// forwarding module.
+import { safeFetchWithDnsPin } from '../utils/ssrf-guard';
 
 /* -------------------------------------------------------------------------- *
  * Vocabulary this file adds
@@ -290,7 +296,11 @@ export interface AppPublicSmokeRun extends AppSmokeRun {
     windowSeconds: number;
     /** How many times the check set was attempted (1 ⇔ it passed first time). */
     attempts: number;
-    /** The first attempt's DNS verdict; `null` when no expectation was supplied. */
+    /**
+     * The first attempt's DNS verdict. `null` only when the run never reached an attempt;
+     * an empty expectation list is a `pointing: false` REFUSAL, not a skipped gate — see
+     * {@link AppPublicSmokeService.dnsVerdict}.
+     */
     dns: AppPublicSmokeDnsVerdict | null;
     /** ISO — the moment the run ended, which is what `appRender.smokeResult.observedAt` records. */
     observedAt: string;
@@ -310,11 +320,27 @@ export class AppPublicSmokeService {
     private readonly logger = new Logger(AppPublicSmokeService.name);
 
     /**
-     * The one place the global `fetch` is reached for (provisional seam, header). A worker that
+     * The one place the outbound HTTP call is made (provisional seam, header). A worker that
      * ships its own dispatcher (a proxy, a custom agent) overrides this instead of the service.
+     *
+     * **It is `safeFetchWithDnsPin`, not the bare global `fetch`.** This service runs in a
+     * cluster-privileged worker and dials a URL derived from a Work's own custom domain — an
+     * address the *member* controls. The bare global was an unguarded SSRF: a member could point
+     * a smoke check at `169.254.169.254`, a `10.x` service, or a hostname that answers public at
+     * validation time and private at fetch time, and the worker would dial it and hand back
+     * status, latency and up to {@link APP_SMOKE_BODY_BYTES} of the body. `safeFetchWithDnsPin`
+     * is the guard the repository already ships
+     * (`packages/plugin/src/helpers/ssrf-guard.ts:206`): lexical check, then resolve, then refuse
+     * if **any** resolved address is private/loopback/link-local (not “pick the public one”),
+     * then dial — the same re-resolve window this branch's own `app-kubeconfig.guard.ts` was
+     * written to close.
+     *
+     * An `SsrfBlockedError` from it lands in {@link runCheck}'s existing catch and is classified
+     * like any other transport failure, so a refused check is a *failed check* with a reason, not
+     * a crashed run.
      */
     protected fetchImpl: typeof fetch = (input: RequestInfo | URL, init?: RequestInit) =>
-        fetch(input, init);
+        safeFetchWithDnsPin(String(input), init);
 
     /**
      * Run the App spec's smoke checks over the public address, retrying every
@@ -414,13 +440,22 @@ export class AppPublicSmokeService {
             const expected = dns.expected.join(', ');
             const addresses = dns.addresses.length > 0 ? dns.addresses.join(', ') : 'nothing';
 
+            // Two different refusals share this branch, and they must not share a message: an
+            // empty `expected` means the CALLER gave us no ingress address, which is our
+            // problem to report, not a DNS record the owner has to create.
+            const failedExpectation =
+                dns.expected.length === 0
+                    ? `no ingress address was supplied for ${dns.host}, so the DNS check (§5.5's first ` +
+                      'classification step) cannot run and the public checks are refused rather than ' +
+                      'dialled unverified. Supply `ingressAddresses` once the Deployment has one.'
+                    : `${dns.host} must resolve to the cluster's ingress address (${expected}) ` +
+                      `but resolved to ${addresses}`;
+
             const checksWithDns: CheckResult[] = checks.map((check) => ({
                 name: checkName(check),
                 status: 'failed',
                 classification: 'dns_not_pointing',
-                failedExpectation:
-                    `${dns.host} must resolve to the cluster's ingress address (${expected}) ` +
-                    `but resolved to ${addresses}`,
+                failedExpectation,
             }));
 
             return { checks: checksWithDns, dns, allPassed: false };
@@ -447,7 +482,28 @@ export class AppPublicSmokeService {
         const expected = (ingressAddresses ?? [])
             .map((value) => String(value).trim())
             .filter(Boolean);
-        if (expected.length === 0) return null;
+        // An empty expectation list is a REFUSAL, not a skipped gate.
+        //
+        // It used to answer `null`, and `attempt()` only acts on `pointing === false` — so an
+        // empty list turned the DNS gate off entirely and the worker dialled whatever the host
+        // resolved to. Empty is also the *default*: `ingressAddresses` is an optional request
+        // field and `app-health.service.ts:1232` supplies `resolvedAddresses(ingressAddress)`,
+        // which is `[]` whenever the ingress address is not yet known. So the one configuration
+        // that disabled the check was the one every un-provisioned Work was in.
+        //
+        // `pointing: false` with an empty `expected` is the honest verdict: we were given
+        // nothing to compare against, so we cannot say this host points at the cluster, and
+        // §5.5's classification order (DNS first) means we must not dial before we can.
+        // {@link attempt}'s existing branch turns it into `dns_not_pointing` on every check,
+        // and the message names the missing input rather than blaming the app.
+        if (expected.length === 0) {
+            return {
+                host: base.hostname,
+                addresses: [],
+                expected: [],
+                pointing: false,
+            };
+        }
 
         const host = base.hostname;
         const addresses = isIP(host) > 0 ? [host] : await this.resolveHostAddresses(host);
