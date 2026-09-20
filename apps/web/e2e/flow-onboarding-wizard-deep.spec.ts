@@ -134,6 +134,13 @@ const ONB = {
  * (apps/web/src/app/[locale]/(dashboard)/layout-client.tsx). Its unit spec,
  * useOnboardingFlow.unit.spec.ts, pins the canonical order and counts.
  *
+ * A checked-in guard now ENFORCES this rather than trusting the comment:
+ * src/components/onboarding/onboarding-step-mirrors.unit.spec.ts lifts this
+ * function straight out of this file and diffs it against the product over
+ * every permutation of the ai / storage / db / deploy / desktop choices, so
+ * drift reddens `lint-and-test` instead of surviving until a UI assertion
+ * happens to notice.
+ *
  * THREE e2e specs carry a copy of this function and must be changed TOGETHER,
  * in the same PR as the product step:
  *
