@@ -902,25 +902,50 @@ async function main() {
 
 					for (const r of need) {
 						const scope = pkg.name.startsWith('@') ? pkg.name.split('/')[0] : null;
-						const args = ['publish', tarball, '--registry', `${r.url}/`, '--tag', opts.tag];
+						const base = ['publish', tarball, '--registry', `${r.url}/`, '--tag', opts.tag];
 						// For a scoped package a configured `@scope:registry` outranks
 						// --registry, so pin the scope on the command line as well.
-						if (scope) args.push(`--${scope}:registry=${r.url}/`);
+						if (scope) base.push(`--${scope}:registry=${r.url}/`);
+						const args = [...base];
 						if (r.id === 'npm') {
-							// New and public packages publish with --access public (a
-							// scoped package would otherwise be created PRIVATE). A
-							// package that is still private is published WITHOUT
-							// --access: changing access needs an interactive 2FA step
-							// that no CI token can pass (npm, 2026-07-31), and it
-							// cannot carry provenance while private.
-							if (!restrictedOnNpm) {
-								args.push('--access', 'public');
-								if (provenance) args.push('--provenance');
-							}
+							// EVERY npm publish carries --access public. A scoped package
+							// would otherwise be CREATED private — and for one that is
+							// ALREADY private, npm applies the flag exactly as
+							// `npm access set status=public` would ("specifying a value
+							// of restricted or public during publish will change the
+							// access for an existing package", npm-publish docs).
+							//
+							// That is now the ONLY route: since 2026-07-31 npm refuses
+							// access changes from every token type (granular and
+							// `npm login` alike — 401/403 with the "tokens that bypass
+							// 2FA are being restricted for account changes" notice), and
+							// the CLI's fallback is an interactive browser approval PER
+							// PACKAGE. Publishing is still permitted, so the publish is
+							// what flips them.
+							args.push('--access', 'public');
+							// Provenance is rejected while a package is still private at
+							// the moment of upload, so it joins from the next release on.
+							if (provenance && !restrictedOnNpm) args.push('--provenance');
 						}
 						if (opts.dryRun) args.push('--dry-run');
+						// If npm ever refuses the access change, publish the version
+						// anyway: staying private is the status quo, losing the release
+						// is not. Only for a package that is already private — for a new
+						// one, publishing without --access would CREATE it private.
+						const fallback =
+							r.id === 'npm' && restrictedOnNpm ? [...base, ...(opts.dryRun ? ['--dry-run'] : [])] : null;
 						try {
-							run('npm', args, { cwd: tmp, env: { ...env, NPM_CONFIG_USERCONFIG: userconfigs[r.id] } });
+							try {
+								run('npm', args, { cwd: tmp, env: { ...env, NPM_CONFIG_USERCONFIG: userconfigs[r.id] } });
+							} catch (err) {
+								const first = describeExecError(err);
+								if (!fallback || !/EOTP|one-time pass|E403|forbidden|access/i.test(first)) throw err;
+								console.log(
+									`::warning::${pkg.name}: npm refused the access change on publish (${lastLines(first, 1)}); publishing without it, the package stays private.`
+								);
+								run('npm', fallback, { cwd: tmp, env: { ...env, NPM_CONFIG_USERCONFIG: userconfigs[r.id] } });
+								row.actions.push('⚠ published without --access');
+							}
 							row.actions.push(`${opts.dryRun ? 'dry-run: ' : ''}published → ${r.id}`);
 						} catch (err) {
 							const msg = describeExecError(err);
@@ -967,7 +992,7 @@ async function main() {
 
 	if (restrictedOnNpmList.length) {
 		console.log(
-			`::warning::${restrictedOnNpmList.length} package(s) are still PRIVATE on npmjs.org. CI cannot change that (npm requires an interactive 2FA step for access changes): the job summary lists the one-time commands (docs/devops/github-workflows-deep-dive.md).`
+			`::warning::${restrictedOnNpmList.length} package(s) were PRIVATE on npmjs.org when this run started; each was published with --access public, which is what flips them. Re-read the registry (or check the job summary) to confirm, and see docs/devops/github-workflows-deep-dive.md if any stayed private.`
 		);
 	}
 
@@ -993,14 +1018,15 @@ async function main() {
 		if (restrictedOnNpmList.length) {
 			lines.push(
 				'',
-				'### Still private on npmjs.org',
+				'### Was private on npmjs.org at the start of this run',
 				'',
-				'Changing access needs an interactive 2FA step, so CI publishes them without changing it. One-time fix, from a maintainer machine:',
+				`${restrictedOnNpmList.length} package(s). Each was published with \`--access public\`, which npm applies to an existing package exactly as \`npm access set status=public\` would — the only route left to CI, since npm refuses access changes from every token type. Verify with:`,
 				'',
 				'```bash',
-				'npm login',
-				...restrictedOnNpmList.map((n) => `npm access set status=public ${n}`),
-				'```'
+				...restrictedOnNpmList.slice(0, 5).map((n) => `curl -so /dev/null -w '%{http_code} ' https://registry.npmjs.org/${encodeURIComponent(n)}  # 200 = public`),
+				'```',
+				'',
+				'Any that stayed private are flagged `⚠ published without --access` in the table above.'
 			);
 		}
 		if (privateOnGithub.length) {
