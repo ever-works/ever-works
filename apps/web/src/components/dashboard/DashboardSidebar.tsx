@@ -40,7 +40,6 @@ import {
     BarChart3,
     Video,
     Inbox,
-    Receipt,
     BookOpen,
     type LucideIcon,
 } from 'lucide-react';
@@ -206,17 +205,25 @@ export function DashboardSidebar({
         },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
-        // Schedules workspace — everything that runs without the owner, from
-        // every source, with run-now / pause / resume. Sits just above Runs
-        // and Activity (the forecast beside the record of what ran) so Teams
-        // keeps its slot directly after Tasks and Runs stays right above
-        // Activity.
-        { name: t('navigation.schedules'), href: ROUTES.DASHBOARD_SCHEDULES, icon: CalendarClock },
-        // Runs ledger (AW-09) — "what did my agents execute, and what did it
-        // cost", placed right above Activity ("what changed in my workspace")
-        // so the two neighbouring questions are learnt side by side.
-        { name: t('navigation.runs'), href: ROUTES.DASHBOARD_RUNS, icon: Receipt },
-        { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
+        // Activity — ONE entry for "what happened, and what will happen without
+        // me": the operation Log, the agent Runs ledger, the Live Feed and the
+        // Schedules list. Runs and Schedules each used to sit here as their own
+        // page; both turned out to be views of the same rows, so they are the
+        // Activity page's `?view=runs` and `?view=schedules` now.
+        //
+        // `matchPrefixes` keeps this entry lit on the two retired paths, which
+        // still exist as redirects — so an old bookmark highlights the item it
+        // now belongs to instead of nothing.
+        {
+            name: t('navigation.activity'),
+            href: ROUTES.DASHBOARD_ACTIVITY,
+            icon: Activity,
+            matchPrefixes: [
+                ROUTES.DASHBOARD_ACTIVITY,
+                ROUTES.DASHBOARD_RUNS,
+                ROUTES.DASHBOARD_SCHEDULES,
+            ],
+        },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
 

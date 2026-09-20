@@ -192,6 +192,32 @@ jobs:
       - name: Cross-check the fixture corpus
         run: python packages/agent-plugins/scripts/oracle-check.py packages/agent-plugins/fixtures
 
+  # The npm release script decides which version every @ever-works package is
+  # published at, on every push to main (publish-plugins.yml). Its unit tests
+  # need no install and no build, so they run on a GitHub-hosted runner in
+  # seconds instead of queueing for the self-hosted pool.
+  release-tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Release script unit tests
+        run: node --test scripts/release-npm-packages.test.mjs
+
+      # Belt and braces: the publishers run this same gate themselves before
+      # they build (ci.yml does not run on `develop` pushes, and no publisher
+      # depends on it), so a bad merge cannot reach a pushed image first.
+      - uses: ./.github/actions/assert-no-analytics-key
+
 
   # W (EW-779, self-build finding OPS-21) — THE NODE-CONTRACT GATE.
   #

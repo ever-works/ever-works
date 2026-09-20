@@ -21,6 +21,15 @@ import type { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
  *   itself still satisfies `>` (or `<`) and is served again on the next
  *   page.
  *
+ * WHICH of those two a given read may use is not the driver's name but
+ * the shape of its tie-break column — see {@link timeSortKeyStrategy},
+ * which every ASCENDING keyset must ask before reaching for the builders
+ * below. Truncating a Postgres column to the cursor's millisecond hands
+ * the ordering inside that millisecond to a random uuid. The runs ledger
+ * is a DESCENDING keyset and keeps the truncated key on purpose: there,
+ * comparing the native column against a millisecond cursor would skip
+ * rows instead of repeating them.
+ *
  * The fix is to compare a canonical, fixed-width, lexicographically
  * ordered text key on BOTH sides of the predicate, at the millisecond
  * resolution a cursor can actually name:
@@ -54,6 +63,67 @@ const SQLITE_KEY_FORMAT = '%Y-%m-%dT%H:%M:%f';
 const POSTGRES_KEY_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.MS';
 
 /**
+ * True when a TypeORM `DataSourceOptions.type` names the Postgres driver.
+ *
+ * The companion to {@link isSqliteFamilyDriver}: naming BOTH shipped
+ * families is what lets a read discriminate three ways — this driver,
+ * that driver, and the portable path everything else keeps — instead of
+ * the two-way "postgres or else" that silently hands one driver's SQL to
+ * every other one.
+ */
+export function isPostgresDriver(type: unknown): boolean {
+    return type === 'postgres';
+}
+
+/**
+ * Which form of the instant an ASCENDING keyset over a
+ * `@CreateDateColumn()` may order and page on.
+ *
+ * Truncating the ORDER BY down to the millisecond a cursor can name does
+ * not merely lose digits: it hands the ordering INSIDE one millisecond to
+ * the keyset's tie-break column. Whether that is safe is a property of
+ * that tie-break, not of the driver's name:
+ *
+ * - `'canonical-text'` — the sqlite family. `@CreateDateColumn()` is
+ *   whole-second TEXT there, so the canonical key is the only thing that
+ *   compares correctly at all, and the tie-break is the engine `rowid`
+ *   (see {@link keysetTieBreakSql}), which IS insertion order. Truncating
+ *   costs nothing: the order stays chronological.
+ * - `'native-column'` — Postgres. The column is a real `timestamp`
+ *   carrying microseconds while the tie-break is the row's random uuid v4
+ *   primary key, so truncating to the cursor's millisecond would order
+ *   rows written inside one millisecond by uuid — the session transcript
+ *   then renders a tool call above the assistant message that requested
+ *   it. The column therefore keeps its own resolution in both the ORDER
+ *   BY and the keyset equality. That makes the cursor's millisecond
+ *   useless as a lower bound: the cursor row's own microseconds still
+ *   exceed it, so a page whose rows all share that millisecond would be
+ *   served again with the identical cursor, forever. A keyset on this
+ *   strategy must anchor on the cursor row's STORED instant instead —
+ *   `AgentRunLogRepository.findTimelinePage` reads it with a sub-select
+ *   by the cursor's id — and fall back to the millisecond (widened to its
+ *   start: repeat, never skip) only when that row no longer exists.
+ * - `'portable-column'` — every other driver, i.e. the raw-column
+ *   predicate these reads have always emitted. Nothing is narrowed here.
+ *
+ * This answer is for ASCENDING keysets only. In a DESCENDING one a
+ * millisecond cursor sits BELOW the cursor row's true microsecond instant,
+ * so `native < cursor` EXCLUDES the older rows left in that millisecond
+ * instead of repeating the newer ones, and they are skipped for good. The
+ * runs ledger (`agent-run.repository.ts`'s `listLedgerPage`) is that case:
+ * it keeps the truncated key, calling {@link timeSortKeyColumnSql}
+ * directly rather than going through this.
+ */
+export type TimeSortKeyStrategy = 'canonical-text' | 'native-column' | 'portable-column';
+
+/** The strategy {@link TimeSortKeyStrategy} documents, for one driver. */
+export function timeSortKeyStrategy(driverType: unknown): TimeSortKeyStrategy {
+    if (isSqliteFamilyDriver(driverType)) return 'canonical-text';
+    if (isPostgresDriver(driverType)) return 'native-column';
+    return 'portable-column';
+}
+
+/**
  * SQL rendering a timestamp COLUMN as its canonical text sort key, or
  * `null` on a driver this module does not canonicalise.
  *
@@ -65,7 +135,7 @@ export function timeSortKeyColumnSql(driverType: unknown, columnSql: string): st
     if (isSqliteFamilyDriver(driverType)) {
         return `strftime('${SQLITE_KEY_FORMAT}', ${columnSql})`;
     }
-    if (driverType === 'postgres') {
+    if (isPostgresDriver(driverType)) {
         return `to_char(${columnSql}, '${POSTGRES_KEY_FORMAT}')`;
     }
     return null;
@@ -84,7 +154,7 @@ export function timeSortKeyParameterSql(driverType: unknown, parameterName: stri
     if (isSqliteFamilyDriver(driverType)) {
         return `strftime('${SQLITE_KEY_FORMAT}', :${parameterName})`;
     }
-    if (driverType === 'postgres') {
+    if (isPostgresDriver(driverType)) {
         return `to_char(CAST(:${parameterName} AS timestamp), '${POSTGRES_KEY_FORMAT}')`;
     }
     return null;

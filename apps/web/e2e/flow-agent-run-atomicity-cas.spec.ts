@@ -34,10 +34,16 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  *     assign path). The agent's manual claim is released → it recovers to
  *     'active' (never stranded RUNNING). #1733: the queued row is NEVER left
  *     orphaned in queued/running.
- *   • POST /:id/run-now on a NON-active agent (draft/paused) → 409 "Agent is
- *     not in an ACTIVE state — pause / resume it first." — gated BEFORE
- *     createQueued, so NO run row is recorded (contrast assign-task, which is
- *     not status-gated and records a run even on a draft agent).
+ *   • POST /:id/run-now on a NON-active agent → 409, gated BEFORE createQueued
+ *     so NO run row is recorded (contrast assign-task, which is not
+ *     status-gated and records a run even on a draft agent). The two 409s do
+ *     NOT share a body, and this file pins both: a DRAFT agent reaches the
+ *     dispatcher and comes back `skipped/inactive` → "Agent is not in an
+ *     ACTIVE state — pause / resume it first."; a PAUSED agent never gets that
+ *     far, because AW-23 refuses it by name in `runNow` itself → "This agent
+ *     is paused. Resume it first." (This header described both with the draft
+ *     copy until 2026-09-18; the paused half asserted only the status code,
+ *     so nothing caught it.)
  *   • POST /:id/runs/:runId/cancel on an already-terminal (failed) run → 200
  *     { cancelled:false, previousStatus:'failed' } — the CAS `WHERE status IN
  *     (queued,running)` matches nothing, so ZERO columns mutate (finishedAt /
@@ -560,6 +566,9 @@ test.describe('Dispatch-failure reconciliation — no orphaned queued run (#1733
             headers: H(u.access_token),
         });
         expect(r2.status()).toBe(409);
+        // Refused BY NAME, one gate earlier than the draft path above — not the
+        // same body, which is the whole point of pinning it.
+        expect((await r2.json()).message).toBe('This agent is paused. Resume it first.');
         expect((await getRunsPage(request, u.access_token, paused.id)).meta.total).toBe(0);
 
         // CONTRAST: assign-task is NOT status-gated — a draft agent DOES record a run.

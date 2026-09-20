@@ -59,8 +59,8 @@ describe('FeedRow', () => {
     });
 
     it('links to the destination when there is one', () => {
-        renderRow({}, '/agents/sessions/run-1');
-        expect(screen.getByRole('link')).toHaveAttribute('href', '/agents/sessions/run-1');
+        renderRow({}, '/agents/activity/run-1');
+        expect(screen.getByRole('link')).toHaveAttribute('href', '/agents/activity/run-1');
     });
 
     it('renders plain text, never a dead link, when there is no destination', () => {

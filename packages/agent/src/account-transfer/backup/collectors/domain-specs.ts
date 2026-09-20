@@ -22,6 +22,16 @@ import type { BackupDomainSpec } from './collector.types';
  * Order matters for exactly this reason — a `parent` file must come after
  * the file that registers its ids.
  *
+ * `personalScope` is the rule a file uses instead when the workspace has no
+ * organization. An `organization`-scoped table whose `organizationId` is
+ * NULL until its owner creates an organization carries one, naming the
+ * owner column (or the owner's parent ids) that tells this person's rows
+ * from everyone else's — so an un-organized owner's webhooks, code-host
+ * installations, onboarding requests and email conversations ship, and a
+ * stranger's never do. An `organization` file without one is written empty
+ * in that workspace, and reported as a gap unless its `organizationId` is
+ * NOT NULL.
+ *
  * `trim` names a policy in `BACKUP_TRIM_POLICIES`; the cutoff and the number
  * of rows left out are recorded per file in the manifest (spec FR-14).
  *
@@ -71,6 +81,9 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 file: 'onboarding.jsonl',
                 entity: 'OnboardingRequest',
                 scope: { by: 'organization' as const },
+                // Personal: the owner's own requests, never an unassigned
+                // stranger's. See `BackupFileSpec.personalScope`.
+                personalScope: { by: 'workspace' as const, userColumn: 'accountId' },
             },
             // APW-11 (T30) — the App Launcher's per-person arrangement. `by: 'user'` because a row
             // is keyed by `userId` + `scopeKey` (`'global' | 'personal' | <organizationId>`), so an
@@ -563,6 +576,10 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 file: 'email-conversations.jsonl',
                 entity: 'EmailConversation',
                 scope: { by: 'organization' as const },
+                // Personal: the conversations of the owner's own agents,
+                // which is also what `email-messages.jsonl` points at — so
+                // no message in the archive names a conversation it lacks.
+                personalScope: { by: 'parent' as const, column: 'agentId', from: 'agentIds' },
             },
             {
                 file: 'email-messages.jsonl',
@@ -627,6 +644,7 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 file: 'code-host-installations.jsonl',
                 entity: 'GitHubAppInstallation',
                 scope: { by: 'organization' as const },
+                personalScope: { by: 'workspace' as const, userColumn: 'createdByUserId' },
             },
             {
                 file: 'code-host-links.jsonl',
@@ -637,6 +655,7 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 file: 'webhook-subscriptions.jsonl',
                 entity: 'WebhookSubscription',
                 scope: { by: 'organization' as const },
+                personalScope: { by: 'workspace' as const, userColumn: 'accountId' },
                 registerIdsAs: 'webhookIds',
             },
             {

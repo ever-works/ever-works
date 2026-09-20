@@ -46,8 +46,8 @@
 		"changeset": "changeset",
 		"changeset:version": "changeset version",
 		"changeset:publish": "changeset publish",
-		"publish:plugins:dry": "node scripts/publish-plugins.mjs --dry-run",
-		"publish:plugins": "node scripts/publish-plugins.mjs"
+		"publish:plugins:dry": "node scripts/release-npm-packages.mjs --dry-run",
+		"publish:plugins": "node scripts/release-npm-packages.mjs"
 	},
 	"keywords": [],
 	"devDependencies": {

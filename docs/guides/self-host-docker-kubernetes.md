@@ -236,16 +236,24 @@ The complete list, with types and defaults, is in the [Environment Variables Ref
 
 ## Images and registries
 
-Every application image is built and pushed by GitHub Actions. The prod publish workflow (`.github/workflows/docker-build-publish-prod.yml`) pushes the same build to several registries at once:
+Every application image is built and pushed by GitHub Actions, and every image is public:
 
-| Image | GHCR                                 | Docker Hub              | DigitalOcean                                    |
-| ----- | ------------------------------------ | ----------------------- | ----------------------------------------------- |
-| API   | `ghcr.io/ever-works/ever-works-api`  | `everco/ever-works-api` | `registry.digitalocean.com/ever/ever-works-api` |
-| Web   | `ghcr.io/ever-works/ever-works-web`  | `everco/ever-works-web` | `registry.digitalocean.com/ever/ever-works-web` |
-| MCP   | `ghcr.io/ever-works/ever-works-mcp`  | —                       | `registry.digitalocean.com/ever/ever-works-mcp` |
-| Docs  | `ghcr.io/ever-works/ever-works-docs` | —                       | —                                               |
+| Image | GHCR                                 | Docker Hub               |
+| ----- | ------------------------------------ | ------------------------ |
+| API   | `ghcr.io/ever-works/ever-works-api`  | `everco/ever-works-api`  |
+| Web   | `ghcr.io/ever-works/ever-works-web`  | `everco/ever-works-web`  |
+| MCP   | `ghcr.io/ever-works/ever-works-mcp`  | `everco/ever-works-mcp`  |
+| Docs  | `ghcr.io/ever-works/ever-works-docs` | `everco/ever-works-docs` |
 
-The Compose files pull `:latest` from GHCR, and that tag moves. For a deployment you intend to keep, pin something immutable: `.github/workflows/k8s-build.yml` also pushes a `sha-<commit>` tag for all four images to GHCR and then retags a moving `:prod` / `:stage` / `:dev` alias onto it, so `ghcr.io/ever-works/ever-works-api:sha-<commit>` is a stable target. Pinning by digest works too.
+**Docker Hub** carries exactly the images production runs: after every production build, `.github/workflows/docker-hub-publish.yml` copies the `ghcr.io/ever-works/<image>:sha-<commit>` image built by `.github/workflows/k8s-build.yml` to `everco/<image>` with the tags `latest`, the release version (for example `0.134.8`) and `sha-<commit>`. Stage and develop builds go to `everco/<image>-stage` and `everco/<image>-dev`. The version tags are the ones to pin:
+
+```bash
+docker pull everco/ever-works-api:0.134.8
+```
+
+**GHCR** additionally carries `:latest`, built separately by `.github/workflows/docker-build-publish-prod.yml` (which also pushes to a DigitalOcean registry when that legacy path is enabled). The Compose files pull that `:latest` from GHCR, and that tag moves. For a deployment you intend to keep, pin something immutable: `.github/workflows/k8s-build.yml` also pushes a `sha-<commit>` tag for all four images to GHCR and then retags a moving `:prod` / `:stage` / `:dev` alias onto it, so `ghcr.io/ever-works/ever-works-api:sha-<commit>` is a stable target. Pinning by digest works too.
+
+No published image carries an analytics key, so browser analytics (PostHog) is off in every pre-built web image. Next.js bakes `NEXT_PUBLIC_*` values into the client bundle at build time, so a runtime environment variable cannot switch it on. To use your own PostHog project, build the web image from source with `--build-arg NEXT_PUBLIC_POSTHOG_KEY=phc_...` (see `.deploy/docker/web/Dockerfile`). Server-side PostHog (`POSTHOG_API_KEY`) is read at runtime as usual.
 
 One non-obvious detail: the dev and stage environments use _separate image names_ (`ever-works-api-dev`, `ever-works-mcp-stage`, …), not different tags on the prod image.
 

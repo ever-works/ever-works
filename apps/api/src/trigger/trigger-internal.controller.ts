@@ -90,6 +90,8 @@ import {
     MemoryFactSweepService,
 } from '@ever-works/agent/services';
 import { SkillReadinessService } from '@ever-works/agent/skills';
+import { WorkspaceBackupRunner, WorkspaceBackupService } from '@ever-works/agent/account-transfer';
+import { WorkspaceBackupRepository } from '@ever-works/agent/database';
 import {
     CreditLedgerService,
     CreditsSweepService,
@@ -537,6 +539,21 @@ export class TriggerInternalController implements OnModuleInit {
         // again, and the handler's own content compare makes that safe (plan §6).
         @Optional()
         private readonly appSourceInitializerService?: AppSourceInitializerService,
+        // AW-22 Workspace backup — backs the `workspace-backup` task
+        // (`startFromPayload`, then `observeRun` until the row settles, then
+        // `notifyFinished` on it — every call short, so none outlives the
+        // RPC deadline) and the `workspace-backup-sweeper` cron
+        // (`runSweep`). The archive is
+        // produced HERE and not in the worker because the runner needs the
+        // DataSource, the active storage backend and each Work's data-repo
+        // walk, none of which exist in worker scope. Appended LAST +
+        // @Optional() per the arity rule above.
+        @Optional()
+        private readonly workspaceBackupRunner?: WorkspaceBackupRunner,
+        @Optional()
+        private readonly workspaceBackupService?: WorkspaceBackupService,
+        @Optional()
+        private readonly workspaceBackupRepository?: WorkspaceBackupRepository,
     ) {}
 
     onModuleInit() {
@@ -711,6 +728,14 @@ export class TriggerInternalController implements OnModuleInit {
             // maps to `undefined` answers a loud "Unknown remote target" instead of
             // pretending the source was recorded in the member's repository.
             AppSourceInitializerService: this.appSourceInitializerService,
+            // AW-22 — `workspace-backup` calls `startFromPayload()` on the
+            // runner, then `observeRun()` and `notifyFinished()` on the
+            // service; the
+            // `workspace-backup-sweeper` cron calls `runSweep()`
+            // (allow-list auto-derived).
+            WorkspaceBackupRunner: this.workspaceBackupRunner,
+            WorkspaceBackupService: this.workspaceBackupService,
+            WorkspaceBackupRepository: this.workspaceBackupRepository,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

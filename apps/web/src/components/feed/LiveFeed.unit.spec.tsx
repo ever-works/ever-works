@@ -240,7 +240,7 @@ describe('LiveFeed', () => {
         act(() => {
             fireEvent.keyDown(document.body, { key: 'o' });
         });
-        expect(push).toHaveBeenCalledWith(`/agents/sessions/${RUN}`);
+        expect(push).toHaveBeenCalledWith(`/agents/activity/${RUN}`);
 
         act(() => {
             fireEvent.keyDown(window, { key: 'j' });

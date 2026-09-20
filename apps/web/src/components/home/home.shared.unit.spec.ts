@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { HomeSummaryDto } from '@ever-works/contracts';
 import {
     canSubmitComposer,
     deriveTaskTitle,
     formatCount,
     formatElapsed,
     formatWaiting,
+    glanceForSummary,
     greetingKeyForHour,
     localHour,
 } from './home.shared';
@@ -58,6 +60,35 @@ describe('home.shared', () => {
         expect(localHour(instant, 'Europe/Kyiv')).toBe(7);
         expect(localHour(instant, 'UTC')).toBe(4);
         expect(localHour(instant, 'Not/AZone')).toBe(4);
+    });
+
+    describe('glanceForSummary', () => {
+        it('passes a loaded summary’s own glance block through, failed or not', () => {
+            const ok: HomeSummaryDto['glance'] = {
+                status: 'ok',
+                data: { needsYou: 1, workingNow: 2, doneToday: 3, failedToday: 4 },
+            };
+            expect(glanceForSummary({ glance: ok } as HomeSummaryDto)).toBe(ok);
+
+            const failed: HomeSummaryDto['glance'] = {
+                status: 'failed',
+                errorKey: 'timeout',
+                data: null,
+            };
+            expect(glanceForSummary({ glance: failed } as HomeSummaryDto)).toBe(failed);
+        });
+
+        it('reports a missing summary as a FAILED block, never as "still loading"', () => {
+            // `undefined` is what `GlanceCounters` reads as loading; returning it
+            // here would leave a skeleton that never resolves, which is how a
+            // broken read passes for a quiet morning.
+            for (const missing of [null, undefined]) {
+                const block = glanceForSummary(missing);
+                expect(block.status).toBe('failed');
+                expect(block.data).toBeNull();
+                expect(block.errorKey).toBe('error');
+            }
+        });
     });
 
     describe('composer length', () => {

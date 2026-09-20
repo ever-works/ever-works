@@ -20,6 +20,7 @@ import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/age
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { ModelRoutingModule } from '@ever-works/agent/model-routing';
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
+import { AccountTransferModule } from '@ever-works/agent/account-transfer';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -173,6 +174,16 @@ import { AppBuildsModule } from '@ever-works/agent/app-builds';
         // `DatabaseModule`-encapsulation trap this branch hit once already
         // (`packages/agent/src/database/__tests__/database-module-encapsulation.spec.ts`).
         TypeOrmModule.forFeature([CacheEntry]),
+        // AW-22 Workspace backup — exposes WorkspaceBackupRunner and
+        // WorkspaceBackupService through the remote-proxy controller so the
+        // `workspace-backup` task and the `workspace-backup-sweeper` cron
+        // (in packages/tasks) run the archive HERE, where the DataSource,
+        // the storage backend and each Work's data-repo walk actually live.
+        // The worker has no DataSource at all — every service it resolves is
+        // an RPC proxy — so this is not a preference: the runner cannot be
+        // constructed in worker scope. WorkspaceBackupRepository comes from
+        // DatabaseModule above.
+        AccountTransferModule,
     ],
     controllers: [TriggerInternalController],
     providers: [DistributedTaskLockService],

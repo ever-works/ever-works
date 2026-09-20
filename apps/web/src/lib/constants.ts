@@ -107,14 +107,31 @@ export const REDIRECT_SEARCH_PARAM = process.env.REDIRECT_SEARCH_PARAM || 'redir
 export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
+    // Activity — ONE surface for "what happened in my workspace": the Log
+    // (every operation), Runs (every agent execution on a Day / Week / Month
+    // calendar, with totals and a receipt each), the Live Feed and Schedules.
+    // The tab is `?view=`; the Runs view's own view-state rides along as
+    // `g` / `d` / `run` and the filters as `agent` / `kind` / `status` / `q`.
     DASHBOARD_ACTIVITY: '/activity',
-    // Runs ledger (AW-09) — every agent run on a Day / Week / Month calendar,
-    // each with a receipt. `?g=` granularity, `?d=` anchor date, `?run=` opens
-    // a receipt; the filters ride along as `agent` / `kind` / `status` / `q`.
+    // The Runs view of the Activity page, addressed directly. Everything that
+    // used to link at the Runs PAGE links here instead (the page is gone; its
+    // features are the Runs view).
+    DASHBOARD_ACTIVITY_RUNS: '/activity?view=runs',
+    // The Schedules view of the Activity page, likewise — the Schedules PAGE is
+    // gone and its list, filters and row controls are this view. The filter
+    // parameters ride along on the links that need them.
+    DASHBOARD_ACTIVITY_SCHEDULES: '/activity?view=schedules',
+    // Runs ledger (AW-09) — RETIRED as a page in favour of the Activity page's
+    // Runs view. Kept as a constant because the route still EXISTS: it 308s to
+    // `DASHBOARD_ACTIVITY_RUNS`, carrying the whole view state with it, so
+    // every bookmark, dashboard tile, help article and e2e journey written
+    // against `/runs` keeps working (and keeps its filters).
     DASHBOARD_RUNS: '/runs',
-    // Schedules workspace — every recurring definition from every source,
-    // with run-now / pause / resume. The Activity page's Schedules tab keeps
-    // working and links here.
+    // Schedules — RETIRED as a page in favour of the Activity page's Schedules
+    // view (`DASHBOARD_ACTIVITY_SCHEDULES` above). Kept as a constant because
+    // the route still EXISTS: it redirects there carrying the whole filter set,
+    // so every bookmark, help link and e2e journey written against `/schedules`
+    // keeps working (and keeps its filters).
     DASHBOARD_SCHEDULES: '/schedules',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.
@@ -207,11 +224,27 @@ export const ROUTES = {
     DASHBOARD_CATALOG_PLAYBOOK: (slug: string) => `/catalog/playbooks/${slug}`,
     DASHBOARD_CATALOG_WORKFLOWS: '/catalog/workflows',
     DASHBOARD_CATALOG_WORKFLOW: (id: string) => `/catalog/workflows/${id}`,
-    // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
+    // Agents hub (Agents/Skills/Tasks PR #1017 — Phase 5; re-shaped by the
+    // Activity merge): the hub's own tabs are now Teams | Agents | Archived,
+    // and the Agents tab carries SUB-tabs Agents | Skills | Activity.
     DASHBOARD_AGENTS: '/agents',
+    // Skills sub-tab — the Skills catalog moved off the Agents catalog page
+    // into a sub-tab of its own (it used to be a `#skills` block there).
+    // `DASHBOARD_AGENT_SKILLS(id)` below is the unrelated PER-AGENT bindings tab.
+    DASHBOARD_AGENTS_SKILLS: '/agents/skills',
+    // Activity sub-tab — the former "Sessions" tab, renamed and extended: the
+    // agent-only twin of the global Activity page (Sessions list + the same
+    // Day / Week / Month ledger), scoped to Agents and nothing else.
+    // PLURAL `AGENTS` deliberately: `DASHBOARD_AGENT_ACTIVITY(id)` below is
+    // the unrelated PER-AGENT activity tab.
+    DASHBOARD_AGENTS_ACTIVITY: '/agents/activity',
+    // Session detail (Feature K) — drill-in for one run, under the Activity
+    // sub-tab so it reads as part of the same surface.
+    DASHBOARD_AGENT_SESSION: (runId: string) => `/agents/activity/${runId}`,
+    // RETIRED paths, kept so every existing link still lands. Both routes
+    // still exist and redirect into the Activity sub-tab.
     DASHBOARD_AGENT_SESSIONS: '/agents/sessions',
-    // Session detail (Feature K) — drill-in for one run.
-    DASHBOARD_AGENT_SESSION: (runId: string) => `/agents/sessions/${runId}`,
+    DASHBOARD_AGENT_SESSION_LEGACY: (runId: string) => `/agents/sessions/${runId}`,
     DASHBOARD_AGENTS_ARCHIVED: '/agents/archived',
     DASHBOARD_AGENT_NEW: '/agents/new',
     DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
@@ -232,11 +265,6 @@ export const ROUTES = {
     DASHBOARD_AGENT_INBOX: (id: string) => `/agents/${id}/inbox`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
-    // Navigation consolidation (docs/specs/features/navigation-consolidation):
-    // the Skills catalog now renders as a block on the Agents tab, so
-    // `/skills` (index only) redirects here. Skill detail routes are
-    // unchanged.
-    DASHBOARD_AGENTS_SKILLS: '/agents#skills',
     // Agents Chart — the org chart with human members stripped.
     DASHBOARD_AGENTS_CHART: '/agents/chart',
     // Teams & Prebuilt Companies (docs/specs/features/teams-and-companies §4)

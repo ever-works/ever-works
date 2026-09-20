@@ -50,9 +50,14 @@ export interface BackupWorkContentSource {
     /**
      * Read one Work's content.
      *
-     * Resolves with empty groups rather than rejecting when the repo cannot
+     * Resolves with empty groups rather than rejecting when the REPO cannot
      * be reached: a Work whose data repo is gone must not cost the archive
      * its other fourteen domains, and the manifest records the shortfall.
+     *
+     * Rejects when the Work itself cannot be resolved, which is a different
+     * thing and has to look different: "this Work has nothing" and "we could
+     * not read this Work" must not both come back as five empty arrays, or
+     * the manifest reports a complete domain over content it never saw.
      */
     readWorkContent(work: BackupWorkRef): Promise<BackupWorkContent>;
 }
@@ -80,7 +85,22 @@ export class AccountExportWorkContentSource implements BackupWorkContentSource {
     constructor(private readonly exportService: AccountExportService) {}
 
     async readWorkContent(work: BackupWorkRef): Promise<BackupWorkContent> {
-        const content = await this.exportService.readWorkRepoContent(work);
+        // By ID, not by ref. The export's walk resolves a Work's repository
+        // coordinates through `Work.getRepoOwner()` / `Work.getDataRepo()`,
+        // instance methods on the entity prototype — and a backup ref is a
+        // plain `{ id, slug }` literal built from a raw row, which has
+        // neither. Handing the ref straight over threw a `TypeError` inside
+        // the walk's own try/catch, which logged and returned EMPTY content,
+        // so every archive wrote five zero-line files per Work and called
+        // the domain complete.
+        const content = await this.exportService.readWorkRepoContentById(work.id);
+        if (!content) {
+            // A Work the archive was told about and cannot load is a gap,
+            // not an empty Work. Rejecting is what makes `addWorkContent`
+            // mark the domain `partial` with `work_content_unavailable`
+            // instead of writing empty files and reporting success.
+            throw new Error(`No Work found for backup content ref ${work.id}`);
+        }
         return {
             items: asRows(content.items),
             categories: asRows(content.categories),

@@ -24,8 +24,9 @@ vi.mock('@/app/actions/dashboard/schedules', () => ({
 }));
 
 // The shell is under test, not its children — each renders only what the
-// assertions below read.
-vi.mock('@/components/common/PageHeader', () => ({ PageHeader: () => null }));
+// assertions below read. The heading is NOT mocked: it is the shared
+// `ActivityViewHeader` every Activity view carries, and the assertion below
+// pins that this list still renders its own.
 vi.mock('./ScheduleHealthBanner', () => ({ ScheduleHealthBanner: () => null }));
 vi.mock('./SchedulesFilters', () => ({ SchedulesFilters: () => null }));
 vi.mock('./SchedulesDegradedNotice', () => ({ SchedulesDegradedNotice: () => null }));
@@ -79,6 +80,17 @@ function pageOf(names: string[], nextCursor: string | null = null): SchedulePage
             data_sync: 0,
             inbound_trigger: names.length,
         },
+        // The PRE-filter breakdown the source chips are built from: it stays
+        // complete while a filter narrows `countsBySourceType`.
+        unfilteredCountsBySourceType: {
+            recurring_task: 0,
+            agent_heartbeat: 0,
+            work_schedule: 0,
+            mission_tick: 0,
+            source_validation: 0,
+            data_sync: 0,
+            inbound_trigger: names.length,
+        },
         countsByStatus: { active: names.length, paused: 0, disabled: 0, error: 0, ended: 0 },
         healthCounts: { ok: names.length, neverRuns: 0 },
         degradedSources: [],
@@ -110,6 +122,22 @@ describe('SchedulesWorkspace — a superseded read never replaces a newer one', 
         vi.clearAllMocks();
         searchParams = new URLSearchParams();
         vi.mocked(getScheduleHealth).mockResolvedValue({ ok: false } as never);
+    });
+
+    it('heads the list with the shared view header, not a second page title', () => {
+        // The page's own `h1` is "Activity". This heading is a SECTION heading
+        // at the Live Feed's weight — a second big title for a view the reader
+        // has already chosen is noise, not orientation.
+        render(<SchedulesWorkspace initialPage={pageOf(['A ROW'])} initialHealth={null} />);
+
+        const heading = screen.getByRole('heading', {
+            level: 2,
+            name: 'dashboard.schedules.title',
+        });
+        expect(heading.className).toContain('text-base');
+        expect(screen.getByText('dashboard.schedules.pageSubtitle')).toBeTruthy();
+        // Nothing here renders an h1 of its own.
+        expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
     });
 
     function mount(initial: SchedulePage) {
@@ -192,5 +220,66 @@ describe('SchedulesWorkspace — a superseded read never replaces a newer one', 
             pending[0](ok(pageOf(['STALE PAGE TWO ROW'])));
         });
         expect(rowNames()).toEqual(['NEW FILTERED ROW']);
+    });
+});
+
+/**
+ * The mount that owes a read.
+ *
+ * This list is two things: the page it used to be (always server-rendered with
+ * its first page) and the Activity page's Schedules VIEW, which is reached by
+ * clicking a tab — at which point the page on screen was rendered for a
+ * different view and carries no schedules payload at all. Skipping the first
+ * load unconditionally, as the page always could, left the embedded mount
+ * showing its "no match" empty state over a list it had never fetched.
+ */
+describe('SchedulesWorkspace — first load', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        searchParams = new URLSearchParams();
+    });
+
+    it('fetches the page AND the health summary when the host had no payload', async () => {
+        vi.mocked(getSchedulePage).mockResolvedValue(ok(pageOf(['FETCHED ROW'])));
+        vi.mocked(getScheduleHealth).mockResolvedValue({
+            ok: true,
+            summary: {
+                checkedAt: '',
+                counts: { ok: 0, neverRuns: 0 },
+                flagged: [],
+                degradedSources: [],
+            },
+        } as never);
+
+        render(<SchedulesWorkspace initialPage={null} initialHealth={null} />);
+
+        await waitFor(() => expect(rowNames()).toEqual(['FETCHED ROW']));
+        expect(getSchedulePage).toHaveBeenCalledTimes(1);
+        expect(getScheduleHealth).toHaveBeenCalledTimes(1);
+        // The empty state must not have been what the reader saw.
+        expect(screen.queryByTestId('schedules-empty-filtered')).toBeNull();
+    });
+
+    it('never re-fetches a page the server already delivered', async () => {
+        vi.mocked(getSchedulePage).mockResolvedValue(ok(pageOf(['SHOULD NOT APPEAR'])));
+        vi.mocked(getScheduleHealth).mockResolvedValue({ ok: false } as never);
+
+        render(<SchedulesWorkspace initialPage={pageOf(['SERVER ROW'])} initialHealth={null} />);
+
+        await waitFor(() => expect(rowNames()).toEqual(['SERVER ROW']));
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        expect(getSchedulePage).not.toHaveBeenCalled();
+        expect(getScheduleHealth).not.toHaveBeenCalled();
+    });
+
+    it('leaves the server’s failure screen alone instead of retrying behind it', async () => {
+        vi.mocked(getSchedulePage).mockResolvedValue(ok(pageOf(['SHOULD NOT APPEAR'])));
+        vi.mocked(getScheduleHealth).mockResolvedValue({ ok: false } as never);
+
+        render(<SchedulesWorkspace initialPage={null} initialFailed initialHealth={null} />);
+
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        expect(getSchedulePage).not.toHaveBeenCalled();
+        expect(screen.getByTestId('schedules-workspace-failed')).toBeTruthy();
     });
 });

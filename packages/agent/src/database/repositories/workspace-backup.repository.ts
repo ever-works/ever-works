@@ -178,6 +178,40 @@ export class WorkspaceBackupRepository {
     }
 
     /**
+     * When the OLDEST backup still charged against the allowance was asked
+     * for — the moment one of the three comes back is one day after this.
+     *
+     * The same status set and the same window as {@link countReadyInWindow},
+     * asked of the database rather than derived from a page of history. The
+     * service used to take the newest `allowance * 2` rows of ANY status and
+     * filter them client-side, so four cancelled or failed attempts between
+     * two ready ones pushed the oldest ready row off the page and the 429's
+     * `retryAt` was computed from a later one — a wait reported as up to
+     * nearly a day longer than it is. Counting over one set and measuring
+     * over another was the defect; this is the same set.
+     */
+    async oldestReadyInWindow(scope: WorkspaceBackupScope, since: Date): Promise<Date | null> {
+        const query = this.repository
+            .createQueryBuilder('backup')
+            .where('backup.userId = :userId', { userId: scope.userId })
+            .andWhere('backup.status IN (:...statuses)', {
+                statuses: ['ready', 'ready_with_gaps', 'expired', 'deleted'],
+            })
+            .andWhere('backup.requestedAt >= :since', { since });
+
+        if (scope.organizationId) {
+            query.andWhere('backup.organizationId = :organizationId', {
+                organizationId: scope.organizationId,
+            });
+        } else {
+            query.andWhere('backup.organizationId IS NULL');
+        }
+
+        const oldest = await query.orderBy('backup.requestedAt', 'ASC').take(1).getOne();
+        return oldest ? new Date(oldest.requestedAt) : null;
+    }
+
+    /**
      * Insert a `queued` row. A unique violation from the partial index means
      * another tab (or another replica) won the race, and is surfaced as
      * {@link WorkspaceBackupAlreadyActiveError} so the service can adopt the

@@ -120,21 +120,39 @@ test.describe('Home summary — API contract', () => {
 });
 
 test.describe('Home — the morning stack', () => {
-    test('renders the greeting, the composer and the blocks in order above Your workspace (S1)', async ({
+    test('renders the composer and the blocks in the owner’s order above More (S1, owner 2026-09-18)', async ({
         page,
     }) => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
 
         const morning = page.getByTestId('home-morning');
         await expect(morning).toBeVisible({ timeout: 30_000 });
-        await expect(page.locator('h1')).toHaveText(/^Good (morning|afternoon|evening), .+\.$/);
         await expect(page.getByTestId('home-composer')).toBeVisible();
+
+        // Owner 2026-09-18 — the page header is gone: no greeting, no
+        // subtitle, no date line, no "Times shown in UTC." footnote. The
+        // timezone is a setting now (`Settings → Profile → Time zone`).
+        await expect(page.getByTestId('home-greeting')).toHaveCount(0);
+        await expect(page.getByTestId('home-score-line')).toHaveCount(0);
+        await expect(page.getByTestId('home-timezone-footnote')).toHaveCount(0);
+        await expect(page.getByText('Manage your AI-powered works')).toHaveCount(0);
 
         const firstRun = page.getByTestId('home-first-run');
         const summaryError = page.getByTestId('home-summary-error');
         if ((await firstRun.count()) === 0 && (await summaryError.count()) === 0) {
+            // `Your workspace` (the merged Today + All card) leads, then Needs
+            // you, Working now, Today beside This week, and Recent activity
+            // last — exactly the order the owner asked for.
+            const ORDER = [
+                'workspace',
+                'needsYou',
+                'workingNow',
+                'today',
+                'thisWeek',
+                'recentActivity',
+            ] as const;
             const positions: number[] = [];
-            for (const id of BLOCKS) {
+            for (const id of ORDER) {
                 const block = page.getByTestId(`home-block-${id}`);
                 // This week renders nothing for an account that never spent.
                 if (id === 'thisWeek' && (await block.count()) === 0) continue;
@@ -145,11 +163,22 @@ test.describe('Home — the morning stack', () => {
             const sorted = [...positions].sort((a, b) => a - b);
             expect(positions[0]).toBe(sorted[0]);
             expect(positions[positions.length - 1]).toBe(sorted[sorted.length - 1]);
+
+            // Recent activity is the last block on the page — the owner's item 1.
+            const recent = page.getByTestId('home-block-recentActivity');
+            const lastPosition = positions[positions.length - 1];
+            expect((await recent.boundingBox())?.y).toBe(lastPosition);
+
+            // The merged stats card really does hold both halves.
+            const workspace = page.getByTestId('home-block-workspace');
+            await expect(workspace.getByRole('heading', { name: 'Your workspace' })).toBeVisible();
+            await expect(workspace.getByRole('heading', { name: 'Today' })).toBeVisible();
+            await expect(workspace.getByRole('heading', { name: 'All' })).toBeVisible();
         }
 
         const workspace = page.getByTestId('home-workspace');
         await expect(workspace).toBeVisible();
-        await expect(workspace.getByRole('button', { name: /Your workspace/ })).toHaveAttribute(
+        await expect(workspace.getByRole('button', { name: /More/ })).toHaveAttribute(
             'aria-expanded',
             'true',
         );
@@ -166,11 +195,9 @@ test.describe('Home — the morning stack', () => {
         ).toBe(true);
     });
 
-    test('Your workspace collapses and expands without losing what it holds', async ({ page }) => {
+    test('More collapses and expands without losing what it holds', async ({ page }) => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
-        const toggle = page
-            .getByTestId('home-workspace')
-            .getByRole('button', { name: /Your workspace/ });
+        const toggle = page.getByTestId('home-workspace').getByRole('button', { name: /More/ });
         await expect(toggle).toBeVisible({ timeout: 30_000 });
 
         await toggle.click();
@@ -191,7 +218,12 @@ test.describe('Home — the morning stack', () => {
         }
         const failedToday = page.getByTestId('home-glance-failedToday');
         if ((await failedToday.count()) > 0) {
-            await expect(failedToday).toHaveAttribute('href', /\/runs\?g=day&status=failed$/);
+            // The runs counter links straight at the Activity page's Runs view —
+            // the ledger is not a page of its own any more.
+            await expect(failedToday).toHaveAttribute(
+                'href',
+                /\/activity\?view=runs&g=day&status=failed$/,
+            );
         }
     });
 });

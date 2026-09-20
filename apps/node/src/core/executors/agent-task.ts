@@ -1540,8 +1540,16 @@ function resolveLocalSessionHome(provider: FleetAgentExecutionProvider, io: Agen
  * `os.homedir()`. Windows is asked for `USERPROFILE` first on purpose —
  * a Git Bash shell exports a POSIX `HOME` (`/c/Users/...`) that no
  * Windows CLI can open.
+ *
+ * Exported for its own unit test and for nothing else. The ordering is a pure
+ * function of (platform, env), and the only other way to observe it is a full
+ * `runAgentTaskJob` with the platform forced — which drags in `quoteShellPath`,
+ * whose win32 branch rightly demands a drive-letter path for the node-owned
+ * scratch and workspace paths. Those come from the HOST, so a win32-forced run
+ * passes on a Windows machine and fails on the Linux CI runner, and the test
+ * that tried it went red on `main`.
  */
-function resolveRealHomeDir(io: AgentTaskIo): string {
+export function resolveRealHomeDir(io: Pick<AgentTaskIo, 'parentEnv' | 'platform'>): string {
 	const parentEnv = io.parentEnv;
 	if (parentEnv) {
 		const platform = io.platform ?? process.platform;

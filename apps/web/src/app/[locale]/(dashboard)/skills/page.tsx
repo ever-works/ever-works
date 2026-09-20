@@ -7,14 +7,18 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 /**
  * `/skills` (index) — retired as a standalone page (navigation consolidation,
- * docs/specs/features/navigation-consolidation): the Skills catalog now renders
- * as a block on the Agents tab, because nobody browses Skills without an Agent
- * in mind.
+ * docs/specs/features/navigation-consolidation): nobody browses Skills without
+ * an Agent in mind, so the catalog lives inside the Agents hub.
  *
- * Kept as a redirect rather than deleted so every bookmark, deep link, doc and
- * e2e journey keeps working; the filters ride along so `/skills?section=custom`
- * lands on `/agents?section=custom#skills`. `/skills/new`, `/skills/[id]` and
- * `/skills/templates` are unchanged.
+ * WHERE it lives has changed twice. First it was a `#skills` anchor block at the
+ * bottom of `/agents`; the Activity merge then gave it a sub-tab of its own,
+ * `/agents/skills`, alongside Agents and Activity. This redirect follows it, and
+ * so does every bookmark, deep link, doc and e2e journey written against the old
+ * shape.
+ *
+ * Kept as a redirect rather than deleted, and it still carries the filters:
+ * `/skills?section=custom` lands on `/agents/skills?section=custom`.
+ * `/skills/new`, `/skills/[id]` and `/skills/templates` are unchanged.
  */
 export default async function SkillsIndexRedirect({
     searchParams,
@@ -23,5 +27,5 @@ export default async function SkillsIndexRedirect({
 }) {
     const filters = parseSkillsSearchParams((await searchParams) ?? {});
     const locale = await getLocale();
-    redirect({ href: buildSkillsHref(ROUTES.DASHBOARD_AGENTS, filters, '#skills'), locale });
+    redirect({ href: buildSkillsHref(ROUTES.DASHBOARD_AGENTS_SKILLS, filters), locale });
 }

@@ -7,7 +7,10 @@ const articles = getHelpArticles();
 describe('screenPattern', () => {
     it('drops query and hash from literal routes and fills builder parameters', () => {
         expect(screenPattern('DASHBOARD_USAGE_COSTS')).toBe('/settings/usage');
-        expect(screenPattern('DASHBOARD_AGENTS_SKILLS')).toBe('/agents');
+        // Skills is a sub-tab of the Agents hub with a path of its own now; it
+        // used to be an `#skills` anchor on /agents, and a hash is dropped here.
+        expect(screenPattern('DASHBOARD_AGENTS_SKILLS')).toBe('/agents/skills');
+        expect(screenPattern('DASHBOARD_AGENTS_ACTIVITY')).toBe('/agents/activity');
         expect(screenPattern('DASHBOARD_WORK_KB')).toBe('/works/:param/kb');
         expect(screenPattern('AUTH_LOGIN')).toBeNull();
         expect(screenPattern('NOT_A_ROUTE')).toBeNull();

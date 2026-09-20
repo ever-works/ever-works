@@ -127,15 +127,52 @@ const ONB = {
 
 // ─── Step derivation (faithful copy of computeStepList) ──────────────────────
 
+/**
+ * MIRRORS `computeStepList()` in
+ * apps/web/src/components/onboarding/useOnboardingFlow.ts, the function that
+ * sizes both the wizard and the Help drawer's "Open onboarding (x/N)" label
+ * (apps/web/src/app/[locale]/(dashboard)/layout-client.tsx). Its unit spec,
+ * useOnboardingFlow.unit.spec.ts, pins the canonical order and counts.
+ *
+ * THREE e2e specs carry a copy of this function and must be changed TOGETHER,
+ * in the same PR as the product step:
+ *
+ *   - flow-onboarding-wizard.spec.ts
+ *   - flow-onboarding-wizard-deep.spec.ts
+ *   - flow-onboarding-catalog-choices.spec.ts
+ *
+ * Only the first was resynced for Wave 11, A8 and AW-20. The other two went on
+ * deriving five steps fewer than the product until 2026-09-18, which is why
+ * their hard-coded totals moved 6 → 11 and 9 → 14 in one go.
+ *
+ * Base flow is always
+ * welcome → ai-choice → storage-choice → db-choice → deploy-choice →
+ * desktop-choice → profile → roster → communication → plugins-catalog →
+ * create-work (11 steps). Per-provider config steps are inserted ONLY for a
+ * non-default choice in the ai/storage/deploy buckets. The db bucket adds a
+ * bare db-choice step with NO config sub-step (even for the non-default
+ * `custom` choice — its connection details are entered on the Deploy page
+ * after creation, not in the wizard). With all defaults that is exactly 11
+ * steps; with all BYOK + a self-hosted deploy it is 14.
+ */
 function computeStepIds(state: Pick<WizardStateV2, 'ai' | 'storage' | 'deploy'>): string[] {
     const ids: string[] = ['welcome', 'ai-choice'];
     if (state.ai.choice !== 'ever-works') ids.push(`ai-config:${state.ai.choice}`);
     ids.push('storage-choice');
     if (state.storage.choice === 'user-github') ids.push(`storage-config:${state.storage.choice}`);
+    // The five steps below that carry no `if` — db-choice (DB bucket),
+    // desktop-choice (A8), profile + roster + communication (Wave 11 / AW-20) —
+    // are UNCONDITIONAL in every permutation of choices, and none of them takes
+    // a config sub-step. They are exactly what this copy was missing.
+    ids.push('db-choice');
     ids.push('deploy-choice');
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         ids.push(`deploy-config:${state.deploy.choice}`);
     }
+    ids.push('desktop-choice');
+    ids.push('profile');
+    ids.push('roster');
+    ids.push('communication');
     ids.push('plugins-catalog', 'create-work');
     return ids;
 }
@@ -259,15 +296,20 @@ test.describe('Onboarding deep — partial deep-merge never clobbers sibling fie
         expect(s5.state.lastStep).toBe(7);
         expect(s5.state.pluginsReviewed).toBe(true);
 
-        // The derived step list now contains all three config sub-steps → 9.
+        // The derived step list now contains all three config sub-steps → 14.
         expect(computeStepIds(s5.state)).toEqual([
             'welcome',
             'ai-choice',
             'ai-config:codex',
             'storage-choice',
             'storage-config:user-github',
+            'db-choice',
             'deploy-choice',
             'deploy-config:k8s',
+            'desktop-choice',
+            'profile',
+            'roster',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);
@@ -458,37 +500,43 @@ test.describe('Onboarding deep — server stores lastStep raw, client clamps the
         expect(showBadge(defaultState, 0)).toBe(true);
 
         // The badge "x of N" must clamp current to the total even though the
-        // stored lastStep is absurd. Defaults → 6 steps → badge reads "6/6".
+        // stored lastStep is absurd. Defaults → 11 steps → badge reads "11/11".
         const defaultBadge = badgeCurrentStep(defaultState);
-        expect(defaultBadge.total).toBe(6);
-        expect(defaultBadge.current).toBe(6);
+        expect(defaultBadge.total).toBe(11);
+        expect(defaultBadge.current).toBe(11);
 
-        // Now widen the derived flow to 9 by choosing all BYOK, with a sane
-        // mid-flow lastStep. The badge should read "<lastStep+1>/9".
+        // Now widen the derived flow to 14 by choosing all BYOK, with a sane
+        // mid-flow lastStep. The badge should read "<lastStep+1>/14".
+        //
+        // `lastStep` is 12 rather than the 6 this test used before the mirror
+        // was resynced, and deliberately so: it has to sit ABOVE the narrowed
+        // total (11) and BELOW the wide one (14), or the shrink assertion below
+        // stops exercising the clamp it exists to prove. At 6 both badges would
+        // simply read 7 and the test would pass without testing anything.
         const wide = await patchState(request, token, {
             ai: { choice: 'gemini' },
             storage: { choice: 'user-github' },
             deploy: { choice: 'vercel' },
-            lastStep: 6,
+            lastStep: 12,
         });
-        expect(computeStepIds(wide.state)).toHaveLength(9);
+        expect(computeStepIds(wide.state)).toHaveLength(14);
         const wideState = await getState(request, token);
         const wideBadge = badgeCurrentStep(wideState);
-        expect(wideBadge.total).toBe(9);
-        expect(wideBadge.current).toBe(7); // min(6+1, 9)
+        expect(wideBadge.total).toBe(14);
+        expect(wideBadge.current).toBe(13); // min(12+1, 14) — mid-flow, un-clamped
 
-        // Shrinking the flow back to 6 (all defaults) while lastStep stays 6
-        // must re-clamp the badge to "6/6" — the total drives the ceiling.
+        // Shrinking the flow back to 11 (all defaults) while lastStep stays 12
+        // must re-clamp the badge to "11/11" — the total drives the ceiling.
         const narrowed = await patchState(request, token, {
             ai: { choice: 'ever-works' },
             storage: { choice: 'ever-works-git' },
             deploy: { choice: 'ever-works' },
         });
-        expect(narrowed.state.lastStep).toBe(6); // lastStep unchanged by this patch
-        expect(computeStepIds(narrowed.state)).toHaveLength(6);
+        expect(narrowed.state.lastStep).toBe(12); // lastStep unchanged by this patch
+        expect(computeStepIds(narrowed.state)).toHaveLength(11);
         const narrowedBadge = badgeCurrentStep(await getState(request, token));
-        expect(narrowedBadge.total).toBe(6);
-        expect(narrowedBadge.current).toBe(6); // min(6+1, 6) clamps to 6
+        expect(narrowedBadge.total).toBe(11);
+        expect(narrowedBadge.current).toBe(11); // min(12+1, 11) clamps to 11
     });
 });
 
@@ -558,8 +606,12 @@ test.describe('Onboarding deep — auto-open/badge state machine across complete
     }) => {
         const token = (await registerUserViaAPI(request)).access_token;
 
-        // Advance to the plugins step (index 4 of the 6-step default flow),
-        // then dismiss WITHOUT completing → the "show badge" quadrant.
+        // Seed the deploy-choice position — index 4 of the 11-step default
+        // flow — then dismiss WITHOUT completing → the "show badge" quadrant.
+        // Nothing here navigates the wizard; `lastStep` is written directly,
+        // and all the badge needs is a position below the derived total. It
+        // said "the plugins step" when the flow was 6 steps long and index 4
+        // really was `plugins-catalog`; at 11 steps that is index 9.
         await patchState(request, token, { lastStep: 4 });
         const dismissRes = await request.post(ONB.dismiss, { headers: authedHeaders(token) });
         expect(dismissRes.status()).toBe(200);
@@ -569,8 +621,8 @@ test.describe('Onboarding deep — auto-open/badge state machine across complete
         expect(shouldAutoOpen(s, 0)).toBe(false);
 
         const badge = badgeCurrentStep(s);
-        expect(badge.total).toBe(6);
-        expect(badge.current).toBe(5); // min(4+1, 6)
+        expect(badge.total).toBe(11);
+        expect(badge.current).toBe(5); // min(4+1, 11)
 
         // A user with at least one work leaves the badge quadrant entirely
         // (the totalWorks gate is shared by both predicates).
@@ -701,8 +753,8 @@ test.describe('Onboarding deep — per-user isolation + concurrent last-write-wi
         expect(bAfterA.state.skippedSteps).toEqual([]);
         expect(bAfterA.state.pluginsReviewed).toBe(false);
 
-        // Step lists diverge accordingly (A: 9-step full BYOK, B: 6-step base).
-        expect(computeStepIds(bAfterA.state)).toHaveLength(6);
+        // Step lists diverge accordingly (A: 14-step full BYOK, B: 11-step base).
+        expect(computeStepIds(bAfterA.state)).toHaveLength(11);
 
         // CONCURRENCY: fire two conflicting ai.choice patches for user A at
         // once. There is no optimistic-lock/409 (probe-verified) — last write

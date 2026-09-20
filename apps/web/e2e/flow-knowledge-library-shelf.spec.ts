@@ -219,10 +219,17 @@ test.describe('Knowledge library shelf — UI', () => {
         await nameInput.fill(folderName);
         await page.getByTestId('library-folder-name-submit').click();
 
+        // Each folder row carries TWO buttons whose accessible name contains the
+        // folder name: the row itself and "Folder options for <name>"
+        // (`LibraryFolderRail.tsx`, `library-folder-select-*` and
+        // `library-folder-menu-*`). A name match alone strict-resolves to both,
+        // so keep the same role + name claim and intersect it with the row's
+        // select button.
         const rail = page.getByTestId('library-folder-rail');
-        await expect(rail.getByRole('button', { name: new RegExp(folderName) })).toBeVisible({
-            timeout: 30_000,
-        });
+        const folderRow = rail
+            .getByRole('button', { name: new RegExp(folderName) })
+            .and(rail.getByTestId(/^library-folder-select-/));
+        await expect(folderRow).toBeVisible({ timeout: 30_000 });
 
         await page.getByTestId('library-search').fill(docs[2].title);
         const row = page.getByTestId(`library-doc-${docs[2].id}`);
@@ -231,7 +238,14 @@ test.describe('Knowledge library shelf — UI', () => {
         const picker = page.getByTestId('library-folder-picker');
         await clickUntilVisible(page.getByTestId(`library-doc-file-${docs[2].id}`), picker);
         await page.getByTestId('library-folder-picker-search').fill(folderName);
-        await picker.getByRole('option', { name: new RegExp(folderName) }).click();
+        // The picker's "New folder \"<name>\"" create option is also a
+        // role="option" whose name contains the folder name
+        // (`FolderPickerDialog.tsx`). Pin the click to an EXISTING folder's
+        // option so it can never file into a freshly created duplicate.
+        await picker
+            .getByRole('option', { name: new RegExp(folderName) })
+            .and(picker.getByTestId(/^library-folder-picker-option-/))
+            .click();
         await page.getByTestId('library-folder-picker-confirm').click();
         await expect(picker).toBeHidden({ timeout: 30_000 });
 

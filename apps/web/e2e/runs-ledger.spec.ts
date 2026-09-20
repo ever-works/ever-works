@@ -3,13 +3,18 @@ import { API_BASE, registerUserViaAPI, authedHeaders } from './helpers/api';
 import { clickAndExpectUrl } from './helpers/nav';
 
 /**
- * Runs ledger (AW-09) — `/runs` UI + `GET /api/runs*` contract.
+ * Runs ledger (AW-09) — the Activity page's Runs view + `GET /api/runs*`
+ * contract.
  *
- * UI: the page lands on Day / today with the timezone stated, the calendar
- * controls and keyboard shortcuts move the window and mirror it into the
- * URL, the rail names its scope, and a reload restores the view. Written to
- * hold whether or not the shared e2e user has runs: it asserts on the
- * ledger's structure (table or one of the empty answers), not on content.
+ * The ledger used to be its own page at `/runs`; it is now the `?view=runs` view
+ * of `/activity`, so the four `goto`s below still work (the retired route
+ * redirects, carrying the whole view state) but they land on the Activity page.
+ *
+ * UI: the view opens on Day / today with the timezone stated, the calendar
+ * controls and keyboard shortcuts move the window and mirror it into the URL,
+ * the rail names its scope, and a reload restores the view. Written to hold
+ * whether or not the shared e2e user has runs: it asserts on the ledger's
+ * structure (table or one of the empty answers), not on content.
  *
  * API: owner-scoped reads, the DTO bounds, and the 404 for a run id the
  * caller cannot see (the missing-vs-foreign equivalence is pinned in the
@@ -20,7 +25,12 @@ test.describe('Runs ledger — UI', () => {
     test('lands on Day / today with the timezone and the rail scope stated', async ({ page }) => {
         await page.goto('/en/runs', { waitUntil: 'domcontentloaded' });
 
-        await expect(page.getByRole('heading', { name: 'Runs', level: 1 })).toBeVisible();
+        // The page is Activity; the ledger is one of its views.
+        await expect(page.getByRole('heading', { name: 'Activity', level: 1 })).toBeVisible();
+        await expect(page.getByTestId('activity-view-runs')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
         await expect(page.getByTestId('runs-timezone')).toContainText('Times shown in');
         // `exact: true`: Playwright's accessible-name match is a case-insensitive
         // SUBSTRING by default, so a bare 'Day' also matches the "Today" button
@@ -98,16 +108,23 @@ test.describe('Runs ledger — UI', () => {
         await expect(page).not.toHaveURL(/status=failed/);
     });
 
-    test('the Sessions tab links to Runs', async ({ page }) => {
+    test('the Agents Activity tab links to the workspace-wide Runs view', async ({ page }) => {
+        // The hub's old "Sessions" tab is the Agents tab's Activity sub-tab now;
+        // its detail route moved under /agents/activity, both old paths redirect.
         await page.goto('/en/agents/sessions', { waitUntil: 'domcontentloaded' });
         // A click that lands before React wires the `<Link>` is silently
         // dropped: the trace shows "click action done" and "navigations have
-        // finished" 20ms later with no request for /runs at all, while the
-        // shell was still firing its hydration server actions. The helper
-        // re-clicks ONLY while the URL has not changed, so the claim is
-        // unchanged — it ends on the same `toHaveURL`.
-        await clickAndExpectUrl(page, page.getByTestId('agent-sessions-open-in-runs'), /\/runs/);
-        await expect(page.getByRole('heading', { name: 'Runs', level: 1 })).toBeVisible();
+        // finished" 20ms later with no request at all, while the shell was still
+        // firing its hydration server actions. The helper re-clicks ONLY while
+        // the URL has not changed, so the claim is unchanged — it ends on the
+        // same `toHaveURL`.
+        await clickAndExpectUrl(
+            page,
+            page.getByTestId('agent-sessions-open-in-runs'),
+            /\/activity\?view=runs/,
+        );
+        await expect(page.getByRole('heading', { name: 'Activity', level: 1 })).toBeVisible();
+        await expect(page.getByTestId('runs-rail')).toBeVisible();
     });
 });
 

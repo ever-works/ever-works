@@ -27,6 +27,7 @@ function build(organizationId: string | null = 'org-1') {
         total: 0,
         unfilteredTotal: 0,
         countsBySourceType: {},
+        unfilteredCountsBySourceType: {},
         countsByStatus: {},
         healthCounts: { ok: 0, neverRuns: 0 },
         degradedSources: [],

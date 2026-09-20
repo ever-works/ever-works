@@ -147,23 +147,55 @@ const ONB = {
 // ─── Step derivation (faithful copy of computeStepList in useOnboardingFlow.ts) ─
 
 /**
- * Mirror of the product's `computeStepList`. Base flow is always
- * welcome → ai-choice → storage-choice → deploy-choice → plugins-catalog →
- * create-work (6). A config sub-step is inserted ONLY for a NON-default AI
- * choice, for `storage.choice === 'user-github'`, and for a `vercel`/`k8s`
- * deploy. Crucially the derivation keys off the CHOICE, not the catalog's
- * `available` flag — so picking the (CI-unavailable) Ever Works defaults still
- * yields the lean 6-step flow with zero config steps.
+ * MIRRORS `computeStepList()` in
+ * apps/web/src/components/onboarding/useOnboardingFlow.ts, the function that
+ * sizes both the wizard and the Help drawer's "Open onboarding (x/N)" label
+ * (apps/web/src/app/[locale]/(dashboard)/layout-client.tsx). Its unit spec,
+ * useOnboardingFlow.unit.spec.ts, pins the canonical order and counts.
+ *
+ * THREE e2e specs carry a copy of this function and must be changed TOGETHER,
+ * in the same PR as the product step:
+ *
+ *   - flow-onboarding-wizard.spec.ts
+ *   - flow-onboarding-wizard-deep.spec.ts
+ *   - flow-onboarding-catalog-choices.spec.ts
+ *
+ * Only the first was resynced for Wave 11, A8 and AW-20. The other two went on
+ * deriving five steps fewer than the product until 2026-09-18, which is why
+ * their hard-coded totals moved 6 → 11 and 9 → 14 in one go.
+ *
+ * Base flow is always
+ * welcome → ai-choice → storage-choice → db-choice → deploy-choice →
+ * desktop-choice → profile → roster → communication → plugins-catalog →
+ * create-work (11 steps). Per-provider config steps are inserted ONLY for a
+ * non-default choice in the ai/storage/deploy buckets. The db bucket adds a
+ * bare db-choice step with NO config sub-step (even for the non-default
+ * `custom` choice — its connection details are entered on the Deploy page
+ * after creation, not in the wizard). With all defaults that is exactly 11
+ * steps; with all BYOK + a self-hosted deploy it is 14.
+ *
+ * The property THIS file turns on: the derivation keys off the CHOICE, not the
+ * catalog's `available` flag — so picking the (CI-unavailable) Ever Works
+ * defaults still yields the base flow with zero config steps.
  */
 function computeStepIds(state: Pick<WizardStateV2, 'ai' | 'storage' | 'deploy'>): string[] {
     const ids: string[] = ['welcome', 'ai-choice'];
     if (state.ai.choice !== 'ever-works') ids.push(`ai-config:${state.ai.choice}`);
     ids.push('storage-choice');
     if (state.storage.choice === 'user-github') ids.push(`storage-config:${state.storage.choice}`);
+    // The five steps below that carry no `if` — db-choice (DB bucket),
+    // desktop-choice (A8), profile + roster + communication (Wave 11 / AW-20) —
+    // are UNCONDITIONAL in every permutation of choices, and none of them takes
+    // a config sub-step. They are exactly what this copy was missing.
+    ids.push('db-choice');
     ids.push('deploy-choice');
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         ids.push(`deploy-config:${state.deploy.choice}`);
     }
+    ids.push('desktop-choice');
+    ids.push('profile');
+    ids.push('roster');
+    ids.push('communication');
     ids.push('plugins-catalog', 'create-work');
     return ids;
 }
@@ -369,7 +401,7 @@ test.describe('Onboarding step list — Ever-Works-default vs BYOK reshapes the 
 
         // A pristine user is on the all-defaults state. Even though the storage
         // and deploy defaults are CI-unavailable ("planned"), the step list is
-        // derived purely from the CHOICE — so it is exactly the 6 base steps,
+        // derived purely from the CHOICE — so it is exactly the 11 base steps,
         // with NO config sub-steps. This is the key default-path property.
         const pristine = await getState(request, token);
         expect(pristine.state.ai.choice).toBe('ever-works');
@@ -379,7 +411,12 @@ test.describe('Onboarding step list — Ever-Works-default vs BYOK reshapes the 
             'welcome',
             'ai-choice',
             'storage-choice',
+            'db-choice',
             'deploy-choice',
+            'desktop-choice',
+            'profile',
+            'roster',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);
@@ -393,7 +430,7 @@ test.describe('Onboarding step list — Ever-Works-default vs BYOK reshapes the 
             deploy: { choice: 'ever-works' },
             lastStep: 1,
         });
-        expect(computeStepIds(afterDefaults.state)).toHaveLength(6);
+        expect(computeStepIds(afterDefaults.state)).toHaveLength(11);
     });
 
     test('each catalog-available, pluginId-backed choice inserts exactly the config step the wizard renders for that plugin', async ({
@@ -433,8 +470,13 @@ test.describe('Onboarding step list — Ever-Works-default vs BYOK reshapes the 
             `ai-config:${aiByok.choice}`,
             'storage-choice',
             'storage-config:user-github',
+            'db-choice',
             'deploy-choice',
             `deploy-config:${deployOwn.choice}`,
+            'desktop-choice',
+            'profile',
+            'roster',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);

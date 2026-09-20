@@ -248,6 +248,14 @@ export class SchedulesService {
             ScheduleStatus,
             number
         >;
+        // The same breakdown taken BEFORE the filters, for the source picker:
+        // `countsBySourceType` above is computed after `sourceType` has been
+        // applied, so selecting a source zeroes every other entry and the
+        // picker can no longer offer a way back or sideways.
+        const unfilteredCountsBySourceType = Object.fromEntries(
+            SOURCE_TYPES.map((type) => [type, 0]),
+        ) as Record<ScheduleSourceType, number>;
+        for (const row of rows) unfilteredCountsBySourceType[row.view.sourceType] += 1;
         let neverRuns = 0;
         for (const view of matching) {
             countsBySourceType[view.sourceType] += 1;
@@ -274,6 +282,7 @@ export class SchedulesService {
             total: matching.length,
             unfilteredTotal,
             countsBySourceType,
+            unfilteredCountsBySourceType,
             countsByStatus,
             healthCounts: { ok: matching.length - neverRuns, neverRuns },
             degradedSources: degraded,

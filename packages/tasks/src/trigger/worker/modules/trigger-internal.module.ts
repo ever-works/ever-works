@@ -32,7 +32,13 @@ import {
     TasksService,
     TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
-import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
+import {
+    AgentRepository,
+    AgentRunRepository,
+    WorkRepository,
+    WorkspaceBackupRepository,
+} from '@ever-works/agent/database';
+import { WorkspaceBackupRunner, WorkspaceBackupService } from '@ever-works/agent/account-transfer';
 import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
@@ -525,6 +531,45 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
                 createRemoteProxy(apiClient, 'WorkUpstreamStateRepository'),
             inject: [TriggerInternalApiClient],
         },
+        // AW-22 Workspace backup — the `workspace-backup` task calls
+        // `startFromPayload()` on the runner, then `observeRun()` and
+        // `notifyFinished()` on the service; the `workspace-backup-sweeper`
+        // cron calls `runSweep()`.
+        //
+        // Both tasks resolved these three classes from a module that never
+        // provided them — the sweeper from this module, the archive task
+        // from the default `TriggerWorkerModule` — so every run died with
+        // `Nest could not find WorkspaceBackupRunner element` and no archive
+        // was ever produced. The same regression this module already records
+        // for `AnonymousUserCleanupService` and
+        // `KnowledgeBaseReconcileService`.
+        //
+        // Proxied rather than provided directly, and not by preference: the
+        // runner injects `@InjectDataSource()` and reads the active storage
+        // backend and each Work's data repository, none of which exist in
+        // worker scope — the worker has no TypeORM DataSource at all, which
+        // is why every entry in this file is an RPC proxy. `runSweep()`
+        // exists on the service for the same reason: its distributed lock
+        // injects `@InjectRepository(CacheEntry)` and so cannot be
+        // constructed here under any wiring.
+        {
+            provide: WorkspaceBackupRunner,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkspaceBackupRunner'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: WorkspaceBackupService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkspaceBackupService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: WorkspaceBackupRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkspaceBackupRepository'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -575,6 +620,13 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         APP_UPSTREAM_STATE_SERVICE,
         APP_UPSTREAM_SYNC_DISPATCHER_SERVICE,
         WORK_UPSTREAM_STATE_REPOSITORY,
+        // AW-22 — exported so the `workspace-backup` task (which resolves
+        // from `TriggerWorkerModule`, and reaches these through that
+        // module's import of this one) and the `workspace-backup-sweeper`
+        // cron can both resolve them.
+        WorkspaceBackupRunner,
+        WorkspaceBackupService,
+        WorkspaceBackupRepository,
     ],
 })
 export class TriggerInternalModule {}

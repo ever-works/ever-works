@@ -1,9 +1,10 @@
 import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { RunLedgerPage, RunLedgerRow, RunWindowStats } from '@ever-works/contracts';
 import { RunsClient } from './RunsClient';
+import { buildRunsSearch, RUNS_GRANULARITY_STORAGE_KEY } from './runs.shared';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
@@ -138,16 +139,36 @@ function stats(over: Partial<RunWindowStats> = {}): RunWindowStats {
     };
 }
 
-function renderClient(over: Partial<React.ComponentProps<typeof RunsClient>> = {}) {
+/** What the viewer's address bar shows (path + query). */
+function addressBar(): string {
+    return `${window.location.pathname}${window.location.search}`;
+}
+
+let replaceState: MockInstance<History['replaceState']>;
+
+/**
+ * Mount the client as the server would have rendered it: by default the
+ * address bar is the URL `initialView` was parsed from. `url` overrides it,
+ * for a mount where the two differ (Back/Forward replaying a cached render).
+ */
+function renderClient(over: Partial<React.ComponentProps<typeof RunsClient>> = {}, url?: string) {
+    const initialView = over.initialView ?? {
+        granularity: 'day' as const,
+        date: '2026-09-08',
+        filters: {},
+        runId: null,
+    };
+    window.history.replaceState(null, '', url ?? `/runs?${buildRunsSearch(initialView)}`);
+    replaceState.mockClear();
     return render(
         <RunsClient
-            initialView={{ granularity: 'day', date: '2026-09-08', filters: {}, runId: null }}
             granularityFromUrl
             timeZone="UTC"
             initialPage={page()}
             initialStats={stats()}
             agents={[{ id: AGENT, name: 'Ops', archived: false }]}
             {...over}
+            initialView={initialView}
         />,
     );
 }
@@ -155,6 +176,7 @@ function renderClient(over: Partial<React.ComponentProps<typeof RunsClient>> = {
 describe('RunsClient', () => {
     beforeEach(() => {
         replace.mockReset();
+        replaceState = vi.spyOn(window.history, 'replaceState');
         getRunsAction.mockReset().mockResolvedValue(page());
         getRunStatsAction.mockReset().mockResolvedValue(stats());
         getRunReceiptAction.mockReset().mockResolvedValue(null);
@@ -162,6 +184,12 @@ describe('RunsClient', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+        replaceState.mockRestore();
+        try {
+            localStorage.clear();
+        } catch {
+            // jsdom always has storage; nothing to reset otherwise.
+        }
     });
 
     it('renders the window as a captioned table with outcome icons and text', () => {
@@ -185,7 +213,144 @@ describe('RunsClient', () => {
             timezone: 'UTC',
         });
         expect(getRunStatsAction.mock.calls[0][0]).toMatchObject({ granularity: 'week' });
-        expect(replace).toHaveBeenCalledWith('/runs?g=week&d=2026-09-08', { scroll: false });
+        expect(addressBar()).toBe('/runs?g=week&d=2026-09-08');
+    });
+
+    // The e2e "keyboard shortcuts move the window and the URL follows" failed
+    // with Week selected and the URL still on `g=day` for 5 s: `router.replace`
+    // only commits the URL when its RSC transition commits. The address bar
+    // must already show the view when the keystroke's render has committed —
+    // no awaiting here — and the page must not ask the router for a server
+    // render it never uses (the actions above refetch the window).
+    it('writes the view into the address bar in the same commit, without a router navigation', () => {
+        renderClient();
+
+        fireEvent.keyDown(document.body, { key: 'w' });
+
+        expect(addressBar()).toBe('/runs?g=week&d=2026-09-08');
+        expect(replaceState).toHaveBeenCalledTimes(1);
+        expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("keeps the address bar's own path, workspace prefix included", () => {
+        renderClient({}, '/org/acme/runs?g=day&d=2026-09-08');
+
+        fireEvent.keyDown(document.body, { key: 'm' });
+
+        expect(addressBar()).toBe('/org/acme/runs?g=month&d=2026-09-08');
+    });
+
+    // Back/Forward onto a history entry the mirror rewrote replays the server
+    // render the page was LOADED with (the router's back/forward cache ignores
+    // stale time), so `initialView` can be older than the address bar.
+    it('adopts the view the address bar names when it differs from the server render', async () => {
+        renderClient({}, '/runs?g=week&d=2026-09-01&status=failed');
+
+        await waitFor(() => expect(getRunsAction).toHaveBeenCalled());
+        expect(getRunsAction.mock.calls[0][0]).toMatchObject({
+            granularity: 'week',
+            date: '2026-09-01',
+            filters: { statuses: ['failed'] },
+        });
+        expect(getRunStatsAction.mock.calls[0][0]).toMatchObject({
+            granularity: 'week',
+            date: '2026-09-01',
+            filters: { statuses: ['failed'] },
+        });
+        expect(addressBar()).toBe('/runs?g=week&d=2026-09-01&status=failed');
+    });
+
+    it('trusts the server render when the address bar matches it', async () => {
+        renderClient();
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(getRunsAction).not.toHaveBeenCalled();
+        expect(getRunStatsAction).not.toHaveBeenCalled();
+        expect(replaceState).not.toHaveBeenCalled();
+    });
+
+    // `next dev` renders under StrictMode, which re-runs the effects of a
+    // client-rendered tree once, tearing parents down first and setting
+    // children up first. The App Router patches `history.replaceState` in an
+    // effect and puts the browser's back in its cleanup, so a mount-time write
+    // on that re-run reaches the unpatched function and wipes the router's
+    // `__NA` history state — and the router ignores Back onto an entry without
+    // it. Nothing has changed at mount, so nothing may be written.
+    it('writes nothing at mount, even when StrictMode re-runs effects under the router', () => {
+        function RouterPatchingHistory({ children }: { children: React.ReactNode }) {
+            React.useEffect(() => {
+                const browserReplaceState = window.history.replaceState;
+                window.history.replaceState = function patched(data, unused, url) {
+                    const kept = { ...(data ?? {}), __NA: true };
+                    return browserReplaceState.call(window.history, kept, unused, url);
+                };
+                return () => {
+                    window.history.replaceState = browserReplaceState;
+                };
+            }, []);
+            return <>{children}</>;
+        }
+        const initialView = {
+            granularity: 'day' as const,
+            date: '2026-09-08',
+            filters: {},
+            runId: null,
+        };
+        window.history.replaceState({ __NA: true }, '', `/runs?${buildRunsSearch(initialView)}`);
+        replaceState.mockClear();
+
+        const { unmount } = render(
+            <React.StrictMode>
+                <RouterPatchingHistory>
+                    <RunsClient
+                        granularityFromUrl
+                        timeZone="UTC"
+                        initialPage={page()}
+                        initialStats={stats()}
+                        agents={[{ id: AGENT, name: 'Ops', archived: false }]}
+                        initialView={initialView}
+                    />
+                </RouterPatchingHistory>
+            </React.StrictMode>,
+        );
+        try {
+            expect(window.history.state).toMatchObject({ __NA: true });
+            expect(replaceState).not.toHaveBeenCalled();
+            expect(addressBar()).toBe('/runs?g=day&d=2026-09-08');
+        } finally {
+            // Unpatch while this test's spy is still the "browser" function.
+            unmount();
+        }
+    });
+
+    it('never lets the remembered granularity override one the address bar names', async () => {
+        localStorage.setItem(RUNS_GRANULARITY_STORAGE_KEY, 'month');
+        // Replayed render of a visit that named no granularity; the entry was
+        // since rewritten to name one.
+        renderClient({ granularityFromUrl: false }, '/runs?g=day&d=2026-09-07');
+
+        await waitFor(() => expect(getRunsAction).toHaveBeenCalled());
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(getRunsAction.mock.lastCall?.[0]).toMatchObject({
+            granularity: 'day',
+            date: '2026-09-07',
+        });
+        expect(addressBar()).toBe('/runs?g=day&d=2026-09-07');
+    });
+
+    it('still applies the remembered granularity when the address bar names none', async () => {
+        localStorage.setItem(RUNS_GRANULARITY_STORAGE_KEY, 'month');
+        renderClient(
+            {
+                granularityFromUrl: false,
+                initialView: { granularity: 'day', date: null, filters: {}, runId: null },
+            },
+            '/runs',
+        );
+
+        await waitFor(() => expect(getRunsAction).toHaveBeenCalled());
+        expect(getRunsAction.mock.lastCall?.[0]).toMatchObject({ granularity: 'month' });
+        expect(addressBar()).toBe('/runs?g=month');
     });
 
     it('does not treat typing in the search box as shortcuts', async () => {
@@ -199,7 +364,9 @@ describe('RunsClient', () => {
 
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(getRunsAction).not.toHaveBeenCalled();
+        expect(replaceState).not.toHaveBeenCalled();
         expect(replace).not.toHaveBeenCalled();
+        expect(addressBar()).toBe('/runs?g=day&d=2026-09-08');
     });
 
     it('steps back a day with the left arrow', async () => {
@@ -222,9 +389,7 @@ describe('RunsClient', () => {
         fireEvent.keyDown(document.body, { key: 'Enter' });
 
         await waitFor(() => expect(getRunReceiptAction).toHaveBeenCalledWith(RUN_A));
-        expect(replace).toHaveBeenLastCalledWith(`/runs?g=day&d=2026-09-08&run=${RUN_A}`, {
-            scroll: false,
-        });
+        expect(addressBar()).toBe(`/runs?g=day&d=2026-09-08&run=${RUN_A}`);
     });
 
     it('applies outcome = failed from the rail error count without navigating away', async () => {
@@ -237,9 +402,7 @@ describe('RunsClient', () => {
         await waitFor(() => expect(getRunsAction).toHaveBeenCalled());
         expect(getRunsAction.mock.calls[0][0].filters).toEqual({ statuses: ['failed'] });
         expect(getRunStatsAction.mock.calls[0][0].filters).toEqual({ statuses: ['failed'] });
-        expect(replace).toHaveBeenCalledWith('/runs?g=day&d=2026-09-08&status=failed', {
-            scroll: false,
-        });
+        expect(addressBar()).toBe('/runs?g=day&d=2026-09-08&status=failed');
     });
 
     it('keeps the rail when the list fails, and offers a retry', () => {

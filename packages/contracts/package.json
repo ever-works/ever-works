@@ -65,5 +65,8 @@
 		"vitest": "^4.1.0"
 	},
 	"peerDependencies": {},
-	"dependencies": {}
+	"dependencies": {},
+	"publishConfig": {
+		"access": "public"
+	}
 }

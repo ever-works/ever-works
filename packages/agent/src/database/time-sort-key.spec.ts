@@ -1,5 +1,11 @@
 import type { SelectQueryBuilder } from 'typeorm';
-import { keysetTieBreakSql, timeSortKeyColumnSql, timeSortKeyParameterSql } from './time-sort-key';
+import {
+    isPostgresDriver,
+    keysetTieBreakSql,
+    timeSortKeyColumnSql,
+    timeSortKeyParameterSql,
+    timeSortKeyStrategy,
+} from './time-sort-key';
 
 /**
  * The building blocks of a portable keyset page. The behaviour that
@@ -21,6 +27,47 @@ describe('time-sort-key', () => {
         'nativescript',
         'react-native',
     ];
+
+    describe('isPostgresDriver', () => {
+        it('names the Postgres driver', () => {
+            expect(isPostgresDriver('postgres')).toBe(true);
+        });
+
+        it.each([undefined, null, 'better-sqlite3', 'mysql', 'mariadb', 'cockroachdb', 42])(
+            'does not claim %p',
+            (type) => {
+                expect(isPostgresDriver(type)).toBe(false);
+            },
+        );
+    });
+
+    describe('timeSortKeyStrategy', () => {
+        // The rule the whole module turns on: truncating an ORDER BY down
+        // to the millisecond a cursor names hands the ordering INSIDE that
+        // millisecond to the tie-break column, so it is only safe where
+        // that tie-break is insertion order.
+        it.each(SQLITE_FAMILY)('truncates on %s, where the tie-break is rowid', (type) => {
+            expect(timeSortKeyStrategy(type)).toBe('canonical-text');
+        });
+
+        it('⭐ keeps the native column on Postgres, whose tie-break is a random uuid', () => {
+            // Regression guard. Ordering a Postgres timeline page on
+            // `to_char(createdAt, '…SS.MS')` throws away the microseconds
+            // the `timestamp` column stores and leaves rows written inside
+            // one millisecond ordered by uuid v4 — the session transcript
+            // renders a tool call above the assistant message that asked
+            // for it. Only a DESCENDING keyset may truncate here, and it
+            // reaches `timeSortKeyColumnSql` directly.
+            expect(timeSortKeyStrategy('postgres')).toBe('native-column');
+        });
+
+        it.each([undefined, null, 'mysql', 'mariadb', 'mongodb', 42])(
+            'leaves %p on the portable raw-column path',
+            (type) => {
+                expect(timeSortKeyStrategy(type)).toBe('portable-column');
+            },
+        );
+    });
 
     describe('timeSortKeyColumnSql', () => {
         it.each(SQLITE_FAMILY)('renders whole-second %s text at millisecond width', (type) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type RefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Loader2, Webhook, Plus, Pause, Play, RefreshCw, Trash2, Copy, Check } from 'lucide-react';
@@ -31,8 +31,12 @@ import { ActivityTimestamp } from '@/components/activity-log/ActivityTimestamp';
  * Create returns the RAW signing secret exactly once; the reveal panel is
  * the only place it is ever shown, alongside the webhook URL and a
  * ready-to-run signed-curl recipe.
+ *
+ * `createRef` is how the Schedules list's "Create" menu reaches this dialog:
+ * the trigger form lives here, so rather than duplicating it the menu asks
+ * this component to open it. Optional, so the manager still works standalone.
  */
-export function TriggersManager() {
+export function TriggersManager({ createRef }: { createRef?: RefObject<(() => void) | null> }) {
     const t = useTranslations('dashboard.triggers');
     const [triggers, setTriggers] = useState<InboundTriggerView[]>([]);
     const [loading, setLoading] = useState(true);
@@ -52,6 +56,14 @@ export function TriggersManager() {
     useEffect(() => {
         setOrigin(window.location.origin);
     }, []);
+
+    useEffect(() => {
+        if (!createRef) return;
+        createRef.current = () => setCreateOpen(true);
+        return () => {
+            createRef.current = null;
+        };
+    }, [createRef]);
 
     const load = useCallback(async () => {
         setLoading(true);

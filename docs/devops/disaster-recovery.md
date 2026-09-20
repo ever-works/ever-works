@@ -70,11 +70,11 @@ DATABASE_CA_CERT: $DATABASE_CA_CERT
 
 ### Container Image Registry
 
-Docker images are pushed to three registries for redundancy during the CI/CD pipeline (`docker-build-publish-prod.yml`):
+Docker images live in more than one registry for redundancy:
 
-1. **GitHub Container Registry** (primary): `ghcr.io/ever-works/ever-works-api:latest`
-2. **Docker Hub** (secondary): `everco/ever-works-api:latest`
-3. **DigitalOcean Registry** (deployment source): `registry.digitalocean.com/ever/ever-works-api:latest`
+1. **GitHub Container Registry** (primary): `ghcr.io/ever-works/ever-works-api:sha-<commit>` / `:prod` (from `k8s-build.yml`) and `:latest` (from `docker-build-publish-prod.yml`)
+2. **Docker Hub**: `everco/ever-works-api:latest` / `:<release version>` / `:sha-<commit>` — a byte-identical copy of the `k8s-build.yml` image, made by `docker-hub-publish.yml`
+3. **DigitalOcean Registry** (legacy deployment source, only when `vars.DO_ENABLED` is set): `registry.digitalocean.com/ever/ever-works-api:latest`
 
 If one registry is unavailable, images can be pulled from an alternative source.
 

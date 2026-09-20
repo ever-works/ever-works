@@ -3,6 +3,9 @@ import {
     HOME_COMPOSER_MIN_CHARS,
     HOME_COUNTER_MAX,
     HOME_TASK_TITLE_MAX_CHARS,
+    type HomeBlock,
+    type HomeGlance,
+    type HomeSummaryDto,
 } from '@ever-works/contracts';
 
 /**
@@ -33,6 +36,31 @@ export {
 
 /** The composer field's id — the Working now empty state focuses it. */
 export const HOME_COMPOSER_INPUT_ID = 'home-composer-input';
+
+/**
+ * The Today half of `Your workspace` when there is NO morning read at all —
+ * the whole summary failed to load.
+ *
+ * `undefined` means "still loading" to `GlanceCounters`, and a skeleton that
+ * never resolves is exactly the "a broken read looks like a quiet morning"
+ * failure that block exists to prevent. So a missing summary is reported as a
+ * FAILED block: it says what could not be read and offers the Retry.
+ *
+ * A summary that loaded but whose `glance` block failed already carries its own
+ * failed block, so it is passed through untouched.
+ */
+export const GLANCE_UNAVAILABLE: HomeBlock<HomeGlance> = {
+    status: 'failed',
+    errorKey: 'error',
+    data: null,
+};
+
+/** The Today counters to render for a given morning read (or its absence). */
+export function glanceForSummary(
+    summary: HomeSummaryDto | null | undefined,
+): HomeBlock<HomeGlance> {
+    return summary?.glance ?? GLANCE_UNAVAILABLE;
+}
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;

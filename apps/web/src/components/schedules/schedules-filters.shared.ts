@@ -15,6 +15,8 @@ export interface SchedulesFilterState {
     status: ScheduleStatus | '';
     health: 'ok' | 'never-runs' | '';
     agent: string;
+    /** The "Active only" switch — only schedules that are switched on. */
+    activeOnly: boolean;
     q: string;
 }
 
@@ -23,6 +25,7 @@ export const EMPTY_SCHEDULE_FILTERS: SchedulesFilterState = {
     status: '',
     health: '',
     agent: '',
+    activeOnly: false,
     q: '',
 };
 
@@ -48,7 +51,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function hasActiveFilters(filters: SchedulesFilterState): boolean {
     return Boolean(
-        filters.source || filters.status || filters.health || filters.agent || filters.q,
+        filters.source ||
+        filters.status ||
+        filters.health ||
+        filters.agent ||
+        filters.activeOnly ||
+        filters.q,
     );
 }
 
@@ -70,8 +78,25 @@ export function filtersFromSearchParams(params: URLSearchParams | null): Schedul
             : '',
         health: health === 'ok' || health === 'never-runs' ? health : '',
         agent: UUID.test(agent) ? agent : '',
+        activeOnly: params?.get('active') === '1',
         q: (params?.get('q') ?? '').slice(0, 120),
     };
+}
+
+/**
+ * The filter state → the query parameters that carry it, in the order they are
+ * written. One place, so the server page, the client shell and the `/schedules`
+ * redirect can never disagree about a filter's name.
+ */
+export function scheduleFilterParams(filters: SchedulesFilterState): Array<[string, string]> {
+    const pairs: Array<[string, string]> = [];
+    if (filters.source) pairs.push(['source', filters.source]);
+    if (filters.status) pairs.push(['status', filters.status]);
+    if (filters.health) pairs.push(['health', filters.health]);
+    if (filters.agent) pairs.push(['agent', filters.agent]);
+    if (filters.activeOnly) pairs.push(['active', '1']);
+    if (filters.q) pairs.push(['q', filters.q]);
+    return pairs;
 }
 
 export function pageParamsFor(filters: SchedulesFilterState): GetSchedulePageParams {
@@ -80,6 +105,9 @@ export function pageParamsFor(filters: SchedulesFilterState): GetSchedulePagePar
     if (filters.status) params.status = filters.status;
     if (filters.health) params.health = filters.health;
     if (filters.agent) params.agentId = filters.agent;
+    // The switch is named for what it shows ("active only"); the API's own
+    // name for the same thing is `enabledOnly`, which is what it filters on.
+    if (filters.activeOnly) params.enabledOnly = true;
     if (filters.q) params.q = filters.q;
     return params;
 }

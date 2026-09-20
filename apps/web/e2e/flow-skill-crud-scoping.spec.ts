@@ -720,7 +720,7 @@ test.describe('Skill CRUD + scope/owner validation', () => {
         // consolidation: the catalog lives on the Agents tab and `/skills`
         // only redirects there. Navigation uses relative paths against the
         // playwright-configured baseURL.
-        await page.goto('/agents#skills', { waitUntil: 'domcontentloaded' });
+        await page.goto('/agents/skills', { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle').catch(() => {});
         await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText(/installed/i).first()).toBeVisible({ timeout: 30_000 });

@@ -730,6 +730,32 @@ export class TriggerService
      * (or `null` when Trigger.dev is disabled / disposed — KB retrieval
      * falls back to lexical via row 30 RRF until the dispatch lands).
      */
+    async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbEmbedDocumentTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'kb-embed-document',
+                        `work:${payload.workId}`,
+                        `doc:${payload.documentId}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `kb-embed:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-embed-document task', error as Error);
+            return null;
+        }
+    }
+
     /**
      * AW-22 — enqueue one complete workspace archive.
      *
@@ -765,32 +791,6 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch workspace-backup task', error as Error);
-            return null;
-        }
-    }
-
-    async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
-        if (!this.ensureConfigured()) {
-            return null;
-        }
-
-        try {
-            const handle = await kbEmbedDocumentTask.trigger(
-                payload,
-                this.stampTenantOptions({
-                    tags: [
-                        'kb-embed-document',
-                        `work:${payload.workId}`,
-                        `doc:${payload.documentId}`,
-                    ],
-                    machine: this.machine() as any,
-                    concurrencyKey: `kb-embed:${payload.workId}`,
-                }),
-            );
-
-            return handle.id;
-        } catch (error) {
-            this.logger.error('Failed to dispatch kb-embed-document task', error as Error);
             return null;
         }
     }

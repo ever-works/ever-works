@@ -36,6 +36,8 @@ image builds, Kubernetes deployments, CLI publishing, and Trigger.dev deployment
 | `release-trigger-stage.yml`                     | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging                            |
 | `release-trigger-prod.yml`                      | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod                               |
 | `publish-cli.yml`                               | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages                                  |
+| `docker-hub-publish.yml`                        | Publish Images to Docker Hub          | After every k8s-build, manual   | Copy the k8s-build images to Docker Hub (`everco`)    |
+| `publish-plugins.yml`                           | Publish Plugins                       | Push to main, manual            | Publish SDK, contracts and plugins to npm + GH Pkgs   |
 
 ## Pipeline Flow
 
@@ -106,7 +108,6 @@ Two parallel jobs build the API and Web images:
   - File: .deploy/docker/api/Dockerfile
   - Platform: linux/amd64
   - Tags: ghcr.io/ever-works/ever-works-api-{env}:latest
-          everco/ever-works-api-{env}:latest
           registry.digitalocean.com/ever/ever-works-api-{env}:latest
   - Cache: registry-based layer caching
   - Build args: NODE_ENV={environment}
@@ -116,16 +117,85 @@ Two parallel jobs build the API and Web images:
 
 ### Registry Push Order
 
-Each image is pushed to up to four registries:
+Each image is pushed to up to three registries:
 
-| Registry                  | Action                                     | Failure Policy            |
-| ------------------------- | ------------------------------------------ | ------------------------- |
-| GitHub Container Registry | `docker/login-action` + push               | Required                  |
-| Docker Hub                | `docker/login-action` + push               | `continue-on-error: true` |
-| DigitalOcean Registry     | `doctl registry login` + push              | `continue-on-error: true` |
-| CW Container Registry     | `docker/login-action` (push commented out) | `continue-on-error: true` |
+| Registry                  | Action                                     | Failure Policy                       |
+| ------------------------- | ------------------------------------------ | ------------------------------------ |
+| GitHub Container Registry | `docker/login-action` + push               | Required                             |
+| DigitalOcean Registry     | `doctl registry login` + push              | Required when `vars.DO_ENABLED=true` |
+| CW Container Registry     | `docker/login-action` (push commented out) | `continue-on-error: true`            |
 
-**Secrets Used:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `DIGITALOCEAN_ACCESS_TOKEN`, `GITHUB_TOKEN`, `CW_DOCKER_REGISTRY`, `CW_DOCKER_USER`, `CW_DOCKER_USER_PASSWORD`
+Docker Hub is **not** pushed from these workflows any more — see
+[Docker Hub Publish Workflow](#docker-hub-publish-workflow-docker-hub-publishyml). The
+`continue-on-error` Docker Hub push that used to live here never succeeded: the repository had
+no `DOCKERHUB_*` secrets, so every run logged `Username and password required` and still went
+green.
+
+**Secrets Used:** `DIGITALOCEAN_ACCESS_TOKEN`, `GITHUB_TOKEN`, `CW_DOCKER_REGISTRY`, `CW_DOCKER_USER`, `CW_DOCKER_USER_PASSWORD`
+
+## Docker Hub Publish Workflow (`docker-hub-publish.yml`)
+
+Publishes the platform images to Docker Hub under the **`everco`** organisation (the org Ever
+Gauzy and Ever Teams publish to), so self-hosters can `docker pull everco/ever-works-api`.
+
+- **Trigger:** `workflow_run` on every completed `k8s-build` for `develop`, `stage` and `main`,
+  plus manual dispatch (`sha`, `move_latest`).
+- **Mechanism:** a registry-to-registry copy of `ghcr.io/ever-works/<image>:sha-<commit>` with
+  `docker buildx imagetools create` — the byte-identical image the clusters run, no rebuild.
+- **Images:** `ever-works-api`, `ever-works-web`, `ever-works-mcp`, `ever-works-docs`.
+
+| Branch    | Docker Hub repository             | Tags                                          |
+| --------- | --------------------------------- | --------------------------------------------- |
+| `main`    | `everco/ever-works-<image>`       | `latest`, `<release version>`, `sha-<commit>` |
+| `stage`   | `everco/ever-works-<image>-stage` | `latest`, `<release version>`, `sha-<commit>` |
+| `develop` | `everco/ever-works-<image>-dev`   | `latest`, `<release version>`, `sha-<commit>` |
+
+`latest` only moves when the commit is still the branch tip. Missing credentials, a failed copy,
+a digest mismatch or a repository that is not anonymously visible are hard errors.
+
+**Secrets Used:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (repository secrets — keep them off
+the org level, see the workflow header). **Variables:** `DOCKERHUB_NAMESPACE` (default
+`everco`), `DOCKERHUB_PUBLISH_ENABLED` (`false` switches it off).
+
+One-time setup: add the two repository secrets (an `everco` Organization Access Token with
+"repository create" + push, username `everco`; or a Read/Write/Delete PAT of an Owner/Editor of
+`everco`), keep `everco`'s default repository privacy at Public, then backfill with
+`gh workflow run docker-hub-publish.yml --ref <develop|stage|main>`.
+
+## npm Package Publish Workflow (`publish-plugins.yml`)
+
+Publishes `@ever-works/contracts`, `@ever-works/plugin` and every distributable plugin to
+**npmjs.org** (with provenance) and **GitHub Packages**, publicly, on every push to `main`.
+`scripts/release-npm-packages.mjs` fingerprints what each package would ship: an unchanged
+package is skipped, a changed one gets the next patch automatically (or its `package.json`
+version, when that was bumped on purpose — including by a pending changeset: the script reads
+`.changeset/*.md` itself and bumps only the packages a changeset names; `pnpm changeset version`
+is never run, because it would bump every plugin that peer-depends on the SDK to a major). Both registries receive the same tarball; sibling `@ever-works/*`
+dependencies are published as caret ranges.
+
+- **Manual dispatch:** `plan` (decide versions only) and `dry-run` run from any branch;
+  `publish` is refused anywhere but `main`.
+- **Every released package needs a `files` allow-list** (`"files": ["dist"]`). Without one
+  npm ships sources, tests and turbo's per-run build log, the fingerprint changes on every
+  build, and the package is refused.
+- **Private packages.** Every npm publish carries `--access public`, including for a package
+  that is currently private: npm applies the flag to an existing package exactly as
+  `npm access set status=public` would, so the publish is what makes it public. That is the
+  only route CI has. Since 2026-07-31 an npm granular access token configured to bypass 2FA —
+  exactly what `NPM_TOKEN` is — cannot change package access: `POST /-/package/<pkg>/access`
+  answers `403`, and npm's changelog lists "changing package access" among the operations that
+  now need an interactive 2FA challenge. The CLI's fallback is a browser approval per package,
+  and npmjs.com sits behind bot detection, so neither can be scripted. If npm ever refuses the flag, the version is published anyway, without it, and the
+  row is marked `⚠ published without --access`. GitHub Packages has no API for visibility at
+  all — flip a package under _Package settings → Change visibility_; the summary lists the
+  ones still private.
+
+**Secrets Used:** `NPM_TOKEN` — an npm granular access token, read and write on the
+`@ever-works` scope, "bypass 2FA", at most 90 days (npm's cap for write tokens; classic tokens
+were revoked on 2025-12-09). Rotate it when the job fails with 401 or `E404 PUT`. npm tries
+trusted publishing (OIDC) first, so packages configured with
+`npm trust github <name> --file publish-plugins.yml --repo ever-works/ever-works --allow-publish`
+need no token at all. `GITHUB_TOKEN` covers GitHub Packages.
 
 ## Kubernetes Deploy Workflows
 
@@ -322,9 +392,9 @@ flowchart LR
 | `JWT_SECRET`                                         | K8s deploys                   |
 | `AUTH_SECRET`                                        | K8s deploys                   |
 | `DIGITALOCEAN_ACCESS_TOKEN`                          | Docker builds, K8s deploys    |
-| `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`             | Docker builds                 |
+| `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`             | Docker Hub publish            |
 | `GITHUB_TOKEN`                                       | Docker builds (auto-provided) |
-| `NPM_TOKEN`                                          | CLI publish                   |
+| `NPM_TOKEN`                                          | CLI + npm package publish     |
 | `TRIGGER_ACCESS_TOKEN`                               | Trigger.dev deploys           |
 | `TRIGGER_ENABLED` / `SECRET_KEY` / `INTERNAL_SECRET` | K8s deploys                   |
 | `DATABASE_*` (7 vars)                                | K8s deploys                   |

@@ -46,8 +46,12 @@
  *     and errorCount stays 0 — a DISPATCH failure is NOT an execution failure,
  *     so it never advances the pauseAfterFailures counter (auto-pause into ERROR
  *     is worker-driven and unreachable without Trigger.dev — asserted truthfully)
- *   • run-now is state-gated: draft / paused → 409 'Agent is not in an ACTIVE
- *     state — pause / resume it first.'
+ *   • run-now is state-gated: draft → 409 'Agent is not in an ACTIVE state —
+ *     pause / resume it first.'; paused → 409 'This agent is paused. Resume it
+ *     first.' (AW-23 refuses a paused agent by name before any dispatch path —
+ *     AgentsController.runNow, pinned by agents.controller.pause.spec.ts and
+ *     the AW-23 spec §6.12 copy table; this one is taken from that source, not
+ *     from the original curl walk, which predates AW-23)
  *   • cross-user run-now / runs on another user's agent → 404 (no existence leak)
  *
  * Fully API-orchestrated; a FRESH registerUserViaAPI() owner per test (never the
@@ -61,6 +65,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const AGENTS = `${API_BASE}/api/agents`;
 const CADENCE_ERR = /Invalid heartbeatCadence/i;
 const INACTIVE_ERR = 'Agent is not in an ACTIVE state — pause / resume it first.';
+/** AW-23: run-now on a PAUSED agent is refused by name, ahead of the generic inactive gate. */
+const PAUSED_ERR = 'This agent is paused. Resume it first.';
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -597,14 +603,16 @@ test.describe('Agent heartbeat — run-now dispatch record + side-effects', () =
         expect(draftRun.status).toBe(409);
         expect(draftRun.body.message).toBe(INACTIVE_ERR);
 
-        // Activate, then pause; a paused agent is refused the same way.
+        // Activate, then pause; a paused agent is also refused 409, but by name
+        // (AW-23) — the controller checks PAUSED before it ever reaches the
+        // dispatcher's generic 'inactive' skip, so the copy differs from draft.
         await activate(request, token, agent.id);
         expect((await request.post(`${AGENTS}/${agent.id}/pause`, { headers: H })).status()).toBe(
             200,
         );
         const pausedRun = await runNow(request, token, agent.id);
         expect(pausedRun.status).toBe(409);
-        expect(pausedRun.body.message).toBe(INACTIVE_ERR);
+        expect(pausedRun.body.message).toBe(PAUSED_ERR);
 
         // A refused run-now created NO run row.
         expect((await listRuns(request, token, agent.id)).length).toBe(0);

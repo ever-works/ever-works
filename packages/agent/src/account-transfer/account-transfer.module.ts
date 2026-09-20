@@ -18,6 +18,7 @@ import { AgentsSkillsTasksImportService } from './agents-skills-tasks-import.ser
 import { AgentsModule } from '../agents/agents.module';
 import { SkillsModule } from '../skills/skills.module';
 import { TasksDomainModule } from '../tasks-domain/tasks.module';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { AccountExportWorkContentSource, BACKUP_WORK_CONTENT } from './backup/backup-work-content';
 import { WorkspaceBackupRunner } from './backup/workspace-backup-runner';
 import { WorkspaceBackupService } from './backup/workspace-backup.service';
@@ -54,6 +55,15 @@ import { WorkspaceBackupService } from './backup/workspace-backup.service';
         // environments; the archive is a complete artefact for keeping.
         WorkspaceBackupService,
         WorkspaceBackupRunner,
+        // The hourly sweep's mutex, for `WorkspaceBackupService.runSweep`.
+        // Provided here rather than taken from the caller because the caller
+        // is the Trigger worker, which has no DataSource and so cannot build
+        // a service that injects `@InjectRepository(CacheEntry)` at all. The
+        // repository token is already in scope through `DatabaseModule`,
+        // which does `TypeOrmModule.forFeature(ENTITIES)` — `CacheEntry`
+        // among them — and re-exports `TypeOrmModule`; the same wiring
+        // `NotificationsModule` and `ReleaseModule` use.
+        DistributedTaskLockService,
         // The Work content port. Bound HERE, where `AccountExportService`
         // already lives, so the archive reads each Work's items through the
         // very walk the JSON export uses and no second reader exists.

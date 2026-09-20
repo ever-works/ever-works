@@ -120,9 +120,20 @@ export const BACKUP_TRIM_POLICIES = Object.freeze({
 	runLogs: Object.freeze({ field: 'createdAt', defaultDays: 90, fullHistoryDays: 1095 }),
 	terminalTranscripts: Object.freeze({ field: 'createdAt', defaultDays: 30, fullHistoryDays: 365 }),
 	notifications: Object.freeze({ field: 'createdAt', defaultDays: 180, fullHistoryDays: 1095 }),
-	pluginUsageEvents: Object.freeze({ field: 'createdAt', defaultDays: 180, fullHistoryDays: 1095 }),
+	// `occurredAt`, not `createdAt`: `PluginUsageEvent` names its
+	// `@CreateDateColumn` `occurredAt` and has no `createdAt` at all. The trim
+	// resolver fails OPEN on an unknown column, so the wrong name here did not
+	// error — it silently exported every plugin usage event for the lifetime
+	// of the workspace, from the archive's single largest history table, while
+	// the docs page published a 180-day window.
+	pluginUsageEvents: Object.freeze({ field: 'occurredAt', defaultDays: 180, fullHistoryDays: 1095 }),
 	deliveryLogs: Object.freeze({ field: 'createdAt', defaultDays: 30, fullHistoryDays: 365 }),
-	triggerFires: Object.freeze({ field: 'createdAt', defaultDays: 90, fullHistoryDays: 1095 }),
+	// `firedAt`, for the same reason: `InboundTriggerFire`'s creation
+	// timestamp is `firedAt` and it has no `createdAt`, so the declared
+	// 90-day window was never applied to `data/schedules/trigger-fires.jsonl`
+	// and the `schedules` domain reported `complete` where the docs promise a
+	// trim.
+	triggerFires: Object.freeze({ field: 'firedAt', defaultDays: 90, fullHistoryDays: 1095 }),
 	retrievalTrail: Object.freeze({ field: 'createdAt', defaultDays: 30, fullHistoryDays: 365 }),
 	fleetJobs: Object.freeze({ field: 'createdAt', defaultDays: 30, fullHistoryDays: 365 })
 }) as Readonly<Record<string, BackupTrimWindow>>;

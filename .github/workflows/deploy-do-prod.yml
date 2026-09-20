@@ -148,7 +148,8 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: production
           # PostHog (server-side: analytics events, feature flag eval, logs).
-          # Same phc_* key used by NEXT_PUBLIC_POSTHOG_KEY at docker-build time.
+          # Server-side only (feature flags, API analytics). The published web
+          # images carry no browser key — see docker-build-publish-*.yml.
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
 

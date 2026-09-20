@@ -14,6 +14,7 @@ import {
     type WorkspaceBackupScope,
 } from '../../database/repositories/workspace-backup.repository';
 import { TenantRepository } from '../../database/repositories/tenant.repository';
+import { DistributedTaskLockService } from '../../cache/distributed-task-lock.service';
 import {
     WORKSPACE_BACKUP_DISPATCHER,
     type WorkspaceBackupDispatcher,
@@ -115,6 +116,12 @@ export class WorkspaceBackupService {
         private readonly activity?: BackupActivityRecorder,
         @Optional() @Inject(BACKUP_NOTIFIER) private readonly notifier?: BackupNotifier,
         @Optional() private readonly tenants?: TenantRepository,
+        // The hourly sweep's mutex, used by {@link runSweep}. Appended last
+        // and @Optional() like everything above it, so every existing
+        // construction site keeps compiling; with nothing bound the passes
+        // run unlocked, which is safe because each one is an idempotent
+        // compare-and-set.
+        @Optional() private readonly locks?: DistributedTaskLockService,
     ) {}
 
     /**
@@ -218,7 +225,7 @@ export class WorkspaceBackupService {
         if (used >= limits.dailyAllowance) {
             return {
                 kind: 'rate_limited',
-                retryAt: await this.nextAllowanceAt(scope, limits.dailyAllowance),
+                retryAt: await this.nextAllowanceAt(scope),
                 limit: limits.dailyAllowance,
             };
         }
@@ -487,20 +494,100 @@ export class WorkspaceBackupService {
 
         let failed = 0;
         for (const backup of stalled) {
-            if (backup.storageKey && this.storage) {
-                await this.storage.deleteArchive(backup.storageKey).catch(() => undefined);
-            }
-            const moved = await this.backups.markTerminal(backup.id, {
-                status: 'failed',
-                failureReason: 'stalled',
-                failureDetail: 'The backup stopped reporting progress',
-                finishedAt: now,
-                storageKey: null,
-                currentDomain: null,
-            });
-            if (moved) failed += 1;
+            if (await this.settleStalled(backup, now)) failed += 1;
         }
         return failed;
+    }
+
+    /**
+     * One backup, as the archive task watching it sees it — settled first
+     * if it has stopped reporting or run past its ceiling.
+     *
+     * The archive task starts the run and then watches the row, rather than
+     * holding an RPC open for the whole archive (see
+     * `WorkspaceBackupRunner.startFromPayload`). Watching is also what makes
+     * the task's notification reliable, so the two rules that end a run from
+     * the OUTSIDE are applied here, on every look, with the same thresholds
+     * the hourly sweeper uses:
+     *
+     *  - **stalled** (spec FR-5) — no heartbeat for `stallMinutes`, or still
+     *    queued after `queuedStallMinutes`. The API process that was
+     *    producing it died; nothing else will ever settle it, and the
+     *    sweeper only looks once an hour.
+     *  - **timeout** (spec FR-6) — running for `timeoutMinutes`, or the
+     *    watcher says it cannot wait any longer (`stop: 'timeout'`: its own
+     *    run is about to reach the job runtime's ceiling, and a watcher
+     *    that is killed raises no notification).
+     *
+     * Both are compare-and-sets out of an active status, so a run that
+     * settled a moment earlier keeps its own outcome, and the runner — whose
+     * heartbeat is bounded to `running` — sees the row leave `running`, stops
+     * between pages and discards anything it had already uploaded.
+     *
+     * Every time is read here, from this process's clock, so the watcher's
+     * clock never has to agree with it. Returns the row as it now stands, or
+     * `null` when it is not in this workspace.
+     */
+    async observeRun(
+        scope: WorkspaceBackupScope,
+        backupId: string,
+        options: { readonly stop?: 'timeout' } = {},
+    ): Promise<WorkspaceBackup | null> {
+        const backup = await this.backups.findInScope(scope, backupId);
+        if (!backup || (backup.status !== 'running' && backup.status !== 'queued')) {
+            return backup;
+        }
+
+        const now = new Date();
+        const limits = BACKUP_DEFAULT_LIMITS;
+        const minutesAgo = (minutes: number) => now.getTime() - minutes * 60 * 1000;
+        const time = (value: Date | string | null | undefined) =>
+            value ? new Date(value).getTime() : Number.NaN;
+
+        let moved = false;
+        if (backup.status === 'queued') {
+            if (time(backup.requestedAt) < minutesAgo(limits.queuedStallMinutes)) {
+                moved = await this.settleStalled(backup, now);
+            }
+        } else if (
+            options.stop === 'timeout' ||
+            time(backup.startedAt) <= minutesAgo(limits.timeoutMinutes)
+        ) {
+            moved = await this.backups.markTerminal(
+                backup.id,
+                {
+                    status: 'failed',
+                    failureReason: 'timeout',
+                    failureDetail: `The backup did not finish within ${limits.timeoutMinutes} minutes and was stopped`,
+                    finishedAt: now,
+                    currentDomain: null,
+                },
+                ['running'],
+            );
+        } else if (
+            // A row claimed without a heartbeat yet is measured from its claim.
+            (time(backup.lastHeartbeatAt) || time(backup.startedAt)) <
+            minutesAgo(limits.stallMinutes)
+        ) {
+            moved = await this.settleStalled(backup, now);
+        }
+
+        return moved ? this.backups.findInScope(scope, backupId) : backup;
+    }
+
+    /** Fail one backup as `stalled` and delete whatever partial object it left. */
+    private async settleStalled(backup: WorkspaceBackup, now: Date): Promise<boolean> {
+        if (backup.storageKey && this.storage) {
+            await this.storage.deleteArchive(backup.storageKey).catch(() => undefined);
+        }
+        return this.backups.markTerminal(backup.id, {
+            status: 'failed',
+            failureReason: 'stalled',
+            failureDetail: 'The backup stopped reporting progress',
+            finishedAt: now,
+            storageKey: null,
+            currentDomain: null,
+        });
     }
 
     /** Sweeper pass 3 — remove records whose bytes went long ago (spec FR-29). */
@@ -511,21 +598,70 @@ export class WorkspaceBackupService {
     }
 
     /**
+     * All three sweeper passes, each under its own distributed lock.
+     *
+     * The hourly cron used to take the locks itself, from the Trigger worker
+     * — which cannot construct `DistributedTaskLockService` at all: the lock
+     * injects `@InjectRepository(CacheEntry)` and the worker process has no
+     * TypeORM DataSource (every service it resolves is an RPC proxy). So the
+     * cron died with `Nest could not find WorkspaceBackupService element`
+     * before any pass ran: retention was never enforced, stalled backups
+     * were never failed — and because `create()` ADOPTS an active row, an
+     * owner whose worker died could never start another backup — and no
+     * record was ever pruned.
+     *
+     * Composing the three passes here, where the lock and the repositories
+     * live, is the same shape `CreditsSweepService.runDailySweep()` uses for
+     * the same reason. The individual passes stay public and unchanged: they
+     * are what the tests drive and what an operator can call one at a time.
+     *
+     * With no lock service bound (isolated unit tests, older deployments)
+     * the passes still run: every one of them is an idempotent
+     * compare-and-set, so a second replica duplicates work rather than
+     * corrupting it, and doing nothing would be the worse failure.
+     */
+    async runSweep(
+        now: Date = new Date(),
+        limit = 200,
+    ): Promise<{ expired: number; stalled: number; pruned: number }> {
+        const exclusively = async (key: string, pass: () => Promise<number>): Promise<number> => {
+            if (!this.locks) {
+                return pass();
+            }
+            const outcome = await this.locks.runExclusive(key, pass);
+            return outcome.result ?? 0;
+        };
+
+        return {
+            expired: await exclusively('workspace-backup:expire', () =>
+                this.expireDueArchives(now, limit),
+            ),
+            stalled: await exclusively('workspace-backup:stalls', () =>
+                this.failStalledBackups(now, limit),
+            ),
+            pruned: await exclusively('workspace-backup:prune', () =>
+                this.pruneOldRecords(now, limit),
+            ),
+        };
+    }
+
+    /**
      * When the daily allowance reopens: one day after the OLDEST ready
      * outcome still inside the window, which is the moment it leaves it.
+     *
+     * Asked of the database over exactly the set the refusal counted. It
+     * used to page the newest `allowance * 2` rows of ANY status and filter
+     * client-side, so the refusal and the retry time were measured over
+     * different row sets: four cancelled or failed attempts — which
+     * deliberately do not charge the allowance, so nothing stops an owner
+     * accumulating them — between the oldest ready backup and the newer ones
+     * pushed it off the page, and the 429 reported a wait later than the
+     * truth by the gap between the two, up to nearly a full day.
      */
-    private async nextAllowanceAt(scope: WorkspaceBackupScope, allowance: number): Promise<Date> {
-        const { rows } = await this.backups.listForScope(scope, { limit: allowance * 2 });
-        const readyStatuses = new Set(['ready', 'ready_with_gaps', 'expired', 'deleted']);
-        const inWindow = rows
-            .filter((row) => readyStatuses.has(row.status))
-            .filter((row) => new Date(row.requestedAt).getTime() >= Date.now() - MS_PER_DAY)
-            .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
-
-        const oldest = inWindow[0];
-        return new Date(
-            (oldest ? new Date(oldest.requestedAt).getTime() : Date.now()) + MS_PER_DAY,
-        );
+    private async nextAllowanceAt(scope: WorkspaceBackupScope): Promise<Date> {
+        const since = new Date(Date.now() - MS_PER_DAY);
+        const oldest = await this.backups.oldestReadyInWindow(scope, since);
+        return new Date((oldest ? oldest.getTime() : Date.now()) + MS_PER_DAY);
     }
 
     private tokenPayload(scope: WorkspaceBackupScope, backupId: string, expiry: number): string {

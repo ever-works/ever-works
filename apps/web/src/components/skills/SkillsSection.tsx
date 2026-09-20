@@ -7,15 +7,22 @@ import type { SkillsPageData, SkillsPageFilters } from '@/lib/skills-page-data';
 import { SkillsPageClient } from './SkillsPageClient';
 
 /**
- * Navigation consolidation (docs/specs/features/navigation-consolidation §3.5):
- * the Skills catalog is a block on the Agents tab rather than its own sidebar
- * entry — nobody browses Skills without an Agent in mind. `/skills` (index)
- * redirects to `/agents#skills`; the detail routes are unchanged.
+ * The Skills catalog — now the **Skills** sub-tab of the Agents hub, at
+ * `/agents/skills`, beside Agents and Activity.
+ *
+ * It has been two other things: the standalone `/skills` page (until navigation
+ * consolidation, docs/specs/features/navigation-consolidation §3.5) and then an
+ * `#skills` anchor block at the bottom of the Agents catalog, because nobody
+ * browses Skills without an Agent in mind. The anchor was the compromise that
+ * kept the catalog reachable without a nav entry; a sub-tab gives it a real URL,
+ * its own filters in the address bar, and a page that does not re-issue the
+ * Agents list on every filter click. `/skills` and `/agents#skills` both
+ * redirect here.
  *
  * Server component: it only reads translations and forwards already-fetched
  * data. `SkillsPageClient` inside is the client island that owns the
- * section/search state, pointed at `/agents` + `#skills` so its `router.replace`
- * keeps the reader on this page and on this anchor.
+ * section/search state, pointed at this page's own path so its `router.replace`
+ * keeps the reader here.
  */
 export async function SkillsSection({
     data,
@@ -31,7 +38,7 @@ export async function SkillsSection({
         <section
             id="skills"
             data-testid="agents-skills-section"
-            className="mt-10 rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 sm:p-6"
+            className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 sm:p-6"
         >
             <PageHeader
                 icon={Sparkles}
@@ -65,8 +72,7 @@ export async function SkillsSection({
             <SkillsPageClient
                 {...data}
                 filters={filters}
-                basePath={ROUTES.DASHBOARD_AGENTS}
-                hash="#skills"
+                basePath={ROUTES.DASHBOARD_AGENTS_SKILLS}
             />
         </section>
     );

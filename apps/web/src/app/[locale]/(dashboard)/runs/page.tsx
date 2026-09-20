@@ -1,97 +1,37 @@
-import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
-import type { RunLedgerPage, RunWindowStats } from '@ever-works/contracts';
-import { Link } from '@/i18n/navigation';
-import { ROUTES } from '@/lib/constants';
-import { agentsAPI } from '@/lib/api/agents';
-import { notificationPreferencesAPI } from '@/lib/api/notification-preferences';
-import { runsAPI } from '@/lib/api/runs';
-import { RunsClient } from '@/components/runs/RunsClient';
-import { parseRunsViewState } from '@/components/runs/runs.shared';
+import { getLocale } from 'next-intl/server';
+import { redirect } from '@/i18n/navigation';
+import { ACTIVITY_VIEW_PARAM } from '../activity/activity-views';
 
-export async function generateMetadata(): Promise<Metadata> {
-    const t = await getTranslations('metadata.pages');
-    return { title: t('runs') };
-}
+type SearchParams = Record<string, string | string[] | undefined>;
+
+/** Query names the ledger owns, in the order they should be re-emitted. */
+const RUNS_PARAMS = ['g', 'd', 'agent', 'kind', 'status', 'q', 'work', 'mission', 'run'] as const;
 
 /**
- * Runs ledger (AW-09) — `/runs`: every agent run on a Day / Week / Month
- * calendar, the window's totals beside it, and a receipt per run.
+ * `/runs` — RETIRED as a page: the Runs ledger is now the **Runs view of the
+ * Activity page** (`/activity?view=runs`), so "what did my agents execute, and
+ * what did it cost" sits in the same place as the rest of the workspace's
+ * history instead of beside it.
  *
- * A calendar-shaped reader over the same run rows the Sessions tab lists
- * (which keeps working exactly as before and is linked from here). The view
- * lives in the URL; the timezone is the viewer's profile timezone, UTC when
- * the profile has none. The list and the totals are fetched independently
- * with `allSettled`, so one failing never renders the page as an error.
+ * Kept as a redirect rather than deleted so every bookmark, dashboard tile,
+ * help article and e2e journey written against `/runs` keeps working — and so
+ * does the VIEW it named: all nine of the ledger's parameters ride along, which
+ * is what makes `/runs?g=month&status=failed` land on that exact window rather
+ * than on a default one.
  */
-export default async function RunsPage({
+export default async function RunsRedirect({
     searchParams,
 }: {
-    searchParams: Promise<Record<string, string | string[] | undefined>>;
+    searchParams?: Promise<SearchParams>;
 }) {
-    const raw = await searchParams;
-    const source = {
-        get: (name: string) => {
-            const value = raw[name];
-            return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
-        },
-    };
-    const view = parseRunsViewState(source);
-
-    const timeZone = await notificationPreferencesAPI
-        .getPreferences()
-        .then((prefs) => prefs.preference?.timezone || 'UTC')
-        .catch(() => 'UTC');
-
-    const query = {
-        granularity: view.granularity,
-        date: view.date ?? undefined,
-        timezone: timeZone,
-        filters: view.filters,
-    };
-    const [page, stats, agents] = await Promise.allSettled([
-        runsAPI.list(query),
-        runsAPI.stats(query),
-        agentsAPI.list({ limit: 200 }).then((response) => response.data),
-    ]);
-
-    const t = await getTranslations('dashboard.runsPage');
-
-    return (
-        <div className="w-full space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                        {t('subtitle')}
-                    </p>
-                </div>
-                <Link
-                    href={ROUTES.DASHBOARD_AGENT_SESSIONS}
-                    className="text-xs text-primary hover:underline"
-                    data-testid="runs-open-sessions"
-                >
-                    {t('openSessions')}
-                </Link>
-            </div>
-            <RunsClient
-                initialView={view}
-                granularityFromUrl={source.get('g') !== null}
-                timeZone={timeZone}
-                initialPage={page.status === 'fulfilled' ? (page.value as RunLedgerPage) : null}
-                initialStats={stats.status === 'fulfilled' ? (stats.value as RunWindowStats) : null}
-                agents={
-                    agents.status === 'fulfilled'
-                        ? agents.value.map((agent) => ({
-                              id: agent.id,
-                              name: agent.name,
-                              archived: agent.status === 'archived',
-                          }))
-                        : []
-                }
-            />
-        </div>
-    );
+    const params = (await searchParams) ?? {};
+    const target = new URLSearchParams();
+    target.set(ACTIVITY_VIEW_PARAM, 'runs');
+    for (const name of RUNS_PARAMS) {
+        const raw = params[name];
+        const value = Array.isArray(raw) ? raw[0] : raw;
+        if (value) target.set(name, value);
+    }
+    const locale = await getLocale();
+    redirect({ href: `/activity?${target.toString()}`, locale });
 }

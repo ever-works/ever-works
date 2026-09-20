@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Mail } from 'lucide-react';
 import { CreateFirstOrgBanner } from '@/components/organizations/CreateFirstOrgBanner';
+import { TimeZoneSetting } from './TimeZoneSetting';
 
 interface ProfileSettingsProps {
     user: {
@@ -20,9 +21,15 @@ interface ProfileSettingsProps {
         /** EW-602: per-user opt-out for budget alert emails. Defaults to true server-side. */
         emailBudgetAlerts?: boolean;
     };
+    /**
+     * Owner 2026-09-18 — the account's profile time zone, or null when it has
+     * never been set (the product then falls back to UTC). Read server-side
+     * from the notification preferences, which is where the product keeps it.
+     */
+    timezone?: string | null;
 }
 
-export function ProfileSettings({ user }: ProfileSettingsProps) {
+export function ProfileSettings({ user, timezone = null }: ProfileSettingsProps) {
     const [isPending, startTransition] = useTransition();
     const [isResending, startResendTransition] = useTransition();
     const [username, setUsername] = useState(user.username);
@@ -179,6 +186,11 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
                         {t('budgetAlerts.toggleLabel')}
                     </label>
                 </div>
+
+                {/* Owner 2026-09-18 — local time or UTC, saved on its own
+                    (the profile time zone is a full-replace write, so it is
+                    not part of the profile form's Save). */}
+                <TimeZoneSetting timezone={timezone} />
 
                 {/* Save Button */}
                 <div className="flex justify-end">

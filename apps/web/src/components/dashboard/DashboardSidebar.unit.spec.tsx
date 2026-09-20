@@ -142,12 +142,28 @@ describe('DashboardSidebar — navigation consolidation', () => {
         expect(labels.indexOf('navigation.memory')).toBe(labels.indexOf('navigation.teams') + 1);
     });
 
-    it('lists Runs (AW-09) directly above Activity, linking to /runs', () => {
+    it('lists Activity once, and neither Runs nor Schedules — both are its views now', () => {
         const { container } = renderSidebar();
         const labels = navLinks(container).map((a) => a.textContent?.trim());
 
-        expect(labels.indexOf('navigation.runs')).toBe(labels.indexOf('navigation.activity') - 1);
-        expect(linkFor(container, 'navigation.runs')?.getAttribute('href')).toBe('/runs');
+        expect(labels.filter((l) => l === 'navigation.activity')).toHaveLength(1);
+        // Runs (AW-09) and Schedules were each their own page; both turned out
+        // to be views of the same rows, so their sidebar entries are gone.
+        expect(labels).not.toContain('navigation.runs');
+        expect(labels).not.toContain('navigation.schedules');
+        expect(linkFor(container, 'navigation.activity')?.getAttribute('href')).toBe('/activity');
+    });
+
+    it('keeps Activity lit on the retired /runs and /schedules paths, which still redirect', () => {
+        for (const path of ['/activity', '/runs', '/schedules']) {
+            nav.pathname = path;
+            const { container, unmount } = renderSidebar();
+            expect(
+                isActive(linkFor(container, 'navigation.activity')),
+                `Activity should be active on ${path}`,
+            ).toBe(true);
+            unmount();
+        }
     });
 });
 

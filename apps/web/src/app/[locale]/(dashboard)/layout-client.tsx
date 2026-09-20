@@ -22,10 +22,13 @@ import { WhatsNewPanel } from '@/components/whats-new/WhatsNewPanel';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
 import {
+    adoptableChatPanelWidth,
     ChatPanelProvider,
     CHAT_PANEL_MIN_WIDTH,
     chatPanelWidthForKey,
+    readSavedChatPanelWidth,
     resetChatPanelWidth,
+    useChatPanelWidth,
 } from '@/lib/hooks/use-chat-panel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
@@ -118,7 +121,6 @@ export function DashboardLayoutClient({
     appLauncherEnabled = false,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
-    const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
     // Tab the Help drawer opens on when a palette command asks for one.
@@ -133,8 +135,9 @@ export function DashboardLayoutClient({
     const [onboardingOpenManually, setOnboardingOpenManually] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
     const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
-    const [chatWidth, setChatWidth] = useState<number>(DEFAULT_CHAT_WIDTH);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
+    // Owns the resizable width and its localStorage round-trip (EW-817).
+    const [chatWidth, setChatWidth] = useChatPanelWidth(isChatExpanded);
     const chatRef = useRef<HTMLDivElement | null>(null);
 
     // Server-authoritative onboarding state; mutated optimistically by the
@@ -196,59 +199,39 @@ export function DashboardLayoutClient({
         !isOnboardingCompleted &&
         !headerDismissed;
 
-    const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
-        setChatOpenRaw(value);
-        document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${getCookieOpts()}`;
+    const setChatOpen = useCallback(
+        (value: boolean, resetOnOpen = true) => {
+            setChatOpenRaw(value);
+            document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${getCookieOpts()}`;
 
-        if (value) {
-            if (resetOnOpen) {
-                // When reopening the chat normally, reset to resizable (non-expanded) mode
-                // and restore the last saved resizable width if available.
-                setIsChatExpanded(false);
+            if (value) {
+                if (resetOnOpen) {
+                    // When reopening the chat normally, reset to resizable (non-expanded) mode
+                    // and restore the last saved resizable width if available.
+                    setIsChatExpanded(false);
+                    setMainStyle(undefined);
+                    // Through the hook's reader, which falls back to the
+                    // default on a value `parseInt` would turn into NaN. The
+                    // raw read this replaces committed that NaN: the panel
+                    // rendered `width: NaNpx` (dropped by CSSOM, so no explicit
+                    // width at all) and the handle published
+                    // `aria-valuenow="NaN"`.
+                    setChatWidth(adoptableChatPanelWidth(readSavedChatPanelWidth()));
+                }
+            } else {
+                // If closing chat, clear any main-style overrides so layout returns to normal
                 setMainStyle(undefined);
-                try {
-                    const v = localStorage.getItem('chat-width');
-                    setChatWidth(v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH);
-                } catch (e) {}
             }
-        } else {
-            // If closing chat, clear any main-style overrides so layout returns to normal
-            setMainStyle(undefined);
-        }
-    }, []);
+        },
+        [setChatWidth],
+    );
 
+    // The chat width's own read-back-and-persist pair lives in `useChatPanelWidth`
+    // (EW-817). Only the viewport probe is left here.
     useEffect(() => {
-        try {
-            const v = localStorage.getItem('chat-width');
-            const savedWidth = v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH;
-            setChatWidth(Number.isFinite(savedWidth) ? savedWidth : DEFAULT_CHAT_WIDTH);
-        } catch (e) {}
-
         try {
             setIsMobile(window.innerWidth < 768);
         } catch (e) {}
-    }, []);
-
-    useEffect(() => {
-        try {
-            // Only persist the width when the chat is in resizable (non-expanded) mode.
-            // This prevents the expanded width from overwriting the user's preferred
-            // resizable width in localStorage.
-            if (!isChatExpanded) {
-                localStorage.setItem('chat-width', String(chatWidth));
-            }
-        } catch {}
-    }, [chatWidth, isChatExpanded]);
-
-    useEffect(() => {
-        try {
-            const savedWidth = localStorage.getItem('chat-width');
-            if (savedWidth) {
-                setChatWidth(parseInt(savedWidth, 10));
-            }
-        } catch {}
-
-        setIsMobile(window.innerWidth < 768);
     }, []);
 
     const computeMainStyle = useCallback(() => {
@@ -290,14 +273,11 @@ export function DashboardLayoutClient({
         return () => window.removeEventListener('resize', onResize);
     }, [computeMainStyle, sidebarCollapsed, chatWidth, chatOpen]);
 
-    // Ensure persisted chat width does not exceed 50% of viewport on mount
-    useEffect(() => {
-        try {
-            const max = Math.floor(window.innerWidth * 0.5);
-            if (chatWidth > max) setChatWidth(Math.max(240, max));
-        } catch (e) {}
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // The "persisted width must not exceed half the viewport" guard that used
+    // to live here now runs inside `useChatPanelWidth`, as
+    // `adoptableChatPanelWidth`. It had `[]` deps, so it closed over the first
+    // render's width — always the default — and fired only below 760px; the
+    // width it was written to clamp was never the width it compared.
 
     // Drag behavior: attach pointermove/up when drag starts to ensure immediate response
 
@@ -412,12 +392,9 @@ export function DashboardLayoutClient({
         if (isChatExpanded) {
             setIsChatExpanded(false);
             setMainStyle(undefined);
-            try {
-                const v = localStorage.getItem('chat-width');
-                setChatWidth(v ? parseInt(v, 10) : DEFAULT_CHAT_WIDTH);
-            } catch (e) {}
+            setChatWidth(adoptableChatPanelWidth(readSavedChatPanelWidth()));
         }
-    }, [isChatExpanded]);
+    }, [isChatExpanded, setChatWidth]);
 
     const handleCollapse = useCallback(() => {
         if (chatOpen) {
@@ -428,8 +405,17 @@ export function DashboardLayoutClient({
             // Reopening always resets to resizable default width via setChatOpen
             setChatOpen(true);
         }
+        // Leaving expanded mode has to put the resizable width back in the
+        // SAME batch as the flag — see the contract on `useChatPanelWidth`.
+        // Without this the persist effect saw `isChatExpanded: false` with
+        // `chatWidth` still at the expanded value and wrote THAT to storage,
+        // so one click of the collapse chevron replaced the user's saved
+        // width with the expanded one, for good.
+        if (isChatExpanded) {
+            setChatWidth(adoptableChatPanelWidth(readSavedChatPanelWidth()));
+        }
         setIsChatExpanded(false);
-    }, [chatOpen, chatWidth, setChatOpen]);
+    }, [chatOpen, chatWidth, isChatExpanded, setChatOpen, setChatWidth]);
 
     const handleExpand = useCallback(() => {
         // expand chat to fill available space (viewport minus sidebar and controls)
@@ -441,37 +427,40 @@ export function DashboardLayoutClient({
         // Open chat without resetting expanded state
         setChatOpen(true, false);
         setIsChatExpanded(true);
-    }, [chatWidth, setChatOpen, sidebarCollapsed]);
+    }, [chatWidth, setChatOpen, setChatWidth, sidebarCollapsed]);
 
-    const startDrag = useCallback((e: React.PointerEvent<Element>) => {
-        e.preventDefault();
-        // Use currentTarget/target cast to Element to call setPointerCapture
-        (e.target as Element).setPointerCapture?.(e.pointerId);
+    const startDrag = useCallback(
+        (e: React.PointerEvent<Element>) => {
+            e.preventDefault();
+            // Use currentTarget/target cast to Element to call setPointerCapture
+            (e.target as Element).setPointerCapture?.(e.pointerId);
 
-        const handlePointerMove = (ev: PointerEvent) => {
-            if (!chatRef.current) return;
-            const rect = chatRef.current.getBoundingClientRect();
-            const maxWidth = Math.floor(window.innerWidth * 0.5);
-            const pointerWidth = Math.max(0, ev.clientX - rect.left);
-            const newWidth = Math.max(350, Math.min(maxWidth, pointerWidth));
-            setChatWidth(newWidth);
-            setIsChatExpanded(false);
-        };
+            const handlePointerMove = (ev: PointerEvent) => {
+                if (!chatRef.current) return;
+                const rect = chatRef.current.getBoundingClientRect();
+                const maxWidth = Math.floor(window.innerWidth * 0.5);
+                const pointerWidth = Math.max(0, ev.clientX - rect.left);
+                const newWidth = Math.max(350, Math.min(maxWidth, pointerWidth));
+                setChatWidth(newWidth);
+                setIsChatExpanded(false);
+            };
 
-        const handlePointerUp = (ev: PointerEvent) => {
-            window.removeEventListener('pointermove', handlePointerMove);
-            window.removeEventListener('pointerup', handlePointerUp);
-        };
+            const handlePointerUp = (ev: PointerEvent) => {
+                window.removeEventListener('pointermove', handlePointerMove);
+                window.removeEventListener('pointerup', handlePointerUp);
+            };
 
-        window.addEventListener('pointermove', handlePointerMove);
-        window.addEventListener('pointerup', handlePointerUp);
-    }, []);
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+        },
+        [setChatWidth],
+    );
 
     // Double-click on the handle puts the width back to the default (FR-17).
     const resetChatWidth = useCallback(() => {
         setChatWidth(resetChatPanelWidth(window.innerWidth));
         setIsChatExpanded(false);
-    }, []);
+    }, [setChatWidth]);
 
     // With the handle focused: ←/→ resize by 16 px, Home resets (spec §6.12).
     const handleResizeKey = useCallback(
@@ -482,7 +471,7 @@ export function DashboardLayoutClient({
             setChatWidth(next);
             setIsChatExpanded(false);
         },
-        [chatWidth],
+        [chatWidth, setChatWidth],
     );
 
     return (

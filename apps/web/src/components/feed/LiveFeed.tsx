@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { FEED_KINDS, type FeedActorSummaryDto, type FeedPageDto } from '@ever-works/contracts';
 import { getFeedActors, getFeedPage } from '@/app/actions/feed';
 import { useRouter } from '@/i18n/navigation';
+import { ActivityViewHeader } from '@/components/activity-log/ActivityViewHeader';
 import { useFeedPaging } from '@/lib/hooks/use-feed-paging';
 import { useFeedUpdates, type FeedUpdateTransport } from '@/lib/hooks/use-feed-updates';
 import { FeedAgentPicker } from './FeedAgentPicker';
@@ -314,22 +315,16 @@ export function LiveFeed({
 
     return (
         <section data-testid="live-feed" aria-labelledby="live-feed-title" className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-                <div>
-                    <h2
-                        id="live-feed-title"
-                        className="text-base font-semibold text-text dark:text-text-dark"
-                    >
-                        {t('title')}
-                    </h2>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {t('subtitle')}
-                    </p>
-                </div>
-                <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {t('refreshNote')}
-                </span>
-            </div>
+            <ActivityViewHeader
+                titleId="live-feed-title"
+                title={t('title')}
+                subtitle={t('subtitle')}
+                aside={
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('refreshNote')}
+                    </span>
+                }
+            />
 
             <FeedFilters
                 filters={filters}

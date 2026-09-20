@@ -74,7 +74,16 @@ describe('LocalFsStoragePlugin — streaming put and get', () => {
 		const got = await plugin.getObjectStream(put.key);
 		expect(got.size).toBe(expected.length);
 		expect(got.mimeType).toBe('application/zip');
-		expect(await drain(got.stream)).toEqual(expected);
+		// Byte for byte, via `Buffer.equals` rather than `toEqual`. They make the
+		// same claim, but `toEqual` walks a Buffer element by element: measured
+		// at 5.9 s for these 768 KiB on a developer machine against 1 ms for
+		// `equals`, which pushed the test past its 30 s budget on a loaded CI
+		// runner and reddened `main`. The first differing offset is reported on
+		// a mismatch, so a failure stays as diagnosable as the diff would be.
+		const actual = await drain(got.stream);
+		expect(actual.length).toBe(expected.length);
+		const firstDifference = actual.equals(expected) ? -1 : actual.findIndex((byte, i) => byte !== expected[i]);
+		expect(firstDifference, `the round-tripped stream differs at byte ${firstDifference}`).toBe(-1);
 	}, 30_000);
 
 	it('keys the object by the digest of the streamed bytes, exactly as putObject does', async () => {

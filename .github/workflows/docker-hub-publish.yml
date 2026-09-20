@@ -1,0 +1,414 @@
+name: Publish Images to Docker Hub
+
+# Publishes the Ever Works container images to Docker Hub under the `everco`
+# organisation — the same org Ever Gauzy (`everco/gauzy-api`) and Ever Teams
+# (`everco/ever-teams-webapp`) publish to — so self-hosters can
+# `docker pull everco/ever-works-api` without touching GHCR.
+#
+#   branch   Docker Hub repository                 tags
+#   -------  ------------------------------------  -----------------------------------------
+#   main     everco/ever-works-{api,web,mcp,docs}  latest, <release version>, sha-<commit>
+#   stage    everco/ever-works-<image>-stage       latest, <release version>, sha-<commit>
+#   develop  everco/ever-works-<image>-dev         latest, <release version>, sha-<commit>
+#
+# 🛑 A MIRROR, NOT A BUILD. This copies the images `k8s-build.yml` already
+# published to GHCR (`ghcr.io/ever-works/<image>:sha-<commit>`) registry-to-
+# registry with `docker buildx imagetools create`. Nothing is rebuilt, so:
+#   - Docker Hub serves the byte-identical image the clusters run (same digest);
+#   - the 3-4 h production build is not repeated on the shared runner pool;
+#   - no deploy lane depends on Docker Hub: a Docker Hub outage turns THIS
+#     workflow red and nothing else.
+# The public web image carries no analytics key: neither k8s-build nor
+# `docker-build-publish-*.yml` bakes NEXT_PUBLIC_POSTHOG_KEY into the bundle.
+#
+# 🛑 FAILS LOUDLY. Until 2026-09 the `docker-build-publish-*.yml` lanes pushed
+# to Docker Hub with `continue-on-error: true` while no DOCKERHUB_* secret
+# existed on this repo: every run logged "Username and password required",
+# then "push access denied", and still went green. Nothing ever reached
+# Docker Hub and nobody noticed. Missing credentials, a missing source image,
+# a failed copy, a digest mismatch and a repository that is not publicly
+# pullable are all hard errors here.
+#
+# Credentials — repository secrets on ever-works/ever-works. Keep them
+# REPO-scoped, not org-scoped: Work repos generated from
+# directory-web-template carry Docker Hub steps that switch on as soon as these
+# secrets are visible to them, and those sites are private.
+#   DOCKERHUB_USERNAME  Docker Hub account (or org name, for an Organization
+#                       Access Token) with write access to the namespace.
+#   DOCKERHUB_TOKEN     Organization Access Token (org scope "repository
+#                       create" + image push on everco/ever-works*), or a
+#                       Personal Access Token (Read, Write, Delete) of an
+#                       Owner/Editor of the org. A Read & Write PAT can push
+#                       but not pre-create repositories through the Hub API.
+# Variables (optional):
+#   DOCKERHUB_NAMESPACE        defaults to `everco`.
+#   DOCKERHUB_PUBLISH_ENABLED  set to `false` to switch the mirror off.
+#
+# Docs: docs/devops/github-workflows-deep-dive.md (Docker Hub Publish Workflow)
+# Internal runbook: Workspace/knowledge/infrastructure/EVER_WORKS_DOCKER_HUB.md
+
+on:
+  # `workflow_run` only fires from the copy of this file on the DEFAULT branch
+  # (develop), for k8s-build runs on any of the listed branches.
+  workflow_run:
+    workflows: [k8s-build]
+    types: [completed]
+    branches: [develop, stage, main, master]
+
+  # Manual (re)publish: pick the branch in the "Use workflow from" selector.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit whose ghcr.io sha-<commit> images to publish (default: the selected branch tip)'
+        required: false
+        type: string
+        default: ''
+      move_latest:
+        description: 'Also move :latest (only honoured when the commit is still the branch tip)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: read
+
+# One publish at a time per branch, never cancelled mid-run. A group keeps only
+# one PENDING run, so runs that will publish nothing — k8s-build runs that were
+# cancelled or skipped (every superseded pending develop build ends that way,
+# often minutes apart) — get a throwaway group of their own and can never
+# displace a real publish waiting in the branch group.
+concurrency:
+  group: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.conclusion != 'failure') && format('docker-hub-publish-noop-{0}', github.run_id) || format('docker-hub-publish-{0}', github.event.workflow_run.head_branch || github.ref_name) }}
+  cancel-in-progress: false
+
+env:
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'everco' }}
+
+jobs:
+  resolve:
+    name: Resolve commit, channel and tags
+    # GitHub-hosted on purpose: this job only talks to api.github.com and holds
+    # no build. The self-hosted pools are reserved for work that needs them.
+    runs-on: ubuntu-latest
+    # A `failure` still runs: k8s-build's matrix is fail-fast: false, so the
+    # legs that succeeded did publish their sha tag.
+    if: >-
+      vars.DOCKERHUB_PUBLISH_ENABLED != 'false' &&
+      (github.event_name == 'workflow_dispatch' ||
+       ((github.event.workflow_run.event == 'push' ||
+         github.event.workflow_run.event == 'workflow_dispatch') &&
+        (github.event.workflow_run.conclusion == 'success' ||
+         github.event.workflow_run.conclusion == 'failure')))
+    outputs:
+      sha: ${{ steps.r.outputs.sha }}
+      suffix: ${{ steps.r.outputs.suffix }}
+      version: ${{ steps.r.outputs.version }}
+      move_latest: ${{ steps.r.outputs.move_latest }}
+      upstream_ok: ${{ steps.r.outputs.upstream_ok }}
+    steps:
+      - id: r
+        name: Resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          DISPATCH_BRANCH: ${{ github.ref_name }}
+          DISPATCH_SHA: ${{ inputs.sha }}
+          DISPATCH_MOVE_LATEST: ${{ inputs.move_latest }}
+          HAS_USERNAME: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+          HAS_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+
+          # Checked once, here, so a missing credential is one clear error
+          # instead of four identical ones across the matrix.
+          if [ "${HAS_USERNAME}" != "true" ] || [ "${HAS_TOKEN}" != "true" ]; then
+            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are not set on ${GITHUB_REPOSITORY}. Add them as REPOSITORY secrets (not org secrets) — see the header of .github/workflows/docker-hub-publish.yml — or set the repository variable DOCKERHUB_PUBLISH_ENABLED=false to switch this workflow off."
+            exit 1
+          fi
+
+          if [ "${EVENT}" = "workflow_run" ]; then
+            BRANCH="${RUN_BRANCH}"
+            SHA="${RUN_SHA}"
+            WANT_LATEST=true
+            # A k8s-build matrix leg can fail while the others published; the
+            # mirror still publishes every image whose source tag exists.
+            UPSTREAM_OK=$([ "${RUN_CONCLUSION}" = "success" ] && echo true || echo false)
+          else
+            BRANCH="${DISPATCH_BRANCH}"
+            SHA="${DISPATCH_SHA:-${GITHUB_SHA}}"
+            WANT_LATEST="${DISPATCH_MOVE_LATEST:-true}"
+            UPSTREAM_OK=true
+          fi
+
+          case "${BRANCH}" in
+            main|master) SUFFIX="" ;;
+            stage) SUFFIX="-stage" ;;
+            develop) SUFFIX="-dev" ;;
+            *)
+              echo "::error::Branch '${BRANCH}' has no Docker Hub channel (only main/master, stage, develop)."
+              exit 1
+              ;;
+          esac
+
+          SHA="$(printf '%s' "${SHA}" | tr '[:upper:]' '[:lower:]')"
+          if ! printf '%s' "${SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::'${SHA}' is not a full 40-character commit SHA."
+            exit 1
+          fi
+
+          # :latest follows the same rule as k8s-build's moving tag: only the
+          # commit that is STILL the branch tip may move it, so a slow, older
+          # run can never roll :latest back behind a newer one.
+          TIP="$(gh api "repos/${REPO}/git/ref/heads/${BRANCH}" --jq '.object.sha' 2>/dev/null || true)"
+          MOVE_LATEST=false
+          if [ "${WANT_LATEST}" = "true" ]; then
+            if [ -z "${TIP}" ]; then
+              echo "::warning::Could not resolve the ${BRANCH} tip; leaving :latest where it is."
+            elif [ "${TIP}" = "${SHA}" ]; then
+              MOVE_LATEST=true
+            else
+              echo "::notice::${BRANCH} advanced to ${TIP}; publishing immutable tags only. That commit's own run moves :latest."
+            fi
+          fi
+
+          # The release version is the vX.Y.Z tag release-{dev,stage,prod}.yml
+          # put on this exact commit (lightweight tags, so the ref points at
+          # the commit itself). Optional: without one the image still gets
+          # :sha-<commit> (and :latest).
+          VERSION="$(
+            gh api "repos/${REPO}/git/matching-refs/tags/v" --paginate \
+              --jq ".[] | select(.object.type == \"commit\" and .object.sha == \"${SHA}\") | .ref" \
+            | sed 's#^refs/tags/v##' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1 || true
+          )"
+          if [ -z "${VERSION}" ]; then
+            echo "::notice::No vX.Y.Z release tag points at ${SHA}; publishing without a version tag."
+          fi
+
+          {
+            echo "sha=${SHA}"
+            echo "suffix=${SUFFIX}"
+            echo "version=${VERSION}"
+            echo "move_latest=${MOVE_LATEST}"
+            echo "upstream_ok=${UPSTREAM_OK}"
+          } >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH} sha=${SHA} suffix='${SUFFIX}' version='${VERSION}' move_latest=${MOVE_LATEST} upstream_ok=${UPSTREAM_OK}"
+
+  publish:
+    name: ${{ matrix.image }}
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every image k8s-build.yml publishes. Adding one there? Add it here.
+        image: [ever-works-api, ever-works-web, ever-works-mcp, ever-works-docs]
+    env:
+      SHA: ${{ needs.resolve.outputs.sha }}
+      SUFFIX: ${{ needs.resolve.outputs.suffix }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+      MOVE_LATEST: ${{ needs.resolve.outputs.move_latest }}
+      UPSTREAM_OK: ${{ needs.resolve.outputs.upstream_ok }}
+      IMAGE: ${{ matrix.image }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: src
+        name: Locate the source image on GHCR
+        run: |
+          set -euo pipefail
+          OWNER="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          SRC="ghcr.io/${OWNER}/${IMAGE}:sha-${SHA}"
+          # Only a definite "not found" may skip an image, and only when its
+          # k8s-build leg failed. Anything else (403 on the token exchange,
+          # 5xx, timeout) is retried and then fails the job: skipping on it
+          # would drop an image that was built, behind a green run.
+          DIGEST=""
+          for attempt in 1 2 3; do
+            if OUT="$(docker buildx imagetools inspect "${SRC}" --format '{{json .Manifest}}' 2>&1)" \
+               && DIGEST="$(printf '%s' "${OUT}" | jq -er '.digest')"; then
+              break
+            fi
+            DIGEST=""
+            if printf '%s' "${OUT}" | grep -q ': not found$'; then
+              if [ "${UPSTREAM_OK}" = "true" ]; then
+                echo "::error::${SRC} does not exist although k8s-build succeeded for ${SHA}."
+                exit 1
+              fi
+              echo "::warning::${SRC} does not exist — its k8s-build leg failed. Skipping ${IMAGE}."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::warning::Inspecting ${SRC} failed (attempt ${attempt}/3): ${OUT}"
+            sleep $((attempt * 15))
+          done
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::Could not inspect ${SRC} after 3 attempts."
+            exit 1
+          fi
+          echo "src=${SRC}" >> "$GITHUB_OUTPUT"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "${SRC} -> ${DIGEST}"
+
+      # Create the repository up front as PUBLIC. A first `docker push` would
+      # also create it, but with the namespace's default privacy, which may be
+      # private — the exact "images are not published" failure this workflow
+      # exists to prevent. Best effort: when the token cannot use the Hub API,
+      # the push below still creates the repo and the visibility check at the
+      # end fails loudly if it came out private.
+      - name: Ensure the Docker Hub repository exists and is public
+        if: steps.src.outputs.skip != 'true'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          REPO_NAME="${IMAGE}${SUFFIX}"
+          HUB=https://hub.docker.com
+          case "${SUFFIX}" in
+            -stage) CHANNEL=" (stage channel)" ;;
+            -dev) CHANNEL=" (develop channel)" ;;
+            *) CHANNEL="" ;;
+          esac
+          DESCRIPTION="Ever Works ${IMAGE#ever-works-}${CHANNEL} — https://github.com/${GITHUB_REPOSITORY}"
+
+          # Hub API token. With an Organization Access Token the identifier is
+          # the org name; with a Personal Access Token it is the username. The
+          # secret is read from the environment by jq and handed to curl on
+          # stdin, so it never appears on any process's command line.
+          JWT="$(
+            jq -n '{identifier: env.DOCKERHUB_USERNAME, secret: env.DOCKERHUB_TOKEN}' \
+              | curl -fsS -X POST "${HUB}/v2/auth/token" -H 'Content-Type: application/json' --data-binary @- \
+              | jq -r '.access_token // empty' || true
+          )"
+          if [ -z "${JWT}" ]; then
+            echo "::warning::Could not get a Docker Hub API token; skipping repository pre-creation. The push creates ${DOCKERHUB_NAMESPACE}/${REPO_NAME} with the namespace's default privacy."
+            exit 0
+          fi
+          echo "::add-mask::${JWT}"
+          AUTH="Authorization: Bearer ${JWT}"
+
+          # The /v2/namespaces/... routes are the documented ones; the legacy
+          # /v2/repositories/... routes refuse organization access tokens.
+          STATUS="$(curl -sS -o /tmp/repo.json -w '%{http_code}' -H "${AUTH}" \
+            "${HUB}/v2/namespaces/${DOCKERHUB_NAMESPACE}/repositories/${REPO_NAME}")"
+          if [ "${STATUS}" = "404" ]; then
+            CREATE="$(jq -n --arg ns "${DOCKERHUB_NAMESPACE}" --arg n "${REPO_NAME}" --arg d "${DESCRIPTION:0:100}" \
+              '{namespace: $ns, name: $n, description: $d, registry: "docker.io", is_private: false}')"
+            CODE="$(curl -sS -o /tmp/create.json -w '%{http_code}' -X POST -H "${AUTH}" \
+              -H 'Content-Type: application/json' -d "${CREATE}" \
+              "${HUB}/v2/namespaces/${DOCKERHUB_NAMESPACE}/repositories")"
+            if [ "${CODE}" = "200" ] || [ "${CODE}" = "201" ]; then
+              echo "Created public repository ${DOCKERHUB_NAMESPACE}/${REPO_NAME}."
+            else
+              echo "::warning::Creating ${DOCKERHUB_NAMESPACE}/${REPO_NAME} returned HTTP ${CODE}: $(head -c 300 /tmp/create.json). The push will create it with the namespace's default privacy (an OAT needs the org-level 'repository create' scope; a PAT needs an Editor or Owner in the org)."
+            fi
+          elif [ "${STATUS}" = "200" ]; then
+            if [ "$(jq -r '.is_private' /tmp/repo.json)" = "true" ]; then
+              # Not in the OpenAPI spec. The namespaced route is the one an
+              # Organization Access Token can use; the legacy route is what
+              # Docker's own Terraform provider calls with a PAT.
+              CODE=""
+              for ROUTE in "namespaces/${DOCKERHUB_NAMESPACE}/repositories/${REPO_NAME}/privacy" \
+                           "repositories/${DOCKERHUB_NAMESPACE}/${REPO_NAME}/privacy"; do
+                CODE="$(curl -sS -o /tmp/privacy.json -w '%{http_code}' -X POST -H "${AUTH}" \
+                  -H 'Content-Type: application/json' -d '{"is_private": false}' "${HUB}/v2/${ROUTE}")"
+                if [ "${CODE}" = "200" ] || [ "${CODE}" = "204" ]; then break; fi
+              done
+              echo "::warning::${DOCKERHUB_NAMESPACE}/${REPO_NAME} was private; making it public returned HTTP ${CODE}."
+            fi
+          else
+            echo "::warning::Looking up ${DOCKERHUB_NAMESPACE}/${REPO_NAME} returned HTTP ${STATUS}; leaving creation to the push."
+          fi
+
+      - name: Copy to Docker Hub
+        if: steps.src.outputs.skip != 'true'
+        env:
+          SRC: ${{ steps.src.outputs.src }}
+        run: |
+          set -euo pipefail
+          DEST="docker.io/${DOCKERHUB_NAMESPACE}/${IMAGE}${SUFFIX}"
+          TAGS=(--tag "${DEST}:sha-${SHA}")
+          if [ -n "${VERSION}" ]; then TAGS+=(--tag "${DEST}:${VERSION}"); fi
+          if [ "${MOVE_LATEST}" = "true" ]; then TAGS+=(--tag "${DEST}:latest"); fi
+
+          # Registry-to-registry copy: blobs stream GHCR -> Docker Hub, no
+          # rebuild and no local image. One source, Docker Hub tags only: a
+          # single-source create is a carbon copy of an index, and
+          # --prefer-index=false keeps a plain image manifest a plain manifest
+          # too (by default it would be wrapped in a new index with a NEW
+          # digest, and the digest check below would rightly fail). Retried
+          # because both registries throw the occasional transient 5xx /
+          # blob-upload reset (k8s-build retries its GHCR push for the same
+          # reason).
+          for attempt in 1 2 3; do
+            if docker buildx imagetools create --prefer-index=false "${TAGS[@]}" "${SRC}"; then
+              exit 0
+            fi
+            echo "::warning::Copy attempt ${attempt}/3 failed; retrying in $((attempt * 30))s."
+            sleep $((attempt * 30))
+          done
+          echo "::error::Could not copy ${SRC} to ${DEST} after 3 attempts."
+          exit 1
+
+      - name: Verify the published image
+        if: steps.src.outputs.skip != 'true'
+        env:
+          SRC_DIGEST: ${{ steps.src.outputs.digest }}
+        run: |
+          set -euo pipefail
+          REPO_NAME="${IMAGE}${SUFFIX}"
+          DEST="docker.io/${DOCKERHUB_NAMESPACE}/${REPO_NAME}"
+          TAGS=("sha-${SHA}")
+          if [ -n "${VERSION}" ]; then TAGS+=("${VERSION}"); fi
+          if [ "${MOVE_LATEST}" = "true" ]; then TAGS+=("latest"); fi
+
+          for TAG in "${TAGS[@]}"; do
+            GOT="$(docker buildx imagetools inspect "${DEST}:${TAG}" --format '{{json .Manifest}}' | jq -er '.digest')"
+            if [ "${GOT}" != "${SRC_DIGEST}" ]; then
+              echo "::error::${DEST}:${TAG} is ${GOT}, expected ${SRC_DIGEST}."
+              exit 1
+            fi
+          done
+
+          # Pullable by the public, not merely by us: the Hub API answers 404
+          # to an anonymous caller for a private (or missing) repository.
+          VIS="$(curl -sS -o /dev/null -w '%{http_code}' "https://hub.docker.com/v2/namespaces/${DOCKERHUB_NAMESPACE}/repositories/${REPO_NAME}")"
+          if [ "${VIS}" != "200" ]; then
+            echo "::error::${DOCKERHUB_NAMESPACE}/${REPO_NAME} is not publicly visible (anonymous lookup returned HTTP ${VIS}). Make it public in Docker Hub → Repository → Settings → Visibility."
+            exit 1
+          fi
+
+          {
+            echo "### \`${DOCKERHUB_NAMESPACE}/${REPO_NAME}\`"
+            echo ""
+            echo "- Source: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/${IMAGE}:sha-${SHA}\`"
+            echo "- Digest: \`${SRC_DIGEST}\`"
+            echo "- Tags: $(printf '`%s` ' "${TAGS[@]}")"
+            echo ""
+            echo "\`\`\`"
+            echo "docker pull ${DOCKERHUB_NAMESPACE}/${REPO_NAME}:${TAGS[${#TAGS[@]}-1]}"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"

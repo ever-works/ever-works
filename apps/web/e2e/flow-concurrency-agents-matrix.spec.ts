@@ -51,9 +51,11 @@
  *       draft agent still records a run). The rollback FREES the (task,agent) dedup
  *       slot, so a later assign mints a fresh run (no orphaned 'queued' row wedges it).
  *       A non-existent / cross-user taskId → 404, no phantom run.
- *     • POST /:id/run-now: STATUS-GATED — a non-ACTIVE agent → 409 "Agent is not in an
- *       ACTIVE state …" with NO run record + status unchanged (the manual-claim CAS
- *       gates before dispatch). On an ACTIVE agent the (keyless) trigger throws → 500,
+ *     • POST /:id/run-now: STATUS-GATED — a non-ACTIVE agent → 409 with NO run record
+ *       + status unchanged (the manual-claim CAS gates before dispatch). A DRAFT agent
+ *       gets the dispatcher's "Agent is not in an ACTIVE state …"; a PAUSED one gets
+ *       AW-23's by-name refusal "This agent is paused. Resume it first." from `runNow`
+ *       before any dispatch path. On an ACTIVE agent the (keyless) trigger throws → 500,
  *       but the claim's release restores the agent to ACTIVE (never a stuck RUNNING).
  *
  *   CREATE  Concurrent DISTINCT-name creates → all 201, distinct ids + slugs, all
@@ -778,6 +780,9 @@ test.describe('run-now dispatch claim gate', () => {
             timeout: T,
         });
         expect(r2.status(), 'run-now on a paused agent is gated with 409').toBe(409);
+        // AW-23: a DIFFERENT body from the draft case above — the paused gate
+        // runs first and names the reason.
+        expect((await r2.json()).message).toBe('This agent is paused. Resume it first.');
         expect(await getAgentStatus(request, u.access_token, paused.id)).toBe('paused');
     });
 

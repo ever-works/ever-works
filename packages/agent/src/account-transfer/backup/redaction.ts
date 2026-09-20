@@ -33,12 +33,39 @@ import {
  *
  * ## The guard that keeps this honest
  *
- * `redaction.spec.ts` reflects over `AGENT_ENTITY_NAMES` and every entity
- * source file, and fails when a column whose name matches
- * `/secret|password|token|hash|credential/i` is neither redacted, nor
- * dropped, nor listed in {@link BACKUP_BENIGN_COLUMNS} with a reason. A new
- * secret column therefore cannot silently start being exported: it either
- * gets a rule or it gets an explicit, reviewed "this is not a secret".
+ * `redaction.spec.ts` reflects over every entity source file and fails when a
+ * column that LOOKS like it carries a secret has no rule and no reviewed
+ * exemption. Three independent families are reflected, because the first one
+ * alone shipped four leaks:
+ *
+ *  1. **Name-shaped.** A column matching
+ *     `/secret|password|token|hash|credential/i`.
+ *  2. **Encrypted-at-rest by name.** A column whose name ends in
+ *     `Encrypted`. `Work.deployDatabaseUrlEncrypted` (the per-Work Postgres
+ *     connection string) and `Work.deployRuntimeEnvEncrypted` (the
+ *     allow-listed runtime env bag) match neither family 1 nor any pattern
+ *     below, and were exported verbatim until this family existed.
+ *  3. **Encrypted-at-rest by decorator.** A column declared with
+ *     `@EncryptedJsonColumn`. Those names say nothing about their contents —
+ *     `RepoConnection.envFiles` is seed `.env` file bodies and
+ *     `NotificationChannel.targetConfig` is a live bot token / webhook URL —
+ *     so only the decorator identifies them.
+ *
+ * A fourth, narrower pass covers every entity the `billing` domain exports:
+ * the archive publishes a `payment_identifiers` exclusion, so every
+ * `provider*`/`payg*` identifier column on any of them needs a rule or a
+ * reviewed exemption too. The entity set is read from the domain table, not
+ * copied, so a billing entity added to the archive later is covered the day
+ * it is added.
+ *
+ * The per-entity column tables below are checked in the other direction as
+ * well: every column they name has to be declared on its entity. A rule on a
+ * column that does not exist deletes nothing, so an identifier whose column
+ * is renamed would otherwise lose its protection without any test noticing.
+ *
+ * A new secret column therefore cannot silently start being exported: it
+ * either gets a rule or it gets an explicit, reviewed "this is not a secret"
+ * in {@link BACKUP_BENIGN_COLUMNS}.
  */
 
 /**
@@ -87,6 +114,17 @@ const DROPPED_ENTITY_SET = new Set(BACKUP_DROPPED_ENTITIES);
 const SECRET_COLUMN_PATTERNS: readonly RegExp[] = Object.freeze([
     /secretencrypted$/i,
     /credentialsencrypted$/i,
+    // Anything the platform bothered to envelope-encrypt at rest is material
+    // the archive may not carry, whatever the rest of the name says. The two
+    // narrower patterns above are subsumed by this one and kept so a reader
+    // can still see which shapes were named deliberately.
+    //
+    // This is the rule that would have stopped `deployDatabaseUrlEncrypted`
+    // (a Postgres connection string, user and password included) and
+    // `deployRuntimeEnvEncrypted` (an allow-listed payment-key bag) from
+    // shipping in `data/works/works.jsonl` while the four sibling
+    // `deploy*SecretEncrypted` columns on the same row were redacted.
+    /encrypted$/i,
     /^secretsettings$/i,
     /^authheaders$/i,
     /^credentialref$/i,
@@ -98,7 +136,27 @@ const SECRET_COLUMN_PATTERNS: readonly RegExp[] = Object.freeze([
 /** Extra per-entity columns redacted to `{ wasSet }` where the shape rule cannot see them. */
 const ENTITY_SECRET_COLUMNS: Readonly<Record<string, readonly string[]>> = Object.freeze({
     FleetNode: Object.freeze(['previousCredentialHash']),
-    RepoConnection: Object.freeze(['credentialRef']),
+    // `envFiles` is the seed `.env` bodies keyed by repository path, an
+    // `@EncryptedJsonColumn` the entity itself records as MASKED in API
+    // responses ("paths + sizes only; full content is returned only by the
+    // explicit owner-gated env-files endpoint"). `page()` reads rows with
+    // `getRawMany()`, which bypasses the decrypt transformer, so what the
+    // archive would have carried is the stored text: the `enc::v1::`
+    // envelope on a keyed install, and the literal `.env` contents wherever
+    // `PLUGIN_SECRET_ENCRYPTION_KEY` is unset or the row predates the
+    // column being encrypted. Redacted to a bag of `{ wasSet }` keyed by
+    // path, which is exactly the masked answer the API already gives — it
+    // still tells the owner which repositories need their `.env` re-seeded.
+    RepoConnection: Object.freeze(['credentialRef', 'envFiles']),
+    // `targetConfig` is the per-plugin channel endpoint bag, and the entity
+    // documents what is inside it: a Telegram `botToken`, a WhatsApp
+    // `accessToken`, a Novu `apiKey`, a Slack/Discord `webhookUrl`. Another
+    // `@EncryptedJsonColumn`, so the same `getRawMany()` caveat applies —
+    // and `domain-specs.ts` already claims of this very file that "channel
+    // endpoints are redacted", which until now they were not. The bag keeps
+    // its field NAMES and none of their values, so the archive answers
+    // "which channels do I have to re-credential?".
+    NotificationChannel: Object.freeze(['targetConfig']),
     // AW-16 Model accounts. `credentials` is the provider's own secret
     // settings bag, encrypted at rest. It is a named bag rather than one
     // opaque value, so `redactRow` keeps the NAMES of the fields that were
@@ -144,10 +202,64 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
         'providerCustomerId',
         'providerSubscriptionId',
         'defaultPaymentMethodRef',
+        // The metered (pay-as-you-go) pair, dropped for the same reason as
+        // their siblings above: `paygSubscriptionId` addresses a live
+        // subscription at the payment provider and `paygSubscriptionItemId`
+        // is the item that "threshold / price updates address", so both are
+        // capabilities rather than records. The archive's own
+        // `payment_identifiers` exclusion promises that provider
+        // subscription and METER identifiers are absent; these two were the
+        // only ones still present.
+        'paygSubscriptionId',
+        'paygSubscriptionItemId',
     ]),
+    // The plan subscription row (`data/billing/subscription.jsonl`). Spec
+    // FR-18.6 names subscription identifiers outright, and both of these
+    // address a live object at the payment provider: `providerSubscriptionId`
+    // is what a later subscription lifecycle delivery uses to update or
+    // revoke exactly this row, and `providerSeatItemId` is the per-seat
+    // subscription item a seat-quantity change creates or updates. The rest
+    // of the row — plan, status, seats, billing provider, period end,
+    // cancel-at-period-end — is the record, and still exports.
+    //
+    // `paymentMethodMeta` is a free-form bag documented as provider-specific
+    // payment-method data — the payment-method category FR-18.6 excludes.
+    // Nothing writes it today, so this drops nothing yet; it is here so that
+    // the first writer cannot put payment-method data into an archive
+    // without anyone deciding to.
+    UserSubscription: Object.freeze([
+        'providerSubscriptionId',
+        'providerSeatItemId',
+        'paymentMethodMeta',
+    ]),
+    // `providerCustomerId` is not a column of `Invoice` (the customer id
+    // lives on `BillingProfile`, dropped above). Kept pending review; see
+    // `KNOWN_STALE_COLUMN_RULES` in `redaction.spec.ts`.
+    //
+    // Reviewed and deliberately KEPT: `hostedUrl` and `pdfUrl`. They are
+    // payment-provider links to this owner's own invoices, and the owner
+    // downloading their own archive is the audience that wants them working.
+    // Not an oversight — do not add them here without revisiting that call.
     Invoice: Object.freeze(['providerInvoiceId', 'providerCustomerId']),
     LicencePurchase: Object.freeze(['providerPaymentId']),
-    CreditLedgerEntry: Object.freeze(['providerEventId']),
+    // The ledger has no `providerEventId` column, which is why this rule
+    // used to delete nothing: the provider EVENT id is written into
+    // `idempotencyKey`, as `{provider}:evt:{eventId}` on a credit purchase or
+    // refund reversal and `revoke:plan:{provider}:evt:{eventId}` on a plan
+    // allowance clawback. Every other key in that column (`run:{runId}`,
+    // `daily:{userId}:{date}`, `grant:plan:…`) is a writer's replay guard,
+    // not something a reader of the ledger needs, so the whole column goes.
+    //
+    // Reviewed and deliberately KEPT: `refId`. On `refType: 'billing-payment'`
+    // rows it carries the provider's payment id, but on every other row it is
+    // the link from a ledger entry to the run or subscription that caused it,
+    // and FR-18.6 does not name payment ids. Keeping the whole column keeps
+    // that record intact. Not an oversight — revisit before adding it here.
+    CreditLedgerEntry: Object.freeze(['idempotencyKey']),
+    // Neither column exists on `UsageLedgerEntry`: nothing forwards a usage
+    // row to the payment provider, so no provider handle is ever stored on
+    // it. Kept pending review; see `KNOWN_STALE_COLUMN_RULES` in
+    // `redaction.spec.ts`.
     UsageLedgerEntry: Object.freeze(['providerMeterId', 'providerEventId']),
 });
 

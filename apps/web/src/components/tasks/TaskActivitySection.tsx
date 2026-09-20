@@ -40,8 +40,9 @@ export function TaskActivitySection({
                     {t('section')}
                 </h2>
                 <Link
-                    href={ROUTES.DASHBOARD_AGENT_SESSIONS}
+                    href={ROUTES.DASHBOARD_AGENTS_ACTIVITY}
                     className="text-[11px] text-text-muted hover:text-text dark:hover:text-text-dark"
+                    data-testid="task-activity-open-agent-activity"
                 >
                     {t('viewRuns')}
                 </Link>
