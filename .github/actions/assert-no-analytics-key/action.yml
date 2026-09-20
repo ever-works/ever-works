@@ -1,0 +1,32 @@
+name: Assert no analytics key in published images
+description: >
+  Fails the job if any workflow in this repository passes NEXT_PUBLIC_POSTHOG_KEY
+  or NEXT_PUBLIC_POSTHOG_HOST to `docker build` from a secret or variable
+  expression. Requires actions/checkout to have run first.
+
+# WHY THIS IS AN ACTION AND NOT JUST A CI STEP.
+#
+# Every image this repo publishes is public (GHCR, and Docker Hub via
+# docker-hub-publish.yml), and Next.js inlines NEXT_PUBLIC_* into the CLIENT
+# bundle at `next build` — so a secret passed as a NEXT_PUBLIC_POSTHOG_* build
+# arg ships the Ever Works analytics key to every self-hoster's browser. It did,
+# in docker-build-publish-*.yml, from 2025 until 2026-09-19.
+#
+# ci.yml runs only on pushes to `main`/`stage` (see the header there), while
+# docker-build-publish-dev.yml and k8s-build.yml publish from `develop` pushes
+# and from manual dispatches, and neither depends on ci.yml. A check that lives
+# only in ci.yml therefore runs AFTER an image with a baked key could already be
+# pushed and mirrored. So each publisher calls this action itself, right after
+# checkout and before any build step: the gate travels with the build, on the
+# same runner, at no extra runner cost (it is one grep).
+
+runs:
+  using: composite
+  steps:
+    - name: Published images carry no analytics key
+      shell: bash
+      run: |
+        if grep -rnE 'NEXT_PUBLIC_POSTHOG_(KEY|HOST)=\$\{\{' "${GITHUB_WORKSPACE}/.github/workflows/"; then
+          echo "::error::A workflow passes NEXT_PUBLIC_POSTHOG_* as a build arg from a secret or variable. Published images are public, and Next.js bakes NEXT_PUBLIC_* into the browser bundle — build them without it (see .deploy/docker/web/Dockerfile)."
+          exit 1
+        fi
