@@ -213,6 +213,11 @@ jobs:
       - name: Release script unit tests
         run: node --test scripts/release-npm-packages.test.mjs
 
+      # Belt and braces: the publishers run this same gate themselves before
+      # they build (ci.yml does not run on `develop` pushes, and no publisher
+      # depends on it), so a bad merge cannot reach a pushed image first.
+      - uses: ./.github/actions/assert-no-analytics-key
+
 
   # W (EW-779, self-build finding OPS-21) — THE NODE-CONTRACT GATE.
   #
