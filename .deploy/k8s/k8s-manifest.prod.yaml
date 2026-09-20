@@ -498,10 +498,13 @@ spec:
             # PostHog (server-side: feature flag eval via apps/web/src/lib/feature-flags)
             # + Sentry (errors + traces). See knowledge/infrastructure/EVER_WORKS_POSTHOG.md.
             # NEXT_PUBLIC_POSTHOG_KEY / NEXT_PUBLIC_POSTHOG_HOST are intentionally NOT
-            # set here — Next.js bakes NEXT_PUBLIC_* into the bundle at BUILD time,
-            # so they're plumbed through the docker-build workflow's build-args
-            # (see .github/workflows/docker-build-publish-prod.yml) and the web
-            # Dockerfile's ARG/ENV declarations.
+            # set here — Next.js bakes NEXT_PUBLIC_* into the bundle at BUILD time, so a
+            # runtime value would be ignored. The published web images are built without
+            # them (they are public: a baked key would collect self-hosters' analytics),
+            # so browser analytics is off in every published web image. NOTE: this
+            # manifest is the retired DigitalOcean path (applied only by
+            # deploy-do-*.yml, behind vars.DO_ENABLED); the live clusters run
+            # k8s-build's :dev / :stage / :prod digests via ArgoCD.
             - name: SENTRY_DSN
               value: "$SENTRY_DSN"
             - name: SENTRY_ENVIRONMENT
