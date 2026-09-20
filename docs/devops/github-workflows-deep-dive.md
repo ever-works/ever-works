@@ -181,11 +181,11 @@ dependencies are published as caret ranges.
 - **Private packages.** Every npm publish carries `--access public`, including for a package
   that is currently private: npm applies the flag to an existing package exactly as
   `npm access set status=public` would, so the publish is what makes it public. That is the
-  only route CI has. Since 2026-07-31 npm refuses an access change from *every* token type —
-  a granular token gets `403`, an `npm login` token `401` with the "tokens that bypass 2FA are
-  being restricted for account changes" notice — and the CLI's only fallback is a browser
-  approval per package (npmjs.com itself sits behind bot detection, so it cannot be scripted
-  either). If npm ever refuses the flag, the version is published anyway, without it, and the
+  only route CI has. Since 2026-07-31 an npm granular access token configured to bypass 2FA —
+  exactly what `NPM_TOKEN` is — cannot change package access: `POST /-/package/<pkg>/access`
+  answers `403`, and npm's changelog lists "changing package access" among the operations that
+  now need an interactive 2FA challenge. The CLI's fallback is a browser approval per package,
+  and npmjs.com sits behind bot detection, so neither can be scripted. If npm ever refuses the flag, the version is published anyway, without it, and the
   row is marked `⚠ published without --access`. GitHub Packages has no API for visibility at
   all — flip a package under _Package settings → Change visibility_; the summary lists the
   ones still private.

@@ -915,13 +915,15 @@ async function main() {
 							// of restricted or public during publish will change the
 							// access for an existing package", npm-publish docs).
 							//
-							// That is now the ONLY route: since 2026-07-31 npm refuses
-							// access changes from every token type (granular and
-							// `npm login` alike — 401/403 with the "tokens that bypass
-							// 2FA are being restricted for account changes" notice), and
-							// the CLI's fallback is an interactive browser approval PER
-							// PACKAGE. Publishing is still permitted, so the publish is
-							// what flips them.
+							// That is now the ONLY route left to CI. Since 2026-07-31 an
+							// npm granular access token configured to bypass 2FA — which
+							// is exactly what NPM_TOKEN is — cannot change package
+							// access: `POST /-/package/<pkg>/access` answers 403, and
+							// npm's changelog lists "changing package access" among the
+							// operations that now need an interactive 2FA challenge. The
+							// CLI's fallback is a browser approval PER PACKAGE. Direct
+							// publishing from the same token stays permitted until
+							// January 2027, so the publish is what flips them.
 							args.push('--access', 'public');
 							// Provenance is rejected while a package is still private at
 							// the moment of upload, so it joins from the next release on.
@@ -941,7 +943,8 @@ async function main() {
 								const first = describeExecError(err);
 								if (!fallback || !/EOTP|one-time pass|E403|forbidden|access/i.test(first)) throw err;
 								console.log(
-									`::warning::${pkg.name}: npm refused the access change on publish (${lastLines(first, 1)}); publishing without it, the package stays private.`
+									`::warning::${pkg.name}: npm refused the access change on publish; publishing without it, so the package stays PRIVATE. npm said:
+${lastLines(first, 5)}`
 								);
 								run('npm', fallback, { cwd: tmp, env: { ...env, NPM_CONFIG_USERCONFIG: userconfigs[r.id] } });
 								row.actions.push('⚠ published without --access');
@@ -1020,7 +1023,7 @@ async function main() {
 				'',
 				'### Was private on npmjs.org at the start of this run',
 				'',
-				`${restrictedOnNpmList.length} package(s). Each was published with \`--access public\`, which npm applies to an existing package exactly as \`npm access set status=public\` would — the only route left to CI, since npm refuses access changes from every token type. Verify with:`,
+				`${restrictedOnNpmList.length} package(s). Each was published with \`--access public\`, which npm applies to an existing package exactly as \`npm access set status=public\` would — the only route left to CI, since a 2FA-bypass granular token (what NPM_TOKEN is) cannot change package access at all. Verify with:`,
 				'',
 				'```bash',
 				...restrictedOnNpmList.slice(0, 5).map((n) => `curl -so /dev/null -w '%{http_code} ' https://registry.npmjs.org/${encodeURIComponent(n)}  # 200 = public`),
