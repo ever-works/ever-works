@@ -384,16 +384,37 @@ const mirrors = discoverMirrors();
 
 describe('onboarding step derivation: the e2e copies vs the product', () => {
     describe('control — this suite is actually comparing something', () => {
-        it('discovered every known copy, and none has vanished unnoticed', () => {
+        it('the discovered copies are exactly the registered ones', () => {
             const files = mirrors.map((m) => m.file);
-            expect(files.length).toBeGreaterThanOrEqual(KNOWN_MIRRORS.length);
-            for (const known of KNOWN_MIRRORS) {
-                expect(
-                    files,
-                    `${known} no longer carries a computeStepIds copy. If it was renamed or the ` +
-                        'copy was deliberately removed, update KNOWN_MIRRORS.',
-                ).toContain(known);
-            }
+
+            // Both directions matter, and they fail for different reasons.
+            //
+            // A copy that VANISHED may be a deliberate deletion or a rename — either
+            // way the sweep quietly got smaller, which is the failure this suite
+            // exists to prevent.
+            //
+            // A copy that APPEARED is already being compared (the sweep discovers
+            // rather than reads this list, so a new one is covered the day it lands).
+            // It still fails here, on purpose: a fourth hand-written copy of a
+            // derivation that has drifted three times is a decision someone should
+            // make on the record, not something that slips in with a green suite.
+            const missing = KNOWN_MIRRORS.filter((f) => !files.includes(f));
+            const unregistered = files.filter(
+                (f) => !(KNOWN_MIRRORS as readonly string[]).includes(f),
+            );
+
+            expect(
+                missing,
+                `no longer carries a computeStepIds copy: ${missing.join(', ')}. If it was ` +
+                    'renamed, or the copy was deliberately removed, update KNOWN_MIRRORS.',
+            ).toEqual([]);
+            expect(
+                unregistered,
+                `a new copy of the step derivation appeared in ${unregistered.join(', ')}. It IS ` +
+                    'already being compared against the product below. Prefer deleting it and ' +
+                    'reusing an existing spec helper; if a fourth copy is genuinely wanted, add ' +
+                    'it to KNOWN_MIRRORS to say so deliberately.',
+            ).toEqual([]);
         });
 
         it.each(REQUIRED_MEMBERS)(
