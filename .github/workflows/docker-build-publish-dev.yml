@@ -67,9 +67,10 @@ jobs:
           sudo docker image list
 
       # DigitalOcean is retired (registry 403): the doctl auth + DO push below
-      # are gated behind vars.DO_ENABLED and SKIP today. deploy-do-*.yml is the
-      # only thing that applies the k8s-manifest.*.yaml files pinning those DO
-      # images, and it is gated on the same var. Kept per the no-removal policy,
+      # are gated on `vars.DO_ENABLED == 'true'`, which is unset, so they do not
+      # run. deploy-do-*.yml is the only thing that applies the k8s-manifest.*.yaml
+      # files pinning those DO images, and it is gated on the same var. Kept per
+      # the no-removal policy,
       # and deliberately NOT continue-on-error, so that re-enabling the var
       # fails loudly: a silent failure once shipped a stale :latest as a
       # "green" build (incident 2026-06-12: an expired DO token meant prod
@@ -118,6 +119,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # This job builds the PUBLIC web image; fail before that if any
+      # workflow reintroduces a NEXT_PUBLIC_POSTHOG_* build arg.
+      - uses: ./.github/actions/assert-no-analytics-key
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
@@ -169,9 +174,10 @@ jobs:
           sudo docker image list
 
       # DigitalOcean is retired (registry 403): the doctl auth + DO push below
-      # are gated behind vars.DO_ENABLED and SKIP today. deploy-do-*.yml is the
-      # only thing that applies the k8s-manifest.*.yaml files pinning those DO
-      # images, and it is gated on the same var. Kept per the no-removal policy,
+      # are gated on `vars.DO_ENABLED == 'true'`, which is unset, so they do not
+      # run. deploy-do-*.yml is the only thing that applies the k8s-manifest.*.yaml
+      # files pinning those DO images, and it is gated on the same var. Kept per
+      # the no-removal policy,
       # and deliberately NOT continue-on-error, so that re-enabling the var
       # fails loudly: a silent failure once shipped a stale :latest as a
       # "green" build (incident 2026-06-12: an expired DO token meant prod

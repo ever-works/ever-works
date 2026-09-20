@@ -213,17 +213,10 @@ jobs:
       - name: Release script unit tests
         run: node --test scripts/release-npm-packages.test.mjs
 
-      # Every image this repo publishes is public (GHCR, Docker Hub), and
-      # Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, so a
-      # secret passed as a NEXT_PUBLIC_POSTHOG_* build arg ships our analytics
-      # key to every self-hoster. It did, in docker-build-publish-*.yml, until
-      # 2026-09-19.
-      - name: Published images carry no analytics key
-        run: |
-          if grep -rnE 'NEXT_PUBLIC_POSTHOG_(KEY|HOST)=\$\{\{' .github/workflows/; then
-            echo "::error::A workflow passes NEXT_PUBLIC_POSTHOG_* as a build arg from a secret. Published images are public; build them without it (see .deploy/docker/web/Dockerfile)."
-            exit 1
-          fi
+      # Belt and braces: the publishers run this same gate themselves before
+      # they build (ci.yml does not run on `develop` pushes, and no publisher
+      # depends on it), so a bad merge cannot reach a pushed image first.
+      - uses: ./.github/actions/assert-no-analytics-key
 
 
   # W (EW-779, self-build finding OPS-21) — THE NODE-CONTRACT GATE.
