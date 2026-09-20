@@ -89,11 +89,19 @@ _Delivers spec FR-1…FR-29, FR-41…FR-46, FR-52, FR-53. The tier stays **Close
       `src/crds/{work,selfcheck,usagereport,abusesignal,appbuild}.ts` (schemas from [plan §3.1–3.2](./plan.md),
       incl. `spec.desiredState: removed`, `spec.dataDeletion`, `status.removal`, `status.dependencies`),
       `scripts/generate-crds.ts` → `deploy/crds/*.yaml`. `pnpm-workspace.yaml` already globs `apps/*`.
-      **Test**: `apps/apps-tier-controller/src/crds/__tests__/crds.spec.ts` (**new**) — generated YAML equals committed
+      **Test**: `packages/apps-tier-crds/src/crds/__tests__/crds.spec.ts` (**new**) — generated YAML equals committed
       YAML; `Work` rejects a `namespace` field (ACC-10-26), an image without `@sha256:`, and an object over 512 KiB
       (ACC-10-27); run `pnpm --filter ever-works-apps-tier-controller test`.
       **Done when**: `pnpm --filter ever-works-apps-tier-controller build test` passes and CI fails if generated CRDs
       drift.
+
+      > **Landed differently, and deliberately (owner ruling, 2026-09-20).** T3 shipped as written, then the
+      > schema half was split out to **`packages/apps-tier-crds`** (`@ever-works/apps-tier-crds`) because both
+      > ends of the tier import it and `apps/*` here means a process, which the CRD-only package was not. The
+      > drift gate is now `pnpm --filter @ever-works/apps-tier-crds test` (47 tests); the filter
+      > `ever-works-apps-tier-controller` still resolves — it now names the controller process, whose bootstrap,
+      > config and reconciler port landed the same day and which **refuses to start** until T6 registers a
+      > reconciler. See `apps/apps-tier-controller/README.md`.
 
 - [ ] **T4. Tenant template and pod overlays.**
       **Create** `apps/apps-tier-controller/src/template/tenant-template.ts` and `src/template/pod-overlays.ts`
@@ -732,7 +740,7 @@ T47, T48 and T52 land with the P1 tasks they modify; T49–T51 are P2._
       tier, so ACC-E2E-10 (b) can pass.
 
 - [ ] **T47 (P1, lands with T4/T6). Deployment phase order, smoke checks and status (GAP-25).**
-      **Modify** `apps/apps-tier-controller/src/crds/work.ts` — `spec.smoke[]`, `spec.cron[].http.authScheme`,
+      **Modify** `packages/apps-tier-crds/src/crds/work.ts` — `spec.smoke[]`, `spec.cron[].http.authScheme`,
       `status.jobs[]`, `status.smoke[]` and `status.deployPhase` exactly as plan §3.1; **modify**
       `src/reconcile/work.reconciler.ts` — the phases are **normative and ordered**: pre-deploy jobs → rollout →
       first-deploy jobs → in-cluster smoke → publish hosts at the edge → post-deploy jobs → CronJobs, each written to

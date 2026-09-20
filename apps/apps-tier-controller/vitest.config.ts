@@ -1,11 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Unit configuration — T3's CRD suite and every later `src/**` spec (T4…T9, T23, T28, T29).
+ * Unit configuration — hermetic by rule: no kubeconfig, no cluster, no clock, no network.
  *
- * The kind-cluster suite lives outside `src/` (`test/integration/*.int.spec.ts`, T11) and is run by
- * `pnpm test:integration` with `vitest.integration.config.ts`, so `pnpm test` stays hermetic: no
- * kubeconfig, no cluster, no clock, no network.
+ * Every spec under `src/**` must run with no cluster reachable. The suite that needs a real API
+ * server is the kind lane (`test/integration/**`, T11) under `vitest.integration.config.ts`.
  */
 export default defineConfig({
 	test: {

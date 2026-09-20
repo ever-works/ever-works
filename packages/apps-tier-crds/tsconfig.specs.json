@@ -4,6 +4,6 @@
 		"noEmit": true,
 		"types": ["node", "vitest/globals"]
 	},
-	"include": ["src/**/*", "test/**/*"],
+	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist", ".turbo"]
 }

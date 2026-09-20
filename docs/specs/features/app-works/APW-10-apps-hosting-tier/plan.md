@@ -216,7 +216,7 @@ operator action outside this epic.
 ## 3. The Kubernetes contract (group `hosting.ever.works`, version `v1alpha1`)
 
 CRD manifests are generated from TypeScript schema definitions in
-`apps/apps-tier-controller/src/crds/*.ts` (**new**) into `apps/apps-tier-controller/deploy/crds/*.yaml`, so
+`packages/apps-tier-crds/src/crds/*.ts` (**new**) into `packages/apps-tier-crds/deploy/crds/*.yaml`, so
 the plugin, the controller and the CRDs share one source. All kinds are **namespaced** in the control
 namespace (default `ever-works-apps-control`).
 
@@ -474,9 +474,17 @@ and never skipped — so ACC-10-02 can be observed at T22 while the gate correct
 
 ### 3.8 Controller code layout (**new** `apps/apps-tier-controller/`)
 
+> **Layout, corrected 2026-09-20 (owner ruling).** The CRD schemas and their generator are **not**
+> in this app any more: they are `@ever-works/apps-tier-crds` under `packages/apps-tier-crds/`,
+> because both ends of the tier import them (the platform writes `Work`, the controller reconciles
+> it) and `apps/*` in this monorepo means "a thing that starts a process". The rows below that name
+> `src/crds/*` and `deploy/crds/*` therefore belong to that package; everything else stays here. See
+> [`apps/apps-tier-controller/README.md`](../../../../apps/apps-tier-controller/README.md).
+
+
 ```
 src/main.ts                    leader election (Lease), informers, reconcile loop, /healthz
-src/crds/*.ts                  schemas → deploy/crds/*.yaml (generator script)
+  → MOVED to packages/apps-tier-crds/: src/crds/*.ts → deploy/crds/*.yaml (generator script)
 src/reconcile/work.reconciler.ts        validate → template → promote → render(APW-06 lib) → overlays → apply
 src/reconcile/selfcheck.reconciler.ts   canaries, probe jobs, dry-runs, drift, drill orchestration
 src/reconcile/quarantine.sequencer.ts   ordered isolate → scale → edge; reverse on release
@@ -497,7 +505,7 @@ src/probe/*.ts                          `probe` entrypoint: net, kernel, token, 
 src/seal/unseal.ts                      RSA-OAEP-256 + AES-256-GCM
 src/seal/dep-token-substitution.ts      ew-dep://<kind>/<output> → real value, after unsealing (APW10-G01)
 canary/                                 the canary app image built by T10 (HTTPS, Postgres client, marker) — APW10-G08
-deploy/                                 CRDs + controller RBAC + Deployment (consumed by the zone's GitOps)
+deploy/                                 controller RBAC + Deployment (consumed by the zone GitOps); CRDs come from packages/apps-tier-crds/deploy/crds/
 Dockerfile                              distroless Node 22, non-root, read-only root filesystem
 ```
 
@@ -910,7 +918,7 @@ i18n (all 21 locale files, camelCase leaves): `admin.appsTier.board.*`, `admin.a
   `destroyApp({ deleteVolumes })` maps to `removeWork({ deleteData })`.
 - `packages/plugins/cloudflare-dns/src/__tests__/edge-hostnames.provider.spec.ts` — status mapping, idempotent
   delete, token never logged.
-- `apps/apps-tier-controller/src/crds/__tests__/crds.spec.ts` — generated YAML equals committed YAML; namespace
+- `packages/apps-tier-crds/src/crds/__tests__/crds.spec.ts` — generated YAML equals committed YAML; namespace
   field, non-digest image and oversize object refused.
 - `…/src/template/__tests__/tenant-template.spec.ts`, `pod-overlays.spec.ts` — golden files; overlays win over
   hostile rendered values (privileged, hostNetwork, token automount, runtime class removal); 11 excepted ranges;
