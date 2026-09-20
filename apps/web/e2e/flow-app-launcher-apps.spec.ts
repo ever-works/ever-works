@@ -426,7 +426,24 @@ async function expectLive(
         'a `listed` item belongs to the panel read as well — two reads of one Work disagreeing ' +
             'would be a launcher defect rather than a stack one',
     ).not.toBeNull();
-    return item as LauncherItem;
+    // Narrowing, not a wider cast. The early `if (item !== null) { … return item }`
+    // above has already narrowed `item` to `null` on this path, so the
+    // `item as LauncherItem` that used to stand here was literally
+    // `null as LauncherItem` — TS2352, and the reason `apps/web`'s type-check was
+    // red at HEAD. Playwright's `expect(…).not.toBeNull()` throws on failure but
+    // does NOT narrow a type, so the assertion above cannot do the job on its own.
+    // `as unknown as LauncherItem` would compile and hand the caller a `null`
+    // wearing an item's type, throwing away the only check that the item exists;
+    // this throw keeps that check and satisfies the compiler. It is unreachable
+    // while the assertion above still throws — which is the point.
+    if (item === null) {
+        throw new Error(
+            `work:${seeded.workId} is 'listed' in the Manage-apps read (includeHidden=true) but ` +
+                'absent from the panel read. Two reads of one Work disagreeing is a launcher ' +
+                'defect rather than a stack one.',
+        );
+    }
+    return item;
 }
 
 /** The account's Activity rows, newest first, as the API answers them. */

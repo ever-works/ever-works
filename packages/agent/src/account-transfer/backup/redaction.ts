@@ -320,6 +320,13 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
         'The names of the per-run prompted values a verification created (§4.10), kept so the cleanup can find and remove them. Names only; the values live in the secret store and are removed at the end of the run.',
     secretCheck:
         'The closed three-value verdict `passed | failed | not_needed` (`APP_BUILD_SECRET_CHECK_RESULTS`). The name matched the guard’s pattern; the value is an enum, not a secret.',
+    // APW-09 T43 (FR-43, XC-18) — `WorkUpstreamState.credentialMemberUserId`. The
+    // guard fired on it the moment that column landed (commit `8eced931d`), which is
+    // exactly its job: a new `*credential*`-shaped column has to be decided, not
+    // inherited. The reason below is read off the column's own docstring
+    // (`work-upstream-state.entity.ts:307-322`), not inferred from the name.
+    credentialMemberUserId:
+        'A USER ID, not a credential: the member whose connection is the credential of record for this App Work’s background jobs once a handover has been recorded (NULL = no handover, and the creator `Work.userId` is used instead). It addresses a member the archive already carries in full; the connection it points at is stored elsewhere and is dropped or redacted there by its own rule.',
 });
 
 /** Does this entity produce no lines in an archive at all? */
