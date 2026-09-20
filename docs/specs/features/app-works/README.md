@@ -26,6 +26,11 @@ never produced)
 
 ## 0. Why this program exists
 
+> 📄 **The source of intent, verbatim: [`ORIGINAL-BRIEF.md`](./ORIGINAL-BRIEF.md)** — the owner's original
+> `/goal` prompt of 2026-09-17, recovered from the session log on 2026-09-20 and filed here unedited, with a
+> table mapping each of its sentences onto the epic that implements it. Read it before arguing that a scope
+> question is settled: it is what the program was asked for, and §0 below is what thirteen epics made of it.
+
 Ever Works builds and maintains Works with agents: it generates directories and websites, runs Tasks,
 Missions and Goals, opens pull requests, deploys to Kubernetes, and keeps an Activity log of all of it.
 Every Work it can **run**, however, starts from a template the platform owns.
