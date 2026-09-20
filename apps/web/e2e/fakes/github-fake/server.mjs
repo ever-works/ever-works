@@ -37,6 +37,16 @@
  *     catalog, blueprints }`. Idempotent; unknown keys are ignored. A `users[]`
  *     entry maps a token **value** to a login once, which is what gives later
  *     requests an identity.
+ *     **T45 adds two keys, and they are the only gated ones:**
+ *     `upstream_pull_requests[]` and `upstream_approval_proposals[]` — APW-09's
+ *     own state (plan §3.1 / §6), armed **only** when
+ *     `EVER_WORKS_E2E_FAKES === '1'` and `NODE_ENV !== 'production'`
+ *     (`state.mjs`'s `upstreamSeedGate`). The switch is read in the **fake's**
+ *     process, so the fake itself must be started with it; an unarmed seed is
+ *     ignored and answers `upstreamSeed.applied: false` with the reason. A
+ *     proposal that names no seeded row is a `400` naming the orphan, and a
+ *     matched proposal gets its `payload.upstreamPullRequestId` filled in.
+ *     Read both back with `GET /_control/state`.
  *   - `POST /_control/fault`  — `{ route, behaviour, method?, token?,
  *     tokenValue?, status?, body?, seconds?, times? }`. Answers `200` with the
  *     still-planted faults; an unknown `behaviour` answers `500` naming it.
@@ -49,9 +59,33 @@
  *     fired.
  *   - `GET  /_control/faults` — the faults still armed, in match order.
  *   - `GET  /_control/state`  — repositories, user logins, organizations,
- *     catalog, blueprints.
+ *     catalog, blueprints, and (T45) the seeded `upstreamPullRequests` and
+ *     `upstreamApprovalProposals`.
  *   - `POST /_control/reset`  — clears repositories, users, catalog, blueprints,
- *     the call log and the fault queue. Keeps the git root.
+ *     the upstream seed, the call log and the fault queue. Keeps the git root.
+ *
+ * **The REST subset, by consumer (T45 additions marked).** APW-13's own rows are
+ * in `routes/{repos,pulls,actions,contents}.mjs`; T45 adds the endpoints
+ * APW-09's upstream lanes call, in `routes/commits.mjs` plus two rows in
+ * `routes/repos.mjs`:
+ *
+ *   - `DELETE /repos/:o/:r/git/refs/*ref` — the branch delete **Withdraw**
+ *     performs (FR-33/FR-45); `204` and the ref really goes, so a following read
+ *     is a `404`.
+ *   - `GET /repos/:o/:r/interaction-limits` — `getInteractionLimit` (G16). A
+ *     seeded limit answers `200 { limit, origin, expires_at }`; an unseeded
+ *     repository answers GitHub's own `204`, which the plugin maps to `null` and
+ *     **never** to `'none'`.
+ *   - `GET /repos/:o/:r/commits/:ref/check-runs` — `checks.listForRef`
+ *     (`total_count`, `check_runs[].{name,status,conclusion,details_url}`).
+ *   - `GET /repos/:o/:r/commits/:ref/statuses` — the commit statuses one commit
+ *     carries; `readChecks` keys them by `context`, newest first.
+ *   - `GET /repos/:o/:r/commits/:ref/status` — the combined status, rolled up
+ *     from the statuses above (`combinedState`) rather than asserted.
+ *   - `GET /repos/:o/:r/compare/:basehead` already answered `total_commits`
+ *     (APW-09 T1's read); `POST /git/refs` and `PATCH /git/refs/*ref` were
+ *     already served. Three of T45's named endpoints were therefore already
+ *     here, and the T45 spec pins them so they cannot regress.
  *
  * **"The next matching call only" — the semantics that decide where a plant
  * goes.** A fault is planted with `times` (default **1**) and matched in plant
@@ -75,6 +109,7 @@ import { pathToFileURL } from 'node:url';
 import { routes as controlRoutes } from './control.mjs';
 import { routes as repoRoutes } from './routes/repos.mjs';
 import { routes as pullRoutes } from './routes/pulls.mjs';
+import { routes as commitRoutes } from './routes/commits.mjs';
 import { routes as actionRoutes } from './routes/actions.mjs';
 import { routes as contentRoutes } from './routes/contents.mjs';
 import {
@@ -100,6 +135,7 @@ export const ALL_ROUTES = [
     ...controlRoutes,
     ...repoRoutes,
     ...pullRoutes,
+    ...commitRoutes,
     ...actionRoutes,
     ...contentRoutes,
 ];

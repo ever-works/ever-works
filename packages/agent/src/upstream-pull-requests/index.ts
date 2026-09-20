@@ -29,6 +29,17 @@
  *   `WorkUpstreamStateRepository`. Also exported: the named refusal it throws
  *   when there is no state row to record a handover on,
  *   `UpstreamCredentialRecordUnwrittenError`.
+ * - `./upstream-contribution-budget.service` — `UpstreamContributionBudgetService`
+ *   (T44, FR-44/ACC-09-33): the one door every contribution run this epic
+ *   dispatches goes through before it is dispatched. `book()` asks the platform's
+ *   `BudgetGuardService` about **the App Work's own** `WorkBudget` and answers
+ *   `allowed` or a `wait` with the reset time; `dispatch()` runs the thunk at most
+ *   once, and only when the budget allowed it. Also exported: the run kinds
+ *   (`UPSTREAM_CONTRIBUTION_RUN_KINDS`), the capability and plugin id the booking
+ *   is made under, the wire projection T44 fixes for the write routes
+ *   (`202 { state, waiting: 'budget', resetAt }` — `toUpstreamBudgetWaitResponse`
+ *   with `UPSTREAM_BUDGET_WAIT_HTTP_STATUS`), `isBudgetExceededLike`, and
+ *   `nextPeriodStartUtc`.
  * - `./upstream-pull-requests.module` — `UpstreamPullRequestsModule`, the module
  *   that provides the service and the store and binds the token, and the reason
  *   the binding is not a line in APW-02's `AppWorksModule` (see its docstring).
@@ -46,7 +57,15 @@
  * complete and tested on their own, and the record is reachable from the real
  * graph (`UpstreamPullRequestsModule` is registered in the API, so a boot with
  * the binding in place is what proves it).
+ *
+ * T44 is in the same position: it names `upstream-preparation.service.ts` and
+ * `upstream-review-follow-up.service.ts` as **Modify** targets and neither exists
+ * yet, so the budget gate is complete and tested on its own
+ * (`__tests__/upstream-budget.spec.ts`) and the two callers take it as their
+ * first step when they land. Nothing else can dispatch a contribution run today,
+ * so there is no live caller left ungated by its absence.
  */
 export * from './upstream-credential.service';
 export * from './upstream-credential.store';
+export * from './upstream-contribution-budget.service';
 export * from './upstream-pull-requests.module';

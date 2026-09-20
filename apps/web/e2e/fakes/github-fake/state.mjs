@@ -56,6 +56,44 @@ export const RESPONSE_BEHAVIOURS = Object.freeze([
 export const READINESS_BEHAVIOURS = Object.freeze(['delay', 'never-ready']);
 
 /**
+ * The switch that arms the **upstream** half of `/_control/seed` (T45).
+ *
+ * APW-09's PR lane needs a seeded `upstream_pull_requests` row plus the approval
+ * proposal that matches it, and the seed that plants them is the one part of the
+ * fake's control API that describes *product* state rather than a GitHub fixture.
+ * It is therefore armed exactly like the fake's API base switch
+ * (`packages/plugins/github/src/e2e-fakes.ts`): the literal string `'1'` in
+ * {@link FAKES_SWITCH_ENV}, and never in production. A production process that
+ * happens to have the variable set is inert rather than armed.
+ *
+ * The consequence a spec author must know: **the fake process itself has to be
+ * started with the switch**, because the gate is read in the fake's own process
+ * when the seed arrives — not in the spec's. `node …/server.mjs` without
+ * `EVER_WORKS_E2E_FAKES=1` starts a fake that serves every GitHub route and
+ * silently drops the upstream seed, so the seed answers `applied: false` with the
+ * reason and `helpers/github-fake-upstream.ts` refuses the lane on it.
+ */
+export const FAKES_SWITCH_ENV = 'EVER_WORKS_E2E_FAKES';
+
+/** The two seed keys the gate above governs. */
+export const UPSTREAM_SEED_KEYS = Object.freeze([
+    'upstream_pull_requests',
+    'upstream_approval_proposals',
+]);
+
+/**
+ * Is this process allowed to honour the upstream seed?
+ *
+ * Deliberately reads the environment per call rather than at module load, the
+ * same rule `resolveGitHubE2eFakeOrigin` keeps, so a unit spec can flip it.
+ */
+export function upstreamSeedGate(env = process.env) {
+    if (env.NODE_ENV === 'production') return { allowed: false, reason: 'production' };
+    if (env[FAKES_SWITCH_ENV] !== '1') return { allowed: false, reason: 'switch-off' };
+    return { allowed: true, reason: 'armed' };
+}
+
+/**
  * Create an empty state. `gitRoot` is where `git-backend.mjs` keeps the bare
  * repositories; the default is a per-process temp directory so two concurrent
  * runs never share a checkout.
@@ -77,6 +115,15 @@ export function createState(options = {}) {
         blueprints: [],
         calls: [],
         faults: [],
+        /**
+         * T45 — the seeded APW-09 state. Not GitHub data: `upstream_pull_requests`
+         * is the platform's own table (APW-09 plan §3.1) and the proposal is an
+         * `agent_action_proposals` row (§6), seeded so the PR lane starts from the
+         * `awaiting_approval` state ACC-NEG-06's precondition needs. Empty unless
+         * the upstream seed was armed (`upstreamSeedGate`).
+         */
+        upstreamPullRequests: [],
+        upstreamApprovalProposals: [],
     };
 }
 
@@ -136,6 +183,22 @@ export function upsertRepository(state, input, parents = {}) {
         workflows: existing?.workflows ?? [],
         actionsSecrets: existing?.actionsSecrets ?? new Map(),
         branchProtection: existing?.branchProtection ?? null,
+        /**
+         * T45 — the repository's TEMPORARY interaction limit (`GET
+         * …/interaction-limits`, APW-09 plan §4 / `getInteractionLimit`). `null`
+         * is GitHub's own "no temporary limit" answer and is served as `204`,
+         * which the plugin maps to `null` — never to `'none'`. A case that needs
+         * a limit seeds one; a case that needs `collaborators_only` seeds that.
+         */
+        interactionLimits: input.interactionLimits ?? existing?.interactionLimits ?? null,
+        /**
+         * T45 — the check runs and commit statuses this repository's commits
+         * answer with. `null` leaves the route's deterministic default in place
+         * (one green `build` check run, one `success` commit status); a case that
+         * needs `action_required`, `failure` or `pending` seeds the rows.
+         */
+        checkRuns: input.checkRuns ?? existing?.checkRuns ?? null,
+        commitStatuses: input.commitStatuses ?? existing?.commitStatuses ?? null,
         /** paths served by `routes/contents.mjs`, seeded on demand */
         contents: existing?.contents ?? new Map(),
         readme: existing?.readme ?? null,
@@ -202,6 +265,11 @@ export function seedUser(state, user) {
  * `/_control/seed` (plan §8.3). Accepts the documented shape and is additive:
  * an unknown key is ignored rather than fatal, so a newer spec fixture does not
  * break an older fake.
+ *
+ * T45 adds two keys, and they are the only ones the switch governs:
+ * `upstream_pull_requests` and `upstream_approval_proposals`. Everything else on
+ * this route is fake-GitHub fixture data and stays unconditional. See
+ * {@link seedUpstreamState} for the shapes and the matching rule.
  */
 export function seed(state, payload = {}) {
     for (const repo of payload.repositories ?? []) upsertRepository(state, repo);
@@ -219,7 +287,131 @@ export function seed(state, payload = {}) {
         organizations: state.organizations.length,
         catalog: state.catalog ? 1 : 0,
         blueprints: state.blueprints.length,
+        upstreamSeed: seedUpstreamState(state, payload, upstreamSeedGate()),
     };
+}
+
+/**
+ * T45 — seed APW-09's own state: `upstream_pull_requests` rows (plan §3.1) and
+ * the `agent_action_proposals` row that approves one (§6).
+ *
+ * **The gate.** The upstream half is honoured only when the switch is armed
+ * ({@link upstreamSeedGate}); otherwise it is ignored and the answer says so
+ * (`applied: false, reason`), so a lane that forgot the switch reads the reason
+ * instead of a seed that quietly did nothing.
+ *
+ * **The matching rule.** A proposal must resolve to a seeded row: by
+ * `upstreamPullRequestId` when it names one, otherwise by `(workId, sourceTaskId)`
+ * — the pair `UNIQUE (actionType, subjectKey)` stands in for in the real
+ * platform. An orphan proposal is refused loudly (`error`), because an approval
+ * proposal with no pull request is exactly the state ACC-NEG-06 would mistake for
+ * a working precondition.
+ *
+ * Row fields use APW-09 plan §3.1's own column names, so what a spec seeds is
+ * what the entity would carry. Idempotent like the rest of this route: seeding
+ * the same `id` again replaces the row rather than duplicating it.
+ */
+export function seedUpstreamState(state, payload, gate) {
+    const rows = payload.upstream_pull_requests;
+    const proposals = payload.upstream_approval_proposals;
+    if (rows === undefined && proposals === undefined) {
+        return { applied: false, reason: 'not-requested', rows: 0, proposals: 0, linked: 0 };
+    }
+    if (!gate.allowed) {
+        return { applied: false, reason: gate.reason, rows: 0, proposals: 0, linked: 0 };
+    }
+
+    for (const row of rows ?? []) {
+        const record = {
+            id: String(row.id),
+            userId: row.userId ?? null,
+            workId: String(row.workId),
+            sourceTaskId: String(row.sourceTaskId),
+            preparationTaskId: row.preparationTaskId ?? null,
+            followUpTaskId: row.followUpTaskId ?? null,
+            upstreamOwner: String(row.upstreamOwner),
+            upstreamRepo: String(row.upstreamRepo),
+            baseBranch: row.baseBranch ?? 'main',
+            headOwner: row.headOwner ?? null,
+            headRepo: row.headRepo ?? null,
+            headBranch: String(row.headBranch),
+            headSha: row.headSha ?? null,
+            upstreamBaseSha: row.upstreamBaseSha ?? null,
+            state: row.state ?? 'preparing',
+            number: row.number ?? null,
+            url: row.url ?? null,
+            title: row.title ?? null,
+            approvalProposalId: row.approvalProposalId ?? null,
+            createdAt: row.createdAt ?? state.generatedAt,
+        };
+        const index = state.upstreamPullRequests.findIndex((entry) => entry.id === record.id);
+        if (index === -1) state.upstreamPullRequests.push(record);
+        else state.upstreamPullRequests[index] = record;
+    }
+
+    for (const proposal of proposals ?? []) {
+        const record = {
+            id: String(proposal.id),
+            userId: proposal.userId ?? null,
+            agentId: proposal.agentId ?? null,
+            actionType: proposal.actionType ?? 'upstream_pull_request',
+            title: proposal.title ?? null,
+            subjectKey: proposal.subjectKey ?? null,
+            riskFlags: [...(proposal.riskFlags ?? ['cross_scope'])],
+            status: proposal.status ?? 'pending',
+            payload: { ...(proposal.payload ?? {}) },
+            createdAt: proposal.createdAt ?? state.generatedAt,
+        };
+        const match = matchProposal(state, record);
+        if (!match) {
+            return {
+                applied: false,
+                reason: 'orphan-proposal',
+                rows: state.upstreamPullRequests.length,
+                proposals: state.upstreamApprovalProposals.length,
+                linked: 0,
+                error:
+                    `approval proposal ${record.id} matches no seeded upstream_pull_requests row ` +
+                    `(upstreamPullRequestId=${String(
+                        record.payload.upstreamPullRequestId ?? proposal.upstreamPullRequestId,
+                    )}, workId=${String(record.payload.workId ?? '')}, ` +
+                    `sourceTaskId=${String(record.payload.sourceTaskId ?? '')})`,
+            };
+        }
+        record.payload.upstreamPullRequestId = match.id;
+        record.payload.workId = match.workId;
+        record.payload.sourceTaskId = match.sourceTaskId;
+        const index = state.upstreamApprovalProposals.findIndex((entry) => entry.id === record.id);
+        if (index === -1) state.upstreamApprovalProposals.push(record);
+        else state.upstreamApprovalProposals[index] = record;
+        match.approvalProposalId = record.id;
+    }
+
+    const linked = state.upstreamApprovalProposals.filter((proposal) =>
+        state.upstreamPullRequests.some((row) => row.id === proposal.payload.upstreamPullRequestId),
+    ).length;
+    return {
+        applied: true,
+        reason: 'armed',
+        rows: state.upstreamPullRequests.length,
+        proposals: state.upstreamApprovalProposals.length,
+        linked,
+    };
+}
+
+/**
+ * Which seeded row a proposal approves: the one it names, else the one with its
+ * `(workId, sourceTaskId)`. Returns `undefined` when there is none, which
+ * {@link seedUpstreamState} turns into a named refusal.
+ */
+function matchProposal(state, proposal) {
+    const named = proposal.payload.upstreamPullRequestId;
+    if (named) return state.upstreamPullRequests.find((row) => row.id === String(named));
+    return state.upstreamPullRequests.find(
+        (row) =>
+            row.workId === String(proposal.payload.workId ?? '') &&
+            row.sourceTaskId === String(proposal.payload.sourceTaskId ?? ''),
+    );
 }
 
 /** Reset everything except the git root — the unit specs use this between cases. */
@@ -231,6 +423,8 @@ export function reset(state) {
     state.blueprints = [];
     state.calls.length = 0;
     state.faults.length = 0;
+    state.upstreamPullRequests = [];
+    state.upstreamApprovalProposals = [];
     state.seq = { repo: 1_000_000, hook: 1, ref: 1, object: 1, pull: 1, run: 1, comment: 1 };
 }
 
@@ -499,6 +693,9 @@ function placeholderRepo(fullName) {
         workflows: [],
         actionsSecrets: new Map(),
         branchProtection: null,
+        interactionLimits: null,
+        checkRuns: null,
+        commitStatuses: null,
         contents: new Map(),
         readme: null,
         gitDir: null,
@@ -852,5 +1049,130 @@ export function comparePayload(repo, input) {
         total_commits: input.totalCommits ?? 1,
         commits: (input.commits ?? []).map((commit) => gitCommitPayload(repo, commit)),
         files: (input.files ?? []).map(workflowRunFilePayload),
+    };
+}
+
+// ---------------------------------------------------------------------------
+// T45 — the upstream endpoints APW-09 calls
+//
+// `docs/specs/features/app-works/APW-09-upstream-pull-requests/tasks.md` T45
+// names the REST subset this epic reads and writes. The projections below are
+// that subset's response shapes; `routes/commits.mjs` and `routes/repos.mjs`
+// serve them.
+//
+// Every one is read by `packages/plugins/github/src/github-api.service.ts`:
+//   - `check_runs[].{name,status,conclusion,details_url}` + `total_count`
+//     (`readChecks` → `checks.listForRef`);
+//   - `statuses[]` keyed by `context`, newest wins
+//     (`readChecks` → `repos.listCommitStatusesForRef`);
+//   - `interaction-limits`'s `limit` (`getInteractionLimit`).
+//
+// Two deliberate subsets, recorded in `fixtures/README.md` so a reader does not
+// mistake them for drift: a `check_run` carries no `app`, `check_suite`,
+// `pull_requests` or `deployment`, and the combined status's `repository` is the
+// identifying half of the repository payload rather than the whole of it. The
+// fields the plugin reads are all present and real.
+// ---------------------------------------------------------------------------
+
+/** The check run a `commits/:ref/check-runs` read answers when none was seeded. */
+export const DEFAULT_CHECK_RUN_NAME = 'build';
+
+/** The commit-status context a `commits/:ref/statuses` read answers when none was seeded. */
+export const DEFAULT_COMMIT_STATUS_CONTEXT = 'continuous-integration/apw-e2e';
+
+/** GitHub's combined-status roll-up: any failure wins, then pending, else success. */
+export function combinedState(statuses) {
+    const states = statuses.map((status) => String(status.state));
+    if (states.some((state) => state === 'error' || state === 'failure')) return 'failure';
+    if (states.some((state) => state === 'pending')) return 'pending';
+    return 'success';
+}
+
+export function checkRunPayload(repo, run) {
+    const base = apiBase(repo);
+    return {
+        id: run.id,
+        name: run.name,
+        status: run.status,
+        conclusion: run.conclusion ?? null,
+        started_at: run.startedAt,
+        completed_at: run.completedAt ?? null,
+        details_url: run.detailsUrl ?? null,
+        // The human link stays on github.com, like every other `html_url` here.
+        html_url: `https://github.com/${repo.owner}/${repo.name}/runs/${run.id}`,
+        head_sha: run.headSha,
+        external_id: run.externalId ?? null,
+        url: `${base}/check-runs/${run.id}`,
+        output: {
+            title: run.outputTitle ?? run.name,
+            summary: run.outputSummary ?? null,
+            text: run.outputText ?? null,
+            annotations_count: run.annotationsCount ?? 0,
+            annotations_url: `${base}/check-runs/${run.id}/annotations`,
+        },
+    };
+}
+
+export function checkRunsPayload(repo, runs) {
+    return {
+        total_count: runs.length,
+        check_runs: runs.map((run) => checkRunPayload(repo, run)),
+    };
+}
+
+export function commitStatusPayload(repo, status) {
+    return {
+        url: `${apiBase(repo)}/statuses/${status.id}`,
+        id: status.id,
+        state: status.state,
+        description: status.description ?? null,
+        target_url: status.targetUrl ?? null,
+        context: status.context,
+        created_at: status.createdAt,
+        updated_at: status.updatedAt ?? status.createdAt,
+        creator: ownerPayload(status.creatorLogin ?? repo.owner),
+    };
+}
+
+export function commitStatusesPayload(repo, statuses) {
+    return statuses.map((status) => commitStatusPayload(repo, status));
+}
+
+/**
+ * `GET /repos/:o/:r/commits/:ref/status` — the combined status. Its `repository`
+ * is the identifying half of the repository payload (see the subset note above).
+ */
+export function combinedStatusPayload(repo, ref, statuses, origin) {
+    const fullName = `${repo.owner}/${repo.name}`;
+    return {
+        state: combinedState(statuses),
+        statuses: commitStatusesPayload(repo, statuses),
+        sha: ref,
+        total_count: statuses.length,
+        repository: {
+            id: repo.id,
+            name: repo.name,
+            full_name: fullName,
+            private: repo.private,
+            owner: ownerPayload(repo.owner),
+            html_url: `${origin}/${fullName}`,
+            default_branch: repo.defaultBranch,
+        },
+        commit_url: `${apiBase(repo)}/commits/${ref}`,
+        url: `${apiBase(repo)}/commits/${ref}/status`,
+    };
+}
+
+/**
+ * `GET /repos/:o/:r/interaction-limits` — GitHub's temporary-limit answer:
+ * `{ limit, origin, expires_at }`. `null` (no seeded limit) is answered `204`,
+ * which is what the live API does and what `getInteractionLimit` maps to `null`.
+ */
+export function interactionLimitPayload(limit) {
+    if (!limit) return null;
+    return {
+        limit: limit.limit,
+        origin: limit.origin ?? 'repository',
+        expires_at: limit.expiresAt ?? null,
     };
 }

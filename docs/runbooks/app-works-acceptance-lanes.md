@@ -73,7 +73,16 @@ environment — substitute your own origins for the variables.
 ```bash
 # 1. The fake GitHub (the workflow starts this BEFORE the API, because the API's first GitHub call
 #    must already reach it). Port 3900.
-node apps/web/e2e/fakes/github-fake/server.mjs &
+#
+#    ⚠️ `EVER_WORKS_E2E_FAKES=1` on THIS line matters since T45 (2026-09-19): the fake's
+#    `POST /_control/seed` honours its two APW-09 keys (`upstream_pull_requests`,
+#    `upstream_approval_proposals`) ONLY while the switch is armed, and the switch is read in the
+#    FAKE's process when the seed arrives. `e2e.yml` already exports it to the step that starts
+#    this process, so CI needs no change; a hand-run local lane does, or its upstream seed is
+#    silently ignored. Start it without the switch and the seed answers
+#    `upstreamSeed: { applied: false, reason: 'switch-off' }`, which
+#    `helpers/github-fake-upstream.ts` turns into a lane failure rather than a mystery.
+EVER_WORKS_E2E_FAKES=1 node apps/web/e2e/fakes/github-fake/server.mjs &
 
 # 1a. BUILD THE PLUGIN PACKAGES FIRST. `packages/plugins/github/dist` absent is the single most
 #     expensive oversight here: the API logs "Failed to load plugin module from …packages/plugins/github"
@@ -125,6 +134,29 @@ Added 2026-09-19 (C14). The fake had these endpoints from the start but document
 | `GET  /_control/state`  | The seeded repositories, user logins, organizations, catalog and Blueprints.                                                                                                                                                                            |
 | `POST /_control/reset`  | Clears repositories, users, catalog, Blueprints, the call log and the fault queue. Keeps the git root.                                                                                                                                                  |
 
+**Added 2026-09-19 (T45) — the upstream seed, and the switch that arms it.** `POST /_control/seed`
+also takes two APW-09 keys, and they are the only gated ones:
+
+| Key                             | Shape                                                                                                                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `upstream_pull_requests[]`      | APW-09 plan §3.1's own column names: `{ id, userId, workId, sourceTaskId, upstreamOwner, upstreamRepo, baseBranch, headOwner, headRepo, headBranch, headSha, upstreamBaseSha, state, number, url, title }`. Idempotent on `id`. |
+| `upstream_approval_proposals[]` | §6's proposal: `{ id, userId, agentId, title, subjectKey, status, payload: { workId, sourceTaskId, upstreamPullRequestId? } }`.                                                                                                 |
+
+- **Armed only when `EVER_WORKS_E2E_FAKES === '1'` and `NODE_ENV !== 'production'`** — the fake's own
+  `upstreamSeedGate`, the same two conditions the GitHub plugin's API-base switch keeps
+  (`packages/plugins/github/src/e2e-fakes.ts`). Unarmed, the two keys are ignored and the seed answers
+  `200 { seeded: { …, upstreamSeed: { applied: false, reason: 'switch-off' \| 'production' \| 'not-requested' } } }`.
+  Everything else on the route is fake-GitHub fixture data and stays unconditional.
+- **A proposal is matched to its row** by `payload.upstreamPullRequestId`, else by
+  `(payload.workId, payload.sourceTaskId)`; the match writes both back (`payload.upstreamPullRequestId`
+  on the proposal, `approvalProposalId` on the row). A proposal matching no row is a **`400`** naming the
+  orphan — a lane whose "an `awaiting_approval` proposal is seeded" precondition quietly seeded nothing is
+  the one failure this route can prevent.
+- Read both back from `GET /_control/state` → `upstreamPullRequests[]`, `upstreamApprovalProposals[]`;
+  `POST /_control/reset` clears them.
+- `apps/web/e2e/helpers/github-fake-upstream.ts` is the recommended entry point: it posts the seed,
+  **refuses the lane** when the fake reports `applied: false` (naming the switch), and reads the pair back.
+
 **"The next matching call only" — the semantics that decide where a plant goes.** A fault is planted
 with `times` (default **1**) and matched in plant order; each matching request takes one application and
 the fault is dropped when its last one is spent. So a spec must plant **in the case's own setup,
@@ -145,6 +177,29 @@ otherwise the identity resolves and the request fails later at a _different_ gat
 `POST /api/register-work` that is `gh_repo_access_denied` from `assertRepoAccess`, not
 `gh_credential_invalid` from `resolveGitHubIdentity`. Both are `403`, so only the typed `code` tells
 them apart.
+
+### The fake's upstream (APW-09) endpoints — added 2026-09-19 (T45)
+
+APW-09's upstream lanes read and write more GitHub than APW-13's did. The subset, and the field each
+consumer reads (`packages/plugins/github/src/github-api.service.ts`):
+
+| Endpoint                                               | Answers                                                                                                                                            |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DELETE /repos/:o/:r/git/refs/*ref`                    | `204`, and the ref is really removed — a following `GET …/git/refs/heads/<branch>` is a `404`. This is **Withdraw**'s branch delete (FR-33/FR-45). |
+| `GET /repos/:o/:r/interaction-limits`                  | `200 { limit, origin, expires_at }` when seeded; GitHub's own **`204`** when not, which the plugin maps to `null` and never to `'none'`.           |
+| `GET /repos/:o/:r/commits/:ref/check-runs`             | `{ total_count, check_runs[] }`; each run carries `name`, `status`, `conclusion`, `details_url`.                                                   |
+| `GET /repos/:o/:r/commits/:ref/statuses`               | The commit statuses; `readChecks` keys them by `context`, newest first.                                                                            |
+| `GET /repos/:o/:r/commits/:ref/status`                 | The combined status, **rolled up** from the statuses above (any `failure`/`error` wins, then `pending`, else `success`) rather than asserted.      |
+| `POST /git/refs`, `PATCH /git/refs/*ref`               | Already served (APW-02/03); pinned by T45 so they cannot regress.                                                                                  |
+| `GET /repos/:o/:r/compare/:basehead`                   | Already answered `total_commits` (APW-09 T1); pinned by T45.                                                                                       |
+| `GET /repos/:o/:r/pulls/:n`, `…/reviews`, `…/comments` | Already served (PR status, review follow-up); pinned by T45.                                                                                       |
+
+`checkRuns` and `commitStatuses` are **seedable per repository** so a lane can exercise the states the
+acceptance rows turn on (`action_required` → _waiting for maintainers_, ACC-09-17; a red check; a
+`pending` status). The PR-lane catalog (`fixtures/catalog-pr-lane.seed.json`) seeds
+`ever-works/cal-diy-template` with an `action_required` `build` run, a green `lint` run, one green
+commit status and a `collaborators_only` interaction limit. Unseeded, a repository answers the one
+deterministic green run and green status `routes/commits.mjs` derives.
 
 ### Traps that cost real time
 

@@ -32,11 +32,17 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 // `allowJs` in apps/web/tsconfig.json lets TypeScript infer its surface.
 import { createFakeGitHub } from '../server.mjs';
 import { seedBareRepoCommit } from '../git-backend.mjs';
+// The switch the upstream seed is armed by (T45), read from the fake's own
+// constant rather than re-spelled here, so a rename cannot leave this spec
+// flipping a variable nothing reads.
+import { FAKES_SWITCH_ENV } from '../state.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.resolve(HERE, '..', 'fixtures');
 const USER_TOKEN = 'apw-e2e-user-token';
 const STRANGER_TOKEN = 'apw-e2e-stranger-token';
+const SHA_A = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+const SHA_B = 'b2c3d4e5f60718293a4b5c6d7e8f901234567890';
 
 type Json = Record<string, any>;
 
@@ -143,6 +149,99 @@ function catalogSeed(): Json {
 async function seedCatalog(): Promise<void> {
     const result = await control('/_control/seed', catalogSeed());
     expect(result.status).toBe(200);
+}
+
+/**
+ * The environment, as a mutable bag.
+ *
+ * `process.env`'s declared properties are `readonly` (`NODE_ENV` among them), so
+ * the two switches below cannot be flipped through the declared type. The cast is
+ * what a spec that arms and disarms a switch has to do; nothing else in this file
+ * writes the environment.
+ */
+function mutableEnv(): Record<string, string | undefined> {
+    return process.env as unknown as Record<string, string | undefined>;
+}
+
+/**
+ * Run `run` with `EVER_WORKS_E2E_FAKES` set to `value`, restoring whatever was
+ * there afterwards.
+ *
+ * The fake reads the switch **per seed call** (`state.mjs`'s `upstreamSeedGate`),
+ * deliberately, so a case can flip it — the same rule `resolveGitHubE2eFakeOrigin`
+ * keeps. Restoring in a `finally` matters more than it looks: this process also
+ * runs every other case in the file, and a leaked `EVER_WORKS_E2E_FAKES=1` would
+ * arm the upstream seed for all of them.
+ */
+async function withFakesSwitch<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+    const env = mutableEnv();
+    const previous = env[FAKES_SWITCH_ENV];
+    if (value === undefined) delete env[FAKES_SWITCH_ENV];
+    else env[FAKES_SWITCH_ENV] = value;
+    try {
+        return await run();
+    } finally {
+        if (previous === undefined) delete env[FAKES_SWITCH_ENV];
+        else env[FAKES_SWITCH_ENV] = previous;
+    }
+}
+
+/** The same, for `NODE_ENV` — the other half of the gate. */
+async function withNodeEnv<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+    const env = mutableEnv();
+    const previous = env.NODE_ENV;
+    if (value === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = value;
+    try {
+        return await run();
+    } finally {
+        if (previous === undefined) delete env.NODE_ENV;
+        else env.NODE_ENV = previous;
+    }
+}
+
+/**
+ * The upstream seed of T45, in APW-09 plan §3.1 / §6's own field names: the
+ * `upstream_pull_requests` row an `awaiting_approval` proposal is about, and the
+ * `agent_action_proposals` row that approves it. The proposal deliberately does
+ * **not** name its row — it is matched by `(workId, sourceTaskId)`, which is what
+ * the sibling case below pins.
+ */
+function upstreamSeed(overrides: Json = {}): Json {
+    return {
+        upstream_pull_requests: [
+            {
+                id: 'upr-0001',
+                userId: 'user-0001',
+                workId: 'work-0001',
+                sourceTaskId: 'task-0001',
+                upstreamOwner: 'ever-works',
+                upstreamRepo: 'cal-diy-template',
+                baseBranch: 'main',
+                headOwner: 'apw-e2e-user',
+                headRepo: 'cal-diy-template',
+                headBranch: 'upstream-pr/add-smoke-test-1a2b',
+                headSha: SHA_A,
+                upstreamBaseSha: SHA_B,
+                state: 'awaiting_approval',
+                number: 12,
+                url: 'https://github.com/ever-works/cal-diy-template/pull/12',
+                title: 'Add the smoke test',
+            },
+        ],
+        upstream_approval_proposals: [
+            {
+                id: 'proposal-0001',
+                userId: 'user-0001',
+                agentId: 'agent-0001',
+                title: 'Approve pull request to ever-works/cal-diy-template: Add the smoke test',
+                subjectKey: 'apw-e2e-subject-key',
+                status: 'pending',
+                payload: { workId: 'work-0001', sourceTaskId: 'task-0001' },
+            },
+        ],
+        ...overrides,
+    };
 }
 
 beforeAll(async () => {
@@ -615,5 +714,345 @@ describe('T2 — the seeded PR-lane catalog serves its consumers', () => {
         expect(archived.body.names).toEqual(['apw-e2e-expired']);
         const read = await api('GET', '/repos/ever-works/templates/topics', { token: USER_TOKEN });
         expect(read.body.names).toEqual(['apw-e2e-expired']);
+    });
+});
+
+/**
+ * T45 — the upstream endpoints APW-09's lanes call.
+ *
+ * `docs/specs/features/app-works/APW-09-upstream-pull-requests/tasks.md` T45
+ * names ten REST endpoints and one extension. This block drives each of them over
+ * real HTTP and asserts **what the consuming plugin reads**, not merely that a
+ * `200` came back:
+ *
+ *   - `check_runs[].{name,status,conclusion,details_url}` plus `total_count`
+ *     (`readChecks` → `checks.listForRef`), seeded with an `action_required` run
+ *     because ACC-09-17 turns on that value reading as *waiting for maintainers*
+ *     rather than as a failure;
+ *   - the commit statuses, and the combined status **rolled up** from them rather
+ *     than asserted;
+ *   - the interaction limit, including GitHub's own `204` for "no temporary
+ *     limit", which the plugin maps to `null` and never to `'none'`;
+ *   - the branch create / update / delete trio, where the delete must really
+ *     remove the ref;
+ *   - the pull-request reads the status lane makes, and the compare's
+ *     `total_commits` (APW-09 T1).
+ *
+ * The structural half — that every URL T45 names is dispatched to *some* route of
+ * the right method — is `contract.unit.spec.ts`'s `T45_ROUTES` net. This block is
+ * the behavioural half.
+ */
+describe('T45 — the upstream endpoints APW-09 calls', () => {
+    it('creates, updates and deletes a branch ref, and the delete really removes it', async () => {
+        const created = await api('POST', '/repos/ever-works/templates/git/refs', {
+            token: USER_TOKEN,
+            body: { ref: 'refs/heads/upstream-pr-withdraw', sha: SHA_A },
+        });
+        expect(created.status).toBe(201);
+        expect(created.body.ref).toBe('refs/heads/upstream-pr-withdraw');
+        expect(created.body.object).toMatchObject({ sha: SHA_A, type: 'commit' });
+
+        const updated = await api(
+            'PATCH',
+            '/repos/ever-works/templates/git/refs/heads/upstream-pr-withdraw',
+            { token: USER_TOKEN, body: { sha: SHA_B } },
+        );
+        expect(updated.status).toBe(200);
+        expect(updated.body.object.sha).toBe(SHA_B);
+
+        const deleted = await api(
+            'DELETE',
+            '/repos/ever-works/templates/git/refs/heads/upstream-pr-withdraw',
+            { token: USER_TOKEN },
+        );
+        expect(deleted.status, 'the live API answers 204 for a branch delete').toBe(204);
+
+        const gone = await api(
+            'GET',
+            '/repos/ever-works/templates/git/refs/heads/upstream-pr-withdraw',
+            { token: USER_TOKEN },
+        );
+        expect(
+            gone.status,
+            'a fake that answered 204 while the branch stayed readable would let a lane ' +
+                'pass a "the branch is gone" assertion it never earned',
+        ).toBe(404);
+
+        const calls = await api('GET', '/_control/calls');
+        const recorded = calls.body.calls.find(
+            (call: Json) => call.method === 'DELETE' && call.path.endsWith('/upstream-pr-withdraw'),
+        );
+        expect(
+            recorded?.status,
+            'the delete is a recorded write, for a zero-writes assertion',
+        ).toBe(204);
+    });
+
+    it('serves check-runs, commit statuses and the combined status of a commit', async () => {
+        const runs = await api(
+            'GET',
+            `/repos/ever-works/cal-diy-template/commits/${SHA_A}/check-runs`,
+            { token: USER_TOKEN },
+        );
+        expect(runs.status).toBe(200);
+        expect(runs.body.total_count).toBe(2);
+        expect(
+            runs.body.check_runs.map((run: Json) => `${run.name}:${run.status}:${run.conclusion}`),
+            'an action_required run is what ACC-09-17 reads as waiting for maintainers',
+        ).toEqual(['build:completed:action_required', 'lint:completed:success']);
+        expect(typeof runs.body.check_runs[0].details_url).toBe('string');
+        expect(typeof runs.body.check_runs[0].output.annotations_count).toBe('number');
+
+        const statuses = await api(
+            'GET',
+            `/repos/ever-works/cal-diy-template/commits/${SHA_A}/statuses`,
+            { token: USER_TOKEN },
+        );
+        expect(statuses.status).toBe(200);
+        expect(Array.isArray(statuses.body)).toBe(true);
+        expect(statuses.body[0]).toMatchObject({
+            context: 'continuous-integration/apw-e2e',
+            state: 'success',
+        });
+
+        const combined = await api(
+            'GET',
+            `/repos/ever-works/cal-diy-template/commits/${SHA_A}/status`,
+            { token: USER_TOKEN },
+        );
+        expect(combined.status).toBe(200);
+        expect(combined.body).toMatchObject({ state: 'success', total_count: 1 });
+        expect(combined.body.repository.full_name).toBe('ever-works/cal-diy-template');
+    });
+
+    it('rolls the combined status up from the statuses instead of asserting it', async () => {
+        await control('/_control/seed', {
+            repositories: [
+                {
+                    owner: 'ever-works',
+                    name: 'templates',
+                    commitStatuses: [
+                        {
+                            id: 910001,
+                            context: 'continuous-integration/one',
+                            state: 'success',
+                            createdAt: '2026-09-18T09:12:04Z',
+                        },
+                        {
+                            id: 910002,
+                            context: 'continuous-integration/two',
+                            state: 'failure',
+                            description: 'The smoke test failed',
+                            createdAt: '2026-09-18T09:13:04Z',
+                        },
+                    ],
+                },
+            ],
+        });
+
+        const statuses = await api('GET', '/repos/ever-works/templates/commits/main/statuses', {
+            token: USER_TOKEN,
+        });
+        expect(statuses.body.map((status: Json) => status.context)).toEqual([
+            'continuous-integration/one',
+            'continuous-integration/two',
+        ]);
+
+        const combined = await api('GET', '/repos/ever-works/templates/commits/main/status', {
+            token: USER_TOKEN,
+        });
+        expect(
+            combined.body.state,
+            'a red status among green ones is a red roll-up, as GitHub answers',
+        ).toBe('failure');
+        expect(combined.body.total_count).toBe(2);
+    });
+
+    it('answers a seeded interaction limit 200 and an unseeded repository GitHub’s own 204', async () => {
+        const limited = await api('GET', '/repos/ever-works/cal-diy-template/interaction-limits', {
+            token: USER_TOKEN,
+        });
+        expect(limited.status).toBe(200);
+        expect(limited.body).toMatchObject({
+            limit: 'collaborators_only',
+            origin: 'repository',
+        });
+        expect(typeof limited.body.expires_at).toBe('string');
+
+        const unlimited = await api('GET', '/repos/ever-works/templates/interaction-limits', {
+            token: USER_TOKEN,
+        });
+        expect(
+            unlimited.status,
+            'the live API answers 204 when a repository has no temporary limit',
+        ).toBe(204);
+        expect(
+            unlimited.body,
+            'a 204 carries no body, which the plugin maps to null — never to `none`',
+        ).toBeNull();
+    });
+
+    it('serves the pull-request reads the upstream status lane makes', async () => {
+        const created = await api('POST', '/repos/ever-works/cal-diy-template/pulls', {
+            token: USER_TOKEN,
+            body: {
+                title: 'Add the smoke test',
+                head: 'apw-e2e-user:upstream-pr-add-smoke-test-1a2b',
+                base: 'main',
+                body: 'The proposal body.',
+            },
+        });
+        expect(created.status).toBe(201);
+        const number = created.body.number;
+
+        const read = await api('GET', `/repos/ever-works/cal-diy-template/pulls/${number}`, {
+            token: USER_TOKEN,
+        });
+        expect(read.status).toBe(200);
+        expect(read.body).toMatchObject({ state: 'open', mergeable: true, draft: false });
+        expect(read.body.head.label).toBe('apw-e2e-user:upstream-pr-add-smoke-test-1a2b');
+        expect(read.body.base.ref).toBe('main');
+
+        const reviews = await api(
+            'GET',
+            `/repos/ever-works/cal-diy-template/pulls/${number}/reviews`,
+            { token: USER_TOKEN },
+        );
+        expect(reviews.status).toBe(200);
+        expect(reviews.body.map((review: Json) => review.state)).toEqual(['APPROVED']);
+        expect(typeof reviews.body[0].submitted_at).toBe('string');
+
+        const comments = await api(
+            'GET',
+            `/repos/ever-works/cal-diy-template/pulls/${number}/comments`,
+            { token: USER_TOKEN },
+        );
+        expect(comments.status).toBe(200);
+        expect(comments.body[0]).toMatchObject({ path: '.works/works.yml' });
+        expect(typeof comments.body[0].line).toBe('number');
+    });
+
+    it('answers total_commits on the compare read (APW-09 T1)', async () => {
+        const compared = await api(
+            'GET',
+            '/repos/ever-works/cal-diy-template/compare/main...apw-e2e-head',
+            { token: USER_TOKEN },
+        );
+        expect(compared.status).toBe(200);
+        expect(compared.body.total_commits).toBe(1);
+        expect(Array.isArray(compared.body.files)).toBe(true);
+    });
+});
+
+/**
+ * T45 — the upstream seed and the switch that arms it.
+ *
+ * `POST /_control/seed` gains `upstream_pull_requests` and
+ * `upstream_approval_proposals`, and they are the only seed keys governed by
+ * `EVER_WORKS_E2E_FAKES=1 && NODE_ENV !== 'production'`. Three things a lane's
+ * precondition depends on, each pinned here: an armed seed lands and links, an
+ * unarmed one is **ignored and says so**, and a proposal matching no row is
+ * refused loudly.
+ */
+describe('T45 — the upstream seed, and the switch that arms it', () => {
+    it('seeds the row and its matching proposal when the switch is armed, and reads them back', async () => {
+        const seeded = await withFakesSwitch('1', () => control('/_control/seed', upstreamSeed()));
+
+        expect(seeded.status).toBe(200);
+        expect(seeded.body.seeded.upstreamSeed).toEqual({
+            applied: true,
+            reason: 'armed',
+            rows: 1,
+            proposals: 1,
+            linked: 1,
+        });
+
+        const state = await api('GET', '/_control/state');
+        const row = state.body.upstreamPullRequests[0];
+        expect(row).toMatchObject({
+            id: 'upr-0001',
+            workId: 'work-0001',
+            sourceTaskId: 'task-0001',
+            state: 'awaiting_approval',
+            number: 12,
+            upstreamOwner: 'ever-works',
+            upstreamRepo: 'cal-diy-template',
+        });
+        const proposal = state.body.upstreamApprovalProposals[0];
+        expect(proposal).toMatchObject({
+            id: 'proposal-0001',
+            actionType: 'upstream_pull_request',
+            status: 'pending',
+        });
+        expect(
+            proposal.payload.upstreamPullRequestId,
+            'the proposal is matched to its row, so ACC-NEG-06 starts from a linked pair',
+        ).toBe('upr-0001');
+        expect(row.approvalProposalId).toBe('proposal-0001');
+    });
+
+    it('ignores the upstream seed when the switch is off, and names the reason', async () => {
+        const seeded = await withFakesSwitch(undefined, () =>
+            control('/_control/seed', upstreamSeed()),
+        );
+
+        expect(seeded.status, 'an unarmed seed is not an error — it is an ignorable key').toBe(200);
+        expect(seeded.body.seeded.upstreamSeed).toEqual({
+            applied: false,
+            reason: 'switch-off',
+            rows: 0,
+            proposals: 0,
+            linked: 0,
+        });
+
+        const state = await api('GET', '/_control/state');
+        expect(
+            state.body.upstreamPullRequests,
+            'nothing was stored, so no case can read a row it did not seed',
+        ).toEqual([]);
+        expect(state.body.upstreamApprovalProposals).toEqual([]);
+    });
+
+    it('ignores the upstream seed in production even with the switch on', async () => {
+        const seeded = await withNodeEnv('production', () =>
+            withFakesSwitch('1', () => control('/_control/seed', upstreamSeed())),
+        );
+        expect(seeded.body.seeded.upstreamSeed.applied).toBe(false);
+        expect(seeded.body.seeded.upstreamSeed.reason).toBe('production');
+    });
+
+    it('refuses a proposal that matches no seeded row, naming the orphan', async () => {
+        const seeded = await withFakesSwitch('1', () =>
+            control(
+                '/_control/seed',
+                upstreamSeed({
+                    upstream_approval_proposals: [
+                        {
+                            id: 'proposal-orphan',
+                            payload: { workId: 'work-nobody', sourceTaskId: 'task-nobody' },
+                        },
+                    ],
+                }),
+            ),
+        );
+
+        expect(
+            seeded.status,
+            'a precondition that silently seeded nothing is the failure to prevent',
+        ).toBe(400);
+        expect(String(seeded.body.message)).toContain('proposal-orphan');
+        expect(String(seeded.body.message)).toContain(
+            'matches no seeded upstream_pull_requests row',
+        );
+    });
+
+    it('clears the upstream seed on /_control/reset', async () => {
+        await withFakesSwitch('1', () => control('/_control/seed', upstreamSeed()));
+        expect((await api('GET', '/_control/state')).body.upstreamPullRequests).toHaveLength(1);
+
+        await control('/_control/reset');
+        const state = await api('GET', '/_control/state');
+        expect(state.body.upstreamPullRequests).toEqual([]);
+        expect(state.body.upstreamApprovalProposals).toEqual([]);
     });
 });

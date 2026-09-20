@@ -2,11 +2,13 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { AppWorksModule } from '../app-works/app-works.module';
+import { BudgetsModule } from '../budgets/budgets.module';
 import {
     UPSTREAM_CREDENTIAL_STORE,
     UpstreamCredentialService,
 } from './upstream-credential.service';
 import { UpstreamCredentialStateStore } from './upstream-credential.store';
+import { UpstreamContributionBudgetService } from './upstream-contribution-budget.service';
 
 /**
  * APW-09 (Upstream pull requests) — the epic's agent-side module, and the home
@@ -77,6 +79,20 @@ import { UpstreamCredentialStateStore } from './upstream-credential.store';
  * has not landed stays unbound rather than bound to a placeholder — the rule
  * `AppWorksModule`'s docstring states — and the credential of record is
  * complete without them.
+ *
+ * ## T44's budget gate, and why `BudgetsModule` is imported rather than re-provided
+ *
+ * `UpstreamContributionBudgetService` (T44, FR-44) injects `BudgetGuardService`
+ * and `BudgetService`, both of which `BudgetsModule` provides and exports. They
+ * are imported, never re-provided: a second `BudgetGuardService` instance would
+ * read the same tables but hold its own alert-state wiring, which is exactly the
+ * "two answers to the same question" this module's sibling docstrings refuse.
+ * `BudgetsModule` imports `DatabaseModule`, so this adds no new leaf beyond the
+ * one already imported here.
+ *
+ * Both of the service's collaborators are `@Optional()` at the injection site, so
+ * this module still compiles in a shell that has not imported `BudgetsModule` —
+ * where the gate reports `gate: 'ungated'` rather than pretending a check ran.
  */
 @Module({
     imports: [
@@ -87,15 +103,23 @@ import { UpstreamCredentialStateStore } from './upstream-credential.store';
         // member-token door the background path uses.
         DatabaseModule,
         FacadesModule,
+        // T44: the Work budget the contribution-run gate books against.
+        BudgetsModule,
     ],
     providers: [
         UpstreamCredentialStateStore,
         UpstreamCredentialService,
+        UpstreamContributionBudgetService,
         {
             provide: UPSTREAM_CREDENTIAL_STORE,
             useExisting: UpstreamCredentialStateStore,
         },
     ],
-    exports: [UpstreamCredentialStateStore, UpstreamCredentialService, UPSTREAM_CREDENTIAL_STORE],
+    exports: [
+        UpstreamCredentialStateStore,
+        UpstreamCredentialService,
+        UpstreamContributionBudgetService,
+        UPSTREAM_CREDENTIAL_STORE,
+    ],
 })
 export class UpstreamPullRequestsModule {}

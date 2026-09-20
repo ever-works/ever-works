@@ -94,6 +94,47 @@ Additive, and listed here so they are not mistaken for the contracted set:
   fake's own control API (`control.mjs`), which T3's route table skips because
   they are not GitHub routes.
 
+## Added 2026-09-19 (APW-09 T45) — the upstream endpoints
+
+`docs/specs/features/app-works/APW-09-upstream-pull-requests/tasks.md` T45 names the REST subset
+APW-09's upstream lanes call. Five fixtures are new; the rest of T45's list was already served and is
+pinned by name in `__tests__/contract.unit.spec.ts`'s `T45_ROUTES`.
+
+| Fixture                   | Route                                      | Status | Note                                                                    |
+| ------------------------- | ------------------------------------------ | ------ | ----------------------------------------------------------------------- |
+| `git-ref-delete.json`     | `DELETE /repos/:o/:r/git/refs/*ref`        | 204    | `null` body, like the other 204s above                                  |
+| `interaction-limits.json` | `GET /repos/:o/:r/interaction-limits`      | 200    | an **unseeded** repository answers `204` instead — asserted in the spec |
+| `check-runs.json`         | `GET /repos/:o/:r/commits/:ref/check-runs` | 200    | two runs, one `action_required` (ACC-09-17) and one `success`           |
+| `commit-statuses.json`    | `GET /repos/:o/:r/commits/:ref/statuses`   | 200    | one `success` status                                                    |
+| `commit-status.json`      | `GET /repos/:o/:r/commits/:ref/status`     | 200    | the combined status, rolled up from `commit-statuses.json`'s rows       |
+
+**Two documented subsets**, in the same spirit as the departures above — recorded so a reader does not
+mistake them for drift:
+
+1. **A `check_run` carries no `app`, `check_suite`, `pull_requests` or `deployment`.** The live payload
+   has all four. Every field the consuming plugin reads (`name`, `status`, `conclusion`, `details_url`)
+   plus `total_count` is present and real.
+2. **The combined status's `repository` is the identifying half of the repository payload**
+   (`id`, `name`, `full_name`, `private`, `owner`, `html_url`, `default_branch`) rather than the whole
+   of it. The live payload repeats the full repository object there.
+
+`checkRuns` and `commitStatuses` are also **seedable** on a repository (`catalog-pr-lane.seed.json`
+seeds `ever-works/cal-diy-template`), which is how a lane reaches `action_required`, a red check or a
+`pending` status without editing the fake. An unseeded repository answers one deterministic green run
+and one green status, derived per request from the ref it was asked about.
+
+`catalog-pr-lane.seed.json` also gained `interactionLimits`, `checkRuns` and `commitStatuses` for that
+one repository. It is still a **seed**, not a route response, and the T3 hygiene scan reads it as
+before.
+
+### The T45 seed keys
+
+`POST /_control/seed` takes two APW-09 keys — `upstream_pull_requests[]` and
+`upstream_approval_proposals[]` — **armed only while `EVER_WORKS_E2E_FAKES === '1'` in a non-production
+process** (`state.mjs`'s `upstreamSeedGate`). They are not fixtures of a GitHub response and carry no
+recorded shape; they are the platform's own state, seeded so the PR lane can start from an
+`awaiting_approval` row with a matching approval proposal. The runbook §4 documents them.
+
 ## Regenerating
 
 Do not hand-edit a fixture without re-running the contract test: it, and not

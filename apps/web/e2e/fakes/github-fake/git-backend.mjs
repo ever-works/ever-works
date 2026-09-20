@@ -209,6 +209,23 @@ export function copyRefsBetweenBareRepos(fromDir, toDir) {
     return branches;
 }
 
+/**
+ * T45 — delete one branch from a bare repository, for `DELETE
+ * /repos/:o/:r/git/refs/*ref` (APW-09's **Withdraw**, FR-33/FR-45).
+ *
+ * Best-effort and quiet by design: a branch the bare repository never had is not
+ * an error here (`git branch -D` on a missing branch exits non-zero), because the
+ * repository record is the fake's authority on which refs exist and it is checked
+ * by the caller before this runs. A missing directory, or a `git` that cannot run
+ * at all, must not turn a `204` into a crash — the platform's own assertion is
+ * that the branch is gone, and the record answers that.
+ */
+export function deleteBareBranch(dir, branch) {
+    if (!dir || !fs.existsSync(dir) || !branch) return false;
+    const result = spawnSync('git', ['branch', '-D', branch], { cwd: dir, encoding: 'utf8' });
+    return result.status === 0;
+}
+
 /** Remove the temp git root. Best-effort: a locked file must not fail a spec. */
 export function cleanupGitRoot(state) {
     try {

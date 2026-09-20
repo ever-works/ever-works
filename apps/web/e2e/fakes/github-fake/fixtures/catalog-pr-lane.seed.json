@@ -75,6 +75,51 @@
                     "push": true,
                     "admin": false
                 }
+            ],
+            "interactionLimits": {
+                "limit": "collaborators_only",
+                "origin": "repository",
+                "expiresAt": "2026-10-01T00:00:00Z"
+            },
+            "checkRuns": [
+                {
+                    "id": 900101,
+                    "name": "build",
+                    "status": "completed",
+                    "conclusion": "action_required",
+                    "startedAt": "2026-09-18T09:12:04Z",
+                    "completedAt": "2026-09-18T09:16:04Z",
+                    "detailsUrl": "https://github.com/ever-works/cal-diy-template/actions/runs/960001",
+                    "headSha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+                    "externalId": "apw-e2e-check-build",
+                    "outputTitle": "build",
+                    "outputSummary": "Waiting for maintainers to approve this workflow run."
+                },
+                {
+                    "id": 900102,
+                    "name": "lint",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "startedAt": "2026-09-18T09:12:04Z",
+                    "completedAt": "2026-09-18T09:14:04Z",
+                    "detailsUrl": "https://github.com/ever-works/cal-diy-template/actions/runs/960002",
+                    "headSha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+                    "externalId": "apw-e2e-check-lint",
+                    "outputTitle": "lint",
+                    "outputSummary": "No lint errors."
+                }
+            ],
+            "commitStatuses": [
+                {
+                    "id": 900200,
+                    "context": "continuous-integration/apw-e2e",
+                    "state": "success",
+                    "description": "Build and checks passed",
+                    "targetUrl": "https://ci.example.invalid/apw-e2e/cal-diy-template",
+                    "createdAt": "2026-09-18T09:16:04Z",
+                    "updatedAt": "2026-09-18T09:16:04Z",
+                    "creatorLogin": "apw-e2e-user"
+                }
             ]
         },
         {

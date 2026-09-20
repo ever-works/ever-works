@@ -17,6 +17,7 @@ import {
     gitCommitPayload,
     gitRefPayload,
     gitTreePayload,
+    interactionLimitPayload,
     issueCommentPayload,
     licenseSummaryPayload,
     repoBranchPayload,
@@ -24,7 +25,12 @@ import {
     takeReadinessFault,
     upsertRepository,
 } from '../state.mjs';
-import { copyRefsBetweenBareRepos, ensureBareRepo, seedBareRepoCommit } from '../git-backend.mjs';
+import {
+    copyRefsBetweenBareRepos,
+    deleteBareBranch,
+    ensureBareRepo,
+    seedBareRepoCommit,
+} from '../git-backend.mjs';
 
 const NOT_FOUND = { status: 404, body: { message: 'Not Found' } };
 
@@ -412,6 +418,61 @@ export const routes = [
             const value = ctx.jsonBody?.sha ?? sha(`${ref}-${ctx.state.seq.ref++}`);
             repo.refs.set(ref, value);
             return { status: 200, body: gitRefPayload(repo, ref.replace(/^refs\//, ''), value) };
+        },
+    },
+    {
+        /**
+         * T45 — the branch delete **Withdraw** performs (APW-09 FR-33/FR-45,
+         * `git.deleteRef`). The path is the live API's own general form
+         * (`DELETE /repos/{owner}/{repo}/git/refs/{ref}`), so it answers the
+         * `refs/heads/*` case T45 names without a second, narrower pattern.
+         *
+         * `204` with no body on success — and the ref is really removed from the
+         * repository record and from the bare repository on disk, so a following
+         * `GET …/git/refs/heads/<branch>` answers `404`. A fake that answered
+         * `204` while the branch stayed readable would let a lane pass a
+         * "the branch is gone" assertion it never earned.
+         */
+        name: 'delete-git-ref',
+        method: 'DELETE',
+        pattern: '/repos/:owner/:repo/git/refs/*ref',
+        fixture: 'git-ref-delete',
+        handler: (ctx) => {
+            const { repo, error } = requireRepo(ctx);
+            if (error) return error;
+            const ref = refName(ctx.params.ref);
+            if (!repo.refs.has(ref)) return { status: 404, body: { message: 'Not Found' } };
+            repo.refs.delete(ref);
+            // The bare repository is the other half of "the branch exists": a
+            // clone or a `GET /branches/:branch` must not still find it.
+            if (ref.startsWith('refs/heads/')) {
+                const bare = repo.gitDir ?? ensureBareRepo(ctx.state, repo.owner, repo.name);
+                deleteBareBranch(bare, ref.replace(/^refs\/heads\//, ''));
+            }
+            return { status: 204, body: null };
+        },
+    },
+    {
+        /**
+         * T45 — the repository's temporary interaction limit (APW-09 T2/G16,
+         * `interactions.getRestrictionsForRepo` → `getInteractionLimit`).
+         *
+         * A seeded limit answers `200`; **unseeded answers `204`**, which is what
+         * the live API does when a repository has no temporary limit and what the
+         * plugin maps to `null` — never to `'none'`. A `403`/`404` (the
+         * unreadable-repository halves) is reachable with the existing fault
+         * vocabulary.
+         */
+        name: 'get-interaction-limits',
+        method: 'GET',
+        pattern: '/repos/:owner/:repo/interaction-limits',
+        fixture: 'interaction-limits',
+        handler: (ctx) => {
+            const { repo, error } = requireRepo(ctx);
+            if (error) return error;
+            const payload = interactionLimitPayload(repo.interactionLimits);
+            if (!payload) return { status: 204, body: null };
+            return { status: 200, body: payload };
         },
     },
     {

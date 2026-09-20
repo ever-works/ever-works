@@ -17,6 +17,11 @@
  *   3. **shape equality** — for each call, the fake's status and the key sets and
  *      value types of its response equal the recorded fixture's, to the leaf.
  *
+ * Plus a fourth, added 2026-09-19 (T45): **the upstream endpoint list**, checked
+ * as concrete URLs through the server's own matcher — see `T45_ROUTES`. Net 1 is
+ * APW-13's plan and net 4 is APW-09's, so neither plan's rows can be edited out
+ * from under the other.
+ *
  * The recorded fixtures are the T1 files; their provenance, their strip rules
  * and the two deliberate departures from GitHub's payloads are in
  * `../fixtures/README.md`.
@@ -153,11 +158,12 @@ const PLAN_8_3_ROUTES: Array<{ method: string; pattern: string; plan: string }> 
 ];
 
 /**
- * The call plan. **Order matters** and is load-bearing in three places, each
+ * The call plan. **Order matters** and is load-bearing in four places, each
  * commented where it appears: a route that seeds lazily must be called before a
  * route that reads what it seeded, a route that mutates must come after the
- * reads that expect the un-mutated shape, and a blob sha has to be captured
- * before it can be fetched.
+ * reads that expect the un-mutated shape, a blob sha has to be captured before
+ * it can be fetched, and (T45) a ref has to be created before the delete that
+ * removes it.
  */
 const CALL_PLAN: Array<{
     route: string;
@@ -366,6 +372,40 @@ const CALL_PLAN: Array<{
         body: { sha: SHA_B },
         status: 200,
     },
+
+    // T45 — the upstream endpoints APW-09's lanes call. The branch delete is the
+    // one that must come after the ref it removes was created (`create-git-ref` →
+    // `update-git-ref` above), and nothing below reads `apw-e2e-branch`.
+    {
+        route: 'delete-git-ref',
+        method: 'DELETE',
+        path: '/repos/ever-works/templates/git/refs/heads/apw-e2e-branch',
+        status: 204,
+    },
+    {
+        route: 'get-interaction-limits',
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/interaction-limits',
+        status: 200,
+    },
+    {
+        route: 'list-check-runs-for-ref',
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/commits/main/check-runs',
+        status: 200,
+    },
+    {
+        route: 'list-commit-statuses-for-ref',
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/commits/main/statuses',
+        status: 200,
+    },
+    {
+        route: 'get-combined-status-for-ref',
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/commits/main/status',
+        status: 200,
+    },
     {
         route: 'create-repository-hook',
         method: 'POST',
@@ -524,6 +564,104 @@ function covers(routePattern: string, planPattern: string): boolean {
     return plan.every(
         (segment, index) => route[index] === segment || (segment === '*' && route[index] === '**'),
     );
+}
+
+/**
+ * T45's named endpoint list, as **concrete** method+path pairs.
+ *
+ * `docs/specs/features/app-works/APW-09-upstream-pull-requests/tasks.md` T45
+ * names the REST subset APW-09's upstream lanes call. It is a different plan from
+ * APW-13's §8.3 table above — `PLAN_8_3_ROUTES` is APW-13's and stays exactly as
+ * it was — so this is its own table, and it is checked a stronger way: each row
+ * is a URL the fake must *answer*, dispatched through the server's own matcher
+ * (`compileRoute`, a transcription of `server.mjs`'s `compile`), rather than a
+ * segment-shaped plan pattern. A row whose route exists but whose wildcard cannot
+ * reach the concrete path fails here, which segment counting would have missed.
+ *
+ * Three of the eleven rows were already served before T45 (`create-git-ref`,
+ * `update-git-ref`, `compare-commits` — the last already answering
+ * `total_commits`, APW-09 T1). They are pinned here deliberately: "it was already
+ * there" is not a reason for it to be able to disappear.
+ */
+const T45_ROUTES: Array<{ method: string; path: string; task: string }> = [
+    {
+        method: 'POST',
+        path: '/repos/ever-works/templates/git/refs',
+        task: 'POST /repos/:o/:r/git/refs',
+    },
+    {
+        method: 'PATCH',
+        path: '/repos/ever-works/templates/git/refs/heads/apw-e2e-branch',
+        task: 'PATCH /repos/:o/:r/git/refs/heads/*',
+    },
+    {
+        method: 'DELETE',
+        path: '/repos/ever-works/templates/git/refs/heads/apw-e2e-branch',
+        task: 'DELETE /repos/:o/:r/git/refs/heads/*',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/interaction-limits',
+        task: 'GET /repos/:o/:r/interaction-limits',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/pulls/1',
+        task: 'GET /repos/:o/:r/pulls/:n',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/pulls/1/reviews',
+        task: 'GET /repos/:o/:r/pulls/:n/reviews',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/pulls/1/comments',
+        task: 'GET /repos/:o/:r/pulls/:n/comments',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/commits/main/check-runs',
+        task: 'GET /repos/:o/:r/commits/:ref/check-runs',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/commits/main/status',
+        task: 'GET /repos/:o/:r/commits/:ref/status',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/commits/main/statuses',
+        task: 'GET /repos/:o/:r/commits/:ref/statuses',
+    },
+    {
+        method: 'GET',
+        path: '/repos/ever-works/cal-diy-template/compare/main...apw-e2e-head',
+        task: 'GET /repos/:o/:r/compare/:basehead (total_commits)',
+    },
+];
+
+/**
+ * Does the fake's route table answer this concrete method+path?
+ *
+ * A transcription of `server.mjs`'s `compile` + `matchRoute`: `:param` is one
+ * segment, `*param` is the rest. Kept local rather than exported from the server
+ * so the assertion is about the *table*, not about a second implementation the
+ * server hands it.
+ */
+function fakeAnswers(method: string, path: string): boolean {
+    return (ALL_ROUTES as RouteEntry[]).some((route) => {
+        if (route.method !== method) return false;
+        const source = route.pattern
+            .split('/')
+            .map((segment) => {
+                if (segment.startsWith(':')) return '([^/]+)';
+                if (segment.startsWith('*')) return '(.*)';
+                return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            })
+            .join('/');
+        return new RegExp(`^${source}$`).test(path);
+    });
 }
 
 function fixtureFileNames(): string[] {
@@ -722,6 +860,18 @@ describe('T3 — every plan §8.3 route has a handler and a recorded fixture', (
             (entry) => entry.route,
         );
         expect(unknown).toEqual([]);
+    });
+
+    /**
+     * T45 — the upstream endpoint list APW-09's lanes depend on, checked as
+     * concrete URLs through the server's own matcher. Its own `it()` because it
+     * is its own plan (see `T45_ROUTES`); the APW-13 rows above are untouched.
+     */
+    it('answers every URL of APW-09 T45’s endpoint list, dispatched as the server dispatches', () => {
+        const unanswered = T45_ROUTES.filter((row) => !fakeAnswers(row.method, row.path)).map(
+            (row) => `${row.method} ${row.path} — named by T45 as ${row.task}`,
+        );
+        expect(unanswered, `the fake answers no route for:\n${unanswered.join('\n')}`).toEqual([]);
     });
 
     it('agrees with each route on the method it is called with', () => {
