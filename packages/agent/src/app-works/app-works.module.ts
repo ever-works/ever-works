@@ -15,6 +15,7 @@ import { AppUpstreamSyncDispatcherService } from './app-upstream-sync-dispatcher
 import { AppSourceInspectorService } from './app-source-inspector.service';
 import { AppWorkCreateService } from './app-work-create.service';
 import { AppActionsHygieneService } from './app-actions-hygiene.service';
+import { AppSourceInitializerService } from './app-source-initializer.service';
 import {
     JOB_RUNTIME_PROVIDER_REGISTRY,
     type JobRuntimeProviderRegistry,
@@ -136,6 +137,30 @@ import {
  * API-side, beside the facades it reads providers through, and exposed to the
  * worker as `AppForkReadinessRunner` — see that file's docstring for why its
  * `deps.sleep` function cannot cross the internal channel.
+ *
+ * ## APW-01 T15 — the ready handler joins them (additive)
+ *
+ * `AppSourceInitializerService` (T15, plan §6) is provided **and exported** here,
+ * beside the services above, because T15 says so and because that is what makes the
+ * class reachable from `apps/api` through this one module import. It is the
+ * implementation of APW-02's `APP_FORK_READY_HANDLER` port: the readiness run calls
+ * it once a Work's repository has content, and its `AppSpecService.initialize` call
+ * is the one **C32** measured as missing everywhere (no `work_app_spec_states` row,
+ * so `GET /api/works/:id/app-spec` answered `404` for every App Work and every role).
+ *
+ * 🛑 **Every collaborator of that service is `@Optional()`, and here that is
+ * load-bearing rather than stylistic.** A Nest provider resolves its dependencies
+ * from the module that DECLARES it plus that module's own imports — the rule the C10
+ * section above records. This module deliberately imports neither `AppSpecModule`
+ * (which would drag the App spec entity, the spec state repository and a
+ * non-optional `GitFacadeService` into the two bare-graph compiles this module's own
+ * specs perform) nor `WorkModule` (which imports *this* module — a cycle). So the
+ * copy declared here compiles everywhere and is fully wired only in a graph that
+ * provides those collaborators; `apps/api/src/app-works/app-works.module.ts` imports
+ * `AppSpecModule`, `ActivityLogModule` and a `WorksConfigService` and declares its
+ * OWN copy, which Nest resolves ahead of this one for the `APP_FORK_READY_HANDLER`
+ * binding it owns. Both halves are pinned by
+ * `__tests__/app-source-initializer.service.spec.ts`.
  */
 
 /**
@@ -215,6 +240,10 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // collaborators stay `@Optional()`, so the bare compile this module's spec
         // builds still resolves.
         AppActionsHygieneService,
+        // APW-01 T15 — the ready handler. Provided here (compiling in every graph,
+        // wired where its collaborators are visible) and exported so `apps/api` can
+        // bind it to APW-02's `APP_FORK_READY_HANDLER`. See the docstring above.
+        AppSourceInitializerService,
         // C10 — the binding that makes a readiness dispatch leave the process. See
         // the docstring above for why it lives here and what `null` means.
         buildAppForkReadinessDispatcherProvider(),
@@ -231,6 +260,10 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // dispatcher instance the two call sites use.
         AppActionsHygieneService,
         APP_FORK_READINESS_DISPATCHER,
+        // APW-01 T15 — exported for the same reason: the API-side module binds
+        // `APP_FORK_READY_HANDLER` to this class, and a class that is not exported
+        // cannot be reached across the module edge.
+        AppSourceInitializerService,
     ],
 })
 export class AppWorksModule {}

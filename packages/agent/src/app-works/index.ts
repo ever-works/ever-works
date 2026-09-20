@@ -69,6 +69,16 @@
  *   `AppRuntimeDeletionService` binds it; `WorkLifecycleService` injects it
  *   `@Optional()`, and unbound means "no App runtime exists yet", so an App Work's
  *   delete keeps today's behaviour (the row goes now) until APW-06 merges.
+ * - `./app-source-initializer.service` — `AppSourceInitializerService` (T15, plan §6),
+ *   the implementation of `APP_FORK_READY_HANDLER`: it creates the App spec state row
+ *   (**the call C32 measured as missing everywhere**), applies or requests a Blueprint,
+ *   records the source in `.works/works.yml` with no clone, and runs the licence and
+ *   provisioning follow-ups. It also carries the three **provisional** tokens its
+ *   not-yet-landed collaborators own (`APP_BLUEPRINT_APPLY_SERVICE` — APW-03 T28;
+ *   `APP_PROVISIONING_SERVICE` — APW-04; and the `AppSourceCommitCapability` view of
+ *   APW-03 T22's `commitFiles`), each with its mandatory-swap note. The licence request
+ *   **reuses** APW-03's own `APP_LICENSE_SERVICE` rather than declaring a second Symbol
+ *   for the same owner (R-26).
  */
 
 export * from './app-works.module';
@@ -86,3 +96,4 @@ export * from './app-prompted-values.port';
 export * from './app-source-inspector.service';
 export * from './app-work-create.service';
 export * from './app-work-deletion.port';
+export * from './app-source-initializer.service';

@@ -3,9 +3,13 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import { AppSpecModule } from '@ever-works/agent/app-spec';
+import { WorksConfigService } from '@ever-works/agent/works-config';
 import {
+    APP_FORK_READY_HANDLER,
     AppForkReadinessRunner,
     AppForkReadinessService,
+    AppSourceInitializerService,
     AppWorksModule as AgentAppWorksModule,
 } from '@ever-works/agent/app-works';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -53,12 +57,14 @@ import { AppUpstreamController } from './app-upstream.controller';
  * ## What is not bound here
  *
  * Nothing else. `APP_WORK_AGENT_RESOLVER` (APW-08 T25), `APP_FORK_READINESS_DISPATCHER` /
- * `APP_UPSTREAM_SYNC_DISPATCHER` (APW-02 T31), `APP_FORK_READY_HANDLER` (APW-01),
- * `APP_UPSTREAM_SYNC_SPEC_SOURCE` (APW-03 T12) and `APP_UPSTREAM_LICENSE_SERVICE`
- * (APW-03 T42) all belong to other tasks, and binding a placeholder would make an
- * unconfigured installation look configured — the same rule the agent module's own
- * docstring states. **APW-01 T15 adds the handler binding here**, which is why this
- * module declares its controller in a plain `controllers` array and nothing else.
+ * `APP_UPSTREAM_SYNC_DISPATCHER` (APW-02 T31), `APP_UPSTREAM_SYNC_SPEC_SOURCE` (APW-03
+ * T12), `APP_UPSTREAM_LICENSE_SERVICE` (APW-03 T42), `APP_BLUEPRINT_APPLY_SERVICE`
+ * (APW-03 T28) and `APP_PROVISIONING_SERVICE` (APW-04) all belong to other tasks, and
+ * binding a placeholder would make an unconfigured installation look configured — the
+ * same rule the agent module's own docstring states. **APW-01 T15 adds the
+ * `APP_FORK_READY_HANDLER` binding here** (see the T15 section below); the tokens that
+ * handler reads stay unbound until their owners land, and each absence is a refusal the
+ * handler names rather than a silent success.
  *
  * ## `exports: [AgentAppWorksModule]`
  *
@@ -98,6 +104,37 @@ import { AppUpstreamController } from './app-upstream.controller';
  * `remoteMap` entry `AppForkReadinessRunner` — with the entry absent the worker's
  * proxy answers the loud `Unknown remote target: AppForkReadinessRunner` instead
  * of pretending a readiness run happened.
+ *
+ * ## APW-01 T15 — the ready handler is declared AND bound here (additive)
+ *
+ * This is the module that makes `AppSpecService.initialize` happen at all — the
+ * single unblocker **C32** names (`docs/internal/app-works-build-progress.md` §5.2:
+ * nothing in the shipped runtime called it, so `work_app_spec_states` could never
+ * hold a row and `GET /api/works/:id/app-spec` answered `404` for every App Work and
+ * every role).
+ *
+ * Three additions, and each one is required rather than tidy:
+ *
+ *   1. **`AppSpecModule`** supplies `AppSpecService`, whose `initialize(workId, branch)`
+ *      is step 1 of the hand-off and whose `hasValidAppSpec(workId, sha)` is step 8's
+ *      provisioning gate. It is a leaf with respect to this module.
+ *   2. **`WorksConfigService`** is provided here because the alternative is a cycle:
+ *      the service's other provider is `WorkModule`, which imports
+ *      `AgentAppWorksModule` — and step 4 parses `.works/works.yml` through the
+ *      existing loader rather than a second parser. It injects only
+ *      `GitFacadeService`, which `FacadesModule` supplies for real here.
+ *   3. **`AppSourceInitializerService` is declared here as well as exported by
+ *      `AgentAppWorksModule`**, and the token is bound to THIS copy. That is the C10
+ *      visibility rule (the agent module's docstring records it): a provider resolves
+ *      its dependencies from the module that declares it, so the agent module's copy —
+ *      which deliberately imports neither `AppSpecModule` nor `WorkModule` — cannot see
+ *      `AppSpecService`. Nest resolves a module-local provider ahead of an imported one,
+ *      so the instance `APP_FORK_READY_HANDLER` resolves is the wired one.
+ *
+ * `onDataRepositoryReady` is deliberately **not** added to
+ * `RETRY_SAFE_REMOTE_METHODS` in the controller: a transport failure fails the
+ * `app-fork-readiness` run, the task's retry calls the handler again, and this
+ * handler's own idempotency rules make that safe (plan §6).
  */
 @Module({
     imports: [
@@ -107,9 +144,24 @@ import { AppUpstreamController } from './app-upstream.controller';
         TasksDomainModule,
         FacadesModule,
         ActivityLogModule,
+        AppSpecModule,
     ],
     controllers: [AppUpstreamController],
-    providers: [AppForkReadinessService, AppForkReadinessRunner],
-    exports: [AgentAppWorksModule, AppForkReadinessService, AppForkReadinessRunner],
+    providers: [
+        AppForkReadinessService,
+        AppForkReadinessRunner,
+        WorksConfigService,
+        AppSourceInitializerService,
+        // APW-01 T15 — the hand-off APW-02's readiness run calls. `useExisting`, never
+        // `useClass`: the bound handler must be the SAME instance the RPC channel
+        // publishes, so a worker call and an in-process run cannot diverge.
+        { provide: APP_FORK_READY_HANDLER, useExisting: AppSourceInitializerService },
+    ],
+    exports: [
+        AgentAppWorksModule,
+        AppForkReadinessService,
+        AppForkReadinessRunner,
+        AppSourceInitializerService,
+    ],
 })
 export class AppWorksModule {}

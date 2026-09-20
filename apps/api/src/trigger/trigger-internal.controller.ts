@@ -97,6 +97,7 @@ import {
 } from '@ever-works/agent/subscriptions';
 import {
     AppForkReadinessRunner,
+    AppSourceInitializerService,
     AppUpstreamStateService,
     AppUpstreamSyncDispatcherService,
 } from '@ever-works/agent/app-works';
@@ -522,6 +523,20 @@ export class TriggerInternalController implements OnModuleInit {
         // per the arity rule above, exactly as its siblings are.
         @Optional()
         private readonly appForkReadinessRunner?: AppForkReadinessRunner,
+        // APW-01 T15 — the ready handler. The `app-fork-readiness` run calls
+        // `onDataRepositoryReady` over this hop when the worker hosts the run, so the
+        // hand-off lands where the `DataSource`, the Activity writer and APW-03's
+        // `AppSpecService` are (its `initialize` call is the one C32 measured as missing
+        // everywhere). Appended LAST + `@Optional()` per the arity rule above, exactly as
+        // its siblings are: with the name absent the worker's proxy answers the loud
+        // `Unknown remote target: AppSourceInitializerService` rather than pretending the
+        // source was recorded.
+        //
+        // `onDataRepositoryReady` is deliberately NOT added to `RETRY_SAFE_REMOTE_METHODS`:
+        // a transport failure fails the readiness run, the task's retry calls the handler
+        // again, and the handler's own content compare makes that safe (plan §6).
+        @Optional()
+        private readonly appSourceInitializerService?: AppSourceInitializerService,
     ) {}
 
     onModuleInit() {
@@ -691,6 +706,11 @@ export class TriggerInternalController implements OnModuleInit {
             // row (FR-17…FR-24a) — the service's own `deps.sleep` cannot cross this hop,
             // which is what `AppForkReadinessRunner` exists to bridge.
             AppForkReadinessRunner: this.appForkReadinessRunner,
+            // APW-01 T15 — the worker half of the ready hand-off. Registered
+            // unconditionally for the same reason every App entry above is: a name that
+            // maps to `undefined` answers a loud "Unknown remote target" instead of
+            // pretending the source was recorded in the member's repository.
+            AppSourceInitializerService: this.appSourceInitializerService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

@@ -28,6 +28,11 @@ jest.mock('@ever-works/agent/app-works', () => ({
     // which this suite needs in order to assert that the remote target is registered
     // and callable.
     AppForkReadinessRunner: class AppForkReadinessRunner {},
+    // APW-01 T15 — the ready handler the readiness run calls once the repository has
+    // content. Stubbed for the same reason again: the class reaches APW-03's
+    // `AppSpecService`, the Activity writer and the git facade, none of which this
+    // suite needs in order to assert the remote target is registered and callable.
+    AppSourceInitializerService: class AppSourceInitializerService {},
 }));
 // APW-03 T12/T13 (wired by APW-02 T28) — same rationale: the app-spec barrel
 // reaches the spec state entity and the git facade, neither of which this suite
@@ -219,6 +224,8 @@ describe('TriggerInternalController', () => {
     // C10 — the `app-fork-readiness` job's runner: the readiness run writes the state
     // row, so it runs API-side and the worker proxies it by name.
     let appForkReadinessRunner: any;
+    // APW-01 T15 — the ready handler behind that run's setup hand-off.
+    let appSourceInitializerService: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -324,6 +331,8 @@ describe('TriggerInternalController', () => {
             // C10 — the `app-fork-readiness` runner, appended LAST + `@Optional()` per the
             // arity rule above.
             appForkReadinessRunner,
+            // APW-01 T15 — the ready handler, appended after it, same rule.
+            appSourceInitializerService,
         );
         c.onModuleInit();
         return c;
@@ -425,6 +434,17 @@ describe('TriggerInternalController', () => {
                 probes: 0,
                 sleeps: [],
                 elapsedMs: 0,
+            })),
+        };
+        // APW-01 T15 — the real method the RPC hop must reach (`onDataRepositoryReady`,
+        // the one member `AppForkReadyHandler` declares). The handler creates the App
+        // spec state row, records the source and runs the follow-ups, none of which a
+        // worker can do — so the API process performs it.
+        appSourceInitializerService = {
+            name: 'AppSourceInitializerService',
+            onDataRepositoryReady: jest.fn((payload: { workId: string }) => ({
+                result: 'failed',
+                reason: payload.workId === 'work-1' ? 'spec_state_unavailable' : 'work_not_found',
             })),
         };
 
@@ -1044,6 +1064,73 @@ describe('TriggerInternalController', () => {
                     args: superjson.serialize([]) as any,
                 }),
             ).rejects.toThrow('Method not in allow-list for AppForkReadinessRunner: doesNotExist');
+        });
+    });
+
+    /**
+     * APW-01 T15 — the ready handler, the RPC target the `app-fork-readiness` run calls
+     * once the Work Repository has content.
+     *
+     * Two claims, and both have to hold together: the name is in `remoteMap` (so the
+     * worker's proxy does not answer `Unknown remote target: AppSourceInitializerService`)
+     * and `onDataRepositoryReady` — the one member `AppForkReadyHandler` declares — is in
+     * the auto-derived allow-list (so the call is not refused before it reaches the
+     * method). This is the same pair the C10 block above asserts for the runner, and the
+     * reason is the same: before the entry existed there was nothing to call, so the App
+     * spec state row could never be created (C32).
+     */
+    describe('the APW-01 T15 app-source-initializer remote target', () => {
+        it('registers AppSourceInitializerService so the ready hand-off can happen at all', () => {
+            expect((controller as any).remoteMap.AppSourceInitializerService).toBe(
+                appSourceInitializerService,
+            );
+        });
+
+        it('reaches `onDataRepositoryReady` — the one member the port declares — over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppSourceInitializerService',
+                method: 'onDataRepositoryReady',
+                args: superjson.serialize([{ workId: 'work-1' }]) as any,
+            });
+
+            expect(appSourceInitializerService.onDataRepositoryReady).toHaveBeenCalledWith({
+                workId: 'work-1',
+            });
+            // The service's own answer, passed through untouched: a hand-off that could not
+            // create the state row is a NAMED failure, not a green run.
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                result: 'failed',
+                reason: 'spec_state_unavailable',
+            });
+        });
+
+        it('derives a callable allow-list holding `onDataRepositoryReady` and nothing else', async () => {
+            expect([
+                ...((controller as any).allowedMethods.AppSourceInitializerService as Set<string>),
+            ]).toEqual(['onDataRepositoryReady']);
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppSourceInitializerService',
+                    method: 'run',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow('Method not in allow-list for AppSourceInitializerService: run');
+        });
+
+        it('answers the loud `Unknown remote target` when the binding is absent', async () => {
+            // The fail-closed half: an installation where the handler is not wired must
+            // never look like a hand-off that ran.
+            const bare = buildController();
+            (bare as any).remoteMap.AppSourceInitializerService = undefined;
+
+            await expect(
+                bare.callRemote(VALID_SECRET, {
+                    name: 'AppSourceInitializerService',
+                    method: 'onDataRepositoryReady',
+                    args: superjson.serialize([{ workId: 'work-1' }]) as any,
+                }),
+            ).rejects.toThrow('Unknown remote target: AppSourceInitializerService');
         });
     });
 });
