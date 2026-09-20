@@ -501,7 +501,10 @@ spec:
             # set here — Next.js bakes NEXT_PUBLIC_* into the bundle at BUILD time, so a
             # runtime value would be ignored. The published web images are built without
             # them (they are public: a baked key would collect self-hosters' analytics),
-            # so browser analytics is off in images from docker-build-publish-*.yml.
+            # so browser analytics is off in every published web image. NOTE: this
+            # manifest is the retired DigitalOcean path (applied only by
+            # deploy-do-*.yml, behind vars.DO_ENABLED); the live clusters run
+            # k8s-build's :dev / :stage / :prod digests via ArgoCD.
             - name: SENTRY_DSN
               value: "$SENTRY_DSN"
             - name: SENTRY_ENVIRONMENT

@@ -68,11 +68,14 @@ jobs:
         run: |
           sudo docker image list
 
-      # DigitalOcean is the registry k8s pulls the runtime image from, so the
-      # doctl auth + DO push below are FATAL (no continue-on-error): a silent
-      # failure would ship a stale :latest as a "green" build (incident
-      # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
-      # CW mirror below stays best-effort by design.
+      # DigitalOcean is retired (registry 403): the doctl auth + DO push below
+      # are gated behind vars.DO_ENABLED and SKIP today. deploy-do-*.yml is the
+      # only thing that applies the k8s-manifest.*.yaml files pinning those DO
+      # images, and it is gated on the same var. Kept per the no-removal policy,
+      # and deliberately NOT continue-on-error, so that re-enabling the var
+      # fails loudly: a silent failure once shipped a stale :latest as a
+      # "green" build (incident 2026-06-12: an expired DO token meant prod
+      # served the prior build). The CW mirror below stays best-effort by design.
       - name: Install doctl
         if: ${{ vars.DO_ENABLED == 'true' }}
 
@@ -144,14 +147,16 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-web:latest
           cache-to: type=inline
           # NO NEXT_PUBLIC_POSTHOG_* build args, on purpose. Next.js inlines
-          # NEXT_PUBLIC_* into the client bundle at `next build`, and this image
-          # is PUBLIC (GHCR; pulled by docker-compose.yml and
-          # docker-compose.demo.yml): a baked key would send every self-hoster's
-          # browser analytics and session recordings to the Ever Works PostHog
-          # project. No Ever Works environment runs this `:latest` image (ArgoCD
-          # tracks k8s-build's :prod / :stage / :dev digests), so none loses
-          # analytics. Building from source with your own key: see
-          # .deploy/docker/web/Dockerfile.
+          # NEXT_PUBLIC_* into the client bundle at `next build`, and every tag
+          # this job pushes is PUBLIC on GHCR (docker-compose.yml and
+          # docker-compose.demo.yml pull ever-works-web:latest), so a baked key
+          # would send self-hosters' browser analytics and session recordings to
+          # the Ever Works PostHog project. No Ever Works environment loses
+          # analytics: dev / stage / prod run k8s-build's :dev / :stage / :prod
+          # digests via ArgoCD (ever-co/k8s-gitops), which never carried a
+          # browser key, and .deploy/k8s/k8s-manifest.*.yaml is applied only by
+          # deploy-do-*.yml, gated off behind vars.DO_ENABLED. Building from
+          # source with your own key: see .deploy/docker/web/Dockerfile.
           build-args: |
             NODE_ENV=production
             VERDACCIO_REGISTRY=${{ vars.VERDACCIO_REGISTRY }}
@@ -165,11 +170,14 @@ jobs:
         run: |
           sudo docker image list
 
-      # DigitalOcean is the registry k8s pulls the runtime image from, so the
-      # doctl auth + DO push below are FATAL (no continue-on-error): a silent
-      # failure would ship a stale :latest as a "green" build (incident
-      # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
-      # CW mirror below stays best-effort by design.
+      # DigitalOcean is retired (registry 403): the doctl auth + DO push below
+      # are gated behind vars.DO_ENABLED and SKIP today. deploy-do-*.yml is the
+      # only thing that applies the k8s-manifest.*.yaml files pinning those DO
+      # images, and it is gated on the same var. Kept per the no-removal policy,
+      # and deliberately NOT continue-on-error, so that re-enabling the var
+      # fails loudly: a silent failure once shipped a stale :latest as a
+      # "green" build (incident 2026-06-12: an expired DO token meant prod
+      # served the prior build). The CW mirror below stays best-effort by design.
       - name: Install doctl
         if: ${{ vars.DO_ENABLED == 'true' }}
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
