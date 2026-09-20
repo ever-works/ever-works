@@ -864,23 +864,28 @@ test.describe('ACC-E2E-12 — the App Launcher lane APW-13 references', () => {
     /**
      * E2E-12's spec file is **APW-11 T20's** (`ACCEPTANCE.md:596`: "created by APW-11 T20;
      * APW-13 references it"; Resolution R-22), and T33's Done-when says "this epic's diff
-     * adds no `flow-app-launcher-apps.spec.ts`". Measured in this worktree (2026-09-19): the
-     * file does not exist — `apps/web/e2e/flow-app-launcher-apps.spec.ts` is absent, and the
-     * only two `flow-app-*` specs present are T30's and T31's. So the lane's Test line can
-     * not run E2E-12 yet, and this marker names the epic that owes it rather than hiding the
-     * gap. Lifting it once T20 lands makes the body below its own check: it passes only when
-     * the file is really there.
+     * adds no `flow-app-launcher-apps.spec.ts`".
+     *
+     * **Measured in this worktree on 2026-09-19: the file did not exist** —
+     * `apps/web/e2e/flow-app-launcher-apps.spec.ts` was absent, and the only two `flow-app-*`
+     * specs present were T30's and T31's — so this case carried a `test.fixme` naming APW-11
+     * T20 as the epic that owed it, rather than hiding the gap.
+     *
+     * **Lifted the same day, by T20 landing**: the marker's own body is now the check it was
+     * written to become. It asserts the file is really there and that it carries an
+     * `ACC-E2E-12` case, so a placeholder — or a rename that dropped the acceptance id — fails
+     * here rather than leaving the interlock silently satisfied.
      */
-    test.fixme(
-        'APW-11 T20: apps/web/e2e/flow-app-launcher-apps.spec.ts does not exist in this tree ' +
-            '(measured 2026-09-19), so ACC-E2E-12 cannot run — APW-13 references that file and ' +
-            'must not create it (Resolution R-22)',
-        async () => {
-            const root = e2eRoot();
-            const stat = statSync(join(root, 'flow-app-launcher-apps.spec.ts'), {
-                throwIfNoEntry: false,
-            });
-            expect(stat?.isFile(), 'APW-11 T20 creates this file').toBe(true);
-        },
-    );
+    test('APW-11 T20 landed: apps/web/e2e/flow-app-launcher-apps.spec.ts exists and carries ACC-E2E-12', async () => {
+        const root = e2eRoot();
+        const path = join(root, 'flow-app-launcher-apps.spec.ts');
+        const stat = statSync(path, { throwIfNoEntry: false });
+        expect(stat?.isFile(), 'APW-11 T20 creates this file').toBe(true);
+
+        const source = readFileSync(path, 'utf8');
+        expect(
+            source.includes('ACC-E2E-12'),
+            'the file T20 creates is the E2E-12 lane spec, not an empty placeholder',
+        ).toBe(true);
+    });
 });
