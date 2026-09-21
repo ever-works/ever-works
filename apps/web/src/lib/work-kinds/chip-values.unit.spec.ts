@@ -113,6 +113,8 @@ const NEW_PAGE = '../../app/[locale]/(dashboard)/new/page.tsx';
 const WORK_KINDS_PAGE = '../../app/[locale]/(dashboard)/works/new/page.tsx';
 const NEW_CLIENT = '../../components/new/NewPageClient.tsx';
 const WORKS_NEW_CLIENT = '../../app/[locale]/(dashboard)/works/new/new-work-client.tsx';
+/** The Dashboard composer — a THIRD server page reading the same catalog. */
+const HOME_PAGE = '../../app/[locale]/(dashboard)/(home)/page.tsx';
 
 describe('chip-values — the server-safe home of the chip catalogs', () => {
     describe('the `/new` chip catalog', () => {
@@ -204,6 +206,21 @@ describe('chip-values — the server-safe home of the chip catalogs', () => {
         it('both modules the arrays moved OUT of are still client modules', () => {
             expect(hasUseClientDirective(source(NEW_CLIENT))).toBe(true);
             expect(hasUseClientDirective(source(WORKS_NEW_CLIENT))).toBe(true);
+        });
+
+        it('the Dashboard composer imports the catalog from here too, not from the client barrel', () => {
+            // Added 2026-09-22. That page took `ALL_NEW_CHIP_VALUES` from
+            // `@/components/new`, which re-exports it from `NewPageClient` — a
+            // `'use client'` module — so the server render received a client
+            // reference and `getDisabledWorkKinds`'s `values.filter(…)` threw.
+            // The same 500 this module was extracted to end, on a third page.
+            // `pnpm run boundary:barrels` caught it; this pins it.
+            const homePage = source(HOME_PAGE);
+
+            expect(homePage).toContain("from '@/lib/work-kinds/chip-values'");
+            expect(homePage).not.toMatch(
+                /import\s*\{[^}]*ALL_NEW_CHIP_VALUES[^}]*\}\s*from\s*'@\/components\/new'/,
+            );
         });
 
         it('both server pages import the arrays from `@/lib/work-kinds/chip-values`', () => {
