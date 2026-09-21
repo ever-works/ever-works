@@ -214,9 +214,11 @@ export class TemplateCatalogController {
     @Post('templates/fork')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Fork a standard template',
+        summary: 'Fork a template repository',
         description:
-            'Fork a standard template to the current user GitHub account or organization and set it as default.',
+            'Fork any template in the catalog — curated or added by URL through `POST /custom` — to the ' +
+            'current user GitHub account or organization, and set it as default. A repository the target ' +
+            'already owns is refused: there is nothing to fork.',
     })
     @ApiResponse({ status: 200, description: 'Template forked and set as default' })
     async forkTemplate(@CurrentUser() auth: AuthenticatedUser, @Body() body: ForkTemplateDto) {

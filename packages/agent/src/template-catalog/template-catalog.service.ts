@@ -448,13 +448,6 @@ export class TemplateCatalogService implements OnModuleInit {
             });
         }
 
-        if (template.sourceType !== 'built_in') {
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Only standard templates can be forked.',
-            });
-        }
-
         const providerId = 'github';
         const targetOwner = input.targetOwner.trim();
         if (!targetOwner) {
@@ -482,6 +475,39 @@ export class TemplateCatalogService implements OnModuleInit {
         }
 
         const targetOrganizationLogin = isPersonalTarget ? undefined : organization!.login;
+
+        // **The rule the owner actually stated: "if the repo is not yours, fork
+        // it."** So the only thing that cannot be forked is a repository the
+        // target ALREADY owns — there is nothing to fork, and GitHub refuses to
+        // fork a repository into the account that owns it.
+        //
+        // What used to stand here instead, near the top of this method, was
+        // `if (template.sourceType !== 'built_in') -> 400 "Only standard
+        // templates can be forked."` That single line was the whole distance
+        // between this platform and the App Works brief's steps 1 and 2:
+        // `addCustomTemplate` (`:206`) already registers ANY GitHub repository
+        // URL as a template, and everything below this point already works for
+        // one — a `custom` row carries `repositoryOwner` / `repositoryName` from
+        // the parsed URL, which is all the fork path reads. The refusal was a
+        // curation policy, not a technical limit.
+        //
+        // Checked against the programme's own decisions before removing it
+        // (2026-09-21): **D1 does not cover this.** D1 is "a new Work kind
+        // `app`; the `repo` kind is not modified", and the two alternatives it
+        // rejects are lifting `repo`'s guard and extending Work Import
+        // `link_existing` (`docs/specs/features/app-works/README.md:124-129`).
+        // It says nothing about `template-catalog`, so reusing this path needs
+        // no decision reversed.
+        if (
+            template.repositoryOwner.trim().toLowerCase() === targetOwner.toLowerCase() &&
+            template.sourceType === 'custom'
+        ) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'This repository already belongs to the selected account — there is nothing to fork. Use it directly instead.',
+            });
+        }
 
         const existingTemplate =
             await this.templateRepository.findOwnedCustomByRepositoryCoordinates(
