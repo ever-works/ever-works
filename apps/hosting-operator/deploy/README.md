@@ -6,18 +6,18 @@ empty folder — somebody will apply it. What follows is the specification T10 h
 thinking is not lost between now and then.
 
 > The CRDs are **not** here. They are generated artefacts of
-> [`packages/apps-tier-crds`](../../../packages/apps-tier-crds/deploy/crds/) and are installed into
+> [`packages/hosting-crds`](../../../packages/hosting-crds/deploy/crds/) and are installed into
 > the zone before this controller starts.
 
 ## 1. Where the image build belongs
 
 This repo builds images from **`.deploy/docker/<app>/Dockerfile`**, not from the app folder — see
 `.deploy/docker/{api,web,node,mcp,docs}/`. So the controller's image belongs at
-**`.deploy/docker/apps-tier-controller/Dockerfile`**, and should be derived from
+**`.deploy/docker/hosting-operator/Dockerfile`**, and should be derived from
 [`.deploy/docker/node/Dockerfile`](../../../.deploy/docker/node/Dockerfile), which is the closest
 analogue (a long-running worker rather than an HTTP server). Reuse from it:
 
-- `turbo prune --scope=ever-works-apps-tier-controller --docker` for the pruned workspace,
+- `turbo prune --scope=ever-works-hosting-operator --docker` for the pruned workspace,
 - the `VERDACCIO_REGISTRY` probe-with-fallback layer, verbatim — a Verdaccio outage must not fail
   an image build (see that file's own rationale),
 - `node:22-bookworm-slim`. There is no Chromium here, so `alpine` would be defensible — but
@@ -26,7 +26,7 @@ analogue (a long-running worker rather than an HTTP server). Reuse from it:
 Differences from `node`:
 
 - **entrypoint** `node dist/main.js` (the bundle carries its own shebang, so
-  `ever-works-apps-tier-controller` works too),
+  `ever-works-hosting-operator` works too),
 - **run as non-root**, read-only root filesystem, all capabilities dropped, `seccomp: RuntimeDefault`.
   The controller is the most privileged thing in the zone; it should be the least privileged
   _process_ in it.

@@ -96,7 +96,7 @@ No `CustomResourceDefinition`, informer or controller code exists anywhere in th
 | Id  | Decision                                                                                                                                                                                                                                                                                                                                                                                  | Alternatives rejected                                                                                                                  |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | D-A | **Desired state as custom resources** in one control namespace; the zone's API server is the only inbound surface.                                                                                                                                                                                                                                                                        | Platform server-side apply (needs broad credential); a bespoke controller HTTP API (a second auth surface to build, audit and expose). |
-| D-B | **Controller in TypeScript in this monorepo** (`apps/apps-tier-controller`), informers from `@kubernetes/client-node`, level-triggered reconcile with a 300 s resync.                                                                                                                                                                                                                     | Go + controller-runtime: mature, but duplicates APW-06's renderer and validation in a second language, and a second test stack.        |
+| D-B | **Controller in TypeScript in this monorepo** (`apps/hosting-operator`), informers from `@kubernetes/client-node`, level-triggered reconcile with a 300 s resync.                                                                                                                                                                                                                         | Go + controller-runtime: mature, but duplicates APW-06's renderer and validation in a second language, and a second test stack.        |
 | D-C | The controller renders workloads from the **constrained desired-state schema** with APW-06's renderer, then applies **non-overridable overlays** (security context, runtime class, token, labels, bandwidth). It never applies manifests authored by the platform.                                                                                                                        | Accept rendered manifests from the platform (a platform bug or compromise becomes arbitrary manifests in the zone).                    |
 | D-D | **Sealed secrets**: hybrid RSA-OAEP-256 (4,096-bit) + AES-256-GCM with Node `crypto` to the controller's public key; the private key is generated in the zone and never leaves it.                                                                                                                                                                                                        | Platform creates Secrets (needs `secrets` write); an extra sealing library (new dependency for a 60-line function).                    |
 | D-E | Zone admission = PSA `restricted` by namespace label **and** cluster default, built-in **ValidatingAdmissionPolicy** (CEL) for structural rules, plus an image-signature admission controller. Concrete products are chosen in the private plan.                                                                                                                                          | A single policy engine for everything (a larger in-zone dependency where built-in CEL suffices for structure).                         |
@@ -126,7 +126,7 @@ No `CustomResourceDefinition`, informer or controller code exists anywhere in th
  └───────────────────────────────┬─────────────────────────────────────────────────────────────┘
           control credential: CRUD on hosting.ever.works/* + get 2 named objects, ONE namespace
  ┌───────────────────────────────▼──────────── isolated zone ──────────────────────────────────┐
- │ apps/apps-tier-controller (image built by this monorepo's CI, deployed by the zone's GitOps) │
+ │ apps/hosting-operator (image built by this monorepo's CI, deployed by the zone's GitOps) │
  │   reconcile Work → namespace template → promotion Job (copy·scan·sign) → workloads          │
  │   quarantine sequencer · heartbeat Lease · UsageReport writer · AbuseSignal intake          │
  │   SelfCheck runner → canary Works → probe Jobs (same image, `probe` entrypoint)             │
@@ -216,7 +216,7 @@ operator action outside this epic.
 ## 3. The Kubernetes contract (group `hosting.ever.works`, version `v1alpha1`)
 
 CRD manifests are generated from TypeScript schema definitions in
-`packages/apps-tier-crds/src/crds/*.ts` (**new**) into `packages/apps-tier-crds/deploy/crds/*.yaml`, so
+`packages/hosting-crds/src/crds/*.ts` (**new**) into `packages/hosting-crds/deploy/crds/*.yaml`, so
 the plugin, the controller and the CRDs share one source. All kinds are **namespaced** in the control
 namespace (default `ever-works-apps-control`).
 
@@ -468,23 +468,22 @@ Every probe emits `misconfigured` → **Error** when its FR-7 minimum targets ar
 tenant template with no exemption (ACC-10-06) — so a P1 self-check or quarantine drill on a real zone would have its
 probe Jobs refused. P1 therefore carries a **minimal copy-and-sign promotion**: the controller promotes its own image
 and one named canary image into each canary's `t-<id>` space at startup (T6), and T10 builds that canary image from
-`apps/apps-tier-controller/canary/` (an HTTPS client for LG-16, a Postgres client for LG-14 and a marker writer for
+`apps/hosting-operator/canary/` (an HTTPS client for LG-16, a Postgres client for LG-14 and a marker writer for
 LG-18). In a P1 run the P2-only items report **`inconclusive`** with reason **`PHASE_NOT_ENABLED`** — never `passed`
 and never skipped — so ACC-10-02 can be observed at T22 while the gate correctly stays not-green for P2.
 
-### 3.8 Controller code layout (**new** `apps/apps-tier-controller/`)
+### 3.8 Controller code layout (**new** `apps/hosting-operator/`)
 
 > **Layout, corrected 2026-09-20 (owner ruling).** The CRD schemas and their generator are **not**
-> in this app any more: they are `@ever-works/apps-tier-crds` under `packages/apps-tier-crds/`,
+> in this app any more: they are `@ever-works/hosting-crds` under `packages/hosting-crds/`,
 > because both ends of the tier import them (the platform writes `Work`, the controller reconciles
 > it) and `apps/*` in this monorepo means "a thing that starts a process". The rows below that name
 > `src/crds/*` and `deploy/crds/*` therefore belong to that package; everything else stays here. See
-> [`apps/apps-tier-controller/README.md`](../../../../apps/apps-tier-controller/README.md).
-
+> [`apps/hosting-operator/README.md`](../../../../apps/hosting-operator/README.md).
 
 ```
 src/main.ts                    leader election (Lease), informers, reconcile loop, /healthz
-  → MOVED to packages/apps-tier-crds/: src/crds/*.ts → deploy/crds/*.yaml (generator script)
+  → MOVED to packages/hosting-crds/: src/crds/*.ts → deploy/crds/*.yaml (generator script)
 src/reconcile/work.reconciler.ts        validate → template → promote → render(APW-06 lib) → overlays → apply
 src/reconcile/selfcheck.reconciler.ts   canaries, probe jobs, dry-runs, drift, drill orchestration
 src/reconcile/quarantine.sequencer.ts   ordered isolate → scale → edge; reverse on release
@@ -505,7 +504,7 @@ src/probe/*.ts                          `probe` entrypoint: net, kernel, token, 
 src/seal/unseal.ts                      RSA-OAEP-256 + AES-256-GCM
 src/seal/dep-token-substitution.ts      ew-dep://<kind>/<output> → real value, after unsealing (APW10-G01)
 canary/                                 the canary app image built by T10 (HTTPS, Postgres client, marker) — APW10-G08
-deploy/                                 controller RBAC + Deployment (consumed by the zone GitOps); CRDs come from packages/apps-tier-crds/deploy/crds/
+deploy/                                 controller RBAC + Deployment (consumed by the zone GitOps); CRDs come from packages/hosting-crds/deploy/crds/
 Dockerfile                              distroless Node 22, non-root, read-only root filesystem
 ```
 
@@ -918,7 +917,7 @@ i18n (all 21 locale files, camelCase leaves): `admin.appsTier.board.*`, `admin.a
   `destroyApp({ deleteVolumes })` maps to `removeWork({ deleteData })`.
 - `packages/plugins/cloudflare-dns/src/__tests__/edge-hostnames.provider.spec.ts` — status mapping, idempotent
   delete, token never logged.
-- `packages/apps-tier-crds/src/crds/__tests__/crds.spec.ts` — generated YAML equals committed YAML; namespace
+- `packages/hosting-crds/src/crds/__tests__/crds.spec.ts` — generated YAML equals committed YAML; namespace
   field, non-digest image and oversize object refused.
 - `…/src/template/__tests__/tenant-template.spec.ts`, `pod-overlays.spec.ts` — golden files; overlays win over
   hostile rendered values (privileged, hostNetwork, token automount, runtime class removal); 11 excepted ranges;
@@ -941,7 +940,7 @@ i18n (all 21 locale files, camelCase leaves): `admin.appsTier.board.*`, `admin.a
   `…/src/signals/__tests__/signal-rules.spec.ts` — FR-38 boundaries 89/90 %, 29/30 min, 9/10 attempts, 49/50 mail
   attempts; High requests detector quarantine in the same reconcile.
 - `…/deploy/__tests__/platform-role.spec.ts` — `deploy/rbac/platform-role.yaml` equals §3.3 exactly.
-- **Integration (CI, kind cluster, no sandbox runtime available):** `apps/apps-tier-controller/test/integration/`
+- **Integration (CI, kind cluster, no sandbox runtime available):** `apps/hosting-operator/test/integration/`
   — CRDs install; `Work` → namespace template → workload with overlays; LG-04 probe reports
   `SANDBOX_KERNEL_NOT_DETECTED` — the known-dirty control proving the probe can fail; LG-11 token probe passes;
   LG-12 review fails when the test grants `secrets get`.

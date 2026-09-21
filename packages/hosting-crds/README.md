@@ -1,4 +1,4 @@
-# `@ever-works/apps-tier-crds`
+# `@ever-works/hosting-crds`
 
 The **Kubernetes API contract** of the Ever Works Apps hosting tier (APW-10): the five
 `hosting.ever.works/v1alpha1` CRD schemas as code, and the generator that renders them to
@@ -18,14 +18,14 @@ Both ends of the hosting tier need the same schema and **neither may fork it**:
 
 - the **platform** (`apps/api`, through the `apps-tier` plugin capability) _writes_ `Work` objects
   and _reads_ their `status`;
-- the **controller** ([`apps/apps-tier-controller`](../../apps/apps-tier-controller/)) runs inside
+- the **controller** ([`apps/hosting-operator`](../../apps/hosting-operator/)) runs inside
   the hosting zone and reconciles them.
 
 Nothing here touches a cluster, reads a kubeconfig, or reconciles anything — it is pure schema, so
 every spec is hermetic by construction. Constants (`APPS_TIER_API_GROUP`, `APPS_TIER_API_VERSION`,
 `APPS_TIER_MAX_SEALED_ENV_BYTES`, …) are imported from `@ever-works/contracts` and never re-spelled.
 
-> **Layout note (owner ruling, 2026-09-20).** This shipped originally as `apps/apps-tier-controller`.
+> **Layout note (owner ruling, 2026-09-20).** This shipped originally as `apps/hosting-operator`.
 > It moved here because `apps/*` in this monorepo means “a thing that starts a process”, and this
 > package has no `start` and no `bin` — it builds dual CJS+ESM with `.d.ts`, which is a library.
 > The process half kept the old path and the old package name.
@@ -33,10 +33,10 @@ every spec is hermetic by construction. Constants (`APPS_TIER_API_GROUP`, `APPS_
 ## Commands
 
 ```bash
-pnpm --filter @ever-works/apps-tier-crds test              # 47 tests, incl. the manifest drift gate
-pnpm --filter @ever-works/apps-tier-crds type-check
-pnpm --filter @ever-works/apps-tier-crds generate:crds     # rewrite deploy/crds/*.yaml
-pnpm --filter @ever-works/apps-tier-crds generate:crds:check   # one-line drift report for CI
+pnpm --filter @ever-works/hosting-crds test              # 47 tests, incl. the manifest drift gate
+pnpm --filter @ever-works/hosting-crds type-check
+pnpm --filter @ever-works/hosting-crds generate:crds     # rewrite deploy/crds/*.yaml
+pnpm --filter @ever-works/hosting-crds generate:crds:check   # one-line drift report for CI
 ```
 
 ## The drift gate

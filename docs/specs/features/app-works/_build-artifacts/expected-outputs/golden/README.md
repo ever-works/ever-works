@@ -386,15 +386,15 @@ file is renamed, moved or shortened. The build then succeeded end to end. The ha
 those three lines; the table's other rows are untouched, per the rule above.
 
 **2026-09-20 — why `CONTRACTS.md` gained one path string.** The APW-10 CRD schemas moved from
-`apps/apps-tier-controller/src/crds/` to `packages/apps-tier-crds/src/crds/` (owner ruling: `apps/*` in this
+`apps/hosting-operator/src/crds/` to `packages/hosting-crds/src/crds/` (owner ruling: `apps/*` in this
 monorepo means a process, and a CRD-only package is a library — see
-`apps/apps-tier-controller/README.md` §3). `CONTRACTS.md` row 374, APW-10 `plan.md` §3.8 and `tasks.md` T3 now
+`apps/hosting-operator/README.md` §3). `CONTRACTS.md` row 374, APW-10 `plan.md` §3.8 and `tasks.md` T3 now
 name the package path. Nothing was renamed inside the schemas and no golden file changed: `check.mjs` still
 passes all 2 064 assertions, and `deploy/crds/*.yaml` were regenerated only because the generated-file header
 names its own source path (the drift test compares that header, so the regeneration is the proof, not a risk).
 
-| Spec file      | sha256 (first 16) — current | Lines | Relationship to the §8 pin                                                              |
-| -------------- | --------------------------- | ----- | --------------------------------------------------------------------------------------- |
+| Spec file      | sha256 (first 16) — current | Lines | Relationship to the §8 pin                                                               |
+| -------------- | --------------------------- | ----- | ---------------------------------------------------------------------------------------- |
 | `CONTRACTS.md` | `c8c4b5cead4f7e8b`          | 817   | newer again — one path string in row 374; the §8 pin (`5141efa2806702ad`, 702) unchanged |
 
 **How to read this:** the §8 hash is provenance — "what the golden outputs were generated from" — and the §8.1

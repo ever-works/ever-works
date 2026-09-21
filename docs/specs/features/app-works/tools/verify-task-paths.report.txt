@@ -7,9 +7,9 @@ a path a task marks as new that already exists means that surface has landed.
 
 epics: 13 · tasks: 699 · root-anchored paths: 2668 · package-relative skipped: 202
 
-present: 1639 · absent: 1029 · of the absent, another task says it creates them: 699
+present: 1641 · absent: 1027 · of the absent, another task says it creates them: 698
 
-## LANDED SURFACE — marked "new", already in the repository (246)
+## LANDED SURFACE — marked "new", already in the repository (247)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -166,7 +166,8 @@ present: 1639 · absent: 1029 · of the absent, another task says it creates the
 - APW-10-apps-hosting-tier T1 — `packages/contracts/src/apps/__tests__/apps-tier.spec.ts`
 - APW-10-apps-hosting-tier T2 — `packages/plugin/src/contracts/capabilities/apps-tier.interface.ts`
 - APW-10-apps-hosting-tier T2 — `packages/plugin/src/contracts/__tests__/apps-tier.types.spec.ts`
-- APW-10-apps-hosting-tier T3 — `packages/apps-tier-crds/src/crds/__tests__/crds.spec.ts`
+- APW-10-apps-hosting-tier T3 — `packages/hosting-crds/src/crds/__tests__/crds.spec.ts`
+- APW-10-apps-hosting-tier T6 — `apps/hosting-operator/src/main.ts`
 - APW-11-app-launcher T1 — `packages/contracts/src/apps/app-launcher.ts`
 - APW-11-app-launcher T1 — `packages/contracts/src/apps/__tests__/app-launcher.spec.ts`
 - APW-11-app-launcher T2 — `packages/agent/src/entities/app-launcher-preference.entity.ts`
@@ -271,19 +272,19 @@ present: 1639 · absent: 1029 · of the absent, another task says it creates the
 | APW-07-app-env-and-dependencies | 66 | 21 | 20 | 48 |
 | APW-08-evolve-loop | 122 | 2 | 1 | 56 |
 | APW-09-upstream-pull-requests | 91 | 4 | 4 | 46 |
-| APW-10-apps-hosting-tier | 149 | 5 | 3 | 53 |
+| APW-10-apps-hosting-tier | 148 | 6 | 4 | 53 |
 | APW-11-app-launcher | 72 | 48 | 22 | 33 |
 | APW-12-ever-id | 121 | 9 | 6 | 53 |
 | APW-13-golden-paths | 91 | 33 | 24 | 73 |
 
-Landed tasks **163 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
+Landed tasks **164 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
 
-## ABSENT PATHS (1029) — grouped by epic
+## ABSENT PATHS (1027) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
-- APW-10-apps-hosting-tier: 144
+- APW-10-apps-hosting-tier: 142
 - APW-08-evolve-loop: 120
 - APW-12-ever-id: 112
 - APW-04-app-provisioner: 110

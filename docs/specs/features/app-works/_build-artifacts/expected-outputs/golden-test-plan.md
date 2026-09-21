@@ -284,7 +284,7 @@ changes, plus the object that exists only on this target. The differences, in on
 above and in nothing else — i.e. the diff between `manifests/<app>/*.yaml` and
 `manifests/<app>/managed-overlay.yaml` is the whole difference. The zone's own overlays are **not** part of
 that diff and must not be asserted from this directory (they are APW-10's; its golden set is
-`apps/apps-tier-controller`'s). Asserting an overlay here would make APW-06's renderer test fail the moment
+`apps/hosting-operator`'s). Asserting an overlay here would make APW-06's renderer test fail the moment
 APW-10 changes a zone value.
 
 **One refusal, not an object.** On the managed target both golden apps lose their fast schedules:

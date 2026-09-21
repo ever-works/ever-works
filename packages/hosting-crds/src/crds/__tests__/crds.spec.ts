@@ -6,7 +6,7 @@
  * 1. **The committed `deploy/crds/*.yaml` is byte-identical to a fresh generation**, for all five
  *    kinds, plus the directory holds nothing this generator does not produce. That is the drift
  *    gate: `pnpm test` is what fails when a schema changes and the manifests do not, so no CI job
- *    needs a special step beyond running the suite (`pnpm --filter ever-works-apps-tier-controller
+ *    needs a special step beyond running the suite (`pnpm --filter ever-works-hosting-operator
  *    test`, which T10's workflow already runs).
  * 2. **`Work` refuses an unknown field under `spec`**, `namespace` among them (ACC-10-26), refuses
  *    an image that is not digest-pinned, and refuses every FR-26 bound at N+1 while accepting N
@@ -359,7 +359,7 @@ describe('deploy/crds — the committed manifests are the generated ones (tasks 
 				throw new Error(
 					`${file.fileName} has drifted from src/crds/${file.kind.toLowerCase()}.ts at line ${differingLine + 1}: ` +
 						`committed ${JSON.stringify(committedLines[differingLine])} vs generated ${JSON.stringify(generatedLines[differingLine])}. ` +
-						`Run \`pnpm --filter ever-works-apps-tier-controller generate:crds\` and commit the result.`
+						`Run \`pnpm --filter ever-works-hosting-operator generate:crds\` and commit the result.`
 				);
 			}
 			expect(committed).toBe(file.yaml);

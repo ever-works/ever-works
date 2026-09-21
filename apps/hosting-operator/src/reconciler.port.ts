@@ -6,7 +6,7 @@
  * observable the same way — and so the bootstrap can refuse to run a registry that claims to watch
  * a kind the CRDs do not define, which is the failure mode of every hand-rolled operator.
  */
-import { CRD_MANIFESTS } from '@ever-works/apps-tier-crds';
+import { CRD_MANIFESTS } from '@ever-works/hosting-crds';
 
 import type { ControllerConfig } from './config.js';
 

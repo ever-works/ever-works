@@ -173,9 +173,9 @@ describe('FR-2 runtime half — a non-TLS issuer outside development', () => {
 				// A deny-list (`!== 'production'`) would let every one of them through.
 				const { plugin, provider } = await pluginFor(INSECURE_ISSUER, nodeEnv);
 
-				await expect(
-					plugin.buildAuthorizationRequest({ redirectUri: REDIRECT_URI })
-				).rejects.toBeInstanceOf(OidcProviderUnavailableError);
+				await expect(plugin.buildAuthorizationRequest({ redirectUri: REDIRECT_URI })).rejects.toBeInstanceOf(
+					OidcProviderUnavailableError
+				);
 				expect(provider.requests).toEqual([]);
 			}
 		);
@@ -183,9 +183,7 @@ describe('FR-2 runtime half — a non-TLS issuer outside development', () => {
 		it('accepts the exact spellings the allow-list names, case- and space-insensitively', async () => {
 			for (const nodeEnv of ['development', 'DEVELOPMENT', ' test ', 'Test', 'Development ']) {
 				const { plugin } = await pluginFor(INSECURE_ISSUER, nodeEnv);
-				await expect(
-					plugin.buildAuthorizationRequest({ redirectUri: REDIRECT_URI })
-				).resolves.toBeTruthy();
+				await expect(plugin.buildAuthorizationRequest({ redirectUri: REDIRECT_URI })).resolves.toBeTruthy();
 			}
 		});
 	});

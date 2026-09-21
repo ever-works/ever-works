@@ -6,7 +6,7 @@ the Ever Works Apps hosting tier — **APW-10**.
 
 > ### ⚠️ Current state: a skeleton that refuses to start, on purpose
 >
-> The CRD contract is complete and installed ([`packages/apps-tier-crds`](../../packages/apps-tier-crds/)).
+> The CRD contract is complete and installed ([`packages/hosting-crds`](../../packages/hosting-crds/)).
 > **No reconciler exists yet**, so [`src/reconcile/index.ts`](src/reconcile/index.ts) is an empty
 > registry and the bootstrap exits `78` (`EX_CONFIG`) with `NO_RECONCILERS_REGISTERED`.
 >
@@ -48,11 +48,11 @@ are in different trust domains:
  │     plugin (apps-tier)   │  reads status ◄─ │   SelfCheck / AbuseSignal                   │
  │                          │                  │        │                                    │
  │  holds NO zone           │                  │        ▼  reconciled by                     │
- │  cluster-admin           │                  │   apps-tier-controller (this app)           │
+ │  cluster-admin           │                  │   hosting-operator (this app)           │
  └──────────────────────────┘                  │        │                                    │
                                                │        ▼ tenant ns: ewa-<workId>            │
             both ends import the SAME schema   │   Deployment / Service / Ingress / Jobs …   │
-            @ever-works/apps-tier-crds  ───────┤   NetworkPolicy / ResourceQuota / LimitRange│
+            @ever-works/hosting-crds  ───────┤   NetworkPolicy / ResourceQuota / LimitRange│
                                                └─────────────────────────────────────────────┘
 ```
 
@@ -72,17 +72,17 @@ Two consequences worth internalising:
 
 ## 3. Layout: why this is two packages
 
-|                                                             |                                                                                                                                                                                                                                               |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`packages/apps-tier-crds`](../../packages/apps-tier-crds/) | **the API contract.** The five CRD schemas as code + the generator that renders `deploy/crds/*.yaml`. A library, because _both_ ends import it and neither may fork the schema. Pure schema: no cluster, no kubeconfig, no clock, no network. |
-| `apps/apps-tier-controller` (here)                          | **the process.** Config, bootstrap, reconcilers, probe entrypoint. Ships as one executable bundle; nothing imports it, Kubernetes starts it.                                                                                                  |
+|                                                         |                                                                                                                                                                                                                                               |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/hosting-crds`](../../packages/hosting-crds/) | **the API contract.** The five CRD schemas as code + the generator that renders `deploy/crds/*.yaml`. A library, because _both_ ends import it and neither may fork the schema. Pure schema: no cluster, no kubeconfig, no clock, no network. |
+| `apps/hosting-operator` (here)                          | **the process.** Config, bootstrap, reconcilers, probe entrypoint. Ships as one executable bundle; nothing imports it, Kubernetes starts it.                                                                                                  |
 
 > **Provenance (owner ruling, 2026-09-20).** All of this originally shipped as a single
-> `apps/apps-tier-controller` holding only CRD types. It was split because `apps/*` in this monorepo
+> `apps/hosting-operator` holding only CRD types. It was split because `apps/*` in this monorepo
 > means _“a thing that starts a process”_ — every other entry has a `start` script or a `bin`, and
 > that one had neither, while declaring `main`/`module`/`types`/`exports` and building dual CJS+ESM
 > with `.d.ts`, i.e. a library. The schema half moved to `packages/`; this half keeps the name,
-> so `pnpm --filter ever-works-apps-tier-controller …` still refers to the process.
+> so `pnpm --filter ever-works-hosting-operator …` still refers to the process.
 
 ## 4. The five objects
 
@@ -134,10 +134,10 @@ in-cluster-smoke → publish → public-smoke → post-deploy-jobs → cron → 
 | [`deploy/README.md`](deploy/README.md)             | —     | the image/RBAC/probe specification T10 must satisfy. **No manifests committed** — an untested RBAC YAML that looks authoritative is worse than none                                                        |
 
 ```bash
-pnpm --filter ever-works-apps-tier-controller test         # 46 tests, hermetic
-pnpm --filter ever-works-apps-tier-controller type-check
-pnpm --filter ever-works-apps-tier-controller build        # single ESM bundle + shebang
-pnpm --filter ever-works-apps-tier-controller start        # exits 78: NO_RECONCILERS_REGISTERED
+pnpm --filter ever-works-hosting-operator test         # 46 tests, hermetic
+pnpm --filter ever-works-hosting-operator type-check
+pnpm --filter ever-works-hosting-operator build        # single ESM bundle + shebang
+pnpm --filter ever-works-hosting-operator start        # exits 78: NO_RECONCILERS_REGISTERED
 ```
 
 ### Verified on 2026-09-20
@@ -161,20 +161,20 @@ build gate — run `build` too.**
 
 Tasks are from [`docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md`](../../docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md).
 
-| Task    | Lands as                                                | Notes                                                                                                                                                                                   |
-| ------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~T3~~  | `packages/apps-tier-crds`                               | ✅ done — CRDs + drift gate (47 tests)                                                                                                                                                  |
-| **T4**  | `src/tenant/tenant-template.ts`                         | the tenancy objects. **Only** T4 may emit Namespace / ServiceAccount / LimitRange / ResourceQuota / NetworkPolicy; the APW-06 renderer's copies are discarded (APW10-G03)               |
-| **T5**  | `src/seal/`, `src/validate/`                            | unsealing, fingerprints, closed-schema validation                                                                                                                                       |
-| **T6**  | `src/reconcile/work.reconciler.ts`                      | the phase machine, heartbeat, leader election. Also `src/render/work-to-render-input.ts` — `Work.spec` → APW-06 `AppRenderInput`, with a golden round-trip against T26's forward mapper |
-| **T7**  | `src/reconcile/quarantine.sequencer.ts`                 | the timed cut-off; proven by the `apw10-quarantine-drill`                                                                                                                               |
-| **T8**  | `src/probe/`                                            | the probe entrypoint: ≤ 4 KiB JSON to the termination message, and it must **never print a target address**                                                                             |
-| **T9**  | `src/reconcile/selfcheck.reconciler.ts`                 | the zone proving its own isolation; `apw10-weakened-zone-drill`                                                                                                                         |
-| **T10** | `.deploy/docker/apps-tier-controller/`, `deploy/*.yaml` | see [`deploy/README.md`](deploy/README.md)                                                                                                                                              |
-| **T11** | `test/integration/*.int.spec.ts`                        | kind cluster; config already present as `vitest.integration.config.ts`                                                                                                                  |
-| **T12** | `packages/plugins/ever-works-apps`                      | the platform-side control client + sealing                                                                                                                                              |
-| **T39** | `src/reconcile/removal.reconciler.ts`                   | release without data deletion                                                                                                                                                           |
-| **T43** | `src/reconcile/dependency.reconciler.ts`                | per-Work Postgres / Redis / bucket and their release                                                                                                                                    |
+| Task    | Lands as                                            | Notes                                                                                                                                                                                   |
+| ------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~T3~~  | `packages/hosting-crds`                             | ✅ done — CRDs + drift gate (47 tests)                                                                                                                                                  |
+| **T4**  | `src/tenant/tenant-template.ts`                     | the tenancy objects. **Only** T4 may emit Namespace / ServiceAccount / LimitRange / ResourceQuota / NetworkPolicy; the APW-06 renderer's copies are discarded (APW10-G03)               |
+| **T5**  | `src/seal/`, `src/validate/`                        | unsealing, fingerprints, closed-schema validation                                                                                                                                       |
+| **T6**  | `src/reconcile/work.reconciler.ts`                  | the phase machine, heartbeat, leader election. Also `src/render/work-to-render-input.ts` — `Work.spec` → APW-06 `AppRenderInput`, with a golden round-trip against T26's forward mapper |
+| **T7**  | `src/reconcile/quarantine.sequencer.ts`             | the timed cut-off; proven by the `apw10-quarantine-drill`                                                                                                                               |
+| **T8**  | `src/probe/`                                        | the probe entrypoint: ≤ 4 KiB JSON to the termination message, and it must **never print a target address**                                                                             |
+| **T9**  | `src/reconcile/selfcheck.reconciler.ts`             | the zone proving its own isolation; `apw10-weakened-zone-drill`                                                                                                                         |
+| **T10** | `.deploy/docker/hosting-operator/`, `deploy/*.yaml` | see [`deploy/README.md`](deploy/README.md)                                                                                                                                              |
+| **T11** | `test/integration/*.int.spec.ts`                    | kind cluster; config already present as `vitest.integration.config.ts`                                                                                                                  |
+| **T12** | `packages/plugins/ever-works-apps`                  | the platform-side control client + sealing                                                                                                                                              |
+| **T39** | `src/reconcile/removal.reconciler.ts`               | release without data deletion                                                                                                                                                           |
+| **T43** | `src/reconcile/dependency.reconciler.ts`            | per-Work Postgres / Redis / bucket and their release                                                                                                                                    |
 
 ## 8. Rules this component keeps
 

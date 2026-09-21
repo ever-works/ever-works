@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
  * Everything here is hermetic by construction: this package is pure schema, so a spec has no
  * kubeconfig, no cluster, no clock and no network to reach for. The kind-cluster suite (T11) that
  * installs these CRDs and asserts what the zone did with a fixture `Work` belongs to the process
- * that does the reconciling — it lives in `apps/apps-tier-controller` with its own
+ * that does the reconciling — it lives in `apps/hosting-operator` with its own
  * `vitest.integration.config.ts`.
  */
 export default defineConfig({

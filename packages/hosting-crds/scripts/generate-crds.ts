@@ -3,8 +3,8 @@
  * T3 — write `deploy/crds/*.yaml` from the schema modules in `src/crds/*.ts`.
  *
  * ```
- * pnpm --filter @ever-works/apps-tier-crds generate:crds         # write the manifests
- * pnpm --filter @ever-works/apps-tier-crds generate:crds:check   # fail if they have drifted
+ * pnpm --filter @ever-works/hosting-crds generate:crds         # write the manifests
+ * pnpm --filter @ever-works/hosting-crds generate:crds:check   # fail if they have drifted
  * ```
  *
  * Both forms build first (`tsup`) and then run this file, because Node cannot execute the
@@ -76,7 +76,7 @@ if (checkOnly) {
 
 if (checkOnly && (drifted.length > 0 || strays.length > 0)) {
 	console.error(
-		`\n${drifted.length} drifted and ${strays.length} stray CRD manifest(s). Run \`pnpm --filter @ever-works/apps-tier-crds generate:crds\` and commit the result.`
+		`\n${drifted.length} drifted and ${strays.length} stray CRD manifest(s). Run \`pnpm --filter @ever-works/hosting-crds generate:crds\` and commit the result.`
 	);
 	process.exit(1);
 }

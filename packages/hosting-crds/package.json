@@ -1,5 +1,5 @@
 {
-	"name": "@ever-works/apps-tier-crds",
+	"name": "@ever-works/hosting-crds",
 	"version": "0.1.0",
 	"description": "Ever Works Apps hosting tier — the `hosting.ever.works/v1alpha1` Kubernetes API contract (CRD schemas + manifest generation), shared by the platform that writes the objects and the controller that reconciles them",
 	"author": {
