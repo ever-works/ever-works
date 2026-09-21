@@ -214,23 +214,39 @@ describe('github-actions-build — the build capability declaration (T7, R-13)',
 		expect(plugin.supportedStrategies).not.toContain('auto');
 	});
 
-	it('throws not implemented from every member it declares, naming the owner', async () => {
+	it('still throws not implemented from the ONE member that is not written, naming the owner', async () => {
 		// Rule: a capability a plugin claims, it implements — and where it cannot
-		// yet, it fails loudly instead of answering. Each member's message names the
-		// task that fills it (see the class docstring for the full table).
-		const cases: Array<[string, () => Promise<unknown>]> = [
-			['prepareRepository', () => plugin.prepareRepository({} as never, { token: 'x' }, {} as never)],
-			['startBuild', () => plugin.startBuild({} as never, { token: 'x' })],
-			['getBuild', () => plugin.getBuild({} as never, { token: 'x' }, (text) => text)],
-			['cancelBuild', () => plugin.cancelBuild({} as never, { token: 'x' })],
-			['getLogsUrl', () => plugin.getLogsUrl({} as never, { token: 'x' })]
-		];
-		for (const [member, call] of cases) {
-			await expect(call()).rejects.toThrow(/is not implemented yet/);
-		}
-		expect(notImplemented('getBuild', 'APW-05 T12').message).toBe(
-			'github-actions-build: getBuild is not implemented yet — APW-05 T12 owns it.'
+		// yet, it fails loudly instead of answering.
+		//
+		// This case listed all five members until 2026-09-21, when APW-05 T12
+		// implemented four of them (`startBuild`, `getBuild`, `cancelBuild`,
+		// `getLogsUrl` — see `runs.spec.ts`). `prepareRepository` is still unwritten
+		// because T11's runner selector and T41's checks job are, so it is the only
+		// one left that must fail loudly. Shrinking this list is the job; the four
+		// that left it are asserted NOT to throw below, so a regression that put one
+		// back cannot pass silently.
+		await expect(plugin.prepareRepository({} as never, { token: 'x' }, {} as never)).rejects.toThrow(
+			/is not implemented yet/
 		);
+
+		expect(notImplemented('prepareRepository', 'APW-05 T11').message).toBe(
+			'github-actions-build: prepareRepository is not implemented yet — APW-05 T11 owns it.'
+		);
+	});
+
+	it('no longer throws not implemented from the four T12 filled', async () => {
+		// Called with empty inputs, so each one fails on the SHAPE of what it was
+		// given rather than on being unwritten. What this pins is the distinction:
+		// whatever these four do now, `is not implemented yet` is not it.
+		const cases: Array<() => Promise<unknown>> = [
+			() => plugin.startBuild({} as never, { token: 'x' }),
+			() => plugin.getBuild({} as never, { token: 'x' }, (text) => text),
+			() => plugin.cancelBuild({} as never, { token: 'x' }),
+			() => plugin.getLogsUrl({} as never, { token: 'x' })
+		];
+		for (const call of cases) {
+			await expect(call()).rejects.not.toThrow(/is not implemented yet/);
+		}
 	});
 
 	it('leaves the two optional members undeclared rather than placing a throwing stub', () => {
