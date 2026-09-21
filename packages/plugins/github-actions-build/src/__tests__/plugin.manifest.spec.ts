@@ -249,12 +249,13 @@ describe('github-actions-build — the build capability declaration (T7, R-13)',
 		}
 	});
 
-	it('leaves the two optional members undeclared rather than placing a throwing stub', () => {
-		// `listRecentRuns` is T12's and `checkImageAccess` is T14's; the contract
-		// makes both optional and a caller materialises them, so a placeholder here
-		// would claim a wiring that does not exist.
+	it('declares `checkImageAccess` now that it does something, and still not `listRecentRuns`', () => {
+		// The contract makes both optional and a caller materialises them, so a
+		// throwing placeholder would claim a wiring that does not exist. T14 gave
+		// `checkImageAccess` a real implementation (`registry/ghcr-access.ts`), so it
+		// is declared; T12's run discovery is still unwritten, so it is not.
+		expect(typeof (plugin as unknown as Record<string, unknown>).checkImageAccess).toBe('function');
 		expect((plugin as unknown as Record<string, unknown>).listRecentRuns).toBeUndefined();
-		expect((plugin as unknown as Record<string, unknown>).checkImageAccess).toBeUndefined();
 	});
 
 	it('declares no validateSettings for the pull token — that check is T29s (plan §4.12)', () => {

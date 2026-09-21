@@ -20,6 +20,7 @@ import { octokitActionsRunsPort, type ActionsRepositoryRef, type ActionsRunsPort
 import { correlateDispatchedRun } from './runs/run-correlator.js';
 import { observeRun } from './runs/run-observer.js';
 import { readResultArtifact } from './runs/result-artifact.js';
+import { checkImageAccess as checkGhcrAccess, type GhcrAccessResult, type GhcrFetch } from './registry/ghcr-access.js';
 
 import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } from './settings.schema.js';
 
@@ -64,11 +65,17 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  * are T13's. A digest read from the artifact is reported `confirmed: false`
  * always; confirming it against the registry is `checkImageAccess` (T14).
  *
- * `listRecentRuns?` (T12's run discovery, §7.4a) and `checkImageAccess?` (T14)
- * are still deliberately **not declared**: both are optional on the contract and
- * a caller materialises the member before calling it, so declaring a throwing
- * placeholder would buy nothing and would tell a future reader the capability is
- * wired when it is not.
+ * `checkImageAccess?` (T14) IS declared now, because it does something: it reads
+ * the manifest anonymously, then with the pull token, and checks that token's
+ * scopes through `GET /user`. It is the confirming half of §4.8's "only ever
+ * confirmed, never believed" — `getBuild` still reports an artifact digest as
+ * `confirmed: false` always, and the caller does the comparison, because it is
+ * the only party holding both the Build row and the `pullToken` setting.
+ *
+ * `listRecentRuns?` (T12's run discovery, §7.4a) is still deliberately **not
+ * declared**: it is optional on the contract and a caller materialises the member
+ * before calling it, so declaring a throwing placeholder would buy nothing and
+ * would tell a future reader the capability is wired when it is not.
  */
 export class GitHubActionsBuildPlugin implements IBuildPlugin {
 	readonly id = 'github-actions-build';
@@ -325,6 +332,42 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 		const runId = await this.resolveRunId(port, ref, repository);
 		if (runId === null) return;
 		await port.cancelWorkflowRun({ repository, runId });
+	}
+
+	/**
+	 * APW-05 T14 — can this installation read the image, and is its pull token the
+	 * right shape?
+	 *
+	 * Declared now that it does something. It stayed undeclared while it did not,
+	 * because the contract makes it optional and a caller materialises the member
+	 * before calling it — so a throwing placeholder would have told a reader the
+	 * capability was wired when it was not.
+	 *
+	 * This is the **confirming** half of plan §4.8's "only ever confirmed, never
+	 * believed". `getBuild` reports the digest the member's own CI claimed with
+	 * `confirmed: false`, always; comparing it against the digest this method reads
+	 * from the registry is what makes it true, and that comparison belongs to the
+	 * caller, which is the only party holding both the Build row and the
+	 * installation's `pullToken` setting (`getBuild(ref, auth)` is given neither).
+	 */
+	async checkImageAccess(input: {
+		readonly imageRepository: string;
+		readonly tag: string;
+		readonly pullToken?: string;
+	}): Promise<GhcrAccessResult> {
+		return checkGhcrAccess(input, this.registryFetch());
+	}
+
+	/**
+	 * The registry/API HTTP seam.
+	 *
+	 * `redirect: 'manual'` is set by `ghcr-access.ts` on every request and passed
+	 * straight through here: a 3xx followed with the `Authorization` header still
+	 * attached is how a pull token reaches a host that is neither `api.github.com`
+	 * nor `ghcr.io`, and that module's spec watches every call for exactly that.
+	 */
+	protected registryFetch(): GhcrFetch {
+		return (url, init) => fetch(url, init as RequestInit);
 	}
 
 	/** APW-05 T12 — the run's own page, which is where a member reads its logs. */
