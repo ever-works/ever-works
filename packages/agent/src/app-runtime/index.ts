@@ -106,3 +106,16 @@ export * from './app-cluster-op.router';
 export * from './app-lifecycle-ops.service';
 export * from './app-smoke.service';
 export * from './app-health.service';
+// APW-06 T17 — the module that binds `WORK_APP_RUNTIME_STATES`, and §2.2's
+// deploy request path, which is the first thing in this epic a route can
+// actually reach.
+//
+// `work-app-runtime-state.port` is deliberately NOT re-exported here.
+// `AppDeployQueueWrite` and `AppHealthStatePatch` are each declared twice in
+// this directory — once by the port as the canonical shape, once by the
+// consumer service as its own structural view — and a barrel that exports both
+// is ambiguous (TS2308). The consumers' views are what every existing importer
+// already uses; the port is the implementation's contract, imported by path
+// where it is needed.
+export * from './app-runtime-state.module';
+export * from './app-deploy-request.module';
