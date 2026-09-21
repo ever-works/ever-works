@@ -108,6 +108,12 @@ const BOUND: readonly string[] = [
     // handover's prose, and the metadata said otherwise. Which is the point.
     'APP_BUILD_PREPARE_RUNNER',
     'APP_BUILD_WATCH_RUNNER',
+    // APW-05 T16's two credential/fact ports, provided by `AppBuildsModule`
+    // (2026-09-22). Declared by `build-facade.service.ts`, so they belong in this
+    // register like any other port — a new token in NEITHER list fails the last
+    // case in this file, which is how they got here.
+    'BUILD_REPOSITORY_FACTS_SOURCE',
+    'BUILD_TOKEN_SOURCE',
     // APW-06 T17 — provided by `AppRuntimeStateModule` (2026-09-21).
     'WORK_APP_RUNTIME_STATES',
 ];
@@ -224,10 +230,10 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **62 of the 66 tokens in these two lists are
-        // dormant**, and the four that are not are named in `BOUND`.
+        // that it cannot drift: **62 of the 68 tokens in these two lists are
+        // dormant**, and the six that are not are named in `BOUND`.
         expect(UNBOUND).toHaveLength(62);
-        expect(BOUND).toHaveLength(4);
+        expect(BOUND).toHaveLength(6);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {

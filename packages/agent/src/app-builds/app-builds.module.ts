@@ -19,11 +19,15 @@ import {
     AppBuildsService,
 } from './app-builds.service';
 import {
+    BUILD_REPOSITORY_FACTS_SOURCE,
     BUILD_TOKEN_SOURCE,
     BuildFacadeService,
+    type BuildRepositoryFactsSource,
     type BuildTokenSource,
 } from './build-facade.service';
 import { GitBuildTokenSource } from './git-build-token.source';
+import { UpstreamBuildFactsSource } from './upstream-build-facts.source';
+import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { GitFacadeService } from '../facades/git.facade';
 
 /**
@@ -160,6 +164,25 @@ import { GitFacadeService } from '../facades/git.facade';
             }),
             inject: [ModuleRef],
         },
+        // APW-05 T16's other half: whether the repository is ours to push a
+        // workflow change into (`WorkUpstreamState.relation`), and which runner
+        // class it needs. Resolved through `ModuleRef` non-strictly for the same
+        // reason the token source above is: `WorkUpstreamStateRepository` is
+        // provided by `AppWorksModule`, not by this one, and importing that
+        // module here would make `app-builds.module.spec.ts` stop compiling
+        // standalone. With nothing to find, the facade's own SAFE defaults apply
+        // and a Build takes the pull-request path on the private runner.
+        {
+            provide: BUILD_REPOSITORY_FACTS_SOURCE,
+            useFactory: (ref: ModuleRef): BuildRepositoryFactsSource => ({
+                getBuildRepositoryFacts: async (input) => {
+                    const states = ref.get(WorkUpstreamStateRepository, { strict: false });
+                    if (!states) return null;
+                    return new UpstreamBuildFactsSource(states).getBuildRepositoryFacts(input);
+                },
+            }),
+            inject: [ModuleRef],
+        },
         {
             provide: APP_BUILD_PREPARE_RUNNER,
             useFactory: (ref: ModuleRef) => ({
@@ -200,6 +223,7 @@ import { GitFacadeService } from '../facades/git.facade';
         BuildFacadeService,
         APP_BUILD_PLUGIN_RESOLVER,
         BUILD_TOKEN_SOURCE,
+        BUILD_REPOSITORY_FACTS_SOURCE,
     ],
 })
 export class AppBuildsModule {}
