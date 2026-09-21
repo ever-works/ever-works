@@ -99,6 +99,10 @@ function boundTokenNames(): Set<string> {
  * document. Keep it sorted; it is read by people.
  */
 const BOUND: readonly string[] = [
+    // APW-05 T16 — `BuildFacadeService`, provided by `AppBuildsModule` (2026-09-21).
+    // Four services in this epic inject it; until it was bound every one of them
+    // took its `pluginUnavailable` branch and no Build could be requested.
+    'APP_BUILD_PLUGIN_RESOLVER',
     // APW-05 T19/T20 — provided by `AppBuildsModule`. Found by THIS register on
     // its first run: they were in the unbound list when it was drafted from the
     // handover's prose, and the metadata said otherwise. Which is the point.
@@ -125,7 +129,6 @@ const UNBOUND: readonly string[] = [
     'APP_BLUEPRINT_APPLY_SERVICE',
     'APP_BUILD_EDIT_ACCESS',
     'APP_BUILD_PLATFORM_SETTINGS_WRITER',
-    'APP_BUILD_PLUGIN_RESOLVER',
     'APP_BUILD_RUNNER_RECIPE_SOURCE',
     'APP_BUILD_SPEC_SOURCE',
     'APP_BUILD_WORK_SOURCE',
@@ -221,10 +224,10 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **63 of the 66 tokens in these two lists are
-        // dormant**, and the three that are not are named in `BOUND`.
-        expect(UNBOUND).toHaveLength(63);
-        expect(BOUND).toHaveLength(3);
+        // that it cannot drift: **62 of the 66 tokens in these two lists are
+        // dormant**, and the four that are not are named in `BOUND`.
+        expect(UNBOUND).toHaveLength(62);
+        expect(BOUND).toHaveLength(4);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {

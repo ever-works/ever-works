@@ -13,10 +13,12 @@ import { AppBuildPullTokenService } from './app-build-pull-token.service';
 import { AppBuildPrepareRunner } from './app-build-prepare.runner';
 import { AppBuildWatchRunner } from './app-build-watch.runner';
 import {
+    APP_BUILD_PLUGIN_RESOLVER,
     APP_BUILD_PREPARE_RUNNER,
     APP_BUILD_WATCH_RUNNER,
     AppBuildsService,
 } from './app-builds.service';
+import { BuildFacadeService } from './build-facade.service';
 
 /**
  * APW-05 T17 — the Builds module (T19 adds the prepare runner — see below).
@@ -111,6 +113,18 @@ import {
         AppBuildsService,
         AppBuildPullTokenService,
         AppBuildPrepareRunner,
+        // APW-05 T16 — the resolver four services in this epic inject and nothing
+        // provided until 2026-09-21, so every one of them took its
+        // `pluginUnavailable` branch and no Build could be requested at all.
+        //
+        // `useExisting`, so the facade is one instance under two names. It is
+        // constructed with `PluginRegistryService` and `WorkRepository` required
+        // and its two credential/fact ports `@Optional()`, which is why binding
+        // it here does not drag the credential stack into this module: with
+        // nothing bound for those, `resolve` answers `null` and says which half
+        // was missing in the log.
+        BuildFacadeService,
+        { provide: APP_BUILD_PLUGIN_RESOLVER, useExisting: BuildFacadeService },
         {
             provide: APP_BUILD_PREPARE_RUNNER,
             useFactory: (ref: ModuleRef) => ({
@@ -144,6 +158,12 @@ import {
         AppBuildPullTokenService,
         AppBuildPrepareRunner,
         AppBuildWatchRunner,
+        // Exported as well as provided: a token bound in `providers` and absent
+        // from `exports` resolves to `undefined` at every `@Optional() @Inject()`
+        // site in another module, silently — which is exactly the defect
+        // `packages/tasks`' own guard caught three dispatchers committing.
+        BuildFacadeService,
+        APP_BUILD_PLUGIN_RESOLVER,
     ],
 })
 export class AppBuildsModule {}
