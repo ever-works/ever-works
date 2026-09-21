@@ -450,6 +450,30 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly memoryFactEmbedService?: MemoryFactEmbedService,
         @Optional()
         private readonly memoryFactSweepService?: MemoryFactSweepService,
+        // AW-22 Workspace backup — backs the `workspace-backup` task
+        // (`startFromPayload`, then `observeRun` until the row settles, then
+        // `notifyFinished` on it — every call short, so none outlives the
+        // RPC deadline) and the `workspace-backup-sweeper` cron (`runSweep`).
+        // The archive is produced HERE and not in the worker because the runner
+        // needs the DataSource, the active storage backend and each Work's
+        // data-repo walk, none of which exist in worker scope.
+        //
+        // ⚠ These three arrived on `develop` appended LAST, and the App Works
+        // block below arrived on this branch appended LAST. Both cannot be last.
+        // They are ordered this way round because
+        // `app-source-initializer.service.spec.ts:1353` asserts, against the
+        // SOURCE, that `appSourceInitializerService` is the final `@Optional()`
+        // — that is APW-01 T15's own guard against a mid-list insertion, and it
+        // is the stricter of the two. `trigger-internal.controller.spec.ts`'s
+        // arity assertion is positional (the last three indices must be
+        // `@Optional()`), which holds either way. The positional construction in
+        // that spec passes `undefined` for these three at exactly this offset.
+        @Optional()
+        private readonly workspaceBackupRunner?: WorkspaceBackupRunner,
+        @Optional()
+        private readonly workspaceBackupService?: WorkspaceBackupService,
+        @Optional()
+        private readonly workspaceBackupRepository?: WorkspaceBackupRepository,
         // APW-02 T28 — the App upstream trio the Trigger.dev worker reaches over
         // the internal RPC channel. All three are appended LAST + `@Optional()`
         // per the arity rule above (every positional
@@ -539,21 +563,6 @@ export class TriggerInternalController implements OnModuleInit {
         // again, and the handler's own content compare makes that safe (plan §6).
         @Optional()
         private readonly appSourceInitializerService?: AppSourceInitializerService,
-        // AW-22 Workspace backup — backs the `workspace-backup` task
-        // (`startFromPayload`, then `observeRun` until the row settles, then
-        // `notifyFinished` on it — every call short, so none outlives the
-        // RPC deadline) and the `workspace-backup-sweeper` cron
-        // (`runSweep`). The archive is
-        // produced HERE and not in the worker because the runner needs the
-        // DataSource, the active storage backend and each Work's data-repo
-        // walk, none of which exist in worker scope. Appended LAST +
-        // @Optional() per the arity rule above.
-        @Optional()
-        private readonly workspaceBackupRunner?: WorkspaceBackupRunner,
-        @Optional()
-        private readonly workspaceBackupService?: WorkspaceBackupService,
-        @Optional()
-        private readonly workspaceBackupRepository?: WorkspaceBackupRepository,
     ) {}
 
     onModuleInit() {

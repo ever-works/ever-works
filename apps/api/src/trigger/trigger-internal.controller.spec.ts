@@ -311,6 +311,14 @@ describe('TriggerInternalController', () => {
             undefined, // rosterProvisioningService
             undefined, // memoryFactEmbedService
             undefined, // memoryFactSweepService
+            // AW-22 (develop) — the workspace-backup trio. Not exercised by these
+            // tests, but POSITIONAL: they sit between `memoryFactSweepService` and
+            // the App Works block in the constructor, so omitting them here would
+            // land the App values three slots early. See the constructor's own
+            // note for why this order and not the other.
+            undefined, // workspaceBackupRunner
+            undefined, // workspaceBackupService
+            undefined, // workspaceBackupRepository
             // APW-02 T28 — the App upstream trio, appended LAST + `@Optional()` per
             // the arity rule above.
             appUpstreamStateService,

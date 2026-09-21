@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { KubernetesApiService, defaultClientFactory, type KubernetesClientFactory } from '../k8s-api.service';
@@ -1018,6 +1018,26 @@ describe('defaultClientFactory wiring for the new APIs', () => {
 			makeApiClient
 		};
 	}
+
+	/**
+	 * Pay for `@kubernetes/client-node` HERE, once, and out of the cases' budget.
+	 *
+	 * Every other case in this file mocks the factory; these are the only two that
+	 * reach the real `k8sClientLoader()`, whose `require` of that package is the
+	 * single most expensive import in this suite. Whichever case ran first paid
+	 * the whole cost, and on a loaded self-hosted runner that is enough to blow
+	 * the 10 s `testTimeout` in `vitest.config.ts` — measured in CI run
+	 * 35591005499: **14,797 ms** for the `authorizationV1Api` case and **9 ms**
+	 * for the `coreV1Api` case immediately after it, from the module cache. The
+	 * assertions were never the problem, and this file is otherwise 940 green.
+	 *
+	 * A `beforeAll` with its own generous timeout attributes the cost to setup,
+	 * where it belongs, and leaves each case measuring what it is about. Raising
+	 * the whole suite's `testTimeout` instead would hide the next real hang.
+	 */
+	beforeAll(() => {
+		defaultClientFactory.coreV1Api(recordingClient().client);
+	}, 120_000);
 
 	it('authorizationV1Api hands makeApiClient the real object-parameter AuthorizationV1Api class', () => {
 		const { client, makeApiClient } = recordingClient();
