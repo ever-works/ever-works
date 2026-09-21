@@ -822,7 +822,20 @@ export class WorkspaceBackupRunner {
                 // left out, and a `partial` domain can carry trims like any
                 // other — so a file planned off an unfinished parent must not
                 // erase the reports of its siblings.
-                const trims = await collector.trims(context, plans);
+                // `collector.trims` issues its own COUNT queries. This branch
+                // runs precisely because the database already failed one query
+                // for this domain, so treat a second failure as "no reports
+                // available" rather than letting it reach the outer catch —
+                // that would return `failed` with no files at all and hide
+                // data the writer has already streamed into the archive.
+                let trims: BackupTrimReport[] = [];
+                try {
+                    trims = await collector.trims(context, plans);
+                } catch (error) {
+                    this.logger.warn(
+                        `[backup] ${key}: trim reports unavailable after a partial read (${String(error)})`,
+                    );
+                }
                 return {
                     outcome: {
                         key,
