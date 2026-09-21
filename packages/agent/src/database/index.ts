@@ -125,6 +125,8 @@ export * from './repositories/app-launcher-preference.repository';
 // Actions hygiene, schedule, divergence, manual-sync allowance). Also
 // feature-owned and wired by the App Works module (T15), for the same reason.
 export * from './repositories/work-upstream-state.repository';
+// APW-06 T17 — the per-App-Work runtime state store behind WORK_APP_RUNTIME_STATES.
+export * from './repositories/work-app-runtime-state.repository';
 // APW-07 App env & dependencies — the stored Environment values of one App Work
 // (T8), and the dependency rows a provider provisions, releases and reports on.
 // Both are feature-owned and wired by their own modules (T13 / T16), so neither

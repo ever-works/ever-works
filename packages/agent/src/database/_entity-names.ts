@@ -249,6 +249,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkAppSpecState',
     // APW-04 App Provisioner — one row per provisioning attempt of an App Work.
     'WorkAppProvisioning',
+    // APW-06 T17 — one per App Work: target, namespace, cluster fingerprint,
+    // the atomic deploy lock and its queue of one, health counters and the
+    // deletion claim.
+    'WorkAppRuntimeState',
     'WorkBudget',
     'WorkBudgetAlertState',
     // APW-05 Builds — one row per Build of an App Work (per-Work numbering),

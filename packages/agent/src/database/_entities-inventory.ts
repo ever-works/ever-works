@@ -183,6 +183,7 @@ import { WorkspaceBackup } from '../entities/workspace-backup.entity';
 import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
 // APW-02 Fork lifecycle — the per-App-Work upstream state row. Concrete path,
 // never the barrel: see the module docstring.
+import { WorkAppRuntimeState } from '../entities/work-app-runtime-state.entity';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 // APW-07 App env & dependencies — one encrypted value per (Work, name), and one
 // row per (Work, kind) recording what a dependency provider provisioned.
@@ -491,6 +492,12 @@ export const ENTITIES = [
     // columns: the active Organization must never be stamped onto a 'global'
     // row every Organization shares.
     AppLauncherPreference,
+    // APW-06 T17 — the runtime state of one App Work: which target it deploys
+    // to, the namespace and cluster it is frozen against, the atomic deploy
+    // lock and its latest-wins queue of one, the health counters the poller
+    // orders by, and the deletion claim. Registered next to `WorkDeployment`,
+    // which is the row it points at through `currentDeploymentId`.
+    WorkAppRuntimeState,
     // APW-02 Fork lifecycle — the Upstream state of one App Work: readiness,
     // Actions hygiene, schedule, divergence and the manual-sync allowance.
     WorkUpstreamState,

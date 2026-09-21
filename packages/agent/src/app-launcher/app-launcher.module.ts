@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { AppRuntimeStateModule } from '../app-runtime/app-runtime-state.module';
 import { DatabaseModule } from '../database/database.module';
 import { AppLauncherPreferenceRepository } from '../database/repositories/app-launcher-preference.repository';
 import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
@@ -41,15 +43,27 @@ import {
  * 2026-09-18. A declared provider that injects a repository must declare where
  * that repository comes from.
  *
- * `APP_PUBLISHED_HOSTS`, `WORK_APP_RUNTIME_STATES`, `APPS_TIER_POLICY` and
- * `APP_SPEC_DISPLAY_NAMES` are intentionally **not** bound here. Each is
- * `@Optional()` in the service and each is owned by another epic (APW-06, APW-10,
- * APW-03); binding a fake here would make an unconfigured installation look
- * configured, which is the one thing the optional-injection posture exists to
- * prevent.
+ * `APP_PUBLISHED_HOSTS`, `APPS_TIER_POLICY` and `APP_SPEC_DISPLAY_NAMES` are
+ * intentionally **not** bound here. Each is `@Optional()` in the service and each
+ * is owned by another epic (APW-06, APW-10, APW-03); binding a fake here would
+ * make an unconfigured installation look configured, which is the one thing the
+ * optional-injection posture exists to prevent.
+ *
+ * `WORK_APP_RUNTIME_STATES` **was** in that list and no longer is (2026-09-21).
+ * The distinction the paragraph above draws is between binding a FAKE and binding
+ * the real thing: APW-06 T17's `AppRuntimeStateModule` provides the real
+ * repository over the real table, so importing it is not a stand-in for the
+ * owning epic — it IS the owning epic's binding.
  */
 @Module({
-    imports: [DatabaseModule, TypeOrmModule.forFeature([AppLauncherPreference])],
+    imports: [
+        DatabaseModule,
+        TypeOrmModule.forFeature([AppLauncherPreference]),
+        // APW-06 T17 — binds `WORK_APP_RUNTIME_STATES`, which `AppLauncherService`
+        // injects `@Optional()` for FR-15's paused / removed reads. Until T17 landed
+        // the token was bound nowhere, so every tile's runtime state read as absent.
+        AppRuntimeStateModule,
+    ],
     providers: [
         AppLauncherPreferenceRepository,
         AppLauncherService,

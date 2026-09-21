@@ -250,3 +250,5 @@ export * from './work-build-preparation.entity';
 // the §2.5 step table, the attempts, the spend, the open question and the step
 // executor's lease. At most one ACTIVE row per Work (a partial unique).
 export * from './work-app-provisioning.entity';
+// APW-06 T17 — the per-App-Work runtime state row.
+export * from './work-app-runtime-state.entity';
