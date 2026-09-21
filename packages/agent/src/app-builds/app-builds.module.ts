@@ -18,7 +18,13 @@ import {
     APP_BUILD_WATCH_RUNNER,
     AppBuildsService,
 } from './app-builds.service';
-import { BuildFacadeService } from './build-facade.service';
+import {
+    BUILD_TOKEN_SOURCE,
+    BuildFacadeService,
+    type BuildTokenSource,
+} from './build-facade.service';
+import { GitBuildTokenSource } from './git-build-token.source';
+import { GitFacadeService } from '../facades/git.facade';
 
 /**
  * APW-05 T17 — the Builds module (T19 adds the prepare runner — see below).
@@ -125,6 +131,35 @@ import { BuildFacadeService } from './build-facade.service';
         // was missing in the log.
         BuildFacadeService,
         { provide: APP_BUILD_PLUGIN_RESOLVER, useExisting: BuildFacadeService },
+        // APW-05 T16's credential half. Without it `BuildFacadeService` resolves
+        // to `null` for every Work — an honest refusal and a useless one, since
+        // nothing could ever build. `GitFacadeService.getAccessToken` is the
+        // platform's existing answer to "what token acts on this Work's
+        // repository for this member", ladder and all.
+        //
+        // Resolved through `ModuleRef` NON-STRICTLY, and deliberately not by
+        // importing `FacadesModule`. That import was tried and is not shippable:
+        // it drags the whole facade graph in, and `AiFacadeService` needs
+        // `PluginRegistryService` from the `@Global()` plugins module — which is
+        // registered at the API root and absent when this module is compiled
+        // alone. `app-builds.module.spec.ts` compiles it alone on purpose, and it
+        // failed with `Nest can't resolve dependencies of the AiFacadeService`.
+        //
+        // So the lookup is lazy and per call: the module composes standalone, a
+        // running API finds the real facade, and an injector that has none gets a
+        // `null` token — which `BuildFacadeService` already reports as "no
+        // credential" with the reason logged.
+        {
+            provide: BUILD_TOKEN_SOURCE,
+            useFactory: (ref: ModuleRef): BuildTokenSource => ({
+                getBuildToken: async (input) => {
+                    const gitFacade = ref.get(GitFacadeService, { strict: false });
+                    if (!gitFacade) return null;
+                    return new GitBuildTokenSource(gitFacade).getBuildToken(input);
+                },
+            }),
+            inject: [ModuleRef],
+        },
         {
             provide: APP_BUILD_PREPARE_RUNNER,
             useFactory: (ref: ModuleRef) => ({
@@ -164,6 +199,7 @@ import { BuildFacadeService } from './build-facade.service';
         // `packages/tasks`' own guard caught three dispatchers committing.
         BuildFacadeService,
         APP_BUILD_PLUGIN_RESOLVER,
+        BUILD_TOKEN_SOURCE,
     ],
 })
 export class AppBuildsModule {}

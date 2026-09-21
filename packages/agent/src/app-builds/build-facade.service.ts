@@ -1,10 +1,22 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { AppBuildKind } from '@ever-works/contracts';
 import type { BuildAuth, BuildRef, IBuildPlugin, StartBuildInput } from '@ever-works/plugin';
 
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import type { AppBuildPluginBinding, AppBuildPluginResolver } from './app-builds.service';
+
+/**
+ * DI token for {@link BuildTokenSource}.
+ *
+ * Declared ABOVE the class that injects it: `@Inject()` evaluates its argument
+ * at decorator time, and a `const` declared further down the file is in its
+ * temporal dead zone at that moment (TS2448).
+ */
+export const BUILD_TOKEN_SOURCE = Symbol('BUILD_TOKEN_SOURCE');
+
+/** DI token for {@link BuildRepositoryFactsSource}. Declared here for the same reason. */
+export const BUILD_REPOSITORY_FACTS_SOURCE = Symbol('BUILD_REPOSITORY_FACTS_SOURCE');
 
 /**
  * APW-05 T16 — `BuildFacadeService.resolve(workId, userId)`, the binding behind
@@ -81,6 +93,7 @@ export class BuildFacadeService implements AppBuildPluginResolver {
          * log line below is what distinguishes them for an operator.
          */
         @Optional()
+        @Inject(BUILD_TOKEN_SOURCE)
         private readonly tokens?: BuildTokenSource,
         /**
          * Where the repository's visibility and provenance come from.
@@ -90,6 +103,7 @@ export class BuildFacadeService implements AppBuildPluginResolver {
          * {@link BuildFacadeService.factsFor}.
          */
         @Optional()
+        @Inject(BUILD_REPOSITORY_FACTS_SOURCE)
         private readonly facts?: BuildRepositoryFactsSource,
     ) {}
 
@@ -301,9 +315,6 @@ export interface BuildTokenSource {
     }): Promise<string | null>;
 }
 
-/** DI token for {@link BuildTokenSource}. */
-export const BUILD_TOKEN_SOURCE = Symbol('BUILD_TOKEN_SOURCE');
-
 /**
  * Where the App Work's repository visibility and provenance come from.
  *
@@ -318,6 +329,3 @@ export interface BuildRepositoryFactsSource {
         readonly createdByAppWork: boolean;
     } | null>;
 }
-
-/** DI token for {@link BuildRepositoryFactsSource}. */
-export const BUILD_REPOSITORY_FACTS_SOURCE = Symbol('BUILD_REPOSITORY_FACTS_SOURCE');
