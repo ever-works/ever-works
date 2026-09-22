@@ -19,6 +19,10 @@ import {
 } from '@ever-works/contracts';
 import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
+import { isAppWorkKind, type AppSpec } from '@ever-works/contracts';
+import { AppWorkRulesService } from '../app-works/app-work-rules.service';
+import { APP_SPEC_PATH, AppChangeGuard, MAX_FILES } from '../app-works/app-change-guard';
+import { AppSpecService } from '../app-spec/app-spec.service';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -101,7 +105,16 @@ export interface TaskAgentMergeOutcome {
 }
 
 export interface TaskWorkspaceFinalizeOutcome {
-    outcome: 'no-changes' | 'pr-opened' | 'pushed-no-pr' | 'conflict';
+    /**
+     * `blocked-by-guard` is APW-08 T17's, and it is a NEW member rather than a
+     * reuse of the two that nearly fit.
+     *
+     * `pushed-no-pr` is the agent LACKING permission to open one — nothing is
+     * wrong and the Task is not blocked. `conflict` blocks, but saying a branch
+     * conflicts when it merges cleanly and merely touches a protected path would
+     * send the member to rebase something that does not need rebasing.
+     */
+    outcome: 'no-changes' | 'pr-opened' | 'pushed-no-pr' | 'conflict' | 'blocked-by-guard';
     prNumber?: number;
     prUrl?: string;
     conflictPaths?: string[];
@@ -176,6 +189,18 @@ export class TaskWorkspaceService {
         // Multi-repo Task workspaces (slice C, PR C2) — the Task's own extra
         // repositories by registry connection. Appended LAST + @Optional.
         @Optional() private readonly repoConnections?: RepoConnectionRepository,
+        // APW-08 T17 — the evolve loop's change guard and the rules it reads.
+        // Appended LAST + @Optional() per this file's own positional-spec arity
+        // rule: eighteen construction sites pass a prefix of these arguments,
+        // several of them casting through `ServiceArgs[N]`, so an argument
+        // inserted anywhere else re-indexes them WITHOUT a compile error.
+        //
+        // All three absent means the epic is not installed in this graph, and the
+        // guard is SKIPPED rather than failing closed — see `guardAppChange`. An
+        // installed guard that cannot read the rules is a different answer.
+        @Optional() private readonly appWorkRules?: AppWorkRulesService,
+        @Optional() private readonly appChangeGuard?: AppChangeGuard,
+        @Optional() private readonly appSpecs?: AppSpecService,
     ) {}
 
     /**
@@ -1256,6 +1281,22 @@ export class TaskWorkspaceService {
             return { outcome: 'conflict', conflictPaths: simulation.conflictPaths };
         }
 
+        // APW-08 T17 — the change guard, between a clean merge and a pull
+        // request. The branch is ALREADY pushed by this point (`finalize(...,
+        // { push: true })` above, `branchState: 'pushed'`), so a refusal here
+        // refuses the pull request and says so; it cannot un-push.
+        const guarded = await this.guardAppChange({
+            input,
+            work,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch: workspace.branch,
+            baseSha: workspace.baseSha ?? null,
+        });
+        if (guarded) return guarded;
+
         return this.openPullRequestForBranch({
             task,
             work,
@@ -1343,6 +1384,22 @@ export class TaskWorkspaceService {
         const baseRef =
             (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
             repository.defaultBranch;
+
+        // APW-08 T17 — the same guard, at the same point in the other finalize
+        // path. Note it sits AFTER the idempotence short-circuit above: a Task
+        // that already carries a pull request has already been through here, and
+        // re-judging it would block a branch whose PR a member may be reviewing.
+        const guarded = await this.guardAppChange({
+            input,
+            work,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch,
+            baseSha: input.baseSha ?? null,
+        });
+        if (guarded) return guarded;
 
         return this.openPullRequestForBranch({
             task,
@@ -2335,6 +2392,231 @@ export class TaskWorkspaceService {
             error: `branch delete failed — the branch is still on the remote: ${reason}`,
             updatedAt: new Date().toISOString(),
         };
+    }
+
+    /**
+     * APW-08 T17 — the change guard, at the one point both finalize paths share.
+     *
+     * Answers `null` to PROCEED and a terminal outcome to refuse. It is a method
+     * rather than two inline blocks because the two call sites must not be able
+     * to drift: a rule enforced on the workspace path and not on the fleet path
+     * is a rule an agent can route around by choosing where it runs.
+     *
+     * ## Three absences, three different answers
+     *
+     * | State | Answer | Why |
+     * | --- | --- | --- |
+     * | Work is not kind `app` | proceed | This is the shared finalize tail for EVERY Work. `kind` defaults to `'default'`, and an ungated guard would run on every Task in the product. |
+     * | the epic is not installed | proceed | Nothing is bound, so nothing was promised. Refusing here would break every App Work on a graph that simply has not imported APW-08 yet. |
+     * | installed, but the rules cannot be READ | **refuse** | A run whose protected paths are unknown is a run with no protected paths. This is the one this file must fail closed on. |
+     *
+     * The middle row and the bottom row are the distinction that matters, and
+     * they are why `AppWorkRulesService` being `undefined` and
+     * `AppWorkRulesService.resolve` THROWING are handled separately rather than
+     * in one `try`.
+     *
+     * ## Nothing here may throw
+     *
+     * Every other collaborator this service calls at finalize time is
+     * best-effort — `transitionTask`, `postSystemMessage`, `stampChangedFiles`
+     * all swallow. `resolve` and `getCompareDiff` do not: they throw
+     * `AppSpecUnreadableError` and the provider's own errors. An escape from here
+     * would leave the Task at `branchState: 'pushed'` with no pull request, no
+     * chat message and no `BLOCKED` transition — strictly worse than the refusal,
+     * because the member would see a Task that simply stopped.
+     *
+     * So the whole body is wrapped, and a throw becomes the refusal it was
+     * trying to be.
+     *
+     * ## The base commit, and what to do when the caller has none
+     *
+     * The rules are read at the Task's BASE commit — the security property
+     * `AppWorkRulesService` exists to hold. `finalizeRun` has
+     * `workspace.baseSha`; `finalizeRemotePush` may have nothing, because the
+     * fleet passes `baseSha: result.git.baseSha ?? null` and that is a normal
+     * push rather than an error.
+     *
+     * When it is absent the base branch's own tip is resolved instead. That is
+     * still a commit the agent did not author — it writes to its own branch — so
+     * the property holds, and it costs one provider read on the App path only.
+     * If even that cannot be read, the rules are unknown and the answer is the
+     * bottom row of the table.
+     *
+     * ## The diff is compared against the BRANCH, not a sha
+     *
+     * `finalizeRun` never captures the pushed commit — nothing in it reads the
+     * sha back — so `head` is the branch name, the same shape
+     * `task-pr-status.service.ts` uses. It means the verdict is not pinned to a
+     * commit: a push that lands between the compare and the pull request is not
+     * in what was judged. Recorded rather than hidden; pinning it needs the
+     * finalize path to return the sha it pushed, which is a change to
+     * `WorkspaceFacadeService`.
+     */
+    private async guardAppChange(input: {
+        input: { task: Task; userId: string; agentId: string };
+        work: Work;
+        owner: string;
+        repo: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+        baseRef: string;
+        branch: string;
+        baseSha: string | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome | null> {
+        const { work, owner, repo, gitOptions, baseRef, branch } = input;
+        const task = input.input.task;
+
+        // ---- row 1: not an App Work ---------------------------------------
+        if (!isAppWorkKind(work.kind)) return null;
+
+        // ---- row 2: the epic is not installed ------------------------------
+        if (!this.appWorkRules || !this.appChangeGuard || !this.gitFacade) {
+            this.logger.debug(
+                `Task ${task.id}: App change guard skipped — not bound in this graph.`,
+            );
+            return null;
+        }
+
+        try {
+            const baseSha = input.baseSha?.trim() || (await this.resolveBaseSha(input));
+            if (!baseSha) {
+                return this.refuseChange(
+                    input.input,
+                    task,
+                    `The base commit on \`${baseRef}\` could not be read, so this Work's protected ` +
+                        'paths are unknown. The branch was pushed but no pull request was opened.',
+                );
+            }
+
+            const rules = await this.appWorkRules.resolve(work, baseSha);
+            const diff = await this.gitFacade.getCompareDiff(
+                owner,
+                repo,
+                baseRef,
+                branch,
+                { maxFiles: MAX_FILES },
+                gitOptions,
+            );
+
+            const verdict = this.appChangeGuard.evaluate({
+                rules,
+                diff,
+                ...(await this.readGuardedSpecs(work, baseSha, branch, diff, gitOptions)),
+                labels: Array.isArray(task.labels) ? task.labels : [],
+            });
+
+            if (verdict.allowed) {
+                if (verdict.note) {
+                    // Allowed, and larger than the Work's guidance. Said once,
+                    // here, rather than silently: T18 puts it on the pull
+                    // request body as well.
+                    await this.postSystemMessage(input.input, verdict.note);
+                }
+                return null;
+            }
+
+            const paths = verdict.paths.length
+                ? ['', 'Paths:', ...verdict.paths.map((path) => `- \`${path}\``)]
+                : [];
+            return this.refuseChange(
+                input.input,
+                task,
+                [
+                    `${verdict.message} The branch was pushed but no pull request was opened.`,
+                    ...paths,
+                ].join('\n'),
+            );
+        } catch (error) {
+            // See the docstring: an escape here is worse than any refusal.
+            const reason = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Task ${task.id}: App change guard could not decide: ${reason}`);
+            return this.refuseChange(
+                input.input,
+                task,
+                `This Work's rules could not be read, so the change was not checked against its ` +
+                    'protected paths. The branch was pushed but no pull request was opened.',
+            );
+        }
+    }
+
+    /**
+     * The base branch's own tip, for a caller that supplied no base commit.
+     *
+     * `null` rather than a throw: the caller turns it into the refusal, and a
+     * provider that will not answer is the same answer as a branch with no
+     * commits.
+     */
+    private async resolveBaseSha(input: {
+        owner: string;
+        repo: string;
+        baseRef: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+    }): Promise<string | null> {
+        if (!this.gitFacade) return null;
+        try {
+            const commit = await this.gitFacade.getLatestCommit(
+                input.owner,
+                input.repo,
+                input.baseRef,
+                input.gitOptions,
+            );
+            return commit?.sha?.trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * The two App specs rule 4 compares, read ONLY when the diff touches the file.
+     *
+     * Returning `{}` leaves `headSpec` `undefined`, which the guard reads as "not
+     * read" and skips rule 4 on — distinct from `null`, which is "read and it
+     * does not parse" and is itself a refusal. The distinction is the whole
+     * reason this helper answers a partial object rather than two values.
+     */
+    private async readGuardedSpecs(
+        work: Work,
+        baseSha: string,
+        branch: string,
+        diff: { files: readonly { path: string; previousPath?: string }[] },
+        gitOptions: { userId: string; providerId: string; workId: string },
+    ): Promise<{ baseSpec?: AppSpec | null; headSpec?: AppSpec | null }> {
+        const touchesSpec = diff.files.some(
+            (file) => file.path === APP_SPEC_PATH || file.previousPath === APP_SPEC_PATH,
+        );
+        if (!touchesSpec || !this.appSpecs || !this.gitFacade) return {};
+
+        const base = await this.appSpecs.getEffectiveSpec(work.id, baseSha);
+        // `options` before `ref` — the facade's own argument order
+        // (`git.facade.ts:855-861`), which is not the order the sibling reads use.
+        const file = await this.gitFacade.getFileContent(
+            work.getRepoOwner(),
+            work.getDataRepo(),
+            APP_SPEC_PATH,
+            gitOptions,
+            branch,
+        );
+        if (file?.content === undefined || file?.content === null) {
+            // The branch DELETED the spec. `null` is the right answer: a Work
+            // that can no longer describe itself is exactly rule 4's refusal.
+            return { baseSpec: base?.spec ?? null, headSpec: null };
+        }
+
+        const head = await this.appSpecs.parseDraft(work.id, String(file.content));
+        return { baseSpec: base?.spec ?? null, headSpec: head.spec };
+    }
+
+    /** The refusal both paths share: stay `pushed`, say why, block. */
+    private async refuseChange(
+        input: { task: Task; userId: string; agentId: string },
+        task: Task,
+        body: string,
+    ): Promise<TaskWorkspaceFinalizeOutcome> {
+        // `branchState` is deliberately NOT changed: the branch really is
+        // pushed, and rewriting that to something else would make the Task
+        // describe a push that did not happen.
+        await this.postSystemMessage(input, body);
+        await this.transitionTask(task, TaskStatus.BLOCKED);
+        return { outcome: 'blocked-by-guard' };
     }
 
     private async postSystemMessage(
