@@ -73,6 +73,7 @@ import { DatabaseModule } from '../database/database.module';
 // T10 specifies: the apps services sit in this module to avoid a module cycle
 // with `TaskTransitionService`.
 import { AppWorkRulesService } from '../app-works/app-work-rules.service';
+import { AppChangeGuard } from '../app-works/app-change-guard';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 
 /**
@@ -155,6 +156,10 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
         // throws `AppSpecUnreadableError` naming the branch, which is the
         // documented refusal and not a boot failure.
         AppWorkRulesService,
+        // APW-08 T17 — the change guard. Pure: it takes a diff and the frozen
+        // rules and answers a verdict, so it needs no collaborator and cannot
+        // be the reason this module fails to compose.
+        AppChangeGuard,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,
@@ -250,6 +255,7 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
         // must resolve the SAME instance, or they would read the spec
         // separately and come to disagree.
         AppWorkRulesService,
+        AppChangeGuard,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,

@@ -113,3 +113,18 @@ export {
     type AppWorkRules,
     type AppWorkRulesWork,
 } from './app-work-rules.service';
+
+// APW-08 T17 — what an evolve run's branch is refused for. Exported beside the
+// rules it reads, because a caller needs both or neither.
+export {
+    ALWAYS_PROTECTED,
+    APP_SPEC_PATH,
+    AppChangeGuard,
+    AppChangeRefusedError,
+    MAX_FILES,
+    PROVISION_LABEL,
+    REFUSAL_MULTIPLE,
+    type AppChangeGuardInput,
+    type AppChangeRefusalCode,
+    type AppChangeVerdict,
+} from './app-change-guard';
