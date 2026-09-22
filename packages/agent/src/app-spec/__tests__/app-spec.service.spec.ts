@@ -1094,6 +1094,82 @@ describe('AppSpecService (APW-03 T12)', () => {
         });
     });
 
+    // ── parseDraft (APW-08 T17's head-spec read) ────────────────────
+
+    describe('parseDraft — the same verdict, keeping the document', () => {
+        it('answers the parsed spec beside the verdict', async () => {
+            // APW-08's change guard compares two `AppSpec`s
+            // (`diffGuardedSpecBlocks`), and a comparison needs two documents
+            // rather than two verdicts.
+            await seedState();
+
+            const result = await service.parseDraft(WORK, validDocument());
+
+            expect(result.status).toBe('valid');
+            expect(result.spec).not.toBeNull();
+            // `AppSpec` is the `spec:` BLOCK, not the whole document — it has
+            // `source` / `display` / `agents` at its top level and no `kind`.
+            // That is why `isProtectedPath(spec, path)` reads
+            // `spec.display.protectedPaths` directly.
+            expect(result.spec).toHaveProperty('source');
+            expect(result.spec).not.toHaveProperty('kind');
+        });
+
+        it('answers a NULL spec for a document with errors, by APW-03\u2019s own rule', async () => {
+            // Not an oversight and not a parse failure: this document parses.
+            // `app-spec.validate.ts:200-209` says `spec` is non-null *only when
+            // the document has zero errors* — FR-20 — and that *"the best-effort
+            // copy the rules ran on is deliberately not exposed: treating it as
+            // 'the spec' is exactly the mistake strictness exists to prevent"*.
+            //
+            // It lines up exactly with what APW-08's guard needs: a head spec
+            // that does not validate arrives as `null`, which the guard already
+            // treats as "read and invalid" and refuses on.
+            await seedState();
+
+            const result = await service.parseDraft(
+                WORK,
+                validDocument({ build: { strategy: 'image' } }, ['components']),
+            );
+
+            expect(result.status).toBe('invalid');
+            expect(result.errorCount).toBeGreaterThan(0);
+            expect(result.spec).toBeNull();
+        });
+
+        it('answers a null spec for text that is not YAML at all', async () => {
+            await seedState();
+
+            const result = await service.parseDraft(WORK, 'spec: [unclosed');
+
+            expect(result.status).toBe('invalid');
+            expect(result.spec).toBeNull();
+        });
+
+        it('gives validateDraft the IDENTICAL verdict — one validation path', async () => {
+            await seedState();
+            const text = validDocument();
+
+            const parsed = await service.parseDraft(WORK, text);
+            const validated = await service.validateDraft(WORK, text);
+            const { spec: _dropped, ...verdict } = parsed;
+
+            expect(validated).toEqual(verdict);
+        });
+
+        it('validateDraft does NOT carry the spec — it is an HTTP response', async () => {
+            // `AppSpecDraftValidationDto implements AppSpecDraftValidation` and is
+            // returned by `POST /api/works/:id/app-spec/validate`. Widening that
+            // interface would push a member's whole App spec into a response that
+            // exists to say whether their draft parses.
+            await seedState();
+
+            const validated = await service.validateDraft(WORK, validDocument());
+
+            expect(validated).not.toHaveProperty('spec');
+        });
+    });
+
     // ── hasValidAppSpec (ACC-03-57, FR-89) ──────────────────────────────────
 
     describe('hasValidAppSpec (FR-89, ACC-03-57)', () => {

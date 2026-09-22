@@ -283,6 +283,32 @@ export interface AppSpecDraftValidation {
     readonly suppressedRules: readonly string[];
 }
 
+/**
+ * {@link AppSpecDraftValidation} plus the PARSED document.
+ *
+ * Separate from `AppSpecDraftValidation` on purpose, and not a widening of it:
+ * that interface is implemented by `AppSpecDraftValidationDto` and returned over
+ * HTTP by `POST /api/works/:id/app-spec/validate`. Adding `spec` to it would
+ * push a member's whole App spec into an API response that exists to report
+ * whether their draft parses.
+ *
+ * APW-08's change guard is what needs the object: `diffGuardedSpecBlocks(base,
+ * head)` compares two `AppSpec`s, and the guard cannot compare a verdict.
+ * Plan §2.5 says the head version is *"validated by
+ * `AppSpecService.validateDraft`"* — which is right about the validation and
+ * silent about the fact that `validateDraft` drops the parse on the floor.
+ */
+export interface AppSpecDraftParse extends AppSpecDraftValidation {
+    /**
+     * The parsed document, or `null` when it did not parse at all.
+     *
+     * A spec with validation ERRORS can still parse — `status` is what says
+     * whether it is usable, and `spec` is what says whether there is anything
+     * to compare. A caller that needs both must read both.
+     */
+    readonly spec: AppSpec | null;
+}
+
 /** What `getState` answers: the row, plus what the 60-second lazy check did. */
 export interface AppSpecStateRead {
     readonly workId: string;
@@ -1198,6 +1224,25 @@ export class AppSpecService {
      * from inventing a warning (`app-spec.rules.ts:21-22`).
      */
     async validateDraft(workId: string, text: string): Promise<AppSpecDraftValidation> {
+        // Delegates, and drops `spec`. One validation path, one set of rules —
+        // and the parsed document stays off the HTTP response (see
+        // {@link AppSpecDraftParse}).
+        const { spec: _spec, ...verdict } = await this.parseDraft(workId, text);
+        return verdict;
+    }
+
+    /**
+     * {@link validateDraft}, keeping the parsed document.
+     *
+     * APW-08's change guard compares the App spec on a branch with the one at
+     * the Task's base commit (`diffGuardedSpecBlocks`), and a comparison needs
+     * two documents rather than two verdicts.
+     *
+     * The caller decides what an unusable status means. This method does not:
+     * it reports what parsed and what the rules said, and a guard that must
+     * refuse an invalid head is the one place that rule belongs.
+     */
+    async parseDraft(workId: string, text: string): Promise<AppSpecDraftParse> {
         const context = await this.loadContext(workId, null);
         const validation = validateAppSpecDocument(text, {
             mode: 'draft',
@@ -1213,6 +1258,7 @@ export class AppSpecService {
             truncated: validation.truncated,
             rulesRan: validation.rulesRan,
             suppressedRules: validation.suppressedRules,
+            spec: validation.spec ?? null,
         };
     }
 
