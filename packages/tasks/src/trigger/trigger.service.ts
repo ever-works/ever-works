@@ -80,6 +80,12 @@ import { appSpecEvaluateTask } from '../tasks/trigger/app-spec-evaluate.task';
 // itself comes from `@ever-works/agent/tasks` (`APP_BUILD_PREPARE_TASK_ID`), which is the
 // same string that module registers its task under.
 import type { appBuildPrepareTask } from '../tasks/trigger/app-build-prepare.task';
+// APW-06 T32 — the `app-deploy` one-shot. Imported as a VALUE (unlike the two
+// Build tasks above, which are reached by id) because this dispatcher passes no
+// `queue` of its own: the task declares `APP_RUNTIME_TASK_QUEUE` and its
+// two-hour `maxDuration`, and triggering the object keeps both with the task
+// instead of restating them at every call site.
+import { appDeployTask, type AppDeployTaskPayload } from '../tasks/trigger/app-deploy.task';
 // C10 — the `app-fork-readiness` job (APW-02 plan §6.1/§6.2). Both the id and the type
 // come from the task module itself here: T31's planned agent-side
 // `app-fork-readiness.types.ts` has not landed, and unlike the Build pair there is no
@@ -1108,6 +1114,106 @@ export class TriggerService
         }
 
         return handle.id;
+    }
+
+    /**
+     * APW-06 T32 — enqueue one `app-deploy` run (plan §2.2 step 5, §9.2:1245).
+     *
+     * ## Why this returns `string | null` and the dependency dispatcher throws
+     *
+     * A dropped dependency dispatch strands a row at `pending` with nothing
+     * behind it, so that one is loud. A Deployment is different: the row already
+     * exists by the time this is called, `AppDeployRequestService` gives the
+     * dispatch a **2 s budget** and reports `dispatched: false` when it is not
+     * met, and the orchestrator releases the lock on every outcome. A `null`
+     * therefore reaches a caller that has somewhere to put it; an exception
+     * would be caught by that same budget and reported identically, with a stack
+     * nobody reads.
+     *
+     * ## The two refusals, both BEFORE anything is enqueued
+     *
+     * 1. the runtime is disabled (no secret key / `shouldUseTrigger()` false).
+     *    There is deliberately **no in-process fallback**: App cluster work must
+     *    run on the isolated worker (FR-5), and running it in the API is the
+     *    exact thing the isolation rule exists to prevent;
+     * 2. `NODE_ENV=production` without `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`
+     *    (plan §6.2:950-952) — the operator's attestation that this queue's worker
+     *    has no route to internal networks. A Deployment dials the owner's own
+     *    cluster; an unattested production worker must not be handed it.
+     *
+     * The same pair guards {@link dispatchAppDependencyProvision}, and the task
+     * itself refuses under condition 2 as well, so a message already queued when
+     * the flag flips still cannot dial.
+     *
+     * ## `concurrencyKey` is per WORK, not per Deployment
+     *
+     * Two Deployments of one App Work must never roll out at once — that is the
+     * whole point of the `work_app_runtime_states` deploy lock, and the queue key
+     * is the second line of defence behind it. Per-deployment would let a queued
+     * row start while the row holding the lock was still applying objects.
+     *
+     * `opts.delayMs` is the dequeue's own re-dispatch (§5.6 step 7): the
+     * orchestrator asks for the queued Deployment to start after the current one
+     * finishes releasing, rather than sleeping inside a run.
+     */
+    async dispatchAppDeploy(
+        payload: AppDeployTaskPayload,
+        opts: { delayMs?: number } = {},
+    ): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            this.logger.warn(
+                `Refusing to dispatch app-deploy for Work ${payload.workId}: the job runtime is ` +
+                    'disabled, and App cluster work has no in-process fallback (FR-5).',
+            );
+            return null;
+        }
+
+        // Optional-chained on purpose, and failing CLOSED: `config.everWorks` is
+        // absent in several specs' partial config mocks, and a missing accessor
+        // must read as "not attested" rather than throw a TypeError that looks
+        // like a dispatch bug.
+        if (
+            process.env.NODE_ENV === 'production' &&
+            config.everWorks?.apps?.isClusterWorkerIsolated?.() !== true
+        ) {
+            this.logger.warn(
+                `Refusing to dispatch app-deploy for Work ${payload.workId}: production requires ` +
+                    'EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true, the operator attestation that ' +
+                    "this worker has no route to internal networks. A Deployment dials the owner's cluster.",
+            );
+            return null;
+        }
+
+        try {
+            const delayMs = typeof opts.delayMs === 'number' && opts.delayMs > 0 ? opts.delayMs : 0;
+            const handle = await appDeployTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'app-deploy',
+                        `work:${payload.workId}`,
+                        `deployment:${payload.deploymentId}`,
+                        ...(payload.trigger ? [`trigger:${payload.trigger}`] : []),
+                    ],
+                    machine: this.machine() as any,
+                    // Per WORK — see the docstring. The deploy lock is the first
+                    // line of defence; this is the second.
+                    concurrencyKey: `app-deploy:${payload.workId}`,
+                    ...(delayMs > 0 ? { delay: new Date(Date.now() + delayMs) } : {}),
+                }),
+            );
+            return handle?.id ?? null;
+        } catch (error) {
+            // Swallowed and reported, for the reason in the docstring: the caller
+            // has a budget and a `dispatched: false` field to put this in, and
+            // the Deployment row already exists either way.
+            this.logger.error(
+                `Failed to dispatch app-deploy for Work ${payload.workId} ` +
+                    `(deployment ${payload.deploymentId})`,
+                error as Error,
+            );
+            return null;
+        }
     }
 
     /**

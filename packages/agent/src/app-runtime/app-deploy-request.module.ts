@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AppDeployPreconditionsService } from './app-deploy-preconditions.service';
+import { buildAppDeployDispatcherProviders } from './app-deploy-dispatcher.provider';
 import { AppDeployRequestService } from './app-deploy-request.service';
 import { AppRuntimeStateModule } from './app-runtime-state.module';
 
@@ -14,20 +15,21 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * declared in **no Nest module at all**, so no route and no `DeployService`
  * could reach it. Nothing failed; the code simply could not be called.
  *
- * It can be called now. **It still refuses**, and that is the correct behaviour
- * rather than a shortfall: `request()`'s first gate is §9.2's isolated-worker
- * check, so with no `APP_DEPLOY_DISPATCHER` bound it answers
- * `422 worker_not_isolated`, creates no row and reads nothing. That refusal is
- * the honest state of the epic — an App Work cannot deploy until an isolated
- * cluster worker is attested — and it is a very different state from
- * "unreachable", which is what it was.
+ * It can be called now, and as of 2026-09-22 the §9.2 gate it opens with can
+ * answer YES: `buildAppDeployDispatcherProviders()` binds
+ * `APP_DEPLOY_DISPATCHER` and `APP_DEPLOY_DISPATCHER_AVAILABILITY` to one gate
+ * over the job-runtime registry, and `TriggerService.dispatchAppDeploy` is the
+ * method behind it. Where there is no registered runtime — or, in production,
+ * no `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true` attestation — the answer is
+ * still `422 worker_not_isolated` with no row created, which is the honest
+ * state and the safe one.
  *
  * The distance left, named so nobody reads this module as more than it is: the
- * dispatcher (`APP_DEPLOY_DISPATCHER`), the Deployment store
- * (`APP_DEPLOY_DEPLOYMENT_STORE`) and every port
+ * Deployment store (`APP_DEPLOY_DEPLOYMENT_STORE`) and every port
  * `AppDeployPreconditionsService` reads — spec, env, dependencies, builds,
- * hosts, tier policy — are all still unbound. The dormancy register
- * (`app-works-port-dormancy.spec.ts`) counts them.
+ * hosts, tier policy — are still unbound, except `APP_RUNTIME_ENV_SOURCE` and
+ * `APP_DEPENDENCIES_SERVICE`, which APW-07's `AppRuntimeEnvModule` binds. The
+ * dormancy register (`app-works-port-dormancy.spec.ts`) counts what is left.
  *
  * ## Why both services, and why only these two
  *
@@ -53,7 +55,11 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  */
 @Module({
     imports: [AppRuntimeStateModule],
-    providers: [AppDeployPreconditionsService, AppDeployRequestService],
+    providers: [
+        AppDeployPreconditionsService,
+        AppDeployRequestService,
+        ...buildAppDeployDispatcherProviders(),
+    ],
     exports: [AppDeployPreconditionsService, AppDeployRequestService],
 })
 export class AppDeployRequestModule {}

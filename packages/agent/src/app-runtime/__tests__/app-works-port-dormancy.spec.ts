@@ -4,6 +4,7 @@ import { AppEnvModule } from '../../app-env/app-env.module';
 import { AppLauncherModule } from '../../app-launcher/app-launcher.module';
 import { AppSpecModule } from '../../app-spec/app-spec.module';
 import { AppWorksModule } from '../../app-works/app-works.module';
+import { AppDeployRequestModule } from '../app-deploy-request.module';
 import { AppRuntimeEnvModule } from '../../app-env/app-runtime-env.module';
 import { AppRuntimeStateModule } from '../app-runtime-state.module';
 
@@ -53,6 +54,7 @@ import { AppRuntimeStateModule } from '../app-runtime-state.module';
 /** Every Nest module this programme declares, by the name its file gives it. */
 const APP_WORKS_MODULES = {
     AppBuildsModule,
+    AppDeployRequestModule,
     AppDependenciesModule,
     AppEnvModule,
     AppLauncherModule,
@@ -137,6 +139,14 @@ const BOUND: readonly string[] = [
     //                                  Deployment could pass preconditions
     'APP_DEPENDENCIES_SERVICE',
     'APP_DEPENDENCY_CONFIG_CIPHER',
+    // APW-06 §9.2 — the deploy dispatcher and its availability probe, bound
+    // 2026-09-22 by `AppDeployRequestModule` to ONE gate over the job-runtime
+    // registry. Unbound, `request()` refused `422 worker_not_isolated` before
+    // reading anything — which it STILL does when no runtime is registered or,
+    // in production, when the operator has not attested the worker. Binding it
+    // can only move a request from "refused before a row" to "dispatched".
+    'APP_DEPLOY_DISPATCHER',
+    'APP_DEPLOY_DISPATCHER_AVAILABILITY',
     'APP_ENV_DEPLOY_READINESS',
     'APP_ENV_ENSURE_GENERATED',
     'APP_ENV_RESOLVER_FINGERPRINTS',
@@ -178,8 +188,6 @@ const UNBOUND: readonly string[] = [
     'APP_DEPENDENCY_SPEC_SOURCE',
     'APP_DEPLOY_BUILD_SOURCE',
     'APP_DEPLOY_DEPLOYMENT_STORE',
-    'APP_DEPLOY_DISPATCHER',
-    'APP_DEPLOY_DISPATCHER_AVAILABILITY',
     'APP_DEPLOY_HOST_SOURCE',
     'APP_DEPLOY_SPEC_SOURCE',
     'APP_DEPLOY_TARGET_RESOLVER',
@@ -231,10 +239,10 @@ describe('App Works port dormancy register (§5.10)', () => {
     it('reads real provider metadata — a zero here would make every case below vacuous', () => {
         const bound = boundTokenNames();
 
-        // Eight modules that between them provide services, repositories and at
+        // Nine modules that between them provide services, repositories and at
         // least one symbol token. If this collapses, the metadata read broke and
         // the assertions underneath would all pass by accident.
-        expect(Object.keys(APP_WORKS_MODULES)).toHaveLength(8);
+        expect(Object.keys(APP_WORKS_MODULES)).toHaveLength(9);
         expect(bound.size).toBeGreaterThan(5);
     });
 
@@ -263,11 +271,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **56 of the 68 tokens in these two lists are
-        // dormant**, and the 12 that are not are named in `BOUND`. It was 62 of
-        // 68 on 2026-09-21; APW-07's six moved across on 2026-09-22.
-        expect(UNBOUND).toHaveLength(56);
-        expect(BOUND).toHaveLength(12);
+        // that it cannot drift: **54 of the 68 tokens in these two lists are
+        // dormant**, and the 14 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's six and APW-06's two moved across on
+        // 2026-09-22.
+        expect(UNBOUND).toHaveLength(54);
+        expect(BOUND).toHaveLength(14);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {
