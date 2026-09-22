@@ -4,6 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { DatabaseModule } from '../database/database.module';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkAppSpecStateRepository } from '../database/repositories/work-app-spec-state.repository';
+import { AppSpecService } from '../app-spec/app-spec.service';
 import { AppBuildPreparationRepository } from '../database/repositories/app-build-preparation.repository';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import { WorkBuild } from '../entities/work-build.entity';
@@ -15,8 +18,12 @@ import { AppBuildWatchRunner } from './app-build-watch.runner';
 import {
     APP_BUILD_PLUGIN_RESOLVER,
     APP_BUILD_PREPARE_RUNNER,
+    APP_BUILD_SPEC_SOURCE,
     APP_BUILD_WATCH_RUNNER,
+    APP_BUILD_WORK_SOURCE,
     AppBuildsService,
+    type AppBuildSpecSource,
+    type AppBuildWorkSource,
 } from './app-builds.service';
 import {
     BUILD_REPOSITORY_FACTS_SOURCE,
@@ -27,6 +34,8 @@ import {
 } from './build-facade.service';
 import { GitBuildTokenSource } from './git-build-token.source';
 import { UpstreamBuildFactsSource } from './upstream-build-facts.source';
+import { AppBuildSpecReadSource } from './build-spec.source';
+import { AppBuildWorkContextSource } from './build-work-context.source';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { GitFacadeService } from '../facades/git.facade';
 
@@ -183,6 +192,42 @@ import { GitFacadeService } from '../facades/git.facade';
             }),
             inject: [ModuleRef],
         },
+        // APW-05 — the six facts a Build row cannot be written without. Unbound,
+        // `requestPrepare` answered `workUnavailable` for every App Work, so no
+        // Build could be requested at all.
+        //
+        // Lazy through `ModuleRef` for the reason the two credential sources
+        // above are: `WorkAppSpecStateRepository` belongs to `AppSpecModule` and
+        // importing that module here would stop `app-builds.module.spec.ts`
+        // compiling standalone (it carries `FacadesModule`, which needs the
+        // `@Global()` plugin registry). `WorkRepository` comes from
+        // `DatabaseModule`, which this module already imports, so it is resolved
+        // strictly — its absence IS a wiring fault and should say so.
+        {
+            provide: APP_BUILD_WORK_SOURCE,
+            useFactory: (ref: ModuleRef, works: WorkRepository): AppBuildWorkSource => ({
+                read: async (workId: string) =>
+                    new AppBuildWorkContextSource(
+                        works,
+                        ref.get(WorkAppSpecStateRepository, { strict: false }) ?? null,
+                        ref.get(APP_BUILD_PLUGIN_RESOLVER, { strict: false }) ?? null,
+                    ).read(workId),
+            }),
+            inject: [ModuleRef, WorkRepository],
+        },
+        // APW-03's effective spec, collapsed to the four facts §5.1 reads. Same
+        // lazy shape, same reason: `AppSpecService` lives in `AppSpecModule`.
+        {
+            provide: APP_BUILD_SPEC_SOURCE,
+            useFactory: (ref: ModuleRef): AppBuildSpecSource => ({
+                read: async (workId: string, sha?: string | null) => {
+                    const specs = ref.get(AppSpecService, { strict: false });
+                    if (!specs) return null;
+                    return new AppBuildSpecReadSource(specs).read(workId, sha);
+                },
+            }),
+            inject: [ModuleRef],
+        },
         {
             provide: APP_BUILD_PREPARE_RUNNER,
             useFactory: (ref: ModuleRef) => ({
@@ -224,6 +269,8 @@ import { GitFacadeService } from '../facades/git.facade';
         APP_BUILD_PLUGIN_RESOLVER,
         BUILD_TOKEN_SOURCE,
         BUILD_REPOSITORY_FACTS_SOURCE,
+        APP_BUILD_WORK_SOURCE,
+        APP_BUILD_SPEC_SOURCE,
     ],
 })
 export class AppBuildsModule {}
