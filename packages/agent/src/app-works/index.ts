@@ -97,3 +97,19 @@ export * from './app-source-inspector.service';
 export * from './app-work-create.service';
 export * from './app-work-deletion.port';
 export * from './app-source-initializer.service';
+
+// APW-08 T10 — the rules one evolve run is governed by, read at the Task's BASE
+// commit and frozen. Exported here because the dispatch brief, the Fleet
+// admission and the change guard all ask this one service rather than reading
+// the spec three times.
+export {
+    AppSpecUnreadableError,
+    AppWorkRulesService,
+    DEFAULT_SIZE_GUIDANCE,
+    MAX_CHECKS,
+    MAX_INSTRUCTION_FILES,
+    MAX_SIZE_GUIDANCE,
+    MIN_SIZE_GUIDANCE,
+    type AppWorkRules,
+    type AppWorkRulesWork,
+} from './app-work-rules.service';

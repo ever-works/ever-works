@@ -68,6 +68,11 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DatabaseModule } from '../database/database.module';
+// APW-08 T10 — the evolve loop's rules resolver. It lives in `app-works/`
+// with the rest of the App Works services and is PROVIDED here, which is what
+// T10 specifies: the apps services sit in this module to avoid a module cycle
+// with `TaskTransitionService`.
+import { AppWorkRulesService } from '../app-works/app-work-rules.service';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 
 /**
@@ -145,6 +150,11 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
         MergeApprovalModule,
     ],
     providers: [
+        // APW-08 T10. It takes `AppSpecService` `@Optional()`, so this module
+        // composes with or without APW-03 in the graph — without it, `resolve`
+        // throws `AppSpecUnreadableError` naming the branch, which is the
+        // documented refusal and not a boot failure.
+        AppWorkRulesService,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,
@@ -235,6 +245,11 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
         DistributedTaskLockService,
     ],
     exports: [
+        // Exported as well as provided: the dispatch brief, the Fleet
+        // admission and the change guard all live outside this module and
+        // must resolve the SAME instance, or they would read the spec
+        // separately and come to disagree.
+        AppWorkRulesService,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,
