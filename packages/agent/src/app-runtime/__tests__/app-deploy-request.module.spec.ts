@@ -1,10 +1,45 @@
+// `AppDeployRequestModule` imports `AppSpecModule` for `APP_DEPLOY_SPEC_SOURCE`,
+// and that module carries `FacadesModule`, whose `AiFacadeService` needs the
+// plugin registry `PluginsModule.forRoot()` registers GLOBALLY at application
+// bootstrap — present at the API root, absent in a standalone compile. It is
+// shelled here as `app-works.module.spec.ts` and `community-pr.module.spec.ts`
+// shell it, so this stays a test of THIS wiring.
+//
+// The shell is not EMPTY, though, and that is the interesting part:
+// `AppSpecService` takes `GitFacadeService` **not** `@Optional()` (it reads
+// `.works/works.yml` through it), so an empty shell fails the compile with
+// "GitFacadeService at index [1]". The stub below is what the real
+// `FacadesModule` would export; nothing in these cases calls it, because none of
+// them reads a spec.
+jest.mock('../../facades/facades.module', () => {
+    const { Module } = require('@nestjs/common');
+    const { GitFacadeService } = require('../../facades/git.facade');
+
+    @Module({
+        providers: [{ provide: GitFacadeService, useValue: {} }],
+        exports: [GitFacadeService],
+    })
+    class FacadesModule {}
+
+    return { FacadesModule };
+});
+
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { ENTITIES } from '../../database/_entities-inventory';
 import { AppDeployRequestModule } from '../app-deploy-request.module';
-import { AppDeployRequestService } from '../app-deploy-request.service';
-import { AppDeployPreconditionsService } from '../app-deploy-preconditions.service';
+import {
+    APP_DEPLOY_DEPLOYMENT_STORE,
+    APP_DEPLOY_DISPATCHER,
+    AppDeployRequestService,
+} from '../app-deploy-request.service';
+import {
+    APP_DEPLOY_BUILD_SOURCE,
+    APP_DEPLOY_SPEC_SOURCE,
+    AppDeployPreconditionsService,
+} from '../app-deploy-preconditions.service';
+import { AppSpecService } from '../../app-spec/app-spec.service';
 import { WORK_APP_RUNTIME_STATES } from '../../app-launcher/app-launcher.service';
 
 /**
@@ -75,6 +110,26 @@ describe('AppDeployRequestModule', () => {
 
         expect(result.httpStatus).toBe(422);
         expect(result.code).toBe('worker_not_isolated');
+
+        await moduleRef.close();
+    });
+
+    it('resolves the four §5.1 seams it now binds', async () => {
+        // Each one was a refusal before it was bound, and the container is where
+        // that is checkable: the dormancy register reads module METADATA, which
+        // cannot tell a token bound to nothing from one bound to a provider that
+        // does not resolve.
+        const moduleRef = await compile();
+
+        expect(moduleRef.get(APP_DEPLOY_DEPLOYMENT_STORE, { strict: false })).toBeDefined();
+        expect(moduleRef.get(APP_DEPLOY_BUILD_SOURCE, { strict: false })).toBeDefined();
+        expect(moduleRef.get(APP_DEPLOY_DISPATCHER, { strict: false })).toBeDefined();
+        // APW-03's own service, not a wrapper: `getEffectiveSpec` is the one read
+        // §5.1 names, and a narrowing adapter would be a second place to keep it
+        // in step with APW-03.
+        expect(moduleRef.get(APP_DEPLOY_SPEC_SOURCE, { strict: false })).toBeInstanceOf(
+            AppSpecService,
+        );
 
         await moduleRef.close();
     });

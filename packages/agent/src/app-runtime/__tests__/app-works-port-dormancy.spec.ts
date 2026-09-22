@@ -157,6 +157,11 @@ const BOUND: readonly string[] = [
     'APP_DEPLOY_DEPLOYMENT_STORE',
     'APP_DEPLOY_DISPATCHER',
     'APP_DEPLOY_DISPATCHER_AVAILABILITY',
+    // APW-06 §5.1 — APW-03's `AppSpecService`, bound 2026-09-22. Unbound, the
+    // preconditions pushed `spec_invalid` with "no App spec source is available
+    // in this process" for EVERY request, so no App Work could deploy whatever
+    // its spec actually said.
+    'APP_DEPLOY_SPEC_SOURCE',
     'APP_ENV_DEPLOY_READINESS',
     'APP_ENV_ENSURE_GENERATED',
     'APP_ENV_RESOLVER_FINGERPRINTS',
@@ -197,7 +202,6 @@ const UNBOUND: readonly string[] = [
     'APP_DEPENDENCY_CLUSTER_ACCESS',
     'APP_DEPENDENCY_SPEC_SOURCE',
     'APP_DEPLOY_HOST_SOURCE',
-    'APP_DEPLOY_SPEC_SOURCE',
     'APP_DEPLOY_TARGET_RESOLVER',
     'APP_ENV_ACTIVITY',
     'APP_ENV_ACTOR_NAMES',
@@ -279,12 +283,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **52 of the 68 tokens in these two lists are
-        // dormant**, and the 16 that are not are named in `BOUND`. It was 62 of
-        // 68 on 2026-09-21; APW-07's six and APW-06's four moved across on
+        // that it cannot drift: **51 of the 68 tokens in these two lists are
+        // dormant**, and the 17 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's six and APW-06's five moved across on
         // 2026-09-22.
-        expect(UNBOUND).toHaveLength(52);
-        expect(BOUND).toHaveLength(16);
+        expect(UNBOUND).toHaveLength(51);
+        expect(BOUND).toHaveLength(17);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {

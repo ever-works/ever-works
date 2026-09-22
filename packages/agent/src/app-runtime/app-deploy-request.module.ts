@@ -5,10 +5,13 @@ import { WorkBuild } from '../entities/work-build.entity';
 import { WorkDeployment } from '../entities/work-deployment.entity';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import { WorkDeploymentRepository } from '../database/repositories/work-deployment.repository';
+import { AppSpecModule } from '../app-spec/app-spec.module';
+import { AppSpecService } from '../app-spec/app-spec.service';
 import { AppDeployBuildSourceAdapter } from './app-deploy-build.source';
 import { AppDeployDeploymentStoreAdapter } from './app-deploy-deployment.store';
 import {
     APP_DEPLOY_BUILD_SOURCE,
+    APP_DEPLOY_SPEC_SOURCE,
     AppDeployPreconditionsService,
 } from './app-deploy-preconditions.service';
 import { buildAppDeployDispatcherProviders } from './app-deploy-dispatcher.provider';
@@ -44,15 +47,19 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * every App Work whether or not it had one, so a Build that succeeded could
  * never be deployed.
  *
+ * `APP_DEPLOY_SPEC_SOURCE` → APW-03's `AppSpecService`, which is why this module
+ * imports `AppSpecModule`. That import brings `DatabaseModule`, `FacadesModule`
+ * and `ActivityLogModule` with it — a graph this module had deliberately stayed
+ * out of — and it is taken anyway because the alternative was worse: unbound,
+ * §5.1 pushed `spec_invalid` with *"no App spec source is available in this
+ * process"* for **every** request, so no App Work could deploy whatever its spec
+ * said. `FacadesModule` needs the globally-registered plugin registry, which is
+ * present at the API root and absent in a standalone compile, so this module's
+ * own spec shells it the way `app-works.module.spec.ts` does.
+ *
  * The distance left, named so nobody reads this module as more than it is,
  * with what each one would take:
  *
- *   - `APP_DEPLOY_SPEC_SOURCE` → APW-03's `AppSpecService`, which EXISTS and is
- *     exported by `AppSpecModule`. It is not imported here yet because that
- *     module pulls `DatabaseModule`, `FacadesModule` and `ActivityLogModule`
- *     with it — a graph this module has deliberately stayed out of, and one
- *     whose standalone compile needs the globally-registered plugin registry.
- *     The binding is a two-line change once the API composes them together;
  *   - `APP_DEPLOY_HOST_SOURCE` → `AppHostsService`, which exists but is provided
  *     by nothing and whose own eight stores are all unbound, so binding it today
  *     would answer `null` for every host. `primary_domain_missing` is advisory,
@@ -85,7 +92,11 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * imported by the API today rather than after the rest of the epic lands.
  */
 @Module({
-    imports: [AppRuntimeStateModule, TypeOrmModule.forFeature([WorkDeployment, WorkBuild])],
+    imports: [
+        AppRuntimeStateModule,
+        AppSpecModule,
+        TypeOrmModule.forFeature([WorkDeployment, WorkBuild]),
+    ],
     providers: [
         AppDeployPreconditionsService,
         AppDeployRequestService,
@@ -102,6 +113,12 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
         AppBuildRepository,
         AppDeployBuildSourceAdapter,
         { provide: APP_DEPLOY_BUILD_SOURCE, useExisting: AppDeployBuildSourceAdapter },
+        // APW-03's effective spec, at the Build's commit. A plain alias: the
+        // swap `app-deploy-preconditions.service.ts:163` documents, and
+        // `getEffectiveSpec` is deliberately the ONLY read — `hasValidAppSpec`
+        // is APW-01's minimal-path predicate and answering `spec_invalid` from
+        // it would read the repository twice.
+        { provide: APP_DEPLOY_SPEC_SOURCE, useExisting: AppSpecService },
         ...buildAppDeployDispatcherProviders(),
     ],
     exports: [AppDeployPreconditionsService, AppDeployRequestService, APP_DEPLOY_DEPLOYMENT_STORE],
