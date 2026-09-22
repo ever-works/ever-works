@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { WorkDeployment } from '../entities/work-deployment.entity';
+import { WorkDeploymentRepository } from '../database/repositories/work-deployment.repository';
+import { AppDeployDeploymentStoreAdapter } from './app-deploy-deployment.store';
 import { AppDeployPreconditionsService } from './app-deploy-preconditions.service';
 import { buildAppDeployDispatcherProviders } from './app-deploy-dispatcher.provider';
-import { AppDeployRequestService } from './app-deploy-request.service';
+import { APP_DEPLOY_DEPLOYMENT_STORE, AppDeployRequestService } from './app-deploy-request.service';
 import { AppRuntimeStateModule } from './app-runtime-state.module';
 
 /**
@@ -24,11 +28,16 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * still `422 worker_not_isolated` with no row created, which is the honest
  * state and the safe one.
  *
- * The distance left, named so nobody reads this module as more than it is: the
- * Deployment store (`APP_DEPLOY_DEPLOYMENT_STORE`) and every port
- * `AppDeployPreconditionsService` reads — spec, env, dependencies, builds,
- * hosts, tier policy — are still unbound, except `APP_RUNTIME_ENV_SOURCE` and
- * `APP_DEPENDENCIES_SERVICE`, which APW-07's `AppRuntimeEnvModule` binds. The
+ * `APP_DEPLOY_DEPLOYMENT_STORE` is bound too (T16, same day):
+ * `AppDeployDeploymentStoreAdapter` over `WorkDeploymentRepository`, now that
+ * `work_deployments` has the six App columns §7.1 names. Without it §2.2 step 4
+ * had nowhere to write the row a Deployment IS.
+ *
+ * The distance left, named so nobody reads this module as more than it is:
+ * `AppDeployPreconditionsService` still reads unbound ports for the App spec
+ * (`APP_DEPLOY_SPEC_SOURCE`), the Builds (`APP_DEPLOY_BUILD_SOURCE`), the hosts
+ * (`APP_DEPLOY_HOST_SOURCE`) and the hosting tier (`APPS_TIER_POLICY`). Its env
+ * and dependency ports ARE bound, by APW-07's `AppRuntimeEnvModule`. The
  * dormancy register (`app-works-port-dormancy.spec.ts`) counts what is left.
  *
  * ## Why both services, and why only these two
@@ -54,12 +63,19 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * imported by the API today rather than after the rest of the epic lands.
  */
 @Module({
-    imports: [AppRuntimeStateModule],
+    imports: [AppRuntimeStateModule, TypeOrmModule.forFeature([WorkDeployment])],
     providers: [
         AppDeployPreconditionsService,
         AppDeployRequestService,
+        // T16's row. `forFeature` is declared HERE for the reason
+        // `AppRuntimeStateModule` spells out: Nest resolves a provider in the
+        // module that DECLARES it, and this branch has broken the API boot twice
+        // by registering an entity in a parent instead.
+        WorkDeploymentRepository,
+        AppDeployDeploymentStoreAdapter,
+        { provide: APP_DEPLOY_DEPLOYMENT_STORE, useExisting: AppDeployDeploymentStoreAdapter },
         ...buildAppDeployDispatcherProviders(),
     ],
-    exports: [AppDeployPreconditionsService, AppDeployRequestService],
+    exports: [AppDeployPreconditionsService, AppDeployRequestService, APP_DEPLOY_DEPLOYMENT_STORE],
 })
 export class AppDeployRequestModule {}

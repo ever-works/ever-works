@@ -145,6 +145,12 @@ const BOUND: readonly string[] = [
     // reading anything — which it STILL does when no runtime is registered or,
     // in production, when the operator has not attested the worker. Binding it
     // can only move a request from "refused before a row" to "dispatched".
+    // APW-06 T16 — `AppDeployDeploymentStoreAdapter`, bound 2026-09-22 once
+    // `work_deployments` grew the six App columns of plan §7.1. §2.2 step 4 had
+    // nowhere to write the row a Deployment IS: the draft's `buildId`,
+    // `appTarget`, `appTrigger` and `appRender` were not columns, so TypeORM
+    // would have dropped all four silently.
+    'APP_DEPLOY_DEPLOYMENT_STORE',
     'APP_DEPLOY_DISPATCHER',
     'APP_DEPLOY_DISPATCHER_AVAILABILITY',
     'APP_ENV_DEPLOY_READINESS',
@@ -187,7 +193,6 @@ const UNBOUND: readonly string[] = [
     'APP_DEPENDENCY_CLUSTER_ACCESS',
     'APP_DEPENDENCY_SPEC_SOURCE',
     'APP_DEPLOY_BUILD_SOURCE',
-    'APP_DEPLOY_DEPLOYMENT_STORE',
     'APP_DEPLOY_HOST_SOURCE',
     'APP_DEPLOY_SPEC_SOURCE',
     'APP_DEPLOY_TARGET_RESOLVER',
@@ -271,12 +276,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **54 of the 68 tokens in these two lists are
-        // dormant**, and the 14 that are not are named in `BOUND`. It was 62 of
-        // 68 on 2026-09-21; APW-07's six and APW-06's two moved across on
+        // that it cannot drift: **53 of the 68 tokens in these two lists are
+        // dormant**, and the 15 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's six and APW-06's three moved across on
         // 2026-09-22.
-        expect(UNBOUND).toHaveLength(54);
-        expect(BOUND).toHaveLength(14);
+        expect(UNBOUND).toHaveLength(53);
+        expect(BOUND).toHaveLength(15);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {
