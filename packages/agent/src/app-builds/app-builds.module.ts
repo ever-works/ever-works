@@ -7,6 +7,7 @@ import { DatabaseModule } from '../database/database.module';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkAppSpecStateRepository } from '../database/repositories/work-app-spec-state.repository';
 import { AppSpecService } from '../app-spec/app-spec.service';
+import { AppEnvRuntimeSource } from '../app-env/app-env-runtime.source';
 import { AppBuildPreparationRepository } from '../database/repositories/app-build-preparation.repository';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import { WorkBuild } from '../entities/work-build.entity';
@@ -18,10 +19,12 @@ import { AppBuildWatchRunner } from './app-build-watch.runner';
 import {
     APP_BUILD_PLUGIN_RESOLVER,
     APP_BUILD_PREPARE_RUNNER,
+    APP_BUILD_RUNNER_RECIPE_SOURCE,
     APP_BUILD_SPEC_SOURCE,
     APP_BUILD_WATCH_RUNNER,
     APP_BUILD_WORK_SOURCE,
     AppBuildsService,
+    type AppBuildRunnerRecipeSource,
     type AppBuildSpecSource,
     type AppBuildWorkSource,
 } from './app-builds.service';
@@ -215,6 +218,41 @@ import { GitFacadeService } from '../facades/git.facade';
             }),
             inject: [ModuleRef, WorkRepository],
         },
+        // APW-07's VALUE-FREE recipe, for §4.12's runner verification. The plan
+        // is explicit that it carries the recipe and **never a resolved value**
+        // (`plan.md:1025-1030`), which is why only the `runner` half of
+        // `resolveEphemeral` is declared on this port: the `cluster` half
+        // returns real values and has no business in a Build.
+        //
+        // The context is widened here rather than by the port. APW-07's method
+        // takes `AppRuntimeEphemeralEnvContext` — primary host, primary URL,
+        // build commit, internal URLs — and the runner branch reads none of
+        // them; a Build has no host and no URL to resolve against, which is what
+        // makes its recipe value-free in the first place. Passing `null` for
+        // each is the honest translation, not a stub.
+        {
+            provide: APP_BUILD_RUNNER_RECIPE_SOURCE,
+            useFactory: (ref: ModuleRef): AppBuildRunnerRecipeSource => ({
+                resolveEphemeral: async (workId, specCommitSha, ctx) => {
+                    const env = ref.get(AppEnvRuntimeSource, { strict: false });
+                    if (!env) {
+                        // Unbound reads as "no recipe and nothing missing",
+                        // which is what §4.12 already does with an absent one:
+                        // the verification job runs with no env rather than
+                        // refusing the Build.
+                        return { secretNames: [], unsetRequired: [] };
+                    }
+                    return env.resolveEphemeral(workId, specCommitSha, {
+                        target: ctx.target,
+                        primaryUrl: null,
+                        primaryHost: null,
+                        buildCommitSha: null,
+                        internalUrls: {},
+                    });
+                },
+            }),
+            inject: [ModuleRef],
+        },
         // APW-03's effective spec, collapsed to the four facts §5.1 reads. Same
         // lazy shape, same reason: `AppSpecService` lives in `AppSpecModule`.
         {
@@ -271,6 +309,7 @@ import { GitFacadeService } from '../facades/git.facade';
         BUILD_REPOSITORY_FACTS_SOURCE,
         APP_BUILD_WORK_SOURCE,
         APP_BUILD_SPEC_SOURCE,
+        APP_BUILD_RUNNER_RECIPE_SOURCE,
     ],
 })
 export class AppBuildsModule {}

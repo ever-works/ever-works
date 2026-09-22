@@ -117,6 +117,9 @@ const BOUND: readonly string[] = [
     // for EVERY App Work and no Build could be requested at all;
     // `APP_BUILD_SPEC_SOURCE` is what §5.1's `specValidAtCommit` clause reads,
     // so unbound it could never hold.
+    // APW-05 §4.12 — APW-07's value-free runner recipe, bound 2026-09-22 now
+    // that `AppRuntimeEnvModule` provides `AppEnvRuntimeSource`.
+    'APP_BUILD_RUNNER_RECIPE_SOURCE',
     'APP_BUILD_SPEC_SOURCE',
     'APP_BUILD_WATCH_RUNNER',
     'APP_BUILD_WORK_SOURCE',
@@ -201,7 +204,6 @@ const UNBOUND: readonly string[] = [
     'APP_BLUEPRINT_APPLY_SERVICE',
     'APP_BUILD_EDIT_ACCESS',
     'APP_BUILD_PLATFORM_SETTINGS_WRITER',
-    'APP_BUILD_RUNNER_RECIPE_SOURCE',
     'APP_CLUSTER_OP_DISPATCHER',
     'APP_COMMIT_ANCESTRY',
     'APP_CUSTOM_DOMAIN_STORE',
@@ -289,12 +291,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **49 of the 68 tokens in these two lists are
-        // dormant**, and the 19 that are not are named in `BOUND`. It was 62 of
-        // 68 on 2026-09-21; APW-07's six, APW-06's five and APW-05's two moved
+        // that it cannot drift: **48 of the 68 tokens in these two lists are
+        // dormant**, and the 20 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's six, APW-06's five and APW-05's three moved
         // across on 2026-09-22.
-        expect(UNBOUND).toHaveLength(49);
-        expect(BOUND).toHaveLength(19);
+        expect(UNBOUND).toHaveLength(48);
+        expect(BOUND).toHaveLength(20);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {
