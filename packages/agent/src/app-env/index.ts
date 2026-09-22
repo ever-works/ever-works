@@ -59,6 +59,10 @@ export {
 } from './app-env.service';
 
 export { AppEnvModule } from './app-env.module';
+// The composition root that binds `APP_RUNTIME_ENV_SOURCE` and
+// `APP_ENV_DEPLOY_READINESS` — see its own docstring for why the two swaps
+// cannot both live in `AppEnvModule`.
+export { AppRuntimeEnvModule } from './app-runtime-env.module';
 
 // APW-07 T14 — the resolver and APW-06's runtime source (plan §2.2, §4.6).
 //

@@ -4,6 +4,7 @@ import { AppEnvModule } from '../../app-env/app-env.module';
 import { AppLauncherModule } from '../../app-launcher/app-launcher.module';
 import { AppSpecModule } from '../../app-spec/app-spec.module';
 import { AppWorksModule } from '../../app-works/app-works.module';
+import { AppRuntimeEnvModule } from '../../app-env/app-runtime-env.module';
 import { AppRuntimeStateModule } from '../app-runtime-state.module';
 
 /**
@@ -55,6 +56,7 @@ const APP_WORKS_MODULES = {
     AppDependenciesModule,
     AppEnvModule,
     AppLauncherModule,
+    AppRuntimeEnvModule,
     AppRuntimeStateModule,
     AppSpecModule,
     AppWorksModule,
@@ -108,6 +110,37 @@ const BOUND: readonly string[] = [
     // handover's prose, and the metadata said otherwise. Which is the point.
     'APP_BUILD_PREPARE_RUNNER',
     'APP_BUILD_WATCH_RUNNER',
+    // ---- APW-07, wired 2026-09-22 ----------------------------------------
+    //
+    // `AppEnvModule` (T13) and `AppDependenciesModule` (T16) were both complete
+    // and both in NO DI graph at all. `AppRuntimeEnvModule` imports the two and
+    // performs the `useExisting` swaps their own docstrings specify. What each
+    // token unblocked, measured rather than assumed:
+    //
+    //   APP_DEPENDENCIES_SERVICE       the Deploy preconditions' dependency
+    //                                  check, the lifecycle removal ordering and
+    //                                  the deletion task's kept-rows report
+    //   APP_DEPENDENCY_CONFIG_CIPHER   every `configure` call and every stored
+    //                                  dependency output answered
+    //                                  `secureStorageUnavailable` on an
+    //                                  installation that had a key
+    //   APP_ENV_DEPLOY_READINESS       `AppEnvRuntimeSource.resolve` reported no
+    //                                  not-ready dependencies AND dispatched no
+    //                                  provisioning at all (GAP-05)
+    //   APP_ENV_ENSURE_GENERATED       a generated entry with no row was
+    //                                  unresolved rather than generated
+    //   APP_ENV_RESOLVER_FINGERPRINTS  FR-24's changed-since-build and
+    //                                  changed-since-deploy flags were ALWAYS
+    //                                  false
+    //   APP_RUNTIME_ENV_SOURCE         `AppDeployPreconditionsService` answered
+    //                                  `env_source_unavailable`, so no
+    //                                  Deployment could pass preconditions
+    'APP_DEPENDENCIES_SERVICE',
+    'APP_DEPENDENCY_CONFIG_CIPHER',
+    'APP_ENV_DEPLOY_READINESS',
+    'APP_ENV_ENSURE_GENERATED',
+    'APP_ENV_RESOLVER_FINGERPRINTS',
+    'APP_RUNTIME_ENV_SOURCE',
     // APW-05 T16's two credential/fact ports, provided by `AppBuildsModule`
     // (2026-09-22). Declared by `build-facade.service.ts`, so they belong in this
     // register like any other port — a new token in NEITHER list fails the last
@@ -141,9 +174,7 @@ const UNBOUND: readonly string[] = [
     'APP_CLUSTER_OP_DISPATCHER',
     'APP_COMMIT_ANCESTRY',
     'APP_CUSTOM_DOMAIN_STORE',
-    'APP_DEPENDENCIES_SERVICE',
     'APP_DEPENDENCY_CLUSTER_ACCESS',
-    'APP_DEPENDENCY_CONFIG_CIPHER',
     'APP_DEPENDENCY_SPEC_SOURCE',
     'APP_DEPLOY_BUILD_SOURCE',
     'APP_DEPLOY_DEPLOYMENT_STORE',
@@ -156,9 +187,6 @@ const UNBOUND: readonly string[] = [
     'APP_ENV_ACTOR_NAMES',
     'APP_ENV_BUILD_FINGERPRINTS',
     'APP_ENV_DEPLOY_FINGERPRINTS',
-    'APP_ENV_DEPLOY_READINESS',
-    'APP_ENV_ENSURE_GENERATED',
-    'APP_ENV_RESOLVER_FINGERPRINTS',
     'APP_ENV_SPEC_SOURCE',
     'APP_HEALTH_EGRESS_SOURCE',
     'APP_HOSTS_APPS_DOMAIN',
@@ -169,12 +197,17 @@ const UNBOUND: readonly string[] = [
     'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
     'APP_IMAGE_REFERENCE_RESOLVER',
     'APP_LICENSE_SERVICE',
+    // Still unbound ON PURPOSE (2026-09-22): its declared owner is APW-07's env
+    // write path, and `AppEnvService.apply` needs an `AppEnvActor` and a spec
+    // that declares the name. `storePrompted(workId, values)` carries neither,
+    // and at create time the Blueprint that would declare the names has not
+    // been applied. Binding it means inventing an actor and an ordering that
+    // APW-07 T24/T25 own, and both are open.
     'APP_PROMPTED_VALUES_PORT',
     'APP_PROVISIONING_SERVICE',
     'APP_PROVISION_EVENTS_PORT',
     'APP_PUBLISHED_HOSTS',
     'APP_RUNTIME_DELETION_FACADE',
-    'APP_RUNTIME_ENV_SOURCE',
     'APP_RUNTIME_EVENT_SINK',
     'APP_RUNTIME_HEALTH_FACADE',
     'APP_RUNTIME_NOTIFICATIONS',
@@ -198,10 +231,10 @@ describe('App Works port dormancy register (§5.10)', () => {
     it('reads real provider metadata — a zero here would make every case below vacuous', () => {
         const bound = boundTokenNames();
 
-        // Seven modules that between them provide services, repositories and at
+        // Eight modules that between them provide services, repositories and at
         // least one symbol token. If this collapses, the metadata read broke and
         // the assertions underneath would all pass by accident.
-        expect(Object.keys(APP_WORKS_MODULES)).toHaveLength(7);
+        expect(Object.keys(APP_WORKS_MODULES)).toHaveLength(8);
         expect(bound.size).toBeGreaterThan(5);
     });
 
@@ -230,10 +263,11 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **62 of the 68 tokens in these two lists are
-        // dormant**, and the six that are not are named in `BOUND`.
-        expect(UNBOUND).toHaveLength(62);
-        expect(BOUND).toHaveLength(6);
+        // that it cannot drift: **56 of the 68 tokens in these two lists are
+        // dormant**, and the 12 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's six moved across on 2026-09-22.
+        expect(UNBOUND).toHaveLength(56);
+        expect(BOUND).toHaveLength(12);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {

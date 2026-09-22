@@ -25,31 +25,98 @@
  * there is no token that could resolve to nothing and no way for an import to
  * answer "0 imported" because a provider was forgotten.
  *
- * ## The seams this module does NOT bind (and why that is deliberate)
+ * - `AppEnvResolver` (T14) and the two seams it closes, added 2026-09-22 — see
+ *   below.
+ *
+ * ## The two seams this module DOES bind, and why they moved here
+ *
+ * An earlier revision of this docstring listed `APP_ENV_RESOLVER_FINGERPRINTS`
+ * among the seams whose implementation "does not exist in this tree yet",
+ * naming APW-07 T14's `AppEnvResolver`. That was **false when it was written**:
+ * `app-env.resolver.ts` is 1,000+ lines in this same folder and `AppEnvResolver`
+ * is the class the claim says is missing. The consequence was not cosmetic —
+ * `AppEnvService.fingerprints` answered "no resolution" for an installation that
+ * had one, so FR-24's changed-since-deploy flags were always `false`.
+ *
+ * Both bindings have to live **here**, not in a wiring module that imports this
+ * one, because Nest resolves a provider's dependencies in the module that
+ * declares the provider: `AppEnvService` is declared here, so the token it
+ * injects must be provided here or it receives `undefined`.
+ *
+ * - `APP_ENV_RESOLVER_FINGERPRINTS` → `{ useExisting: AppEnvResolver }`, the
+ *   swap `app-env.service.ts:314` documents.
+ * - `APP_ENV_ENSURE_GENERATED` → a **call-time** `ModuleRef` lookup of
+ *   `AppEnvService`, exactly as `app-env.resolver.ts:97-117` requires: the two
+ *   classes inject each other's token, and two plain `useExisting` aliases are a
+ *   provider cycle Nest refuses to bootstrap. `ensureGenerated` is idempotent,
+ *   so resolving the service per call costs nothing.
+ *
+ * `TypeOrmModule.forFeature` also gained `WorkAppDependency`, because
+ * `AppEnvResolver` reads dependency rows directly (`app-env.resolver.ts:591`)
+ * and without the feature every `ew-dep://` reference resolves
+ * `dependencyNotReady`. The rows are read, never written, here.
+ *
+ * ## The seams this module still does NOT bind (and why that is deliberate)
  * `APP_ENV_SPEC_SOURCE`, `APP_ENV_ACTIVITY`, `APP_ENV_BUILD_FINGERPRINTS`,
- * `APP_ENV_DEPLOY_FINGERPRINTS`, `APP_ENV_RESOLVER_FINGERPRINTS` and
- * `APP_ENV_ACTOR_NAMES` are other owners' — APW-03's `AppSpecService`, APW-07
- * T26's activity writer, APW-05's `WorkBuild.buildValueFingerprints`, APW-06's
- * `appRender.envFingerprints`, APW-07 T14's `AppEnvResolver` and APW-01's
- * Work-member read. None of them exists in this tree yet, so none can be bound
- * without inventing it. `AppEnvService` takes every one `@Optional()` and answers
- * each absence explicitly (`specUnavailable`, `activityRecorded: false`, `false`
- * for both change flags, `null` for an unresolvable actor name), so an unbound
- * seam degrades into a named answer rather than a silent success. The bindings
- * land with their owners — the exact `useExisting` swap of each is in the block
- * above its token in `app-env.service.ts`.
+ * `APP_ENV_DEPLOY_FINGERPRINTS` and `APP_ENV_ACTOR_NAMES` are other owners' —
+ * APW-03's `AppSpecService`, APW-07 T26's activity writer, APW-05's
+ * `WorkBuild.buildValueFingerprints`, APW-06's `appRender.envFingerprints` and
+ * APW-01's Work-member read. None of those exists in this tree, so none can be
+ * bound without inventing it. `AppEnvService` takes every one `@Optional()` and
+ * answers each absence explicitly (`specUnavailable`, `activityRecorded: false`,
+ * `false` for both change flags, `null` for an unresolvable actor name), so an
+ * unbound seam degrades into a named answer rather than a silent success. The
+ * bindings land with their owners — the exact `useExisting` swap of each is in
+ * the block above its token in `app-env.service.ts`.
+ *
+ * `APP_RUNTIME_ENV_SOURCE` and `APP_ENV_DEPLOY_READINESS` are bound by
+ * `AppRuntimeEnvModule` (`app-runtime-env.module.ts`) rather than here: their
+ * consumer is `AppEnvRuntimeSource`, which needs `AppDependenciesService`, and
+ * importing `AppDependenciesModule` from here would make the two modules
+ * mutually dependent. That module imports both and is the composition root.
  */
 
 import { Module } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
+import { WorkAppDependency } from '../entities/work-app-dependency.entity';
 import { WorkAppEnvValueRepository } from '../database/repositories/work-app-env-value.repository';
 import { AppEnvCrypto } from './app-env-crypto';
-import { AppEnvService } from './app-env.service';
+import { APP_ENV_RESOLVER_FINGERPRINTS, AppEnvService } from './app-env.service';
+import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([WorkAppEnvValue])],
-    providers: [WorkAppEnvValueRepository, AppEnvCrypto, AppEnvService],
-    exports: [AppEnvService, AppEnvCrypto, WorkAppEnvValueRepository],
+    imports: [TypeOrmModule.forFeature([WorkAppEnvValue, WorkAppDependency])],
+    providers: [
+        WorkAppEnvValueRepository,
+        AppEnvCrypto,
+        AppEnvResolver,
+        AppEnvService,
+        // FR-24's changed-since-build / changed-since-deploy flags. A plain
+        // alias, because the resolver IS the resolution this token names.
+        { provide: APP_ENV_RESOLVER_FINGERPRINTS, useExisting: AppEnvResolver },
+        {
+            // The cycle break `app-env.resolver.ts:97-117` specifies: the service
+            // injects the resolver's token and the resolver injects the
+            // service's, so the generation side resolves at CALL time. Nest
+            // refuses to bootstrap two plain aliases here.
+            provide: APP_ENV_ENSURE_GENERATED,
+            useFactory: (ref: ModuleRef) => ({
+                ensureGenerated: async (workId: string) => {
+                    await ref.get(AppEnvService).ensureGenerated(workId);
+                },
+            }),
+            inject: [ModuleRef],
+        },
+    ],
+    exports: [
+        AppEnvService,
+        AppEnvCrypto,
+        AppEnvResolver,
+        WorkAppEnvValueRepository,
+        APP_ENV_RESOLVER_FINGERPRINTS,
+        APP_ENV_ENSURE_GENERATED,
+    ],
 })
 export class AppEnvModule {}
