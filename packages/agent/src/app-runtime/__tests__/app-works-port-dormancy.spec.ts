@@ -39,7 +39,26 @@ import { AppRuntimeStateModule } from '../app-runtime-state.module';
  * different test with a different failure mode (and `AppRuntimeStateModule` is
  * covered that way already — the API is booted in CI and by hand). What this
  * file answers is narrower and exact: *of the tokens this programme declares,
- * which ones does any App Works module claim to provide?*
+ * which ones does any App Works module **in this package** claim to provide?*
+ *
+ * ## ⚠ The scope is THIS PACKAGE, and {@link UNBOUND} does not mean "dormant
+ * ## everywhere"
+ *
+ * `packages/tasks`' own `TriggerAppRuntimeModule` binds eleven of these tokens
+ * for the isolated App cluster worker — the process that actually reaches a
+ * cluster. This file cannot see them: `packages/tasks` depends on
+ * `packages/agent`, so importing that module here would invert the dependency.
+ *
+ * A token in {@link UNBOUND} therefore means **"no module in `packages/agent`
+ * provides it"**, which is the right question for the API's graph and the wrong
+ * one for the worker's. {@link WORKER_BOUND} names the eleven so a reader of
+ * this register is not misled into re-binding something that is already bound
+ * somewhere it belongs better — `AppRuntimeFacadeService` is worker-ONLY by
+ * design (`requireAppClusterWorkerContext`), so its tokens must NOT move here.
+ *
+ * `WORKER_BOUND` is maintained by hand for the dependency reason above, and
+ * `trigger-app-runtime.module.spec.ts` is what keeps the worker's own side
+ * honest.
  *
  * ## How to use it when a number below changes
  *
@@ -193,6 +212,44 @@ const BOUND: readonly string[] = [
 ];
 
 /**
+ * What `packages/tasks`' `TriggerAppRuntimeModule` binds, for the isolated App
+ * cluster worker.
+ *
+ * Every one of these also appears in {@link UNBOUND}, and that is not a
+ * contradiction — see the scope note in this file's header. They are listed
+ * here so the register cannot be read as "nothing provides these anywhere",
+ * which is the mistake it would otherwise invite.
+ *
+ * Six are bound to real classes:
+ *
+ *   `APP_DEPLOY_TARGET_RESOLVER`, `APP_RUNTIME_DELETION_FACADE`,
+ *   `APP_RUNTIME_VERIFICATION_FACADE` and `APP_RUNTIME_HEALTH_FACADE` all to
+ *   `AppRuntimeFacadeService` — one class, so no consumer can be handed a
+ *   different plugin; `APP_VERIFICATION_SPEC_SOURCE` to `AppRenderInputBuilder`;
+ *   `APP_DEPLOY_HOST_SOURCE` to `AppHostsService`.
+ *
+ * Five are bound to `default-ports.ts`'s **deliberate fail-closed stubs** until
+ * their owners land. `APP_RUNTIME_ENV_SOURCE` is the one worth understanding:
+ * the agent package binds it to the REAL `AppEnvRuntimeSource`
+ * (`AppRuntimeEnvModule`), and the worker deliberately does not — the worker
+ * holds no DataSource, so the env service and resolver behind it cannot read a
+ * row there. Two different answers for two different processes, both correct.
+ */
+const WORKER_BOUND: readonly string[] = [
+    'APPS_TIER_POLICY',
+    'APP_DEPLOY_HOST_SOURCE',
+    'APP_DEPLOY_TARGET_RESOLVER',
+    'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
+    'APP_RUNTIME_DELETION_FACADE',
+    'APP_RUNTIME_ENV_SOURCE',
+    'APP_RUNTIME_HEALTH_FACADE',
+    'APP_RUNTIME_TARGET',
+    'APP_RUNTIME_VERIFICATION_FACADE',
+    'APP_VERIFICATION_SINK',
+    'APP_VERIFICATION_SPEC_SOURCE',
+];
+
+/**
  * The tokens that are declared, injected, and provided by NOTHING.
  *
  * Every one of them is an `@Optional()` injection, so an installation carrying
@@ -294,13 +351,41 @@ describe('App Works port dormancy register (§5.10)', () => {
         // `BOUND` and say in the commit what now works that did not.
         expect(wronglyBound).toEqual([]);
 
-        // The register's headline. It is an assertion and not a log line so
+        // The register's headline, and it is about THIS PACKAGE — see the
+        // scope note in the header and `WORKER_BOUND`. It is an assertion
+        // and not a log line so
         // that it cannot drift: **47 of the 68 tokens in these two lists are
         // dormant**, and the 21 that are not are named in `BOUND`. It was 62 of
         // 68 on 2026-09-21; APW-07's seven, APW-06's five and APW-05's three
         // moved across on 2026-09-22.
         expect(UNBOUND).toHaveLength(47);
         expect(BOUND).toHaveLength(21);
+    });
+
+    it('names where the worker binds what this package does not', () => {
+        // The register measures `packages/agent` only, and reading `UNBOUND` as
+        // "dormant everywhere" is the mistake it invites.
+        //
+        // A token bound in BOTH packages is usually a defect — two instances of
+        // a cluster facade is a way to hand two consumers different plugins —
+        // so the overlap is an allow-list of one, with its reason:
+        //
+        //   `APP_RUNTIME_ENV_SOURCE` is the REAL `AppEnvRuntimeSource` here and
+        //   a fail-closed stub in the worker, because the worker holds no
+        //   DataSource and the env service behind it cannot read a row there.
+        //   Two processes, two correct answers.
+        const BOUND_IN_BOTH: readonly string[] = ['APP_RUNTIME_ENV_SOURCE'];
+
+        const overlap = BOUND.filter((name) => WORKER_BOUND.includes(name));
+        expect(overlap).toEqual([...BOUND_IN_BOTH]);
+
+        for (const name of WORKER_BOUND) {
+            if (BOUND_IN_BOTH.includes(name)) continue;
+            expect(UNBOUND).toContain(name);
+        }
+
+        // Sorted, like the other two, because it is read by people.
+        expect([...WORKER_BOUND]).toEqual([...WORKER_BOUND].sort());
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {
