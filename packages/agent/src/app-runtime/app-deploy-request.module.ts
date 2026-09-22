@@ -2,9 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { WorkBuild } from '../entities/work-build.entity';
-import { WorkDeployment } from '../entities/work-deployment.entity';
+import { DatabaseModule } from '../database/database.module';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
-import { WorkDeploymentRepository } from '../database/repositories/work-deployment.repository';
 import { AppSpecModule } from '../app-spec/app-spec.module';
 import { AppSpecService } from '../app-spec/app-spec.service';
 import { AppDeployBuildSourceAdapter } from './app-deploy-build.source';
@@ -95,16 +94,22 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
     imports: [
         AppRuntimeStateModule,
         AppSpecModule,
-        TypeOrmModule.forFeature([WorkDeployment, WorkBuild]),
+        // `WorkDeploymentRepository` is one of `DatabaseModule`'s own
+        // (`_repository-inventory.ts:152`), so it is IMPORTED rather than
+        // re-provided: providing it here would construct a second instance
+        // beside the one every other consumer resolves, which is the mistake
+        // `AppRuntimeStateModule`'s docstring spells out for `useClass`.
+        // `DatabaseModule` is already in this graph through `AppSpecModule`,
+        // so the import costs nothing new.
+        DatabaseModule,
+        // `WorkBuild` only: `AppBuildRepository` is FEATURE-owned (it is
+        // deliberately absent from the inventory), so this module provides it
+        // and needs the entity's repository token to do so.
+        TypeOrmModule.forFeature([WorkBuild]),
     ],
     providers: [
         AppDeployPreconditionsService,
         AppDeployRequestService,
-        // T16's row. `forFeature` is declared HERE for the reason
-        // `AppRuntimeStateModule` spells out: Nest resolves a provider in the
-        // module that DECLARES it, and this branch has broken the API boot twice
-        // by registering an entity in a parent instead.
-        WorkDeploymentRepository,
         AppDeployDeploymentStoreAdapter,
         { provide: APP_DEPLOY_DEPLOYMENT_STORE, useExisting: AppDeployDeploymentStoreAdapter },
         // §5.1's Build reads. `AppBuildRepository` is APW-05's and is provided
