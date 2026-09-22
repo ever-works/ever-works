@@ -1,4 +1,8 @@
-import type { AppSpecService } from '../app-spec/app-spec.service';
+import {
+    APP_SPEC_USABLE_STATUSES,
+    isUsableAppSpecStatus,
+    type AppSpecService,
+} from '../app-spec/app-spec.service';
 import type { AppBuildSpecRead, AppBuildSpecSource } from './app-builds.service';
 
 /**
@@ -52,17 +56,18 @@ export class AppBuildSpecReadSource implements AppBuildSpecSource {
 }
 
 /**
- * The two APW-03 statuses a Build may run on.
+ * The two APW-03 statuses a Build may run on — **APW-03's own list**, not a
+ * second copy of it.
  *
- * Exported so the collapse is testable on its own and so a reader can find the
- * list without reading the adapter — it is the whole decision this file makes.
+ * This file used to declare the pair itself. It no longer does: the same two
+ * statuses are read by `AppSpecService` in two places and by APW-07's env
+ * source, and four independent copies of "which statuses count as valid" is
+ * three chances for them to drift. The re-export stays so a reader of the Build
+ * path still finds the answer here rather than having to know where it moved.
  */
-export const BUILDABLE_SPEC_STATUSES: readonly string[] = Object.freeze([
-    'valid',
-    'valid_with_warnings',
-]);
+export const BUILDABLE_SPEC_STATUSES = APP_SPEC_USABLE_STATUSES;
 
 /** `true` ⇔ the spec at this commit may be built. */
 export function isUsableStatus(status: unknown): boolean {
-    return BUILDABLE_SPEC_STATUSES.includes(String(status ?? ''));
+    return isUsableAppSpecStatus(status);
 }

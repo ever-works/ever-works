@@ -221,12 +221,19 @@ export interface AppEnvSpecSnapshot {
 
 // ── provisional — APW-03 T12 `AppSpecService` ────────────────────────────────
 //
-// `AppSpecService.getEffectiveSpec(workId, commitSha?)`
-// (`APW-03/tasks.md:274`) does not exist in this tree. The swap is one adapter,
-// bound by APW-07's module owner (T24):
-// `{ provide: APP_ENV_SPEC_SOURCE, useExisting: AppSpecService }` with a
-// `read(workId)` that maps `{ status: 'valid', spec, specHash, commitSha }` to
-// the snapshot below and every other status to `null` (fail closed).
+// This comment used to say `AppSpecService.getEffectiveSpec(workId, commitSha?)`
+// "does not exist in this tree". It does — `app-spec.service.ts:940` — and it
+// has since APW-03 T12 landed. The consequence of believing otherwise was total:
+// this seam is what every read in this file goes through, so unbound meant
+// `list` answered `[]`, `missingRequired` found nothing missing and
+// `ensureGenerated` had nothing to generate, for every App Work.
+//
+// The adapter is `app-env-spec.source.ts` and `AppEnvModule` binds it. It maps a
+// USABLE status — `valid` or `valid_with_warnings`, `APP_SPEC_USABLE_STATUSES`
+// — to the snapshot below and everything else to `null`. An earlier draft of
+// this comment asked for `valid` alone; that would drop every env value of an
+// App Work whose spec has one cosmetic warning, which is a bigger failure than
+// the one failing closed guards against.
 
 /** The effective App spec of one App Work. */
 export interface AppEnvSpecSource {

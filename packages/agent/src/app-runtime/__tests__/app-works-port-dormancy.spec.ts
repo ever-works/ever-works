@@ -176,6 +176,11 @@ const BOUND: readonly string[] = [
     'APP_ENV_DEPLOY_READINESS',
     'APP_ENV_ENSURE_GENERATED',
     'APP_ENV_RESOLVER_FINGERPRINTS',
+    // APW-07 — APW-03's effective spec, bound 2026-09-22. The seam every read
+    // in that epic goes through: unbound, `list` answered `[]`,
+    // `missingRequired` found nothing missing and `ensureGenerated` had
+    // nothing to generate, for every App Work.
+    'APP_ENV_SPEC_SOURCE',
     'APP_RUNTIME_ENV_SOURCE',
     // APW-05 T16's two credential/fact ports, provided by `AppBuildsModule`
     // (2026-09-22). Declared by `build-facade.service.ts`, so they belong in this
@@ -215,7 +220,6 @@ const UNBOUND: readonly string[] = [
     'APP_ENV_ACTOR_NAMES',
     'APP_ENV_BUILD_FINGERPRINTS',
     'APP_ENV_DEPLOY_FINGERPRINTS',
-    'APP_ENV_SPEC_SOURCE',
     'APP_HEALTH_EGRESS_SOURCE',
     'APP_HOSTS_APPS_DOMAIN',
     'APP_HOSTS_DEPLOYMENT_STORE',
@@ -291,12 +295,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **48 of the 68 tokens in these two lists are
-        // dormant**, and the 20 that are not are named in `BOUND`. It was 62 of
-        // 68 on 2026-09-21; APW-07's six, APW-06's five and APW-05's three moved
-        // across on 2026-09-22.
-        expect(UNBOUND).toHaveLength(48);
-        expect(BOUND).toHaveLength(20);
+        // that it cannot drift: **47 of the 68 tokens in these two lists are
+        // dormant**, and the 21 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's seven, APW-06's five and APW-05's three
+        // moved across on 2026-09-22.
+        expect(UNBOUND).toHaveLength(47);
+        expect(BOUND).toHaveLength(21);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {

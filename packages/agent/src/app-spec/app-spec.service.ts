@@ -233,6 +233,29 @@ export interface AppSpecEvaluationOutcome {
 }
 
 /** What `getEffectiveSpec` answers — the read APW-05, 06 and 08 consume (plan §2.7:383-386). */
+/**
+ * The two validation statuses that mean "this spec may be used".
+ *
+ * APW-03 has TWO of them on purpose: warnings do not stop anything, and a
+ * single `valid` would have forced every consumer to decide for itself whether
+ * a warning is fatal. Three places were deciding that independently before this
+ * constant existed — twice in this service and once in APW-05's Build spec
+ * source — and a fourth (APW-07's env source) was about to.
+ *
+ * Every other status is NOT usable, including `missing` and `unreadable`, which
+ * mean "we could not tell" rather than "it is broken". They are the same answer
+ * to a consumer: a spec we could not read is a spec we cannot act on.
+ */
+export const APP_SPEC_USABLE_STATUSES: readonly string[] = Object.freeze([
+    'valid',
+    'valid_with_warnings',
+]);
+
+/** `true` ⇔ {@link APP_SPEC_USABLE_STATUSES} contains this status. */
+export function isUsableAppSpecStatus(status: unknown): boolean {
+    return APP_SPEC_USABLE_STATUSES.includes(String(status ?? ''));
+}
+
 export interface AppSpecEffectiveRead {
     /** `valid` · `valid_with_warnings` · `invalid` · `missing` · `unreadable` · `no_state`. */
     readonly status: string;

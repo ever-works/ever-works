@@ -83,7 +83,14 @@ import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
 import { WorkAppDependency } from '../entities/work-app-dependency.entity';
 import { WorkAppEnvValueRepository } from '../database/repositories/work-app-env-value.repository';
 import { AppEnvCrypto } from './app-env-crypto';
-import { APP_ENV_RESOLVER_FINGERPRINTS, AppEnvService } from './app-env.service';
+import { AppSpecService } from '../app-spec/app-spec.service';
+import {
+    APP_ENV_RESOLVER_FINGERPRINTS,
+    APP_ENV_SPEC_SOURCE,
+    AppEnvService,
+    type AppEnvSpecSource,
+} from './app-env.service';
+import { AppEnvSpecReadSource } from './app-env-spec.source';
 import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
 
 @Module({
@@ -93,6 +100,27 @@ import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
         AppEnvCrypto,
         AppEnvResolver,
         AppEnvService,
+        // APW-03's effective spec — the seam EVERY read in this epic goes
+        // through. Unbound it answered "no entries at all" for every App Work.
+        //
+        // Lazy through `ModuleRef` rather than an `AppSpecModule` import: that
+        // module carries `DatabaseModule`, `FacadesModule` and
+        // `ActivityLogModule`, and `FacadesModule` needs the `@Global()` plugin
+        // registry that only exists at the API root. `AppEnvModule` is compiled
+        // standalone by its own spec and by `AppRuntimeEnvModule`'s, and this
+        // keeps both possible — the same shape `app-builds.module.ts` uses for
+        // its four cross-module sources.
+        {
+            provide: APP_ENV_SPEC_SOURCE,
+            useFactory: (ref: ModuleRef): AppEnvSpecSource => ({
+                read: async (workId: string) => {
+                    const specs = ref.get(AppSpecService, { strict: false });
+                    if (!specs) return null;
+                    return new AppEnvSpecReadSource(specs).read(workId);
+                },
+            }),
+            inject: [ModuleRef],
+        },
         // FR-24's changed-since-build / changed-since-deploy flags. A plain
         // alias, because the resolver IS the resolution this token names.
         { provide: APP_ENV_RESOLVER_FINGERPRINTS, useExisting: AppEnvResolver },
@@ -117,6 +145,7 @@ import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
         WorkAppEnvValueRepository,
         APP_ENV_RESOLVER_FINGERPRINTS,
         APP_ENV_ENSURE_GENERATED,
+        APP_ENV_SPEC_SOURCE,
     ],
 })
 export class AppEnvModule {}
