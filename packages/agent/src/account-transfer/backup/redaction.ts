@@ -539,6 +539,18 @@ export const BACKUP_BENIGN_ENTITY_COLUMNS: Readonly<
         metadata:
             'Not an extension dict despite its docstring: this column IS the knowledge document\u2019s body, plus `archivedFrom*`/`transcribed*` stamps our own code writes. No DTO declares the field and the global pipe runs `forbidNonWhitelisted`, so no HTTP caller can name a key. Redacting it would delete the document text from the archive \u2014 text the owner already has mirrored in plaintext in their own data repo. A credential an owner types INTO a runbook body ships with it; that is the residual, and it is the same one the body itself carries.',
     }),
+    // APW-06 T16 \u2014 the three `simple-json` columns added to `work_deployments`
+    // on 2026-09-22. All three are written ONLY by the App deploy orchestrator on
+    // the isolated cluster worker; no DTO declares any of them, and the global
+    // pipe runs `forbidNonWhitelisted`, so no HTTP caller can widen one.
+    WorkDeployment: Object.freeze({
+        componentStatuses:
+            'One writer, one shape: the orchestrator maps Kubernetes\u2019 own pod status onto `{ name, role, desired, ready, restarts, lastTerminationReason?, oomKilledAt? }` at the terminal state. Every value is ours or the cluster\u2019s \u2014 a component name from the App spec, three integers, a timestamp, and `lastTerminationReason`, which is the kubelet\u2019s closed reason enum (`OOMKilled`, `Error`, `Completed`) and never the container\u2019s own output. Nothing here is authored by the member\u2019s application.',
+        smokeResult:
+            'The \u00a75.5 check results: `{ inCluster: CheckResult[], public: CheckResult[], hairpin?, classification?, observedAt }`. Seven of the nine `CheckResult` fields are ours or the transport\u2019s \u2014 a check name from the App spec, a pass/fail/skip enum, an HTTP status, a latency, and a closed classification enum. **The residual is `found`**: it is a substring of the member\u2019s OWN application\u2019s HTTP response, capped at 200 characters and secret-scrubbed by the plugin that produced it (`app-deployment.types.ts:427`). The cap and the scrub are the guarantee, and the scrub is best-effort code we do not run ourselves \u2014 an application that prints an env value into an error page could put 200 characters of it here. Reviewed and accepted 2026-09-22 on the basis that the member owns both the application and the archive; re-challenge this entry if `found` ever grows past 200 characters or a plugin outside this repo starts producing it.',
+        appRender:
+            'The render facts: `{ phase, namespace, specCommitSha, envChecksum, jobResults[], warnings[], preconditions[], rollback?, cancelledBy?, supersededBy? }`. Plan \u00a77.1 states the rule at the column \u2014 *\u201cNever values or log text\u201d* \u2014 and every member is a platform-authored fact rather than an app-authored one: a phase enum, a namespace we compute, a commit sha, a checksum OF the env rather than the env, our own refusal codes, and row ids. `jobResults[]` carries a job\u2019s name, status and timestamps; the job\u2019s OUTPUT is deliberately not in it, which is the same line \u00a74.9\u2019s failure excerpts draw.',
+    }),
 });
 
 /** Does this entity produce no lines in an archive at all? */
