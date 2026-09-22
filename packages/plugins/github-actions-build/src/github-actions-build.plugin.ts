@@ -17,10 +17,18 @@ import type {
 import { APP_BUILD_WORKFLOW_PATH, computeBuildInputsHash, type AppBuildKind } from '@ever-works/contracts';
 import { Octokit } from 'octokit';
 
-import { octokitActionsRunsPort, type ActionsRepositoryRef, type ActionsRunsPort } from './runs/actions-runs.port.js';
+import {
+	octokitActionsRunsPort,
+	type ActionsJob,
+	type ActionsRepositoryRef,
+	type ActionsRun,
+	type ActionsRunsPort
+} from './runs/actions-runs.port.js';
 import { correlateDispatchedRun } from './runs/run-correlator.js';
-import { observeRun } from './runs/run-observer.js';
-import { readResultArtifact } from './runs/result-artifact.js';
+import { failingStep, observeRun, BUILD_JOB_NAME } from './runs/run-observer.js';
+import { readResultArtifact, type BuildResultArtifact } from './runs/result-artifact.js';
+import { classifyFailure } from './runs/failure-classifier.js';
+import { readJobLogTail } from './runs/log-tail.js';
 import { checkImageAccess as checkGhcrAccess, type GhcrAccessResult, type GhcrFetch } from './registry/ghcr-access.js';
 import { selectRunner } from './runner/runner-selector.js';
 import { generateWorkflow } from './workflow/generator.js';
@@ -59,7 +67,7 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  * | --------------------- | ----------------------------------------------------------------------------------------------------------- |
  * | `prepareRepository`   | §4.6: select the runner (T11), generate the file (T8) with the checks job (T41), deliver it (T9), then sync the build values (T10) — in that order, so nothing reaches a member's repository until it is known the Build could run |
  * | `startBuild`          | dispatches the generated file on the TRACKED branch with `ew_build_id` / `ew_sha` / `ew_mode` and the two optional inputs, then correlates once |
- * | `getBuild`            | run + jobs → `BuildSnapshot` via `runs/run-observer.ts`, plus the result artifact for a finished run. T43 fills `verification` |
+ * | `getBuild`            | run + jobs → `BuildSnapshot` via `runs/run-observer.ts`, plus the result artifact for a finished run and, for a FAILED one, the log tail (T13) classified into `failure`. T43 fills `verification` |
  * | `cancelBuild`         | resolves the same run `getBuild` would, then the cancel endpoint                                          |
  * | `getLogsUrl`          | the run's own page                                                                                        |
  *
@@ -68,12 +76,13 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  *
  *   - the **404/422 retry after a bootstrap commit** (`APW05-G02`) — a
  *     just-written workflow file is briefly undispatchable;
- *   - `getBuild` attaches no `failure` block. `runs/failure-classifier.ts` (T13)
- *     exists and is tested, but nothing fetches the failing job's LOG yet, and a
- *     classifier with no log to read would report `unknown` for everything;
  *   - a digest read from the artifact is reported `confirmed: false` **always**.
  *     Confirming it is `checkImageAccess` (T14, below) and the comparison belongs
- *     to the caller.
+ *     to the caller;
+ *   - a failure whose log has EXPIRED classifies as `unknown`. GitHub deletes
+ *     job logs on the repository's retention schedule, and a Build observed
+ *     after that is genuinely unexplainable — reporting `unknown` is the honest
+ *     answer, and re-running the Build is the only way to get a better one.
  *
  * `checkImageAccess?` (T14) IS declared now, because it does something: it reads
  * the manifest anonymously, then with the pull token, and checks that token's
@@ -412,12 +421,11 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 	 * means "no such run" — never "I could not tell", which the contract says is a
 	 * throw, and which is why a failed API call is not caught here.
 	 *
-	 * `redact` is APW-07's redactor for this App Work. It is applied to every
-	 * excerpt before it leaves this method; today the snapshot carries none (the log
-	 * tail is T13's classifier), and it is accepted and threaded so the call site
-	 * cannot forget it when T13 lands.
+	 * `redact` is APW-07's redactor for this App Work, and it is USED: every line
+	 * of every excerpt goes through it, and through the secret-shape mask after
+	 * it, before it leaves this method (FR-38).
 	 */
-	async getBuild(ref: BuildRef, auth: BuildAuth, _redact: (text: string) => string): Promise<BuildSnapshot | null> {
+	async getBuild(ref: BuildRef, auth: BuildAuth, redact: (text: string) => string): Promise<BuildSnapshot | null> {
 		const port = this.actionsPort(auth);
 		const repository: ActionsRepositoryRef = {
 			owner: ref.repository.owner,
@@ -432,30 +440,97 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 
 		const jobs = await port.listRunJobs({ repository, runId });
 		const snapshot = observeRun({ run, jobs, mode: 'build' });
+		const finished = snapshot.status !== 'queued' && snapshot.status !== 'running';
 
 		// The result artifact is read only for a finished run: an unfinished one has
 		// not uploaded it, and asking would spend a request per poll to learn that.
-		if (snapshot.status !== 'queued' && snapshot.status !== 'running') {
-			const artifact = await readResultArtifact(port, { repository, runId });
-			if (artifact.ok) {
-				return {
-					...snapshot,
-					// `confirmed: false` without exception. This plugin reads the digest
-					// the member's own CI claimed; confirming it against the registry is
-					// `checkImageAccess` (T14), and a plugin that marked its own input
-					// confirmed would make plan §4.8's "never believed" untrue.
-					image: {
-						repository: artifact.result.imageRepository ?? '',
-						digest: artifact.result.digest,
-						tags: [...(artifact.result.tags ?? [])],
-						confirmed: false
-					},
-					...(artifact.result.secretCheck ? { secretCheck: artifact.result.secretCheck } : {})
-				};
-			}
-		}
+		const artifact = finished ? await readResultArtifact(port, { repository, runId }) : null;
+		const result = artifact?.ok ? artifact.result : null;
 
-		return snapshot;
+		// T13 — a failed Build says WHY. Only a FAILED one: a successful Build has
+		// nothing to classify, and classifying an in-progress one would buy the log
+		// again on every poll.
+		const failure =
+			snapshot.status === 'failed'
+				? await this.classifyRunFailure({ port, repository, run, jobs, snapshot, result, redact })
+				: null;
+
+		return {
+			...snapshot,
+			...(result
+				? {
+						// `confirmed: false` without exception. This plugin reads the digest
+						// the member's own CI claimed; confirming it against the registry is
+						// `checkImageAccess` (T14), and a plugin that marked its own input
+						// confirmed would make plan §4.8's "never believed" untrue.
+						image: {
+							repository: result.imageRepository ?? '',
+							digest: result.digest,
+							tags: [...(result.tags ?? [])],
+							confirmed: false
+						},
+						...(result.secretCheck ? { secretCheck: result.secretCheck } : {})
+					}
+				: {}),
+			...(failure ? { failure } : {})
+		};
+	}
+
+	/**
+	 * APW-05 T13 — why a failed run failed, as `BuildSnapshot.failure`.
+	 *
+	 * ## Which job's log
+	 *
+	 * The `build` job decides the Build's status (`run-observer.ts`, R-9), so when
+	 * it failed it is the one worth reading. Only when it did NOT fail — a Build
+	 * the run marked failed for some other reason — does any other failing job
+	 * stand in. A failed `Ever Works check:` job is deliberately last: it never
+	 * flips a Build to `failed`, so if it is the only failure the run's own
+	 * conclusion is what actually needs explaining.
+	 *
+	 * No failing job at all is not an error: `jobCount` then carries the run into
+	 * the classifier's `workflowInvalid` row, which is exactly what a run that
+	 * produced no jobs is.
+	 *
+	 * ## Why the artifact's smoke rows are passed in
+	 *
+	 * `verificationFailed` is a class the LOG cannot show: the smoke rows live in
+	 * the result artifact, which `getBuild` has already read by this point. Passing
+	 * them costs nothing and is the difference between "your build failed" and
+	 * "your app built, and then did not answer".
+	 */
+	private async classifyRunFailure(input: {
+		readonly port: ActionsRunsPort;
+		readonly repository: ActionsRepositoryRef;
+		readonly run: ActionsRun;
+		readonly jobs: readonly ActionsJob[];
+		readonly snapshot: BuildSnapshot;
+		readonly result: BuildResultArtifact | null;
+		readonly redact: (text: string) => string;
+	}): Promise<BuildSnapshot['failure']> {
+		const { port, repository, run, jobs, snapshot, result, redact } = input;
+
+		const failed = (job: ActionsJob) => Boolean(job.conclusion) && job.conclusion !== 'success';
+		const buildJob = jobs.find((job) => job.name === BUILD_JOB_NAME);
+		const failingJob = buildJob && failed(buildJob) ? buildJob : jobs.find(failed);
+
+		const log = failingJob ? await readJobLogTail(port, { repository, jobId: failingJob.id }) : '';
+		const smoke = result?.smoke ?? null;
+
+		return classifyFailure(
+			{
+				log,
+				jobConclusion: failingJob?.conclusion ?? null,
+				runConclusion: run.conclusion ?? null,
+				jobCount: jobs.length,
+				failingStepName: failingStep(failingJob)?.name ?? null,
+				...(typeof snapshot.billableMinutes === 'number' ? { minutes: snapshot.billableMinutes } : {}),
+				...(smoke
+					? { verification: { failed: smoke.filter((row) => !row.passed).length, total: smoke.length } }
+					: {})
+			},
+			redact
+		);
 	}
 
 	/**

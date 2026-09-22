@@ -138,6 +138,27 @@ export interface ActionsRunsPort {
 		readonly repository: ActionsRepositoryRef;
 		readonly artifactId: number;
 	}): Promise<Uint8Array>;
+
+	/**
+	 * `GET /repos/{o}/{r}/actions/jobs/{id}/logs`, following the redirect, asking
+	 * for at most the last `maxBytes` with a `Range` header (plan §4.8).
+	 *
+	 * **Optional, and the only optional member of this port.** A caller whose
+	 * token cannot read logs — or an adapter written before this landed — still
+	 * gets a classified failure (`unknown`) rather than a thrown observation,
+	 * which is why {@link readJobLogTail} probes for it instead of requiring it.
+	 *
+	 * `partial` reports whether the server honoured the range (`206`) rather than
+	 * answering the whole body (`200`). The reader uses it to decide whether to
+	 * drop the first line: a byte range almost never starts on a line boundary.
+	 *
+	 * `null` is "there is no log" — an expired one, or a job that never ran.
+	 */
+	downloadJobLogTail?(input: {
+		readonly repository: ActionsRepositoryRef;
+		readonly jobId: number;
+		readonly maxBytes: number;
+	}): Promise<{ readonly bytes: Uint8Array; readonly partial: boolean } | null>;
 }
 
 /** The subset of Octokit's surface this adapter uses, so the adapter is typed without importing Octokit's generics. */
@@ -239,6 +260,22 @@ export function octokitActionsRunsPort(octokit: OctokitLike): ActionsRunsPort {
 				per_page: 100
 			});
 			return asArray<ActionsArtifact>(data, 'artifacts');
+		},
+
+		async downloadJobLogTail({ repository, jobId, maxBytes }) {
+			const response = (await octokit.request('GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs', {
+				owner: repository.owner,
+				repo: repository.repo,
+				job_id: jobId,
+				// A request, not a guarantee — the reader cuts again on arrival.
+				headers: { range: `bytes=-${maxBytes}` }
+			})) as { data: unknown; status?: number };
+			const data = response.data;
+			if (data === null || data === undefined) return null;
+			const bytes =
+				typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data as ArrayBuffer);
+			// 206 is the server honouring the range; 200 is the whole body.
+			return { bytes, partial: response.status === 206 };
 		},
 
 		async downloadArtifactZip({ repository, artifactId }) {
