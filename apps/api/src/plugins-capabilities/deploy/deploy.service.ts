@@ -1,5 +1,7 @@
 import {
     BadRequestException,
+    HttpException,
+    HttpStatus,
     Injectable,
     InternalServerErrorException,
     Logger,
@@ -36,7 +38,7 @@ import {
     SubdomainAllocator,
     EverWorksDbProvisionService,
 } from '@ever-works/agent/ever-works-providers';
-import { isRepositoryWorkKind } from '@ever-works/contracts';
+import { isAppWorkKind, isRepositoryWorkKind } from '@ever-works/contracts';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -44,6 +46,10 @@ import {
     WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
+import {
+    AppDeployRequestService,
+    type AppDeployRequestResult,
+} from '@ever-works/agent/app-runtime';
 import type {
     DeploymentConfig,
     DeploymentResult,
@@ -128,6 +134,14 @@ export class DeployService {
         // fixtures that construct DeployService directly keep working (a
         // missing provider means "don't auto-provision", same as feature-off).
         private readonly dbProvisionService?: EverWorksDbProvisionService,
+        // APW-06 §2.2's SECOND caller. `deploy()` is reached by the batch route,
+        // the scheduler and `POST /api/deploy/works/:id`; an App Work arriving
+        // through any of them must take the App path, not the website one.
+        // Optional in DI for the same reason as the two above — fixtures
+        // construct this service directly — and an absent service is a named
+        // refusal rather than a silent fall-through to the website path, which
+        // would push the member's App repository at a website provider.
+        private readonly appDeployRequest?: AppDeployRequestService,
     ) {}
 
     /**
@@ -173,6 +187,69 @@ export class DeployService {
      * Returns the dispatched flag plus the deployment-history row id so the
      * caller can start verification keyed by environment.
      */
+    /**
+     * APW-06 §2.2 — route an App Work's deploy to the App request path.
+     *
+     * `DeployResult` carries `{ dispatched, deploymentId }`, which is what every
+     * caller of {@link deploy} reads, so an ACCEPTED or QUEUED request maps
+     * straight onto it. A refusal cannot: the callers treat a resolved
+     * `DeployResult` as "we queued something", and `deployBatch` records it as a
+     * success. So a refusal throws, carrying the request service's own status
+     * and code — `422 APP_DEPLOY_PRECONDITIONS`, `409 APP_DEPLOY_IN_PROGRESS`,
+     * `422 worker_not_isolated` — which is the same body
+     * `work-app-deploy.controller.ts` answers with, so the two paths cannot
+     * describe one refusal two ways.
+     *
+     * `trigger` is `manual` rather than the caller's `triggerSource`: the FR-23
+     * sources are a different vocabulary (`manual` · `build` · `domain-change` ·
+     * `rollback` · `target-saved`) and mapping `scheduled` onto one of them would
+     * invent a source the spec does not have. A scheduled App deploy is a manual
+     * one as far as the Deployment row is concerned, until APW-06 gives
+     * schedules a source of their own.
+     */
+    private async deployAppWork(
+        workId: string,
+        userId: string,
+        options: DeployOptions,
+    ): Promise<DeployResult> {
+        if (!this.appDeployRequest) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'app_deploy_unavailable',
+                message:
+                    'This process cannot request an App Work Deployment: the App deploy request ' +
+                    'service is not available. Nothing was queued.',
+            });
+        }
+
+        const result: AppDeployRequestResult = await this.appDeployRequest.request({
+            workId,
+            userId,
+            trigger: 'manual',
+            ...(options.commitSha ? { headCommitSha: options.commitSha } : {}),
+            ...(options.branch ? { branch: options.branch } : {}),
+        });
+
+        if (result.status === 'refused' || !result.deploymentId) {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: result.code ?? 'app_deploy_refused',
+                    message:
+                        result.unmet[0]?.message ??
+                        'The App Work Deployment was refused; nothing was queued.',
+                    unmet: result.unmet,
+                },
+                result.httpStatus || HttpStatus.UNPROCESSABLE_ENTITY,
+            );
+        }
+
+        // `queued` is a success: the row exists in the latest-wins queue of one
+        // and will run when the Deployment holding the lock releases it. It is
+        // reported as NOT dispatched, which is exactly what `dispatched` means.
+        return { dispatched: result.dispatched, deploymentId: result.deploymentId };
+    }
+
     async deploy(
         workId: string,
         userId: string,
@@ -199,6 +276,22 @@ export class DeployService {
             throw new BadRequestException(
                 `Work "${candidate.slug}" is a Repository Work — it has no website repository and nothing to deploy`,
             );
+        }
+
+        // APW-06 §2.2 — an App Work deploys to a Kubernetes cluster through its
+        // own runtime state, not to a website provider. Checked here, beside the
+        // Repository-Work refusal and BEFORE the facade resolves a provider, for
+        // the same reason that one is: `resolvePluginAndTokenWithWork` would
+        // throw `NoDeployProviderError` first and the member would be told their
+        // configuration is wrong when the real answer is that this Work deploys
+        // somewhere else entirely.
+        //
+        // The member-facing route is `POST /api/works/:id/deploy`
+        // (`work-app-deploy.controller.ts`). This branch is what catches the
+        // OTHER callers — `deployBatch`, the schedule dispatcher, and the legacy
+        // `POST /api/deploy/works/:id` — so one deploy lock serves all of them.
+        if (candidate && isAppWorkKind(candidate.kind)) {
+            return this.deployAppWork(candidate.id, userId, options);
         }
 
         const { plugin, token, work, settings, settingSources } =
