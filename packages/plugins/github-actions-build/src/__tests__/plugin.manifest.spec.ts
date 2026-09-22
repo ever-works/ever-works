@@ -214,31 +214,21 @@ describe('github-actions-build — the build capability declaration (T7, R-13)',
 		expect(plugin.supportedStrategies).not.toContain('auto');
 	});
 
-	it('still throws not implemented from the ONE member that is not written, naming the owner', async () => {
+	it('no longer throws not implemented from ANY member — the list is empty', async () => {
 		// Rule: a capability a plugin claims, it implements — and where it cannot
 		// yet, it fails loudly instead of answering.
 		//
-		// This case listed all five members until 2026-09-21, when APW-05 T12
-		// implemented four of them (`startBuild`, `getBuild`, `cancelBuild`,
-		// `getLogsUrl` — see `runs.spec.ts`). `prepareRepository` is still unwritten
-		// because T11's runner selector and T41's checks job are, so it is the only
-		// one left that must fail loudly. Shrinking this list is the job; the four
-		// that left it are asserted NOT to throw below, so a regression that put one
-		// back cannot pass silently.
-		await expect(plugin.prepareRepository({} as never, { token: 'x' }, {} as never)).rejects.toThrow(
-			/is not implemented yet/
-		);
-
-		expect(notImplemented('prepareRepository', 'APW-05 T11').message).toBe(
-			'github-actions-build: prepareRepository is not implemented yet — APW-05 T11 owns it.'
-		);
-	});
-
-	it('no longer throws not implemented from the four T12 filled', async () => {
-		// Called with empty inputs, so each one fails on the SHAPE of what it was
-		// given rather than on being unwritten. What this pins is the distinction:
-		// whatever these four do now, `is not implemented yet` is not it.
+		// The history of this case IS the epic's: it listed all five members until
+		// 2026-09-21, when T12 implemented four (`startBuild`, `getBuild`,
+		// `cancelBuild`, `getLogsUrl`); `prepareRepository` stayed, waiting on T11's
+		// runner selector; T11 landed on 2026-09-22 and T41's checks job turned out
+		// to be already written, so §4.6 could be composed and the list is now empty.
+		//
+		// Each member is called with empty inputs, so it fails on the SHAPE of what
+		// it was given. What this pins is the distinction: whatever these five do
+		// now, `is not implemented yet` is not it.
 		const cases: Array<() => Promise<unknown>> = [
+			() => plugin.prepareRepository({} as never, { token: 'x' }, {} as never),
 			() => plugin.startBuild({} as never, { token: 'x' }),
 			() => plugin.getBuild({} as never, { token: 'x' }, (text) => text),
 			() => plugin.cancelBuild({} as never, { token: 'x' }),
@@ -247,6 +237,14 @@ describe('github-actions-build — the build capability declaration (T7, R-13)',
 		for (const call of cases) {
 			await expect(call()).rejects.not.toThrow(/is not implemented yet/);
 		}
+
+		// The helper stays exported and its message format stays pinned. It is the
+		// shape the NEXT unwritten member must use, and deleting a working refusal
+		// helper because nothing currently refuses is how the next one ends up
+		// throwing a bare `Error('todo')`.
+		expect(notImplemented('someFutureMember', 'APW-05 T99').message).toBe(
+			'github-actions-build: someFutureMember is not implemented yet — APW-05 T99 owns it.'
+		);
 	});
 
 	it('declares `checkImageAccess` now that it does something, and still not `listRecentRuns`', () => {

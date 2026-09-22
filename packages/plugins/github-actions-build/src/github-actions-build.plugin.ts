@@ -1,4 +1,5 @@
 import type {
+	AppBuildBlock,
 	BuildAuth,
 	BuildRef,
 	BuildSnapshot,
@@ -13,7 +14,7 @@ import type {
 	RepositoryWriter,
 	StartBuildInput
 } from '@ever-works/plugin';
-import { APP_BUILD_WORKFLOW_PATH, type AppBuildKind } from '@ever-works/contracts';
+import { APP_BUILD_WORKFLOW_PATH, computeBuildInputsHash, type AppBuildKind } from '@ever-works/contracts';
 import { Octokit } from 'octokit';
 
 import { octokitActionsRunsPort, type ActionsRepositoryRef, type ActionsRunsPort } from './runs/actions-runs.port.js';
@@ -21,6 +22,10 @@ import { correlateDispatchedRun } from './runs/run-correlator.js';
 import { observeRun } from './runs/run-observer.js';
 import { readResultArtifact } from './runs/result-artifact.js';
 import { checkImageAccess as checkGhcrAccess, type GhcrAccessResult, type GhcrFetch } from './registry/ghcr-access.js';
+import { selectRunner } from './runner/runner-selector.js';
+import { generateWorkflow } from './workflow/generator.js';
+import { writeWorkflow } from './repo/workflow-writer.js';
+import { createBuildValueSecretSync, type RepositorySecretPort } from './repo/secret-sync.js';
 
 import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } from './settings.schema.js';
 
@@ -42,28 +47,33 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  *     when `onLoad` and `onUnload` sit on its prototype, so an arrow-function
  *     property would make this plugin undiscoverable.
  *
- * ## Which `IBuildPlugin` members work, and which still throw (Constitution VI,
- * ## Rule: a capability a plugin claims, it implements — no member pretends)
+ * ## Every `IBuildPlugin` member is implemented (Constitution VI, Rule: a
+ * ## capability a plugin claims, it implements — no member pretends)
  *
- * **Four of the five are implemented (T12, 2026-09-21.)** The fifth still throws
- * {@link notImplemented} naming the task that fills it, and it throws rather than
- * returning a plausible answer on purpose: there is no stub that would "succeed"
- * at preparing a repository before the code that does it exists.
+ * **All five, as of 2026-09-22.** T12 did four on 2026-09-21; T11's runner
+ * selector landed the next day, T41's checks job turned out to be already
+ * written, and §4.6 could then be composed — so `prepareRepository` is the last
+ * one and the `notImplemented` list is empty.
  *
- * | Member                | State                                           | Detail                                                                                                    |
- * | --------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
- * | `prepareRepository`   | **throws** — T11 and T41 own what is missing    | T8 generator, T9 writer and T10 secret sync landed; the `runs-on` label/class (T11) and the `checks` job (T41) have not. T16 binds the `RepositoryWriter` and T19 calls it |
- * | `startBuild`          | **implemented (T12)**                           | dispatches the generated file on the TRACKED branch with `ew_build_id` / `ew_sha` / `ew_mode` and the two optional inputs, then correlates once |
- * | `getBuild`            | **implemented (T12)**                           | run + jobs → `BuildSnapshot` via `runs/run-observer.ts`, plus the result artifact for a finished run. T43 fills `verification`; T13's classifier fills `failure` |
- * | `cancelBuild`         | **implemented (T12)**                           | resolves the same run `getBuild` would, then the cancel endpoint                                          |
- * | `getLogsUrl`          | **implemented (T12)**                           | the run's own page                                                                                        |
+ * | Member                | Detail                                                                                                    |
+ * | --------------------- | ----------------------------------------------------------------------------------------------------------- |
+ * | `prepareRepository`   | §4.6: select the runner (T11), generate the file (T8) with the checks job (T41), deliver it (T9), then sync the build values (T10) — in that order, so nothing reaches a member's repository until it is known the Build could run |
+ * | `startBuild`          | dispatches the generated file on the TRACKED branch with `ew_build_id` / `ew_sha` / `ew_mode` and the two optional inputs, then correlates once |
+ * | `getBuild`            | run + jobs → `BuildSnapshot` via `runs/run-observer.ts`, plus the result artifact for a finished run. T43 fills `verification` |
+ * | `cancelBuild`         | resolves the same run `getBuild` would, then the cancel endpoint                                          |
+ * | `getLogsUrl`          | the run's own page                                                                                        |
  *
- * What T12 deliberately did NOT do, so nobody reads the table above as more than
- * it says: the **404/422 retry after a bootstrap commit** (a just-written
- * workflow file is briefly undispatchable — `APW05-G02`) is not implemented, and
- * `getBuild` attaches no `failure` block, because the log tail and the classifier
- * are T13's. A digest read from the artifact is reported `confirmed: false`
- * always; confirming it against the registry is `checkImageAccess` (T14).
+ * What is deliberately still NOT done, so nobody reads the table above as more
+ * than it says:
+ *
+ *   - the **404/422 retry after a bootstrap commit** (`APW05-G02`) — a
+ *     just-written workflow file is briefly undispatchable;
+ *   - `getBuild` attaches no `failure` block. `runs/failure-classifier.ts` (T13)
+ *     exists and is tested, but nothing fetches the failing job's LOG yet, and a
+ *     classifier with no log to read would report `unknown` for everything;
+ *   - a digest read from the artifact is reported `confirmed: false` **always**.
+ *     Confirming it is `checkImageAccess` (T14, below) and the comparison belongs
+ *     to the caller.
  *
  * `checkImageAccess?` (T14) IS declared now, because it does something: it reads
  * the manifest anonymously, then with the pull token, and checks that token's
@@ -165,12 +175,172 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 	// Every member is declared and none pretends: see the class docstring for the
 	// task each one waits on.
 
+	/**
+	 * APW-05 §4.6 — put the workflow (and the build values) where a Build can use them.
+	 *
+	 * Four steps, in this order, and the order is the point: nothing is written to a
+	 * member's repository until it is known the Build could run at all.
+	 *
+	 *  1. **Select the runner** (T11). A declared memory the chosen runner cannot
+	 *     give is `runnerTooSmall`, and it BLOCKS here — before a commit, before a
+	 *     secret, before anything reaches GitHub. The alternative is writing a
+	 *     workflow that is guaranteed to be OOM-killed minutes into its first run.
+	 *  2. **Generate the file** (T8), with the checks job (T41) when the spec
+	 *     declares checks and the verify job when the App Work can verify.
+	 *  3. **Deliver it** (T9): unchanged, committed, or a pull request for a
+	 *     repository that is not ours to write into (R-4). A hand-edited file is
+	 *     `editedByHand` and is never overwritten.
+	 *  4. **Sync the build values** (T10), and only then — a secret written for a
+	 *     workflow that was never delivered is a secret nobody will clean up.
+	 *
+	 * ## The two failure shapes, kept apart
+	 *
+	 * A `blocked` result is a Build that will not start and a member who is told
+	 * why. A THROW is this plugin failing at its own job. `writeWorkflow`'s own
+	 * `'blocked'` state is mapped onto `PrepareRepositoryResult.blocked` rather than
+	 * passed through, because that state is the writer's and is not one of the five
+	 * the contract's `workflow.state` allows — the writer's docstring says so, and
+	 * storing it would put a value in the database that no reader understands.
+	 *
+	 * ## `contentSha256` is stored only after a matching read-back
+	 *
+	 * `storedWorkflowSha256` is `null` until the writer has PROVEN the tracked
+	 * branch holds the generated bytes (FR-8). Reporting the hash of what we sent,
+	 * rather than of what is there, is how a failed write becomes an unnoticed
+	 * hand-edit detection failure on the next preparation.
+	 */
 	async prepareRepository(
-		_input: PrepareRepositoryInput,
-		_auth: BuildAuth,
-		_writer: RepositoryWriter
+		input: PrepareRepositoryInput,
+		auth: BuildAuth,
+		writer: RepositoryWriter
 	): Promise<PrepareRepositoryResult> {
-		throw notImplemented('prepareRepository', 'APW-05 T11 (runner selector) and T41 (checks job)');
+		const settings = (input.settings ?? {}) as GitHubActionsBuildSettings;
+
+		// 1 · the runner, before anything is written anywhere.
+		const selection = selectRunner({
+			visibility: input.repository.visibility,
+			resources: resourcesOf(input.build ?? null),
+			settings
+		});
+		if (!selection.ok) {
+			return {
+				workflow: { state: 'unchanged', contentSha256: '' },
+				secretsWritten: [],
+				secretsRemoved: [],
+				buildInputsHash: computeBuildInputsHash(input.values ?? []),
+				blocked: {
+					reason: selection.blocked.reason,
+					detail: { needed: selection.blocked.needed, max: selection.blocked.max }
+				}
+			};
+		}
+
+		// 2 · the file.
+		const content = generateWorkflow({
+			trackedBranch: input.repository.trackedBranch,
+			repository: {
+				owner: input.repository.owner,
+				repo: input.repository.repo,
+				visibility: input.repository.visibility
+			},
+			appSpecHash: input.appSpecHash,
+			build: input.build ?? null,
+			values: input.values ?? [],
+			runner: { label: selection.runner.label, class: selection.runner.runnerClass },
+			settings: {
+				reclaimDisk: settings.reclaimDisk,
+				attestations: settings.attestations,
+				allowBuildValuesOnPullRequests: settings.allowBuildValuesOnPullRequests,
+				verificationPromptedValuesRequireApproval: settings.verificationPromptedValuesRequireApproval
+			},
+			// A Build that has no `build` block cannot be verified in the runner; the
+			// verify job would have nothing to run.
+			verifyEnabled: Boolean(input.build),
+			checks: input.checks ?? []
+		});
+
+		// 3 · the delivery.
+		const written = await writeWorkflow(
+			{
+				repository: {
+					owner: input.repository.owner,
+					repo: input.repository.repo,
+					trackedBranch: input.repository.trackedBranch,
+					createdByAppWork: input.repository.createdByAppWork
+				},
+				content,
+				lastWrittenWorkflowSha256: input.lastWrittenWorkflowSha256
+			},
+			writer
+		);
+
+		if (written.state === 'blocked') {
+			return {
+				workflow: { state: 'unchanged', contentSha256: written.storedWorkflowSha256 ?? '' },
+				secretsWritten: [],
+				secretsRemoved: [],
+				buildInputsHash: computeBuildInputsHash(input.values ?? []),
+				blocked: {
+					reason: written.blocked?.reason ?? 'workflowWriteFailed',
+					detail: { cause: written.blocked?.detail.cause ?? 'unknown' }
+				}
+			};
+		}
+
+		// 4 · the build values, only now that the workflow is really there.
+		const sync = createBuildValueSecretSync({ port: this.secretPort(auth, input.repository) });
+		const synced = await sync.syncBuildValues({
+			values: input.values ?? [],
+			previouslyWrittenSecretNames: input.previouslyWrittenSecretNames ?? []
+		});
+
+		return {
+			workflow: {
+				state: written.state,
+				...(written.commitSha ? { commitSha: written.commitSha } : {}),
+				...(written.pullRequestUrl ? { pullRequestUrl: written.pullRequestUrl } : {}),
+				// Only a matching read-back sets this — see the docstring.
+				contentSha256: written.storedWorkflowSha256 ?? ''
+			},
+			secretsWritten: synced.secretsWritten ?? [],
+			secretsRemoved: synced.secretsRemoved ?? [],
+			buildInputsHash: synced.buildInputsHash ?? computeBuildInputsHash(input.values ?? []),
+			...(synced.blocked ? { blocked: synced.blocked } : {})
+		};
+	}
+
+	/**
+	 * The repository-secret operations T10's sync needs, over Octokit.
+	 *
+	 * A seam for the same reason {@link actionsPort} is one: the loader constructs
+	 * this class with no arguments, so a spec replaces it on the instance.
+	 */
+	protected secretPort(
+		auth: BuildAuth,
+		repository: { readonly owner: string; readonly repo: string }
+	): RepositorySecretPort {
+		const octokit = new Octokit({ auth: auth.token });
+		const base = { owner: repository.owner, repo: repository.repo };
+		return {
+			getRepoPublicKey: async () => {
+				const { data } = await octokit.request('GET /repos/{owner}/{repo}/actions/secrets/public-key', base);
+				return data as { key_id: string; key: string };
+			},
+			putRepoSecret: async ({ name, encryptedValue, keyId }) => {
+				await octokit.request('PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}', {
+					...base,
+					secret_name: name,
+					encrypted_value: encryptedValue,
+					key_id: keyId
+				});
+			},
+			deleteRepoSecret: async ({ name }) => {
+				await octokit.request('DELETE /repos/{owner}/{repo}/actions/secrets/{secret_name}', {
+					...base,
+					secret_name: name
+				});
+			}
+		};
 	}
 
 	/**
@@ -382,6 +552,30 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 		const run = await port.getWorkflowRun({ repository, runId });
 		return run?.html_url ?? null;
 	}
+}
+
+/**
+ * `build.resources`, as the runner selector reads it.
+ *
+ * The contract's own names and no others: `AppBuildBlock.resources` is
+ * `{ cpu, memoryGiB?, timeoutMinutes }` (`build.interface.ts:141`). An earlier
+ * draft also accepted `memory` and `vcpu` as aliases; they are removed, because
+ * a fallback for a spelling the contract does not have tells the next reader
+ * that both exist — and quietly accepts a typo that should have failed
+ * validation long before it reached a build plugin.
+ *
+ * `memoryGiB` is optional on the contract, and absent means "the runner's
+ * maximum" — it never blocks (APW05-G14), which is what {@link selectRunner}
+ * already does with `undefined`. `build` itself is nullable for the bootstrap
+ * file of plan §4.6 step 0.
+ */
+function resourcesOf(build: AppBuildBlock | null | undefined): { memoryGiB?: number; vcpu?: number } | undefined {
+	const resources = build?.resources;
+	if (!resources) return undefined;
+	return {
+		...(typeof resources.memoryGiB === 'number' ? { memoryGiB: resources.memoryGiB } : {}),
+		...(typeof resources.cpu === 'number' ? { vcpu: resources.cpu } : {})
+	};
 }
 
 /**
