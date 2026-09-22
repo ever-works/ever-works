@@ -150,6 +150,10 @@ const BOUND: readonly string[] = [
     // nowhere to write the row a Deployment IS: the draft's `buildId`,
     // `appTarget`, `appTrigger` and `appRender` were not columns, so TypeORM
     // would have dropped all four silently.
+    // APW-06 §5.1 — `AppDeployBuildSourceAdapter` over APW-05's Build rows,
+    // bound 2026-09-22. Unbound, the preconditions answered `no_green_build`
+    // for every App Work whether or not it had one.
+    'APP_DEPLOY_BUILD_SOURCE',
     'APP_DEPLOY_DEPLOYMENT_STORE',
     'APP_DEPLOY_DISPATCHER',
     'APP_DEPLOY_DISPATCHER_AVAILABILITY',
@@ -192,7 +196,6 @@ const UNBOUND: readonly string[] = [
     'APP_CUSTOM_DOMAIN_STORE',
     'APP_DEPENDENCY_CLUSTER_ACCESS',
     'APP_DEPENDENCY_SPEC_SOURCE',
-    'APP_DEPLOY_BUILD_SOURCE',
     'APP_DEPLOY_HOST_SOURCE',
     'APP_DEPLOY_SPEC_SOURCE',
     'APP_DEPLOY_TARGET_RESOLVER',
@@ -276,12 +279,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect(wronglyBound).toEqual([]);
 
         // The register's headline. It is an assertion and not a log line so
-        // that it cannot drift: **53 of the 68 tokens in these two lists are
-        // dormant**, and the 15 that are not are named in `BOUND`. It was 62 of
-        // 68 on 2026-09-21; APW-07's six and APW-06's three moved across on
+        // that it cannot drift: **52 of the 68 tokens in these two lists are
+        // dormant**, and the 16 that are not are named in `BOUND`. It was 62 of
+        // 68 on 2026-09-21; APW-07's six and APW-06's four moved across on
         // 2026-09-22.
-        expect(UNBOUND).toHaveLength(53);
-        expect(BOUND).toHaveLength(15);
+        expect(UNBOUND).toHaveLength(52);
+        expect(BOUND).toHaveLength(16);
     });
 
     it('keeps both lists sorted and disjoint, so the register stays readable', () => {
