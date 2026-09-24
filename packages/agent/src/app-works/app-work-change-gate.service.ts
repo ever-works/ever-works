@@ -8,8 +8,14 @@ import type {
     AppWorkChangeGate,
     AppWorkChangeGateInput,
     AppWorkChangeGateVerdict,
+    AppWorkChangePathsInput,
 } from '../tasks-domain/app-work-change-gate.port';
-import { APP_SPEC_PATH, AppChangeGuard, MAX_FILES } from './app-change-guard';
+import {
+    APP_SPEC_PATH,
+    AppChangeGuard,
+    AppChangeRefusedError,
+    MAX_FILES,
+} from './app-change-guard';
 import { AppWorkRulesService } from './app-work-rules.service';
 
 /**
@@ -118,10 +124,45 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
     }
 
     /**
+     * The pre-write half: may these paths be written? Rules 2 and 3 only —
+     * there is no diff to read yet. Same base-tip rules commit, same "nothing
+     * escapes" contract as {@link evaluate}.
+     */
+    async checkPaths(input: AppWorkChangePathsInput): Promise<AppWorkChangeGateVerdict> {
+        if (input.paths.length === 0) return { allowed: true, note: null };
+        try {
+            const baseSha = await this.baseTip(input);
+            if (!baseSha) {
+                return refusal(
+                    `The base commit on \`${input.baseRef}\` could not be read, so this Work's ` +
+                        'protected paths are unknown.',
+                );
+            }
+            const rules = await this.rules.resolve(input.work, baseSha);
+            this.guard.assertPathsAllowed(rules, input.paths);
+            return { allowed: true, note: null };
+        } catch (error) {
+            if (error instanceof AppChangeRefusedError) {
+                return { allowed: false, message: error.message, paths: error.paths };
+            }
+            const reason = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `App change gate (paths) for Work ${input.work.id} could not decide: ${reason}`,
+            );
+            return refusal(
+                "This Work's rules could not be read, so the change was not checked against its " +
+                    'protected paths.',
+            );
+        }
+    }
+
+    /**
      * The tip of `baseRef`, read by the platform. `null` when the provider
      * answers nothing — the caller turns that into the refusal it is.
      */
-    private async baseTip(input: AppWorkChangeGateInput): Promise<string | null> {
+    private async baseTip(
+        input: Pick<AppWorkChangeGateInput, 'owner' | 'repo' | 'baseRef' | 'gitOptions'>,
+    ): Promise<string | null> {
         const commit = await this.git.getLatestCommit(
             input.owner,
             input.repo,

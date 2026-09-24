@@ -59,7 +59,7 @@ import {
 // names the roles it chooses between. Same two imports, and the same rule,
 // as `repos[role]` in `packages/agent/src/works/repository-work-guard.ts`
 // (`hasRepositoryRole`) — the ONE place that knowledge lives.
-import { getWorkCapabilities } from '@ever-works/contracts';
+import { getWorkCapabilities, isAppWorkKind } from '@ever-works/contracts';
 import type { RepositoryRole } from '@ever-works/contracts/api';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -81,6 +81,10 @@ import {
     TaskAgentReviewService,
     RUN_STEERING_PORT,
     TERMINAL_SESSION_STARTER,
+    // APW-08 T17 — the App Work change gate the agent git tools ask.
+    APP_WORK_CHANGE_GATE,
+    type AppWorkChangeGate,
+    type AppWorkChangeGateVerdict,
 } from '@ever-works/agent/tasks-domain';
 // Domain chat-tool sources (AGENT_DOMAIN_TOOL_SOURCES binding below).
 // Each module contributes the ONE service/repository its descriptor
@@ -676,12 +680,18 @@ function normalizeBranchRef(ref: string): string {
             // the protected-branch refusal is the Work's EFFECTIVE policy, so it
             // is read through the one service that already resolves that matrix
             // (four scopes, field-by-field) instead of being re-implemented here.
+            //
+            // APW-08 T17 — the App Work change gate is APPENDED too, and
+            // `optional` so every positional construction keeps working. It is
+            // provided and exported by `TasksDomainModule`, which this module
+            // imports; `tasks-domain.di-contract.spec.ts` pins that export.
             inject: [
                 GitFacadeService,
                 AgentRepository,
                 PullRequestGateService,
                 WorkRepository,
                 MergePolicyService,
+                { token: APP_WORK_CHANGE_GATE, optional: true },
             ],
             useFactory: (
                 git: GitFacadeService,
@@ -689,6 +699,7 @@ function normalizeBranchRef(ref: string): string {
                 prGate: PullRequestGateService,
                 works: WorkRepository,
                 mergePolicy: MergePolicyService,
+                appChangeGate?: AppWorkChangeGate,
             ): AgentGitFacade => {
                 /**
                  * APW-08 P0 — the repository an Agent git tool actually acts on.
@@ -885,6 +896,66 @@ function normalizeBranchRef(ref: string): string {
                         { providerId, userId, workId } as any,
                     );
 
+                /**
+                 * APW-08 T17 — ask the App Work change gate, and turn a refusal
+                 * into this adapter's own error shape (`tool: reason. consequence`).
+                 *
+                 * The tools are how an agent reaches a pull request WITHOUT the
+                 * finalize path, so without this they were a way around the guard.
+                 *
+                 * Fails CLOSED when no gate is bound, unlike the finalize path.
+                 * There, "not bound" is the answer for eighteen partial
+                 * constructions of `TaskWorkspaceService`; here there is exactly
+                 * one real graph and it binds the gate, so absence can only mean
+                 * misconfiguration — and the inputs to these tools are chosen by
+                 * the model.
+                 *
+                 * The gate never rejects by contract; the `catch` is the net
+                 * under that contract, and it refuses too.
+                 */
+                const assertAppWorkChange = async (
+                    tool: 'commitToRepo' | 'openPullRequest',
+                    ask: (gate: AppWorkChangeGate) => Promise<AppWorkChangeGateVerdict>,
+                    consequence: string,
+                ): Promise<void> => {
+                    if (!appChangeGate) {
+                        throw new Error(
+                            `${tool}: this is an App Work, and its changes must pass the Work's ` +
+                                `change rules, but the change gate is not available in this ` +
+                                `process. ${consequence}`,
+                        );
+                    }
+                    let verdict: AppWorkChangeGateVerdict;
+                    try {
+                        verdict = await ask(appChangeGate);
+                    } catch {
+                        verdict = {
+                            allowed: false,
+                            message:
+                                "This Work's rules could not be read, so the change was not " +
+                                'checked against its protected paths.',
+                            paths: [],
+                        };
+                    }
+                    // `=== true`: see the same note in `task-workspace.service.ts`.
+                    if (verdict.allowed === true) return;
+                    const named = verdict.paths.length
+                        ? ` Paths: ${verdict.paths.join(', ')}.`
+                        : '';
+                    throw new Error(`${tool}: ${verdict.message}${named} ${consequence}`);
+                };
+
+                /** The branch an App Work's RULES are read from: the Work's own base. */
+                const appRulesBase = async (
+                    target: Awaited<ReturnType<typeof resolveWorkGitTarget>>,
+                    providerId: string,
+                    userId: string,
+                    workId: string,
+                    dir: string | null,
+                ): Promise<string> =>
+                    (await resolveBaseBranch(target, userId, workId)) ||
+                    (dir ? ((await readLocalDefaultBranch(providerId, dir)) ?? '') : '');
+
                 return {
                     async commitToRepo(input) {
                         const { userId, agentId, workId, message, files } = input;
@@ -943,6 +1014,70 @@ function normalizeBranchRef(ref: string): string {
                                     'commitToRepo',
                                     branch,
                                     await resolveProtectedBranches(workId),
+                                );
+                            }
+                            // APW-08 T17 (FR-8) — an App Work's change is judged
+                            // BEFORE anything is written, so a refusal leaves nothing
+                            // behind. Two sets of paths, because the commit takes both:
+                            // the ones this call writes, and whatever the SHARED per-Work
+                            // working copy already holds (earlier tool calls stage into
+                            // it, and `commit` takes the whole index). A working copy
+                            // that cannot be read is a commit whose contents are
+                            // unknown, so that refuses too.
+                            //
+                            // Refusing here rather than at the pull request matters for
+                            // one rule above all: a pushed branch whose workflow file
+                            // changed can RUN that workflow on push.
+                            if (isAppWorkKind(target.work.kind)) {
+                                const rulesBase = await appRulesBase(
+                                    target,
+                                    providerId,
+                                    userId,
+                                    workId,
+                                    dir,
+                                );
+                                const pending = await git
+                                    .getStatus(providerId, dir)
+                                    .catch(() => null);
+                                await assertAppWorkChange(
+                                    'commitToRepo',
+                                    async (gate) => {
+                                        if (pending === null) {
+                                            return {
+                                                allowed: false,
+                                                message:
+                                                    'The working copy could not be read, so what this ' +
+                                                    'commit would include is unknown.',
+                                                paths: [],
+                                            };
+                                        }
+                                        if (!rulesBase) {
+                                            return {
+                                                allowed: false,
+                                                message:
+                                                    "This Work's base branch could not be resolved, " +
+                                                    'so its rules are unknown.',
+                                                paths: [],
+                                            };
+                                        }
+                                        const paths = new Set<string>();
+                                        for (const f of files ?? []) {
+                                            if (typeof f.path === 'string') paths.add(f.path);
+                                        }
+                                        for (const change of pending) {
+                                            paths.add(change.path);
+                                            if (change.oldPath) paths.add(change.oldPath);
+                                        }
+                                        return gate.checkPaths({
+                                            work: target.work,
+                                            owner: target.owner,
+                                            repo: target.repo,
+                                            gitOptions: { userId, providerId, workId },
+                                            baseRef: rulesBase,
+                                            paths: [...paths],
+                                        });
+                                    },
+                                    'Nothing was written, committed or pushed.',
                                 );
                             }
                             // Stage any file edits provided inline. Empty `files`
@@ -1136,6 +1271,48 @@ function normalizeBranchRef(ref: string): string {
                             throw new Error(
                                 `openPullRequest: head branch '${head}' does not exist in ` +
                                     `${target.owner}/${target.repo}. Push the branch before opening a pull request.`,
+                            );
+                        }
+                        // APW-08 T17 — an App Work's pull request is judged by the
+                        // same gate as the finalize paths, on the provider's own
+                        // diff of the VERIFIED head.
+                        //
+                        // The rules come from the Work's OWN base branch, not from
+                        // `base` above: `base` may be chosen by the model, and a pull
+                        // request into a branch whose spec it had loosened would
+                        // otherwise be judged by the loosened rules. The diff is read
+                        // against that same Work base, so a stacked pull request is
+                        // judged on everything it would eventually bring into it —
+                        // stricter, never looser.
+                        if (isAppWorkKind(target.work.kind)) {
+                            const rulesBase = await appRulesBase(
+                                target,
+                                providerId,
+                                userId,
+                                workId,
+                                gateCwd,
+                            );
+                            await assertAppWorkChange(
+                                'openPullRequest',
+                                async (gate) =>
+                                    rulesBase
+                                        ? gate.evaluate({
+                                              work: target.work,
+                                              taskLabels: [],
+                                              owner: target.owner,
+                                              repo: target.repo,
+                                              gitOptions: { userId, providerId, workId },
+                                              baseRef: rulesBase,
+                                              branch: head,
+                                          })
+                                        : {
+                                              allowed: false,
+                                              message:
+                                                  "This Work's base branch could not be resolved, so " +
+                                                  'its rules are unknown.',
+                                              paths: [],
+                                          },
+                                'The pull request was not opened.',
                             );
                         }
                         const pr = await git.createPullRequest(

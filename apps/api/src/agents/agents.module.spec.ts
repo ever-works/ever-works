@@ -83,6 +83,8 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskAgentReviewService: class TaskAgentReviewService {},
     TaskStatus: {},
     RUN_STEERING_PORT: 'RUN_STEERING_PORT',
+    // APW-08 T17 — the App Work change gate the git tools ask.
+    APP_WORK_CHANGE_GATE: 'APP_WORK_CHANGE_GATE',
 }));
 jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestModule: class EventIngestModule {},
@@ -179,6 +181,7 @@ import {
     TaskReviewerRepository,
     TaskApproverRepository,
     TaskAgentReviewService,
+    APP_WORK_CHANGE_GATE,
 } from '@ever-works/agent/tasks-domain';
 import {
     AgentRepository,
@@ -504,6 +507,10 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
             // than from a second, hand-rolled list. Positional, like every
             // argument above it.
             MergePolicyService,
+            // APW-08 T17 — APPENDED, and optional so every positional
+            // construction keeps working; the tools refuse an App Work change
+            // when it is absent rather than skipping the check.
+            { token: APP_WORK_CHANGE_GATE, optional: true },
         ]);
     });
 
@@ -747,6 +754,9 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         // The tool stages exactly what it writes before committing — see the
         // staging case below for why that call exists.
         add: jest.fn().mockResolvedValue(undefined),
+        // APW-08 T17 — what the shared working copy already holds, which an
+        // App Work commit is judged on as well as the files it writes.
+        getStatus: jest.fn().mockResolvedValue([]),
         commit: jest.fn().mockResolvedValue('sha-1'),
         push: jest.fn().mockResolvedValue(undefined),
         createPullRequest: jest
@@ -759,6 +769,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             work?: unknown;
             git?: ReturnType<typeof makeGit>;
             protectedBranches?: string[];
+            /** APW-08 T17 — the sixth, optional argument. Absent by default. */
+            appChangeGate?: unknown;
         } = {},
     ): Harness => {
         const git = options.git ?? makeGit();
@@ -784,6 +796,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             prGate,
             works,
             mergePolicy,
+            options.appChangeGate,
         ) as GitTools;
         return { facade, git, works, mergePolicy, prGate };
     };
@@ -830,6 +843,196 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         // before any git operation must not reach for it either.
         expect(git.listBranches).not.toHaveBeenCalled();
     };
+
+    /**
+     * APW-08 T17 — the agent git tools are how an agent reaches a pull request
+     * WITHOUT the finalize path, so for an App Work they ask the same change
+     * gate. Every other kind is untouched: the first case of each tool below is
+     * the proof.
+     */
+    describe('App Works — the tools ask the change gate', () => {
+        const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+        const os = jest.requireActual<typeof import('node:os')>('node:os');
+        const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+        let dir: string;
+
+        beforeEach(() => {
+            dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'app-work-gate-'));
+        });
+        afterEach(() => {
+            fs.rmSync(dir, { recursive: true, force: true });
+        });
+
+        const appWork = () =>
+            makeWork({ kind: 'app', taskIsolationBaseBranch: 'production' } as WorkOverrides);
+        const gitIn = () => {
+            const git = makeGit();
+            git.cloneOrPull.mockResolvedValue(dir);
+            return git;
+        };
+        const allow = () => ({
+            checkPaths: jest.fn().mockResolvedValue({ allowed: true, note: null }),
+            evaluate: jest.fn().mockResolvedValue({ allowed: true, note: null }),
+        });
+        const refuse = (paths: string[] = ['infra/main.tf']) => ({
+            checkPaths: jest.fn().mockResolvedValue({
+                allowed: false,
+                message: 'This Work protects `infra/main.tf`, so an agent may not write it.',
+                paths,
+            }),
+            evaluate: jest.fn().mockResolvedValue({
+                allowed: false,
+                message:
+                    'This change edits paths this Work protects, which an agent may not change.',
+                paths,
+            }),
+        });
+        const files = [{ path: 'infra/main.tf', body: 'resource "x" "y" {}\n' }];
+
+        describe('commitToRepo', () => {
+            it('does not ask the gate for a Work that is not kind `app`', async () => {
+                const gate = allow();
+                const { facade } = build({ git: gitIn(), appChangeGate: gate });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing', files }));
+
+                expect(gate.checkPaths).not.toHaveBeenCalled();
+            });
+
+            it('asks BEFORE writing, with the Work base and the written paths', async () => {
+                const gate = allow();
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing', files }));
+
+                expect(gate.checkPaths).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        baseRef: 'production',
+                        paths: ['infra/main.tf'],
+                        owner: 'acme',
+                        repo: 'acme-website',
+                    }),
+                );
+                expect(gate.checkPaths.mock.invocationCallOrder[0]).toBeLessThan(
+                    git.add.mock.invocationCallOrder[0],
+                );
+            });
+
+            it('includes what the SHARED working copy already holds', async () => {
+                // `commit` takes the whole index, and earlier tool calls stage into
+                // the same per-Work working copy.
+                const gate = allow();
+                const git = gitIn();
+                git.getStatus.mockResolvedValue([
+                    { path: '.github/workflows/ci.yml', status: 'modified' },
+                    { path: 'src/new.ts', status: 'renamed', oldPath: 'infra/old.ts' },
+                ]);
+                const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+                expect(gate.checkPaths.mock.calls[0][0].paths).toEqual(
+                    expect.arrayContaining([
+                        '.github/workflows/ci.yml',
+                        'src/new.ts',
+                        'infra/old.ts',
+                    ]),
+                );
+            });
+
+            it('writes, stages, commits and pushes NOTHING when refused', async () => {
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork(), appChangeGate: refuse() });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(
+                    /commitToRepo: .*infra\/main\.tf.*Nothing was written, committed or pushed/,
+                );
+
+                expect(fs.existsSync(nodePath.join(dir, 'infra/main.tf'))).toBe(false);
+                expect(git.switchBranch).not.toHaveBeenCalled();
+                expect(git.add).not.toHaveBeenCalled();
+                expect(git.commit).not.toHaveBeenCalled();
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it('refuses when the working copy cannot be read — its contents are unknown', async () => {
+                const gate = allow();
+                const git = gitIn();
+                git.getStatus.mockRejectedValue(new Error('corrupt index'));
+                const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/working copy could not be read/);
+                expect(git.commit).not.toHaveBeenCalled();
+            });
+
+            it('fails CLOSED when no gate is bound — never skips the check', async () => {
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork() });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/change gate is not available/);
+                expect(git.commit).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('openPullRequest', () => {
+            it('does not ask the gate for a Work that is not kind `app`', async () => {
+                const gate = allow();
+                const { facade } = build({ appChangeGate: gate });
+
+                await facade.openPullRequest(prInput());
+
+                expect(gate.evaluate).not.toHaveBeenCalled();
+            });
+
+            it('opens the pull request when the gate allows, judging the VERIFIED head', async () => {
+                const gate = allow();
+                const { facade, git } = build({ work: appWork(), appChangeGate: gate });
+
+                await facade.openPullRequest(prInput());
+
+                expect(gate.evaluate).toHaveBeenCalledWith(
+                    expect.objectContaining({ baseRef: 'production', branch: 'feature/pricing' }),
+                );
+                expect(git.createPullRequest).toHaveBeenCalledTimes(1);
+            });
+
+            it('reads the rules from the WORK base, not a base the model chose', async () => {
+                // A pull request into a branch whose spec the agent had loosened
+                // would otherwise be judged by the loosened rules.
+                const gate = allow();
+                const { facade } = build({ work: appWork(), appChangeGate: gate });
+
+                await facade.openPullRequest(prInput({ base: 'loosened-rules' }));
+
+                expect(gate.evaluate.mock.calls[0][0].baseRef).toBe('production');
+            });
+
+            it('opens nothing when refused, and says so', async () => {
+                const { facade, git } = build({ work: appWork(), appChangeGate: refuse() });
+
+                await expect(facade.openPullRequest(prInput())).rejects.toThrow(
+                    /openPullRequest: .*The pull request was not opened/,
+                );
+                expect(git.createPullRequest).not.toHaveBeenCalled();
+            });
+
+            it('fails CLOSED when no gate is bound', async () => {
+                const { facade, git } = build({ work: appWork() });
+
+                await expect(facade.openPullRequest(prInput())).rejects.toThrow(
+                    /change gate is not available/,
+                );
+                expect(git.createPullRequest).not.toHaveBeenCalled();
+            });
+        });
+    });
 
     describe('commitToRepo', () => {
         /**

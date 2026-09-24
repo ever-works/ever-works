@@ -301,3 +301,68 @@ describe('the branch’s .works/works.yml, three ways', () => {
         });
     });
 });
+
+describe('checkPaths — the pre-write question (FR-8)', () => {
+    const pathsInput = (paths: string[]) => ({
+        work: WORK,
+        owner: 'acme',
+        repo: 'their-app',
+        gitOptions: { userId: 'u-1', providerId: 'github', workId: 'w-1' },
+        baseRef: 'production',
+        paths,
+    });
+
+    it('allows paths that match nothing, reading the rules at the base tip', async () => {
+        const { gate, m } = harness();
+
+        await expect(gate.checkPaths(pathsInput(['src/app.ts']))).resolves.toEqual({
+            allowed: true,
+            note: null,
+        });
+        expect(m.resolve).toHaveBeenCalledWith(WORK, BASE_TIP);
+    });
+
+    it('refuses a protected path and names it', async () => {
+        const { gate, m } = harness();
+        m.resolve.mockResolvedValue(rules({ protectedPaths: ['infra/**'] }));
+
+        const verdict = await gate.checkPaths(pathsInput(['src/app.ts', 'infra/main.tf']));
+
+        expect(verdict).toMatchObject({ allowed: false, paths: ['infra/main.tf'] });
+    });
+
+    it('refuses a workflow file whatever the spec says — a pushed workflow can RUN', async () => {
+        const { gate } = harness();
+
+        const verdict = await gate.checkPaths(pathsInput(['.github/workflows/ci.yml']));
+
+        expect(verdict).toMatchObject({ allowed: false, paths: ['.github/workflows/ci.yml'] });
+    });
+
+    it('asks nothing of the provider for an empty list', async () => {
+        const { gate, m } = harness();
+
+        await expect(gate.checkPaths(pathsInput([]))).resolves.toMatchObject({ allowed: true });
+        expect(m.getLatestCommit).not.toHaveBeenCalled();
+    });
+
+    it('refuses, and never throws, when the rules cannot be read', async () => {
+        const { gate, m } = harness();
+        m.resolve.mockRejectedValue(new AppSpecUnreadableError('w-1', 'production', 'invalid'));
+
+        const verdict = await gate.checkPaths(pathsInput(['src/app.ts']));
+
+        expect(verdict.allowed).toBe(false);
+        expect(verdict.allowed === false && verdict.message).toContain('could not be read');
+    });
+
+    it('refuses when the base tip cannot be read', async () => {
+        const { gate, m } = harness();
+        m.getLatestCommit.mockResolvedValue(null as never);
+
+        await expect(gate.checkPaths(pathsInput(['src/app.ts']))).resolves.toMatchObject({
+            allowed: false,
+        });
+        expect(m.resolve).not.toHaveBeenCalled();
+    });
+});

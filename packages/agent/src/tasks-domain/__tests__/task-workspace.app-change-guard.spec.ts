@@ -84,7 +84,14 @@ function task(overrides: Record<string, unknown> = {}) {
  * construction sites do.
  */
 function service(m: Mocks, opts: { bound?: boolean; kind?: string } = {}) {
-    const gate: AppWorkChangeGate = { evaluate: m.evaluate };
+    const gate: AppWorkChangeGate = {
+        evaluate: m.evaluate,
+        // The finalize path never asks the pre-write question; a double that
+        // throws makes sure it never starts to.
+        checkPaths: jest.fn(async () => {
+            throw new Error('finalize must not call checkPaths');
+        }),
+    };
 
     return new TaskWorkspaceService(
         { findById: jest.fn(async () => work(opts.kind ?? 'app')) } as never, // works

@@ -57,7 +57,29 @@ export type AppWorkChangeGateVerdict =
     | { readonly allowed: true; readonly note: string | null }
     | { readonly allowed: false; readonly message: string; readonly paths: readonly string[] };
 
+/**
+ * The pre-write question (FR-8): may these paths be written at all?
+ *
+ * Asked by the `commitToRepo` agent tool BEFORE it writes, so a refusal leaves
+ * nothing behind. It answers only the rules a path list can answer —
+ * protected paths and `.github/workflows/**` — because there is no diff yet.
+ * The workflow rule matters most here: a pushed branch whose workflow file was
+ * changed can RUN that changed workflow on push, so refusing only at the pull
+ * request would be too late for it.
+ */
+export interface AppWorkChangePathsInput {
+    readonly work: Work;
+    readonly owner: string;
+    readonly repo: string;
+    readonly gitOptions: { userId: string; providerId: string; workId: string };
+    /** The Work's base branch; the rules commit is ITS tip, read by the gate. */
+    readonly baseRef: string;
+    readonly paths: readonly string[];
+}
+
 export interface AppWorkChangeGate {
     /** Never rejects. An internal failure is a refusal with a message saying so. */
     evaluate(input: AppWorkChangeGateInput): Promise<AppWorkChangeGateVerdict>;
+    /** Never rejects. The pre-write half — see {@link AppWorkChangePathsInput}. */
+    checkPaths(input: AppWorkChangePathsInput): Promise<AppWorkChangeGateVerdict>;
 }
