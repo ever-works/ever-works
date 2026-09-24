@@ -1112,18 +1112,36 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         });
 
         it('stages the NORMALISED path — the string judged is the string written and staged', async () => {
-            const { facade, git } = build();
+            // A REAL checkout directory. Every write is now checked against where
+            // its path resolves on disk (`assertRealWriteTarget`), which needs the
+            // checkout to exist — as it always does behind a real `cloneOrPull`.
+            // The fake `WORK_DIR` only worked because the old write loop's
+            // `mkdir -p` created it in the shared /tmp; on a clean runner this
+            // case failed while passing on any machine that had run it before.
+            const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+            const os = jest.requireActual<typeof import('node:os')>('node:os');
+            const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+            const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-normalise-'));
+            try {
+                const { facade, git } = build();
+                git.cloneOrPull.mockResolvedValue(dir);
 
-            await facade
-                .commitToRepo(
-                    commitInput({
-                        branch: 'feature/pricing',
-                        files: [{ path: './src//nested/../app.ts', body: 'export {};\n' }],
-                    }),
-                )
-                .catch(() => undefined);
+                await facade
+                    .commitToRepo(
+                        commitInput({
+                            branch: 'feature/pricing',
+                            files: [{ path: './src//nested/../app.ts', body: 'export {};\n' }],
+                        }),
+                    )
+                    .catch(() => undefined);
 
-            expect(git.add).toHaveBeenCalledWith(WORK_PROVIDER, expect.anything(), ['src/app.ts']);
+                expect(git.add).toHaveBeenCalledWith(WORK_PROVIDER, dir, ['src/app.ts']);
+                expect(fs.readFileSync(nodePath.join(dir, 'src', 'app.ts'), 'utf8')).toBe(
+                    'export {};\n',
+                );
+            } finally {
+                fs.rmSync(dir, { recursive: true, force: true });
+            }
         });
 
         it.each([
