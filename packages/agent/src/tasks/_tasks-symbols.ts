@@ -111,9 +111,13 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // `runtime-binding-stamper.service.ts` header for the per-dispatcher
     // wiring deferral.
     // EW-693 / T27 — the long-running plugin operation job: the method the active
-    // job runtime's dispatchers expose for it, and the task id it registers under
-    // (`plugin-operation-dispatch.ts`).
+    // job runtime's dispatchers expose for it, the task id it registers under,
+    // and the run's time budget — queue TTL, maxDuration and the router's
+    // default wait derived from both (`plugin-operation-dispatch.ts`).
+    'PLUGIN_OPERATION_DEFAULT_WAIT_MS',
     'PLUGIN_OPERATION_DISPATCH_METHOD',
+    'PLUGIN_OPERATION_MAX_DURATION_SECONDS',
+    'PLUGIN_OPERATION_QUEUE_TTL_SECONDS',
     'PLUGIN_OPERATION_TASK_ID',
     // AW-20 P1 — enqueues one roster provisioning run (a coordinator plus
     // lane-owning specialists, wired together). Sequential, retryable,

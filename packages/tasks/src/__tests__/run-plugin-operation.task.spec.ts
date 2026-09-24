@@ -51,6 +51,8 @@ vi.mock('@ever-works/agent/plugins', async () => {
         PluginRegistryService: class PluginRegistryService {},
         materializePlugin: actual.materializePlugin,
         resolvePluginOperation: actual.resolvePluginOperation,
+        describeMissingOperation: actual.describeMissingOperation,
+        pluginLoadFailure: actual.pluginLoadFailure,
     };
 });
 
@@ -72,6 +74,10 @@ vi.mock('../trigger/worker/trigger-logger', () => ({
 
 import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
 import { PluginInstallerService, PluginRegistryService } from '@ever-works/agent/plugins';
+import {
+    PLUGIN_OPERATION_MAX_DURATION_SECONDS,
+    PLUGIN_OPERATION_TASK_ID,
+} from '@ever-works/agent/tasks';
 import { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
 import { TriggerPluginHydratorService } from '../trigger/worker/services/trigger-plugin-hydrator.service';
 
@@ -82,6 +88,12 @@ const registered = recorded.find((entry) => entry.id === 'run-plugin-operation')
 const run = (payload: Record<string, unknown>) => registered.run(payload);
 
 const PLUGIN_ID = 'acme-generator';
+
+/**
+ * The manifest of a plugin that declares `generate` — only declared operations
+ * can be called by name (`everworks.plugin.operations`).
+ */
+const DECLARES_GENERATE = { id: PLUGIN_ID, operations: [{ name: 'generate' }] };
 
 interface Harness {
     installer: { ensurePluginAvailable: ReturnType<typeof vi.fn> } | 'absent';
@@ -110,7 +122,7 @@ function harness(
             get: vi.fn((id: string) =>
                 over.plugin === 'unregistered' || id !== PLUGIN_ID
                     ? undefined
-                    : (over.entry ?? { plugin: { generate } }),
+                    : (over.entry ?? { manifest: DECLARES_GENERATE, plugin: { generate } }),
             ),
         },
         close: vi.fn(async () => undefined),
@@ -149,6 +161,13 @@ describe('run-plugin-operation (EW-693 T27)', () => {
         expect(registered).toBeDefined();
         expect(runPluginOperationTask).toBe(registered);
         expect(registered.maxDuration).toBe(3600);
+    });
+
+    it('registers under the agent’s shared constants — the id the dispatcher triggers, and the budget the router waits on', () => {
+        // The agent package is NOT mocked here: these are the values the router
+        // and `TriggerService.dispatchPluginOperation` use.
+        expect(registered.id).toBe(PLUGIN_OPERATION_TASK_ID);
+        expect(registered.maxDuration).toBe(PLUGIN_OPERATION_MAX_DURATION_SECONDS);
     });
 
     describe('with both services bound', () => {
@@ -334,7 +353,7 @@ describe('run-plugin-operation (EW-693 T27)', () => {
             const h = harness({ hydrator: { initialize } });
             (h.registry as { get: ReturnType<typeof vi.fn> }).get.mockImplementation(() => {
                 order.push('lookup');
-                return { plugin: { generate: h.generate } };
+                return { manifest: DECLARES_GENERATE, plugin: { generate: h.generate } };
             });
 
             await expect(
@@ -398,7 +417,7 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                     };
                 },
             });
-            return { state: 'loaded', plugin: proxy };
+            return { state: 'loaded', manifest: DECLARES_GENERATE, plugin: proxy };
         }
 
         class RealPlugin {
@@ -441,6 +460,124 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 });
             },
         );
+
+        /**
+         * The allowlist: TypeScript `private`/`protected` are erased at runtime,
+         * so a method the class defines is NOT an operation unless the manifest
+         * declares it.
+         */
+        it('answers OPERATION_NOT_FOUND — and calls nothing — for a method the manifest does not declare', async () => {
+            class WithHelper extends RealPlugin {
+                helper = vi.fn(async () => 'helped');
+                async runPrompt() {
+                    return 'spawned';
+                }
+            }
+            const real = new WithHelper();
+            const runPrompt = vi.spyOn(WithHelper.prototype, 'runPrompt');
+
+            for (const op of ['helper', 'runPrompt']) {
+                harness({ entry: lazyEntry(real) });
+                await expect(run({ pluginId: PLUGIN_ID, operation: op })).resolves.toMatchObject({
+                    ok: false,
+                    error: {
+                        code: 'OPERATION_NOT_FOUND',
+                        message: expect.stringContaining(`does not declare operation "${op}"`),
+                    },
+                });
+            }
+            expect(real.helper).not.toHaveBeenCalled();
+            expect(runPrompt).not.toHaveBeenCalled();
+            runPrompt.mockRestore();
+        });
+
+        it('calls nothing for a plugin whose manifest declares no operations', async () => {
+            const generate = vi.fn();
+            harness({ entry: { plugin: { generate } } });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: { code: 'OPERATION_NOT_FOUND' },
+            });
+            expect(generate).not.toHaveBeenCalled();
+        });
+
+        it.each(['onLoad', 'constructor', '_internal', 'toString'])(
+            'refuses %s even when the manifest declares it — the name rules and the Object.prototype boundary still apply',
+            async (op) => {
+                const entry = lazyEntry(new RealPlugin());
+                harness({
+                    entry: {
+                        ...entry,
+                        manifest: {
+                            id: PLUGIN_ID,
+                            operations: [{ name: 'generate' }, { name: op }],
+                        },
+                    },
+                });
+
+                await expect(run({ pluginId: PLUGIN_ID, operation: op })).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'OPERATION_NOT_FOUND' },
+                });
+            },
+        );
+
+        it('answers OPERATION_NOT_FOUND, saying so, for a declared operation the class lacks', async () => {
+            const entry = lazyEntry(new RealPlugin());
+            harness({
+                entry: {
+                    ...entry,
+                    manifest: {
+                        id: PLUGIN_ID,
+                        operations: [{ name: 'generate' }, { name: 'publish' }],
+                    },
+                },
+            });
+
+            await expect(run({ pluginId: PLUGIN_ID, operation: 'publish' })).resolves.toMatchObject(
+                {
+                    ok: false,
+                    error: {
+                        code: 'OPERATION_NOT_FOUND',
+                        message: expect.stringContaining(
+                            'declares operation "publish" but does not implement it',
+                        ),
+                    },
+                },
+            );
+        });
+
+        /**
+         * A lazy plugin's `onLoad` runs inside its first materialisation; a throw
+         * there is recorded on the registry entry (`callOnLoad`) and
+         * `__materialize` still resolves. The state has to be read again.
+         */
+        it('answers WORKER_PLUGIN_LOAD_FAILED — and runs nothing — when onLoad fails while the plugin materialises', async () => {
+            const real = new RealPlugin();
+            const generate = vi.spyOn(real, 'generate');
+            const entry: Record<string, unknown> = lazyEntry(real);
+            const plugin = entry.plugin as { __materialize: ReturnType<typeof vi.fn> };
+            plugin.__materialize.mockImplementation(async () => {
+                entry.state = 'error';
+                entry.error = new Error('onLoad: required setting "apiKey" is missing');
+                return real;
+            });
+            harness({ entry });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: {
+                    code: 'WORKER_PLUGIN_LOAD_FAILED',
+                    message: expect.stringContaining('required setting "apiKey" is missing'),
+                },
+            });
+            expect(generate).not.toHaveBeenCalled();
+        });
 
         it('answers WORKER_PLUGIN_LOAD_FAILED when the plugin will not materialise', async () => {
             harness({ entry: lazyEntry(new RealPlugin(), new Error('import failed')) });

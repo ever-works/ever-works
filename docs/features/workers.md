@@ -77,7 +77,7 @@ Everything else is enqueued by something you — or an Agent — did. The API re
 | `kb-backfill-skeleton`          | An operator backfills the Knowledge Base skeleton for a list of Works.              | 2 hours              |
 | `agent-task-execute`            | A Task is assigned to an Agent.                                                     | 60 minutes           |
 | `idea-build-execute`            | An Idea is built into a Work, retried or rebuilt.                                   | 60 minutes           |
-| `run-plugin-operation`          | A [plugin](./plugins.md) operation is routed `long-running` (call or manifest).     | 60 minutes           |
+| `run-plugin-operation`          | A [plugin](./plugins.md) operation is declared or called `long-running`.            | 60 minutes           |
 | `terminal-session`              | You open an [Agent Terminal](./agent-terminals.md).                                 | 60 minutes           |
 | `template-customization`        | A [template](./website-templates.md) is customized for a Work.                      | 60 minutes           |
 | `workflow-run`                  | `POST /api/workflows/:id/run` creates the run row, then enqueues it.                | —                    |

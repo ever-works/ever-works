@@ -30,7 +30,8 @@ import { TriggerRemoteCacheModule } from './trigger-remote-cache.module';
  * NON-optional dependency of `PluginContextFactoryService` inside the plugins
  * module. Without it this context could not boot at all ("Nest can't resolve
  * dependencies of the PluginContextFactoryService … CACHE_MANAGER") — and the
- * task boots it with Nest's default `abortOnError`, which exits the process.
+ * task used to boot it with Nest's default `abortOnError`, which exits the
+ * process; it now passes `abortOnError: false`, so a boot failure fails the run.
  * The same pairing every other plugin-using worker module has
  * (`TriggerWorkflowRunModule`, `TriggerAppRuntimeModule`,
  * `TriggerRunPluginOperationModule`); `__tests__/trigger-terminal.module.spec.ts`

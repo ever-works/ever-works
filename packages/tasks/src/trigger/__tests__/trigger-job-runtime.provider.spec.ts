@@ -38,6 +38,7 @@ const { triggerServiceMock, dispatchersSentinel } = vi.hoisted(() => {
             isEnabled: vi.fn<() => boolean>(),
             cancel: vi.fn<(runId: string) => Promise<boolean>>(),
             getRunStatus: vi.fn<(runId: string) => Promise<string>>(),
+            getRunResult: vi.fn<(runId: string) => Promise<unknown>>(),
             registerSchedules:
                 vi.fn<(schedules: readonly { id: string; cron: string }[]) => Promise<void>>(),
             startWorkerHost: vi.fn<(opts: unknown) => Promise<{ stop: () => Promise<void> }>>(),
@@ -207,6 +208,97 @@ describe('TriggerJobRuntimeProvider', () => {
                 expect(triggerServiceMock.getRunStatus).toHaveBeenCalledWith('run_status_test');
             },
         );
+    });
+
+    /**
+     * EW-693 / T27 — `getRunResult` is how `PluginExecutionRouterService` waits
+     * for a long-running plugin operation; nothing exercised either the
+     * platform delegation or the BYO tenant view's own read.
+     */
+    describe('getRunResult delegation', () => {
+        it('forwards runId and returns the service’s result verbatim', async () => {
+            const result = { status: 'completed', output: { ok: true, result: 7 } };
+            triggerServiceMock.getRunResult.mockResolvedValue(result);
+
+            await expect(provider.getRunResult('run_result_test')).resolves.toBe(result);
+            expect(triggerServiceMock.getRunResult).toHaveBeenCalledWith('run_result_test');
+        });
+
+        it('an inherit tenant view reads through the platform service', async () => {
+            const result = { status: 'running' };
+            triggerServiceMock.getRunResult.mockResolvedValue(result);
+            const view = provider.bindToTenant({
+                tenantId: '00000000-0000-0000-0000-00000000cccc',
+                providerId: 'trigger' as const,
+                credentialVersion: 1,
+                credentials: {},
+            });
+
+            await expect(view.getRunResult!('run_inherit')).resolves.toBe(result);
+            expect(triggerServiceMock.getRunResult).toHaveBeenCalledWith('run_inherit');
+        });
+
+        describe('a BYO tenant view', () => {
+            const byoSnapshot = {
+                tenantId: '00000000-0000-0000-0000-00000000dddd',
+                providerId: 'trigger' as const,
+                credentialVersion: 1,
+                credentials: {
+                    accessToken: 'tr_pat_t',
+                    secretKey: 'tr_dev_t',
+                    projectRef: 'proj_t',
+                },
+            };
+
+            function byoView(retrieve: ReturnType<typeof vi.fn>) {
+                const client = {
+                    tasks: { trigger: vi.fn() },
+                    runs: { cancel: vi.fn(), retrieve },
+                };
+                const byo = new TriggerJobRuntimeProvider(
+                    triggerServiceMock as unknown as TriggerService,
+                    {
+                        clientFactory: vi.fn(() => client) as never,
+                        dispatchersFromClient: vi.fn(() => ({})) as never,
+                    },
+                );
+                return byo.bindToTenant(byoSnapshot);
+            }
+
+            it('reads the run from the TENANT’s project, never the platform’s', async () => {
+                const retrieve = vi.fn(async () => ({
+                    status: 'COMPLETED',
+                    output: { ok: true, result: 'tenant' },
+                }));
+
+                await expect(byoView(retrieve).getRunResult!('run_t')).resolves.toEqual({
+                    status: 'completed',
+                    output: { ok: true, result: 'tenant' },
+                });
+                expect(retrieve).toHaveBeenCalledWith('run_t');
+                expect(triggerServiceMock.getRunResult).not.toHaveBeenCalled();
+            });
+
+            it("answers { status: 'unknown' } when the tenant's read throws", async () => {
+                const retrieve = vi.fn(async () => Promise.reject(new Error('401')));
+
+                await expect(byoView(retrieve).getRunResult!('run_t')).resolves.toEqual({
+                    status: 'unknown',
+                });
+            });
+
+            it("answers { status: 'unknown' } for a completed run whose offloaded output did not download", async () => {
+                const retrieve = vi.fn(async () => ({
+                    status: 'COMPLETED',
+                    output: undefined,
+                    outputPresignedUrl: 'https://packets.example/out.json',
+                }));
+
+                await expect(byoView(retrieve).getRunResult!('run_t')).resolves.toEqual({
+                    status: 'unknown',
+                });
+            });
+        });
     });
 
     describe('startWorkerHost delegation', () => {

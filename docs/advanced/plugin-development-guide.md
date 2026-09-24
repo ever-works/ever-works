@@ -261,6 +261,31 @@ The `resolvePluginEnabled()` function determines whether a plugin is active for 
 6. Fallback to manifest autoEnable (default false)
 ```
 
+## Operations the platform may call by name
+
+The platform's execution router can call a plugin method **by name**: in the API process for a short call, or in the `run-plugin-operation` worker job for a long one. Only methods the manifest lists in `everworks.plugin.operations` can be called that way. Anything else the class defines, including inherited helpers and methods TypeScript marks `private` or `protected`, is refused with `OPERATION_NOT_FOUND`. Those markers are erased at runtime, so the list is the only boundary.
+
+```json
+"everworks": {
+	"plugin": {
+		"id": "my-agent",
+		"executionProfile": "sync",
+		"operations": [
+			{ "name": "runSandboxSession", "executionProfile": "long-running" },
+			{ "name": "listModels" }
+		]
+	}
+}
+```
+
+- **Omitted or empty:** nothing can be called by name. Capability calls through the facades are unaffected.
+- **`name`:** the method name. It uses letters and digits, optionally dot-separated, with no leading `_` or `$`. Lifecycle hooks (`onLoad`, `getManifest`, …) are never operations, even when listed.
+- **`executionProfile`** (optional, per operation): `sync` or `long-running`. It overrides the manifest-level `executionProfile` for that operation. A `long-running` operation runs in the worker, in bundled mode too.
+
+The validator rejects a malformed list: a bad name, a duplicate, or an unknown profile.
+
+The method is called with one argument, the call's `args` object. On the long-running path, its result must be serialisable.
+
 ## Settings JSON Schema Extensions
 
 | Extension  | Purpose                                      | Example                        |

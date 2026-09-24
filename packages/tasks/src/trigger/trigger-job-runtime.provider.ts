@@ -432,7 +432,11 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
                           const run = await tenantClient.runs.retrieve(runId);
                           return triggerRunResult(
                               mapTriggerStatusLocal(run.status),
-                              run as { output?: unknown; error?: unknown },
+                              run as {
+                                  output?: unknown;
+                                  error?: unknown;
+                                  outputPresignedUrl?: unknown;
+                              },
                           );
                       } catch {
                           return { status: 'unknown' };

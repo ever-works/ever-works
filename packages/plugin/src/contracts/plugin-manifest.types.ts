@@ -420,6 +420,32 @@ export interface PluginManifest {
 	 * `long-running`).
 	 */
 	readonly executionProfile?: PluginExecutionProfile;
+	/**
+	 * Dynamic plugin distribution (EW-693) — the methods the platform may
+	 * call BY NAME through its execution router (in-process, or in the
+	 * `run-plugin-operation` worker task).
+	 *
+	 * An allowlist: an operation this list does not declare is refused,
+	 * whatever the plugin class defines. TypeScript `private`/`protected`
+	 * markers are erased at runtime, so without a declaration a request could
+	 * reach any helper method a plugin class or its base classes carry.
+	 * Omitted or empty = no operation can be called by name.
+	 */
+	readonly operations?: readonly PluginOperationDeclaration[];
+}
+
+/**
+ * Dynamic plugin distribution (EW-693) — one operation a plugin lets the
+ * platform call by name (see {@link PluginManifest.operations}).
+ */
+export interface PluginOperationDeclaration {
+	/** The method name on the plugin class, e.g. `runSandboxSession`. */
+	readonly name: string;
+	/**
+	 * Where this operation runs. Overrides the manifest-level
+	 * {@link PluginManifest.executionProfile} for this operation only.
+	 */
+	readonly executionProfile?: PluginExecutionProfile;
 }
 
 /**

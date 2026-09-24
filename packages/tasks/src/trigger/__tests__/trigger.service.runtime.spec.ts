@@ -70,6 +70,7 @@ vi.mock('@ever-works/agent/tasks', () => ({
     CredentialVersionService: class {},
     // EW-693 / T27 — the long-running plugin operation job id.
     PLUGIN_OPERATION_TASK_ID: 'run-plugin-operation',
+    PLUGIN_OPERATION_QUEUE_TTL_SECONDS: 15 * 60,
 }));
 
 // Per-task module mocks — the service imports these eagerly; the runtime
@@ -261,6 +262,33 @@ describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 
         it("answers { status: 'unknown' } when runs.retrieve throws", async () => {
             runsRetrieveMock.mockRejectedValue(new Error('network'));
             await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+        });
+
+        /**
+         * An output over the SDK's inline limit sits behind `outputPresignedUrl`;
+         * `runs.retrieve` downloads it but SWALLOWS a failed download, leaving
+         * `output` undefined. Answered as completed, the router reported a run
+         * that succeeded — side effects done — as failed.
+         */
+        it("answers { status: 'unknown' } — read it again — for a COMPLETED run whose offloaded output did not download", async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'COMPLETED',
+                output: undefined,
+                outputPresignedUrl: 'https://packets.example/out.json',
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+        });
+
+        it('keeps a downloaded offloaded output', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'COMPLETED',
+                output: { ok: true, result: 'big' },
+                outputPresignedUrl: 'https://packets.example/out.json',
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'completed',
+                output: { ok: true, result: 'big' },
+            });
         });
     });
 

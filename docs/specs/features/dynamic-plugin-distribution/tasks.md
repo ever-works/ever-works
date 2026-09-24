@@ -155,6 +155,31 @@
 >   resolves the operation on the materialised plugin — an end-to-end spec runs
 >   a fixture plugin through the REAL module.
 >
+> **Review follow-ups:**
+>
+> - Only operations a plugin DECLARES in `everworks.plugin.operations` can be
+>   called by name, on both paths. Before this, TS-`private` helpers, inherited
+>   `BasePlugin` helpers and function-valued class fields were all reachable.
+>   Each declaration may carry its own `executionProfile` (FR-17), which the
+>   router ranks between an explicit call profile and the manifest-level one.
+> - A lazily loaded plugin whose `onLoad` fails is refused: the task answers
+>   `WORKER_PLUGIN_LOAD_FAILED` and the router `PLUGIN_LOAD_FAILED`. Before, the
+>   failure was recorded on the registry entry but the operation ran anyway.
+> - Wait hardening:
+>     - every read has a time limit (30 s, or the time left) and ends on an abort;
+>     - `pollLongRunning` reads for at most 20 s;
+>     - `sleep` no longer leaves listeners on the caller's signal;
+>     - `timeoutMs`/`pollIntervalMs` are validated, and the interval never drops
+>       below 250 ms;
+>     - a run that stays unreadable answers `JOB_RUNTIME_RUN_UNREADABLE` ("not
+>       cancelled"), no longer `JOB_RUNTIME_FAILED`.
+> - A completed run whose offloaded output failed to download reads as `unknown`
+>   and is read again, not as failed.
+> - The task id, the payload type, the queue TTL and `maxDuration` are shared
+>   constants in `@ever-works/agent/tasks`. The router's default wait (80 min:
+>   TTL + `maxDuration` + boot) is derived from them, and an unmocked spec pins
+>   the wiring.
+>
 > **Still open:** T26 — no facade calls the router yet (the first real caller
 > is a product decision); T27's _runtime-installed_ half — the worker binds no
 > installer, because today's `PluginInstallerService` would trust and write

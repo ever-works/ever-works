@@ -2,21 +2,28 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import type { INestApplicationContext } from '@nestjs/common';
 import {
+    describeMissingOperation,
     materializePlugin,
     PluginInstallerService,
+    pluginLoadFailure,
     PluginRegistryService,
     resolvePluginOperation,
 } from '@ever-works/agent/plugins';
+import {
+    PLUGIN_OPERATION_MAX_DURATION_SECONDS,
+    PLUGIN_OPERATION_TASK_ID,
+    type PluginOperationPayload,
+} from '@ever-works/agent/tasks';
 import { getOptionalProvider } from '@ever-works/agent/utils';
 import { TriggerRunPluginOperationModule } from '../../trigger/worker/modules/trigger-run-plugin-operation.module';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
-export interface RunPluginOperationPayload {
-    pluginId: string;
-    operation: string;
-    args?: Record<string, unknown>;
-}
+/**
+ * The payload, as the router and the dispatcher build it — the one shared
+ * definition in `@ever-works/agent/tasks`, so the three cannot drift apart.
+ */
+export type RunPluginOperationPayload = PluginOperationPayload;
 
 export interface RunPluginOperationOutcome {
     ok: boolean;
@@ -41,8 +48,8 @@ export interface RunPluginOperationOutcome {
  * | `WORKER_INSTALL_FAILED`       | a bound installer threw (none is bound — see the module)      |
  * | `WORKER_PLUGIN_HYDRATE_FAILED`| loading the bundled plugins threw                             |
  * | `PLUGIN_NOT_REGISTERED`       | the plugin is not in this worker (not bundled in the image)  |
- * | `WORKER_PLUGIN_LOAD_FAILED`   | the plugin is registered in `error` state, or will not load   |
- * | `OPERATION_NOT_FOUND`         | the plugin has no callable operation of that name             |
+ * | `WORKER_PLUGIN_LOAD_FAILED`   | the plugin is in `error` state, will not load, or its `onLoad` failed while loading |
+ * | `OPERATION_NOT_FOUND`         | the manifest does not declare the operation, or the class lacks it |
  * | `WORKER_PLUGIN_THREW`         | the operation itself threw                                    |
  *
  * ## The context: `TriggerRunPluginOperationModule`
@@ -61,16 +68,26 @@ export interface RunPluginOperationOutcome {
  * function for ANY property name, so `typeof plugin[op] === 'function'` was
  * always true: OPERATION_NOT_FOUND could never be answered, and `constructor`,
  * `__materialize`, `onUnload` or `toString` could be called from a payload.
- * Operations are now resolved on the MATERIALISED plugin, as a function it or
- * its classes define — never `Object.prototype` — and never a lifecycle hook,
- * an `_`-prefixed name or anything that is not a plain identifier. (Public
- * helper methods of a plugin class remain callable; a manifest-declared
- * operation list would narrow that further.)
+ * Operations are now resolved on the MATERIALISED plugin, and only one the
+ * plugin DECLARES in its manifest (`everworks.plugin.operations`) — an
+ * allowlist, because TypeScript `private`/`protected` are erased at runtime and
+ * a prototype walk otherwise reaches every helper a plugin class or its base
+ * classes carry. A declared name still has to be a plain identifier, not
+ * `_`-prefixed and not a lifecycle hook (`resolvePluginOperation`).
  *
- * `maxDuration` is set high enough for the longest legitimate platform
- * operation. `retry: { maxAttempts: 1 }`: a plugin operation can have side
- * effects, and a crashed attempt is reported to the router as failed rather
- * than silently run again.
+ * ## A plugin whose `onLoad` fails
+ *
+ * A lazily registered plugin runs `onLoad` inside its first materialisation.
+ * A throw there is caught and recorded as the registry entry's `error` state —
+ * `__materialize` still resolves — so the state is read again AFTER
+ * materialising, and such a plugin answers WORKER_PLUGIN_LOAD_FAILED instead of
+ * running an operation on an instance whose initialisation failed.
+ *
+ * `maxDuration` (`PLUGIN_OPERATION_MAX_DURATION_SECONDS`) is set high enough
+ * for the longest legitimate platform operation; the router's default wait is
+ * derived from it. `retry: { maxAttempts: 1 }`: a plugin operation can have
+ * side effects, and a crashed attempt is reported to the router as failed
+ * rather than silently run again.
  */
 
 function fail(code: string, message: string): RunPluginOperationOutcome {
@@ -151,12 +168,20 @@ export async function executePluginOperation(
         );
     }
 
-    const method = resolvePluginOperation(plugin, operation);
+    // `onLoad` ran inside that first materialisation; its failure is recorded
+    // on the registry entry, not thrown — read the state again. The registry
+    // mutates its entries in place, so `registered` now carries the state (and
+    // manifest) as they are after loading; the boot spec pins that against the
+    // real registry.
+    const loadFailure = pluginLoadFailure(registered, pluginId);
+    if (loadFailure) {
+        return fail('WORKER_PLUGIN_LOAD_FAILED', loadFailure);
+    }
+
+    const manifest = registered.manifest;
+    const method = resolvePluginOperation(plugin, operation, manifest);
     if (!method) {
-        return fail(
-            'OPERATION_NOT_FOUND',
-            `Plugin "${pluginId}" does not implement operation "${String(operation)}".`,
-        );
+        return fail('OPERATION_NOT_FOUND', describeMissingOperation(pluginId, operation, manifest));
     }
 
     try {
@@ -167,9 +192,12 @@ export async function executePluginOperation(
     }
 }
 
-export const runPluginOperationTask = task<'run-plugin-operation', RunPluginOperationPayload>({
-    id: 'run-plugin-operation',
-    maxDuration: 3600,
+export const runPluginOperationTask = task<
+    typeof PLUGIN_OPERATION_TASK_ID,
+    RunPluginOperationPayload
+>({
+    id: PLUGIN_OPERATION_TASK_ID,
+    maxDuration: PLUGIN_OPERATION_MAX_DURATION_SECONDS,
     // One attempt: a plugin operation can have side effects. See the header.
     retry: { maxAttempts: 1 },
     run: async (payload): Promise<RunPluginOperationOutcome> => {

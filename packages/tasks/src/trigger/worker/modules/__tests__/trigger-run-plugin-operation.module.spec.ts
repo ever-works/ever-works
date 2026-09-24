@@ -31,7 +31,14 @@ import {
  *    worker is hydration from the bundled image;
  * 3. a real lazy proxy answers a function for ANY property, so the operation
  *    check has to run on the materialised plugin — `constructor`,
- *    `__materialize`, `onUnload`, `toString` and `_secret` are refused.
+ *    `__materialize`, `onUnload`, `toString` and `_secret` are refused;
+ * 4. only operations the manifest DECLARES (`everworks.plugin.operations`) are
+ *    callable: inherited helpers (`emitEvent`, `log` — `protected` on the real
+ *    `BasePlugin`), a TS-`private`-style method and a function-valued class
+ *    field were all reachable by name before, and are refused now;
+ * 5. a lazily registered plugin whose `onLoad` throws while materialising
+ *    answers WORKER_PLUGIN_LOAD_FAILED — its operation used to run anyway,
+ *    because the failure is recorded on the registry entry, not thrown.
  */
 
 const FIXTURE_PLUGINS = path.resolve(__dirname, 'fixtures/run-plugin-operation');
@@ -115,6 +122,68 @@ describe('TriggerRunPluginOperationModule (EW-693 T27) — the real worker conte
             });
         },
     );
+
+    it.each(['emitEvent', 'log', 'replaceFile', 'runPrompt'])(
+        'refuses %s — callable on the class, but the manifest does not declare it',
+        async (operation) => {
+            delete (globalThis as { __fixtureEchoHelpersCalled?: unknown })
+                .__fixtureEchoHelpersCalled;
+
+            await expect(
+                execute(operation, { flags: ['--dangerously-bypass'] }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: {
+                    code: 'OPERATION_NOT_FOUND',
+                    message: expect.stringContaining('does not declare operation'),
+                },
+            });
+            expect(
+                (globalThis as { __fixtureEchoHelpersCalled?: unknown }).__fixtureEchoHelpersCalled,
+            ).toBeUndefined();
+        },
+    );
+
+    it('answers OPERATION_NOT_FOUND, saying so, for a declared operation the class lacks', async () => {
+        await expect(execute('declaredButMissing')).resolves.toMatchObject({
+            ok: false,
+            error: {
+                code: 'OPERATION_NOT_FOUND',
+                message: expect.stringContaining(
+                    'declares operation "declaredButMissing" but does not implement it',
+                ),
+            },
+        });
+    });
+
+    it('answers WORKER_PLUGIN_LOAD_FAILED — and runs nothing — when onLoad throws while the plugin loads', async () => {
+        delete (globalThis as { __fixtureOnloadThrowsTouched?: unknown })
+            .__fixtureOnloadThrowsTouched;
+
+        await expect(execute('touch', undefined, 'fixture-onload-throws')).resolves.toMatchObject({
+            ok: false,
+            error: {
+                code: 'WORKER_PLUGIN_LOAD_FAILED',
+                message: expect.stringContaining('required setting "apiKey" is missing'),
+            },
+        });
+        expect(
+            (globalThis as { __fixtureOnloadThrowsTouched?: unknown }).__fixtureOnloadThrowsTouched,
+        ).toBeUndefined();
+        const entry = context
+            .get(PluginRegistryService, { strict: false })
+            .get('fixture-onload-throws');
+        expect(entry?.state).toBe('error');
+
+        // And again: now refused before loading, from the recorded state.
+        await expect(execute('touch', undefined, 'fixture-onload-throws')).resolves.toMatchObject({
+            ok: false,
+            error: { code: 'WORKER_PLUGIN_LOAD_FAILED' },
+        });
+        expect(
+            (globalThis as { __fixtureOnloadThrowsTouched?: unknown }).__fixtureOnloadThrowsTouched,
+        ).toBeUndefined();
+    });
 
     it('reports an operation that throws as WORKER_PLUGIN_THREW', async () => {
         await expect(execute('explode')).resolves.toEqual({

@@ -47,6 +47,7 @@ import {
     APP_BUILD_PREPARE_TASK_ID,
     APP_BUILD_WATCH_TASK_ID,
     // EW-693 / T27 — the long-running plugin operation job, named once in the agent.
+    PLUGIN_OPERATION_QUEUE_TTL_SECONDS,
     PLUGIN_OPERATION_TASK_ID,
     type PluginOperationPayload,
 } from '@ever-works/agent/tasks';
@@ -1394,6 +1395,40 @@ export class TriggerService
     }
 
     /**
+     * EW-693 / T27 — start the `run-plugin-operation` worker task for one
+     * long-running plugin operation (`PluginExecutionRouterService` looks this
+     * method up by name on the active runtime's dispatchers). Answers the run
+     * id, or `null` when Trigger.dev is not configured or the enqueue failed.
+     *
+     * `ttl` bounds the time in the QUEUE, which `maxDuration` does not count: a
+     * run no worker picks up within `PLUGIN_OPERATION_QUEUE_TTL_SECONDS` (15
+     * minutes) expires, and the router reads it as failed instead of waiting on
+     * it. The router's default wait is derived from the same constant.
+     */
+    async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof runPluginOperationTask>(
+                PLUGIN_OPERATION_TASK_ID,
+                { pluginId: payload.pluginId, operation: payload.operation, args: payload.args },
+                this.stampTenantOptions({
+                    tags: ['plugin-operation', `plugin:${payload.pluginId}`],
+                    machine: this.machine() as any,
+                    ttl: `${PLUGIN_OPERATION_QUEUE_TTL_SECONDS / 60}m`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch run-plugin-operation task', error as Error);
+            return null;
+        }
+    }
+
+    /**
      * C10 — the `app-fork-readiness` job (APW-02 plan §6.1:655, §6.2).
      *
      * This is the enqueue half of the gap `docs/internal/app-works-build-progress.md`
@@ -1423,39 +1458,6 @@ export class TriggerService
      * a create + Try again pair from queueing two polls that would each find nothing to
      * do.
      */
-    /**
-     * EW-693 / T27 — start the `run-plugin-operation` worker task for one
-     * long-running plugin operation (`PluginExecutionRouterService` looks this
-     * method up by name on the active runtime's dispatchers). Answers the run
-     * id, or `null` when Trigger.dev is not configured or the enqueue failed.
-     *
-     * `ttl` bounds the time in the QUEUE, which `maxDuration` does not count: a
-     * run no worker picks up within 15 minutes expires, and the router reads it
-     * as failed instead of waiting on it.
-     */
-    async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
-        if (!this.ensureConfigured()) {
-            return null;
-        }
-
-        try {
-            const handle = await tasks.trigger<typeof runPluginOperationTask>(
-                PLUGIN_OPERATION_TASK_ID,
-                { pluginId: payload.pluginId, operation: payload.operation, args: payload.args },
-                this.stampTenantOptions({
-                    tags: ['plugin-operation', `plugin:${payload.pluginId}`],
-                    machine: this.machine() as any,
-                    ttl: '15m',
-                }),
-            );
-
-            return handle.id;
-        } catch (error) {
-            this.logger.error('Failed to dispatch run-plugin-operation task', error as Error);
-            return null;
-        }
-    }
-
     async dispatchAppForkReadiness(payload: AppForkReadinessJobPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
@@ -1489,11 +1491,25 @@ export class TriggerService
  * output only once the run completed, the error message when it has one.
  * Shared by the platform service and the per-tenant provider view, so a BYO
  * tenant's result reads the same.
+ *
+ * An output over the SDK's inline limit is stored behind `outputPresignedUrl`,
+ * and `runs.retrieve` downloads it — but swallows a failed download and leaves
+ * `output` undefined. A completed run in that state is answered `'unknown'`
+ * (read it again), never `completed` without its output: the router would
+ * report a run that succeeded, side effects done, as failed.
  */
 export function triggerRunResult(
     status: JobRunStatus,
-    run: { output?: unknown; error?: unknown },
+    run: { output?: unknown; error?: unknown; outputPresignedUrl?: unknown },
 ): JobRunResult {
+    if (
+        status === 'completed' &&
+        run.output === undefined &&
+        typeof run.outputPresignedUrl === 'string' &&
+        run.outputPresignedUrl.length > 0
+    ) {
+        return { status: 'unknown' };
+    }
     const error = run.error as { message?: unknown } | string | null | undefined;
     const message =
         typeof error === 'string'

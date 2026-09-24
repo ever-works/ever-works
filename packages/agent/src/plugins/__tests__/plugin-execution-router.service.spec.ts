@@ -4,9 +4,15 @@ import {
     type TriggerDispatcher,
     type PluginExecutionTaskOutcome,
 } from '../services/plugin-execution-router.service';
-import type { PluginRegistryService, RegisteredPlugin } from '../services/plugin-registry.service';
+import { getEventListeners } from 'events';
+import { Global, Module } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { PluginRegistryService, type RegisteredPlugin } from '../services/plugin-registry.service';
 import type { PluginInstallerService } from '../services/plugin-installer.service';
 import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.interface';
+import { PLUGINS_MODULE_OPTIONS } from '../plugins.constants';
+import { JOB_RUNTIME_PROVIDER_REGISTRY } from '../../tasks/job-runtime.providers';
+import { PLUGIN_OPERATION_DEFAULT_WAIT_MS } from '../../tasks/plugin-operation-dispatch';
 
 /**
  * EW-693 / T25-T28 — execution router.
@@ -153,7 +159,13 @@ describe('PluginExecutionRouterService (EW-693)', () => {
         it('returns ok=true + the operation result on success', async () => {
             const exec = { extract: jest.fn(async () => ({ items: 5 })) };
             const registry = makeRegistry({
-                'notion-extractor': { manifest: { id: 'notion-extractor' } as never, exec },
+                'notion-extractor': {
+                    manifest: {
+                        id: 'notion-extractor',
+                        operations: [{ name: 'extract' }],
+                    } as never,
+                    exec,
+                },
             });
             const router = makeRouter({ distributionMode: 'dynamic' }, registry, makeInstaller());
 
@@ -186,7 +198,13 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                 }),
             };
             const registry = makeRegistry({
-                'notion-extractor': { manifest: { id: 'notion-extractor' } as never, exec },
+                'notion-extractor': {
+                    manifest: {
+                        id: 'notion-extractor',
+                        operations: [{ name: 'extract' }],
+                    } as never,
+                    exec,
+                },
             });
             const router = makeRouter({ distributionMode: 'dynamic' }, registry, makeInstaller());
 
@@ -272,7 +290,7 @@ describe('PluginExecutionRouterService (EW-693)', () => {
         it('routes via in-process for bundled mode without ever touching the dispatcher', async () => {
             const exec = { 'pipeline.run': jest.fn(async () => ({ done: true })) };
             const registry = makeRegistry({
-                p: { manifest: { id: 'p' } as never, exec },
+                p: { manifest: { id: 'p', operations: [{ name: 'pipeline.run' }] } as never, exec },
             });
             const router = makeRouter({ distributionMode: 'bundled' }, registry, makeInstaller());
 
@@ -459,9 +477,19 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                     Array.from({ length: 10 }, () => ({ status: 'unknown' })),
                 );
 
+                // JOB_RUNTIME_RUN_UNREADABLE, not JOB_RUNTIME_FAILED: the run's
+                // fate is unknown — it may still be executing — and a caller
+                // that re-dispatched on a "failed" code would run it twice.
                 await expect(
                     routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
-                ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_FAILED' } });
+                ).resolves.toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: {
+                        code: 'JOB_RUNTIME_RUN_UNREADABLE',
+                        message: expect.stringContaining('NOT cancelled'),
+                    },
+                });
                 expect(runtime.provider.getRunResult).toHaveBeenCalledTimes(5);
             });
 
@@ -589,11 +617,457 @@ describe('PluginExecutionRouterService (EW-693)', () => {
         });
 
         /**
+         * Review follow-ups (EW-693 T27): what `dispatchSync` may call, and a
+         * plugin whose initialisation failed.
+         */
+        describe('dispatchSync — only DECLARED operations, and only on a plugin that loaded', () => {
+            class Helpers {
+                readonly ran: string[] = [];
+                async onLoad() {}
+                async onUnload() {}
+                async search(args?: Record<string, unknown>) {
+                    return { hits: 1, args };
+                }
+                /** `protected` on the real `BasePlugin`: erased at runtime. */
+                protected emitEvent(name: string) {
+                    this.ran.push(`emitEvent:${name}`);
+                }
+                /** Stands in for a CLI plugin's prompt runner (TS-private there). */
+                protected async runPrompt(args?: Record<string, unknown>) {
+                    this.ran.push('runPrompt');
+                    return args;
+                }
+                /** A function-valued class field. */
+                replaceFile = async () => {
+                    this.ran.push('replaceFile');
+                };
+            }
+            const declaresSearch = { id: 'p', operations: [{ name: 'search' }] } as never;
+
+            it.each(['emitEvent', 'runPrompt', 'replaceFile'])(
+                'refuses %s — the class has it, the manifest does not declare it — and runs nothing',
+                async (op) => {
+                    const real = new Helpers();
+                    const router = routerWith(
+                        null,
+                        {},
+                        { p: { manifest: declaresSearch, exec: real as never } },
+                    );
+
+                    await expect(
+                        router.dispatchSync('p', op, { flags: ['--yolo'] }),
+                    ).resolves.toMatchObject({
+                        ok: false,
+                        error: {
+                            code: 'OPERATION_NOT_FOUND',
+                            message: expect.stringContaining(`does not declare operation "${op}"`),
+                        },
+                    });
+                    expect(real.ran).toEqual([]);
+                },
+            );
+
+            it('calls a declared operation', async () => {
+                const router = routerWith(
+                    null,
+                    {},
+                    {
+                        p: { manifest: declaresSearch, exec: new Helpers() as never },
+                    },
+                );
+
+                await expect(router.dispatchSync('p', 'search', { q: 1 })).resolves.toEqual({
+                    ok: true,
+                    location: 'in-process',
+                    result: { hits: 1, args: { q: 1 } },
+                });
+            });
+
+            it('calls nothing on a plugin whose manifest declares no operations', async () => {
+                const exec = { extract: jest.fn(async () => 'ran') };
+                const router = routerWith(
+                    null,
+                    {},
+                    { p: { manifest: { id: 'p' } as never, exec } },
+                );
+
+                await expect(router.dispatchSync('p', 'extract')).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'OPERATION_NOT_FOUND' },
+                });
+                expect(exec.extract).not.toHaveBeenCalled();
+            });
+
+            it('answers PLUGIN_LOAD_FAILED — and runs nothing — when onLoad fails while the plugin materialises', async () => {
+                const real = new Helpers();
+                const search = jest.spyOn(real, 'search');
+                // Like the real registry: `get` hands out the SAME entry, and
+                // `updateState` mutates it in place. `callOnLoad` catches the
+                // onLoad throw and records it there; `__materialize` resolves.
+                const entry: Record<string, unknown> = {
+                    manifest: declaresSearch,
+                    state: 'loaded',
+                };
+                entry.plugin = {
+                    __materialize: jest.fn(async () => {
+                        entry.state = 'error';
+                        entry.error = new Error('onLoad: required setting "apiKey" is missing');
+                        return real;
+                    }),
+                };
+                const router = new PluginExecutionRouterService({ distributionMode: 'bundled' }, {
+                    get: jest.fn(() => entry),
+                } as unknown as PluginRegistryService);
+
+                await expect(router.dispatchSync('p', 'search')).resolves.toMatchObject({
+                    ok: false,
+                    location: 'in-process',
+                    error: {
+                        code: 'PLUGIN_LOAD_FAILED',
+                        message: expect.stringContaining('required setting "apiKey" is missing'),
+                    },
+                });
+                expect(search).not.toHaveBeenCalled();
+            });
+
+            it('answers PLUGIN_LOAD_FAILED for a plugin already in error state, without loading it', async () => {
+                const materialize = jest.fn(async () => new Helpers());
+                const router = routerWith(
+                    null,
+                    {},
+                    {
+                        p: {
+                            manifest: declaresSearch,
+                            state: 'error',
+                            error: new Error('bad config'),
+                            exec: { __materialize: materialize } as never,
+                        } as never,
+                    },
+                );
+
+                await expect(router.dispatchSync('p', 'search')).resolves.toMatchObject({
+                    ok: false,
+                    error: {
+                        code: 'PLUGIN_LOAD_FAILED',
+                        message: expect.stringContaining('bad config'),
+                    },
+                });
+                expect(materialize).not.toHaveBeenCalled();
+            });
+
+            it('answers PLUGIN_LOAD_FAILED — not IN_PROCESS_THREW — when the plugin will not load', async () => {
+                const router = routerWith(
+                    null,
+                    {},
+                    {
+                        p: {
+                            manifest: declaresSearch,
+                            exec: {
+                                __materialize: jest.fn(async () =>
+                                    Promise.reject(new Error('import failed')),
+                                ),
+                            } as never,
+                        },
+                    },
+                );
+
+                await expect(router.dispatchSync('p', 'search')).resolves.toMatchObject({
+                    ok: false,
+                    error: {
+                        code: 'PLUGIN_LOAD_FAILED',
+                        message: expect.stringContaining('import failed'),
+                    },
+                });
+            });
+        });
+
+        describe('route — an operation’s declared executionProfile (FR-17)', () => {
+            const plugins = {
+                p: {
+                    manifest: {
+                        id: 'p',
+                        executionProfile: 'long-running',
+                        operations: [
+                            { name: 'runSandboxSession', executionProfile: 'long-running' },
+                            { name: 'listModels', executionProfile: 'sync' },
+                            { name: 'plain' },
+                        ],
+                    } as never,
+                },
+                q: {
+                    manifest: {
+                        id: 'q',
+                        operations: [
+                            { name: 'runSandboxSession', executionProfile: 'long-running' },
+                        ],
+                    } as never,
+                },
+            };
+
+            it('sends a declared long-running operation to the job runtime, even in bundled mode', () => {
+                expect(routerWith(null, {}, plugins).route('q', 'runSandboxSession')).toEqual({
+                    location: 'job-runtime',
+                    reason: 'manifest:operations[runSandboxSession].executionProfile=long-running',
+                });
+            });
+
+            it('an operation’s own profile beats the manifest-level one', () => {
+                expect(routerWith(null, {}, plugins).route('p', 'listModels').location).toBe(
+                    'in-process',
+                );
+            });
+
+            it('an operation that declares no profile falls back to the manifest-level one', () => {
+                expect(routerWith(null, {}, plugins).route('p', 'plain')).toEqual({
+                    location: 'job-runtime',
+                    reason: 'manifest:executionProfile=long-running',
+                });
+            });
+
+            it('an explicit profile on the call still beats both', () => {
+                expect(
+                    routerWith(null, {}, plugins).route('q', 'runSandboxSession', {
+                        profile: 'sync',
+                    }).location,
+                ).toBe('in-process');
+            });
+        });
+
+        /**
+         * Review follow-ups (EW-693 T27): the wait must end on time, on an
+         * abort, and without piling listeners on the caller's signal — also
+         * when the job runtime's API stalls.
+         */
+        describe('waiting on a run — a stalled API, an abort, bad options', () => {
+            function stalledRuntime() {
+                const runtime = makeRuntime();
+                runtime.provider.getRunResult.mockImplementation(
+                    () => new Promise(() => undefined),
+                );
+                return runtime;
+            }
+
+            it('a stalled read cannot hold the caller past its deadline', async () => {
+                const runtime = stalledRuntime();
+                const started = Date.now();
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                        timeoutMs: 300,
+                        pollIntervalMs: 250,
+                    }),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: {
+                        code: 'JOB_RUNTIME_WAIT_TIMEOUT',
+                        message: expect.stringContaining('NOT cancelled'),
+                    },
+                });
+                expect(Date.now() - started).toBeLessThan(5_000);
+            });
+
+            it('an abort during a stalled read ends the wait at once', async () => {
+                const runtime = stalledRuntime();
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 50);
+                const started = Date.now();
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                        timeoutMs: 60_000,
+                        signal: controller.signal,
+                    }),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
+                });
+                expect(Date.now() - started).toBeLessThan(5_000);
+                expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+            });
+
+            it('an abort between reads ends the wait at once', async () => {
+                const runtime = makeRuntime([]); // running forever
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 100);
+                const started = Date.now();
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                        timeoutMs: 60_000,
+                        pollIntervalMs: 5_000,
+                        signal: controller.signal,
+                    }),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
+                });
+                expect(Date.now() - started).toBeLessThan(900);
+            });
+
+            it('leaves no abort listener on the caller’s signal once the wait is over', async () => {
+                const runtime = makeRuntime([
+                    { status: 'queued' },
+                    { status: 'running' },
+                    { status: 'completed', output: { ok: true, result: 1 } },
+                ]);
+                const controller = new AbortController();
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                        pollIntervalMs: 250,
+                        signal: controller.signal,
+                    }),
+                ).resolves.toMatchObject({ ok: true, result: 1 });
+                expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+            });
+
+            it.each([
+                ['NaN', Number.NaN],
+                ['0', 0],
+            ])(
+                'a pollIntervalMs of %s is not a hot loop, and the wait still ends',
+                async (_label, pollIntervalMs) => {
+                    const runtime = makeRuntime([]); // running forever
+
+                    await expect(
+                        routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                            timeoutMs: 700,
+                            pollIntervalMs,
+                        }),
+                    ).resolves.toMatchObject({
+                        ok: false,
+                        error: { code: 'JOB_RUNTIME_WAIT_TIMEOUT' },
+                    });
+                    // At most one read per 250 ms (the floor) in a 700 ms wait.
+                    expect(runtime.provider.getRunResult.mock.calls.length).toBeLessThanOrEqual(4);
+                },
+            );
+
+            describe('with fake timers', () => {
+                beforeEach(() => jest.useFakeTimers());
+                afterEach(() => jest.useRealTimers());
+
+                it('waits the run’s whole lifetime by default — queue TTL + maxDuration + boot, 80 minutes', async () => {
+                    expect(PLUGIN_OPERATION_DEFAULT_WAIT_MS).toBe(80 * 60 * 1000);
+                    const runtime = makeRuntime([]); // running forever
+                    let settled: unknown;
+                    void routerWith(runtime)
+                        .dispatchLongRunning('p', 'op')
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(79 * 60 * 1000);
+                    expect(settled).toBeUndefined();
+
+                    await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
+                    expect(settled).toMatchObject({
+                        ok: false,
+                        error: { code: 'JOB_RUNTIME_WAIT_TIMEOUT' },
+                    });
+                });
+
+                it('a NaN timeoutMs means the default wait — not a wait that never ends', async () => {
+                    const runtime = makeRuntime([]); // running forever
+                    let settled: unknown;
+                    void routerWith(runtime)
+                        .dispatchLongRunning('p', 'op', undefined, { timeoutMs: Number.NaN })
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(PLUGIN_OPERATION_DEFAULT_WAIT_MS + 60_000);
+                    expect(settled).toMatchObject({
+                        ok: false,
+                        error: {
+                            code: 'JOB_RUNTIME_WAIT_TIMEOUT',
+                            message: expect.stringContaining(
+                                String(PLUGIN_OPERATION_DEFAULT_WAIT_MS),
+                            ),
+                        },
+                    });
+                });
+
+                it('pollLongRunning answers a stalled read as not-done within 20 s — under the 60 s ingress limit', async () => {
+                    const runtime = stalledRuntime();
+                    let settled: unknown;
+                    void routerWith(runtime)
+                        .pollLongRunning('run_7')
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(20_000);
+                    expect(settled).toEqual({ done: false, runId: 'run_7', status: 'unknown' });
+                });
+            });
+        });
+
+        /**
+         * Every other router spec passes the registry to the constructor. This
+         * one lets Nest inject it: `@Optional() @Inject(JOB_RUNTIME_PROVIDER_REGISTRY)`,
+         * provided by a @Global module the router's own module does not import
+         * — the shape of the API graph (the tasks package's @Global TriggerModule).
+         */
+        describe('Nest wiring of the job-runtime registry', () => {
+            function routerHost() {
+                class RouterHost {}
+                Module({
+                    providers: [
+                        PluginExecutionRouterService,
+                        {
+                            provide: PLUGINS_MODULE_OPTIONS,
+                            useValue: { distributionMode: 'bundled' },
+                        },
+                        { provide: PluginRegistryService, useValue: makeRegistry({}) },
+                    ],
+                    exports: [PluginExecutionRouterService],
+                })(RouterHost);
+                return RouterHost;
+            }
+
+            it('injects the registry a @Global module exports, and dispatches through it', async () => {
+                const runtime = makeRuntime();
+                class RuntimeHost {}
+                Module({
+                    providers: [
+                        { provide: JOB_RUNTIME_PROVIDER_REGISTRY, useValue: runtime.registry },
+                    ],
+                    exports: [JOB_RUNTIME_PROVIDER_REGISTRY],
+                })(RuntimeHost);
+                Global()(RuntimeHost);
+
+                const moduleRef = await Test.createTestingModule({
+                    imports: [RuntimeHost, routerHost()],
+                }).compile();
+
+                await expect(
+                    moduleRef.get(PluginExecutionRouterService).startLongRunning('p', 'op'),
+                ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_7' });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith({
+                    pluginId: 'p',
+                    operation: 'op',
+                    args: undefined,
+                });
+                await moduleRef.close();
+            });
+
+            it('boots without a registry, and answers JOB_RUNTIME_UNAVAILABLE', async () => {
+                const moduleRef = await Test.createTestingModule({
+                    imports: [routerHost()],
+                }).compile();
+
+                await expect(
+                    moduleRef.get(PluginExecutionRouterService).startLongRunning('p', 'op'),
+                ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_UNAVAILABLE' } });
+                await moduleRef.close();
+            });
+        });
+
+        /**
          * The registry hands out lazy proxies whose `get` answers a function for
          * ANY name, so `typeof plugin[op] === 'function'` was always true on the
          * in-process path as well.
          */
         describe('dispatchSync on a lazy proxy', () => {
+            const DECLARES_SEARCH = { id: 'p', operations: [{ name: 'search' }] } as never;
+
             class Real {
                 async onLoad() {}
                 async onUnload() {}
@@ -614,7 +1088,13 @@ describe('PluginExecutionRouterService (EW-693)', () => {
             }
 
             it('calls the operation on the materialised plugin', async () => {
-                const router = routerWith(null, {}, { p: { exec: lazy(new Real()) as never } });
+                const router = routerWith(
+                    null,
+                    {},
+                    {
+                        p: { manifest: DECLARES_SEARCH, exec: lazy(new Real()) as never },
+                    },
+                );
 
                 await expect(router.dispatchSync('p', 'search', { q: 'x' })).resolves.toEqual({
                     ok: true,
@@ -626,7 +1106,13 @@ describe('PluginExecutionRouterService (EW-693)', () => {
             it.each(['teleport', 'constructor', '__materialize', 'onUnload', 'toString'])(
                 'answers OPERATION_NOT_FOUND for %s',
                 async (op) => {
-                    const router = routerWith(null, {}, { p: { exec: lazy(new Real()) as never } });
+                    const router = routerWith(
+                        null,
+                        {},
+                        {
+                            p: { manifest: DECLARES_SEARCH, exec: lazy(new Real()) as never },
+                        },
+                    );
 
                     await expect(router.dispatchSync('p', op)).resolves.toMatchObject({
                         ok: false,
