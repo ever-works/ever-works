@@ -45,8 +45,9 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  *
  * 🛑 **The lock-release half is best-effort today, and it says so at run time**: the store token is
  * APW-11 T5's and its binding is APW-06 **T17**'s
- * (`WorkAppRuntimeStateRepository`, not in this tree), so `appContext.get` answers `undefined` and
- * the hook reports `lockRelease: 'unbound'` instead of pretending to have released anything. The
+ * (`WorkAppRuntimeStateRepository`, not in this tree), so `getOptionalProvider` answers `undefined`
+ * (a bare `appContext.get` would THROW for it) and the hook reports `lockRelease: 'unbound'` instead
+ * of pretending to have released anything. The
  * orchestrator releases the lock itself on every outcome it *does* reach (T25's
  * "no outcome leaves a held lock"), so this hook is the backstop for the cases it never reaches.
  */
