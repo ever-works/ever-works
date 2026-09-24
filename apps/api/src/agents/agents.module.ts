@@ -1094,6 +1094,63 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
                             );
                         }
 
+                        // APW-08 T17 (FR-8) — an App Work's change is judged BEFORE the
+                        // commit slot is taken and before anything is written, so a
+                        // refusal holds no slot and leaves nothing behind.
+                        //
+                        // It is the full guard over the paths this call writes, with
+                        // their new content: protected paths, `.github/workflows/**`,
+                        // the file-count cap, and the guarded blocks of
+                        // `.works/works.yml`. That last rule is why `contents` is sent.
+                        // This tool is how follow-up commits reach an OPEN pull request,
+                        // and a check of paths alone let a commit loosen
+                        // `display.protectedPaths` on a PR that had already been judged.
+                        //
+                        // Only this call's paths are judged, and only they can be
+                        // committed: the branch switch below resets the index to the
+                        // branch, so nothing staged earlier rides along.
+                        if (isAppWorkKind(target.work.kind)) {
+                            // The rules are read from the Work's base branch, so the base
+                            // branch is never a commit target here: an agent that could
+                            // commit to it could rewrite the rules it is judged by.
+                            const targetsBase =
+                                !requestedBranch ||
+                                (base !== '' &&
+                                    normalizeBranchRef(branch) === normalizeBranchRef(base));
+                            if (targetsBase) {
+                                throw new Error(
+                                    `commitToRepo: an App Work's base branch${base ? ` '${base}'` : ''} ` +
+                                        `changes only through a pull request — it is where the Work's ` +
+                                        `rules are read from. Name a feature branch instead. Nothing was ` +
+                                        `written, committed or pushed.`,
+                                );
+                            }
+                            await assertAppWorkChange(
+                                'commitToRepo',
+                                async (gate) =>
+                                    base
+                                        ? gate.checkPaths({
+                                              work: target.work,
+                                              owner: target.owner,
+                                              repo: target.repo,
+                                              gitOptions: { userId, providerId, workId },
+                                              baseRef: base,
+                                              paths: [...new Set(writes.map((w) => w.path))],
+                                              contents: Object.fromEntries(
+                                                  writes.map((w) => [w.path, w.body]),
+                                              ),
+                                          })
+                                        : {
+                                              allowed: false,
+                                              message:
+                                                  "This Work's base branch could not be resolved, " +
+                                                  'so its rules are unknown.',
+                                              paths: [],
+                                          },
+                                'Nothing was written, committed or pushed.',
+                            );
+                        }
+
                         // APW-08 P0 (T2/T3) — everything that touches the working
                         // copy runs under the Work's commit slot, so a second commit
                         // for this Work cannot switch the checkout under the first
@@ -1122,69 +1179,25 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
                                     await resolveProtectedBranches(workId),
                                 );
                             }
-                            // APW-08 T17 (FR-8) — an App Work's change is judged
-                            // BEFORE anything is written, so a refusal leaves nothing
-                            // behind. Two sets of paths, because the commit takes both:
-                            // the ones this call writes, and whatever the SHARED per-Work
-                            // working copy already holds (earlier tool calls stage into
-                            // it, and `commit` takes the whole index). A working copy
-                            // that cannot be read is a commit whose contents are
-                            // unknown, so that refuses too.
+                            // APW-08 P0 — the branch is threaded into the commit itself.
+                            // The commit used to land on whatever branch the clone
+                            // happened to be on while the tool RETURNED `branch ?? 'main'`
+                            // — a branch it had never committed to. Check the branch out
+                            // (creating it if the Agent is starting a new one) so the
+                            // committed branch and the returned branch are the same
+                            // branch, by construction.
                             //
-                            // Refusing here rather than at the pull request matters for
-                            // one rule above all: a pushed branch whose workflow file
-                            // changed can RUN that workflow on push.
-                            if (isAppWorkKind(target.work.kind)) {
-                                const rulesBase = await appRulesBase(
-                                    target,
-                                    providerId,
-                                    userId,
-                                    workId,
-                                    dir,
-                                );
-                                const pending = await git
-                                    .getStatus(providerId, dir)
-                                    .catch(() => null);
-                                await assertAppWorkChange(
-                                    'commitToRepo',
-                                    async (gate) => {
-                                        if (pending === null) {
-                                            return {
-                                                allowed: false,
-                                                message:
-                                                    'The working copy could not be read, so what this ' +
-                                                    'commit would include is unknown.',
-                                                paths: [],
-                                            };
-                                        }
-                                        if (!rulesBase) {
-                                            return {
-                                                allowed: false,
-                                                message:
-                                                    "This Work's base branch could not be resolved, " +
-                                                    'so its rules are unknown.',
-                                                paths: [],
-                                            };
-                                        }
-                                        const paths = new Set<string>(writes.map((w) => w.path));
-                                        for (const change of pending) {
-                                            paths.add(change.path);
-                                            if (change.oldPath) paths.add(change.oldPath);
-                                        }
-                                        return gate.checkPaths({
-                                            work: target.work,
-                                            owner: target.owner,
-                                            repo: target.repo,
-                                            gitOptions: { userId, providerId, workId },
-                                            baseRef: rulesBase,
-                                            paths: [...paths],
-                                        });
-                                    },
-                                    'Nothing was written, committed or pushed.',
-                                );
-                            }
-                            // Stage any file edits provided inline. Empty `files`
-                            // means "commit whatever earlier tool calls staged".
+                            // FIRST — before anything is written or staged. isomorphic-
+                            // git's checkout resets a staged entry to the target commit's
+                            // version and deletes a staged new file, so switching AFTER
+                            // staging erased this call's edits and left `commit` nothing
+                            // to commit. Reproduced against the real library: write, add,
+                            // switch, commit -> null, edits gone; switch, write, add,
+                            // commit -> a sha, edits committed.
+                            await git.switchBranch(providerId, dir, branch, true);
+                            // Empty `files` commits nothing new: the switch above resets
+                            // the index to the branch, so there is nothing staged to take.
+                            let stagedChanges = 0;
                             if (writes.length > 0) {
                                 const fsp = await import('node:fs/promises');
                                 const path = await import('node:path');
@@ -1240,18 +1253,21 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
                                     dir,
                                     writes.map((f) => f.path),
                                 );
+                                // What will actually be committed: the written paths that
+                                // now differ from the branch. A gitignored path is skipped
+                                // by `add`, and a file rewritten with the content it
+                                // already had is not a change — neither is counted.
+                                const status = await git
+                                    .getStatus(providerId, dir)
+                                    .catch(() => null);
+                                const written = [...new Set(writes.map((f) => f.path))];
+                                stagedChanges = status
+                                    ? written.filter((p) => status.some((c) => c.path === p)).length
+                                    : written.length;
                             }
                             const committerName = agent.committerName ?? agent.name;
                             const committerEmail =
                                 agent.committerEmail ?? `${agent.slug}@agents.ever.works`;
-                            // APW-08 P0 — the branch is threaded into the commit itself.
-                            // The commit used to land on whatever branch the clone
-                            // happened to be on while the tool RETURNED `branch ?? 'main'`
-                            // — a branch it had never committed to. Check the branch out
-                            // (creating it if the Agent is starting a new one) so the
-                            // committed branch and the returned branch are the same
-                            // branch, by construction.
-                            await git.switchBranch(providerId, dir, branch, true);
                             const sha = await git.commit(providerId, dir, message, {
                                 name: committerName,
                                 email: committerEmail,
@@ -1292,7 +1308,7 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
                                 // nothing was staged — e.g. every file was written with
                                 // the content it already had — and reporting N changed
                                 // files for it is how the old no-op looked like success.
-                                filesChanged: sha ? (files?.length ?? 0) : 0,
+                                filesChanged: sha ? stagedChanges : 0,
                             };
                         });
                     },

@@ -10,12 +10,7 @@ import type {
     AppWorkChangeGateVerdict,
     AppWorkChangePathsInput,
 } from '../tasks-domain/app-work-change-gate.port';
-import {
-    APP_SPEC_PATH,
-    AppChangeGuard,
-    AppChangeRefusedError,
-    MAX_FILES,
-} from './app-change-guard';
+import { APP_SPEC_PATH, AppChangeGuard, MAX_FILES } from './app-change-guard';
 import { AppWorkRulesService } from './app-work-rules.service';
 
 /**
@@ -124,9 +119,10 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
     }
 
     /**
-     * The pre-write half: may these paths be written? Rules 2 and 3 only —
-     * there is no diff to read yet. Same base-tip rules commit, same "nothing
-     * escapes" contract as {@link evaluate}.
+     * The pre-write half: may these paths be written, with this content? The
+     * SAME guard as {@link evaluate}, over a diff built from the paths — so the
+     * two can never disagree about what a protected path or a guarded spec
+     * block is. Same base-tip rules commit, same never-rejects contract.
      */
     async checkPaths(input: AppWorkChangePathsInput): Promise<AppWorkChangeGateVerdict> {
         if (input.paths.length === 0) return { allowed: true, note: null };
@@ -139,12 +135,37 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 );
             }
             const rules = await this.rules.resolve(input.work, baseSha);
-            this.guard.assertPathsAllowed(rules, input.paths);
-            return { allowed: true, note: null };
-        } catch (error) {
-            if (error instanceof AppChangeRefusedError) {
-                return { allowed: false, message: error.message, paths: error.paths };
+
+            let specs: { baseSpec?: AppSpec | null; headSpec?: AppSpec | null } = {};
+            if (input.paths.includes(APP_SPEC_PATH)) {
+                const content = input.contents?.[APP_SPEC_PATH];
+                if (typeof content !== 'string') {
+                    // Never skip the rule for want of the content — that is exactly
+                    // the hole this question exists to close.
+                    return refusal(
+                        `\`${APP_SPEC_PATH}\` is part of this change, but its new content was not ` +
+                            'provided, so its guarded blocks could not be checked.',
+                    );
+                }
+                const base = await this.specs.getEffectiveSpec(input.work.id, baseSha);
+                const head =
+                    content.length > 0 ? await this.specs.parseDraft(input.work.id, content) : null;
+                specs = { baseSpec: base?.spec ?? null, headSpec: head?.spec ?? null };
             }
+
+            const verdict = this.guard.evaluate({
+                rules,
+                diff: pathsOnlyDiff(input.paths),
+                ...specs,
+                labels: [],
+            });
+            if (verdict.allowed) return { allowed: true, note: null };
+            return {
+                allowed: false,
+                message: verdict.message ?? 'This change was refused by the Work’s rules.',
+                paths: verdict.paths,
+            };
+        } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
             this.logger.warn(
                 `App change gate (paths) for Work ${input.work.id} could not decide: ${reason}`,
@@ -208,6 +229,22 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
         const head = await this.specs.parseDraft(input.work.id, file.content);
         return { baseSpec, headSpec: head.spec };
     }
+}
+
+/**
+ * A diff made of the paths a call is about to write, for the pre-write question.
+ * Line counts are zero on purpose: there is nothing to count before the write,
+ * so the size rule passes here and is judged when a pull request is opened.
+ */
+function pathsOnlyDiff(paths: readonly string[]): GitDiffResult {
+    return {
+        files: paths.map((path) => ({ path, status: 'modified', additions: 0, deletions: 0 })),
+        truncated: false,
+        totalFiles: paths.length,
+        totalAdditions: 0,
+        totalDeletions: 0,
+        patchBytes: 0,
+    };
 }
 
 function refusal(message: string): AppWorkChangeGateVerdict {

@@ -356,6 +356,60 @@ describe('checkPaths — the pre-write question (FR-8)', () => {
         expect(verdict.allowed === false && verdict.message).toContain('could not be read');
     });
 
+    it('judges the guarded spec blocks from the NEW content — before anything is written', async () => {
+        // `commitToRepo` is how follow-up commits reach an open pull request.
+        // Checking paths alone let one loosen `display.protectedPaths`.
+        const { gate, m } = harness();
+        m.getEffectiveSpec.mockResolvedValue({
+            status: 'valid',
+            spec: { display: { protectedPaths: ['infra/**'] } } as AppSpec,
+        });
+        m.parseDraft.mockResolvedValue({
+            status: 'valid',
+            spec: { display: { protectedPaths: [] } } as AppSpec,
+        });
+
+        const verdict = await gate.checkPaths({
+            ...pathsInput([APP_SPEC_PATH]),
+            contents: { [APP_SPEC_PATH]: 'the new spec' },
+        });
+
+        expect(verdict.allowed).toBe(false);
+        expect(verdict.allowed === false && verdict.message).toContain('protected paths');
+        expect(m.parseDraft).toHaveBeenCalledWith('w-1', 'the new spec');
+        expect(m.getEffectiveSpec).toHaveBeenCalledWith('w-1', BASE_TIP);
+    });
+
+    it('allows a spec change that touches no guarded block', async () => {
+        const { gate } = harness();
+
+        await expect(
+            gate.checkPaths({
+                ...pathsInput([APP_SPEC_PATH]),
+                contents: { [APP_SPEC_PATH]: 'same source, new env' },
+            }),
+        ).resolves.toMatchObject({ allowed: true });
+    });
+
+    it('REFUSES a spec change whose content was not provided — never skips the rule', async () => {
+        const { gate } = harness();
+
+        const verdict = await gate.checkPaths(pathsInput([APP_SPEC_PATH]));
+
+        expect(verdict.allowed).toBe(false);
+        expect(verdict.allowed === false && verdict.message).toContain('was not provided');
+    });
+
+    it('refuses more files than can be policed', async () => {
+        const { gate } = harness();
+        const paths = Array.from({ length: 300 }, (_, i) => `src/file-${i}.ts`);
+
+        const verdict = await gate.checkPaths(pathsInput(paths));
+
+        expect(verdict.allowed).toBe(false);
+        expect(verdict.allowed === false && verdict.message).toContain('300 files');
+    });
+
     it('refuses when the base tip cannot be read', async () => {
         const { gate, m } = harness();
         m.getLatestCommit.mockResolvedValue(null as never);

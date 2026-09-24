@@ -58,14 +58,23 @@ export type AppWorkChangeGateVerdict =
     | { readonly allowed: false; readonly message: string; readonly paths: readonly string[] };
 
 /**
- * The pre-write question (FR-8): may these paths be written at all?
+ * The pre-write question (FR-8): may these paths be written, with this content?
  *
  * Asked by the `commitToRepo` agent tool BEFORE it writes, so a refusal leaves
- * nothing behind. It answers only the rules a path list can answer —
- * protected paths and `.github/workflows/**` — because there is no diff yet.
- * The workflow rule matters most here: a pushed branch whose workflow file was
- * changed can RUN that changed workflow on push, so refusing only at the pull
- * request would be too late for it.
+ * nothing behind. It is the same guard as {@link AppWorkChangeGate.evaluate},
+ * over the paths the call writes instead of a provider diff: protected paths,
+ * `.github/workflows/**`, the file-count cap, and — when `.works/works.yml` is
+ * one of the paths — the guarded spec blocks, read from `contents`.
+ *
+ * The spec rule is the one that matters most on this path. `commitToRepo` is how
+ * follow-up commits reach an OPEN pull request, and the first version of this
+ * question checked paths only, so an agent could loosen `display.protectedPaths`
+ * in a commit onto a PR that had already been judged. The workflow rule matters
+ * for a different reason: a pushed branch whose workflow file changed can RUN
+ * that workflow on push, so refusing only at the pull request would be too late.
+ *
+ * Only the size rule is not answered here — there is no diff to count — and it
+ * is judged when a pull request is opened.
  */
 export interface AppWorkChangePathsInput {
     readonly work: Work;
@@ -74,7 +83,14 @@ export interface AppWorkChangePathsInput {
     readonly gitOptions: { userId: string; providerId: string; workId: string };
     /** The Work's base branch; the rules commit is ITS tip, read by the gate. */
     readonly baseRef: string;
+    /** Normalised, repository-relative paths — the exact strings that will be written and staged. */
     readonly paths: readonly string[];
+    /**
+     * The new content of each path, by path. Required for `.works/works.yml`
+     * when it is in `paths`: without it the guarded blocks cannot be judged, and
+     * the gate refuses rather than skipping the rule.
+     */
+    readonly contents?: Readonly<Record<string, string>>;
 }
 
 export interface AppWorkChangeGate {

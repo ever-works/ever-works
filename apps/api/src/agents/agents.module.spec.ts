@@ -919,28 +919,6 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 );
             });
 
-            it('includes what the SHARED working copy already holds', async () => {
-                // `commit` takes the whole index, and earlier tool calls stage into
-                // the same per-Work working copy.
-                const gate = allow();
-                const git = gitIn();
-                git.getStatus.mockResolvedValue([
-                    { path: '.github/workflows/ci.yml', status: 'modified' },
-                    { path: 'src/new.ts', status: 'renamed', oldPath: 'infra/old.ts' },
-                ]);
-                const { facade } = build({ git, work: appWork(), appChangeGate: gate });
-
-                await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
-
-                expect(gate.checkPaths.mock.calls[0][0].paths).toEqual(
-                    expect.arrayContaining([
-                        '.github/workflows/ci.yml',
-                        'src/new.ts',
-                        'infra/old.ts',
-                    ]),
-                );
-            });
-
             it('writes, stages, commits and pushes NOTHING when refused', async () => {
                 const git = gitIn();
                 const { facade } = build({ git, work: appWork(), appChangeGate: refuse() });
@@ -952,23 +930,70 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 );
 
                 expect(fs.existsSync(nodePath.join(dir, 'infra/main.tf'))).toBe(false);
+                // Judged before the commit slot is taken: not even a checkout.
+                expect(git.cloneOrPull).not.toHaveBeenCalled();
                 expect(git.switchBranch).not.toHaveBeenCalled();
                 expect(git.add).not.toHaveBeenCalled();
                 expect(git.commit).not.toHaveBeenCalled();
                 expect(git.push).not.toHaveBeenCalled();
             });
 
-            it('refuses when the working copy cannot be read — its contents are unknown', async () => {
+            it('judges ONLY the paths this call writes — nothing staged earlier can ride along', async () => {
+                // The branch switch resets the index to the branch, so this call's
+                // paths are the whole commit. A scan of the working copy used to be
+                // judged too, and any leftover file in it wedged every later commit.
                 const gate = allow();
                 const git = gitIn();
-                git.getStatus.mockRejectedValue(new Error('corrupt index'));
+                git.getStatus.mockResolvedValue([
+                    { path: '.github/workflows/ci.yml', status: 'modified' },
+                ]);
                 const { facade } = build({ git, work: appWork(), appChangeGate: gate });
 
-                await expect(
-                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
-                ).rejects.toThrow(/working copy could not be read/);
-                expect(git.commit).not.toHaveBeenCalled();
+                await facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/pricing',
+                        files: [{ path: 'src/app.ts', body: 'export {};\n' }],
+                    }),
+                );
+
+                expect(gate.checkPaths.mock.calls[0][0].paths).toEqual(['src/app.ts']);
             });
+
+            it('sends the new spec content, so guarded blocks are judged BEFORE the write', async () => {
+                // This tool is how follow-up commits reach an open pull request; a
+                // check of paths alone let one loosen `display.protectedPaths`.
+                const gate = allow();
+                const { facade } = build({ git: gitIn(), work: appWork(), appChangeGate: gate });
+                const spec = 'version: 1\nkind: app\nspec: {}\n';
+
+                await facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/pricing',
+                        files: [{ path: '.works/works.yml', body: spec }],
+                    }),
+                );
+
+                expect(gate.checkPaths.mock.calls[0][0].contents).toEqual({
+                    '.works/works.yml': spec,
+                });
+            });
+
+            it.each([['production'], ['refs/heads/production'], [undefined]])(
+                'refuses a commit onto the base branch the rules are read from (branch %p)',
+                async (branch) => {
+                    // An agent that could commit to it could rewrite the rules it is
+                    // judged by. No branch means "the base", so that refuses too.
+                    const gate = allow();
+                    const git = gitIn();
+                    const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                    await expect(
+                        facade.commitToRepo(commitInput({ ...(branch ? { branch } : {}), files })),
+                    ).rejects.toThrow(/changes only through a pull request/);
+                    expect(gate.checkPaths).not.toHaveBeenCalled();
+                    expect(git.cloneOrPull).not.toHaveBeenCalled();
+                },
+            );
 
             it('fails CLOSED when no gate is bound — never skips the check', async () => {
                 const git = gitIn();
@@ -1141,6 +1166,124 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         });
     });
 
+    /**
+     * `commitToRepo` against the REAL `GitOperations`, on a real repository.
+     *
+     * The two bugs this tool shipped with were both invisible to doubles: it
+     * never staged what it wrote, and after that was fixed it switched branch
+     * AFTER staging — isomorphic-git's checkout resets staged entries and
+     * deletes staged new files, so the commit was empty and the agent's edits
+     * were erased. A mocked `switchBranch` cannot see either. Here only the
+     * network push is doubled; `switchBranch`, `add`, `commit`, `getStatus` and
+     * `getMainBranch` are the library's own.
+     */
+    describe('against the real GitOperations', () => {
+        const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+        const os = jest.requireActual<typeof import('node:os')>('node:os');
+        const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+        const { execFileSync } =
+            jest.requireActual<typeof import('node:child_process')>('node:child_process');
+        const { GitOperations } =
+            jest.requireActual<typeof import('@ever-works/plugin/git')>('@ever-works/plugin/git');
+        const who = { name: 'probe', email: 'probe@example.test' };
+        let dir: string;
+        let ops: InstanceType<typeof GitOperations>;
+
+        beforeEach(async () => {
+            dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-real-'));
+            execFileSync('git', ['init', '--initial-branch=main'], { cwd: dir, stdio: 'ignore' });
+            ops = new GitOperations(
+                () => ({ username: 'unused', password: 'unused' }),
+                (owner, repo) => `https://example.test/${owner}/${repo}.git`,
+            );
+            fs.writeFileSync(nodePath.join(dir, 'README.md'), '# v1\n');
+            fs.writeFileSync(nodePath.join(dir, '.gitignore'), 'secrets.env\n');
+            await ops.add(dir, ['README.md', '.gitignore']);
+            await ops.commit(dir, 'initial', who);
+        });
+        afterEach(() => {
+            fs.rmSync(dir, { recursive: true, force: true });
+        });
+
+        /** makeGit(), with every local operation delegated to the real library. */
+        const realGit = () => {
+            const git = makeGit();
+            git.cloneOrPull.mockResolvedValue(dir);
+            git.switchBranch.mockImplementation((_p: string, d: string, b: string, c: boolean) =>
+                ops.switchBranch(d, b, c),
+            );
+            git.add.mockImplementation((_p: string, d: string, paths: string[]) =>
+                ops.add(d, paths),
+            );
+            git.commit.mockImplementation((_p: string, d: string, m: string, c: unknown) =>
+                ops.commit(d, m, c as never),
+            );
+            git.getStatus.mockImplementation((_p: string, d: string) => ops.getStatus(d));
+            git.getMainBranch.mockImplementation((_p: string, d: string) => ops.getMainBranch(d));
+            return git;
+        };
+        const committedFiles = (sha: string): string[] =>
+            execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: dir })
+                .toString()
+                .split('\n')
+                .map((line: string) => line.trim())
+                .filter(Boolean)
+                .sort();
+
+        it('commits the files it wrote, on the branch it names, and keeps them on disk', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/pricing',
+                    files: [
+                        { path: 'src/pricing.ts', body: 'export const price = 1;\n' },
+                        { path: 'README.md', body: '# v2\n' },
+                    ],
+                }),
+            );
+
+            expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+            expect(result).toMatchObject({ branch: 'feature/pricing', filesChanged: 2 });
+            expect(committedFiles(result.sha as string)).toEqual(['README.md', 'src/pricing.ts']);
+            expect(fs.readFileSync(nodePath.join(dir, 'README.md'), 'utf8')).toBe('# v2\n');
+            expect(fs.existsSync(nodePath.join(dir, 'src/pricing.ts'))).toBe(true);
+            expect(
+                execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir })
+                    .toString()
+                    .trim(),
+            ).toBe('feature/pricing');
+        });
+
+        it('counts only what changed — identical content and gitignored paths are not changes', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/pricing',
+                    files: [
+                        { path: 'README.md', body: '# v1\n' },
+                        { path: 'secrets.env', body: 'TOKEN=nope\n' },
+                        { path: 'src/new.ts', body: 'export {};\n' },
+                    ],
+                }),
+            );
+
+            expect(result.filesChanged).toBe(1);
+            expect(committedFiles(result.sha as string)).toEqual(['src/new.ts']);
+        });
+
+        it('commits nothing new when handed no files — and says so', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(commitInput({ branch: 'feature/empty' }));
+
+            expect(result).toMatchObject({ sha: null, filesChanged: 0 });
+        });
+    });
     describe('commitToRepo', () => {
         /**
          * The tool writes files and then commits — and until this case existed
@@ -1175,8 +1318,13 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 { path: 'README.md', body: '# Pricing\n' },
             ];
 
-            it('stages the written paths, and only those, BEFORE committing', async () => {
+            it('switches, THEN stages the written paths, and only those, THEN commits', async () => {
                 const git = gitIn();
+                // What the working copy reports after the writes: both paths differ.
+                git.getStatus.mockResolvedValue([
+                    { path: 'src/pricing.ts', status: 'added' },
+                    { path: 'README.md', status: 'modified' },
+                ]);
                 const { facade } = build({ git });
 
                 const result = await facade.commitToRepo(
@@ -1191,7 +1339,12 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                     'src/pricing.ts',
                     'README.md',
                 ]);
-                // Order is the point: staging after the commit is the old no-op.
+                // Order is the point. Staging after the commit was the first no-op;
+                // switching after staging was the second — checkout reset the
+                // staged edits and deleted the new file.
+                expect(git.switchBranch.mock.invocationCallOrder[0]).toBeLessThan(
+                    git.add.mock.invocationCallOrder[0],
+                );
                 expect(git.add.mock.invocationCallOrder[0]).toBeLessThan(
                     git.commit.mock.invocationCallOrder[0],
                 );
