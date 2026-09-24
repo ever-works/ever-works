@@ -744,6 +744,9 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         // overrides it with a list the head is genuinely absent from.
         listBranches: jest.fn().mockResolvedValue([{ name: 'feature/pricing' }, { name: 'main' }]),
         switchBranch: jest.fn().mockResolvedValue('feature/x'),
+        // The tool stages exactly what it writes before committing — see the
+        // staging case below for why that call exists.
+        add: jest.fn().mockResolvedValue(undefined),
         commit: jest.fn().mockResolvedValue('sha-1'),
         push: jest.fn().mockResolvedValue(undefined),
         createPullRequest: jest
@@ -819,6 +822,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         expect(git.getRepoDir).not.toHaveBeenCalled();
         expect(git.cloneOrPull).not.toHaveBeenCalled();
         expect(git.switchBranch).not.toHaveBeenCalled();
+        expect(git.add).not.toHaveBeenCalled();
         expect(git.commit).not.toHaveBeenCalled();
         expect(git.push).not.toHaveBeenCalled();
         // APW-08 P0 (T4) — `openPullRequest` reads the provider's branch list
@@ -828,6 +832,90 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
     };
 
     describe('commitToRepo', () => {
+        /**
+         * The tool writes files and then commits — and until this case existed
+         * it never STAGED them. isomorphic-git commits the index, not the
+         * working copy, so `commit` found nothing staged and returned `null`;
+         * the push sent nothing new and the tool still answered `filesChanged:
+         * N`. Every case above passes no `files`, so the write path had no
+         * coverage at all, and `commit` is mocked to return a sha, so nothing
+         * could have noticed. These cases write into a REAL temporary directory.
+         */
+        describe('stages exactly what it writes', () => {
+            const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+            const os = jest.requireActual<typeof import('node:os')>('node:os');
+            const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+            let dir: string;
+
+            beforeEach(() => {
+                dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-'));
+            });
+            afterEach(() => {
+                fs.rmSync(dir, { recursive: true, force: true });
+            });
+
+            const gitIn = (overrides: Record<string, unknown> = {}) => {
+                const git = makeGit();
+                git.cloneOrPull.mockResolvedValue(dir);
+                Object.assign(git, overrides);
+                return git;
+            };
+            const files = [
+                { path: 'src/pricing.ts', body: 'export const price = 1;\n' },
+                { path: 'README.md', body: '# Pricing\n' },
+            ];
+
+            it('stages the written paths, and only those, BEFORE committing', async () => {
+                const git = gitIn();
+                const { facade } = build({ git });
+
+                const result = await facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files }),
+                );
+
+                expect(fs.readFileSync(nodePath.join(dir, 'src/pricing.ts'), 'utf8')).toBe(
+                    'export const price = 1;\n',
+                );
+                expect(git.add).toHaveBeenCalledTimes(1);
+                expect(git.add).toHaveBeenCalledWith(WORK_PROVIDER, dir, [
+                    'src/pricing.ts',
+                    'README.md',
+                ]);
+                // Order is the point: staging after the commit is the old no-op.
+                expect(git.add.mock.invocationCallOrder[0]).toBeLessThan(
+                    git.commit.mock.invocationCallOrder[0],
+                );
+                expect(result).toMatchObject({ sha: 'sha-1', filesChanged: 2 });
+            });
+
+            it('reports NO changed files when nothing was committed', async () => {
+                // `commit` answers `null` when nothing is staged — e.g. every file
+                // was written with the content it already had. Reporting N changed
+                // files for that is how the no-op used to look like success.
+                const git = gitIn({ commit: jest.fn().mockResolvedValue(null) });
+                const { facade } = build({ git });
+
+                const result = await facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files }),
+                );
+
+                expect(result).toMatchObject({ sha: null, filesChanged: 0 });
+            });
+
+            it('stages nothing of its own when it is handed no files', async () => {
+                // Empty `files` means "commit what earlier tool calls staged";
+                // sweeping in the rest of the shared working copy would commit
+                // changes nobody asked this call to make.
+                const git = gitIn();
+                const { facade } = build({ git });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+                expect(git.add).not.toHaveBeenCalled();
+                expect(git.commit).toHaveBeenCalledTimes(1);
+            });
+        });
+
         it("uses the Work's OWN provider id — never the 'github' literal", async () => {
             const { facade, git } = build();
             await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));

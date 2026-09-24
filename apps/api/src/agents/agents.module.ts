@@ -986,6 +986,22 @@ function normalizeBranchRef(ref: string): string {
                                     await fsp.mkdir(path.dirname(abs), { recursive: true });
                                     await fsp.writeFile(abs, f.body, 'utf8');
                                 }
+                                // Stage EXACTLY the paths written above. isomorphic-git
+                                // commits the INDEX, not the working copy, and this tool
+                                // never staged: every file it wrote stayed unstaged,
+                                // `git.commit` found nothing to commit and returned
+                                // `null`, the push sent nothing new, and the tool still
+                                // answered `filesChanged: N`. Reproduced against the real
+                                // library: commit without add -> null; with add -> a sha.
+                                //
+                                // Only these paths, not `addAll`: the working copy is
+                                // shared per Work, and sweeping in whatever else is dirty
+                                // would commit changes nobody asked this call to make.
+                                await git.add(
+                                    providerId,
+                                    dir,
+                                    files.map((f) => f.path),
+                                );
                             }
                             const committerName = agent.committerName ?? agent.name;
                             const committerEmail =
@@ -1024,7 +1040,11 @@ function normalizeBranchRef(ref: string): string {
                             return {
                                 sha: sha ?? null,
                                 branch,
-                                filesChanged: files?.length ?? 0,
+                                // No commit, no changed files. `null` from `commit` means
+                                // nothing was staged — e.g. every file was written with
+                                // the content it already had — and reporting N changed
+                                // files for it is how the old no-op looked like success.
+                                filesChanged: sha ? (files?.length ?? 0) : 0,
                             };
                         });
                     },
