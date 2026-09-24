@@ -74,6 +74,9 @@ import { DatabaseModule } from '../database/database.module';
 // with `TaskTransitionService`.
 import { AppWorkRulesService } from '../app-works/app-work-rules.service';
 import { AppChangeGuard } from '../app-works/app-change-guard';
+import { AppWorkChangeGateService } from '../app-works/app-work-change-gate.service';
+import { AppSpecModule } from '../app-spec/app-spec.module';
+import { APP_WORK_CHANGE_GATE } from './app-work-change-gate.port';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 
 /**
@@ -149,17 +152,37 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
         // raises the human approval for a green pull request and verifies
         // one before it asks for a merge.
         MergeApprovalModule,
+        // APW-08 T17 — `AppSpecService`, for `AppWorkRulesService` and the change
+        // gate. WITHOUT this import both took it `@Optional()` and got
+        // `undefined` in every real graph: `AppSpecModule` is not `@Global()`,
+        // and Nest resolves a provider's dependencies from the module that
+        // DECLARES it. So `resolve()` threw on its first line and the gate
+        // refused every App Work finalize — the first wiring's headline defect,
+        // invisible to its own spec because that spec built doubles.
+        //
+        // An import, not a `ModuleRef` lookup: the repo's own NestJS guidance
+        // (`di-avoid-service-locator`) prefers constructor injection, and an
+        // import is something `tasks-domain.di-contract.spec.ts` can check.
+        // No cycle: `AppSpecModule` imports only `DatabaseModule`, `TypeOrmModule`,
+        // `FacadesModule` and `ActivityLogModule`, all of which this module
+        // already imports and none of which imports this one.
+        AppSpecModule,
     ],
     providers: [
-        // APW-08 T10. It takes `AppSpecService` `@Optional()`, so this module
-        // composes with or without APW-03 in the graph — without it, `resolve`
-        // throws `AppSpecUnreadableError` naming the branch, which is the
-        // documented refusal and not a boot failure.
+        // APW-08 T10. `AppSpecService` reaches it through the `AppSpecModule`
+        // import above; it stays `@Optional()` so a reduced graph still composes
+        // and answers `AppSpecUnreadableError` rather than failing at boot.
         AppWorkRulesService,
         // APW-08 T17 — the change guard. Pure: it takes a diff and the frozen
-        // rules and answers a verdict, so it needs no collaborator and cannot
-        // be the reason this module fails to compose.
+        // rules and answers a verdict, so it needs no collaborator.
         AppChangeGuard,
+        // APW-08 T17 — the gate `TaskWorkspaceService` asks through
+        // `APP_WORK_CHANGE_GATE`. One instance under two names, so the class is
+        // injectable where a caller wants it and the finalize path depends only
+        // on the port (see `app-work-change-gate.port.ts` for the require ring
+        // that choice avoids).
+        AppWorkChangeGateService,
+        { provide: APP_WORK_CHANGE_GATE, useExisting: AppWorkChangeGateService },
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,
@@ -256,6 +279,10 @@ import { DistributedTaskLockService } from '../cache/distributed-task-lock.servi
         // separately and come to disagree.
         AppWorkRulesService,
         AppChangeGuard,
+        // Exported so the agent git tools (`apps/api/src/agents/agents.module.ts`)
+        // can ask the same gate before they open a pull request.
+        AppWorkChangeGateService,
+        APP_WORK_CHANGE_GATE,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,

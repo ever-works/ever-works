@@ -1,78 +1,58 @@
 import { TaskStatus } from '../../entities/task.entity';
 
 import { TaskWorkspaceService } from '../task-workspace.service';
-import { AppChangeGuard } from '../../app-works/app-change-guard';
-import {
-    AppSpecUnreadableError,
-    type AppWorkRulesService,
-} from '../../app-works/app-work-rules.service';
+import type {
+    AppWorkChangeGate,
+    AppWorkChangeGateInput,
+    AppWorkChangeGateVerdict,
+} from '../app-work-change-gate.port';
 
 /**
- * APW-08 T17 — the change guard, wired into the two finalize paths.
+ * APW-08 T17 — the change gate, wired into the two finalize paths.
  *
- * `finalizeRun` and `finalizeRemotePush` are the shared finalize tail for
- * **every** Work in the product, so most of what matters here is what the guard
- * does NOT do: it must not run for a directory Work, it must not run when the
- * epic is not installed, and above all it must not throw.
+ * `finalizeRun` and `finalizeRemotePush` are the finalize tail for EVERY Work,
+ * so most of what matters is what the gate does NOT do: run for a directory
+ * Work, run when nothing is bound, or throw.
  *
- * The three absences answer differently, and that is the design:
- *
- *   - not an App Work        → proceed
- *   - the epic is not bound  → proceed (nothing was promised)
- *   - bound, rules unreadable→ REFUSE (a run with unknown protected paths is a
- *                              run with no protected paths)
- *
- * The branch is already pushed by the time the guard runs, so every refusal says
- * so — the same thing the existing conflict copy is careful about.
+ * What the gate DECIDES is `app-work-change-gate.service.spec.ts`'s business;
+ * this file drives a double through the port and checks what the finalize path
+ * does with each answer. The first version of this file hand-built the three
+ * App classes instead and stayed green while the real module graph could not
+ * construct them — that gap is `tasks-domain.di-contract.spec.ts`'s now.
  */
 
 const WORK_ID = '11111111-1111-4111-8111-111111111111';
 const TASK_ID = '22222222-2222-4222-8222-222222222222';
-const BASE_SHA = 'a'.repeat(40);
 
 type Mocks = ReturnType<typeof mocks>;
 
 function mocks() {
     return {
         updateById: jest.fn(async (_id: string, _fields: Record<string, unknown>) => undefined),
-        // `transitionTask` re-reads the Task before transitioning
-        // (`task-workspace.service.ts:2117`) and swallows anything that throws,
-        // so a repository double without `findById` makes the transition
-        // silently not happen.
+        // `transitionTask` re-reads the Task before transitioning and swallows
+        // anything that throws, so a double without `findById` makes the
+        // transition silently not happen.
         findByIdTask: jest.fn(async () => ({ id: TASK_ID, status: 'in_progress' })),
-        transition: jest.fn(async () => undefined),
+        transition: jest.fn(async (_task: unknown, _to: unknown, _opts: unknown) => undefined),
         post: jest.fn(async (_userId: string, _message: { body: string }) => undefined),
-        getCompareDiff: jest.fn(async () => diff([{ path: 'src/app.ts' }])),
-        getLatestCommit: jest.fn(async () => ({ sha: 'b'.repeat(40) })),
         getRepository: jest.fn(async () => ({ defaultBranch: 'production' })),
-        getFileContent: jest.fn(async () => null),
         simulateMerge: jest.fn(async () => ({ clean: true, conflictPaths: [] })),
         finalize: jest.fn(async () => ({ empty: false, changedFiles: 1 })),
         createPullRequest: jest.fn(async () => ({ number: 7, url: 'https://example.test/pr/7' })),
-        resolve: jest.fn(async () => rules()),
+        evaluate: jest.fn(
+            async (_input: AppWorkChangeGateInput): Promise<AppWorkChangeGateVerdict> => ({
+                allowed: true,
+                note: null,
+            }),
+        ),
     };
 }
 
-function rules(overrides: Record<string, unknown> = {}) {
-    return Object.freeze({
-        sourceBranch: 'production',
-        checks: [],
-        protectedPaths: [],
-        humanMergePaths: [],
-        instructionFiles: [],
-        sizeGuidance: 500,
-        ...overrides,
-    });
-}
-
-function diff(files: { path: string; previousPath?: string }[]) {
+function refused(paths: string[] = ['infra/main.tf']): AppWorkChangeGateVerdict {
     return {
-        files: files.map((f) => ({ status: 'modified', additions: 1, deletions: 0, ...f })),
-        truncated: false,
-        totalFiles: files.length,
-        totalAdditions: files.length,
-        totalDeletions: 0,
-        patchBytes: 0,
+        allowed: false,
+        message: 'This change edits paths this Work protects, which an agent may not change.',
+        paths,
     };
 }
 
@@ -82,47 +62,43 @@ function work(kind = 'app') {
         kind,
         gitProvider: 'github',
         taskIsolationBaseBranch: 'production',
-        getRepoOwner: () => 'acme',
-        getDataRepo: () => 'their-app',
+        getRepoOwner: (role?: string) => (role === 'website' ? 'acme' : 'acme-data'),
+        getDataRepo: () => 'their-app-data',
+        getWebsiteRepo: () => 'their-app',
     };
 }
 
-function task() {
-    return { id: TASK_ID, workId: WORK_ID, slug: 'add-a-thing', labels: [] as string[] };
+function task(overrides: Record<string, unknown> = {}) {
+    return {
+        id: TASK_ID,
+        workId: WORK_ID,
+        slug: 'add-a-thing',
+        labels: [] as string[],
+        ...overrides,
+    };
 }
 
 /**
- * The service with only what this path reads.
- *
- * Positional, and the guard trio is LAST — the file's own arity rule. `guard`
- * and `specs` are passed as `undefined` by the "not installed" cases, which is
- * exactly what the eighteen existing construction sites do.
+ * Positional, and the gate is LAST — the file's own arity rule. `bound: false`
+ * passes `undefined` there, which is exactly what the eighteen existing
+ * construction sites do.
  */
-function service(m: Mocks, opts: { installed?: boolean; kind?: string } = {}) {
-    const installed = opts.installed !== false;
-    const appRules = { resolve: m.resolve } as unknown as AppWorkRulesService;
+function service(m: Mocks, opts: { bound?: boolean; kind?: string } = {}) {
+    const gate: AppWorkChangeGate = { evaluate: m.evaluate };
 
     return new TaskWorkspaceService(
         { findById: jest.fn(async () => work(opts.kind ?? 'app')) } as never, // works
         { updateById: m.updateById, findById: m.findByIdTask } as never, // tasks
         {} as never, // runs
         { finalize: m.finalize, simulateMerge: m.simulateMerge } as never, // workspaceFacade
-        {
-            getRepository: m.getRepository,
-            getCompareDiff: m.getCompareDiff,
-            getLatestCommit: m.getLatestCommit,
-            getFileContent: m.getFileContent,
-            createPullRequest: m.createPullRequest,
-        } as never, // gitFacade
+        { getRepository: m.getRepository, createPullRequest: m.createPullRequest } as never, // gitFacade
         { transition: m.transition } as never, // transitions
         { post: m.post } as never, // taskChat
         undefined as never, // mergePolicy
         undefined as never, // activityLog
         undefined as never, // agentRepoAttachments
         undefined as never, // repoConnections
-        installed ? appRules : (undefined as never),
-        installed ? new AppChangeGuard() : (undefined as never),
-        undefined as never, // appSpecs — rule 4 is exercised by the guard's own spec
+        opts.bound === false ? (undefined as never) : gate,
     );
 }
 
@@ -134,87 +110,110 @@ function pushInput(overrides: Record<string, unknown> = {}) {
         agentCanOpenPullRequests: true,
         branch: 'ever-works/task/add-a-thing',
         headSha: 'c'.repeat(40),
-        baseSha: BASE_SHA,
+        // Reported by the fleet node. The gate must never see it.
+        baseSha: 'f'.repeat(40),
         ...overrides,
     } as never;
 }
 
-describe('the guard does not touch what it should not', () => {
-    it('does not run for a Work that is not kind `app`', async () => {
-        // This is the shared finalize tail for EVERY Work. `kind` defaults to
-        // `'default'`, so an ungated guard would run on every Task in the
-        // product.
+const bodyOf = (m: Mocks, n = 0) => String(m.post.mock.calls[n]?.[1]?.body ?? '');
+const blockedWith = (m: Mocks) =>
+    m.transition.mock.calls.some((call) => call[1] === TaskStatus.BLOCKED);
+
+describe('the gate does not touch what it should not', () => {
+    it('is not asked for a Work that is not kind `app`', async () => {
         const m = mocks();
 
         await service(m, { kind: 'directory' }).finalizeRemotePush(pushInput());
 
-        expect(m.resolve).not.toHaveBeenCalled();
-        expect(m.getCompareDiff).not.toHaveBeenCalled();
+        expect(m.evaluate).not.toHaveBeenCalled();
         expect(m.createPullRequest).toHaveBeenCalled();
     });
 
-    it('does not run when the epic is not installed — nothing was promised', async () => {
+    it('proceeds when nothing is bound — nothing was promised', async () => {
         const m = mocks();
 
-        await service(m, { installed: false }).finalizeRemotePush(pushInput());
+        await service(m, { bound: false }).finalizeRemotePush(pushInput());
 
-        expect(m.getCompareDiff).not.toHaveBeenCalled();
         expect(m.createPullRequest).toHaveBeenCalled();
-        // It DOES transition — to `in_review`, which is what opening a pull
-        // request means. What must not happen is a BLOCKED transition.
-        expect(m.transition).not.toHaveBeenCalledWith(
-            expect.anything(),
-            TaskStatus.BLOCKED,
-            expect.anything(),
-        );
+        // Opening a pull request transitions to `in_review`; what must not
+        // happen is a BLOCKED transition.
+        expect(blockedWith(m)).toBe(false);
     });
 
-    it('opens the pull request for a clean App Work change', async () => {
+    it('opens the pull request when the gate allows', async () => {
         const m = mocks();
 
         const outcome = await service(m).finalizeRemotePush(pushInput());
 
-        expect(m.resolve).toHaveBeenCalledWith(expect.objectContaining({ id: WORK_ID }), BASE_SHA);
         expect(outcome.outcome).toBe('pr-opened');
+        expect(m.evaluate).toHaveBeenCalledTimes(1);
     });
 });
 
-describe('the guard refuses, and says the branch was pushed', () => {
-    it('blocks a protected-path change without opening a pull request', async () => {
+describe('what the gate is handed', () => {
+    it('never receives a base commit — a fleet-reported baseSha cannot reach it', async () => {
+        // The rules are read at a base commit, and on the fleet path the only
+        // one available is reported by the machine the agent ran on. The port
+        // has no field for it; this pins that nothing smuggles it through.
         const m = mocks();
-        m.resolve.mockResolvedValue(rules({ protectedPaths: ['infra/**'] }) as never);
-        m.getCompareDiff.mockResolvedValue(diff([{ path: 'infra/main.tf' }]) as never);
+
+        await service(m).finalizeRemotePush(pushInput());
+
+        const handed = m.evaluate.mock.calls[0][0] as unknown as Record<string, unknown>;
+        expect(handed).not.toHaveProperty('baseSha');
+        expect(JSON.stringify(handed)).not.toContain('f'.repeat(40));
+    });
+
+    it('targets the App Work’s real repository, not the phantom data repository', async () => {
+        const m = mocks();
+
+        await service(m).finalizeRemotePush(pushInput());
+
+        expect(m.evaluate.mock.calls[0][0]).toMatchObject({
+            owner: 'acme',
+            repo: 'their-app',
+            baseRef: 'production',
+            branch: 'ever-works/task/add-a-thing',
+        });
+    });
+
+    it('passes the Task’s labels, for APW-04’s app-provision exemption', async () => {
+        const m = mocks();
+
+        await service(m).finalizeRemotePush(
+            pushInput({ task: task({ labels: ['app-provision'] }) }),
+        );
+
+        expect(m.evaluate.mock.calls[0][0].taskLabels).toEqual(['app-provision']);
+    });
+});
+
+describe('a refusal blocks the Task and says the branch was pushed', () => {
+    it('opens no pull request and returns blocked-by-guard', async () => {
+        const m = mocks();
+        m.evaluate.mockResolvedValue(refused());
 
         const outcome = await service(m).finalizeRemotePush(pushInput());
 
         expect(outcome.outcome).toBe('blocked-by-guard');
         expect(m.createPullRequest).not.toHaveBeenCalled();
-        expect(m.transition).toHaveBeenCalledWith(
-            expect.anything(),
-            TaskStatus.BLOCKED,
-            expect.anything(),
-        );
+        expect(blockedWith(m)).toBe(true);
     });
 
     it('never claims the change was not pushed — it already was', async () => {
-        // `finalizeRun` pushes before the guard point and `finalizeRemotePush`
-        // is called after the fleet has pushed. Copy that said otherwise would
-        // send a member looking for a branch that is already on the remote.
         const m = mocks();
-        m.resolve.mockResolvedValue(rules({ protectedPaths: ['infra/**'] }) as never);
-        m.getCompareDiff.mockResolvedValue(diff([{ path: 'infra/main.tf' }]) as never);
+        m.evaluate.mockResolvedValue(refused());
 
         await service(m).finalizeRemotePush(pushInput());
 
-        const body = String(m.post.mock.calls[0]?.[1]?.body ?? '');
-        expect(body).toContain('pushed');
-        expect(body).toContain('infra/main.tf');
+        expect(bodyOf(m)).toContain('The branch was pushed');
+        expect(bodyOf(m)).toContain('infra/main.tf');
     });
 
     it('leaves branchState alone — the branch really is pushed', async () => {
         const m = mocks();
-        m.resolve.mockResolvedValue(rules({ protectedPaths: ['infra/**'] }) as never);
-        m.getCompareDiff.mockResolvedValue(diff([{ path: 'infra/main.tf' }]) as never);
+        m.evaluate.mockResolvedValue(refused());
 
         await service(m).finalizeRemotePush(pushInput());
 
@@ -223,68 +222,111 @@ describe('the guard refuses, and says the branch was pushed', () => {
         );
         expect(states).not.toContain('conflict');
     });
-});
 
-describe('nothing here may throw', () => {
-    it('turns an unreadable spec into a refusal, not an escape', async () => {
-        // Every other collaborator at finalize time swallows. An escape would
-        // leave the Task at `pushed` with no PR, no message and no BLOCKED —
-        // strictly worse than the refusal, because the member sees a Task that
-        // simply stopped.
+    it('turns a gate that REJECTS into a refusal rather than an escape', async () => {
+        // The gate's contract is that it never rejects. If it ever does, an
+        // escape would leave the Task pushed with no PR, no message and no
+        // transition — worse than any refusal.
         const m = mocks();
-        m.resolve.mockRejectedValue(new AppSpecUnreadableError(WORK_ID, 'production', 'invalid'));
+        m.evaluate.mockRejectedValue(new Error('boom'));
 
         const outcome = await service(m).finalizeRemotePush(pushInput());
 
         expect(outcome.outcome).toBe('blocked-by-guard');
-        expect(m.transition).toHaveBeenCalled();
-        expect(String(m.post.mock.calls[0]?.[1]?.body ?? '')).toContain('could not be read');
+        expect(bodyOf(m)).toContain('could not be read');
+        expect(blockedWith(m)).toBe(true);
     });
 
-    it('turns a provider that cannot diff into a refusal', async () => {
+    it('posts the size note when the gate allows a large change', async () => {
         const m = mocks();
-        m.getCompareDiff.mockRejectedValue(new Error('getCompareDiff is not supported'));
+        m.evaluate.mockResolvedValue({
+            allowed: true,
+            note: 'This change is 700 lines, over guidance.',
+        });
 
         const outcome = await service(m).finalizeRemotePush(pushInput());
+
+        expect(outcome.outcome).toBe('pr-opened');
+        expect(bodyOf(m)).toContain('700 lines');
+    });
+});
+
+describe('every push is judged, including one onto an open pull request', () => {
+    const withPr = () =>
+        pushInput({ task: task({ prNumber: 12, prUrl: 'https://example.test/pr/12' }) });
+
+    it('asks the gate even though the Task already has a pull request', async () => {
+        // A re-run pushes MORE commits onto the same branch and the open pull
+        // request picks them up. The first wiring skipped this path.
+        const m = mocks();
+
+        await service(m).finalizeRemotePush(withPr());
+
+        expect(m.evaluate).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the idempotent answer when the new push is clean', async () => {
+        const m = mocks();
+
+        const outcome = await service(m).finalizeRemotePush(withPr());
+
+        expect(outcome).toEqual({
+            outcome: 'pr-opened',
+            prNumber: 12,
+            prUrl: 'https://example.test/pr/12',
+        });
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('blocks, and says the OPEN pull request now contains the refused change', async () => {
+        const m = mocks();
+        m.evaluate.mockResolvedValue(refused());
+
+        const outcome = await service(m).finalizeRemotePush(withPr());
+
+        expect(outcome).toEqual({
+            outcome: 'blocked-by-guard',
+            prNumber: 12,
+            prUrl: 'https://example.test/pr/12',
+        });
+        expect(bodyOf(m)).toContain('pull request #12 now contains');
+        expect(blockedWith(m)).toBe(true);
+    });
+
+    it('does no extra I/O for a non-App Task that already has a pull request', async () => {
+        const m = mocks();
+
+        await service(m, { kind: 'directory' }).finalizeRemotePush(withPr());
+
+        expect(m.evaluate).not.toHaveBeenCalled();
+        expect(m.getRepository).not.toHaveBeenCalled();
+    });
+});
+
+describe('finalizeRun — the cloud path', () => {
+    function runInput() {
+        return {
+            task: task(),
+            userId: 'u-1',
+            agentId: 'a-1',
+            agentCanOpenPullRequests: true,
+            workspace: {
+                cwd: '/tmp/ws',
+                baseSha: 'b'.repeat(40),
+                reused: false,
+                branch: 'ever-works/task/add-a-thing',
+            },
+        } as never;
+    }
+
+    it('asks the same gate, and blocks on a refusal', async () => {
+        const m = mocks();
+        m.evaluate.mockResolvedValue(refused());
+
+        const outcome = await service(m).finalizeRun(runInput());
 
         expect(outcome.outcome).toBe('blocked-by-guard');
         expect(m.createPullRequest).not.toHaveBeenCalled();
-    });
-});
-
-describe('the base commit', () => {
-    it('resolves the base branch tip when the caller has no base sha', async () => {
-        // The fleet passes `baseSha: result.git.baseSha ?? null`, and that is a
-        // normal push rather than an error. The base branch's own tip is still
-        // a commit the agent did not author.
-        const m = mocks();
-
-        await service(m).finalizeRemotePush(pushInput({ baseSha: null }));
-
-        expect(m.getLatestCommit).toHaveBeenCalledWith(
-            'acme',
-            'their-app',
-            'production',
-            expect.anything(),
-        );
-        expect(m.resolve).toHaveBeenCalledWith(expect.anything(), 'b'.repeat(40));
-    });
-
-    it('refuses when even the base branch tip cannot be read', async () => {
-        const m = mocks();
-        m.getLatestCommit.mockResolvedValue(null as never);
-
-        const outcome = await service(m).finalizeRemotePush(pushInput({ baseSha: null }));
-
-        expect(outcome.outcome).toBe('blocked-by-guard');
-        expect(m.resolve).not.toHaveBeenCalled();
-    });
-
-    it('prefers the caller’s base sha over a provider round-trip', async () => {
-        const m = mocks();
-
-        await service(m).finalizeRemotePush(pushInput());
-
-        expect(m.getLatestCommit).not.toHaveBeenCalled();
+        expect(m.evaluate.mock.calls[0][0]).not.toHaveProperty('baseSha');
     });
 });

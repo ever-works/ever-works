@@ -510,6 +510,51 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
     });
 
+    it('tells the member a push the App Work gate REFUSED was refused, not that it succeeded', async () => {
+        // APW-08 T17. `blocked-by-guard` was added to the finalize outcome and
+        // this reconciler's message switch had a `default` of "Branch X was
+        // pushed." — so a refused push reached the member reading as a
+        // success. The switch is exhaustive now; this pins the copy.
+        taskWorkspace.finalizeRemotePush.mockResolvedValue({ outcome: 'blocked-by-guard' });
+
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job(),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('refused');
+        expect(body).toContain('no pull request was opened');
+        expect(body).not.toContain('Pull request #');
+    });
+
+    it('says an OPEN pull request now holds a refused change when the gate blocks a later push', async () => {
+        taskWorkspace.finalizeRemotePush.mockResolvedValue({
+            outcome: 'blocked-by-guard',
+            prNumber: 42,
+            prUrl: 'https://github.com/acme/repo/pull/42',
+        });
+
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job(),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('pull request #42 now contains that change');
+        expect(body).toContain('must not be merged');
+    });
+
     it('honours the agent PR permission and a no-changes run', async () => {
         agents.findById.mockResolvedValue({
             id: AGENT,

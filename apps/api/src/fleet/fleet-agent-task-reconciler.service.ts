@@ -1124,8 +1124,22 @@ function describeFinalize(outcome: TaskWorkspaceFinalizeOutcome, branch: string)
             return `Branch \`${branch}\` was pushed; this agent may not open pull requests, so one is left to a human.`;
         case 'conflict':
             return `Branch \`${branch}\` was pushed but conflicts with the base: ${outcome.conflictPaths?.join(', ') ?? ''}`;
-        default:
+        case 'blocked-by-guard':
+            // APW-08 T17. Before this case existed the outcome fell into
+            // `default` and a REFUSED push was reported to the member as
+            // "Branch X was pushed." — i.e. as a success.
+            return outcome.prNumber
+                ? `Branch \`${branch}\` was pushed, but this Work's change rules refused it, so the Task was blocked (the Task thread says why) — pull request #${outcome.prNumber} now contains that change and must not be merged as it stands.`
+                : `Branch \`${branch}\` was pushed, but this Work's change rules refused it, so no pull request was opened and the Task was blocked (the Task thread says why).`;
+        case 'no-changes':
             return `Branch \`${branch}\` was pushed.`;
+        default: {
+            // Exhaustive on purpose. A `default` that answers "pushed" is how
+            // `blocked-by-guard` reached a member as a success: the union grew
+            // and nothing failed to compile. A new outcome now fails HERE.
+            const unhandled: never = outcome.outcome;
+            return `Branch \`${branch}\` was pushed (${String(unhandled)}).`;
+        }
     }
 }
 

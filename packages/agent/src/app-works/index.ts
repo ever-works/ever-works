@@ -128,3 +128,6 @@ export {
     type AppChangeRefusalCode,
     type AppChangeVerdict,
 } from './app-change-guard';
+
+// APW-08 T17 — the change gate `TasksDomainModule` binds to `APP_WORK_CHANGE_GATE`.
+export { AppWorkChangeGateService } from './app-work-change-gate.service';
