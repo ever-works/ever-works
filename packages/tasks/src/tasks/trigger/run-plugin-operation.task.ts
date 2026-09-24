@@ -78,13 +78,15 @@ export const runPluginOperationTask = task<'run-plugin-operation', RunPluginOper
 
             const registered = registry?.get(payload.pluginId);
             if (!registered) {
-                return {
-                    ok: false,
-                    error: {
-                        message: `Plugin "${payload.pluginId}" not registered in worker after ensurePluginAvailable.`,
-                        code: 'PLUGIN_NOT_REGISTERED',
-                    },
-                };
+                // Same code, but the message names the actual cause: an unbound
+                // registry is a wiring fault of this worker context, not a
+                // missing plugin, and without an installer no install was tried.
+                const message = !registry
+                    ? `Plugin "${payload.pluginId}" cannot be resolved: no plugin registry is bound in this worker context.`
+                    : installer
+                      ? `Plugin "${payload.pluginId}" not registered in worker after ensurePluginAvailable.`
+                      : `Plugin "${payload.pluginId}" not registered in worker (no plugin installer is bound, so no install was attempted).`;
+                return { ok: false, error: { message, code: 'PLUGIN_NOT_REGISTERED' } };
             }
 
             const plugin = registered.plugin as unknown as Record<string, unknown>;

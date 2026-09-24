@@ -166,7 +166,10 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 run({ pluginId: PLUGIN_ID, operation: 'generate' }),
             ).resolves.toMatchObject({
                 ok: false,
-                error: { code: 'PLUGIN_NOT_REGISTERED' },
+                error: {
+                    code: 'PLUGIN_NOT_REGISTERED',
+                    message: expect.stringContaining('after ensurePluginAvailable'),
+                },
             });
         });
 
@@ -218,7 +221,10 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 run({ pluginId: PLUGIN_ID, operation: 'generate' }),
             ).resolves.toMatchObject({
                 ok: false,
-                error: { code: 'PLUGIN_NOT_REGISTERED' },
+                error: {
+                    code: 'PLUGIN_NOT_REGISTERED',
+                    message: expect.stringContaining('no plugin installer is bound'),
+                },
             });
         });
 
@@ -229,7 +235,10 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 run({ pluginId: PLUGIN_ID, operation: 'generate' }),
             ).resolves.toMatchObject({
                 ok: false,
-                error: { code: 'PLUGIN_NOT_REGISTERED' },
+                error: {
+                    code: 'PLUGIN_NOT_REGISTERED',
+                    message: expect.stringContaining('no plugin registry is bound'),
+                },
             });
             expect(h.generate).not.toHaveBeenCalled();
             expect(h.close).toHaveBeenCalledTimes(1);
@@ -242,7 +251,10 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 run({ pluginId: PLUGIN_ID, operation: 'generate' }),
             ).resolves.toMatchObject({
                 ok: false,
-                error: { code: 'PLUGIN_NOT_REGISTERED' },
+                error: {
+                    code: 'PLUGIN_NOT_REGISTERED',
+                    message: expect.stringContaining('no plugin registry is bound'),
+                },
             });
         });
     });
