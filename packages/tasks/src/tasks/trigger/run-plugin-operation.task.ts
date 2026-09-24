@@ -1,6 +1,7 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { PluginInstallerService, PluginRegistryService } from '@ever-works/agent/plugins';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
@@ -47,8 +48,19 @@ export const runPluginOperationTask = task<'run-plugin-operation', RunPluginOper
         appContext.useLogger(createTriggerLogger(`RunPluginOperation:${payload.pluginId}`));
 
         try {
-            const installer = appContext.get(PluginInstallerService, { strict: false });
-            const registry = appContext.get(PluginRegistryService, { strict: false });
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS
+            // `UnknownElementException` for an absent provider — it never answers
+            // `undefined` — so "install is optional" below never ran and a missing
+            // registry never produced PLUGIN_NOT_REGISTERED. And this `try` has no
+            // `catch`, so the throw escaped `run` instead of becoming an envelope.
+            const installer = getOptionalProvider<PluginInstallerService>(
+                appContext,
+                PluginInstallerService,
+            );
+            const registry = getOptionalProvider<PluginRegistryService>(
+                appContext,
+                PluginRegistryService,
+            );
 
             if (installer) {
                 try {
