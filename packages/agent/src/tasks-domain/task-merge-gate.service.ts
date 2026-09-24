@@ -18,6 +18,7 @@ import {
     type PromotionMergeVerdict,
 } from '../policy/promotion-merge-guard.port';
 import { TaskWorkspaceService, type TaskAgentMergeOutcome } from './task-workspace.service';
+import { taskRepositoryFullName } from './task-repository';
 
 /** What one post-CI evaluation did, for logs and for the sweep summary. */
 export type TaskMergeGateOutcome =
@@ -301,7 +302,7 @@ export class TaskMergeGateService {
                 promotion?.baseBranch ??
                 revertBase ??
                 ((work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || null),
-            repository: `${work.getRepoOwner()}/${work.getDataRepo()}`,
+            repository: taskRepositoryFullName(work),
             ciState: status.ciState,
             // Provider-side human review, surfaced to the approver as
             // context. It is NOT an authorization: a GitHub login is not a

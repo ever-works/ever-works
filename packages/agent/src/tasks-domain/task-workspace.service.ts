@@ -50,6 +50,7 @@ import {
     parseRepoDeclaredCommands,
     RepoDeclaredCommandsError,
 } from './repo-declared-commands';
+import { resolveTaskRepository } from './task-repository';
 
 /** The ONE path a Work's config lives at; mirrors `WORKS_CONFIG_FILEPATHS`. */
 const WORKS_CONFIG_FILEPATH = '.works/works.yml';
@@ -241,8 +242,7 @@ export class TaskWorkspaceService {
         // v1 repo resolution: the Work's output (data) repo on the Work's
         // git provider. `taskIsolationTargetRepo='linked'` reserves the
         // linked-source-repo variant for the connectors wave.
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
 
         const token = await this.gitFacade.getAccessToken(gitOptions);
@@ -353,8 +353,7 @@ export class TaskWorkspaceService {
             );
         }
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         if (!owner || !repo) return null;
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
@@ -507,8 +506,9 @@ export class TaskWorkspaceService {
         }
         if (input.task.workId && this.repoConnections && this.works) {
             const work = await this.works.findById(input.task.workId).catch(() => null);
-            const owner = work?.getRepoOwner();
-            const repo = work?.getDataRepo();
+            const target = work ? resolveTaskRepository(work) : null;
+            const owner = target?.owner;
+            const repo = target?.repo;
             if (owner && repo) {
                 const primary = await this.resolvePrimaryConnection(
                     input.userId,
@@ -585,8 +585,7 @@ export class TaskWorkspaceService {
                 `Work ${work.id} reads repository-declared commands, but no git facade is available in this runtime to read .works/works.yml`,
             );
         }
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         if (!owner || !repo) {
             // NOT an empty set. Control only reaches here for a Work that
             // OPTED IN — the policy gate and the git-facade gate are both
@@ -1224,8 +1223,7 @@ export class TaskWorkspaceService {
             throw new Error(`Task ${task.id} lost its Work before finalize.`);
         }
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
         const baseRef =
@@ -1377,8 +1375,7 @@ export class TaskWorkspaceService {
             return { outcome: 'pr-opened', prNumber: task.prNumber, prUrl: task.prUrl };
         }
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
         const baseRef =
@@ -1692,8 +1689,7 @@ export class TaskWorkspaceService {
         const work = await this.works.findById(task.workId);
         if (!work) return undefined;
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = {
             userId: task.userId,
             providerId: work.gitProvider,
@@ -2183,8 +2179,8 @@ export class TaskWorkspaceService {
             if (work) {
                 try {
                     await this.gitFacade.deleteBranch(
-                        work.getRepoOwner(),
-                        work.getDataRepo(),
+                        resolveTaskRepository(work).owner,
+                        resolveTaskRepository(work).repo,
                         task.branchRef,
                         { userId, providerId: work.gitProvider, workId: work.id },
                     );
@@ -2254,8 +2250,8 @@ export class TaskWorkspaceService {
             if (work && work.taskBranchCleanup !== 'manual') {
                 try {
                     await this.gitFacade.deleteBranch(
-                        work.getRepoOwner(),
-                        work.getDataRepo(),
+                        resolveTaskRepository(work).owner,
+                        resolveTaskRepository(work).repo,
                         task.branchRef,
                         { userId: task.userId, providerId: work.gitProvider, workId: work.id },
                     );
@@ -2589,8 +2585,8 @@ export class TaskWorkspaceService {
         // `options` before `ref` — the facade's own argument order
         // (`git.facade.ts:855-861`), which is not the order the sibling reads use.
         const file = await this.gitFacade.getFileContent(
-            work.getRepoOwner(),
-            work.getDataRepo(),
+            resolveTaskRepository(work).owner,
+            resolveTaskRepository(work).repo,
             APP_SPEC_PATH,
             gitOptions,
             branch,

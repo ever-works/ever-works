@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
-import {
-    WORK_TASK_REPO_ROLE,
-    matchWorkRepoRole,
-    type WorkRepoRole,
-} from '../works/work-repo-match';
+import { matchWorkRepoRole, type WorkRepoRole } from '../works/work-repo-match';
+import { taskRepositoryRole } from './task-repository';
 
 /** What a git ref resolved to inside the platform, when it resolved at all. */
 export interface TaskGitLink {
@@ -116,7 +113,7 @@ export class TaskGitLinkService {
                         taskId: task.id,
                         taskSlug: task.slug ?? null,
                         repoRoles: matched.roles,
-                        isTaskRepo: matched.roles.includes(WORK_TASK_REPO_ROLE),
+                        isTaskRepo: matched.roles.includes(taskRepositoryRole(matched.work.kind)),
                         prNumber,
                     };
                 }
@@ -161,7 +158,7 @@ export class TaskGitLinkService {
                 taskId: task.id,
                 taskSlug: task.slug ?? null,
                 repoRoles: matched.roles,
-                isTaskRepo: matched.roles.includes(WORK_TASK_REPO_ROLE),
+                isTaskRepo: matched.roles.includes(taskRepositoryRole(matched.work.kind)),
             };
         } catch (error) {
             this.logger.warn(
@@ -174,9 +171,12 @@ export class TaskGitLinkService {
     }
 
     /** Owner-scoped repo→Work walk. One `findByUser` per call, never more. */
-    private async matchWork(
-        base: TaskGitLookupBase,
-    ): Promise<{ work: { id: string }; roles: readonly WorkRepoRole[] } | null> {
+    private async matchWork(base: TaskGitLookupBase): Promise<{
+        // `kind` travels with the match because WHICH role is the Task
+        // repository depends on it — see `taskRepositoryRole`.
+        work: { id: string; kind?: string | null };
+        roles: readonly WorkRepoRole[];
+    } | null> {
         if (!base.userId || !base.owner || !base.repo) return null;
         try {
             const candidates = await this.works.findByUser(base.userId);

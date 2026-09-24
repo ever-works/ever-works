@@ -20,7 +20,8 @@ describe('TaskGitLinkService (git activity ingestion)', () => {
      * CI feedback + autonomous fix loop (slice AC, EW-806) added two
      * fields to every link: WHICH of the Work's repo roles the delivery's
      * repository fills, and whether that is the repository this Work's
-     * Tasks actually live in (the DATA repo — see `WORK_TASK_REPO_ROLE`).
+     * Tasks actually live in (the DATA repo for every kind that has one, the
+     * website-role Work Repository for an App Work — see `taskRepositoryRole`).
      * The default fixture below declares only a `work` repo, so a
      * consumer that ACTS on the Task it resolved must refuse this link;
      * the git-activity consumer, which only decorates an ingested event,
@@ -155,6 +156,56 @@ describe('TaskGitLinkService (git activity ingestion)', () => {
                     prNumber: 42,
                 }),
             ).resolves.toMatchObject({ repoRoles: ['work', 'data'], isTaskRepo: true });
+        });
+
+        it('marks an App Work’s own pull request as the Task repository — the WEBSITE role', async () => {
+            // An App Work has no data repository (`repos.data: false`): its
+            // Tasks branch and open pull requests in its `website`-role Work
+            // Repository. Keying on the data role alone would call every one
+            // of those pull requests "not the Task repository", and every
+            // consumer that acts on a Task would drop it.
+            works.findByUser = jest.fn().mockResolvedValue([
+                {
+                    id: 'work-1',
+                    kind: 'app',
+                    getRepoOwner: () => 'acme',
+                    getMainRepo: () => 'their-app-main',
+                    getWebsiteRepo: () => 'their-app',
+                    getDataRepo: () => 'their-app-data',
+                },
+            ]);
+            await expect(
+                makeSvc().findByPullRequest({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'their-app',
+                    prNumber: 42,
+                }),
+            ).resolves.toMatchObject({ repoRoles: ['website'], isTaskRepo: true });
+        });
+
+        it('does NOT mark a directory Work’s website pull request as the Task repository', async () => {
+            // The other half of the same rule: a directory Work's Tasks live in
+            // its data repository, so pull request #42 in its website repository
+            // is a different pull request that happens to share a number.
+            works.findByUser = jest.fn().mockResolvedValue([
+                {
+                    id: 'work-1',
+                    kind: 'directory',
+                    getRepoOwner: () => 'acme',
+                    getMainRepo: () => 'widgets-main',
+                    getWebsiteRepo: () => 'widgets-www',
+                    getDataRepo: () => 'widgets',
+                },
+            ]);
+            await expect(
+                makeSvc().findByPullRequest({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'widgets-www',
+                    prNumber: 42,
+                }),
+            ).resolves.toMatchObject({ repoRoles: ['website'], isTaskRepo: false });
         });
     });
 
