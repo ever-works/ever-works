@@ -333,6 +333,95 @@ describe('a node cannot move the judgement off an open pull request', () => {
         expect(recorded).not.toContain('innocuous');
         expect(bodyOf(m)).toContain('#12');
     });
+
+    /**
+     * Third adversarial review: the rule held only while a pull request was
+     * RECORDED. `branchRef` is written before the job leaves, so a Task whose
+     * agent may not open pull requests (a person opens one by hand) had its
+     * branch rewritten to whatever the node reported, and every later
+     * judgement followed the node's name.
+     */
+    it('BLOCKS a mismatched branch with no pull request recorded, too — and does not record it', async () => {
+        const m = mocks();
+
+        const outcome = await service(m).finalizeRemotePush(
+            pushInput({
+                task: task({ branchRef: 'ever-works/task/add-a-thing' }),
+                branch: 'innocuous',
+            }),
+        );
+
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard' });
+        const recorded = m.updateById.mock.calls.map(
+            (c) => (c[1] as { branchRef?: string })?.branchRef,
+        );
+        expect(recorded).not.toContain('innocuous');
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('the question and failure paths block a mismatched branch too, after judging the recorded head', async () => {
+        // On those paths the reconciler records the push AFTER this; a
+        // mismatch not refused here is written over `branchRef`.
+        const m = mocks();
+
+        const outcome = await service(m).judgeAppWorkBranch({
+            task: openPr('ever-works/task/add-a-thing') as never,
+            userId: 'u-1',
+            agentId: 'a-1',
+            reportedBranch: 'innocuous',
+        });
+
+        expect(m.evaluate).toHaveBeenCalledWith(
+            expect.objectContaining({ branch: 'ever-works/task/add-a-thing' }),
+        );
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard', prNumber: 12 });
+        expect(blockedWith(m)).toBe(true);
+    });
+
+    it('blocks a mismatched branch on those paths when no pull request is recorded', async () => {
+        const m = mocks();
+
+        const outcome = await service(m).judgeAppWorkBranch({
+            task: task({ branchRef: 'ever-works/task/add-a-thing' }) as never,
+            userId: 'u-1',
+            agentId: 'a-1',
+            reportedBranch: 'innocuous',
+        });
+
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard' });
+    });
+});
+
+describe('a merged or closed pull request is not an open one', () => {
+    /**
+     * Third adversarial review: `judgeAppWorkBranch` treated any recorded
+     * pull request as open. After a merge the branch is often deleted, the
+     * gate fails closed on a branch it cannot read, and a Task whose work had
+     * already landed was blocked with "must not be merged".
+     */
+    it.each([
+        ['prState merged', { prState: 'merged' }],
+        ['prState closed', { prState: 'closed' }],
+        ['branchState merged', { branchState: 'merged' }],
+        ['branchState cleaned', { branchState: 'cleaned' }],
+    ])('does not judge the recorded head when %s', async (_why, fields) => {
+        const m = mocks();
+
+        const outcome = await service(m).judgeAppWorkBranch({
+            task: task({
+                prNumber: 12,
+                prUrl: 'https://example.test/pr/12',
+                branchRef: 'task/real-head',
+                ...fields,
+            }) as never,
+            userId: 'u-1',
+            agentId: 'a-1',
+            reportedBranch: null,
+        });
+
+        expect(outcome).toBeNull();
+        expect(m.evaluate).not.toHaveBeenCalled();
+    });
 });
 
 describe('judgeAppWorkBranch — runs that never reach finalize', () => {

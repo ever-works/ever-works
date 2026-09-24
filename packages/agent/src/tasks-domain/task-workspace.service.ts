@@ -1370,18 +1370,15 @@ export class TaskWorkspaceService {
         // adversarial review showed a node could push a refused change to the PR
         // head and report an innocuous branch. Checked BEFORE `recordRemotePush`,
         // which would otherwise overwrite the recorded head with the reported one.
-        if (isAppWorkKind(work.kind) && task.prNumber && task.prUrl) {
-            const prHead = (task.branchRef ?? '').trim();
-            if (prHead && prHead !== branch) {
-                return this.refuseChange(
-                    input,
-                    task,
-                    `The run reported pushing \`${branch}\`, but this Task's pull request ` +
-                        `#${task.prNumber} is on \`${prHead}\`. A Task's branch never changes once ` +
-                        'written, so the Task is blocked until a person checks what was pushed where.',
-                    { number: task.prNumber, url: task.prUrl },
-                );
-            }
+        //
+        // Not only when a pull request is recorded: `describeFleetWorkspace`
+        // writes `branchRef` BEFORE the job leaves, so a different name is
+        // anomalous on every run — and without a recorded pull request (an
+        // agent that may not open one, a person opening it by hand) the
+        // overwrite would still move every later judgement onto the node's name.
+        if (isAppWorkKind(work.kind)) {
+            const mismatch = this.branchMismatch(task, branch);
+            if (mismatch) return this.refuseChange(input, task, mismatch, openPullRequestOf(task));
         }
 
         await this.recordRemotePush({
@@ -2582,18 +2579,19 @@ export class TaskWorkspaceService {
             const work = await this.works.findById(task.workId);
             if (!work || !isAppWorkKind(work.kind)) return null;
 
-            const existingPullRequest =
-                task.prNumber && task.prUrl
-                    ? { number: task.prNumber, url: task.prUrl }
-                    : undefined;
-            const branch = existingPullRequest
-                ? (task.branchRef ?? '').trim()
-                : (input.reportedBranch ?? '').trim();
+            // An OPEN pull request only: once it is merged or closed (and its
+            // branch perhaps deleted) there is nothing left for a push to reach,
+            // and judging a deleted branch fails closed — which blocked Tasks
+            // whose work had already landed.
+            const existingPullRequest = openPullRequestOf(task);
+            const reported = (input.reportedBranch ?? '').trim();
+            const branch = existingPullRequest ? (task.branchRef ?? '').trim() : reported;
             if (!branch) return null;
 
+            const judged = { task, userId, agentId: input.agentId };
             const { owner, repo } = resolveTaskRepository(work);
-            return this.guardAppChange({
-                input: { task, userId, agentId: input.agentId },
+            const guarded = await this.guardAppChange({
+                input: judged,
                 work,
                 owner,
                 repo,
@@ -2601,6 +2599,16 @@ export class TaskWorkspaceService {
                 branch,
                 ...(existingPullRequest ? { existingPullRequest } : {}),
             });
+            if (guarded) return guarded;
+
+            // The same rule as `finalizeRemotePush`: a reported branch that is
+            // not the Task's recorded branch blocks, BEFORE the caller records
+            // the push — on the question path `recordRemotePush` would
+            // otherwise overwrite `branchRef` with the node's name, and every
+            // later judgement would follow it.
+            const mismatch = reported ? this.branchMismatch(task, reported) : null;
+            if (mismatch) return this.refuseChange(judged, task, mismatch, existingPullRequest);
+            return null;
         } catch (error) {
             this.logger.warn(
                 `Task ${task.id}: App Work branch could not be judged: ${
@@ -2682,6 +2690,21 @@ export class TaskWorkspaceService {
         return repository.defaultBranch;
     }
 
+    /**
+     * The refusal text when a run reports pushing a branch that is not the
+     * Task's recorded one, or `null` when it is (or none is recorded yet).
+     */
+    private branchMismatch(task: Task, reported: string): string | null {
+        const recorded = (task.branchRef ?? '').trim();
+        if (!recorded || recorded === reported) return null;
+        const onPullRequest = task.prNumber ? ` (pull request #${task.prNumber})` : '';
+        return (
+            `The run reported pushing \`${reported}\`, but this Task's branch is \`${recorded}\`${onPullRequest}. ` +
+            "A Task's branch never changes once written, so the Task is blocked until a person checks " +
+            'what was pushed where.'
+        );
+    }
+
     /** The refusal every path shares: stay `pushed`, say why, block. */
     private async refuseChange(
         input: { task: Task; userId: string; agentId: string },
@@ -2739,6 +2762,19 @@ export class TaskWorkspaceService {
  */
 function mountBranchAlreadyGone(message: string): boolean {
     return message.toLowerCase().includes('reference does not exist');
+}
+
+/**
+ * The Task's pull request while it is still OPEN as far as the platform last
+ * saw: recorded, not observed merged or closed, and its branch not merged,
+ * cleaned or discarded. An unknown `prState` counts as open — the status sync
+ * writes it, and a pull request opened a minute ago has none yet.
+ */
+function openPullRequestOf(task: Task): { number: number; url: string } | undefined {
+    if (!task.prNumber || !task.prUrl) return undefined;
+    if (task.prState === 'merged' || task.prState === 'closed') return undefined;
+    if (['merged', 'cleaned', 'discarded'].includes(task.branchState ?? '')) return undefined;
+    return { number: task.prNumber, url: task.prUrl };
 }
 
 /**

@@ -243,6 +243,19 @@ export class FleetAgentTaskReconcilerService {
             await this.bestEffort('board denorm', () =>
                 this.runDenorm.recordTerminal(ctx.taskId, ctx.runId, 'failed'),
             );
+            // APW-08 — a node that finished and pushed before it saw the cancel
+            // still pushed. Nothing is opened or announced for a cancelled run,
+            // but an App Work Task's OPEN pull request picked that push up, so
+            // its recorded head is judged like every other path's.
+            const cancelledTask = await this.tasks.findById(ctx.taskId).catch(() => null);
+            if (cancelledTask) {
+                await this.judgeAppWorkBranch(
+                    cancelledTask,
+                    event.userId,
+                    ctx.agentId ?? run.agentId,
+                    null,
+                );
+            }
             return;
         }
 
@@ -397,13 +410,27 @@ export class FleetAgentTaskReconcilerService {
                     gateStatus: toGateStatus(result.gateStatus),
                 });
                 finalizeNote = describeFinalize(outcome, result.git.branch);
-                primaryPrUrl = outcome.prUrl ?? null;
+                // A refused pull request is not one "to review": the Inbox
+                // notice below lists this URL under that heading.
+                primaryPrUrl =
+                    outcome.outcome === 'blocked-by-guard' ? null : (outcome.prUrl ?? null);
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 finalizeNote = `The branch \`${result.git.branch}\` was pushed, but opening the pull request failed: ${message}`;
                 this.logger.warn(
                     `Task ${task.id}: remote finalize failed after fleet push: ${message}`,
                 );
+                // APW-08 — finalize can throw BEFORE its judgement (an empty
+                // reported branch, a database error while recording). The push
+                // still happened, so an App Work Task's open pull request is
+                // judged here; a refusal replaces the note.
+                const judged = await this.judgeAppWorkBranch(
+                    task,
+                    event.userId,
+                    agentId ?? run.agentId,
+                    reportedPush(result),
+                );
+                if (judged) finalizeNote = describeFinalize(judged, result.git.branch);
             }
         } else if (result.git?.empty || (result.git && !result.git.pushed)) {
             finalizeNote = result.git.empty
@@ -412,16 +439,18 @@ export class FleetAgentTaskReconcilerService {
         }
         // APW-08 T17 — "nothing pushed" is only what the node says. When
         // `finalizeRemotePush` did not run, an App Work Task's open pull request
-        // is still judged at its recorded head.
+        // is still judged at its recorded head — and a refusal REPLACES the
+        // note, so the member is not told "no file changes" about a Task this
+        // just blocked.
         if (task && !(result.git && result.git.pushed && !result.git.empty)) {
-            await this.bestEffort('judge App Work branch', () =>
-                this.taskWorkspace.judgeAppWorkBranch({
-                    task,
-                    userId: event.userId,
-                    agentId: agentId ?? run.agentId,
-                    reportedBranch: null,
-                }),
+            const judged = await this.judgeAppWorkBranch(
+                task,
+                event.userId,
+                agentId ?? run.agentId,
+                null,
             );
+            if (judged)
+                finalizeNote = describeFinalize(judged, task.branchRef ?? result.git?.branch ?? '');
         }
 
         // Multi-repo Task workspaces (slice C): one pull request per mounted
@@ -575,6 +604,17 @@ export class FleetAgentTaskReconcilerService {
             this.logger.debug(
                 `Run ${ctx.runId}: owner question ignored — run already ${run.status} (replayed completion)`,
             );
+            // APW-08 — "already settled" can be the stuck-run sweeper failing a
+            // run whose node was still alive; the node then pushed, and asked.
+            // The success and failure paths judge in this position; so does this.
+            if (task) {
+                await this.judgeAppWorkBranch(
+                    task,
+                    event.userId,
+                    agentId ?? run.agentId,
+                    reportedPush(result),
+                );
+            }
             return;
         }
         // The two parking writes are NOT best-effort, and not silent either
@@ -619,17 +659,25 @@ export class FleetAgentTaskReconcilerService {
         // APW-08 T17 — a run that asks a question still commits and pushes its
         // work first. On an App Work that push is judged here: an open pull
         // request picks it up with nothing else in the way.
-        if (task) {
-            await this.bestEffort('judge App Work branch', () =>
-                this.taskWorkspace.judgeAppWorkBranch({
-                    task,
-                    userId: event.userId,
-                    agentId: agentId ?? run.agentId,
-                    reportedBranch: reportedPush(result),
-                }),
-            );
-        }
-        if (task && result.git && result.git.pushed && !result.git.empty) {
+        const judged = task
+            ? await this.judgeAppWorkBranch(
+                  task,
+                  event.userId,
+                  agentId ?? run.agentId,
+                  reportedPush(result),
+              )
+            : null;
+        // A refused push is NOT recorded: the refusal may be that the node
+        // reported a branch other than the Task's, and recording it would
+        // overwrite `branchRef` with the node's name — moving every later
+        // judgement onto it.
+        if (
+            task &&
+            judged?.outcome !== 'blocked-by-guard' &&
+            result.git &&
+            result.git.pushed &&
+            !result.git.empty
+        ) {
             const git = result.git;
             await this.bestEffort('record pushed branch', () =>
                 this.taskWorkspace.recordRemotePush({
@@ -934,6 +982,34 @@ export class FleetAgentTaskReconcilerService {
     private async describeNode(nodeId: string, userId: string): Promise<string> {
         const node = await this.lookupNode(nodeId, userId);
         return node ? `${node.name} (${nodeId.slice(0, 8)})` : nodeId;
+    }
+
+    /**
+     * APW-08 — judge an App Work Task's branch on a path that does not reach
+     * `finalizeRemotePush`, and hand back what was decided (`null` when there
+     * was nothing to judge, or for every other Work kind). The service never
+     * throws by contract; the `catch` is the net, and answers `null` — the
+     * merge sweep re-judges an App Work pull request before any merge.
+     */
+    private async judgeAppWorkBranch(
+        task: Task,
+        userId: string,
+        agentId: string,
+        reportedBranch: string | null,
+    ): Promise<TaskWorkspaceFinalizeOutcome | null> {
+        try {
+            return await this.taskWorkspace.judgeAppWorkBranch({
+                task,
+                userId,
+                agentId,
+                reportedBranch,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Fleet reconcile: judge App Work branch failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return null;
+        }
     }
 
     private async bestEffort(what: string, fn: () => Promise<unknown>): Promise<void> {

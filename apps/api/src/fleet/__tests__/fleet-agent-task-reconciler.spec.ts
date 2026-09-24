@@ -579,6 +579,100 @@ describe('FleetAgentTaskReconcilerService', () => {
             expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledTimes(1);
             expect(taskWorkspace.judgeAppWorkBranch).not.toHaveBeenCalled();
         });
+
+        // ── third adversarial review ─────────────────────────────────────
+        const REFUSED = {
+            outcome: 'blocked-by-guard',
+            prNumber: 42,
+            prUrl: 'https://github.com/acme/repo/pull/42',
+        };
+        const QUESTION = { text: 'Which plan?', context: null, truncated: false, mountDir: null };
+        const chat = () =>
+            taskChat.post.mock.calls.map((call) => String(call[1]?.body ?? '')).join('\n');
+
+        it('a finalize that THROWS before judging still has the push judged, and a refusal replaces the note', async () => {
+            // An empty reported branch, or a database error while recording,
+            // throws before `finalizeRemotePush` reaches its judgement.
+            taskWorkspace.finalizeRemotePush.mockRejectedValue(
+                new Error('remote finalize has no branch to open a pull request from'),
+            );
+            taskWorkspace.judgeAppWorkBranch.mockResolvedValue(REFUSED);
+
+            await done(successResult);
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+            expect(chat()).toContain('change rules refused');
+            expect(chat()).not.toContain('opening the pull request failed');
+        });
+
+        it('a refusal on the nothing-pushed path is what the member is told', async () => {
+            taskWorkspace.judgeAppWorkBranch.mockResolvedValue(REFUSED);
+
+            await done({
+                ...successResult,
+                git: { ...(successResult.git as object), pushed: false },
+            });
+
+            expect(chat()).toContain('change rules refused');
+            expect(chat()).not.toContain('but not pushed');
+        });
+
+        it('the QUESTION path does not record a push its judgement refused', async () => {
+            // The refusal may be a reported branch that is not the Task's;
+            // recording it would overwrite `branchRef` with the node's name.
+            taskWorkspace.judgeAppWorkBranch.mockResolvedValue({ outcome: 'blocked-by-guard' });
+
+            await done({ ...successResult, question: QUESTION });
+
+            expect(taskWorkspace.recordRemotePush).not.toHaveBeenCalled();
+        });
+
+        it('the QUESTION path still records an allowed push', async () => {
+            await done({ ...successResult, question: QUESTION });
+
+            expect(taskWorkspace.recordRemotePush).toHaveBeenCalledWith(
+                expect.objectContaining({ branch: 'task/tsk-1-task1' }),
+            );
+        });
+
+        it('a question for a run that is already settled still has its push judged', async () => {
+            // "Already settled" can be the stuck-run sweeper failing a run whose
+            // node was still alive — which then pushed, and asked.
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'failed',
+            });
+
+            await done({ ...successResult, question: QUESTION });
+
+            expect(runs.tryMarkCompleted).not.toHaveBeenCalled();
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+        });
+
+        it('a CANCELLED run has its open pull request judged — and nothing is opened or announced', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'cancelled',
+            });
+
+            await done(successResult);
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: null }),
+            );
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(taskChat.post).not.toHaveBeenCalled();
+        });
     });
 
     it('tells the member a push the App Work gate REFUSED was refused, not that it succeeded', async () => {
