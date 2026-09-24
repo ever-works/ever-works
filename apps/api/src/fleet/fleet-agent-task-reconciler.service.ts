@@ -501,7 +501,10 @@ export class FleetAgentTaskReconcilerService {
                         summary,
                     });
                     mountNotes.push(describeMountOutcome(outcome, mount.branch));
-                    if (outcome.prUrl) openedPullRequests.push(outcome.prUrl);
+                    // A refused mount's pull request is not one "to review".
+                    if (outcome.prUrl && outcome.outcome !== 'blocked-by-guard') {
+                        openedPullRequests.push(outcome.prUrl);
+                    }
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error);
                     mountNotes.push(
@@ -1199,8 +1202,21 @@ function describeMountOutcome(outcome: TaskMountPushOutcome, branch: string): st
             return `\`${outcome.repositoryId}\`: pull request #${outcome.prNumber} opened from \`${branch}\` (${outcome.prUrl}).`;
         case 'pushed-no-pr':
             return `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed; the pull request is left to a human.`;
-        default:
+        case 'blocked-by-guard':
+            // APW-08. The mounted repository is an App Work's code repository and
+            // its change rules refused the push — never "opening failed", which
+            // would invite someone to open it by hand.
+            return outcome.prNumber
+                ? `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed, but that App Work's change rules refused it, so the Task was blocked (the Task thread says why) — pull request #${outcome.prNumber} now contains that change and must not be merged as it stands.`
+                : `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed, but that App Work's change rules refused it, so no pull request was opened and the Task was blocked (the Task thread says why).`;
+        case 'failed':
             return `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed, but opening the pull request failed: ${outcome.error ?? 'unknown error'}.`;
+        default: {
+            // Exhaustive on purpose, like `describeFinalize`: a new outcome must
+            // fail to compile here rather than read as "opening failed".
+            const unhandled: never = outcome.outcome;
+            return `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed (${String(unhandled)}).`;
+        }
     }
 }
 

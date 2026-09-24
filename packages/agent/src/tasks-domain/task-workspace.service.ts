@@ -55,7 +55,8 @@ import {
     parseRepoDeclaredCommands,
     RepoDeclaredCommandsError,
 } from './repo-declared-commands';
-import { resolveTaskRepository } from './task-repository';
+import { resolveTaskRepository, taskRepositoryRole } from './task-repository';
+import { matchWorkRepoRoles } from '../works/work-repo-match';
 
 /** The ONE path a Work's config lives at; mirrors `WORKS_CONFIG_FILEPATHS`. */
 const WORKS_CONFIG_FILEPATH = '.works/works.yml';
@@ -134,7 +135,13 @@ export interface TaskWorkspaceFinalizeOutcome {
  */
 export interface TaskMountPushOutcome {
     repositoryId: string;
-    outcome: 'pr-opened' | 'pushed-no-pr' | 'failed';
+    /**
+     * `blocked-by-guard` — the mounted repository is an App Work's code
+     * repository and that Work's change rules refused the pushed branch: no
+     * pull request was opened, and one already open now carries a change the
+     * rules refuse (APW-08).
+     */
+    outcome: 'pr-opened' | 'pushed-no-pr' | 'failed' | 'blocked-by-guard';
     prNumber?: number;
     prUrl?: string;
     error?: string;
@@ -745,6 +752,13 @@ export class TaskWorkspaceService {
                     providerId: repo.provider,
                     workId: input.workId,
                 });
+                // `getRepository` answers null for a repository the provider does
+                // not find; reading `.defaultBranch` off it was a bare TypeError.
+                if (!remote) {
+                    throw new Error(
+                        `Attached repository ${identity} cannot be mounted on a fleet node: the git provider does not find it, so its default branch is unknown.`,
+                    );
+                }
                 baseRef = remote.defaultBranch;
             }
             mounts.push({
@@ -812,6 +826,11 @@ export class TaskWorkspaceService {
                     providerId: resolved.provider,
                     workId: input.workId,
                 });
+                if (!remote) {
+                    throw new Error(
+                        `Task ${input.task.id}: extra repository ${identity} cannot be mounted on a fleet node: the git provider does not find it, so its default branch is unknown.`,
+                    );
+                }
                 baseRef = remote.defaultBranch;
             }
             const mountDir = extra.mountDir?.trim() || resolved.mountDir;
@@ -965,6 +984,23 @@ export class TaskWorkspaceService {
             );
         }
 
+        // APW-08 — a mounted repository can be an App Work's code repository:
+        // a registry connection is just a URL, so an agent attachment or a Task
+        // extra can name ANOTHER App Work's repository (or, until the identity
+        // was canonicalised, the Task's own under another spelling). Every
+        // other change-gate call is keyed on the Task's own Work, so that
+        // Work's rules never ran here. Judged BEFORE all three branches below:
+        // an open pull request re-recorded, one left to a human, one opened.
+        const refusal = await this.judgeMountedAppWorkChange({
+            task,
+            userId,
+            agentId: input.agentId,
+            owner,
+            repo,
+            branch,
+        });
+        if (refusal) return this.refuseMountChange(task, input, refusal);
+
         // Idempotent on the pull request, exactly like the primary path: the
         // Task branch name is stable, so a re-run pushes MORE commits onto the
         // branch behind an already-open pull request. Asking the provider for
@@ -1066,6 +1102,156 @@ export class TaskWorkspaceService {
             const message = error instanceof Error ? error.message : String(error);
             return this.recordMountFailure(task, input, message);
         }
+    }
+
+    /**
+     * APW-08 — judge a pushed MOUNT branch against the change rules of every
+     * App Work whose Task repository the mounted repository is (normally none,
+     * or one). Answers the refusal text, or `null` to proceed.
+     *
+     * Same posture as {@link guardAppChange}: no gate bound → proceed; a gate
+     * that throws, or rules that cannot be read → REFUSE, because the
+     * alternative is a pull request nobody judged. Each Work is judged with its
+     * OWN coordinates, credentials and base branch — the rules live on that
+     * Work's base, not on the mount's configured base.
+     */
+    private async judgeMountedAppWorkChange(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        owner: string;
+        repo: string;
+        branch: string;
+    }): Promise<string | null> {
+        const { task, userId, owner, repo, branch } = input;
+        if (!this.appChangeGate) return null;
+        let candidates: Work[];
+        try {
+            candidates = (await this.works.findByUser(userId)) ?? [];
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: mount ${owner}/${repo} could not be matched to its Works: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return (
+                `The Works this repository might belong to could not be read, so the change pushed to ` +
+                `\`${owner}/${repo}\` was not checked against any App Work's change rules.`
+            );
+        }
+        const appWorks = matchWorkRepoRoles(candidates, owner, repo).filter(
+            (match) =>
+                isAppWorkKind(match.work.kind) &&
+                match.roles.includes(taskRepositoryRole(match.work.kind)),
+        );
+        for (const { work } of appWorks) {
+            const target = resolveTaskRepository(work);
+            const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
+            let verdict: AppWorkChangeGateVerdict;
+            try {
+                verdict = await this.appChangeGate.evaluate({
+                    work,
+                    taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                    owner: target.owner,
+                    repo: target.repo,
+                    gitOptions,
+                    baseRef: await this.resolveBaseRef(work, target.owner, target.repo, gitOptions),
+                    branch,
+                });
+            } catch (error) {
+                this.logger.warn(
+                    `Task ${task.id}: App change gate could not decide for mount ${owner}/${repo} (Work ${work.id}): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return (
+                    `\`${owner}/${repo}\` is the code repository of App Work "${work.name || work.id}", and ` +
+                    'its rules could not be read, so the change was not checked against its protected paths.'
+                );
+            }
+            // `=== true`: this package compiles without `strictNullChecks`.
+            if (verdict.allowed !== true) {
+                const paths = verdict.paths.length
+                    ? ['', 'Paths:', ...verdict.paths.map((path) => `- \`${path}\``)]
+                    : [];
+                return [
+                    `\`${owner}/${repo}\` is the code repository of App Work "${work.name || work.id}", ` +
+                        `and its change rules refused this change: ${verdict.message}`,
+                    ...paths,
+                ].join('\n');
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The mount-side refusal: record the entry as `failed` with the reason —
+     * KEEPING the pull request number and URL when one is already open, so the
+     * link to the pull request that now carries the refused change is not lost
+     * — say why in the Task thread, and block the Task. No pull request is
+     * opened. Never throws, like the rest of `finalizeMountPush`.
+     */
+    private async refuseMountChange(
+        task: Task,
+        input: {
+            userId: string;
+            agentId: string;
+            repositoryId: string;
+            branch: string;
+            baseRef?: string | null;
+            headSha?: string | null;
+        },
+        reason: string,
+    ): Promise<TaskMountPushOutcome> {
+        const branch = input.branch.trim();
+        const fresh = (await this.tasks.findById(task.id).catch(() => null)) ?? task;
+        const existing = (
+            Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : []
+        ).find(
+            (entry) =>
+                entry.repositoryId.toLowerCase() === input.repositoryId.toLowerCase() &&
+                entry.branch === branch &&
+                typeof entry.prNumber === 'number' &&
+                typeof entry.prUrl === 'string',
+        );
+        const consequence = existing
+            ? `The branch \`${branch}\` was pushed, and pull request #${existing.prNumber} (${existing.prUrl}) ` +
+              'now contains this change — it must not be merged as it stands.'
+            : `The branch \`${branch}\` was pushed, but no pull request was opened.`;
+        try {
+            await this.recordLinkedPullRequest(task, {
+                repositoryId: input.repositoryId,
+                branch,
+                baseRef: input.baseRef ?? existing?.baseRef ?? null,
+                headSha: input.headSha ?? null,
+                prNumber: existing?.prNumber ?? null,
+                prUrl: existing?.prUrl ?? null,
+                state: 'failed',
+                error: reason,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: refused mount ${input.repositoryId} could not be recorded: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        await this.postSystemMessage(
+            { task, userId: input.userId, agentId: input.agentId },
+            `${reason}\n\n${consequence}`,
+        );
+        await this.transitionTask(task, TaskStatus.BLOCKED);
+        this.logger.warn(
+            `Task ${task.id}: mount ${input.repositoryId} refused by an App Work's change rules.`,
+        );
+        return {
+            repositoryId: input.repositoryId,
+            outcome: 'blocked-by-guard',
+            ...(existing
+                ? { prNumber: existing.prNumber as number, prUrl: existing.prUrl as string }
+                : {}),
+            error: reason,
+        };
     }
 
     private async recordMountFailure(
@@ -2853,12 +3039,14 @@ export function repositoryIdFromCloneUrl(cloneUrl: string): string | null {
             return null;
         }
     }
-    const segments = path
-        .replace(/\.git$/i, '')
-        .split('/')
-        .filter((segment) => segment.length > 0);
+    // Split FIRST, then strip `.git` from the repository segment: stripping the
+    // whole path left `owner/repo.git/` (a trailing slash) as `owner/repo.git`,
+    // an identity no comparison with `owner/repo` recognised — git resolves that
+    // URL to the real repository, so a mount could alias the Task's primary.
+    const segments = path.split('/').filter((segment) => segment.length > 0);
     if (segments.length !== 2) return null;
-    const [owner, repo] = segments;
+    const owner = segments[0];
+    const repo = segments[1].replace(/\.git$/i, '');
     const safe = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
     if (!safe.test(owner) || !safe.test(repo) || owner === '..' || repo === '..') return null;
     return `${owner}/${repo}`;

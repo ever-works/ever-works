@@ -1235,6 +1235,36 @@ describe('FleetAgentTaskReconcilerService', () => {
             expect(inbox!.notice.mock.calls[0][1].body).toContain('Pull requests to review (1):');
         });
 
+        it('says a mount an App Work’s rules REFUSED was refused, and does not list its pull request for review', async () => {
+            // APW-08: the mounted repository is another App Work's code repository
+            // and its change rules refused the push. The pull request that already
+            // existed now carries that change — it must not appear under "Pull
+            // requests to review", and the note must not read "opening failed".
+            taskWorkspace.finalizeMountPush.mockResolvedValue({
+                repositoryId: 'acme/template',
+                outcome: 'blocked-by-guard',
+                prNumber: 7,
+                prUrl: 'https://github.com/acme/template/pull/7',
+                error: 'refused',
+            });
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+            const body: string = taskChat.post.mock.calls[0][1].body;
+            expect(body).toContain("that App Work's change rules refused it");
+            expect(body).toContain('pull request #7 now contains that change');
+            expect(body).not.toContain('opening the pull request failed');
+            const noticeBody: string = inbox!.notice.mock.calls[0][1].body;
+            expect(noticeBody).toContain('Pull requests to review (1):');
+            expect(noticeBody).not.toContain('- https://github.com/acme/template/pull/7');
+        });
+
         it('still completes the run when recording a mount pull request throws, and says so', async () => {
             taskWorkspace.finalizeMountPush.mockRejectedValue(new Error('db down'));
             await build().onCompleted(
