@@ -264,9 +264,13 @@ export async function recoverFailedAppDeploy(
             'AppDeploy:Failure',
             async (appContext): Promise<AppDeployFailureOutcome> => {
                 try {
-                    const deployments = appContext.get(WorkDeploymentRepository, {
-                        strict: false,
-                    });
+                    // `getOptionalProvider`: an absent repository used to THROW here and
+                    // be logged as "could not mark deployment" — a failure to mark,
+                    // rather than the missing binding it was.
+                    const deployments = getOptionalProvider<WorkDeploymentRepository>(
+                        appContext,
+                        WorkDeploymentRepository,
+                    );
                     if (deployments?.markTerminal) {
                         await deployments.markTerminal(deploymentId, 'ERROR', {
                             lastError: `${APP_DEPLOY_WORKER_FAILED_CODE}: ${failure}`.slice(0, 500),

@@ -4,6 +4,7 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
 import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
 import { createRemoteProxy } from '../../trigger/worker/remote-proxy';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 
 /**
  * C10 — `app-fork-readiness` (APW-02 plan §6.2, `plan.md:664-670`).
@@ -177,9 +178,11 @@ export async function runAppForkReadinessTask(
     return withWorkerContext(
         'AppForkReadiness',
         async (appContext): Promise<AppForkReadinessTaskResult> => {
-            const runner = appContext.get<AppForkReadinessRunnerSeam>(
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named refusal below could never be reached.
+            const runner = getOptionalProvider<AppForkReadinessRunnerSeam>(
+                appContext,
                 APP_FORK_READINESS_RUNNER_SEAM,
-                { strict: false },
             );
             if (!runner?.run) {
                 logger.error(

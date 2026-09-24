@@ -40,6 +40,8 @@ const {
     contextHolder: { current: undefined as unknown },
 }));
 
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
+
 vi.mock('@trigger.dev/sdk', () => ({
     task: (params: Record<string, unknown>) => {
         recorded.push(params);
@@ -204,6 +206,27 @@ describe('app-fork-readiness (C10)', () => {
 
     it('names the missing seam instead of reporting a run that readied nothing', async () => {
         appContext.get.mockReturnValue(undefined);
+
+        const result = await registered.run({ workId: WORK_ID });
+
+        expect(result).toMatchObject({
+            status: 'skipped',
+            jobId: 'app-fork-readiness',
+            workId: WORK_ID,
+            outcome: null,
+            reason: 'runnerUnavailable',
+            error: null,
+        });
+        expect(run).not.toHaveBeenCalled();
+        expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('names the missing seam instead of reporting a run that readied nothing — when Nest THROWS for it, its real behaviour', async () => {
+        appContext.get.mockImplementation(() => {
+            // What Nest actually does for an absent provider; the case above
+            // fakes `undefined`, which Nest never returns.
+            throw new UnknownElementException('absent provider');
+        });
 
         const result = await registered.run({ workId: WORK_ID });
 

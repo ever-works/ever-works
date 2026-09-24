@@ -29,6 +29,8 @@ const {
     recorded: [] as Array<Record<string, unknown>>,
 }));
 
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
+
 vi.mock('@trigger.dev/sdk', () => ({
     task: (params: Record<string, unknown>) => {
         recorded.push(params);
@@ -182,6 +184,23 @@ describe('app-smoke (APW-06 T32 + T70)', () => {
 
     it('still names the service file when the context boots without it', async () => {
         appContext.get.mockReturnValue(undefined);
+
+        const result = await registered.run({ workId: WORK_ID });
+
+        expect(result).toMatchObject({
+            status: 'skipped',
+            reason: 'smoke_service_unavailable',
+            missing: 'packages/agent/src/app-runtime/app-smoke.service.ts',
+        });
+        expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('still names the service file when the context boots without it — when Nest THROWS for it, its real behaviour', async () => {
+        appContext.get.mockImplementation(() => {
+            // What Nest actually does for an absent provider; the case above
+            // fakes `undefined`, which Nest never returns.
+            throw new UnknownElementException('absent provider');
+        });
 
         const result = await registered.run({ workId: WORK_ID });
 

@@ -4,6 +4,7 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
 import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
 import { createRemoteProxy } from '../../trigger/worker/remote-proxy';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 
 /**
  * APW-05 T20 — `app-build-watch` (plan §7.3, §7.1).
@@ -174,9 +175,12 @@ export async function runAppBuildWatchTask(
     return withWorkerContext(
         'AppBuildWatch',
         async (appContext): Promise<AppBuildWatchTaskResult> => {
-            const runner = appContext.get<AppBuildWatchRunnerSeam>(APP_BUILD_WATCH_RUNNER_SEAM, {
-                strict: false,
-            });
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named refusal below could never be reached.
+            const runner = getOptionalProvider<AppBuildWatchRunnerSeam>(
+                appContext,
+                APP_BUILD_WATCH_RUNNER_SEAM,
+            );
             if (!runner?.run) {
                 logger.error(
                     'app-build-watch: the runner seam is not available in this worker context — ' +

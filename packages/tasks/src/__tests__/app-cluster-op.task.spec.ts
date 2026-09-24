@@ -32,6 +32,8 @@ const {
     recorded: [] as Array<Record<string, unknown>>,
 }));
 
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
+
 vi.mock('@trigger.dev/sdk', () => ({
     task: (params: Record<string, unknown>) => {
         recorded.push(params);
@@ -245,6 +247,23 @@ describe('app-cluster-op (APW-06 T32 + T70)', () => {
 
     it('still names the router file when the context boots without it', async () => {
         appContext.get.mockReturnValue(undefined);
+
+        const result = await registered.run({ op: 'pause', workId: WORK_ID });
+
+        expect(result).toMatchObject({
+            status: 'skipped',
+            reason: 'op_router_unavailable',
+            missing: 'packages/agent/src/app-runtime/app-cluster-op.router.ts',
+        });
+        expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('still names the router file when the context boots without it — when Nest THROWS for it, its real behaviour', async () => {
+        appContext.get.mockImplementation(() => {
+            // What Nest actually does for an absent provider; the case above
+            // fakes `undefined`, which Nest never returns.
+            throw new UnknownElementException('absent provider');
+        });
 
         const result = await registered.run({ op: 'pause', workId: WORK_ID });
 

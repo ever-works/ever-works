@@ -38,6 +38,8 @@ const {
     recorded: [] as Array<Record<string, unknown>>,
 }));
 
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
+
 vi.mock('@trigger.dev/sdk', () => ({
     task: vi.fn((params: unknown) => params),
     schedules: {
@@ -160,6 +162,24 @@ describe('app-health-poll (APW-06 T32)', () => {
 
     it('polls nothing when the lock service is unbound — a refusal, not a guess', async () => {
         appContext.get.mockReturnValue(undefined);
+
+        const result = await registered.run();
+
+        expect(result).toMatchObject({
+            status: 'skipped',
+            reason: 'lock_service_unavailable',
+            lockGuard: 'unavailable',
+        });
+        expect(cleanExpired).not.toHaveBeenCalled();
+        expect(loggerWarnMock).toHaveBeenCalled();
+    });
+
+    it('polls nothing when the lock service is unbound — a refusal, not a guess — when Nest THROWS for it, its real behaviour', async () => {
+        appContext.get.mockImplementation(() => {
+            // What Nest actually does for an absent provider; the case above
+            // fakes `undefined`, which Nest never returns.
+            throw new UnknownElementException('absent provider');
+        });
 
         const result = await registered.run();
 

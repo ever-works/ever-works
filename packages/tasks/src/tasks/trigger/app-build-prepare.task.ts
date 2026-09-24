@@ -4,6 +4,7 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
 import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
 import { createRemoteProxy } from '../../trigger/worker/remote-proxy';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 
 /**
  * APW-05 T19 — `app-build-prepare` (plan §7.2, §7.1).
@@ -166,9 +167,11 @@ export async function runAppBuildPrepareTask(
     return withWorkerContext(
         'AppBuildPrepare',
         async (appContext): Promise<AppBuildPrepareTaskResult> => {
-            const runner = appContext.get<AppBuildPrepareRunnerSeam>(
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named refusal below could never be reached.
+            const runner = getOptionalProvider<AppBuildPrepareRunnerSeam>(
+                appContext,
                 APP_BUILD_PREPARE_RUNNER_SEAM,
-                { strict: false },
             );
             if (!runner?.run) {
                 logger.error(
