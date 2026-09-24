@@ -1283,6 +1283,79 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
 
             expect(result).toMatchObject({ sha: null, filesChanged: 0 });
         });
+
+        /**
+         * The text check refuses `.git` by name, but a path can reach `.git`
+         * under another name: through a link that is already in the checkout, or
+         * — on Windows — through a short name or a stream name the filesystem
+         * resolves. A written `.git/config` sends the push, and the member's
+         * token, wherever it says. Each case must leave `.git/config` untouched.
+         */
+        describe('never writes git metadata under another name', () => {
+            const POISON = '[remote "origin"]\n\turl = http://127.0.0.1:9/stranger.git\n';
+            const gitConfig = () => fs.readFileSync(nodePath.join(dir, '.git', 'config'), 'utf8');
+
+            it('refuses a write through a link in the checkout that points at .git', async () => {
+                // A repository can commit `docs -> .git`; a junction needs no
+                // privileges on Windows and is a plain directory link elsewhere.
+                fs.symlinkSync(nodePath.join(dir, '.git'), nodePath.join(dir, 'docs'), 'junction');
+                const before = gitConfig();
+                const { facade } = build({ git: realGit() });
+
+                await expect(
+                    facade.commitToRepo(
+                        commitInput({
+                            branch: 'feature/x',
+                            files: [{ path: 'docs/config', body: POISON }],
+                        }),
+                    ),
+                ).rejects.toThrow(/symbolic link/);
+                expect(gitConfig()).toBe(before);
+            });
+
+            it('refuses a Windows short name for .git where the filesystem has one', async () => {
+                // `GIT~1` is `.git` on an NTFS volume with 8.3 names enabled. On
+                // any other filesystem it is an ordinary new directory, and the
+                // write is harmless — which this case also pins.
+                const aliases = fs.existsSync(nodePath.join(dir, 'GIT~1', 'config'));
+                const before = gitConfig();
+                const { facade } = build({ git: realGit() });
+
+                const attempt = facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/x',
+                        files: [{ path: 'GIT~1/config', body: POISON }],
+                    }),
+                );
+
+                if (aliases) {
+                    await expect(attempt).rejects.toThrow(/resolves inside \.git/);
+                } else {
+                    await expect(attempt).resolves.toMatchObject({ filesChanged: 1 });
+                }
+                expect(gitConfig()).toBe(before);
+            });
+
+            // The stream name opens `.git` itself on NTFS (measured through Node).
+            // A trailing dot or space did NOT alias through Node on the machine
+            // this was measured on, but the Win32 path layer other tools use
+            // strips both, and git refuses all three under `core.protectNTFS`.
+            it.each([
+                ['an NTFS stream name', '.git::$INDEX_ALLOCATION/config', /alternate data stream/],
+                ['a trailing dot', '.git./config', /dot or a space/],
+                ['a trailing space', '.git /config', /dot or a space/],
+            ])('refuses %s after .git', async (_what, path, why) => {
+                const before = gitConfig();
+                const { facade } = build({ git: realGit() });
+
+                await expect(
+                    facade.commitToRepo(
+                        commitInput({ branch: 'feature/x', files: [{ path, body: POISON }] }),
+                    ),
+                ).rejects.toThrow(why);
+                expect(gitConfig()).toBe(before);
+            });
+        });
     });
     describe('commitToRepo', () => {
         /**

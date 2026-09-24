@@ -113,6 +113,12 @@ export interface FacadePushOptions {
     readonly ref?: string;
     /** Receiving branch on the remote. Omitted → derived from `ref`. */
     readonly remoteRef?: string;
+    /**
+     * The repository this push is for. Given both, the provider pushes to the
+     * URL it computes for them rather than one read from the checkout's config.
+     */
+    readonly owner?: string;
+    readonly repo?: string;
 }
 
 export class GitFacadeError extends FacadeError {

@@ -163,6 +163,13 @@ export function checkoutDirectoryName(cloneUrl: string, owner: string, repo: str
 	return `${CHECKOUT_DIR_PREFIX}/r/${shortDigest(identity)}-${slugPart(owner)}--${slugPart(repo)}`;
 }
 
+/**
+ * Passed as `corsProxy` on every network call. isomorphic-git reads
+ * `http.corsProxy` from the checkout's config when the argument is `undefined`
+ * (and only then); an empty string is "no proxy" and skips that read.
+ */
+const NO_CORS_PROXY = '';
+
 export interface GitOperationsConfig {
 	readonly baseDir?: string;
 	readonly defaultCommitter?: GitCommitter;
@@ -215,7 +222,7 @@ export class GitOperations implements IGitOperations {
 				// be reset, the directory is dropped and cloned fresh rather than
 				// pulled from a remote nobody chose.
 				await git.setConfig({ fs, dir, path: 'remote.origin.url', value: url });
-				await this.pull(dir, token, committer);
+				await this.pullFrom(dir, token, url, committer);
 				return dir;
 			} catch {
 				await this.removeDirSafe(dir);
@@ -256,6 +263,10 @@ export class GitOperations implements IGitOperations {
 	}
 
 	async pull(dir: string, token: string, committer?: GitCommitter): Promise<void> {
+		await this.pullFrom(dir, token, await this.remoteUrl(dir, 'origin'), committer);
+	}
+
+	private async pullFrom(dir: string, token: string, url: string, committer?: GitCommitter): Promise<void> {
 		const auth = this.getAuth(token);
 		const resolvedCommitter = this.mergeCommitter(committer);
 
@@ -265,8 +276,39 @@ export class GitOperations implements IGitOperations {
 			http,
 			dir,
 			author: resolvedCommitter,
-			singleBranch: true
+			singleBranch: true,
+			// See `remoteUrl`: the checkout's config never chooses where this goes.
+			remote: 'origin',
+			url,
+			corsProxy: NO_CORS_PROXY
 		});
+	}
+
+	/**
+	 * The URL a network operation on `dir` sends the credentials to, read from
+	 * `remote.<remote>.url` ONLY.
+	 *
+	 * Left to itself, isomorphic-git (1.37) picks the destination from the
+	 * checkout's own config: `remote.origin.pushurl` over `remote.origin.url`
+	 * for a push, `branch.<ref>.remote` (another remote entirely) for a pull or
+	 * fetch, and `http.corsProxy` — which routes the request, `Authorization`
+	 * header included, through another host — for all three. Each was
+	 * reproduced against a local stand-in server receiving the token. (Its
+	 * internal push also honours `branch.<ref>.pushRemote` and
+	 * `remote.pushDefault`, but the public `push` defaults `remote` to
+	 * `'origin'` first.) A checkout's config is a file; anything that has written into the
+	 * checkout, now or in an earlier run, could have set any of them. Passing
+	 * the remote, this URL and an empty proxy explicitly means none of those
+	 * keys is ever read. `cloneOrPull` re-asserts `remote.origin.url` itself,
+	 * and a push that knows its repository computes the URL instead
+	 * (`GitPushOptions.owner`/`repo`).
+	 */
+	private async remoteUrl(dir: string, remote: string): Promise<string> {
+		const url: unknown = await git.getConfig({ fs, dir, path: `remote.${remote}.url` });
+		if (typeof url !== 'string' || url.trim().length === 0) {
+			throw new Error(`No URL is configured for git remote '${remote}' in ${dir}`);
+		}
+		return url;
 	}
 
 	async add(dir: string, paths: string | string[]): Promise<void> {
@@ -310,13 +352,16 @@ export class GitOperations implements IGitOperations {
 	}
 
 	async push(options: GitPushOptions): Promise<void> {
-		const { dir, token, force = false, maxRetries = 3, ref, remoteRef } = options;
+		const { dir, token, force = false, maxRetries = 3, ref, remoteRef, owner, repo } = options;
 
 		if (!token) {
 			throw new Error('Git token is required for push operation');
 		}
 
 		const auth = this.getAuth(token);
+		// A caller that names the repository gets the URL this provider computes
+		// for it; otherwise `origin`'s URL, and nothing else, from the config.
+		const url = owner && repo ? this.getCloneUrl(owner, repo) : await this.remoteUrl(dir, 'origin');
 		let lastError: Error | null = null;
 
 		for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -332,7 +377,10 @@ export class GitOperations implements IGitOperations {
 					dir,
 					ref,
 					remoteRef,
-					force
+					force,
+					remote: 'origin',
+					url,
+					corsProxy: NO_CORS_PROXY
 				});
 				return;
 			} catch (error: unknown) {
@@ -566,7 +614,9 @@ export class GitOperations implements IGitOperations {
 			fs,
 			http,
 			dir,
-			remote
+			remote,
+			url: await this.remoteUrl(dir, remote),
+			corsProxy: NO_CORS_PROXY
 		});
 	}
 

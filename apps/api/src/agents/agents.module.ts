@@ -60,7 +60,13 @@ import {
 // as `repos[role]` in `packages/agent/src/works/repository-work-guard.ts`
 // (`hasRepositoryRole`) — the ONE place that knowledge lives.
 import { getWorkCapabilities, isAppWorkKind } from '@ever-works/contracts';
-import { posix as posixPath } from 'node:path';
+import { lstat, realpath } from 'node:fs/promises';
+import {
+    join as joinPath,
+    posix as posixPath,
+    relative as relativePath,
+    sep as pathSep,
+} from 'node:path';
 import type { RepositoryRole } from '@ever-works/contracts/api';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -313,7 +319,14 @@ function plainBranchName(tool: string, raw: string): string {
  *
  * Also refused: non-strings, empty, backslashes (one name must mean one path on
  * every host), NUL, absolute or drive-lettered paths, and anything that
- * normalises to the root, above it, or to a directory.
+ * normalises to the root, above it, or to a directory. And the names git itself
+ * refuses under `core.protectNTFS`: a colon (`.git::$INDEX_ALLOCATION` opens
+ * `.git` itself on NTFS — measured) and a trailing dot or space (the Win32 path
+ * layer strips them, so `.git.` is `.git` to most Windows tools).
+ *
+ * Text alone cannot see everything a path resolves to — a Windows short name
+ * (`GIT~1` is `.git`) or a symbolic link committed to the repository. The write
+ * loop checks the real location as well: {@link assertRealWriteTarget}.
  */
 function normalizeRepoPath(tool: string, raw: unknown): string {
     const refuse = (why: string): never => {
@@ -336,12 +349,70 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
     ) {
         return refuse('must name a file inside the repository');
     }
-    if (normalized.split('/').some((segment) => segment.toLowerCase() === '.git')) {
+    const segments = normalized.split('/');
+    if (segments.some((segment) => segment.toLowerCase() === '.git')) {
         return refuse(
             'files inside .git are never written — they are the repository, not its content',
         );
     }
+    if (segments.some((segment) => segment.includes(':'))) {
+        return refuse('a colon names an alternate data stream on Windows');
+    }
+    if (segments.some((segment) => /[. ]$/.test(segment))) {
+        return refuse('a name ending in a dot or a space is a different name on Windows');
+    }
     return normalized;
+}
+
+/**
+ * The write-time half of {@link normalizeRepoPath}: where `relPath` ACTUALLY
+ * lands under `repoRoot`, checked on disk just before the write.
+ *
+ * Refuses a path through any symbolic link (or Windows junction) that already
+ * exists in the checkout — a repository can commit `docs -> .git` or
+ * `docs -> /`, and `writeFile('docs/config')` follows it. Then resolves the
+ * deepest part of the path that exists and refuses it if it is outside the
+ * checkout or inside `.git`: that catches every alias the text check cannot
+ * see, such as a Windows short name (`GIT~1/config` writes `.git/config`).
+ * Reproduced on an NTFS volume with short names enabled.
+ *
+ * Parts of the path that do not exist yet are created as plain directories by
+ * the caller's `mkdir`, so they cannot alias anything. The Work's commit slot
+ * is held for the whole write, so nothing else changes the checkout between
+ * this check and the write.
+ */
+async function assertRealWriteTarget(
+    tool: string,
+    repoRoot: string,
+    relPath: string,
+): Promise<void> {
+    const refuse = (why: string): never => {
+        throw new Error(
+            `${tool}: file path ${JSON.stringify(relPath)} ${why} — refusing to write.`,
+        );
+    };
+    let cursor = repoRoot;
+    let deepest = repoRoot;
+    for (const segment of relPath.split('/')) {
+        cursor = joinPath(cursor, segment);
+        let isLink: boolean;
+        try {
+            isLink = (await lstat(cursor)).isSymbolicLink();
+        } catch (err) {
+            const code = (err as NodeJS.ErrnoException).code;
+            if (code === 'ENOENT' || code === 'ENOTDIR') break;
+            throw err;
+        }
+        if (isLink) refuse('goes through a symbolic link in the repository');
+        deepest = cursor;
+    }
+    const inside = relativePath(await realpath(repoRoot), await realpath(deepest));
+    if (inside === '..' || inside.startsWith(`..${pathSep}`) || /^[A-Za-z]:|^[\\/]/.test(inside)) {
+        refuse('resolves outside the repo directory');
+    }
+    if (inside.split(pathSep).some((segment) => segment.toLowerCase() === '.git')) {
+        refuse('resolves inside .git');
+    }
 }
 
 // PASS-4 review fix (CRITICAL): @Global() is required for the same
@@ -1234,6 +1305,7 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
                                             )} resolves outside the repo directory — refusing to write.`,
                                         );
                                     }
+                                    await assertRealWriteTarget('commitToRepo', repoRoot, f.path);
                                     await fsp.mkdir(path.dirname(abs), { recursive: true });
                                     await fsp.writeFile(abs, f.body, 'utf8');
                                 }
@@ -1286,6 +1358,10 @@ function normalizeRepoPath(tool: string, raw: unknown): string {
                                         // never expand to another branch or to a tag.
                                         ref: `refs/heads/${branch}`,
                                         remoteRef: `refs/heads/${branch}`,
+                                        // The URL is computed for this repository, never
+                                        // read from a checkout the model has written into.
+                                        owner: target.owner,
+                                        repo: target.repo,
                                     },
                                     {
                                         providerId,

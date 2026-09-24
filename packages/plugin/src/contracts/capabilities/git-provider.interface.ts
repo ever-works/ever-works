@@ -178,6 +178,14 @@ export interface GitPushOptions {
 	 * silently choosing the destination.
 	 */
 	readonly remoteRef?: string;
+	/**
+	 * The repository this push is FOR. When both are given the push goes to
+	 * the URL the provider computes for them, never to one read from the
+	 * checkout's config — pass them whenever anything other than the platform
+	 * itself (an agent tool, a model) has written into the checkout.
+	 */
+	readonly owner?: string;
+	readonly repo?: string;
 }
 
 export interface CreateRepoOptions {
