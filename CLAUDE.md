@@ -214,6 +214,9 @@ If you find a stray doc in the root, move it into `docs/` (most likely
 - **Prettier config conflict**: Root `package.json` uses tabs + 120 width; `.prettierrc` file uses spaces + 100 width. The root `package.json` config takes precedence for most files. Be aware when formatting.
 - **Jest module mappings**: Agent package tests map `@ever-works/plugin` and `@ever-works/contracts` to source works via `moduleNameMapper`. If tests fail with import errors, check these mappings in `jest.config.js`.
 - **Build before test**: Some packages require their workspace dependencies to be built first. Run `pnpm build` from root if you get resolution errors during testing.
+- **`ModuleRef.get` / `appContext.get` THROW for an absent provider**: `get(Token, { strict: false })` throws `UnknownElementException`; it never returns `undefined`, so an `if (!x)` after it is dead code. Use `getOptionalProvider(resolver, Token)` from `@ever-works/agent/utils`, which answers `undefined` for exactly that exception and rethrows anything else. A test double whose `get` returns `undefined` models a behaviour Nest does not have — throw `UnknownElementException` instead.
+- **A Task's repository is `resolveTaskRepository(work)`, not `getDataRepo()`**: an App Work has no data repository (`repos.data: false` in `work-capabilities.ts`), so `getDataRepo()` answers `${slug}-data`, which does not exist. The rule (data when the kind has one, else website) lives in `packages/agent/src/tasks-domain/task-repository.ts`; anything matching a pull request or branch back to a Task must use `taskRepositoryRole(kind)`, not `WORK_TASK_REPO_ROLE`.
+- **`packages/tasks` and `apps/api` consume the agent package's BUILT output**: after adding an export to `packages/agent`, rebuild it (`cd packages/agent && npx nest build -b swc && npx tsc -p tsconfig.types.json`) or dependent tests fail with "X is not a function" and type-checks read stale declarations.
 
 <!-- autoskills:start -->
 
