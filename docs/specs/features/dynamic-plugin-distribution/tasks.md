@@ -5,8 +5,8 @@
 
 **Feature ID**: `dynamic-plugin-distribution`
 **Plan**: `./plan.md`
-**Status**: `Done`
-**Last updated**: 2026-06-03
+**Status**: `In progress` — Phase 7 (T26, T27) is not complete; see the Phase 7 status note.
+**Last updated**: 2026-09-24
 
 ---
 
@@ -137,7 +137,32 @@
 
 ## Phase 7 — Execution router (T25–T28)
 
-- [ ] **T25**. Implement `PluginExecutionRouterService` at
+> **Status (2026-09-24).** The router existed but could never run a
+> long-running call: it was not exported and had no caller; it lazy-imported
+> `@trigger.dev/sdk` (which does not resolve from `packages/agent`) and waited
+> on `wait.forRunToComplete` (absent in SDK 4.5.11); and the worker task booted
+> a context with no plugin registry. Now:
+>
+> - the router routes an explicit per-call profile, or the manifest's
+>   `executionProfile`, in bundled AND dynamic mode (an unmarked call stays
+>   in-process in bundled mode, FR-22), is exported from `PluginsModule`, and
+>   dispatches through the active job runtime —
+>   `dispatchers.dispatchPluginOperation`, then the contract's new optional
+>   `getRunResult` (deadline, backoff, `AbortSignal`), with
+>   `startLongRunning` / `pollLongRunning` for callers that must not block;
+> - `run-plugin-operation` boots `TriggerRunPluginOperationModule` (registry +
+>   remote cache), hydrates the plugins bundled into the worker image, and
+>   resolves the operation on the materialised plugin — an end-to-end spec runs
+>   a fixture plugin through the REAL module.
+>
+> **Still open:** T26 — no facade calls the router yet (the first real caller
+> is a product decision); T27's _runtime-installed_ half — the worker binds no
+> installer, because today's `PluginInstallerService` would trust and write
+> the API's shared install row and never register the plugin, so a plugin not
+> bundled in the worker image answers `PLUGIN_NOT_REGISTERED`; and tenant-aware
+> routing (the router uses the platform's active runtime).
+
+- [x] **T25**. Implement `PluginExecutionRouterService` at
       `packages/agent/src/plugins/services/plugin-execution-router.service.ts`:
       decide in-process vs job-runtime per capability/operation from
       `executionProfile` + operation classification (FR-17).
@@ -153,7 +178,9 @@
       result channel (FR-16). Coordinate with [EW-683] for provider abstraction.
     - **Test**: long call for a runtime-installed plugin succeeds in the worker
       (worker installs into its own store first), not just the API.
-- [ ] **T28**. Result/error propagation + timeout/retry parity between paths.
+- [x] **T28**. Result/error propagation + timeout/retry parity between paths.
+      (Both paths answer one `PluginExecutionResult`; the job-runtime path adds the
+      run id and named `JOB_RUNTIME_*` codes; the worker task runs one attempt.)
 
 ## Phase 8 — Deployment (T29–T32)
 

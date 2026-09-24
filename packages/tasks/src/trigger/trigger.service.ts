@@ -46,8 +46,12 @@ import {
     AppBuildWatchDispatcher,
     APP_BUILD_PREPARE_TASK_ID,
     APP_BUILD_WATCH_TASK_ID,
+    // EW-693 / T27 — the long-running plugin operation job, named once in the agent.
+    PLUGIN_OPERATION_TASK_ID,
+    type PluginOperationPayload,
 } from '@ever-works/agent/tasks';
 import type {
+    JobRunResult,
     JobRunStatus,
     JobRuntimeDispatchers,
     JobRuntimeId,
@@ -95,6 +99,7 @@ import {
     APP_FORK_READINESS_TASK_ID,
     type appForkReadinessTask,
 } from '../tasks/trigger/app-fork-readiness.task';
+import type { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 // C10 — the readiness payload and dispatcher contract T23 declared (provisionally) in
 // `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
@@ -314,6 +319,28 @@ export class TriggerService
         } catch (error) {
             this.logger.debug(`getRunStatus(${runId}) failed: ${error}`);
             return 'unknown';
+        }
+    }
+
+    /**
+     * EW-693 / T27 — the contract's optional `getRunResult`: the run's status
+     * AND its output (`runs.retrieve`, which also fetches an output stored
+     * behind a presigned URL). The only request/response read the platform
+     * makes of a Trigger.dev run — `PluginExecutionRouterService` uses it to
+     * wait for a long-running plugin operation. Never throws: an unreadable run
+     * is `{ status: 'unknown' }`.
+     */
+    async getRunResult(runId: string): Promise<JobRunResult> {
+        if (!this.ensureConfigured()) {
+            return { status: 'unknown' };
+        }
+
+        try {
+            const run = await runs.retrieve(runId);
+            return triggerRunResult(this.mapTriggerStatus(run.status), run);
+        } catch (error) {
+            this.logger.debug(`getRunResult(${runId}) failed: ${error}`);
+            return { status: 'unknown' };
         }
     }
 
@@ -1396,6 +1423,39 @@ export class TriggerService
      * a create + Try again pair from queueing two polls that would each find nothing to
      * do.
      */
+    /**
+     * EW-693 / T27 — start the `run-plugin-operation` worker task for one
+     * long-running plugin operation (`PluginExecutionRouterService` looks this
+     * method up by name on the active runtime's dispatchers). Answers the run
+     * id, or `null` when Trigger.dev is not configured or the enqueue failed.
+     *
+     * `ttl` bounds the time in the QUEUE, which `maxDuration` does not count: a
+     * run no worker picks up within 15 minutes expires, and the router reads it
+     * as failed instead of waiting on it.
+     */
+    async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof runPluginOperationTask>(
+                PLUGIN_OPERATION_TASK_ID,
+                { pluginId: payload.pluginId, operation: payload.operation, args: payload.args },
+                this.stampTenantOptions({
+                    tags: ['plugin-operation', `plugin:${payload.pluginId}`],
+                    machine: this.machine() as any,
+                    ttl: '15m',
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch run-plugin-operation task', error as Error);
+            return null;
+        }
+    }
+
     async dispatchAppForkReadiness(payload: AppForkReadinessJobPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
@@ -1422,4 +1482,28 @@ export class TriggerService
             return null;
         }
     }
+}
+
+/**
+ * A retrieved Trigger.dev run as the contract's {@link JobRunResult}: the
+ * output only once the run completed, the error message when it has one.
+ * Shared by the platform service and the per-tenant provider view, so a BYO
+ * tenant's result reads the same.
+ */
+export function triggerRunResult(
+    status: JobRunStatus,
+    run: { output?: unknown; error?: unknown },
+): JobRunResult {
+    const error = run.error as { message?: unknown } | string | null | undefined;
+    const message =
+        typeof error === 'string'
+            ? error
+            : error && typeof error.message === 'string'
+              ? error.message
+              : null;
+    return {
+        status,
+        ...(status === 'completed' ? { output: run.output } : {}),
+        ...(message ? { error: { message } } : {}),
+    };
 }

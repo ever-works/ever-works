@@ -16,3 +16,4 @@ export * from './plugin-operations.service';
 export * from './plugin-installer.service';
 // EW-693 — sync vs long-running execution router (Phase 7).
 export * from './plugin-execution-router.service';
+export * from './plugin-operation.util';

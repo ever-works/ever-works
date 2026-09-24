@@ -14,27 +14,35 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * tests never touch the network and never need real env vars.
  */
 
-const { configureMock, runsCancelMock, runsRetrieveMock, triggerConfig, subscriptionsConfig } =
-    vi.hoisted(() => {
-        return {
-            configureMock: vi.fn(),
-            runsCancelMock: vi.fn(),
-            runsRetrieveMock: vi.fn(),
-            triggerConfig: {
-                shouldUseTrigger: vi.fn(),
-                getSecretKey: vi.fn(),
-                getApiUrl: vi.fn(),
-                getMachine: vi.fn(),
-                getInternalBaseUrl: vi.fn(),
-                getInternalSecret: vi.fn(),
-            },
-            subscriptionsConfig: { getDispatchIntervalMinutes: vi.fn(() => 5) },
-        };
-    });
+const {
+    configureMock,
+    runsCancelMock,
+    runsRetrieveMock,
+    tasksTriggerMock,
+    triggerConfig,
+    subscriptionsConfig,
+} = vi.hoisted(() => {
+    return {
+        configureMock: vi.fn(),
+        runsCancelMock: vi.fn(),
+        runsRetrieveMock: vi.fn(),
+        tasksTriggerMock: vi.fn(),
+        triggerConfig: {
+            shouldUseTrigger: vi.fn(),
+            getSecretKey: vi.fn(),
+            getApiUrl: vi.fn(),
+            getMachine: vi.fn(),
+            getInternalBaseUrl: vi.fn(),
+            getInternalSecret: vi.fn(),
+        },
+        subscriptionsConfig: { getDispatchIntervalMinutes: vi.fn(() => 5) },
+    };
+});
 
 vi.mock('@trigger.dev/sdk', () => ({
     configure: configureMock,
     runs: { cancel: runsCancelMock, retrieve: runsRetrieveMock },
+    tasks: { trigger: tasksTriggerMock },
     task: vi.fn().mockImplementation(() => ({ id: 'mock-task' })),
     schedules: { task: vi.fn().mockImplementation(() => ({ id: 'mock-schedule-task' })) },
     logger: { log: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -60,6 +68,8 @@ vi.mock('@ever-works/agent/tasks', () => ({
     // on TenantRuntimeBindingResolverService). The full-module mock must
     // provide it or vitest 400s the whole file on the missing export.
     CredentialVersionService: class {},
+    // EW-693 / T27 — the long-running plugin operation job id.
+    PLUGIN_OPERATION_TASK_ID: 'run-plugin-operation',
 }));
 
 // Per-task module mocks — the service imports these eagerly; the runtime
@@ -205,6 +215,89 @@ describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 
             runsRetrieveMock.mockResolvedValue({ status: triggerStatus });
             await expect(service.getRunStatus('run_x')).resolves.toBe(expected);
             expect(runsRetrieveMock).toHaveBeenCalledWith('run_x');
+        });
+    });
+
+    /**
+     * EW-693 / T27 — the contract's optional `getRunResult`: status AND output,
+     * the one request/response read `PluginExecutionRouterService` makes to
+     * wait for a long-running plugin operation.
+     */
+    describe('getRunResult()', () => {
+        it("answers { status: 'unknown' } when the runtime is disabled, without a call", async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+            expect(runsRetrieveMock).not.toHaveBeenCalled();
+        });
+
+        it('answers the output of a COMPLETED run', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'COMPLETED',
+                output: { ok: true, result: { n: 1 } },
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'completed',
+                output: { ok: true, result: { n: 1 } },
+            });
+            expect(runsRetrieveMock).toHaveBeenCalledWith('run_x');
+        });
+
+        it('carries no output until the run completes', async () => {
+            runsRetrieveMock.mockResolvedValue({ status: 'EXECUTING', output: 'partial' });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'running' });
+        });
+
+        it('answers the error message of a FAILED run', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'CRASHED',
+                error: { message: 'worker OOM', name: 'Error' },
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'failed',
+                error: { message: 'worker OOM' },
+            });
+        });
+
+        it("answers { status: 'unknown' } when runs.retrieve throws", async () => {
+            runsRetrieveMock.mockRejectedValue(new Error('network'));
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+        });
+    });
+
+    describe('dispatchPluginOperation()', () => {
+        const payload = { pluginId: 'acme-gen', operation: 'generate', args: { n: 1 } };
+
+        it('answers null when the runtime is disabled, without a call', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            await expect(service.dispatchPluginOperation(payload)).resolves.toBeNull();
+            expect(tasksTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('triggers run-plugin-operation with the payload, tags and a queue ttl, and answers the run id', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_42' });
+
+            await expect(service.dispatchPluginOperation(payload)).resolves.toBe('run_42');
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'run-plugin-operation',
+                { pluginId: 'acme-gen', operation: 'generate', args: { n: 1 } },
+                expect.objectContaining({
+                    tags: ['plugin-operation', 'plugin:acme-gen'],
+                    // maxDuration does not count queue time; the ttl bounds it.
+                    ttl: '15m',
+                }),
+            );
+        });
+
+        it('answers null when the enqueue fails', async () => {
+            tasksTriggerMock.mockRejectedValue(new Error('rate limited'));
+            await expect(service.dispatchPluginOperation(payload)).resolves.toBeNull();
+        });
+
+        it('is reachable through the dispatchers bag, by the name the router looks up', () => {
+            expect(
+                typeof (service.dispatchers as unknown as Record<string, unknown>)
+                    .dispatchPluginOperation,
+            ).toBe('function');
         });
     });
 

@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IJobRuntimeProvider,
+    JobRunResult,
     JobRunStatus,
     JobRuntimeDispatchers,
     JobRuntimeId,
@@ -16,7 +17,7 @@ import {
     type TriggerClient,
     type TriggerTenantCredentials,
 } from '@ever-works/job-runtime-trigger-plugin';
-import { TriggerService, triggerTenantStampStorage } from './trigger.service';
+import { TriggerService, triggerRunResult, triggerTenantStampStorage } from './trigger.service';
 import {
     createTenantTriggerClient,
     dispatchersFromTenantClient,
@@ -204,6 +205,14 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
      */
     async getRunStatus(runId: string): Promise<JobRunStatus> {
         return this.triggerService.getRunStatus(runId);
+    }
+
+    /**
+     * EW-693 / T27 — delegates to {@link TriggerService.getRunResult}: the
+     * run's status and output, for the long-running plugin operation path.
+     */
+    async getRunResult(runId: string): Promise<JobRunResult> {
+        return this.triggerService.getRunResult(runId);
     }
 
     /**
@@ -415,6 +424,21 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
                       }
                   }
                 : (runId: string) => base.getRunStatus(runId),
+            // EW-693 / T27 — read a BYO tenant's run from THEIR project; the
+            // platform credentials would 404 on it.
+            getRunResult: tenantClient
+                ? async (runId: string): Promise<JobRunResult> => {
+                      try {
+                          const run = await tenantClient.runs.retrieve(runId);
+                          return triggerRunResult(
+                              mapTriggerStatusLocal(run.status),
+                              run as { output?: unknown; error?: unknown },
+                          );
+                      } catch {
+                          return { status: 'unknown' };
+                      }
+                  }
+                : (runId: string) => base.getRunResult(runId),
             isEnabled(): boolean {
                 return base.isEnabled();
             },

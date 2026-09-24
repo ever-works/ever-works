@@ -91,9 +91,10 @@ const PROVIDERS = [
     // EW-693 — runtime installer. Inert in bundled mode; active only
     // when PluginsModuleOptions.distributionMode === 'dynamic'.
     PluginInstallerService,
-    // EW-693 — execution router (Phase 7). Bundled mode always
-    // routes to in-process; the router still applies the
-    // ensurePluginAvailable gate for parity with dynamic mode.
+    // EW-693 — execution router (Phase 7). Routes a plugin operation
+    // in-process or to the `run-plugin-operation` worker task through the
+    // active job runtime (an explicit or manifest long-running profile is
+    // honoured in bundled mode too).
     PluginExecutionRouterService,
 ];
 
@@ -128,6 +129,10 @@ const EXPORTS = [
     // (Phase 7) can call ensurePluginAvailable before invoking a
     // distributable plugin.
     PluginInstallerService,
+    // EW-693 — the execution router. It was provided but never exported, so
+    // nothing outside this module could inject it (T26 "facade adoption" was
+    // never reachable).
+    PluginExecutionRouterService,
 ];
 
 /**

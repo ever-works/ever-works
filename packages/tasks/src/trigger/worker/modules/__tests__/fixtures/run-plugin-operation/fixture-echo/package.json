@@ -1,0 +1,22 @@
+{
+    "name": "@ever-works/fixture-echo-plugin",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Test fixture for trigger-run-plugin-operation.module.spec.ts — a plugin the REAL loader discovers, registers lazily and materialises.",
+    "main": "./index.cjs",
+    "everworks": {
+        "plugin": {
+            "id": "fixture-echo",
+            "name": "Fixture Echo",
+            "version": "1.0.0",
+            "category": "utility",
+            "capabilities": [],
+            "description": "Echoes its arguments; used only by the run-plugin-operation boot spec.",
+            "author": {
+                "name": "Ever Works Team"
+            },
+            "license": "AGPL-3.0",
+            "builtIn": false
+        }
+    }
+}

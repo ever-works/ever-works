@@ -153,5 +153,7 @@ export * from './app-works-jobs';
 // its jobs under.
 export * from './app-build-prepare.types';
 export * from './app-build-prepare-dispatcher';
+// EW-693 / T27 — the long-running plugin operation job's id, dispatch method and payload.
+export * from './plugin-operation-dispatch';
 export * from './app-build-watch.types';
 export * from './app-build-watch-dispatcher';

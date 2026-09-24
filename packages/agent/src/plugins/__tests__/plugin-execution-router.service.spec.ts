@@ -12,9 +12,12 @@ import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.
  * EW-693 / T25-T28 — execution router.
  *
  * Pinned behaviours:
- * 1. Bundled-mode routing is ALWAYS in-process (FR-22). No Trigger.dev
- *    dispatch occurs even for operations classified as long-running.
- * 2. Manifest `executionProfile` is the highest-priority signal.
+ * 1. Bundled mode with NO explicit profile routes in-process (FR-22): no job
+ *    runtime dispatch even for operations the taxonomy calls long-running. An
+ *    explicit per-call profile, or the manifest's `executionProfile`, is
+ *    honoured in bundled mode too (EW-693 T27 — see the block at the end).
+ * 2. An explicit per-call profile, then the manifest `executionProfile`, are
+ *    the highest-priority signals.
  * 3. Operation taxonomy default: short for unknown / search / extract;
  *    long-running for pipeline.run / deploy.deploy / generation.run
  *    plus the `.long-running` / `.deploy` / `.generate` suffix wildcards.
@@ -215,6 +218,9 @@ describe('PluginExecutionRouterService (EW-693)', () => {
             expect(result).toEqual({
                 ok: true,
                 location: 'job-runtime',
+                // The run id travels with every job-runtime answer, so a caller
+                // can read the run again later.
+                runId: 'run_1',
                 result: { generated: 42 },
             });
             expect(dispatcher.trigger).toHaveBeenCalledWith({
@@ -290,6 +296,344 @@ describe('PluginExecutionRouterService (EW-693)', () => {
 
             expect(result.location).toBe('job-runtime');
             expect(dispatcher.trigger).toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * EW-693 / T27 — the long-running path, made to work.
+     *
+     * The router used to lazy-import `@trigger.dev/sdk` (which does not resolve
+     * from this package) and wait on `wait.forRunToComplete` (which SDK 4.5.11
+     * does not have), so every long-running call reported "empty result" while
+     * the real run kept going. It now dispatches through the ACTIVE JOB RUNTIME
+     * (`dispatchers.dispatchPluginOperation`) and waits on its `getRunResult`.
+     */
+    describe('the job-runtime path (EW-693 T27)', () => {
+        type Read = { status: string; output?: unknown; error?: { message: string } | null };
+
+        function makeRuntime(reads: Read[] = [], runId: string | null = 'run_7') {
+            const queue = [...reads];
+            const provider = {
+                dispatchers: { dispatchPluginOperation: jest.fn(async () => runId) },
+                getRunResult: jest.fn(async () => queue.shift() ?? { status: 'running' }),
+                cancel: jest.fn(async () => true),
+            };
+            const registry = { getActive: jest.fn(() => provider) };
+            return { provider, registry };
+        }
+
+        function routerWith(
+            runtime: { registry: unknown } | null,
+            opts: Partial<PluginsModuleOptions> = {},
+            plugins: Parameters<typeof makeRegistry>[0] = {},
+        ) {
+            return new PluginExecutionRouterService(
+                { distributionMode: 'bundled', ...opts },
+                makeRegistry(plugins),
+                undefined,
+                (runtime?.registry ?? null) as never,
+            );
+        }
+
+        const fast = { pollIntervalMs: 1, timeoutMs: 5_000 };
+
+        describe('route — explicit and manifest profiles are honoured in bundled mode', () => {
+            it('sends an explicit long-running call to the job runtime even in bundled mode', () => {
+                expect(
+                    routerWith(null).route('p', 'runSandboxSession', { profile: 'long-running' }),
+                ).toEqual({
+                    location: 'job-runtime',
+                    reason: 'caller:profile=long-running',
+                });
+            });
+
+            it('honours a manifest executionProfile of long-running in bundled mode', () => {
+                const router = routerWith(
+                    null,
+                    {},
+                    {
+                        p: { manifest: { id: 'p', executionProfile: 'long-running' } as never },
+                    },
+                );
+                expect(router.route('p', 'execute').location).toBe('job-runtime');
+            });
+
+            it('an explicit sync profile beats a long-running manifest', () => {
+                const router = routerWith(
+                    null,
+                    { distributionMode: 'dynamic' },
+                    {
+                        p: { manifest: { id: 'p', executionProfile: 'long-running' } as never },
+                    },
+                );
+                expect(router.route('p', 'execute', { profile: 'sync' }).location).toBe(
+                    'in-process',
+                );
+            });
+
+            it('still keeps an UNMARKED call in-process in bundled mode (FR-22)', () => {
+                expect(routerWith(null).route('p', 'pipeline.run')).toEqual({
+                    location: 'in-process',
+                    reason: 'bundled-mode',
+                });
+            });
+        });
+
+        describe('dispatchLongRunning — through the active job runtime', () => {
+            it('starts the run, waits through queued and running, and answers the task’s result with its run id', async () => {
+                const runtime = makeRuntime([
+                    { status: 'queued' },
+                    { status: 'running' },
+                    { status: 'completed', output: { ok: true, result: { n: 9 } } },
+                ]);
+                const router = routerWith(runtime);
+
+                const result = await router.dispatchLongRunning(
+                    'p',
+                    'runSandboxSession',
+                    { a: 1 },
+                    fast,
+                );
+
+                expect(result).toEqual({
+                    ok: true,
+                    location: 'job-runtime',
+                    runId: 'run_7',
+                    result: { n: 9 },
+                });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith({
+                    pluginId: 'p',
+                    operation: 'runSandboxSession',
+                    args: { a: 1 },
+                });
+                expect(runtime.provider.getRunResult).toHaveBeenCalledTimes(3);
+                expect(runtime.provider.getRunResult).toHaveBeenCalledWith('run_7');
+            });
+
+            it('forwards the worker’s own failure envelope', async () => {
+                const runtime = makeRuntime([
+                    {
+                        status: 'completed',
+                        output: {
+                            ok: false,
+                            error: { code: 'PLUGIN_NOT_REGISTERED', message: 'not bundled' },
+                        },
+                    },
+                ]);
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toEqual({
+                    ok: false,
+                    location: 'job-runtime',
+                    runId: 'run_7',
+                    error: { code: 'PLUGIN_NOT_REGISTERED', message: 'not bundled' },
+                });
+            });
+
+            it.each([
+                ['failed', 'JOB_RUNTIME_FAILED'],
+                ['cancelled', 'JOB_RUNTIME_CANCELLED'],
+            ])('maps a %s run to %s with the runtime’s message', async (status, code) => {
+                const runtime = makeRuntime([{ status, error: { message: 'worker OOM' } }]);
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: { code, message: 'worker OOM' },
+                });
+            });
+
+            it('refuses a completed run whose output is not the task envelope', async () => {
+                const runtime = makeRuntime([{ status: 'completed', output: 'surprise' }]);
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_FAILED' } });
+            });
+
+            it('tolerates a few unreadable reads, then gives up on a run it cannot read', async () => {
+                const runtime = makeRuntime(
+                    Array.from({ length: 10 }, () => ({ status: 'unknown' })),
+                );
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_FAILED' } });
+                expect(runtime.provider.getRunResult).toHaveBeenCalledTimes(5);
+            });
+
+            it('stops waiting at the deadline WITHOUT cancelling the run, and says so with the run id', async () => {
+                const runtime = makeRuntime([]); // running forever
+
+                const result = await routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                    pollIntervalMs: 1,
+                    timeoutMs: 20,
+                });
+
+                expect(result).toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: {
+                        code: 'JOB_RUNTIME_WAIT_TIMEOUT',
+                        message: expect.stringContaining('NOT cancelled'),
+                    },
+                });
+                expect(runtime.provider.cancel).not.toHaveBeenCalled();
+            });
+
+            it('stops waiting when the caller aborts', async () => {
+                const runtime = makeRuntime([]);
+                const controller = new AbortController();
+                controller.abort();
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                        ...fast,
+                        signal: controller.signal,
+                    }),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
+                });
+            });
+
+            it('answers JOB_RUNTIME_UNAVAILABLE with no active runtime — and never falls back in-process', async () => {
+                const router = routerWith(null, {}, { p: { exec: { op: jest.fn() } } });
+
+                await expect(
+                    router.dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    location: 'job-runtime',
+                    error: { code: 'JOB_RUNTIME_UNAVAILABLE' },
+                });
+            });
+
+            it('answers JOB_RUNTIME_DISPATCH_FAILED when the runtime accepts no run', async () => {
+                const runtime = makeRuntime([], null);
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'JOB_RUNTIME_DISPATCH_FAILED' },
+                });
+                expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+            });
+
+            it('dispatch() with an explicit profile takes this path in bundled mode', async () => {
+                const runtime = makeRuntime([
+                    { status: 'completed', output: { ok: true, result: 'done' } },
+                ]);
+
+                await expect(
+                    routerWith(runtime).dispatch(
+                        'p',
+                        'runSandboxSession',
+                        {},
+                        { profile: 'long-running', ...fast },
+                    ),
+                ).resolves.toMatchObject({ ok: true, location: 'job-runtime', result: 'done' });
+            });
+        });
+
+        describe('startLongRunning + pollLongRunning — for callers that must not block', () => {
+            it('starts without waiting and answers the run id', async () => {
+                const runtime = makeRuntime();
+
+                await expect(
+                    routerWith(runtime).startLongRunning('p', 'op', { a: 1 }),
+                ).resolves.toEqual({
+                    ok: true,
+                    location: 'job-runtime',
+                    runId: 'run_7',
+                });
+                expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+            });
+
+            it('reads the run ONCE per poll: pending, then the result', async () => {
+                const runtime = makeRuntime([
+                    { status: 'running' },
+                    { status: 'completed', output: { ok: true, result: 3 } },
+                ]);
+                const router = routerWith(runtime);
+
+                await expect(router.pollLongRunning('run_7')).resolves.toEqual({
+                    done: false,
+                    runId: 'run_7',
+                    status: 'running',
+                });
+                await expect(router.pollLongRunning('run_7')).resolves.toEqual({
+                    done: true,
+                    runId: 'run_7',
+                    result: { ok: true, location: 'job-runtime', runId: 'run_7', result: 3 },
+                });
+                expect(runtime.provider.getRunResult).toHaveBeenCalledTimes(2);
+            });
+
+            it('answers JOB_RUNTIME_UNAVAILABLE from both with no active runtime', async () => {
+                const router = routerWith(null);
+
+                await expect(router.startLongRunning('p', 'op')).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'JOB_RUNTIME_UNAVAILABLE' },
+                });
+                await expect(router.pollLongRunning('run_7')).resolves.toMatchObject({
+                    done: true,
+                    result: { ok: false, error: { code: 'JOB_RUNTIME_UNAVAILABLE' } },
+                });
+            });
+        });
+
+        /**
+         * The registry hands out lazy proxies whose `get` answers a function for
+         * ANY name, so `typeof plugin[op] === 'function'` was always true on the
+         * in-process path as well.
+         */
+        describe('dispatchSync on a lazy proxy', () => {
+            class Real {
+                async onLoad() {}
+                async onUnload() {}
+                async search(args?: Record<string, unknown>) {
+                    return { hits: 1, args };
+                }
+            }
+            function lazy(real: object) {
+                const stub = { __materialize: jest.fn(async () => real) };
+                return new Proxy(stub, {
+                    get(target, prop) {
+                        if (prop in target) return Reflect.get(target, prop);
+                        return () => {
+                            throw new TypeError(`forwarded ${String(prop)}`);
+                        };
+                    },
+                });
+            }
+
+            it('calls the operation on the materialised plugin', async () => {
+                const router = routerWith(null, {}, { p: { exec: lazy(new Real()) as never } });
+
+                await expect(router.dispatchSync('p', 'search', { q: 'x' })).resolves.toEqual({
+                    ok: true,
+                    location: 'in-process',
+                    result: { hits: 1, args: { q: 'x' } },
+                });
+            });
+
+            it.each(['teleport', 'constructor', '__materialize', 'onUnload', 'toString'])(
+                'answers OPERATION_NOT_FOUND for %s',
+                async (op) => {
+                    const router = routerWith(null, {}, { p: { exec: lazy(new Real()) as never } });
+
+                    await expect(router.dispatchSync('p', op)).resolves.toMatchObject({
+                        ok: false,
+                        error: { code: 'OPERATION_NOT_FOUND' },
+                    });
+                },
+            );
         });
     });
 });
