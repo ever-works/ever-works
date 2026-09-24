@@ -93,6 +93,33 @@ export function matchWorkRepoRole<T extends Work>(
 }
 
 /**
+ * EVERY Work in `works` that has `owner/repo` in some role, each with the roles
+ * it fills, in the order given.
+ *
+ * {@link matchWorkRepoRole} stops at the first, which is right for callers that
+ * only decorate an event with "which Work is this about". It is wrong for a
+ * caller that must find the TASK that owns a pull request or branch: one
+ * account may register the same repository as two Works — a `repo` Work and an
+ * App Work over one code repository, or an App Work over a directory Work's
+ * generated website repository — and the Task lives in only one of them. The
+ * first match could be the wrong one, and `findByUser` has no order.
+ */
+export function matchWorkRepoRoles<T extends Work>(
+    works: readonly T[],
+    owner: string,
+    repo: string,
+): { work: T; roles: readonly WorkRepoRole[] }[] {
+    const target = `${owner}/${repo}`.trim().toLowerCase();
+    if (!target || target === '/') return [];
+    const matches: { work: T; roles: readonly WorkRepoRole[] }[] = [];
+    for (const work of works) {
+        const roles = WORK_REPO_ROLES.filter((role) => getWorkRepoFullName(work, role) === target);
+        if (roles.length > 0) matches.push({ work, roles });
+    }
+    return matches;
+}
+
+/**
  * Split an `owner/repo` string as it arrives on an
  * `IngestedEventWorkHint` of kind `repo`. Returns null for anything that
  * is not exactly two non-empty segments — a malformed hint must resolve
