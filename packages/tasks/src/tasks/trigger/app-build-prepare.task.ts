@@ -40,7 +40,7 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  *    able to resolve it) — the API side of the RPC pair. It is not in this
  *    task's file list; **routed as a finding**, with the failure mode named: with
  *    it unbound the proxy's call rejects and this run reports
- *    `status: 'failed'`, `reason: 'runnerUnavailable'` with the RPC's own message
+ *    `status: 'failed'`, `reason: 'prepareFailed'` with the RPC's own message
  *    — a named, visible failure, never a green run that prepared nothing.
  * 2. `APP_BUILD_PREPARE_DISPATCHER` (T18) is what puts this job on the queue at
  *    all. Until it is bound, `AppBuildsService.dispatchPrepare` takes §7.1's
@@ -135,7 +135,7 @@ export interface AppBuildPrepareRunnerSeam {
         },
     ],
 })
-class AppBuildPrepareWorkerModule {}
+export class AppBuildPrepareWorkerModule {}
 
 /** `error.message` when there is one, `String(error)` otherwise. */
 function errorText(error: unknown): string {

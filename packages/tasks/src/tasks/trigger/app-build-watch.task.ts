@@ -143,7 +143,7 @@ export interface AppBuildWatchRunnerSeam {
         },
     ],
 })
-class AppBuildWatchWorkerModule {}
+export class AppBuildWatchWorkerModule {}
 
 /** `error.message` when there is one, `String(error)` otherwise. */
 function errorText(error: unknown): string {
