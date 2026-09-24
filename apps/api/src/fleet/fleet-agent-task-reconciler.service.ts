@@ -255,6 +255,13 @@ export class FleetAgentTaskReconcilerService {
                     ctx.agentId ?? run.agentId,
                     null,
                 );
+                // …and so did every OPEN mount pull request (APW-08).
+                await this.judgeMountedPullRequests(
+                    cancelledTask,
+                    event.userId,
+                    ctx.agentId ?? run.agentId,
+                    new Set(),
+                );
             }
             return;
         }
@@ -322,6 +329,7 @@ export class FleetAgentTaskReconcilerService {
             // are visible on the Task rather than orphaned on the remote —
             // for the repositories the PLAN put on the job, never for what
             // the node chose to report.
+            const finalizedMounts = new Set<string>();
             if (task && result?.mountGit && result.mountGit.length > 0) {
                 const planned = this.plannedMounts(event.job, ctx.runId);
                 for (const entry of result.mountGit) {
@@ -332,6 +340,7 @@ export class FleetAgentTaskReconcilerService {
                     }
                     if (!entry.pushed || entry.empty) continue;
                     const mount = planned.get(entry.repositoryId!.trim().toLowerCase())!;
+                    finalizedMounts.add(mount.repositoryId.toLowerCase());
                     await this.bestEffort(`record pushed mount ${mount.repositoryId}`, () =>
                         this.taskWorkspace.finalizeMountPush({
                             task,
@@ -357,6 +366,13 @@ export class FleetAgentTaskReconcilerService {
                         agentId: agentId ?? run.agentId,
                         reportedBranch: reportedPush(result),
                     }),
+                );
+                // Open mount pull requests the node did not report as pushed.
+                await this.judgeMountedPullRequests(
+                    task,
+                    event.userId,
+                    agentId ?? run.agentId,
+                    finalizedMounts,
                 );
             }
             await this.postChat(
@@ -464,6 +480,7 @@ export class FleetAgentTaskReconcilerService {
         // planner's spec on the job; the node only says what it pushed.
         const mountNotes: string[] = [];
         const openedPullRequests: string[] = [];
+        const finalizedMounts = new Set<string>();
         if (task && result.mountGit && result.mountGit.length > 0) {
             if (primaryPrUrl) openedPullRequests.push(primaryPrUrl);
             const planned = this.plannedMounts(event.job, ctx.runId);
@@ -487,6 +504,7 @@ export class FleetAgentTaskReconcilerService {
                 // throw here (a DB outage while recording the link) must not
                 // abort before `markCompleted`, or the run stays `running`
                 // for a job that is already `done`.
+                finalizedMounts.add(mount.repositoryId.toLowerCase());
                 try {
                     const outcome = await this.taskWorkspace.finalizeMountPush({
                         task,
@@ -545,6 +563,29 @@ export class FleetAgentTaskReconcilerService {
                     organizationId: task.organizationId ?? null,
                 });
             });
+        }
+
+        // APW-08 — open mount pull requests the node did not report as pushed
+        // (unpushed, empty, or left out: "pushed: false" is only what it says).
+        if (task) {
+            const rejudged = await this.judgeMountedPullRequests(
+                task,
+                event.userId,
+                agentId ?? run.agentId,
+                finalizedMounts,
+            );
+            if (rejudged.length > 0) {
+                finalizeNote = [
+                    finalizeNote,
+                    'Mounted repositories:',
+                    ...rejudged.map(
+                        (outcome) =>
+                            `- \`${outcome.repositoryId}\`: its open pull request #${outcome.prNumber} now carries a change that App Work's change rules refused, so the Task was blocked (the Task thread says why).`,
+                    ),
+                ]
+                    .filter((line) => line.length > 0)
+                    .join('\n');
+            }
         }
 
         await this.runs.markCompleted(ctx.runId, summary);
@@ -616,6 +657,12 @@ export class FleetAgentTaskReconcilerService {
                     event.userId,
                     agentId ?? run.agentId,
                     reportedPush(result),
+                );
+                await this.judgeMountedPullRequests(
+                    task,
+                    event.userId,
+                    agentId ?? run.agentId,
+                    new Set(),
                 );
             }
             return;
@@ -711,6 +758,7 @@ export class FleetAgentTaskReconcilerService {
         // it, so the owner answers knowing one repository is still on the
         // node.
         const mountNotes: string[] = [];
+        const finalizedMounts = new Set<string>();
         if (result.mountGit && result.mountGit.length > 0) {
             const planned = this.plannedMounts(event.job, ctx.runId);
             for (const entry of result.mountGit) {
@@ -739,6 +787,7 @@ export class FleetAgentTaskReconcilerService {
                 // question is still filed, and the notes above still travel
                 // with it — only the branch bookkeeping needs the row.
                 if (!task) continue;
+                finalizedMounts.add(mount.repositoryId.toLowerCase());
                 await this.bestEffort(`record pushed mount ${mount.repositoryId}`, () =>
                     this.taskWorkspace.finalizeMountPush({
                         task,
@@ -752,6 +801,15 @@ export class FleetAgentTaskReconcilerService {
                     }),
                 );
             }
+        }
+
+        if (task) {
+            await this.judgeMountedPullRequests(
+                task,
+                event.userId,
+                agentId ?? run.agentId,
+                finalizedMounts,
+            );
         }
 
         const node = await this.lookupNode(event.nodeId, event.userId);
@@ -1012,6 +1070,34 @@ export class FleetAgentTaskReconcilerService {
                 `Fleet reconcile: judge App Work branch failed: ${error instanceof Error ? error.message : String(error)}`,
             );
             return null;
+        }
+    }
+
+    /**
+     * APW-08 — re-judge the Task's OPEN mount pull requests that this reconcile
+     * did not finalise (`except`). Mirrors {@link judgeAppWorkBranch} for the
+     * primary: every path that can leave an open pull request with new commits
+     * judges it. Never throws; a refusal is posted and blocks the Task inside
+     * the service.
+     */
+    private async judgeMountedPullRequests(
+        task: Task,
+        userId: string,
+        agentId: string,
+        except: ReadonlySet<string>,
+    ): Promise<TaskMountPushOutcome[]> {
+        try {
+            return await this.taskWorkspace.judgeMountedPullRequests({
+                task,
+                userId,
+                agentId,
+                except,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Fleet reconcile: judge mounted pull requests failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return [];
         }
     }
 

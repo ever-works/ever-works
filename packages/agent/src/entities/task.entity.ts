@@ -67,6 +67,14 @@ export interface TaskLinkedPullRequest {
     prUrl: string | null;
     state: 'pushed' | 'pr-open' | 'failed';
     error?: string | null;
+    /**
+     * APW-08 — `failed` because an App Work's change rules refused the pushed
+     * branch, with the pull request (when there is one) STILL OPEN. Kept apart
+     * from the other `failed` entries on purpose: a discard survivor must never
+     * be picked up again, but a refused pull request is re-recorded `pr-open` by
+     * the next run the rules allow.
+     */
+    refusedByGuard?: boolean;
     /** ISO timestamp of the last update to this entry. */
     updatedAt: string;
 }

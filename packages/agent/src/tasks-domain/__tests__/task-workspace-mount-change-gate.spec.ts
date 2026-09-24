@@ -150,7 +150,7 @@ const blocked = (m: ReturnType<typeof harness>['m']) =>
     m.transition.mock.calls.some((call) => (call as unknown[])[1] === TaskStatus.BLOCKED);
 
 describe('finalizeMountPush — a mount that is ANOTHER App Work’s code repository', () => {
-    it('judges it with THAT Work’s coordinates, credentials, base and the Task’s labels', async () => {
+    it('judges it with THAT Work’s coordinates and credentials, at the base the pull request merges into', async () => {
         const { service, m, task } = harness();
 
         await service.finalizeMountPush(push(task));
@@ -160,8 +160,11 @@ describe('finalizeMountPush — a mount that is ANOTHER App Work’s code reposi
         expect(handed).toMatchObject({
             owner: 'acme',
             repo: 'shop-app',
-            // B's own base — where its rules live — not the mount's `main`.
-            baseRef: 'production',
+            // The mount's planned base — the branch its pull request merges into —
+            // NOT B's isolation base `production`: judging one base while the pull
+            // request targets another refused changes the agent never made, or
+            // allowed ones it did (third adversarial review).
+            baseRef: 'main',
             branch: 'task/tsk-9-task1',
             gitOptions: { userId: USER, providerId: 'github', workId: APP_B.id },
             taskLabels: ['checkout'],
@@ -305,6 +308,193 @@ describe('finalizeMountPush — mounts that are no App Work’s code repository'
         ).resolves.toMatchObject({
             outcome: 'pr-opened',
         });
+        expect(m.evaluate).not.toHaveBeenCalled();
+    });
+});
+
+describe('finalizeMountPush — the judged base, and recovering from a refusal', () => {
+    it('judges a mount with no planned base at the repository default — where its pull request would go', async () => {
+        const { service, m, task } = harness();
+        m.getRepository.mockResolvedValue({ defaultBranch: 'trunk', cloneUrl: '' });
+
+        await service.finalizeMountPush(push(task, { baseRef: null }));
+
+        expect(m.evaluate.mock.calls[0][0]).toMatchObject({ baseRef: 'trunk' });
+    });
+
+    it('marks a refusal of an OPEN pull request so the next ALLOWED run re-records it instead of opening another', async () => {
+        // Third adversarial review, reproduced: the refusal rewrote the entry to
+        // `failed`; the next allowed run did not recognise it, asked the provider
+        // for a second pull request (422 "already exists") and then wiped the link.
+        const open = {
+            repositoryId: 'acme/shop-app',
+            branch: 'task/tsk-9-task1',
+            baseRef: 'main',
+            headSha: 'a'.repeat(40),
+            prNumber: 42,
+            prUrl: 'https://github.com/acme/shop-app/pull/42',
+            state: 'pr-open' as const,
+            error: null,
+            updatedAt: '2026-09-20T00:00:00.000Z',
+        };
+        const task = makeTask({ linkedPullRequests: [open] });
+        const { service, m } = harness({ task });
+        m.evaluate.mockResolvedValueOnce(refused());
+
+        await service.finalizeMountPush(push(task));
+        const afterRefusal = recorded(m)[0] as Record<string, unknown>;
+        expect(afterRefusal).toMatchObject({ state: 'failed', prNumber: 42, refusedByGuard: true });
+
+        // The change is fixed; the next run is allowed.
+        m.findTask.mockResolvedValue(makeTask({ linkedPullRequests: [afterRefusal as never] }));
+        const outcome = await service.finalizeMountPush(push(task));
+
+        expect(outcome).toMatchObject({ outcome: 'pr-opened', prNumber: 42 });
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+        const restored = recorded(m)[0] as Record<string, unknown>;
+        expect(restored).toMatchObject({ state: 'pr-open', prNumber: 42, error: null });
+        expect(restored.refusedByGuard).toBeUndefined();
+    });
+
+    it('never re-records a DISCARD survivor, and never drops its link when opening another fails', async () => {
+        // `failed` with a kept link and no refusal flag: the operator tried to
+        // throw this pull request away. It must stay unmatched — and the link,
+        // the operator's only way back to it, must survive a failed open.
+        const survivor = {
+            repositoryId: 'acme/shop-app',
+            branch: 'task/tsk-9-task1',
+            baseRef: 'main',
+            headSha: null,
+            prNumber: 42,
+            prUrl: 'https://github.com/acme/shop-app/pull/42',
+            state: 'failed' as const,
+            error: 'branch delete failed — the branch is still on the remote: 403',
+            updatedAt: '2026-09-20T00:00:00.000Z',
+        };
+        const task = makeTask({ linkedPullRequests: [survivor] });
+        const { service, m } = harness({ task });
+        m.createPullRequest.mockRejectedValue(new Error('422: A pull request already exists'));
+
+        const outcome = await service.finalizeMountPush(push(task));
+
+        expect(m.createPullRequest).toHaveBeenCalledTimes(1);
+        expect(outcome).toMatchObject({ outcome: 'failed' });
+        expect(recorded(m)[0]).toMatchObject({ state: 'failed', prNumber: 42 });
+    });
+
+    it('keeps an existing link on the PRs-off path too', async () => {
+        const task = makeTask({
+            linkedPullRequests: [
+                {
+                    repositoryId: 'acme/shop-app',
+                    branch: 'task/tsk-9-task1',
+                    baseRef: 'main',
+                    headSha: null,
+                    prNumber: 42,
+                    prUrl: 'https://github.com/acme/shop-app/pull/42',
+                    state: 'failed',
+                    error: 'branch delete failed',
+                    updatedAt: '2026-09-20T00:00:00.000Z',
+                },
+            ],
+        });
+        const { service, m } = harness({ task });
+
+        await service.finalizeMountPush(push(task, { agentCanOpenPullRequests: false }));
+
+        expect(recorded(m)[0]).toMatchObject({ state: 'pushed', prNumber: 42 });
+    });
+});
+
+/**
+ * Third adversarial review: an open mount pull request picks up new commits on
+ * paths that never call `finalizeMountPush` — a cancel, a question for a
+ * settled run, a mount the node reports as unpushed / empty / not at all. The
+ * primary pull request is re-judged on those paths; mount pull requests now are.
+ */
+describe('judgeMountedPullRequests', () => {
+    const open = (over: Record<string, unknown> = {}) => ({
+        repositoryId: 'acme/shop-app',
+        branch: 'task/tsk-9-task1',
+        baseRef: 'main',
+        headSha: null,
+        prNumber: 42,
+        prUrl: 'https://github.com/acme/shop-app/pull/42',
+        state: 'pr-open' as const,
+        error: null,
+        updatedAt: '2026-09-20T00:00:00.000Z',
+        ...over,
+    });
+
+    it('refuses an open mount pull request whose recorded branch the Work’s rules now refuse', async () => {
+        const task = makeTask({ linkedPullRequests: [open() as never] });
+        const { service, m } = harness({ task });
+        m.evaluate.mockResolvedValue(refused());
+
+        const outcomes = await service.judgeMountedPullRequests({
+            task,
+            userId: USER,
+            agentId: 'agent-1',
+        });
+
+        expect(outcomes).toEqual([
+            expect.objectContaining({ outcome: 'blocked-by-guard', prNumber: 42 }),
+        ]);
+        expect(m.evaluate.mock.calls[0][0]).toMatchObject({
+            branch: 'task/tsk-9-task1',
+            baseRef: 'main',
+        });
+        expect(recorded(m)[0]).toMatchObject({
+            state: 'failed',
+            prNumber: 42,
+            refusedByGuard: true,
+        });
+        expect(blocked(m)).toBe(true);
+    });
+
+    it('does nothing when the rules allow it, for repositories already finalised, or with no gate', async () => {
+        const task = makeTask({ linkedPullRequests: [open() as never] });
+
+        const allowed = harness({ task });
+        await expect(
+            allowed.service.judgeMountedPullRequests({ task, userId: USER, agentId: 'agent-1' }),
+        ).resolves.toEqual([]);
+
+        const excepted = harness({ task });
+        excepted.m.evaluate.mockResolvedValue(refused());
+        await expect(
+            excepted.service.judgeMountedPullRequests({
+                task,
+                userId: USER,
+                agentId: 'agent-1',
+                except: new Set(['acme/shop-app']),
+            }),
+        ).resolves.toEqual([]);
+        expect(excepted.m.evaluate).not.toHaveBeenCalled();
+
+        const unbound = harness({ task, bound: false });
+        await expect(
+            unbound.service.judgeMountedPullRequests({ task, userId: USER, agentId: 'agent-1' }),
+        ).resolves.toEqual([]);
+    });
+
+    it('skips entries that are not open pull requests', async () => {
+        const task = makeTask({
+            linkedPullRequests: [
+                open({ state: 'pushed', prNumber: null, prUrl: null }) as never,
+                open({
+                    repositoryId: 'acme/other',
+                    state: 'failed',
+                    refusedByGuard: true,
+                }) as never,
+            ],
+        });
+        const { service, m } = harness({ task });
+        m.evaluate.mockResolvedValue(refused());
+
+        await expect(
+            service.judgeMountedPullRequests({ task, userId: USER, agentId: 'agent-1' }),
+        ).resolves.toEqual([]);
         expect(m.evaluate).not.toHaveBeenCalled();
     });
 });

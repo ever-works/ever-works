@@ -998,6 +998,7 @@ export class TaskWorkspaceService {
             owner,
             repo,
             branch,
+            baseRef: input.baseRef,
         });
         if (refusal) return this.refuseMountChange(task, input, refusal);
 
@@ -1045,13 +1046,16 @@ export class TaskWorkspaceService {
         const { providerId } = gitOptions;
 
         if (!input.agentCanOpenPullRequests || providerId === 'git') {
+            // Never drop a recorded pull request link here (a discard survivor's
+            // is the operator's only way back to it).
+            const kept = await this.existingPullRequestLink(task, repositoryId, branch);
             await this.recordLinkedPullRequest(task, {
                 repositoryId,
                 branch,
                 baseRef: input.baseRef ?? null,
                 headSha: input.headSha ?? null,
-                prNumber: null,
-                prUrl: null,
+                prNumber: kept?.prNumber ?? null,
+                prUrl: kept?.prUrl ?? null,
                 state: 'pushed',
                 error: null,
             });
@@ -1068,8 +1072,13 @@ export class TaskWorkspaceService {
         try {
             let baseRef = input.baseRef?.trim() || '';
             if (!baseRef) {
-                baseRef = (await this.gitFacade.getRepository(owner, repo, gitOptions))
-                    .defaultBranch;
+                const remote = await this.gitFacade.getRepository(owner, repo, gitOptions);
+                if (!remote) {
+                    throw new Error(
+                        `the git provider does not find ${repositoryId}, so its default branch is unknown`,
+                    );
+                }
+                baseRef = remote.defaultBranch;
             }
             const primaryNote = input.primaryPrUrl ? ` Part of ${input.primaryPrUrl}.` : '';
             const summaryNote = input.summary ? `\n\n${input.summary}` : '';
@@ -1122,6 +1131,14 @@ export class TaskWorkspaceService {
         owner: string;
         repo: string;
         branch: string;
+        /**
+         * The base the mount's pull request merges into (the planned mount
+         * base). The rules are read, and the diff taken, THERE — that is what
+         * the pull request would change. Absent, it is the repository's default
+         * branch, which is what `finalizeMountPush` opens the pull request
+         * against too.
+         */
+        baseRef?: string | null;
     }): Promise<string | null> {
         const { task, userId, owner, repo, branch } = input;
         if (!this.appChangeGate) return null;
@@ -1155,7 +1172,7 @@ export class TaskWorkspaceService {
                     owner: target.owner,
                     repo: target.repo,
                     gitOptions,
-                    baseRef: await this.resolveBaseRef(work, target.owner, target.repo, gitOptions),
+                    baseRef: await this.mountJudgementBase(input.baseRef, target, gitOptions),
                     branch,
                 });
             } catch (error) {
@@ -1185,6 +1202,120 @@ export class TaskWorkspaceService {
     }
 
     /**
+     * The base a mounted App Work repository is judged at: the mount's planned
+     * base when there is one, else the repository's default branch — the same
+     * base `finalizeMountPush` opens the pull request against. NOT the Work's
+     * own isolation base: judging one base while the pull request merges into
+     * another either refused changes the agent never made or allowed ones it
+     * did (third adversarial review). Throws when the default cannot be read,
+     * which the caller turns into a refusal.
+     */
+    private async mountJudgementBase(
+        planned: string | null | undefined,
+        target: { owner: string; repo: string },
+        gitOptions: { userId: string; providerId: string; workId: string },
+    ): Promise<string> {
+        const base = (planned ?? '').trim();
+        if (base) return base;
+        const remote = this.gitFacade
+            ? await this.gitFacade.getRepository(target.owner, target.repo, gitOptions)
+            : null;
+        if (!remote?.defaultBranch) {
+            throw new Error(
+                `the default branch of ${target.owner}/${target.repo} could not be read`,
+            );
+        }
+        return remote.defaultBranch;
+    }
+
+    /**
+     * APW-08 — re-judge the Task's OPEN mount pull requests on a fleet path that
+     * did not run {@link finalizeMountPush} for them: a cancelled run whose node
+     * had already pushed, a question for an already-settled run, and a mount the
+     * node reports as unpushed, empty or not at all ("pushed: false" is only
+     * what the node says). The open pull request picked those commits up either
+     * way; the primary pull request is re-judged on the same paths
+     * (`judgeAppWorkBranch`). Each is judged at its recorded branch and base.
+     * `except` names repositories this reconcile already finalised. Never throws.
+     */
+    async judgeMountedPullRequests(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        except?: ReadonlySet<string>;
+    }): Promise<TaskMountPushOutcome[]> {
+        const outcomes: TaskMountPushOutcome[] = [];
+        try {
+            if (!this.appChangeGate) return outcomes;
+            const fresh = (await this.tasks.findById(input.task.id)) ?? input.task;
+            const entries = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+            for (const entry of entries) {
+                if (entry.state !== 'pr-open' || typeof entry.prNumber !== 'number') continue;
+                if (input.except?.has(entry.repositoryId.toLowerCase())) continue;
+                const [owner, repo] = entry.repositoryId.split('/');
+                if (!owner || !repo) continue;
+                const refusal = await this.judgeMountedAppWorkChange({
+                    task: fresh,
+                    userId: input.userId,
+                    agentId: input.agentId,
+                    owner,
+                    repo,
+                    branch: entry.branch,
+                    baseRef: entry.baseRef,
+                });
+                if (!refusal) continue;
+                outcomes.push(
+                    await this.refuseMountChange(
+                        fresh,
+                        {
+                            userId: input.userId,
+                            agentId: input.agentId,
+                            repositoryId: entry.repositoryId,
+                            branch: entry.branch,
+                            baseRef: entry.baseRef,
+                            headSha: entry.headSha,
+                        },
+                        refusal,
+                    ),
+                );
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Task ${input.task.id}: open mount pull requests could not be re-judged: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        return outcomes;
+    }
+
+    /**
+     * The recorded pull request for `repositoryId` from exactly `branch`, in ANY
+     * state — including a discard survivor's `failed` link — or `null`. For the
+     * writers that must never drop a link they did not open; matching an OPEN
+     * pull request to push onto is {@link findOpenLinkedPullRequest}'s job.
+     */
+    private async existingPullRequestLink(
+        task: Task,
+        repositoryId: string,
+        branch: string,
+    ): Promise<(TaskLinkedPullRequest & { prNumber: number; prUrl: string }) | null> {
+        const fresh = (await this.tasks.findById(task.id).catch(() => null)) ?? task;
+        const entries = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+        const entry = entries.find(
+            (candidate) =>
+                candidate.repositoryId.toLowerCase() === repositoryId.toLowerCase() &&
+                candidate.branch === branch &&
+                typeof candidate.prNumber === 'number' &&
+                typeof candidate.prUrl === 'string' &&
+                candidate.prUrl.length > 0,
+        );
+        return entry
+            ? { ...entry, prNumber: entry.prNumber as number, prUrl: entry.prUrl as string }
+            : null;
+    }
+
+    /**
      * The mount-side refusal: record the entry as `failed` with the reason —
      * KEEPING the pull request number and URL when one is already open, so the
      * link to the pull request that now carries the refused change is not lost
@@ -1204,16 +1335,12 @@ export class TaskWorkspaceService {
         reason: string,
     ): Promise<TaskMountPushOutcome> {
         const branch = input.branch.trim();
-        const fresh = (await this.tasks.findById(task.id).catch(() => null)) ?? task;
-        const existing = (
-            Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : []
-        ).find(
-            (entry) =>
-                entry.repositoryId.toLowerCase() === input.repositoryId.toLowerCase() &&
-                entry.branch === branch &&
-                typeof entry.prNumber === 'number' &&
-                typeof entry.prUrl === 'string',
-        );
+        const existing = await this.existingPullRequestLink(task, input.repositoryId, branch);
+        // Only an OPEN pull request is marked for recovery: the next run the rules
+        // allow re-records it `pr-open` (see `findOpenLinkedPullRequest`). A
+        // discard survivor keeps its link but stays unmatched, as discard intends.
+        const wasOpen =
+            !!existing && (existing.state === 'pr-open' || existing.refusedByGuard === true);
         const consequence = existing
             ? `The branch \`${branch}\` was pushed, and pull request #${existing.prNumber} (${existing.prUrl}) ` +
               'now contains this change — it must not be merged as it stands.'
@@ -1228,6 +1355,7 @@ export class TaskWorkspaceService {
                 prUrl: existing?.prUrl ?? null,
                 state: 'failed',
                 error: reason,
+                refusedByGuard: !existing || wasOpen,
             });
         } catch (error) {
             this.logger.warn(
@@ -1264,13 +1392,20 @@ export class TaskWorkspaceService {
         },
         error: string,
     ): Promise<TaskMountPushOutcome> {
+        // Never drop a recorded pull request link (a discard survivor's is the
+        // operator's only way back to it).
+        const kept = await this.existingPullRequestLink(
+            task,
+            input.repositoryId,
+            input.branch.trim(),
+        );
         await this.recordLinkedPullRequest(task, {
             repositoryId: input.repositoryId,
             branch: input.branch.trim(),
             baseRef: input.baseRef ?? null,
             headSha: input.headSha ?? null,
-            prNumber: null,
-            prUrl: null,
+            prNumber: kept?.prNumber ?? null,
+            prUrl: kept?.prUrl ?? null,
             state: 'failed',
             error,
         });
@@ -1297,7 +1432,12 @@ export class TaskWorkspaceService {
             if (
                 entry.repositoryId.toLowerCase() === repositoryId.toLowerCase() &&
                 entry.branch === branch &&
-                entry.state === 'pr-open' &&
+                (entry.state === 'pr-open' ||
+                    // Refused by an App Work's rules, the pull request still open:
+                    // a run the rules now ALLOW re-records it rather than asking
+                    // the provider for a second one (a 422 that used to wipe the
+                    // link). Never a discard survivor — see `mountBranchSurvived`.
+                    (entry.state === 'failed' && entry.refusedByGuard === true)) &&
                 typeof entry.prNumber === 'number' &&
                 typeof entry.prUrl === 'string' &&
                 entry.prUrl.length > 0
@@ -2612,6 +2752,9 @@ export class TaskWorkspaceService {
         return {
             ...entry,
             state: 'failed',
+            // A refused pull request the operator then discarded is a discard
+            // survivor now, never re-recorded by a later run.
+            refusedByGuard: false,
             error: `branch delete failed — the branch is still on the remote: ${reason}`,
             updatedAt: new Date().toISOString(),
         };

@@ -90,6 +90,7 @@ describe('FleetAgentTaskReconcilerService', () => {
         finalizeMountPush: jest.Mock;
         recordRemotePush: jest.Mock;
         judgeAppWorkBranch: jest.Mock;
+        judgeMountedPullRequests: jest.Mock;
     };
     let taskChat: { post: jest.Mock };
     let dispatchGate: { drainForWork: jest.Mock };
@@ -163,6 +164,8 @@ describe('FleetAgentTaskReconcilerService', () => {
             recordRemotePush: jest.fn().mockResolvedValue(undefined),
             // APW-08 T17 — answers `null` (nothing to judge) unless a case says otherwise.
             judgeAppWorkBranch: jest.fn().mockResolvedValue(null),
+            // APW-08 — answers "nothing re-judged" unless a case says otherwise.
+            judgeMountedPullRequests: jest.fn().mockResolvedValue([]),
         };
         taskChat = { post: jest.fn().mockResolvedValue({}) };
         dispatchGate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: false }) };
@@ -654,6 +657,54 @@ describe('FleetAgentTaskReconcilerService', () => {
             expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
                 expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
             );
+        });
+
+        /**
+         * Third adversarial review: open MOUNT pull requests pick up a push on the
+         * same paths the primary does, and nothing re-judged them there.
+         */
+        it('re-judges every open mount pull request on a CANCELLED run', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'cancelled',
+            });
+
+            await done(successResult);
+
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ except: new Set() }),
+            );
+        });
+
+        it('re-judges every open mount pull request on a question for a SETTLED run', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'failed',
+            });
+
+            await done({ ...successResult, question: QUESTION });
+
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ except: new Set() }),
+            );
+        });
+
+        it('re-judges open mount pull requests on the FAILURE and QUESTION paths', async () => {
+            await done(
+                { ...successResult, status: 'failed', failureReason: 'red check' },
+                'failed',
+            );
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledTimes(1);
+
+            taskWorkspace.judgeMountedPullRequests.mockClear();
+            await done({ ...successResult, question: QUESTION });
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledTimes(1);
         });
 
         it('a CANCELLED run has its open pull request judged — and nothing is opened or announced', async () => {
@@ -1210,6 +1261,51 @@ describe('FleetAgentTaskReconcilerService', () => {
             expect(noticeBody).toContain('https://github.com/acme/repo/pull/42');
             expect(noticeBody).toContain('https://github.com/acme/template/pull/7');
             expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+        });
+
+        it('re-judges open mount pull requests the node reported as unpushed or empty — not the ones it finalised', async () => {
+            // `acme/template` was pushed and finalised; `acme/docs` is reported
+            // empty, and "empty" is only what the node says.
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ except: new Set(['acme/template']) }),
+            );
+        });
+
+        it('tells the member when an open mount pull request was refused on re-judgement', async () => {
+            taskWorkspace.judgeMountedPullRequests.mockResolvedValue([
+                {
+                    repositoryId: 'acme/docs',
+                    outcome: 'blocked-by-guard',
+                    prNumber: 9,
+                    prUrl: 'https://github.com/acme/docs/pull/9',
+                    error: 'refused',
+                },
+            ]);
+
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+
+            const body: string = taskChat.post.mock.calls[0][1].body;
+            expect(body).toContain(
+                "`acme/docs`: its open pull request #9 now carries a change that App Work's change rules refused",
+            );
         });
 
         it('keeps going when one mount pull request fails and reports it', async () => {
