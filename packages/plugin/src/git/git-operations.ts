@@ -205,6 +205,16 @@ export class GitOperations implements IGitOperations {
 
 		if (await this.workExists(dir)) {
 			try {
+				// Re-assert `origin` before pulling. `pull` and `push` send the
+				// credentials to whatever `origin` points at in `.git/config`, and a
+				// persistent checkout's config is a file anything writing into the
+				// checkout can change. Pinning it to the URL computed here — the one
+				// this method would clone from — means a rewritten `origin` is put
+				// back before any credential is used, and a checkout poisoned earlier
+				// is healed on its next use. Inside the `try` on purpose: if it cannot
+				// be reset, the directory is dropped and cloned fresh rather than
+				// pulled from a remote nobody chose.
+				await git.setConfig({ fs, dir, path: 'remote.origin.url', value: url });
 				await this.pull(dir, token, committer);
 				return dir;
 			} catch {

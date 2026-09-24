@@ -60,6 +60,7 @@ import {
 // as `repos[role]` in `packages/agent/src/works/repository-work-guard.ts`
 // (`hasRepositoryRole`) — the ONE place that knowledge lives.
 import { getWorkCapabilities, isAppWorkKind } from '@ever-works/contracts';
+import { posix as posixPath } from 'node:path';
 import type { RepositoryRole } from '@ever-works/contracts/api';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
@@ -250,6 +251,97 @@ function normalizeBranchRef(ref: string): string {
         .trim()
         .replace(/^refs\/heads\//i, '')
         .toLowerCase();
+}
+
+/**
+ * Ref prefixes a branch NAME must not carry once one leading `refs/heads/` is
+ * stripped. isomorphic-git expands a pushed ref through `refs/<ref>`,
+ * `refs/tags/<ref>` and `refs/heads/<ref>`, so `heads/main` becomes
+ * `refs/heads/main` and `tags/v9` becomes a tag — names that sailed past
+ * {@link normalizeBranchRef}'s protected-branch comparison.
+ */
+const QUALIFIED_REF_PREFIXES = ['refs/', 'heads/', 'tags/', 'remotes/'] as const;
+
+/** Characters git's own `check-ref-format` refuses in a branch name. */
+const REF_FORBIDDEN = '~^:?*[\\';
+
+/**
+ * The plain branch name an agent tool may act on, or a refusal.
+ *
+ * One leading `refs/heads/` is accepted and stripped — that IS a branch name,
+ * fully qualified. Anything else that qualifies the name (`heads/`, `tags/`,
+ * `refs/tags/`, `remotes/`) is refused, together with what `git
+ * check-ref-format` refuses: control characters and spaces, `~^:?*[\\`, `..`,
+ * `@{`, `//`, a leading `-` `/` or `.`, and a trailing `/` `.` or `.lock`.
+ */
+function plainBranchName(tool: string, raw: string): string {
+    let name = raw.trim();
+    if (name.toLowerCase().startsWith('refs/heads/')) name = name.slice('refs/heads/'.length);
+    const lower = name.toLowerCase();
+    const qualified = QUALIFIED_REF_PREFIXES.some((prefix) => lower.startsWith(prefix));
+    const malformed =
+        name.length === 0 ||
+        name === '@' ||
+        [...name].some((ch) => ch.charCodeAt(0) <= 0x20 || ch.charCodeAt(0) === 0x7f) ||
+        [...name].some((ch) => REF_FORBIDDEN.includes(ch)) ||
+        name.includes('..') ||
+        name.includes('@{') ||
+        name.includes('//') ||
+        /^[-/.]/.test(name) ||
+        /[/.]$/.test(name) ||
+        name.endsWith('.lock');
+    if (qualified || malformed) {
+        throw new Error(
+            `${tool}: '${raw}' is not a plain branch name. Pass the branch name alone (for example ` +
+                `'feature/pricing') — never a ref path such as 'heads/…', 'tags/…' or 'refs/tags/…'.`,
+        );
+    }
+    return name;
+}
+
+/**
+ * A repository-relative path an agent tool may WRITE, normalised once so the
+ * path that is judged, the path that is written and the path that is staged are
+ * the same string.
+ *
+ * Refuses anything inside `.git` — any segment, any case (a case-insensitive
+ * filesystem resolves `.GIT/config` to `.git/config`). The escape check below it
+ * only stops paths leaving the checkout; `.git/config` does not leave it, and
+ * `pull`/`push` send the git credentials to whatever `origin` points at there.
+ * Reproduced against the real `GitOperations`: a written `.git/config` sent the
+ * token to a local stand-in server on its first `401` challenge.
+ *
+ * Also refused: non-strings, empty, backslashes (one name must mean one path on
+ * every host), NUL, absolute or drive-lettered paths, and anything that
+ * normalises to the root, above it, or to a directory.
+ */
+function normalizeRepoPath(tool: string, raw: unknown): string {
+    const refuse = (why: string): never => {
+        throw new Error(`${tool}: invalid file path ${JSON.stringify(raw)} — ${why}.`);
+    };
+    if (typeof raw !== 'string' || raw.length === 0) {
+        return refuse('must be a non-empty path relative to the repo root');
+    }
+    if (raw.includes('\\')) return refuse('use forward slashes');
+    if (raw.includes('\0')) return refuse('contains a NUL byte');
+    if (posixPath.isAbsolute(raw) || /^[A-Za-z]:/.test(raw)) {
+        return refuse('must be relative to the repo root');
+    }
+    const normalized = posixPath.normalize(raw);
+    if (
+        normalized === '.' ||
+        normalized === '..' ||
+        normalized.startsWith('../') ||
+        normalized.endsWith('/')
+    ) {
+        return refuse('must name a file inside the repository');
+    }
+    if (normalized.split('/').some((segment) => segment.toLowerCase() === '.git')) {
+        return refuse(
+            'files inside .git are never written — they are the repository, not its content',
+        );
+    }
+    return normalized;
 }
 
 // PASS-4 review fix (CRITICAL): @Global() is required for the same
@@ -978,8 +1070,22 @@ function normalizeBranchRef(ref: string): string {
                         // operation runs: nothing is cloned, switched, staged,
                         // committed or pushed.
                         const base = await resolveBaseBranch(target, userId, workId);
-                        let branch = typeof input.branch === 'string' ? input.branch.trim() : '';
-                        const namedTarget = branch || base;
+                        // A plain branch name or a refusal — see `plainBranchName`.
+                        // The caller's own spelling is kept for the protected-branch
+                        // refusal below, which should name what the caller typed.
+                        const requestedBranch =
+                            typeof input.branch === 'string' ? input.branch.trim() : '';
+                        let branch = requestedBranch
+                            ? plainBranchName('commitToRepo', requestedBranch)
+                            : '';
+                        // Every path normalised ONCE, before anything is judged or
+                        // written: the string the gate sees is the string that is
+                        // written and the string that is staged.
+                        const writes = (files ?? []).map((f) => ({
+                            path: normalizeRepoPath('commitToRepo', f?.path),
+                            body: f.body,
+                        }));
+                        const namedTarget = requestedBranch || base;
                         if (namedTarget) {
                             assertNotProtectedBranch(
                                 'commitToRepo',
@@ -1060,10 +1166,7 @@ function normalizeBranchRef(ref: string): string {
                                                 paths: [],
                                             };
                                         }
-                                        const paths = new Set<string>();
-                                        for (const f of files ?? []) {
-                                            if (typeof f.path === 'string') paths.add(f.path);
-                                        }
+                                        const paths = new Set<string>(writes.map((w) => w.path));
                                         for (const change of pending) {
                                             paths.add(change.path);
                                             if (change.oldPath) paths.add(change.oldPath);
@@ -1082,7 +1185,7 @@ function normalizeBranchRef(ref: string): string {
                             }
                             // Stage any file edits provided inline. Empty `files`
                             // means "commit whatever earlier tool calls staged".
-                            if (files && files.length > 0) {
+                            if (writes.length > 0) {
                                 const fsp = await import('node:fs/promises');
                                 const path = await import('node:path');
                                 // SECURITY: `f.path` is supplied verbatim by the LLM
@@ -1098,7 +1201,7 @@ function normalizeBranchRef(ref: string): string {
                                 // overwrite arbitrary files outside the repo on the
                                 // shared worker filesystem (path traversal / zip-slip).
                                 const repoRoot = path.resolve(dir);
-                                for (const f of files) {
+                                for (const f of writes) {
                                     if (
                                         typeof f.path !== 'string' ||
                                         f.path.length === 0 ||
@@ -1135,7 +1238,7 @@ function normalizeBranchRef(ref: string): string {
                                 await git.add(
                                     providerId,
                                     dir,
-                                    files.map((f) => f.path),
+                                    writes.map((f) => f.path),
                                 );
                             }
                             const committerName = agent.committerName ?? agent.name;
@@ -1159,11 +1262,21 @@ function normalizeBranchRef(ref: string): string {
                             // time", which is how a commit could silently go
                             // nowhere while the tool reported success.
                             await git
-                                .push({ dir, force: false, ref: branch, remoteRef: branch }, {
-                                    providerId,
-                                    userId,
-                                    workId,
-                                } as any)
+                                .push(
+                                    {
+                                        dir,
+                                        force: false,
+                                        // Fully qualified on both sides, so a name can
+                                        // never expand to another branch or to a tag.
+                                        ref: `refs/heads/${branch}`,
+                                        remoteRef: `refs/heads/${branch}`,
+                                    },
+                                    {
+                                        providerId,
+                                        userId,
+                                        workId,
+                                    } as any,
+                                )
                                 .catch((err: Error) => {
                                     // Don't swallow push failures silently — the
                                     // model needs to know its commit didn't reach

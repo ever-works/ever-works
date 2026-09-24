@@ -1034,6 +1034,113 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         });
     });
 
+    /**
+     * The names an agent hands the git tools are checked BEFORE anything runs.
+     *
+     * Two of them were ways out of the tool's intended shape:
+     *
+     *   - a file path inside `.git`. The write loop only stopped paths leaving
+     *     the checkout, and `.git/config` does not leave it; `pull` and `push`
+     *     send the git credentials to whatever `origin` points at there.
+     *     Reproduced against the real `GitOperations`: a written `.git/config`
+     *     sent the token to a stand-in server on its first `401` challenge.
+     *   - a branch spelled as a ref. isomorphic-git expands a pushed ref through
+     *     `refs/<ref>`, `refs/tags/<ref>` and `refs/heads/<ref>`, so `heads/main`
+     *     reached `main` past the protected-branch check and `tags/v9` pushed a
+     *     tag.
+     */
+    describe('agent-supplied names are checked before anything runs', () => {
+        it.each([
+            '.git/config',
+            '.GIT/config',
+            '.Git/hooks/pre-push',
+            'sub/.git/HEAD',
+            './.git/config',
+            'src/../.git/config',
+        ])('refuses a write inside .git: %s', async (path) => {
+            const { facade, git } = build();
+
+            await expect(
+                facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files: [{ path, body: 'x' }] }),
+                ),
+            ).rejects.toThrow(/inside \.git are never written/);
+            expectNoGitWork(git);
+        });
+
+        it.each([
+            ['../outside.txt', /inside the repository/],
+            ['src\\app.ts', /forward slashes/],
+            ['/etc/passwd', /relative to the repo root/],
+            ['C:/Windows/win.ini', /relative to the repo root/],
+            ['src/', /inside the repository/],
+            ['', /non-empty path/],
+        ])('refuses the path %j before any git work', async (path, message) => {
+            const { facade, git } = build();
+
+            await expect(
+                facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files: [{ path, body: 'x' }] }),
+                ),
+            ).rejects.toThrow(message);
+            expectNoGitWork(git);
+        });
+
+        it('stages the NORMALISED path — the string judged is the string written and staged', async () => {
+            const { facade, git } = build();
+
+            await facade
+                .commitToRepo(
+                    commitInput({
+                        branch: 'feature/pricing',
+                        files: [{ path: './src//nested/../app.ts', body: 'export {};\n' }],
+                    }),
+                )
+                .catch(() => undefined);
+
+            expect(git.add).toHaveBeenCalledWith(WORK_PROVIDER, expect.anything(), ['src/app.ts']);
+        });
+
+        it.each([
+            'heads/main',
+            'tags/v9.9.9',
+            'refs/tags/v9.9.9',
+            'refs/heads/heads/main',
+            'remotes/origin/main',
+            'feature..x',
+            'feature~1',
+            'feature:x',
+            '-feature',
+            'feature/',
+            'feature.lock',
+            'feature @{0}',
+        ])('refuses the branch %j before any git work', async (branch) => {
+            const { facade, git } = build();
+
+            await expect(facade.commitToRepo(commitInput({ branch }))).rejects.toThrow(
+                /not a plain branch name/,
+            );
+            expectNoGitWork(git);
+        });
+
+        it('accepts one leading refs/heads/ and pushes the fully-qualified branch', async () => {
+            const { facade, git } = build();
+
+            const result = await facade.commitToRepo(
+                commitInput({ branch: 'refs/heads/feature/pricing' }),
+            );
+
+            expect(result.branch).toBe('feature/pricing');
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    ref: 'refs/heads/feature/pricing',
+                    remoteRef: 'refs/heads/feature/pricing',
+                }),
+                expect.anything(),
+            );
+        });
+    });
+
     describe('commitToRepo', () => {
         /**
          * The tool writes files and then commits — and until this case existed
@@ -1150,8 +1257,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 expect.objectContaining({
                     dir: WORK_DIR,
                     force: false,
-                    ref: 'feature/pricing',
-                    remoteRef: 'feature/pricing',
+                    ref: 'refs/heads/feature/pricing',
+                    remoteRef: 'refs/heads/feature/pricing',
                 }),
                 expect.objectContaining({ providerId: WORK_PROVIDER }),
             );
@@ -1202,8 +1309,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             expect(git.push).toHaveBeenCalledWith(
                 expect.objectContaining({
                     dir: WORK_DIR,
-                    ref: 'feature/pricing',
-                    remoteRef: 'feature/pricing',
+                    ref: 'refs/heads/feature/pricing',
+                    remoteRef: 'refs/heads/feature/pricing',
                 }),
                 expect.objectContaining({ providerId: WORK_PROVIDER }),
             );
@@ -1246,7 +1353,10 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 true,
             );
             expect(git.push).toHaveBeenCalledWith(
-                expect.objectContaining({ ref: 'integration', remoteRef: 'integration' }),
+                expect.objectContaining({
+                    ref: 'refs/heads/integration',
+                    remoteRef: 'refs/heads/integration',
+                }),
                 expect.anything(),
             );
             expect(result.branch).toBe('integration');
@@ -1272,7 +1382,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             );
             expect(git.switchBranch).toHaveBeenCalledWith(WORK_PROVIDER, WORK_DIR, 'trunk', true);
             expect(git.push).toHaveBeenCalledWith(
-                expect.objectContaining({ ref: 'trunk', remoteRef: 'trunk' }),
+                expect.objectContaining({ ref: 'refs/heads/trunk', remoteRef: 'refs/heads/trunk' }),
                 expect.anything(),
             );
             expect(result.branch).toBe('trunk');
