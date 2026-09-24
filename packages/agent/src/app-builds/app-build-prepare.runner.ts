@@ -105,10 +105,15 @@ import {
  * and that run exists only because the workflow was written. So a blocked Build
  * is blocked, `startBuild` is never called for it, and steps 5–8 still run.
  *
- * A provider throw is deliberately NOT caught: `plan.md:1627` retries a GitHub
- * 5xx "with the runtime's backoff 3 times over 10 minutes; a requested Build
- * stays `queued`" — which holds because nothing was written when the throw
- * happened, and re-throwing is what lets the job runtime retry.
+ * A provider throw is deliberately NOT caught here: it propagates to the
+ * caller, which reports it. `plan.md:1627` asks for a runtime retry of a GitHub
+ * 5xx "3 times over 10 minutes"; that is NOT delivered — the worker task returns
+ * the failure instead of rethrowing it (decided 2026-09-24, see
+ * `packages/tasks/src/tasks/trigger/app-build-prepare.task.ts`, "Budget"), and
+ * the in-process fallback runs once. Nothing re-drives a failed prepare today:
+ * a requested Build stays `queued` until the Work is prepared again. Nor is
+ * "nothing written" true at that point — the provider may already hold the
+ * workflow commit or pull request and some secrets.
  *
  * ## What this file does not do
  *
@@ -131,7 +136,11 @@ export function appBuildPrepareLockKey(workId: string): string {
     return `${APP_BUILD_PREPARE_LOCK_KEY_PREFIX}${workId}`;
 }
 
-/** How long one pass may hold the lock (`plan.md:1370`: "held ≤ 5 minutes"). */
+/**
+ * The lock's lease (`plan.md:1370`: "held ≤ 5 minutes"). A LEASE, renewed by the
+ * lock service's heartbeat while the pass runs (up to its 24 h default lifetime,
+ * since no `maxLifetimeMs` is passed) — not a cap on how long a pass may run.
+ */
 export const APP_BUILD_PREPARE_LOCK_TTL_MS = 5 * 60 * 1000;
 
 /** How many passes one dispatch may run before it coalesces (`plan.md:1373`). */
@@ -1097,13 +1106,14 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         try {
             result = await binding.prepareRepository!(request, undefined, binding.writer);
         } catch (error) {
-            // §9.2: a GitHub 5xx or a rate limit retries with the runtime's
-            // backoff, and the requested Build stays `queued`. Re-throwing is what
-            // gives the runtime that chance; nothing has been written.
+            // Propagated to the caller, which reports it as failed. §9.2's runtime
+            // retry is NOT delivered (see the worker task's "Budget"), and the
+            // provider may already hold the workflow commit or pull request and
+            // some secrets — the §3.1b row is simply not updated for them.
             this.logger.warn(
                 `App builds: prepareRepository failed for work ${workId} (${
                     error instanceof Error ? error.message : String(error)
-                }); the run is left to the job runtime's retry.`,
+                }); nothing retries it — requested Builds stay queued until the Work is prepared again.`,
             );
             throw error;
         }

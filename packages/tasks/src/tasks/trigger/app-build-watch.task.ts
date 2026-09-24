@@ -54,16 +54,21 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  *    `AppBuildsService.dispatchWatch` returns `false`, runs nothing, and logs the
  *    §7.1 fallback; the sweep of §7.4 is what covers Builds meanwhile.
  *
- * ## Budget — 120 s, up to 2 attempts
+ * ## Budget — 120 s; runner failures are REPORTED, not retried
  *
  * §7.3:1386-1388's lease is `:now + 2 minutes`, so a run may not outlive the
  * lease it holds: another worker would take the same Build at that point, and
  * the two would race over a claim that is idempotent by construction but not
  * worth racing. The observation itself is one provider read plus a handful of
- * database writes; a run still going at two minutes has already lost its lease,
- * and §7.4's two-minute sweep is the retry that matters — it re-observes every
- * silent non-terminal Build regardless of what happened here, which is also why
- * a `concurrencyLimited` refusal loses nothing.
+ * database writes; a run still going at two minutes has already lost its lease.
+ *
+ * Every runner THROW is RETURNED as `status: 'failed'` (Trigger.dev retries
+ * only a run that throws), and the runner's own `skipped` answers — `leaseHeld`,
+ * `concurrencyLimited`, … — are reported as skipped runs. The retry that is
+ * meant to matter is §7.4's two-minute sweep, which re-observes every silent
+ * non-terminal Build regardless of what happened here. 🛑 That sweep has NOT
+ * landed (T21, as of 2026-09-24): until it does, a Build whose observation
+ * failed is re-observed only by the next webhook delivery or dispatch.
  *
  * ## The payload is declared here, and T18 owns its home
  *
@@ -151,6 +156,36 @@ function errorText(error: unknown): string {
 }
 
 /**
+ * The watch runner's own verdict, read defensively off the wire — the same rule
+ * as `app-build-prepare`'s: `observed`, `skipped` and `failed` are the runner's
+ * statuses; anything else fails closed as `unrecognisedRunnerResult`.
+ */
+function watchOutcome(result: unknown): {
+    status: AppBuildWatchTaskResult['status'];
+    reason: string | null;
+    error: string | null;
+} {
+    const value = (result ?? {}) as { status?: unknown; reason?: unknown; error?: unknown };
+    const text = (field: unknown) => (typeof field === 'string' && field.length > 0 ? field : null);
+    if (value.status === 'observed') return { status: 'observed', reason: null, error: null };
+    if (value.status === 'skipped') {
+        return { status: 'skipped', reason: text(value.reason) ?? 'skipped', error: null };
+    }
+    if (value.status === 'failed') {
+        return {
+            status: 'failed',
+            reason: text(value.reason) ?? 'watchFailed',
+            error: text(value.error),
+        };
+    }
+    return {
+        status: 'failed',
+        reason: 'unrecognisedRunnerResult',
+        error: `the runner answered without a recognised status (${JSON.stringify(value.status ?? null)})`,
+    };
+}
+
+/**
  * The run body, **exported** — not only registered, so a local worker can drain
  * *this* function and the dev path and the Trigger path cannot drift.
  */
@@ -199,13 +234,29 @@ export async function runAppBuildWatchTask(
 
             try {
                 const result = await runner.run({ buildId, reason: reason ?? 'event' });
-                logger.info('app-build-watch finished', { buildId, reason });
-                return {
-                    status: 'observed',
-                    jobId: APP_BUILD_WATCH_TASK_ID,
+                // The runner names its own outcome, and it is reported as-is: a
+                // `leaseHeld` or `concurrencyLimited` pass observed nothing and is a
+                // `skipped` run, never a green `observed` one.
+                const outcome = watchOutcome(result);
+                const log =
+                    outcome.status === 'observed'
+                        ? logger.info
+                        : outcome.status === 'skipped'
+                          ? logger.warn
+                          : logger.error;
+                log('app-build-watch finished', {
                     buildId,
                     reason,
-                    error: null,
+                    status: outcome.status,
+                    ...(outcome.reason ? { runnerReason: outcome.reason } : {}),
+                    ...(outcome.error ? { error: outcome.error } : {}),
+                });
+                return {
+                    status: outcome.status,
+                    jobId: APP_BUILD_WATCH_TASK_ID,
+                    buildId,
+                    reason: outcome.status === 'observed' ? reason : outcome.reason,
+                    error: outcome.error,
                     result,
                 };
             } catch (error) {
@@ -235,8 +286,10 @@ export const appBuildWatchTask = task<'app-build-watch', AppBuildWatchTaskPayloa
     id: APP_BUILD_WATCH_TASK_ID,
     // Two minutes — §7.3's lease. See the file header.
     maxDuration: 120,
-    // §9.2's retry shape, as the sibling job has it. A retry that arrives while
-    // the lease is live exits as `leaseHeld`; §7.4's sweep is the real backstop.
+    // Applies only to what escapes the run body's catch (boot or close failures,
+    // worker crashes or evictions): runner failures are returned, not retried —
+    // see the header's "Budget". A retry that arrives while the lease is live is
+    // answered `leaseHeld`.
     retry: { maxAttempts: 2 },
     run: runAppBuildWatchTask,
 });

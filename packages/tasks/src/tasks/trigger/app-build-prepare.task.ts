@@ -35,32 +35,36 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  *
  * 🛑 **The two registrations this file does not own.**
  *
- * 1. `apps/api/src/trigger/trigger-internal.controller.ts`'s `remoteMap` must
- *    expose `AppBuildPrepareRunner` (and `trigger-internal.module.ts` must be
- *    able to resolve it) — the API side of the RPC pair. It is not in this
- *    task's file list; **routed as a finding**, with the failure mode named: with
- *    it unbound the proxy's call rejects and this run reports
- *    `status: 'failed'`, `reason: 'prepareFailed'` with the RPC's own message
- *    — a named, visible failure, never a green run that prepared nothing.
+ * 1. `apps/api/src/trigger/trigger-internal.controller.ts`'s `remoteMap`
+ *    exposes `AppBuildPrepareRunner` — the API side of the RPC pair (landed; it
+ *    was routed as a finding from this file). Were it missing, the proxy's call
+ *    would reject and this run report `status: 'failed'`,
+ *    `reason: 'prepareFailed'` with the RPC's own message.
  * 2. `APP_BUILD_PREPARE_DISPATCHER` (T18) is what puts this job on the queue at
  *    all. It is bound (`packages/agent/src/tasks/job-runtime.providers.ts`) and
- *    enqueues this job when a job runtime is registered; with none it resolves
- *    `null`, and `AppBuildsService.dispatchPrepare` takes §7.1's documented
- *    fallback and runs `AppBuildPrepareRunner.run` **in the API process** once,
- *    with no retry of any kind — the path the local e2e stack takes.
+ *    enqueues this job when a job runtime is registered and configured. When
+ *    it resolves `null` — no runtime registered, Trigger not configured, or the
+ *    enqueue failed — `AppBuildsService.dispatchPrepare` takes §7.1's
+ *    documented fallback and runs `AppBuildPrepareRunner.run` **in the API
+ *    process** once, with no retry of any kind — the local e2e stack's path.
  *
  * ## Budget — 300 s; runner failures are REPORTED, not retried
  *
- * Five minutes is the §7.2 lock's own TTL ("held ≤ 5 minutes"). It bounds this
- * WORKER run only: the pass itself runs in the API behind the RPC, which keeps
- * going (and keeps heart-beating the lock) after the worker's 45 s RPC deadline
- * or `maxDuration`, so the API-side pass can outlive this run.
+ * `maxDuration` 300 s is the §7.2 lock's lease ("held ≤ 5 minutes"). It bounds
+ * this WORKER run only, and the worker's real bound is shorter — the RPC's
+ * non-retried 45 s deadline. The pass itself runs in the API behind the RPC and
+ * keeps going after that deadline, its lock's 5-minute lease renewed every
+ * 100 s by the heartbeat (up to a 24 h lifetime), so the API-side pass can
+ * outlive this run.
  *
  * `plan.md:1627` (§9.2) asks for "Job retries with the runtime's backoff 3 times
  * over 10 minutes". This job deliberately does NOT deliver that: every runner
- * failure is RETURNED as `status: 'failed'`, and Trigger.dev retries only a run
- * that throws. Decided on 2026-09-24 after reading the runner, because a task-side
- * rethrow cannot be made safe here:
+ * THROW is RETURNED as `status: 'failed'`, and Trigger.dev retries only a run
+ * that throws. (Some failures never reach the task as failures at all: the
+ * runner swallows a failed `startBuild` — reporting `prepared` — and turns a
+ * thrown read of the Work, spec, plugin or build values into a named skip.)
+ * Decided on 2026-09-24 after reading the runner, because a task-side rethrow
+ * cannot be made safe here:
  *
  * - it cannot tell a retryable failure from a permanent one — every runner throw
  *   crosses the RPC as a detail-less 500, so a GitHub 5xx, a 401/403/404, a 422
@@ -69,10 +73,12 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  *   `workflow_dispatch` landed but before `dispatchedAt` was stamped would, on a
  *   retry, dispatch the still-undispatched Build again;
  * - and it would not help: `{ maxAttempts: 3 }` with the runtime's default
- *   backoff retries after ~1–2 s and ~2–4 s (not "over 10 minutes"), and in the
- *   usual transient cases — the API still running the pass after an RPC
- *   timeout, or an API pod gone mid-pass — the lock is still held, so a retry
- *   answers `skipped: locked`.
+ *   backoff retries after ~1–2 s and ~2–4 s (not "over 10 minutes"), far too
+ *   soon for a 5xx outage or a rate-limit window. A failure that arrives as a
+ *   500 has already released the lock, so a retry would take it and re-run the
+ *   pass (which is how the duplicate above happens); only after an RPC timeout
+ *   or a lost API pod is the lock still held, and then a retry answers
+ *   `skipped: locked`.
  *
  * Nor does "the runner writes nothing until `prepareRepository` has answered"
  * hold: Builds can be blocked `missingBuildValues`, and the provider can already
@@ -83,12 +89,16 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  * with `dispatchedAt` NULL until something prepares the Work again (another
  * prepare reason, or the owner's next Rebuild). Nothing re-drives it today: the
  * §7.6 listeners and the §7.4 sweep have not landed, and the planned sweep
- * dispatches watch, not prepare. The fix belongs in the runner and the service
- * (classify provider failures into §9.2's `blocked` values, claim a Build before
- * dispatching it), not in a blanket task-level retry.
+ * dispatches watch, not prepare. And in the database-error-after-dispatch
+ * window above, that next prepare dispatches the same Build AGAIN (Builds are
+ * picked by `dispatchedAt IS NULL`). The fix belongs in the runner and the
+ * service — classify provider failures into §9.2's `blocked` values, and claim
+ * a Build before dispatching it — not in a blanket task-level retry.
  *
- * `retry: { maxAttempts: 3 }` therefore only ever applies to a throw OUTSIDE the
- * run body's `catch` — a worker context that cannot boot — and is kept for that.
+ * `retry: { maxAttempts: 3 }` therefore applies only to what escapes the run
+ * body's `catch`: a worker context that cannot boot or close, and a worker
+ * crash, eviction or stall. A retry then re-issues the RPC — safe, except in
+ * the dispatch window above.
  *
  * ## The payload is declared here, and T18 owns its eventual home
  *
@@ -176,8 +186,11 @@ function errorText(error: unknown): string {
 
 /**
  * The runner's own verdict, read defensively off the wire (the result crosses
- * the RPC as data): `skipped` and `failed` carry the runner's reason and error;
- * anything else — including a result with no status — is `prepared`, as before.
+ * the RPC as data). `prepared` and `skipped` are what the runner returns today;
+ * `failed` is in its result type and honoured if it ever arrives. Anything else
+ * — no status, an unknown one — is NOT a success: it fails closed as
+ * `unrecognisedRunnerResult`, since a green run nobody can read is the silent
+ * no-op this programme forbids.
  */
 function runnerOutcome(result: unknown): {
     status: AppBuildPrepareTaskResult['status'];
@@ -186,6 +199,7 @@ function runnerOutcome(result: unknown): {
 } {
     const value = (result ?? {}) as { status?: unknown; reason?: unknown; error?: unknown };
     const text = (field: unknown) => (typeof field === 'string' && field.length > 0 ? field : null);
+    if (value.status === 'prepared') return { status: 'prepared', reason: null, error: null };
     if (value.status === 'skipped') {
         return { status: 'skipped', reason: text(value.reason) ?? 'skipped', error: null };
     }
@@ -196,7 +210,11 @@ function runnerOutcome(result: unknown): {
             error: text(value.error),
         };
     }
-    return { status: 'prepared', reason: null, error: null };
+    return {
+        status: 'failed',
+        reason: 'unrecognisedRunnerResult',
+        error: `the runner answered without a recognised status (${JSON.stringify(value.status ?? null)})`,
+    };
 }
 
 /**
@@ -252,11 +270,21 @@ export async function runAppBuildPrepareTask(
                 // did nothing — `locked`, `pluginUnavailable`, … — is a `skipped`
                 // run with the runner's reason, never a green `prepared`.
                 const outcome = runnerOutcome(result);
-                logger.info('app-build-prepare finished', {
+                // `prepared` is info; a skip is a warning (a pass that did nothing
+                // is worth seeing); a runner-reported failure is an error. The run
+                // itself still COMPLETES in Trigger.dev — this job never throws.
+                const log =
+                    outcome.status === 'prepared'
+                        ? logger.info
+                        : outcome.status === 'skipped'
+                          ? logger.warn
+                          : logger.error;
+                log('app-build-prepare finished', {
                     workId,
                     reason,
                     status: outcome.status,
                     ...(outcome.reason ? { runnerReason: outcome.reason } : {}),
+                    ...(outcome.error ? { error: outcome.error } : {}),
                 });
                 return {
                     status: outcome.status,
@@ -293,9 +321,10 @@ export const appBuildPrepareTask = task<'app-build-prepare', AppBuildPrepareTask
     id: APP_BUILD_PREPARE_TASK_ID,
     // Five minutes — the §7.2 lock's own TTL. See the file header.
     maxDuration: 300,
-    // Applies only to a throw OUTSIDE the run body's catch (a worker context
-    // that cannot boot). Runner failures are returned, not retried — see the
-    // header's "Budget" for why §9.2:1627's runtime retry is not delivered here.
+    // Applies only to what escapes the run body's catch (boot or close
+    // failures, worker crashes or evictions). Runner failures are returned, not
+    // retried — see the header's "Budget" for why §9.2:1627's retry is not
+    // delivered here.
     retry: { maxAttempts: 3 },
     run: runAppBuildPrepareTask,
 });

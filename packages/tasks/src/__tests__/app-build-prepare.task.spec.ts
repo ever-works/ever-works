@@ -8,12 +8,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * what is pinned is what the thin layer owns:
  *
  *   1. **the registration** — the id the dispatcher enqueues under, the 300 s
- *      budget (the §7.2 lock's own TTL) and the 3-attempt retry shape;
+ *      budget (the §7.2 lock's lease) and the retry registration, which only
+ *      covers what escapes the run body's catch;
  *   2. **the RPC seam** — the worker proxies exactly the name the API's
  *      `remoteMap` must publish (`AppBuildPrepareRunner`), read off the worker
  *      module's own factory so a rename reddens here;
- *   3. **what a run reports** — a prepare, an unusable payload, and a rejected
- *      RPC, each named.
+ *   3. **what a run reports** — the runner's OWN outcome (prepared, skipped,
+ *      failed; anything unrecognised fails closed), an unusable payload, and a
+ *      rejected RPC, each named.
  *
  * Not pinned: the `runnerUnavailable` branch. The module handed to
  * `withWorkerContext` always binds the seam to a remote proxy, so that branch
@@ -26,6 +28,7 @@ const {
     createRemoteProxyMock,
     loggerErrorMock,
     loggerInfoMock,
+    loggerWarnMock,
     recorded,
     contextHolder,
 } = vi.hoisted(() => ({
@@ -33,6 +36,7 @@ const {
     createRemoteProxyMock: vi.fn(() => ({ run: vi.fn() })),
     loggerErrorMock: vi.fn(),
     loggerInfoMock: vi.fn(),
+    loggerWarnMock: vi.fn(),
     recorded: [] as Array<Record<string, unknown>>,
     // The `vi.mock` factories are hoisted above every `let`, so the context
     // they hand to the run body lives in a hoisted box.
@@ -46,7 +50,7 @@ vi.mock('@trigger.dev/sdk', () => ({
     },
     logger: {
         info: loggerInfoMock,
-        warn: vi.fn(),
+        warn: loggerWarnMock,
         error: loggerErrorMock,
         debug: vi.fn(),
         log: vi.fn(),
@@ -82,12 +86,29 @@ const registered = recorded.find((entry) => entry.id === APP_BUILD_PREPARE_TASK_
 
 const WORK_ID = '0b1c2d3e-4444-4555-8666-777788889999';
 
+/** The runner's real result shape (`AppBuildPrepareRunResult`), a prepared pass. */
+const PREPARED_RESULT = {
+    status: 'prepared',
+    jobId: 'app-build-prepare',
+    workId: WORK_ID,
+    reason: null,
+    passes: 1,
+    coalesced: false,
+    prepared: true,
+    workflowState: 'current',
+    secretsSynced: true,
+    buildsDispatched: 1,
+    buildsBlocked: 0,
+    error: null,
+};
+
 describe('app-build-prepare (APW-05 T19)', () => {
     let run: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        run = vi.fn(async () => ({ workId: WORK_ID, prepared: true }));
+        // The runner's real result shape (`AppBuildPrepareRunResult`).
+        run = vi.fn(async () => PREPARED_RESULT);
         contextHolder.current = {
             useLogger: vi.fn(),
             get: vi.fn((token: unknown) =>
@@ -96,10 +117,11 @@ describe('app-build-prepare (APW-05 T19)', () => {
         };
     });
 
-    it('registers its id, the lock-length budget and the 3-attempt retry shape', () => {
+    it('registers its id, the lock-length budget and the retry registration', () => {
         expect(registered).toBeDefined();
         expect(appBuildPrepareTask.id).toBe('app-build-prepare');
-        // The §7.2 lock is held for at most five minutes; a run may not outlive it.
+        // `maxDuration` is the §7.2 lock's 5-minute lease. `retry` only covers
+        // what escapes the run body's catch — see the task header's "Budget".
         expect(registered.maxDuration).toBe(300);
         expect(registered.retry).toEqual({ maxAttempts: 3 });
     });
@@ -130,7 +152,7 @@ describe('app-build-prepare (APW-05 T19)', () => {
             workId: WORK_ID,
             reason: 'envChanged',
             error: null,
-            result: { workId: WORK_ID, prepared: true },
+            result: PREPARED_RESULT,
         });
     });
 
@@ -177,26 +199,32 @@ describe('app-build-prepare (APW-05 T19)', () => {
     /**
      * The runner names its own outcome, and a pass that did nothing is not a
      * prepare. The task used to wrap EVERY runner answer as `status: 'prepared'`,
-     * so `skipped: locked` — the answer a retry gets while the lock is still held
-     * — and `pluginUnavailable` (every pass today) read as green runs.
+     * so `skipped: locked` (another pass holds the lock) and `pluginUnavailable`
+     * (no binding can prepare the repository — where a pass that gets that far
+     * stops today) read as green runs.
      */
-    it.each([
-        ['locked', 'the lock is held by another pass'],
-        ['pluginUnavailable', 'no build plugin can prepare the repository'],
-    ])('reports a runner skip (%s) as a skipped run with the runner’s reason', async (skip) => {
-        run.mockResolvedValue({ status: 'skipped', reason: skip, workId: WORK_ID, passes: 0 });
+    it.each(['locked', 'pluginUnavailable', 'nothingToPrepare'])(
+        'reports a runner skip (%s) as a skipped run with the runner’s reason, passing its result through',
+        async (skip) => {
+            const skipped = { ...PREPARED_RESULT, status: 'skipped', reason: skip, passes: 0 };
+            run.mockResolvedValue(skipped);
 
-        const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
+            const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
 
-        expect(result).toMatchObject({
-            status: 'skipped',
-            jobId: 'app-build-prepare',
-            workId: WORK_ID,
-            reason: skip,
-            error: null,
-        });
-    });
+            expect(result).toEqual({
+                status: 'skipped',
+                jobId: 'app-build-prepare',
+                workId: WORK_ID,
+                reason: skip,
+                error: null,
+                result: skipped,
+            });
+            expect(loggerWarnMock).toHaveBeenCalled();
+        },
+    );
 
+    // `failed` is in the runner's result type though it throws today; honoured
+    // if it ever arrives, and logged as an error.
     it('reports a runner-reported failure as failed, with its reason and error', async () => {
         run.mockResolvedValue({
             status: 'failed',
@@ -220,5 +248,31 @@ describe('app-build-prepare (APW-05 T19)', () => {
         const result = await registered.run({ workId: WORK_ID, reason: 'envChanged' });
 
         expect(result).toMatchObject({ status: 'prepared', reason: 'envChanged', error: null });
+    });
+
+    it('fails CLOSED on a runner answer with no recognised status', async () => {
+        run.mockResolvedValue({ workId: WORK_ID, prepared: true });
+
+        const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
+
+        expect(result).toMatchObject({
+            status: 'failed',
+            reason: 'unrecognisedRunnerResult',
+            error: expect.stringContaining('without a recognised status'),
+        });
+        expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('pins the runner’s swallowed-dispatch answer: prepared, with nothing dispatched', async () => {
+        // The runner swallows a failed `startBuild` and reports the pass
+        // `prepared` with `buildsDispatched: 0` — so a §9.2 dispatch failure is
+        // NOT a failed run. Pinned as it is; the fix belongs in the runner (see
+        // the task header's routed finding).
+        const swallowed = { ...PREPARED_RESULT, buildsDispatched: 0 };
+        run.mockResolvedValue(swallowed);
+
+        const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
+
+        expect(result).toMatchObject({ status: 'prepared', result: swallowed });
     });
 });

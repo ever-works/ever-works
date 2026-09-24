@@ -10,8 +10,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *
  * Not pinned: the `runnerUnavailable` branch, which the real composition cannot
  * reach (the seam is always bound to a remote proxy); a missing API-side
- * registration is a REJECTED call, the last case here. §7.4's two-minute sweep,
- * not this job's retry, is what re-observes a Build either way.
+ * registration is a REJECTED call. Runner failures are reported, not retried;
+ * the planned §7.4 sweep (not landed as of 2026-09-24) is the intended backstop.
  */
 
 const {
@@ -70,12 +70,26 @@ const registered = recorded.find((entry) => entry.id === APP_BUILD_WATCH_TASK_ID
 
 const BUILD_ID = '9a8b7c6d-1111-4222-8333-444455556666';
 
+/** The runner's real result shape (`AppBuildWatchRunResult`), an observation. */
+const OBSERVED_RESULT = {
+    status: 'observed',
+    jobId: 'app-build-watch',
+    buildId: BUILD_ID,
+    reason: null,
+    observedStatus: 'running',
+    started: false,
+    restamped: false,
+    finalised: false,
+    error: null,
+};
+
 describe('app-build-watch (APW-05 T20)', () => {
     let run: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        run = vi.fn(async () => ({ buildId: BUILD_ID, status: 'running' }));
+        // The runner's real result shape (`AppBuildWatchRunResult`).
+        run = vi.fn(async () => OBSERVED_RESULT);
         contextHolder.current = {
             useLogger: vi.fn(),
             get: vi.fn((token: unknown) =>
@@ -116,7 +130,7 @@ describe('app-build-watch (APW-05 T20)', () => {
             buildId: BUILD_ID,
             reason: 'sweep',
             error: null,
-            result: { buildId: BUILD_ID, status: 'running' },
+            result: OBSERVED_RESULT,
         });
     });
 
@@ -151,6 +165,44 @@ describe('app-build-watch (APW-05 T20)', () => {
             error: 'Unknown remote target: AppBuildWatchRunner',
             result: null,
         });
+        expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    /**
+     * The watch runner names its own outcome too. The task used to report every
+     * answer as `observed`, so a `leaseHeld` or `concurrencyLimited` pass — one
+     * that observed nothing — read as green.
+     */
+    it.each(['leaseHeld', 'concurrencyLimited'])(
+        'reports a runner skip (%s) as a skipped run with the runner’s reason',
+        async (skip) => {
+            const skipped = {
+                ...OBSERVED_RESULT,
+                status: 'skipped',
+                reason: skip,
+                observedStatus: null,
+            };
+            run.mockResolvedValue(skipped);
+
+            const result = await registered.run({ buildId: BUILD_ID, reason: 'sweep' });
+
+            expect(result).toEqual({
+                status: 'skipped',
+                jobId: 'app-build-watch',
+                buildId: BUILD_ID,
+                reason: skip,
+                error: null,
+                result: skipped,
+            });
+        },
+    );
+
+    it('fails CLOSED on a runner answer with no recognised status', async () => {
+        run.mockResolvedValue({ buildId: BUILD_ID, status: 'running' });
+
+        const result = await registered.run({ buildId: BUILD_ID, reason: 'event' });
+
+        expect(result).toMatchObject({ status: 'failed', reason: 'unrecognisedRunnerResult' });
         expect(loggerErrorMock).toHaveBeenCalled();
     });
 });
