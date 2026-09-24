@@ -153,9 +153,12 @@ describe('app-build-prepare (APW-05 T19)', () => {
     });
 
     it('reports a rejected RPC as failed with the transport’s own message — and does not throw', async () => {
-        // The production shape of a missing API-side registration. NOTE: the run
-        // RETURNS the failure rather than throwing it, so the runtime's
-        // `maxAttempts: 3` never fires for it — pinned as it is today.
+        // The production shape of a missing API-side registration. The run
+        // RETURNS the failure rather than throwing it, so the runtime does not
+        // retry it — DELIBERATELY (decided 2026-09-24, see the task header's
+        // "Budget"): every runner throw arrives as the same detail-less 500, and a
+        // blanket rethrow could re-dispatch a Build whose GitHub run already
+        // started.
         run.mockRejectedValue(new Error('Unknown remote target: AppBuildPrepareRunner'));
 
         const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
@@ -169,5 +172,53 @@ describe('app-build-prepare (APW-05 T19)', () => {
             result: null,
         });
         expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    /**
+     * The runner names its own outcome, and a pass that did nothing is not a
+     * prepare. The task used to wrap EVERY runner answer as `status: 'prepared'`,
+     * so `skipped: locked` — the answer a retry gets while the lock is still held
+     * — and `pluginUnavailable` (every pass today) read as green runs.
+     */
+    it.each([
+        ['locked', 'the lock is held by another pass'],
+        ['pluginUnavailable', 'no build plugin can prepare the repository'],
+    ])('reports a runner skip (%s) as a skipped run with the runner’s reason', async (skip) => {
+        run.mockResolvedValue({ status: 'skipped', reason: skip, workId: WORK_ID, passes: 0 });
+
+        const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
+
+        expect(result).toMatchObject({
+            status: 'skipped',
+            jobId: 'app-build-prepare',
+            workId: WORK_ID,
+            reason: skip,
+            error: null,
+        });
+    });
+
+    it('reports a runner-reported failure as failed, with its reason and error', async () => {
+        run.mockResolvedValue({
+            status: 'failed',
+            reason: null,
+            error: 'db down',
+            workId: WORK_ID,
+        });
+
+        const result = await registered.run({ workId: WORK_ID, reason: 'rebuild' });
+
+        expect(result).toMatchObject({
+            status: 'failed',
+            reason: 'prepareFailed',
+            error: 'db down',
+        });
+    });
+
+    it('still reports a runner answer that says it prepared as prepared, with the dispatch reason', async () => {
+        run.mockResolvedValue({ status: 'prepared', reason: null, workId: WORK_ID, passes: 1 });
+
+        const result = await registered.run({ workId: WORK_ID, reason: 'envChanged' });
+
+        expect(result).toMatchObject({ status: 'prepared', reason: 'envChanged', error: null });
     });
 });
