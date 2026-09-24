@@ -17,9 +17,18 @@ export interface LazyPluginStub extends IPlugin {
     readonly __isMaterialized: boolean;
     /**
      * Force materialization (import + onLoad) and return the real plugin.
-     * Concurrent callers share a single import + onLoad invocation.
+     * Concurrent callers share a single import + onLoad invocation — but by
+     * default a caller that arrives while the first-materialise hook (onLoad)
+     * is still running gets the instance at once, BEFORE onLoad has settled:
+     * the hook itself calls the plugin through this proxy, so it cannot wait.
+     *
+     * `{ waitForLoad: true }` resolves only once that first materialization
+     * has FINISHED, the hook (onLoad and its state bookkeeping) included — for
+     * a caller that must not run anything before onLoad has settled (the
+     * execution router, the `run-plugin-operation` worker task). Never pass it
+     * from inside the plugin's own onLoad: it would wait on itself.
      */
-    __materialize(): Promise<IPlugin>;
+    __materialize(options?: { readonly waitForLoad?: boolean }): Promise<IPlugin>;
 }
 
 /**
@@ -147,7 +156,12 @@ export function createLazyPluginProxy(
         get __isMaterialized() {
             return materialized !== null;
         },
-        __materialize: ensureMaterialized,
+        // `importPromise` settles only after `onFirstMaterialize`, and stays set
+        // once it succeeded; `ensureMaterialized` covers "not started yet" and
+        // "the hook failed" (it then answers the instance, and the failure
+        // hook has recorded the error state).
+        __materialize: (options?: { readonly waitForLoad?: boolean }) =>
+            options?.waitForLoad ? (importPromise ?? ensureMaterialized()) : ensureMaterialized(),
     } as unknown as LazyPluginStub;
 
     return new Proxy(stub, {

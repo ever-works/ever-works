@@ -172,9 +172,21 @@
 >     - `timeoutMs`/`pollIntervalMs` are validated, and the interval never drops
 >       below 250 ms;
 >     - a run that stays unreadable answers `JOB_RUNTIME_RUN_UNREADABLE` ("not
->       cancelled"), no longer `JOB_RUNTIME_FAILED`.
-> - A completed run whose offloaded output failed to download reads as `unknown`
->   and is read again, not as failed.
+>       cancelled"), no longer `JOB_RUNTIME_FAILED`;
+>     - the last sleep is cut to the time left, and one final read is made at
+>       the deadline, so a run that finished inside the budget is answered.
+> - A completed run whose offloaded output failed to download is
+>   `completed` + `outputUnavailable` (a new optional `JobRunResult` field). It is
+>   read again, and if it stays that way the answer is
+>   `JOB_RUNTIME_OUTPUT_UNREADABLE`: completed, do not re-dispatch. It is never
+>   reported as failed or as "may still be running".
+> - Second review:
+>     - a caller that arrives while another caller's first materialisation is
+>       still in `onLoad` now waits for it (`__materialize({ waitForLoad: true })`)
+>       before the state check;
+>     - `operations` and `executionProfile` are read from the static manifest
+>       only, never from `getManifest()`, so cold and warm replicas route alike;
+>     - an invalid plugin manifest is logged, not dropped silently.
 > - The task id, the payload type, the queue TTL and `maxDuration` are shared
 >   constants in `@ever-works/agent/tasks`. The router's default wait (80 min:
 >   TTL + `maxDuration` + boot) is derived from them, and an unmocked spec pins

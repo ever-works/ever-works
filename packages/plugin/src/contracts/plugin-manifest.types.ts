@@ -430,6 +430,12 @@ export interface PluginManifest {
 	 * markers are erased at runtime, so without a declaration a request could
 	 * reach any helper method a plugin class or its base classes carry.
 	 * Omitted or empty = no operation can be called by name.
+	 *
+	 * Declare it (and `executionProfile`) in package.json: a lazily loaded
+	 * plugin is routed BEFORE it loads, so the loader never takes either field
+	 * from the runtime `getManifest()`. A reserved name (a lifecycle hook) or
+	 * an otherwise malformed list fails manifest validation, and the plugin is
+	 * not loaded.
 	 */
 	readonly operations?: readonly PluginOperationDeclaration[];
 }

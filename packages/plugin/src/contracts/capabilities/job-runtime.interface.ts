@@ -95,6 +95,13 @@ export interface JobRunResult {
 	readonly output?: unknown;
 	/** Why a `'failed'` / `'cancelled'` run ended, when the provider exposes it. */
 	readonly error?: { readonly message: string } | null;
+	/**
+	 * `true` when `status` is `'completed'` but the output could not be read
+	 * this time (e.g. it is stored behind a URL the download of which failed).
+	 * The run's work is DONE — never dispatch it again; reading it again may
+	 * return the output.
+	 */
+	readonly outputUnavailable?: boolean;
 }
 
 /**

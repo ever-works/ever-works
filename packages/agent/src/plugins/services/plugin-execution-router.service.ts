@@ -46,6 +46,12 @@ const READ_TIMEOUT_MS = 30_000;
  * well under the 60 s ingress limit its HTTP callers sit behind.
  */
 const POLL_READ_TIMEOUT_MS = 20_000;
+/**
+ * The least time the LAST read — the one made at the deadline — is given, so
+ * a run that settled just before the deadline is still seen. The wait can
+ * therefore end up to this much after `timeoutMs`.
+ */
+const FINAL_READ_MIN_MS = 1_000;
 
 /**
  * EW-693 / T25 — execution router (sync vs long-running).
@@ -267,6 +273,8 @@ export class PluginExecutionRouterService {
      * {@link pollLongRunning}. The codes that mean "gave up, fate unknown" are
      * JOB_RUNTIME_WAIT_TIMEOUT, JOB_RUNTIME_WAIT_ABORTED and
      * JOB_RUNTIME_RUN_UNREADABLE — none of them says the run failed.
+     * JOB_RUNTIME_OUTPUT_UNREADABLE says it COMPLETED (do not dispatch it again)
+     * but its output could not be read.
      */
     async dispatchLongRunning<TResult = unknown>(
         pluginId: string,
@@ -351,7 +359,10 @@ export class PluginExecutionRouterService {
      * ONE read of a long-running run started earlier: `{ done: false }` while it
      * is queued or running — or unreadable right now, including a read that
      * took longer than `POLL_READ_TIMEOUT_MS` — else the final
-     * {@link PluginExecutionResult}.
+     * {@link PluginExecutionResult}. A run that completed but whose output could
+     * not be read this time is `done`, with JOB_RUNTIME_OUTPUT_UNREADABLE: its
+     * work is over and it must not be dispatched again (a later poll may still
+     * return the output).
      */
     async pollLongRunning<TResult = unknown>(runId: string): Promise<LongRunningPoll<TResult>> {
         const provider = this.activeProvider();
@@ -411,7 +422,14 @@ export class PluginExecutionRouterService {
      * it stays unreadable for {@link MAX_UNKNOWN_READS} reads in a row. Each
      * read is limited to the time left (at most {@link READ_TIMEOUT_MS}) and
      * ends early on an abort, so neither the deadline nor the signal waits on
-     * a stalled API.
+     * a stalled API. The last sleep is cut to the time left, and one final read
+     * is made AT the deadline (given at least {@link FINAL_READ_MIN_MS}), so a
+     * run that finished inside the budget is not reported as timed out.
+     *
+     * A completed run whose output could not be read (`outputUnavailable`) is
+     * read again like an unreadable one; if it stays that way, the answer is
+     * JOB_RUNTIME_OUTPUT_UNREADABLE — terminal, "completed, do not re-dispatch"
+     * — not RUN_UNREADABLE's "may still be running".
      */
     private async awaitRunOutcome(
         provider: IJobRuntimeProvider,
@@ -441,10 +459,12 @@ export class PluginExecutionRouterService {
             const read = await readRunResult(
                 provider,
                 runId,
-                Math.min(READ_TIMEOUT_MS, Math.max(0, deadline - Date.now())),
+                Math.min(READ_TIMEOUT_MS, Math.max(deadline - Date.now(), FINAL_READ_MIN_MS)),
                 signal,
             );
+            const outputUnavailable = isOutputUnavailable(read);
             if (
+                !outputUnavailable &&
                 read.status !== 'unknown' &&
                 read.status !== 'queued' &&
                 read.status !== 'running'
@@ -453,20 +473,24 @@ export class PluginExecutionRouterService {
                 return outcomeOf(read, runId);
             }
             if (signal?.aborted) return aborted();
-            if (read.status === 'unknown') {
+            if (outputUnavailable || read.status === 'unknown') {
                 unknownReads += 1;
                 if (unknownReads >= MAX_UNKNOWN_READS) {
-                    // NOT a failure: the run may well still be executing.
-                    return taskFailure(
-                        'JOB_RUNTIME_RUN_UNREADABLE',
-                        `Run ${runId} could not be read from the job runtime ${unknownReads} times in a row. ` +
-                            'It was NOT cancelled and may still be running; read it again later.',
-                    );
+                    // Neither says the run failed. A run that COMPLETED is done,
+                    // though, and must not be dispatched again.
+                    return outputUnavailable
+                        ? outcomeOf(read, runId)
+                        : taskFailure(
+                              'JOB_RUNTIME_RUN_UNREADABLE',
+                              `Run ${runId} could not be read from the job runtime ${unknownReads} times in a row. ` +
+                                  'It was NOT cancelled and may still be running; read it again later.',
+                          );
                 }
             } else {
                 unknownReads = 0;
             }
-            if (Date.now() + interval > deadline) {
+            const left = deadline - Date.now();
+            if (left <= 0) {
                 this.logger.warn(
                     `Stopped waiting for plugin operation run ${runId} after ${timeoutMs} ms.`,
                 );
@@ -475,7 +499,8 @@ export class PluginExecutionRouterService {
                     `Run ${runId} did not finish within ${timeoutMs} ms. It was NOT cancelled; read it again later.`,
                 );
             }
-            await sleep(interval, signal);
+            // Never sleep past the deadline: the next read is the final one.
+            await sleep(Math.min(interval, left), signal);
             interval = Math.min(maxInterval, interval * 2);
         }
     }
@@ -535,11 +560,23 @@ function pluginLoadFailed(message: string): PluginExecutionResult<never> {
     return { ok: false, location: 'in-process', error: { message, code: 'PLUGIN_LOAD_FAILED' } };
 }
 
+/** A completed run whose output the runtime could not read this time. */
+function isOutputUnavailable(read: JobRunResult): boolean {
+    return read.status === 'completed' && read.outputUnavailable === true;
+}
+
 /** A settled read as the task's envelope: its own output when completed, else a failure. */
 function outcomeOf<TResult = unknown>(
     read: JobRunResult,
     runId: string,
 ): PluginExecutionTaskOutcome<TResult> {
+    if (isOutputUnavailable(read)) {
+        return taskFailure(
+            'JOB_RUNTIME_OUTPUT_UNREADABLE',
+            `Run ${runId} COMPLETED, but its output could not be read. Its work is done — do NOT ` +
+                'dispatch it again; reading the run again may return the output.',
+        );
+    }
     if (read.status === 'completed') {
         return isTaskOutcome(read.output)
             ? (read.output as PluginExecutionTaskOutcome<TResult>)

@@ -272,4 +272,70 @@ describe('lazy-plugin-proxy', () => {
         expect(asSym[Symbol.asyncIterator]).toBeUndefined();
         expect(loader).not.toHaveBeenCalled();
     });
+
+    /**
+     * EW-693 — the first-materialise hook (onLoad) runs while `materialized` is
+     * already set, because the hook calls the plugin THROUGH the proxy. So a
+     * second caller's plain `__materialize()` answers before onLoad settles; a
+     * caller that must not run anything before then passes `waitForLoad`.
+     */
+    describe('__materialize({ waitForLoad: true })', () => {
+        function deferred() {
+            let resolve!: () => void;
+            const promise = new Promise<void>((r) => (resolve = r));
+            return { promise, resolve };
+        }
+        const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+        it('waits for the first-materialise hook that a plain __materialize() does not wait for', async () => {
+            const hookGate = deferred();
+            const loader = jest.fn().mockResolvedValue(makeRealPlugin('w1', jest.fn()));
+            const stub = createLazyPluginProxy(makeManifest('w1'), loader, () => hookGate.promise);
+            const order: string[] = [];
+
+            void stub.__materialize().then(() => order.push('first caller'));
+            await flush(); // the loader has resolved; the hook is running
+            void stub.__materialize().then(() => order.push('plain'));
+            void stub.__materialize({ waitForLoad: true }).then(() => order.push('waitForLoad'));
+            await flush();
+
+            expect(order).toEqual(['plain']);
+            hookGate.resolve();
+            await flush();
+            // All three now; which of the two hook-waiters resolves first is incidental.
+            expect(order).toHaveLength(3);
+            expect(order).toEqual(expect.arrayContaining(['plain', 'first caller', 'waitForLoad']));
+        });
+
+        it('does not deadlock the hook, which calls the plugin through the proxy', async () => {
+            const onLoad = jest.fn().mockResolvedValue(undefined);
+            const loader = jest.fn().mockResolvedValue(makeRealPlugin('w2', onLoad));
+            let stub: ReturnType<typeof createLazyPluginProxy>;
+            stub = createLazyPluginProxy(makeManifest('w2'), loader, async () => {
+                await stub.onLoad({} as never);
+            });
+
+            await expect(stub.__materialize({ waitForLoad: true })).resolves.toMatchObject({
+                id: 'w2',
+            });
+            expect(onLoad).toHaveBeenCalledTimes(1);
+        });
+
+        it('answers at once once loaded, and starts the load when nothing has yet', async () => {
+            const loader = jest.fn().mockResolvedValue(makeRealPlugin('w3', jest.fn()));
+            const stub = createLazyPluginProxy(
+                makeManifest('w3'),
+                loader,
+                jest.fn().mockResolvedValue(undefined),
+            );
+
+            await expect(stub.__materialize({ waitForLoad: true })).resolves.toMatchObject({
+                id: 'w3',
+            });
+            await expect(stub.__materialize({ waitForLoad: true })).resolves.toMatchObject({
+                id: 'w3',
+            });
+            expect(loader).toHaveBeenCalledTimes(1);
+        });
+    });
 });

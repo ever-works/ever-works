@@ -267,16 +267,19 @@ describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 
         /**
          * An output over the SDK's inline limit sits behind `outputPresignedUrl`;
          * `runs.retrieve` downloads it but SWALLOWS a failed download, leaving
-         * `output` undefined. Answered as completed, the router reported a run
-         * that succeeded — side effects done — as failed.
+         * `output` undefined. Answered as a plain completed run, the router
+         * reported a run that succeeded — side effects done — as failed.
          */
-        it("answers { status: 'unknown' } — read it again — for a COMPLETED run whose offloaded output did not download", async () => {
+        it('answers completed + outputUnavailable — done, read it again — for a COMPLETED run whose offloaded output did not download', async () => {
             runsRetrieveMock.mockResolvedValue({
                 status: 'COMPLETED',
                 output: undefined,
                 outputPresignedUrl: 'https://packets.example/out.json',
             });
-            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'completed',
+                outputUnavailable: true,
+            });
         });
 
         it('keeps a downloaded offloaded output', async () => {

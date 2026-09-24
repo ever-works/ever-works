@@ -13,6 +13,7 @@ import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.
 import { PLUGINS_MODULE_OPTIONS } from '../plugins.constants';
 import { JOB_RUNTIME_PROVIDER_REGISTRY } from '../../tasks/job-runtime.providers';
 import { PLUGIN_OPERATION_DEFAULT_WAIT_MS } from '../../tasks/plugin-operation-dispatch';
+import { createLazyPluginProxy } from '../services/lazy-plugin-proxy';
 
 /**
  * EW-693 / T25-T28 — execution router.
@@ -327,7 +328,12 @@ describe('PluginExecutionRouterService (EW-693)', () => {
      * (`dispatchers.dispatchPluginOperation`) and waits on its `getRunResult`.
      */
     describe('the job-runtime path (EW-693 T27)', () => {
-        type Read = { status: string; output?: unknown; error?: { message: string } | null };
+        type Read = {
+            status: string;
+            output?: unknown;
+            error?: { message: string } | null;
+            outputUnavailable?: boolean;
+        };
 
         function makeRuntime(reads: Read[] = [], runId: string | null = 'run_7') {
             const queue = [...reads];
@@ -730,6 +736,70 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                 expect(search).not.toHaveBeenCalled();
             });
 
+            /**
+             * With the REAL lazy proxy. Its `__materialize` answers a caller that
+             * arrives while another caller's first materialisation is still in
+             * its onLoad hook at once — before onLoad settles, with the entry
+             * still `loaded`. The router waits for the hook (`__whenLoaded`).
+             */
+            it('a caller arriving while another caller’s onLoad is still running waits for it — and runs nothing when it fails', async () => {
+                const ran: string[] = [];
+                const real = {
+                    id: 'p',
+                    async onLoad() {
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                        throw new Error('onLoad: required setting "apiKey" is missing');
+                    },
+                    async onUnload() {},
+                    async search(args?: { from?: string }) {
+                        ran.push(args?.from ?? '?');
+                        return 'ran';
+                    },
+                };
+                const entry: Record<string, unknown> = {
+                    manifest: declaresSearch,
+                    state: 'loaded',
+                };
+                // The bootstrap wiring: the hook calls onLoad THROUGH the proxy,
+                // and `callOnLoad` records a throw as the entry's error state.
+                const proxy = createLazyPluginProxy(
+                    { id: 'p', operations: [{ name: 'search' }] } as never,
+                    async () => real as never,
+                    async () => {
+                        try {
+                            await (entry.plugin as { onLoad: () => Promise<void> }).onLoad();
+                        } catch (err) {
+                            entry.state = 'error';
+                            entry.error = err;
+                        }
+                    },
+                );
+                entry.plugin = proxy;
+                const router = new PluginExecutionRouterService({ distributionMode: 'bundled' }, {
+                    get: jest.fn(() => entry),
+                } as unknown as PluginRegistryService);
+
+                // A facade-style call starts the first materialisation…
+                const facadeCall = (
+                    proxy as unknown as { search: (a: unknown) => Promise<unknown> }
+                )
+                    .search({ from: 'facade' })
+                    .catch(() => undefined);
+                // …and the router arrives while its onLoad is still running.
+                await new Promise((resolve) => setTimeout(resolve, 20));
+                const answer = await router.dispatchSync('p', 'search', { from: 'router' });
+                await facadeCall;
+
+                expect(answer).toMatchObject({
+                    ok: false,
+                    error: {
+                        code: 'PLUGIN_LOAD_FAILED',
+                        message: expect.stringContaining('required setting "apiKey" is missing'),
+                    },
+                });
+                expect(ran).not.toContain('router');
+            });
+
             it('answers PLUGIN_LOAD_FAILED for a plugin already in error state, without loading it', async () => {
                 const materialize = jest.fn(async () => new Helpers());
                 const router = routerWith(
@@ -940,14 +1010,93 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                         ok: false,
                         error: { code: 'JOB_RUNTIME_WAIT_TIMEOUT' },
                     });
-                    // At most one read per 250 ms (the floor) in a 700 ms wait.
-                    expect(runtime.provider.getRunResult.mock.calls.length).toBeLessThanOrEqual(4);
+                    // At most one read per 250 ms (the floor) in a 700 ms wait, plus
+                    // the final read made at the deadline.
+                    expect(runtime.provider.getRunResult.mock.calls.length).toBeLessThanOrEqual(5);
                 },
             );
+
+            /**
+             * A completed run whose output could not be read (an offloaded
+             * output whose download failed) is DONE: read it again a few times,
+             * then say so — never "failed", never "may still be running".
+             */
+            it('a completed run whose output stays unreadable ends JOB_RUNTIME_OUTPUT_UNREADABLE — completed, do not re-dispatch', async () => {
+                const runtime = makeRuntime(
+                    Array.from({ length: 10 }, () => ({
+                        status: 'completed',
+                        outputUnavailable: true,
+                    })),
+                );
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: {
+                        code: 'JOB_RUNTIME_OUTPUT_UNREADABLE',
+                        message: expect.stringContaining('do NOT dispatch it again'),
+                    },
+                });
+                expect(runtime.provider.getRunResult).toHaveBeenCalledTimes(5);
+            });
+
+            it('a completed run whose output becomes readable on a later read answers that output', async () => {
+                const runtime = makeRuntime([
+                    { status: 'completed', outputUnavailable: true },
+                    { status: 'completed', output: { ok: true, result: 'late' } },
+                ]);
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, fast),
+                ).resolves.toMatchObject({ ok: true, runId: 'run_7', result: 'late' });
+            });
+
+            it('pollLongRunning answers such a run as done — JOB_RUNTIME_OUTPUT_UNREADABLE, not a failure', async () => {
+                const runtime = makeRuntime([{ status: 'completed', outputUnavailable: true }]);
+
+                await expect(routerWith(runtime).pollLongRunning('run_7')).resolves.toMatchObject({
+                    done: true,
+                    runId: 'run_7',
+                    result: { ok: false, error: { code: 'JOB_RUNTIME_OUTPUT_UNREADABLE' } },
+                });
+            });
 
             describe('with fake timers', () => {
                 beforeEach(() => jest.useFakeTimers());
                 afterEach(() => jest.useRealTimers());
+
+                /**
+                 * The wait used to give up as soon as the next full backoff step
+                 * would pass the deadline — up to a whole interval early, for a
+                 * run that finished inside the budget.
+                 */
+                it.each([
+                    ['default interval', 5_000, undefined, 4_200],
+                    ['60 s interval', 90_000, 60_000, 80_000],
+                ])(
+                    'makes a final read AT the deadline (%s) — a run that finished inside the budget is answered',
+                    async (_label, timeoutMs, pollIntervalMs, completesAt) => {
+                        const started = Date.now();
+                        const runtime = makeRuntime();
+                        runtime.provider.getRunResult.mockImplementation(async () =>
+                            Date.now() - started >= completesAt
+                                ? { status: 'completed', output: { ok: true, result: 'in time' } }
+                                : { status: 'running' },
+                        );
+                        let settled: unknown;
+                        void routerWith(runtime)
+                            .dispatchLongRunning('p', 'op', undefined, {
+                                timeoutMs,
+                                pollIntervalMs,
+                            })
+                            .then((result) => (settled = result));
+
+                        await jest.advanceTimersByTimeAsync(timeoutMs + 2_000);
+                        expect(settled).toMatchObject({ ok: true, result: 'in time' });
+                    },
+                );
 
                 it('waits the run’s whole lifetime by default — queue TTL + maxDuration + boot, 80 minutes', async () => {
                     expect(PLUGIN_OPERATION_DEFAULT_WAIT_MS).toBe(80 * 60 * 1000);

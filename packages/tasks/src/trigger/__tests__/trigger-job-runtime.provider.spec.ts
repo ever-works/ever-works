@@ -287,7 +287,7 @@ describe('TriggerJobRuntimeProvider', () => {
                 });
             });
 
-            it("answers { status: 'unknown' } for a completed run whose offloaded output did not download", async () => {
+            it('answers completed + outputUnavailable for a completed run whose offloaded output did not download', async () => {
                 const retrieve = vi.fn(async () => ({
                     status: 'COMPLETED',
                     output: undefined,
@@ -295,7 +295,8 @@ describe('TriggerJobRuntimeProvider', () => {
                 }));
 
                 await expect(byoView(retrieve).getRunResult!('run_t')).resolves.toEqual({
-                    status: 'unknown',
+                    status: 'completed',
+                    outputUnavailable: true,
                 });
             });
         });

@@ -16,6 +16,26 @@ import type {
 import type { OnFirstMaterialize, OnMaterializeError } from './lazy-plugin-proxy';
 
 /**
+ * EW-693 — the runtime manifest (`getManifest()`) WITHOUT the routing
+ * declarations: `operations` (what the execution router may call by name) and
+ * `executionProfile`. Those are read from the STATIC manifest only
+ * (package.json `everworks.plugin`, or a built-in module's `manifest`).
+ *
+ * A lazily registered plugin is routed before it is loaded, so a declaration
+ * only `getManifest()` supplied would route the same operation in-process on a
+ * cold replica and to the job runtime on a warm one — and the allowlist, read
+ * after loading, would disagree with the routing read before it.
+ */
+function withoutRoutingDeclarations(
+    runtimeManifest: PluginManifest,
+): Omit<PluginManifest, 'operations' | 'executionProfile'> {
+    const rest: Record<string, unknown> = { ...runtimeManifest };
+    delete rest.operations;
+    delete rest.executionProfile;
+    return rest as unknown as Omit<PluginManifest, 'operations' | 'executionProfile'>;
+}
+
+/**
  * Result of plugin discovery
  */
 export interface DiscoveredPlugin {
@@ -174,7 +194,19 @@ export class PluginLoaderService {
             const { manifest, validation } = this.manifestValidator.validateAndExtract(packageJson);
 
             if (!validation.valid || !manifest) {
-                // Not a plugin or invalid manifest
+                // Not a plugin (no `everworks.plugin` block) — or a plugin whose
+                // manifest is invalid, which used to vanish from discovery
+                // without a word. Say why for the latter.
+                const everworks = packageJson.everworks as Record<string, unknown> | undefined;
+                if (everworks?.plugin) {
+                    this.logger.warn(
+                        `Skipping plugin package at ${packagePath}: invalid manifest — ${(
+                            validation.errors ?? []
+                        )
+                            .map((error) => `${error.path}: ${error.message}`)
+                            .join('; ')}`,
+                    );
+                }
                 return null;
             }
 
@@ -245,7 +277,8 @@ export class PluginLoaderService {
             // Merge runtime manifest from plugin class (provides readme, icon overrides, etc.)
             // Runtime manifest fills in fields not defined in package.json
             if (typeof plugin.getManifest === 'function') {
-                const runtimeManifest = plugin.getManifest();
+                // Routing declarations come from package.json only.
+                const runtimeManifest = withoutRoutingDeclarations(plugin.getManifest());
                 // Only keep defined values from package.json manifest to avoid
                 // overriding runtime values (e.g. homepage, icon) with undefined
                 const definedManifest = pickBy(
@@ -406,7 +439,8 @@ export class PluginLoaderService {
 
                 // Merge with runtime manifest if available (same as external plugins)
                 if (typeof plugin.getManifest === 'function') {
-                    const runtimeManifest = plugin.getManifest();
+                    // Routing declarations come from the module manifest only.
+                    const runtimeManifest = withoutRoutingDeclarations(plugin.getManifest());
                     const definedManifest: Record<string, unknown> = {};
                     for (const [key, value] of Object.entries(manifest)) {
                         if (value !== undefined) {
@@ -616,7 +650,9 @@ export class PluginLoaderService {
     ): Promise<void> {
         if (typeof real.getManifest !== 'function') return;
         try {
-            const runtimeManifest = real.getManifest();
+            // Routing declarations come from package.json only: the plugin was
+            // routed with that manifest before it loaded.
+            const runtimeManifest = withoutRoutingDeclarations(real.getManifest());
             const definedManifest = pickBy(
                 discovered.manifest as unknown as Record<string, unknown>,
                 (v) => v !== undefined,

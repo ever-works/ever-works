@@ -194,14 +194,20 @@ export function validateOperationDeclarations(operations: unknown): ValidationEr
 }
 
 /**
- * The real plugin behind a registry entry: a lazy proxy is materialised (its
- * `__materialize` loads and caches the real instance); anything else is
- * returned as it is. Rejects when the plugin will not load.
+ * The real plugin behind a registry entry, once it has LOADED: a lazy proxy is
+ * materialised with `{ waitForLoad: true }`, so its first-materialise hook
+ * (onLoad) has settled — by default `__materialize` answers a caller that
+ * arrives while another caller's onLoad is still running before that onLoad
+ * settles, and the registry state read afterwards would still say `loaded`.
+ * Anything else is returned as it is. Rejects when the plugin will not load.
  */
 export async function materializePlugin(plugin: unknown): Promise<object> {
     const lazy = plugin as { __materialize?: unknown };
     if (typeof lazy.__materialize === 'function') {
-        return (await (lazy.__materialize as () => Promise<object>)()) as object;
+        const materialize = lazy.__materialize as (options: {
+            waitForLoad: boolean;
+        }) => Promise<object>;
+        return (await materialize({ waitForLoad: true })) as object;
     }
     return plugin as object;
 }

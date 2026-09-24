@@ -1494,9 +1494,12 @@ export class TriggerService
  *
  * An output over the SDK's inline limit is stored behind `outputPresignedUrl`,
  * and `runs.retrieve` downloads it — but swallows a failed download and leaves
- * `output` undefined. A completed run in that state is answered `'unknown'`
- * (read it again), never `completed` without its output: the router would
- * report a run that succeeded, side effects done, as failed.
+ * `output` undefined. A completed run in that state is answered `completed`
+ * with `outputUnavailable: true`: its work is done (never dispatch it again),
+ * and reading it again may return the output. Answered as a plain `completed`
+ * without output, the router reported a run that succeeded as failed; answered
+ * `unknown`, a download that never succeeds left callers told "may still be
+ * running" forever.
  */
 export function triggerRunResult(
     status: JobRunStatus,
@@ -1508,7 +1511,7 @@ export function triggerRunResult(
         typeof run.outputPresignedUrl === 'string' &&
         run.outputPresignedUrl.length > 0
     ) {
-        return { status: 'unknown' };
+        return { status: 'completed', outputUnavailable: true };
     }
     const error = run.error as { message?: unknown } | string | null | undefined;
     const message =

@@ -279,10 +279,12 @@ The platform's execution router can call a plugin method **by name**: in the API
 ```
 
 - **Omitted or empty:** nothing can be called by name. Capability calls through the facades are unaffected.
-- **`name`:** the method name. It uses letters and digits, optionally dot-separated, with no leading `_` or `$`. Lifecycle hooks (`onLoad`, `getManifest`, …) are never operations, even when listed.
+- **`name`:** the method name. It uses letters and digits, optionally dot-separated, with no leading `_` or `$`. These names are reserved and can never be listed: `constructor`, `onLoad`, `onUnload`, `onEnable`, `onDisable`, `healthCheck`, `getManifest`, `getSettings`, `validateSettings`, `validateConnection`, `configure`, `initialize` and `dispose`.
 - **`executionProfile`** (optional, per operation): `sync` or `long-running`. It overrides the manifest-level `executionProfile` for that operation. A `long-running` operation runs in the worker, in bundled mode too.
 
-The validator rejects a malformed list: a bad name, a duplicate, or an unknown profile.
+Declare `operations` (and `executionProfile`) in `package.json`. A lazily loaded plugin is routed before it loads, so these two fields are never taken from what `getManifest()` returns.
+
+A malformed list fails manifest validation, and **the plugin is not loaded at all**: a bad or reserved name, a duplicate, or an unknown profile. Discovery logs the reason ("Skipping plugin package … invalid manifest").
 
 The method is called with one argument, the call's `args` object. On the long-running path, its result must be serialisable.
 

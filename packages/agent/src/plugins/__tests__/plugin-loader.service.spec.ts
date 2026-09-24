@@ -888,4 +888,150 @@ describe('PluginLoaderService', () => {
             );
         });
     });
+
+    /**
+     * EW-693 — `operations` and `executionProfile` decide what the execution
+     * router may call and where it runs. A lazily registered plugin is routed
+     * BEFORE it loads, from its package.json manifest; a declaration only
+     * `getManifest()` supplied was merged in at first use, so the same
+     * operation routed in-process on a cold replica and to the job runtime on
+     * a warm one. Routing declarations now come from the static manifest only.
+     */
+    describe('routing declarations come from the static manifest only', () => {
+        const runtimeDeclares = {
+            operations: [{ name: 'runLong', executionProfile: 'long-running' }],
+            executionProfile: 'long-running',
+        };
+
+        it('load(): drops operations and executionProfile that only getManifest() supplies', async () => {
+            const manifest = createMockManifest();
+            const plugin = {
+                ...createMockPlugin(),
+                getManifest: jest.fn().mockReturnValue({
+                    ...manifest,
+                    readme: '## Readme',
+                    ...runtimeDeclares,
+                }),
+            };
+            (service as any).loadPluginModule = jest.fn().mockResolvedValue(plugin);
+
+            const result = await service.load({
+                path: '/path/to/plugin',
+                packageJson: {},
+                manifest,
+                builtIn: false,
+            });
+
+            expect(result.success).toBe(true);
+            const registered = (registry.register as jest.Mock).mock.calls[0][1];
+            expect(registered.readme).toBe('## Readme'); // other runtime fields still merge
+            expect(registered.operations).toBeUndefined();
+            expect(registered.executionProfile).toBeUndefined();
+        });
+
+        it('load(): keeps the declarations package.json makes', async () => {
+            const manifest = {
+                ...createMockManifest(),
+                operations: [{ name: 'fromPackageJson' }],
+                executionProfile: 'sync',
+            } as PluginManifest;
+            const plugin = {
+                ...createMockPlugin(),
+                getManifest: jest
+                    .fn()
+                    .mockReturnValue({ ...createMockManifest(), ...runtimeDeclares }),
+            };
+            (service as any).loadPluginModule = jest.fn().mockResolvedValue(plugin);
+
+            await service.load({
+                path: '/path/to/plugin',
+                packageJson: {},
+                manifest,
+                builtIn: false,
+            });
+
+            const registered = (registry.register as jest.Mock).mock.calls[0][1];
+            expect(registered.operations).toEqual([{ name: 'fromPackageJson' }]);
+            expect(registered.executionProfile).toBe('sync');
+        });
+
+        it('first materialisation of a lazy plugin: does not fold runtime-only declarations into the registered manifest', async () => {
+            const manifest = createMockManifest();
+            const real = {
+                ...createMockPlugin(),
+                getManifest: jest.fn().mockReturnValue({
+                    ...manifest,
+                    readme: '## Readme',
+                    ...runtimeDeclares,
+                }),
+            };
+
+            await (service as any).enrichManifestAfterMaterialize('test-plugin', real, {
+                path: '/path/to/plugin',
+                packageJson: {},
+                manifest,
+                builtIn: false,
+            });
+
+            expect(registry.updateRegisteredManifest).toHaveBeenCalledTimes(1);
+            const merged = (registry.updateRegisteredManifest as jest.Mock).mock.calls[0][1];
+            expect(merged.readme).toBe('## Readme');
+            expect(merged.operations).toBeUndefined();
+            expect(merged.executionProfile).toBeUndefined();
+        });
+    });
+
+    /**
+     * A package WITH an `everworks.plugin` block whose manifest fails validation
+     * (e.g. a reserved name in `operations`) used to vanish from discovery
+     * without a log line — in the API and in the worker.
+     */
+    describe('an invalid plugin manifest is reported, not dropped silently', () => {
+        it('warns with the validation errors for a package that declares a plugin', async () => {
+            const warn = jest
+                .spyOn((service as any).logger, 'warn')
+                .mockImplementation(() => undefined);
+            warn.mockClear();
+            (manifestValidator.validateAndExtract as jest.Mock).mockReturnValue({
+                manifest: null,
+                validation: {
+                    valid: false,
+                    errors: [{ path: 'operations[0].name', message: 'must be a method name' }],
+                },
+            });
+            const readFile = jest
+                .spyOn(require('fs/promises'), 'readFile')
+                .mockResolvedValue(
+                    JSON.stringify({ name: 'x', everworks: { plugin: { id: 'bad-plugin' } } }),
+                );
+
+            await expect(
+                (service as any).tryLoadPluginManifest('/plugins/bad-plugin'),
+            ).resolves.toBeNull();
+
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('operations[0].name: must be a method name'),
+            );
+            readFile.mockRestore();
+            warn.mockRestore();
+        });
+
+        it('stays quiet for a package that is not a plugin at all', async () => {
+            const warn = jest
+                .spyOn((service as any).logger, 'warn')
+                .mockImplementation(() => undefined);
+            warn.mockClear();
+            const readFile = jest
+                .spyOn(require('fs/promises'), 'readFile')
+                .mockResolvedValue(JSON.stringify({ name: 'just-a-library' }));
+
+            await expect(
+                (service as any).tryLoadPluginManifest('/plugins/lib'),
+            ).resolves.toBeNull();
+
+            expect(warn).not.toHaveBeenCalled();
+            readFile.mockRestore();
+            warn.mockRestore();
+        });
+    });
 });
