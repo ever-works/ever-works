@@ -310,6 +310,114 @@ describe('every push is judged, including one onto an open pull request', () => 
     });
 });
 
+describe('a node cannot move the judgement off an open pull request', () => {
+    const openPr = (branchRef: string) =>
+        task({ prNumber: 12, prUrl: 'https://example.test/pr/12', branchRef });
+
+    it('BLOCKS when the reported branch is not the pull request head — before recording it', async () => {
+        // The second adversarial review: a node pushed a refused change to the PR
+        // head and reported an innocuous branch, and was judged on the innocuous
+        // one. A Task's branch never changes once written.
+        const m = mocks();
+
+        const outcome = await service(m).finalizeRemotePush(
+            pushInput({ task: openPr('ever-works/task/add-a-thing'), branch: 'innocuous' }),
+        );
+
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard', prNumber: 12 });
+        expect(m.evaluate).not.toHaveBeenCalled();
+        // `recordRemotePush` would have overwritten the recorded head.
+        const recorded = m.updateById.mock.calls.map(
+            (c) => (c[1] as { branchRef?: string })?.branchRef,
+        );
+        expect(recorded).not.toContain('innocuous');
+        expect(bodyOf(m)).toContain('#12');
+    });
+});
+
+describe('judgeAppWorkBranch — runs that never reach finalize', () => {
+    const judge = (
+        m: Mocks,
+        t: ReturnType<typeof task>,
+        reportedBranch: string | null,
+        kind = 'app',
+    ) =>
+        service(m, { kind }).judgeAppWorkBranch({
+            task: t as never,
+            userId: 'u-1',
+            agentId: 'a-1',
+            reportedBranch,
+        });
+
+    it('judges an open pull request at the head the PLATFORM recorded, not the reported one', async () => {
+        const m = mocks();
+
+        await judge(
+            m,
+            task({
+                prNumber: 12,
+                prUrl: 'https://example.test/pr/12',
+                branchRef: 'task/real-head',
+            }),
+            'something-else',
+        );
+
+        expect(m.evaluate).toHaveBeenCalledWith(
+            expect.objectContaining({ branch: 'task/real-head' }),
+        );
+    });
+
+    it('blocks and names the open pull request when that head is refused', async () => {
+        const m = mocks();
+        m.evaluate.mockResolvedValue(refused());
+
+        const outcome = await judge(
+            m,
+            task({
+                prNumber: 12,
+                prUrl: 'https://example.test/pr/12',
+                branchRef: 'task/real-head',
+            }),
+            null,
+        );
+
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard', prNumber: 12 });
+        expect(blockedWith(m)).toBe(true);
+        expect(bodyOf(m)).toContain('pull request #12 now contains');
+    });
+
+    it('judges the reported branch when there is no pull request but the node says it pushed', async () => {
+        const m = mocks();
+
+        await judge(m, task(), 'ever-works/task/add-a-thing');
+
+        expect(m.evaluate).toHaveBeenCalledWith(
+            expect.objectContaining({ branch: 'ever-works/task/add-a-thing' }),
+        );
+    });
+
+    it('judges nothing when there is no pull request and nothing was pushed', async () => {
+        const m = mocks();
+
+        await expect(judge(m, task(), null)).resolves.toBeNull();
+        expect(m.evaluate).not.toHaveBeenCalled();
+    });
+
+    it('returns at once for every other Work kind', async () => {
+        const m = mocks();
+
+        await expect(
+            judge(
+                m,
+                task({ prNumber: 12, prUrl: 'x', branchRef: 'task/x' }),
+                'task/x',
+                'directory',
+            ),
+        ).resolves.toBeNull();
+        expect(m.evaluate).not.toHaveBeenCalled();
+    });
+});
+
 describe('finalizeRun — the cloud path', () => {
     function runInput() {
         return {

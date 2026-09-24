@@ -89,6 +89,7 @@ describe('FleetAgentTaskReconcilerService', () => {
         finalizeRemotePush: jest.Mock;
         finalizeMountPush: jest.Mock;
         recordRemotePush: jest.Mock;
+        judgeAppWorkBranch: jest.Mock;
     };
     let taskChat: { post: jest.Mock };
     let dispatchGate: { drainForWork: jest.Mock };
@@ -160,6 +161,8 @@ describe('FleetAgentTaskReconcilerService', () => {
                 prUrl: `https://github.com/${input.repositoryId}/pull/7`,
             })),
             recordRemotePush: jest.fn().mockResolvedValue(undefined),
+            // APW-08 T17 — answers `null` (nothing to judge) unless a case says otherwise.
+            judgeAppWorkBranch: jest.fn().mockResolvedValue(null),
         };
         taskChat = { post: jest.fn().mockResolvedValue({}) };
         dispatchGate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: false }) };
@@ -508,6 +511,74 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(body).toContain('Pull request #42');
         expect(body).toContain('$0.42');
         expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+    });
+
+    /**
+     * APW-08 T17 — the second adversarial review found three fleet paths that
+     * pushed an App Work's branch and never judged it: a run that ends with a
+     * question, a run that fails, and a run whose node reports nothing pushed.
+     * Every path that does not reach `finalizeRemotePush` now asks
+     * `judgeAppWorkBranch`, which judges an open pull request at the head the
+     * PLATFORM recorded whatever the node says.
+     */
+    describe('App Work branches are judged on every path that skips finalize', () => {
+        const done = (result: Record<string, unknown>, status: FleetJobView['status'] = 'done') =>
+            build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job({ status }),
+                    USER,
+                    'node-report',
+                    NODE,
+                    result as unknown as Record<string, unknown>,
+                ),
+            );
+
+        it('the QUESTION path judges what the run pushed', async () => {
+            await done({
+                ...successResult,
+                question: { text: 'Which plan?', context: null, truncated: false, mountDir: null },
+            });
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+        });
+
+        it('the FAILURE path judges what the run pushed', async () => {
+            await done(
+                {
+                    ...successResult,
+                    status: 'failed',
+                    failureReason: 'a required check did not pass',
+                },
+                'failed',
+            );
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+        });
+
+        it('a run reporting NOTHING pushed still has its open pull request judged', async () => {
+            // "pushed: false" is only what the node says.
+            await done({
+                ...successResult,
+                git: { ...(successResult.git as object), pushed: false },
+            });
+
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: null }),
+            );
+        });
+
+        it('a pushed success is judged by finalizeRemotePush, not twice', async () => {
+            await done(successResult);
+
+            expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.judgeAppWorkBranch).not.toHaveBeenCalled();
+        });
     });
 
     it('tells the member a push the App Work gate REFUSED was refused, not that it succeeded', async () => {

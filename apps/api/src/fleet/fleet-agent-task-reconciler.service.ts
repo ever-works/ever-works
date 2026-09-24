@@ -333,6 +333,19 @@ export class FleetAgentTaskReconcilerService {
                     );
                 }
             }
+            // APW-08 T17 — a failed run can still have pushed its branch (a red
+            // required check does not stop the node's finalize). On an App Work
+            // that push is judged, and an open pull request's head always is.
+            if (task) {
+                await this.bestEffort('judge App Work branch', () =>
+                    this.taskWorkspace.judgeAppWorkBranch({
+                        task,
+                        userId: event.userId,
+                        agentId: agentId ?? run.agentId,
+                        reportedBranch: reportedPush(result),
+                    }),
+                );
+            }
             await this.postChat(
                 task,
                 event.userId,
@@ -396,6 +409,19 @@ export class FleetAgentTaskReconcilerService {
             finalizeNote = result.git.empty
                 ? 'The run produced no file changes.'
                 : `Changes were committed on \`${result.git.branch}\` but not pushed (git policy).`;
+        }
+        // APW-08 T17 — "nothing pushed" is only what the node says. When
+        // `finalizeRemotePush` did not run, an App Work Task's open pull request
+        // is still judged at its recorded head.
+        if (task && !(result.git && result.git.pushed && !result.git.empty)) {
+            await this.bestEffort('judge App Work branch', () =>
+                this.taskWorkspace.judgeAppWorkBranch({
+                    task,
+                    userId: event.userId,
+                    agentId: agentId ?? run.agentId,
+                    reportedBranch: null,
+                }),
+            );
         }
 
         // Multi-repo Task workspaces (slice C): one pull request per mounted
@@ -590,6 +616,19 @@ export class FleetAgentTaskReconcilerService {
             this.runDenorm.recordTerminal(ctx.taskId, ctx.runId, 'completed'),
         );
 
+        // APW-08 T17 — a run that asks a question still commits and pushes its
+        // work first. On an App Work that push is judged here: an open pull
+        // request picks it up with nothing else in the way.
+        if (task) {
+            await this.bestEffort('judge App Work branch', () =>
+                this.taskWorkspace.judgeAppWorkBranch({
+                    task,
+                    userId: event.userId,
+                    agentId: agentId ?? run.agentId,
+                    reportedBranch: reportedPush(result),
+                }),
+            );
+        }
         if (task && result.git && result.git.pushed && !result.git.empty) {
             const git = result.git;
             await this.bestEffort('record pushed branch', () =>
@@ -1110,6 +1149,17 @@ function truncate(value: string, max: number): string {
 
 function describeError(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The branch a fleet node says it pushed on this run, or `null` when it says it
+ * pushed nothing. Only ever a CLAIM — `judgeAppWorkBranch` judges an open pull
+ * request's head from the platform's own record whatever this says.
+ */
+function reportedPush(result: FleetAgentTaskResult | null | undefined): string | null {
+    const git = result?.git;
+    if (!git || !git.pushed || git.empty) return null;
+    return typeof git.branch === 'string' && git.branch.trim() ? git.branch.trim() : null;
 }
 
 function describeFinalize(outcome: TaskWorkspaceFinalizeOutcome, branch: string): string {

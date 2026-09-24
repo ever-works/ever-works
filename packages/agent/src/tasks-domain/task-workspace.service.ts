@@ -1362,6 +1362,28 @@ export class TaskWorkspaceService {
             );
         }
 
+        // APW-08 — on an App Work whose Task already has a pull request, the
+        // branch the node REPORTS must be the pull request's head the platform
+        // recorded. A Task's branch never changes once written (see `branchRef`
+        // in `provisionForRun`), so a different name is either a broken node or
+        // one pushing the change somewhere it will not be judged — the second
+        // adversarial review showed a node could push a refused change to the PR
+        // head and report an innocuous branch. Checked BEFORE `recordRemotePush`,
+        // which would otherwise overwrite the recorded head with the reported one.
+        if (isAppWorkKind(work.kind) && task.prNumber && task.prUrl) {
+            const prHead = (task.branchRef ?? '').trim();
+            if (prHead && prHead !== branch) {
+                return this.refuseChange(
+                    input,
+                    task,
+                    `The run reported pushing \`${branch}\`, but this Task's pull request ` +
+                        `#${task.prNumber} is on \`${prHead}\`. A Task's branch never changes once ` +
+                        'written, so the Task is blocked until a person checks what was pushed where.',
+                    { number: task.prNumber, url: task.prUrl },
+                );
+            }
+        }
+
         await this.recordRemotePush({
             task,
             branch,
@@ -2526,6 +2548,67 @@ export class TaskWorkspaceService {
             [`${verdict.message} ${consequence}`, ...paths].join('\n'),
             existingPullRequest,
         );
+    }
+
+    /**
+     * APW-08 T17 — judge an App Work Task's branch at the end of a fleet run that
+     * did NOT go through {@link finalizeRemotePush}: one that ended with a
+     * question, one that failed, or one whose node reported nothing pushed.
+     *
+     * The second adversarial review found all three pushed without judgement.
+     * A run that asks a question still commits and pushes its work first, and so
+     * does a run with a red check — onto the Task's branch, which an open pull
+     * request picks up with nothing in the way. And "pushed: false" is only what
+     * the node says; the wire is untrusted.
+     *
+     * So: when the Task has an open pull request, its head is judged — the head
+     * the PLATFORM recorded (`branchRef`), never a name the node reports.
+     * Without one, the reported branch is judged if the node says it pushed, so a
+     * refused change is at least named and the Task blocked. Otherwise there is
+     * nothing to judge. Every other Work kind returns at once.
+     *
+     * Never throws, like everything this service calls at finalize time.
+     */
+    async judgeAppWorkBranch(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        /** The branch the node says it pushed on this run, if it says it pushed. */
+        reportedBranch?: string | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome | null> {
+        const { task, userId } = input;
+        try {
+            if (!task.workId) return null;
+            const work = await this.works.findById(task.workId);
+            if (!work || !isAppWorkKind(work.kind)) return null;
+
+            const existingPullRequest =
+                task.prNumber && task.prUrl
+                    ? { number: task.prNumber, url: task.prUrl }
+                    : undefined;
+            const branch = existingPullRequest
+                ? (task.branchRef ?? '').trim()
+                : (input.reportedBranch ?? '').trim();
+            if (!branch) return null;
+
+            const { owner, repo } = resolveTaskRepository(work);
+            return this.guardAppChange({
+                input: { task, userId, agentId: input.agentId },
+                work,
+                owner,
+                repo,
+                gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
+                branch,
+                ...(existingPullRequest ? { existingPullRequest } : {}),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App Work branch could not be judged: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 
     /** The branch a pull request would target: the Work's base branch, or the default. */
