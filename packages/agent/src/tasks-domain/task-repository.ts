@@ -1,4 +1,6 @@
 import { getWorkCapabilities } from '@ever-works/contracts';
+import type { Work } from '../entities/work.entity';
+import { matchWorkRepoRoles } from '../works/work-repo-match';
 
 /**
  * The repository a Task acts on — where its branch is cut, its pull request is
@@ -97,4 +99,31 @@ export function resolveTaskRepository(work: TaskRepositoryWork): TaskRepositoryT
 export function taskRepositoryFullName(work: TaskRepositoryWork): string {
     const { owner, repo } = resolveTaskRepository(work);
     return `${owner}/${repo}`;
+}
+
+/**
+ * The Task that opened pull request `prNumber` in `owner/repo`, looked for in
+ * EVERY Work whose Task repository that is — and only in those.
+ *
+ * Only those, because `tasks.prNumber` is unique within the Task repository
+ * alone: pull request #7 in a directory Work's website repository is not the
+ * pull request its Task #7 opened in the data repository. Every one of them,
+ * because one account can register a repository as two Works (an App Work over
+ * a directory Work's website repository) and `findByUser` has no order — a
+ * first-match lookup filed a review on whichever Work the database listed
+ * first, while the resume path looked for it on the other.
+ */
+export async function findTaskForPullRequest<W extends Work, T>(
+    works: readonly W[],
+    owner: string,
+    repo: string,
+    prNumber: number,
+    findByWorkAndPrNumber: (workId: string, prNumber: number) => Promise<T | null | undefined>,
+): Promise<{ work: W; task: T } | null> {
+    for (const { work, roles } of matchWorkRepoRoles(works, owner, repo)) {
+        if (!roles.includes(taskRepositoryRole(work.kind))) continue;
+        const task = await findByWorkAndPrNumber(work.id, prNumber);
+        if (task) return { work, task };
+    }
+    return null;
 }

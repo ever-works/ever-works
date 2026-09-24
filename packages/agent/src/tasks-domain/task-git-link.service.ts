@@ -53,7 +53,7 @@ export interface TaskGitLookupBase {
  *
  *   1. **Owner-scoped, always.** Candidate Works come from
  *      `WorkRepository.findByUser(userId)` and the repo is matched with
- *      the shared `matchWorkByRepo`, so a delivery can never resolve into
+ *      the shared `matchWorkRepoRoles`, so a delivery can never resolve into
  *      another tenant's Task.
  *   2. **`null` is a normal outcome.** A repository that is not a Work, a
  *      branch nobody's Task owns, a PR opened by a human — all ordinary.

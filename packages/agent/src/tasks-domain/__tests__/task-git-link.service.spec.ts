@@ -23,9 +23,11 @@ describe('TaskGitLinkService (git activity ingestion)', () => {
      * Tasks actually live in (the DATA repo for every kind that has one, the
      * website-role Work Repository for an App Work — see `taskRepositoryRole`).
      * The default fixture below declares only a `work` repo, so a
-     * consumer that ACTS on the Task it resolved must refuse this link;
-     * the git-activity consumer, which only decorates an ingested event,
-     * goes on ignoring both fields.
+     * consumer that ACTS on the Task it resolved must refuse this link —
+     * and since the third adversarial review so does the git-activity
+     * decoration (`taskFields` in the PR review bridge): naming a Task that
+     * opened the same number in another repository labels the event with
+     * the wrong Task.
      */
     const WORK_REPO_LINK = {
         workId: 'work-1',

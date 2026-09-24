@@ -693,6 +693,56 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
     });
 
     /**
+     * Third adversarial review. One account can register a repository as two
+     * Works; here a second Work has `octo/site` only as its WEBSITE repository
+     * and an unrelated Task #42 in its own data repository. This Task's pull
+     * request was opened by a person, so its number was never recorded. The
+     * number lookup finds the OTHER Work's #42 — a miss, since it is not this
+     * repository's Task — and used to give up there instead of trying the
+     * branch, which names this Task exactly.
+     */
+    it('falls back to the branch when a pull request number resolves outside the Task repository', async () => {
+        const { task } = await seedWorkTaskAndRun();
+        await taskRows.update({ id: task.id }, { prNumber: null });
+        const other = await workRows.save(
+            workRows.create({
+                userId: OWNER_USER,
+                name: 'Other',
+                slug: 'other',
+                owner: 'octo',
+                description: 'shares octo/site as its website',
+                sourceRepository: {
+                    relatedRepositories: {
+                        data: { owner: 'octo', repo: 'other-data' },
+                        work: { owner: 'octo', repo: 'other-main' },
+                        website: { owner: 'octo', repo: 'site' },
+                    },
+                },
+            } as Partial<Work>),
+        );
+        await taskRows.save(
+            taskRows.create({
+                userId: OWNER_USER,
+                workId: other.id,
+                slug: 'o-42',
+                title: 'Unrelated',
+                status: TaskStatus.IN_REVIEW,
+                createdByType: 'user',
+                createdById: OWNER_USER,
+                requireAllApprovers: true,
+                prNumber: 42,
+                branchRef: 'task/o-42-unrelated',
+            } as Partial<Task>),
+        );
+        const service = buildService();
+
+        await service.handle(BINDING, 'check_run', checkRun() as never);
+
+        expect(resumes).toHaveLength(1);
+        expect((await tasks.findById(task.id))?.ciHeadSha).toBe(HEAD);
+    });
+
+    /**
      * The merged -> DONE transition is poll-driven, runs on a two-minute
      * cron and only fires from `in_progress` / `in_review`, and a pull
      * request the owner CLOSED without merging is never transitioned at

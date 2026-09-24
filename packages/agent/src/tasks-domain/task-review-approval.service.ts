@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { normalizeCommitSha } from '@ever-works/contracts';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
-import { matchWorkByRepo } from '../works/work-repo-match';
+import { findTaskForPullRequest } from './task-repository';
 
 /**
  * Merge approval (self-build slice AE, EW-805) — the missing half of the
@@ -79,10 +79,15 @@ export class TaskReviewApprovalService {
         }
         try {
             const candidates = await this.works.findByUser(input.userId);
-            const work = matchWorkByRepo(candidates ?? [], input.owner, input.repo);
-            if (!work) return false;
-            const task = await this.tasks.findByWorkAndPrNumber(work.id, input.prNumber);
-            if (!task) return false;
+            const found = await findTaskForPullRequest(
+                candidates ?? [],
+                input.owner,
+                input.repo,
+                input.prNumber,
+                (workId, prNumber) => this.tasks.findByWorkAndPrNumber(workId, prNumber),
+            );
+            if (!found) return false;
+            const { task } = found;
 
             const updated = await this.tasks.recordPullRequestReviewApproval(
                 task.id,
@@ -146,10 +151,15 @@ export class TaskReviewApprovalService {
         }
         try {
             const candidates = await this.works.findByUser(input.userId);
-            const work = matchWorkByRepo(candidates ?? [], input.owner, input.repo);
-            if (!work) return false;
-            const task = await this.tasks.findByWorkAndPrNumber(work.id, input.prNumber);
-            if (!task) return false;
+            const found = await findTaskForPullRequest(
+                candidates ?? [],
+                input.owner,
+                input.repo,
+                input.prNumber,
+                (workId, prNumber) => this.tasks.findByWorkAndPrNumber(workId, prNumber),
+            );
+            if (!found) return false;
+            const { task } = found;
 
             const cleared = await this.tasks.clearPullRequestReviewApproval(
                 task.id,

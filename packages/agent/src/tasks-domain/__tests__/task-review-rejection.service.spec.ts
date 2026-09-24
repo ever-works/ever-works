@@ -44,17 +44,19 @@ describe('TaskReviewRejectionService (M9)', () => {
             findByTaskId: jest.fn().mockResolvedValue([]),
             setState: jest.fn().mockResolvedValue(undefined),
         };
-        // `matchWorkByRepo` reads a Work's repo roles through its
-        // accessor methods, so the fixture speaks that interface rather
-        // than guessing at column names.
+        // The repo matcher reads a Work's repo roles through its accessor
+        // methods, so the fixture speaks that interface rather than guessing
+        // at column names. `acme/widgets` is the Work's DATA repository —
+        // where its Tasks open pull requests, and so the only repository a
+        // pull request review can be about (see the two-Works cases below).
         works = {
             findByUser: jest.fn().mockResolvedValue([
                 {
                     id: 'work-1',
-                    getRepoOwner: (role: string) => (role === 'work' ? 'acme' : null),
-                    getMainRepo: () => 'widgets',
+                    getRepoOwner: () => 'acme',
+                    getMainRepo: () => 'widgets-main',
                     getWebsiteRepo: () => null,
-                    getDataRepo: () => null,
+                    getDataRepo: () => 'widgets',
                 },
             ]),
         };
@@ -142,6 +144,61 @@ describe('TaskReviewRejectionService (M9)', () => {
                     reviewerLabel: 'octocat',
                 }),
             );
+        });
+
+        it('records nothing for a pull request in a repository that is not the Work’s Task repository', async () => {
+            // #9 in the Work's MAIN repository is not the pull request its Task
+            // #9 opened in the data repository.
+            await expect(
+                makeSvc().recordPullRequestRejection({ ...input, repo: 'widgets-main' }),
+            ).resolves.toBeNull();
+            expect(tasks.findByWorkAndPrNumber).not.toHaveBeenCalled();
+            expect(rejections.record).not.toHaveBeenCalled();
+        });
+
+        /**
+         * One account can register a repository as two Works: here an App Work
+         * wraps a directory Work's generated website repository `acme/site`.
+         * The App Work's Tasks open their pull requests THERE; the directory
+         * Work's Task #7 opened #7 in `acme/site-data`, a different pull
+         * request. The recorder used to take whichever Work the database
+         * listed first, in ANY role — while the resume path reads the review
+         * back only from the Work whose Task repository this is.
+         */
+        const directory = {
+            id: 'dir-1',
+            kind: 'directory',
+            getRepoOwner: () => 'acme',
+            getMainRepo: () => 'site-main',
+            getWebsiteRepo: () => 'site',
+            getDataRepo: () => 'site-data',
+        };
+        const app = {
+            id: 'app-1',
+            kind: 'app',
+            getRepoOwner: () => 'acme',
+            getMainRepo: () => 'site-app-main',
+            getWebsiteRepo: () => 'site',
+            getDataRepo: () => 'site-app-data',
+        };
+
+        it.each([
+            ['the directory Work first', () => [directory, app]],
+            ['the App Work first', () => [app, directory]],
+        ])('records the review on the App Work’s Task with %s', async (_order, list) => {
+            works.findByUser = jest.fn().mockResolvedValue(list());
+            tasks.findByWorkAndPrNumber = jest.fn(async (workId: string) =>
+                workId === 'app-1'
+                    ? { id: 'app-task', prNumber: 7 }
+                    : { id: 'dir-task', prNumber: 7 },
+            );
+
+            await makeSvc().recordPullRequestRejection({ ...input, repo: 'site', prNumber: 7 });
+
+            expect(rejections.record).toHaveBeenCalledWith(
+                expect.objectContaining({ taskId: 'app-task', workId: 'app-1' }),
+            );
+            expect(tasks.findByWorkAndPrNumber).not.toHaveBeenCalledWith('dir-1', 7);
         });
 
         it('returns null when the repo matches no Work', async () => {
