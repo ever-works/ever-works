@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
@@ -24,6 +25,7 @@ import {
     APP_BUILD_WATCH_RUNNER,
     APP_BUILD_WORK_SOURCE,
     AppBuildsService,
+    type AppBuildPluginResolver,
     type AppBuildRunnerRecipeSource,
     type AppBuildSpecSource,
     type AppBuildWorkSource,
@@ -169,7 +171,7 @@ import { GitFacadeService } from '../facades/git.facade';
             provide: BUILD_TOKEN_SOURCE,
             useFactory: (ref: ModuleRef): BuildTokenSource => ({
                 getBuildToken: async (input) => {
-                    const gitFacade = ref.get(GitFacadeService, { strict: false });
+                    const gitFacade = getOptionalProvider<GitFacadeService>(ref, GitFacadeService);
                     if (!gitFacade) return null;
                     return new GitBuildTokenSource(gitFacade).getBuildToken(input);
                 },
@@ -188,7 +190,10 @@ import { GitFacadeService } from '../facades/git.facade';
             provide: BUILD_REPOSITORY_FACTS_SOURCE,
             useFactory: (ref: ModuleRef): BuildRepositoryFactsSource => ({
                 getBuildRepositoryFacts: async (input) => {
-                    const states = ref.get(WorkUpstreamStateRepository, { strict: false });
+                    const states = getOptionalProvider<WorkUpstreamStateRepository>(
+                        ref,
+                        WorkUpstreamStateRepository,
+                    );
                     if (!states) return null;
                     return new UpstreamBuildFactsSource(states).getBuildRepositoryFacts(input);
                 },
@@ -212,8 +217,14 @@ import { GitFacadeService } from '../facades/git.facade';
                 read: async (workId: string) =>
                     new AppBuildWorkContextSource(
                         works,
-                        ref.get(WorkAppSpecStateRepository, { strict: false }) ?? null,
-                        ref.get(APP_BUILD_PLUGIN_RESOLVER, { strict: false }) ?? null,
+                        getOptionalProvider<WorkAppSpecStateRepository>(
+                            ref,
+                            WorkAppSpecStateRepository,
+                        ) ?? null,
+                        getOptionalProvider<AppBuildPluginResolver>(
+                            ref,
+                            APP_BUILD_PLUGIN_RESOLVER,
+                        ) ?? null,
                     ).read(workId),
             }),
             inject: [ModuleRef, WorkRepository],
@@ -234,7 +245,7 @@ import { GitFacadeService } from '../facades/git.facade';
             provide: APP_BUILD_RUNNER_RECIPE_SOURCE,
             useFactory: (ref: ModuleRef): AppBuildRunnerRecipeSource => ({
                 resolveEphemeral: async (workId, specCommitSha, ctx) => {
-                    const env = ref.get(AppEnvRuntimeSource, { strict: false });
+                    const env = getOptionalProvider<AppEnvRuntimeSource>(ref, AppEnvRuntimeSource);
                     if (!env) {
                         // Unbound reads as "no recipe and nothing missing",
                         // which is what §4.12 already does with an absent one:
@@ -259,7 +270,7 @@ import { GitFacadeService } from '../facades/git.facade';
             provide: APP_BUILD_SPEC_SOURCE,
             useFactory: (ref: ModuleRef): AppBuildSpecSource => ({
                 read: async (workId: string, sha?: string | null) => {
-                    const specs = ref.get(AppSpecService, { strict: false });
+                    const specs = getOptionalProvider<AppSpecService>(ref, AppSpecService);
                     if (!specs) return null;
                     return new AppBuildSpecReadSource(specs).read(workId, sha);
                 },

@@ -47,6 +47,8 @@ const {
     recorded: [] as Array<Record<string, unknown>>,
 }));
 
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
+
 vi.mock('@trigger.dev/sdk', () => ({
     task: (params: Record<string, unknown>) => {
         recorded.push(params);
@@ -268,6 +270,25 @@ describe('app-deploy (APW-06 T32)', () => {
 
     it('reports `orchestratorUnavailable` rather than deploying nothing quietly', async () => {
         appContext.get.mockReturnValue(undefined);
+
+        const result = await registered('app-deploy').run({
+            workId: 'work-1',
+            deploymentId: 'deployment-1',
+        });
+
+        expect(result).toMatchObject({ status: 'skipped', reason: 'orchestratorUnavailable' });
+        expect(loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('reports `orchestratorUnavailable` when Nest THROWS for the absent provider — its real behaviour', async () => {
+        // The case above mocks `get` returning `undefined`, which Nest never
+        // does: `appContext.get(Token, { strict: false })` throws
+        // `UnknownElementException` for a provider it does not have. That is
+        // why this branch looked tested while being unreachable — the job
+        // failed with Nest's generic "does not exist" instead of `skipped`.
+        appContext.get.mockImplementation(() => {
+            throw new UnknownElementException('AppDeployOrchestrator');
+        });
 
         const result = await registered('app-deploy').run({
             workId: 'work-1',

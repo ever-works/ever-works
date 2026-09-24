@@ -1,6 +1,7 @@
 import { logger, schedules } from '@trigger.dev/sdk';
 import { CACHE_MANAGER } from '@ever-works/agent/cache';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 import { AppHealthService, type AppHealthPollSummary } from '@ever-works/agent/app-runtime';
 import {
     APP_RUNTIME_TASK_QUEUE,
@@ -113,7 +114,12 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
         'AppHealthPoll',
         async (appContext): Promise<AppHealthPollTaskResult> => {
             // ---- the guard ---------------------------------------------------------------
-            const locks = appContext.get(DistributedTaskLockService, { strict: false });
+            // `getOptionalProvider`: `appContext.get` THROWS for an absent provider,
+            // which made the warning below unreachable.
+            const locks = getOptionalProvider<DistributedTaskLockService>(
+                appContext,
+                DistributedTaskLockService,
+            );
             if (!locks?.isLocked) {
                 logger.warn(
                     'app-health-poll: DistributedTaskLockService is not bound in this worker ' +
@@ -166,9 +172,9 @@ export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
             const cacheSweep = await sweepExpiredCacheEntries(appContext);
 
             // ---- the sweep itself (T27) ---------------------------------------------------
-            const health = appContext.get(AppHealthService, { strict: false }) as
-                | AppHealthService
-                | undefined;
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named error below could never be reached.
+            const health = getOptionalProvider<AppHealthService>(appContext, AppHealthService);
 
             if (!health?.poll) {
                 logger.error(

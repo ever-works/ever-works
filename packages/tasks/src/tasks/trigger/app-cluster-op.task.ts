@@ -6,6 +6,7 @@ import {
     appClusterWorkerRefusal,
 } from '../../trigger/worker/modules/trigger-app-runtime.module';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 
 /**
  * APW-06 T32 (`tasks.md:556-573`) — **`app-cluster-op`**, the one-shot that carries every §9.2 op
@@ -170,9 +171,9 @@ export async function runAppClusterOpTask(
     return withWorkerContext(
         'AppClusterOp',
         async (appContext): Promise<AppClusterOpTaskResult> => {
-            const router = appContext.get(AppClusterOpRouter, { strict: false }) as
-                | AppClusterOpRouter
-                | undefined;
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named error below could never be reached.
+            const router = getOptionalProvider<AppClusterOpRouter>(appContext, AppClusterOpRouter);
 
             if (!router?.handle) {
                 logger.error(

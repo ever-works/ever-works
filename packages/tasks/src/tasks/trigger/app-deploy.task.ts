@@ -5,6 +5,7 @@ import {
 } from '@ever-works/agent/app-runtime';
 import { WorkDeploymentRepository } from '@ever-works/agent/database';
 import { WORK_APP_RUNTIME_STATES } from '@ever-works/agent/app-launcher';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 import {
     APP_RUNTIME_TASK_QUEUE,
     TriggerAppRuntimeModule,
@@ -144,7 +145,13 @@ export async function runAppDeployTask(
     return withWorkerContext(
         'AppDeploy',
         async (appContext): Promise<AppDeployTaskResult> => {
-            const orchestrator = appContext.get(AppDeployOrchestrator, { strict: false });
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named-error branch below could never run — the
+            // job failed with Nest's generic "does not exist" instead of `skipped`.
+            const orchestrator = getOptionalProvider<AppDeployOrchestrator>(
+                appContext,
+                AppDeployOrchestrator,
+            );
             if (!orchestrator?.run) {
                 // Nothing to delegate to: the context booted without the orchestrator, which
                 // means this module was replaced by something narrower. Say so by name.
@@ -276,7 +283,12 @@ export async function recoverFailedAppDeploy(
                 }
 
                 try {
-                    const states = appContext.get(WORK_APP_RUNTIME_STATES, { strict: false });
+                    const states = getOptionalProvider<{
+                        releaseDeployLock?: (
+                            workId: string,
+                            deploymentId: string,
+                        ) => Promise<unknown>;
+                    }>(appContext, WORK_APP_RUNTIME_STATES);
                     if (states?.releaseDeployLock) {
                         await states.releaseDeployLock(workId, deploymentId);
                         outcome.lockRelease = 'released';

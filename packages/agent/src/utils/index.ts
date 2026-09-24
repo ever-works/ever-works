@@ -16,3 +16,4 @@ export * from './secret-scan';
 // only reachable via a deep relative import, so `apps/api` could not use it and
 // `organization.service.ts` let a lost slug race escape as a raw 500.
 export * from './db-error.utils';
+export * from './optional-provider.util';

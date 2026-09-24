@@ -6,6 +6,7 @@ import {
     appClusterWorkerRefusal,
 } from '../../trigger/worker/modules/trigger-app-runtime.module';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 
 /**
  * APW-06 T32 (`tasks.md:556-573`) — **`app-smoke`**, the one-shot behind FR-36/FR-37's on-demand
@@ -106,9 +107,9 @@ export async function runAppSmokeTask(payload: AppSmokeTaskPayload): Promise<App
     return withWorkerContext(
         'AppSmoke',
         async (appContext): Promise<AppSmokeTaskResult> => {
-            const service = appContext.get(AppSmokeService, { strict: false }) as
-                | AppSmokeService
-                | undefined;
+            // `getOptionalProvider`, not `appContext.get`: the latter THROWS for an
+            // absent provider, so the named error below could never be reached.
+            const service = getOptionalProvider<AppSmokeService>(appContext, AppSmokeService);
 
             if (!service?.run) {
                 logger.error(

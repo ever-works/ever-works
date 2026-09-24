@@ -78,6 +78,7 @@
 
 import { Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
 import { WorkAppDependency } from '../entities/work-app-dependency.entity';
@@ -114,7 +115,7 @@ import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
             provide: APP_ENV_SPEC_SOURCE,
             useFactory: (ref: ModuleRef): AppEnvSpecSource => ({
                 read: async (workId: string) => {
-                    const specs = ref.get(AppSpecService, { strict: false });
+                    const specs = getOptionalProvider<AppSpecService>(ref, AppSpecService);
                     if (!specs) return null;
                     return new AppEnvSpecReadSource(specs).read(workId);
                 },
