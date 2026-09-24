@@ -67,6 +67,8 @@ describe('TaskMergeGateService', () => {
             }),
         };
         const taskWorkspace = {
+            // APW-08 — `null` is "not an App Work, nothing to judge".
+            judgeAppWorkMerge: jest.fn().mockResolvedValue(null),
             attemptMergeForOpenPullRequest: jest
                 .fn()
                 .mockResolvedValue({ attempted: true, merged: true }),
@@ -135,6 +137,61 @@ describe('TaskMergeGateService', () => {
         // The reviewer looked at a different commit; saying "octocat
         // approved" next to this diff would be a lie.
         expect(mergeApprovals.requestMergeApproval.mock.calls[0][0].reviewApprovedBy).toBeNull();
+    });
+
+    // ── a refused or blocked pull request is never merged ────────────
+    //
+    // Every App Work refusal leaves the pull request OPEN (the branch is
+    // already pushed), and this gate reads the pull request, not the Task.
+    // The third adversarial review showed a refused App Work pull request
+    // merged as soon as CI went green, or reached a human as an ordinary
+    // Approve button.
+
+    it('neither asks nor merges for a BLOCKED Task, whatever the policy', async () => {
+        for (const policy of [NEEDS_APPROVAL, { ...NEEDS_APPROVAL, requireHumanApproval: false }]) {
+            const { service, mergeApprovals, taskWorkspace } = build({ policy, approved: true });
+
+            const outcome = await service.onPullRequestStatusRefreshed(
+                task({ status: 'blocked' }),
+                status(),
+            );
+
+            expect(outcome).toEqual({ action: 'skipped', reason: 'task-blocked' });
+            expect(mergeApprovals.requestMergeApproval).not.toHaveBeenCalled();
+            expect(taskWorkspace.attemptMergeForOpenPullRequest).not.toHaveBeenCalled();
+        }
+    });
+
+    it('neither asks nor merges an App Work pull request its rules refuse at the current head', async () => {
+        for (const policy of [NEEDS_APPROVAL, { ...NEEDS_APPROVAL, requireHumanApproval: false }]) {
+            const { service, mergeApprovals, taskWorkspace } = build({ policy, approved: true });
+            taskWorkspace.judgeAppWorkMerge.mockResolvedValue({
+                allowed: false,
+                reason: 'app-change-refused',
+            });
+
+            // The Task is NOT blocked: the transition is best-effort, and a head
+            // can move after its push was judged.
+            const outcome = await service.onPullRequestStatusRefreshed(task(), status());
+
+            expect(outcome).toEqual({ action: 'skipped', reason: 'app-change-refused' });
+            expect(mergeApprovals.requestMergeApproval).not.toHaveBeenCalled();
+            expect(taskWorkspace.attemptMergeForOpenPullRequest).not.toHaveBeenCalled();
+        }
+    });
+
+    it('continues exactly as before when the App Work rules allow the head', async () => {
+        const { service, taskWorkspace } = build({
+            policy: { ...NEEDS_APPROVAL, requireHumanApproval: false },
+        });
+        taskWorkspace.judgeAppWorkMerge.mockResolvedValue({ allowed: true });
+
+        const outcome = await service.onPullRequestStatusRefreshed(task(), status());
+
+        expect(outcome).toMatchObject({ action: 'merge-attempted' });
+        expect(taskWorkspace.judgeAppWorkMerge).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'task-1' }),
+        );
     });
 
     // ── an INCOMPLETE CI read is not green ────────────────────────────
@@ -318,7 +375,10 @@ describe('TaskMergeGateService', () => {
                 .fn()
                 .mockResolvedValue({ policy: NEEDS_APPROVAL, source: 'work', chain: [] }),
         };
-        const taskWorkspace = { attemptMergeForOpenPullRequest: jest.fn() };
+        const taskWorkspace = {
+            attemptMergeForOpenPullRequest: jest.fn(),
+            judgeAppWorkMerge: jest.fn().mockResolvedValue(null),
+        };
         const service = new TaskMergeGateService(
             works as never,
             mergePolicy as never,

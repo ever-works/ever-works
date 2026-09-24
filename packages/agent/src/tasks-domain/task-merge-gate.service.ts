@@ -8,7 +8,7 @@ import {
     resolvePromotionBranches,
 } from '@ever-works/contracts';
 import type { ReleaseLadder } from '@ever-works/contracts';
-import { Task } from '../entities/task.entity';
+import { Task, TaskStatus } from '../entities/task.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { MergePolicyService } from '../policy/merge-policy.service';
 import { MergeApprovalService } from '../agent-approvals/merge-approval.service';
@@ -144,6 +144,13 @@ export class TaskMergeGateService {
         if (!headSha) {
             return { action: 'skipped', reason: 'head-sha-unknown' };
         }
+        // A blocked Task is waiting on a person — for a merge conflict, an App
+        // Work change the Work's rules refused, or because someone blocked it.
+        // Its pull request stays open either way, and green CI is not the
+        // person's answer: neither merge it nor ask anyone to approve a merge.
+        if (task.status === TaskStatus.BLOCKED) {
+            return { action: 'skipped', reason: 'task-blocked' };
+        }
 
         // Release promotion lane (slice AI) — the extra refusal, applied
         // BEFORE any approval is raised and before any merge is attempted.
@@ -170,6 +177,17 @@ export class TaskMergeGateService {
 
         const work = await this.works.findById(task.workId);
         if (!work) return { action: 'skipped', reason: 'no-work' };
+
+        // APW-08 — an App Work pull request is judged AGAIN at its current head
+        // before anyone is asked to approve it or it is merged. The status check
+        // above is not enough on its own: the transition to blocked is
+        // best-effort, and a head can move after its push was judged (or be
+        // pushed on a path that was never judged). Fails closed; every other
+        // Work kind returns `null` and continues unchanged.
+        const appVerdict = await this.taskWorkspace.judgeAppWorkMerge(task);
+        if (appVerdict && appVerdict.allowed !== true) {
+            return { action: 'skipped', reason: appVerdict.reason };
+        }
 
         // Post-deploy verification and revert (slice AJ, EW-809) — the
         // SECOND narrowing, and it exists because undoing a promotion is

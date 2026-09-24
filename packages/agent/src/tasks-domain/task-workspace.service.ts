@@ -2611,6 +2611,61 @@ export class TaskWorkspaceService {
         }
     }
 
+    /**
+     * APW-08 — may the platform MERGE this App Work Task's open pull request?
+     *
+     * Every refusal leaves the pull request open (the branch is already
+     * pushed), and the post-CI merge sweep reads the pull request, not the
+     * Task's verdict — the third adversarial review showed it would merge a
+     * refused pull request as soon as CI went green, or offer it to a human as
+     * an ordinary Approve button. So the head is judged again, here, before
+     * any approval is raised or merge attempted: whatever path pushed it, and
+     * whether or not that push was ever judged.
+     *
+     * Side-effect free — no chat message, no transition — because the sweep
+     * asks every few minutes; the refusal itself was said when the push was
+     * judged. Returns `null` for every other Work kind (nothing to judge), and
+     * FAILS CLOSED: no gate bound, no branch recorded, rules unreadable — each
+     * is a refusal, because the alternative is merging a change nobody judged.
+     */
+    async judgeAppWorkMerge(
+        task: Task,
+    ): Promise<{ allowed: true } | { allowed: false; reason: string } | null> {
+        if (!task.workId) return null;
+        const work = await this.works.findById(task.workId);
+        if (!work || !isAppWorkKind(work.kind)) return null;
+        if (!this.appChangeGate) return { allowed: false, reason: 'app-change-gate-unavailable' };
+        const branch = (task.branchRef ?? '').trim();
+        if (!branch) return { allowed: false, reason: 'app-change-branch-unknown' };
+        try {
+            const { owner, repo } = resolveTaskRepository(work);
+            const gitOptions = {
+                userId: task.userId,
+                providerId: work.gitProvider,
+                workId: work.id,
+            };
+            const verdict = await this.appChangeGate.evaluate({
+                work,
+                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                owner,
+                repo,
+                gitOptions,
+                baseRef: await this.resolveBaseRef(work, owner, repo, gitOptions),
+                branch,
+            });
+            return verdict.allowed === true
+                ? { allowed: true }
+                : { allowed: false, reason: 'app-change-refused' };
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App Work pull request could not be judged for merge: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { allowed: false, reason: 'app-change-unjudged' };
+        }
+    }
+
     /** The branch a pull request would target: the Work's base branch, or the default. */
     private async resolveBaseRef(
         work: Work,

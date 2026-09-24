@@ -418,6 +418,75 @@ describe('judgeAppWorkBranch — runs that never reach finalize', () => {
     });
 });
 
+/**
+ * The post-CI merge sweep asks this before it raises an approval or merges.
+ * Every refusal leaves the pull request open, and the sweep reads the pull
+ * request, not the Task — so without it a refused App Work change merged as
+ * soon as CI went green.
+ */
+describe('judgeAppWorkMerge — before any merge or approval', () => {
+    const OPEN = { prNumber: 12, prUrl: 'https://example.test/pr/12', branchRef: 'task/real-head' };
+
+    it('judges the recorded head against the Work’s base, in the App Work’s real repository', async () => {
+        const m = mocks();
+
+        await expect(service(m).judgeAppWorkMerge(task(OPEN) as never)).resolves.toEqual({
+            allowed: true,
+        });
+        expect(m.evaluate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                owner: 'acme',
+                repo: 'their-app',
+                baseRef: 'production',
+                branch: 'task/real-head',
+            }),
+        );
+    });
+
+    it('answers refused — and says nothing, moves nothing: the sweep asks every few minutes', async () => {
+        const m = mocks();
+        m.evaluate.mockResolvedValue(refused());
+
+        await expect(service(m).judgeAppWorkMerge(task(OPEN) as never)).resolves.toEqual({
+            allowed: false,
+            reason: 'app-change-refused',
+        });
+        expect(m.post).not.toHaveBeenCalled();
+        expect(m.transition).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['no gate is bound', { bound: false }, OPEN, 'app-change-gate-unavailable'],
+        ['no branch is recorded', {}, { ...OPEN, branchRef: null }, 'app-change-branch-unknown'],
+    ])('fails closed when %s', async (_why, opts, fields, reason) => {
+        const m = mocks();
+
+        await expect(service(m, opts).judgeAppWorkMerge(task(fields) as never)).resolves.toEqual({
+            allowed: false,
+            reason,
+        });
+    });
+
+    it('fails closed when the gate throws', async () => {
+        const m = mocks();
+        m.evaluate.mockRejectedValue(new Error('provider down'));
+
+        await expect(service(m).judgeAppWorkMerge(task(OPEN) as never)).resolves.toEqual({
+            allowed: false,
+            reason: 'app-change-unjudged',
+        });
+    });
+
+    it('returns null for every other Work kind, asking nothing', async () => {
+        const m = mocks();
+
+        await expect(
+            service(m, { kind: 'directory' }).judgeAppWorkMerge(task(OPEN) as never),
+        ).resolves.toBeNull();
+        expect(m.evaluate).not.toHaveBeenCalled();
+    });
+});
+
 describe('finalizeRun — the cloud path', () => {
     function runInput() {
         return {
