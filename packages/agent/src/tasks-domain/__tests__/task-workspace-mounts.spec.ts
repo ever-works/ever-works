@@ -1,6 +1,7 @@
 import type { Task } from '../../entities/task.entity';
 import {
     TaskWorkspaceService,
+    cloneUrlHost,
     credentialFreeUrlForMessages,
     repositoryIdFromCloneUrl,
 } from '../task-workspace.service';
@@ -103,6 +104,35 @@ describe('repositoryIdFromCloneUrl', () => {
         ['free text', 'not a url'],
     ])('rejects %s', (_label, url) => {
         expect(repositoryIdFromCloneUrl(url)).toBeNull();
+    });
+});
+
+describe('cloneUrlHost', () => {
+    // `repositoryIdFromCloneUrl` drops the host on purpose (it is an
+    // `owner/repo` identity). The registry match for a Task's PRIMARY
+    // repository must not: a mirror on another host with the same path is a
+    // different repository, and its env files and grants are not the primary's.
+    it.each([
+        ['https://github.com/o/r.git', 'github.com'],
+        ['https://GitHub.COM/o/r', 'github.com'],
+        ['https://github.example.com:8443/o/r', 'github.example.com'],
+        ['https://user:sekret@gitlab.example.com/o/r.git', 'gitlab.example.com'],
+        ['ssh://git@github.com/o/r.git', 'github.com'],
+        ['git@github.com:o/r.git', 'github.com'],
+        ['git@GitHub.com:o/r.git', 'github.com'],
+        ['github.com:o/r', 'github.com'],
+    ])('reads the host of %s', (url, expected) => {
+        expect(cloneUrlHost(url)).toBe(expected);
+    });
+
+    it.each([
+        ['empty input', ''],
+        ['whitespace', '   '],
+        ['free text', 'not a url'],
+        ['a hostless URL', 'file:///srv/git/o/r.git'],
+        ['a non-string', undefined as unknown as string],
+    ])('answers null for %s (never throws)', (_label, url) => {
+        expect(cloneUrlHost(url)).toBeNull();
     });
 });
 

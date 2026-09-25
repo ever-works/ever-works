@@ -370,6 +370,14 @@ export class TaskWorkspaceService {
         if (!owner || !repo) return null;
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        // `getRepository` answers null for a repository the provider does not
+        // find; reading `.defaultBranch` (and later `.cloneUrl`) off it was a
+        // bare TypeError instead of a refusal naming the repository.
+        if (!repository) {
+            throw new Error(
+                `Task ${task.id}: its repository ${owner}/${repo} cannot be described for a fleet node: the git provider does not find it.`,
+            );
+        }
         const baseRef =
             (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
             repository.defaultBranch;
@@ -396,10 +404,14 @@ export class TaskWorkspaceService {
         // Run secrets (slice Y): the PRIMARY repository of a Task is a Work
         // repository, not a registry row, so it has no env files of its own.
         // Its `.env` comes from a registry connection the operator added for
-        // the same clone URL — resolved explicitly here rather than skipped,
-        // because the one repository that matters most (the platform
-        // building itself) is exactly the primary.
-        const primaryRef = await this.resolvePrimaryEnvFilesRef(userId, repositoryId);
+        // the same repository on the same host — resolved explicitly here
+        // rather than skipped, because the one repository that matters most
+        // (the platform building itself) is exactly the primary.
+        const primaryRef = await this.resolvePrimaryEnvFilesRef(
+            userId,
+            repositoryId,
+            repository.cloneUrl,
+        );
         const envFilesRef = normalizeFleetRunEnvFileRefs([
             ...(primaryRef ? [primaryRef] : []),
             ...mountEnvRefs,
@@ -418,11 +430,20 @@ export class TaskWorkspaceService {
      * Run secrets (slice Y) — the registry connection whose clone URL IS
      * the Task's primary repository, if the operator registered one.
      *
+     * "Is" means the same `owner/repo` ON THE SAME HOST as the clone URL the
+     * git provider reported for the primary (`primaryCloneUrl`). The
+     * `owner/repo` identity alone is host-agnostic, so without the host a
+     * mirror at `gitlab.example.com/<owner>/<repo>` would hand ITS `.env` to
+     * a GitHub primary, and a mirror row next to the real one would make the
+     * primary look ambiguous. A row on another host is skipped with a log
+     * line naming both HOSTS (never the URL, which may carry userinfo).
+     *
      * Returns null when no row matches: a Task whose repository has no
      * registry entry simply gets no env files, exactly as today. REFUSES
-     * when two enabled rows claim the same repository, naming both — the
-     * alternative is picking one by listing order, and "which `.env` landed
-     * in the checkout" is not a question that may be answered by luck.
+     * when two enabled rows claim the same repository on the same host,
+     * naming both — the alternative is picking one by listing order, and
+     * "which `.env` landed in the checkout" is not a question that may be
+     * answered by luck.
      *
      * Never reads `envFiles`; only `envFilePaths`, which is why nothing
      * here can put a decrypted value on the job.
@@ -430,6 +451,7 @@ export class TaskWorkspaceService {
     private async resolvePrimaryEnvFilesRef(
         userId: string,
         primaryRepositoryId: string,
+        primaryCloneUrl: string,
     ): Promise<FleetRunEnvFileRef | null> {
         // No registry wired at all (an in-process caller, a narrower module
         // graph) is "no registry row for the primary", which is the same
@@ -452,18 +474,25 @@ export class TaskWorkspaceService {
                 }`,
             );
         }
-        const wanted = primaryRepositoryId.toLowerCase();
-        const matches = rows.filter(
-            (row) =>
-                row.enabled &&
-                typeof row.url === 'string' &&
-                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
+        const { matches, otherHost, primaryHost } = this.primaryRegistryMatches(
+            rows,
+            primaryRepositoryId,
+            primaryCloneUrl,
         );
+        for (const row of otherHost) {
+            this.logger.log(
+                `Repository connection ${row.name} names ${primaryRepositoryId} on ${cloneUrlHost(row.url) ?? '<unknown host>'}, ` +
+                    `not the Task primary's host ${primaryHost}; its env files and env grants do not apply to the primary.`,
+            );
+        }
         if (matches.length > 1) {
+            // Row NAMES only: a registry URL may carry userinfo, and this
+            // message reaches the run row, the Task page and the API log.
             throw new Error(
                 `Repository registry has ${matches.length} enabled connections for the Task's primary repository ` +
-                    `${primaryRepositoryId} (${matches.map((row) => row.name).join(', ')}); ` +
-                    'disable or remove all but one so the run knows whose env files to use.',
+                    `${primaryRepositoryId} on ${primaryHost} (${matches.map((row) => row.name).join(', ')}) — ` +
+                    'clone URLs that differ only by .git, a trailing slash, letter case or https/SSH form name the ' +
+                    'same repository; disable or remove all but one so the run knows whose env files to use.',
             );
         }
         const [connection] = matches;
@@ -489,11 +518,20 @@ export class TaskWorkspaceService {
      * skipped rather than throwing — because `describeFleetWorkspace` has
      * already refused a workspace it could not describe, and a grant that
      * fails to resolve means LESS access, never more.
+     *
+     * The PRIMARY repository's grants come from the registry row for the
+     * `workspace` that `describeFleetWorkspace` produced — the same
+     * `owner/repo` on the same host its env files were matched against, so
+     * a mirror on another host grants nothing to the primary. Without a
+     * described workspace the primary contributes no grants (LESS access,
+     * never more); the Work is not re-read for a second, looser match.
      */
     async resolveFleetRunEnvGrants(input: {
         task: Task;
         userId: string;
         agentId?: string;
+        /** The described workspace (`describeFleetWorkspace`); its primary's grants apply. */
+        workspace?: Pick<FleetTaskWorkspaceSpec, 'repositoryId' | 'repoUrl'>;
     }): Promise<string[]> {
         const sources: ResolvedAgentRepo[] = [];
         if (input.agentId && this.agentRepoAttachments) {
@@ -517,18 +555,13 @@ export class TaskWorkspaceService {
             ]);
             if (resolved) sources.push(resolved);
         }
-        if (input.task.workId && this.repoConnections && this.works) {
-            const work = await this.works.findById(input.task.workId).catch(() => null);
-            const target = work ? resolveTaskRepository(work) : null;
-            const owner = target?.owner;
-            const repo = target?.repo;
-            if (owner && repo) {
-                const primary = await this.resolvePrimaryConnection(
-                    input.userId,
-                    `${owner}/${repo}`,
-                );
-                if (primary) sources.push(primary);
-            }
+        if (input.workspace && this.repoConnections) {
+            const primary = await this.resolvePrimaryConnection(
+                input.userId,
+                input.workspace.repositoryId,
+                input.workspace.repoUrl,
+            );
+            if (primary) sources.push(primary);
         }
         return normalizeFleetRunEnvGrants(sources.flatMap((source) => source.envGrants));
     }
@@ -661,26 +694,54 @@ export class TaskWorkspaceService {
         });
     }
 
-    /** The enabled registry row for `primaryRepositoryId`, or null. Never throws. */
+    /**
+     * The enabled registry row for `primaryRepositoryId` on the host of
+     * `primaryCloneUrl`, or null (none, or more than one). Never throws.
+     */
     private async resolvePrimaryConnection(
         userId: string,
         primaryRepositoryId: string,
+        primaryCloneUrl: string | null | undefined,
     ): Promise<ResolvedAgentRepo | null> {
         if (!this.repoConnections || typeof this.repoConnections.listByUser !== 'function')
             return null;
         const rows = await this.repoConnections.listByUser(userId).catch(() => []);
-        const wanted = primaryRepositoryId.toLowerCase();
-        const matches = rows.filter(
-            (row) =>
-                row.enabled &&
-                typeof row.url === 'string' &&
-                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
-        );
+        const { matches } = this.primaryRegistryMatches(rows, primaryRepositoryId, primaryCloneUrl);
         if (matches.length !== 1) return null;
         const [resolved] = mapAttachmentEdgesToRepos([
             { repoConnection: matches[0] } as unknown as AgentRepoAttachment,
         ]);
         return resolved ?? null;
+    }
+
+    /**
+     * The registry rows that ARE the Task's primary repository: enabled, the
+     * same `owner/repo` (case-insensitive, through `repositoryIdFromCloneUrl`,
+     * so `.git`, a trailing slash, letter case and https/SSH spellings are one
+     * repository) AND the same host as the primary's clone URL. `otherHost`
+     * is the same `owner/repo` on a different host: a mirror, not the primary.
+     * Shared by env files and grants, so both resolve the primary identically.
+     *
+     * FAILS CLOSED: a primary clone URL with no readable host matches nothing
+     * — less access, never a host-agnostic fallback.
+     */
+    private primaryRegistryMatches<Row extends { enabled: boolean; url: string; name: string }>(
+        rows: readonly Row[],
+        primaryRepositoryId: string,
+        primaryCloneUrl: string | null | undefined,
+    ): { matches: Row[]; otherHost: Row[]; primaryHost: string | null } {
+        const primaryHost = cloneUrlHost(primaryCloneUrl ?? '');
+        if (!primaryHost) return { matches: [], otherHost: [], primaryHost: null };
+        const wanted = primaryRepositoryId.toLowerCase();
+        const matches: Row[] = [];
+        const otherHost: Row[] = [];
+        for (const row of rows) {
+            if (!row.enabled || typeof row.url !== 'string') continue;
+            if (repositoryIdFromCloneUrl(row.url)?.toLowerCase() !== wanted) continue;
+            if (cloneUrlHost(row.url) === primaryHost) matches.push(row);
+            else otherHost.push(row);
+        }
+        return { matches, otherHost, primaryHost };
     }
 
     /**
@@ -3193,4 +3254,30 @@ export function repositoryIdFromCloneUrl(cloneUrl: string): string | null {
     const safe = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
     if (!safe.test(owner) || !safe.test(repo) || owner === '..' || repo === '..') return null;
     return `${owner}/${repo}`;
+}
+
+/**
+ * The lower-cased HOSTNAME of an HTTPS, `ssh://` or scp-like
+ * (`git@host:owner/repo`) clone URL — port and userinfo ignored — or null
+ * when there is none. Never throws.
+ *
+ * `repositoryIdFromCloneUrl` is host-agnostic by design; this is the half
+ * it drops, for the places where `owner/repo` alone is not an identity (the
+ * registry row that supplies a Task primary's env files and grants). Same
+ * parse as there: scp-like only when the value has no `scheme://`.
+ */
+export function cloneUrlHost(cloneUrl: string): string | null {
+    if (typeof cloneUrl !== 'string') return null;
+    const value = cloneUrl.trim();
+    if (!value) return null;
+    const scpLike = /^(?:[A-Za-z0-9._-]+@)?([A-Za-z0-9.-]+):(.+)$/.exec(value);
+    if (scpLike && !/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+        return scpLike[1].toLowerCase();
+    }
+    try {
+        const host = new URL(value).hostname.toLowerCase();
+        return host || null;
+    } catch {
+        return null;
+    }
 }
