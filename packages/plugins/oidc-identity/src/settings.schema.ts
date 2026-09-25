@@ -43,10 +43,11 @@ import type { JsonSchema } from '@ever-works/plugin';
  *     place — which is what kept it unnoticed. Do not restate a gate here without
  *     naming the function that enforces it.
  *
- * **A bound in this schema is a write-time check, and for an `x-envVar` key it
- * never runs.** `PluginSettingsService.filterEnvVarFields` strips every key that
- * is `x-envVar` and not `x-secret` from settings writes, so the validator never
- * sees it. The value is read from its environment variable by `parseEnvValue`,
+ * **A bound in this schema is a write-time check, and for an `x-envVar` key that
+ * is not `x-secret` it never runs.** `PluginSettingsService.filterEnvVarFields`
+ * strips every key that is `x-envVar` and not `x-secret` from settings writes, so
+ * the validator never sees it. (`clientSecret` is both, so it is kept and IS
+ * validated on write.) The value is read from its environment variable by `parseEnvValue`,
  * which turns an `integer` key into `Number(value)` and checks nothing else. So
  * `clockSkewSeconds`'s `minimum: 0` / `maximum: 120` (FR-2) does not reach the
  * value the plugin reads. That bound is enforced at run time by

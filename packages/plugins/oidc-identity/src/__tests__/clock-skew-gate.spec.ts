@@ -242,6 +242,20 @@ describe('FR-2 — a clockSkewSeconds outside 0–120 turns the integration off'
 			expect(health.status).toBe('unhealthy');
 			expect(health.checks?.find((check) => check.name === 'configuration')?.status).toBe('unhealthy');
 		});
+
+		it('names the refused field (never the value) in the health row, as Test connection does', async () => {
+			const { plugin } = await pluginFor(value);
+
+			const health = await plugin.healthCheck();
+			const configuration = health.checks?.find((check) => check.name === 'configuration');
+
+			// The gate refuses `clockSkewSeconds`; the issuer, client id and client secret
+			// are all set, so a row that blames them sends the operator to the wrong field.
+			expect(configuration?.message).toBe('Not configured: clockSkewSeconds.');
+			// The row, not the whole view: the other rows carry cache constants (3600 s)
+			// that would collide with the probe values.
+			expect(JSON.stringify(configuration)).not.toContain(String(value));
+		});
 	});
 
 	describe('what the gate closes: the time checks used to fail open', () => {

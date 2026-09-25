@@ -30,8 +30,12 @@ import {
  * 3. **Counters, codes, flags and ids only** (FR-53: "without repository names or
  *    tokens"). The typed payloads below admit nothing else, and every value is checked
  *    again at run time: a string that is not a short code (a URL, an `owner/repo`, a
- *    sentence) is dropped from the payload and counted as `redacted`. The user id travels
- *    as PostHog's distinct id, never as a property.
+ *    sentence) is dropped from the payload and counted as `redacted`. That check is a
+ *    SHAPE check and only a backstop: a bare owner login or repository name
+ *    (`secret-widgets-91`) is code-shaped and passes it. Keeping names out is the typed
+ *    payloads' and the call sites' job, and every call site today passes only closed
+ *    codes, counters and flags. The user id travels as PostHog's distinct id, never as a
+ *    property.
  *
  * 🛑 **A leaf file on purpose.** It imports nothing from the App Works services, so every
  * one of them (and `WorkLifecycleService`) can import it without closing a require ring.
@@ -132,7 +136,9 @@ const DROP_LOG_EVERY = 1000;
 
 /**
  * A code: `fork`, `no_push_access`, `your-cluster`, `http_409`. No `/`, no `:`, no
- * whitespace, so a URL, an `owner/repo` pair or a sentence can never pass.
+ * whitespace, so a URL, an `owner/repo` pair or a sentence can never pass. A bare
+ * login or repository name CAN — it has a code's shape — which is why the typed
+ * payloads, not this pattern, are what keep names out.
  */
 const CODE_SHAPE = /^[A-Za-z0-9_.-]{1,64}$/;
 

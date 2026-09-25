@@ -873,7 +873,10 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 	 * The three states, and why each one is the honest answer:
 	 *
 	 *   - **`unhealthy`** — an administrator's configuration could not be read (a
-	 *     required setting is missing or blank), or FR-14/FR-5's availability record
+	 *     required setting is missing or blank, or `resolveSettings` refused a set
+	 *     value: a non-TLS issuer outside development, or a `clockSkewSeconds`
+	 *     outside FR-2's bound — the `configuration` row names the field, never the
+	 *     value), or FR-14/FR-5's availability record
 	 *     says the provider was last seen unusable. The second is a real outage of
 	 *     this capability: sign-in is off until a **Test connection** passes.
 	 *   - **`healthy`** — the settings resolve and this process has successfully
@@ -893,7 +896,8 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 	 */
 	async healthCheck(): Promise<PluginHealthCheck> {
 		const startedAt = this.now();
-		const configured = (await this.resolveSettings()).ok;
+		const resolved = await this.resolveSettings();
+		const configured = resolved.ok;
 		const discoveryRefreshedAt = this.discoveryReader?.lastRefreshedAt ?? null;
 		const jwksRefreshedAt = this.jwksRefreshedAtMs;
 
@@ -909,9 +913,13 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 			{
 				name: 'configuration',
 				status: configured ? 'healthy' : 'unhealthy',
-				message: configured
+				// The refused fields by NAME, exactly as `testConnection` reports them:
+				// `resolveSettings` also refuses a set issuer (the non-TLS gate) and a set
+				// `clockSkewSeconds` (the FR-2 bound), and a fixed "issuer, client id or
+				// client secret is missing" would send the operator to the wrong field.
+				message: resolved.ok
 					? 'The issuer, client id and client secret are set.'
-					: 'Not configured: a required setting (issuer, client id or client secret) is missing.'
+					: `Not configured: ${resolved.missing.join(', ')}.`
 			},
 			{
 				name: 'availability',

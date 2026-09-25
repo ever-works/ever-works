@@ -156,6 +156,18 @@ describe('FR-2 runtime half — a non-TLS issuer outside development', () => {
 			expect(provider.requests).toEqual([]);
 		});
 
+		it('names the refused field (never the value) in the health row', async () => {
+			const { plugin, provider } = await pluginFor(INSECURE_ISSUER, 'production');
+
+			const health = await plugin.healthCheck();
+
+			expect(health.checks?.find((check) => check.name === 'configuration')?.message).toBe(
+				'Not configured: issuerUrl.'
+			);
+			expect(JSON.stringify(health)).not.toContain(INSECURE_ISSUER);
+			expect(provider.requests).toEqual([]);
+		});
+
 		it('logs why a configured integration reports "not configured", without the value', async () => {
 			errorLines.length = 0;
 			const { plugin } = await pluginFor(INSECURE_ISSUER, 'production');

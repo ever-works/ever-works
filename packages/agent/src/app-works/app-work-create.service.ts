@@ -565,6 +565,15 @@ export class AppWorkCreateService {
         // would create a brand-new fork or private copy always lands here: it has
         // no coordinates yet, so it cannot be the equivalent of a Work that already
         // exists (a private-copy double-submit therefore still answers this 409).
+        //
+        // FR-23 gap, known and recorded: a fork double-submit lands here too when
+        // the target owner was outside the inspection's fork scan
+        // (`existingForkChecked: false` — the 15-call budget did not reach it, or
+        // its check failed). The first request's fork then exists but is not
+        // reported, so there is no `adoptedFork` to look the Work up by, and the
+        // identical retry answers this 409 instead of `alreadyExisted`. Closing it
+        // means comparing the slug holder's recorded upstream and owner with this
+        // request's before the throw.
         if (input.slugConflictDeferred) {
             throw slugTakenConflict(dto.slug);
         }
@@ -1623,8 +1632,15 @@ export function appCreateLockKey(input: {
 
 /**
  * The per-user slug refusal. One helper, because step 5 throws it directly and
- * step 8 throws it when step 5 deferred it — a member must not be able to tell
- * the two apart.
+ * step 8 throws it when step 5 deferred it — the two throws are the same answer,
+ * byte for byte.
+ *
+ * Only the answer is identical, not when it arrives. A deferred request runs the
+ * inspection first, so any inspect-time refusal (steps 6 and 6a: mode or target
+ * owner unavailable, `rate_limited`, the deploy-target confirmation,
+ * `blueprint_mismatch`), step 7's `create_in_progress` and step 8's
+ * `app_work_exists` can answer before this 409, where step 5 would have answered
+ * the 409 straight away. The spec fixes no order between these refusals.
  */
 function slugTakenConflict(slug: string): ConflictException {
     return new ConflictException(

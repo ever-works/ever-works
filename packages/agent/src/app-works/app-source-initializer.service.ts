@@ -484,7 +484,9 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
         // ── step 7: one Activity row per outcome ──────────────────────────────
         await this.recordActivity(context, minimal, Boolean(context.blueprintId));
 
-        // FR-53 — one `app_work.source_ready` per success row, never for a failure.
+        // FR-53 — one `app_work.source_ready` per non-failed MINIMAL-PATH invocation
+        // (steps 3–6; per invocation, not per Work — see `trackSourceReady`), never for a
+        // failure. Step 2a's Blueprint request writes its own success row and emits nothing.
         if (minimal.outcome !== 'failed') {
             this.trackSourceReady(context, minimal);
         }
@@ -1296,13 +1298,25 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
     }
 
     /**
-     * `app_work.source_ready` (FR-53, plan §9.1) — emitted beside each success Activity
-     * row: the relation, how long the Work was preparing (from the state row's
-     * `readinessStartedAt`, `null` when the row carries none) and whether the source
-     * went through a setup pull request. A link therefore emits twice over its life —
-     * `setupPullRequest: true` when the pull request opens, `false` on the post-merge
-     * re-invocation — exactly as it writes two Activity rows. Never the repository, the
-     * pull request URL or the file.
+     * `app_work.source_ready` (FR-53, plan §9.1) — emitted once per non-failed
+     * MINIMAL-PATH invocation (steps 3–6), beside that invocation's success Activity row:
+     * the relation, how long the Work was preparing (from the state row's
+     * `readinessStartedAt`, `null` when the row carries none) and whether THIS
+     * invocation ended waiting on a setup pull request. Never the repository, the pull
+     * request URL or the file.
+     *
+     * It counts minimal-path invocations, not Works — and NOT every success Activity row
+     * either: step 2a's Blueprint request (`requestBlueprint`) writes a COMPLETED
+     * `app.source.<relation>` row (`blueprint: true`, `setupPullRequest: false`) and
+     * answers `blueprint_requested` without emitting. A Blueprint Work's event comes from
+     * the re-invocation after the Blueprint lands, when the file records it and the
+     * minimal path runs. A link emits at least twice: `setupPullRequest: true` when the
+     * pull request opens, then `false` on the post-merge re-invocation, whose
+     * `preparingMs` includes the wait for the merge. Any re-dispatched readiness run that
+     * answers `unchanged`, or that finds its setup pull request still open, emits again.
+     * So a dashboard must not count this event per Work, must not equate it with the
+     * `app.source.*` success rows, and must not read `setupPullRequest: false` as
+     * "needed no setup pull request".
      */
     private trackSourceReady(context: InitializerContext, result: MinimalPathResult): void {
         const started = context.readinessStartedAt

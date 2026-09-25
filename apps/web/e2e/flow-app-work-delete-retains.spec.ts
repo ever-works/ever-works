@@ -277,6 +277,8 @@ interface DeleteView {
     slug?: string;
     message?: string;
     deleted_repositories?: string[];
+    /** `true` when the App runtime holds the removal pending and the row stays (FR-40a). */
+    deleting?: boolean;
 }
 
 interface ActivityRowView {
@@ -839,8 +841,49 @@ test.describe('ACC-NEG-07 — the halves that need APW-06 / APW-07, and T39’s 
             )
             .toBe(true);
 
-        // The Work row is gone, so the record cannot reference it; it names it instead.
-        expect(row?.workId ?? null, 'the record no longer references the deleted row').toBeNull();
+        // Which record to expect follows the delete's own answer. A completed delete
+        // (`status: 'success'`, what this lane answers while nothing binds
+        // APP_WORK_DELETION_PORT) has removed the row, so the record cannot reference it
+        // and names it in `details` instead. A pending one (`deleting: true` — e.g. a
+        // runtime that answered `runtime_state_unreadable` or `dispatcher_unavailable`)
+        // correctly KEEPS the row, and the controller then links the record to it.
+        //
+        // The pending expectation assumes the removal has NOT completed by the time of the
+        // poll. That holds for the answers that never complete here, but once APW-06 binds
+        // APP_WORK_DELETION_PORT the usual pending answer is a successful claim plus a
+        // dispatch, and the worker can finish first: `completeAppWorkDeletion` removes the
+        // row and the `activity_log.workId` foreign key (`onDelete: 'SET NULL'`) nulls the
+        // link. So a null link on a pending answer is accepted only when the Work already
+        // answers 404. (The other side of that race — the fire-and-forget insert carrying
+        // `workId` landing AFTER the row is gone — is refused by the same foreign key, and
+        // the poll above then times out with no row at all: a controller question for
+        // APW-06, not something this read can tolerate.)
+        const deleteBody = (deleted.json ?? {}) as DeleteView;
+        const rowKept = deleteBody.status === 'pending' || deleteBody.deleting === true;
+        if (rowKept) {
+            let expectedLink: string | null = work.workId;
+            if ((row?.workId ?? null) === null) {
+                const read = await request.get(`${API_BASE}/api/works/${work.workId}`, {
+                    headers: authedHeaders(user.access_token),
+                });
+                if (read.status() === 404) {
+                    // The pending removal completed before the poll: SET NULL, not a defect.
+                    expectedLink = null;
+                }
+            }
+            expect(
+                row?.workId ?? null,
+                `the delete answered pending (body=${deleted.text.slice(0, 200)}), so the Work ` +
+                    'row stays and the record references it (a null link is accepted only ' +
+                    'once the Work answers 404, i.e. the pending removal already completed)',
+            ).toBe(expectedLink);
+        } else {
+            expect(deleteBody.status, `delete body=${deleted.text.slice(0, 300)}`).toBe('success');
+            expect(
+                row?.workId ?? null,
+                'the delete completed, so the record no longer references the deleted row',
+            ).toBeNull();
+        }
         expect(row?.details?.slug).toBe(work.slug);
         // "… and names what was kept": the fork stays, and the record says so.
         expect(row?.details?.message ?? '', 'the record names what was kept').toContain('Kept:');

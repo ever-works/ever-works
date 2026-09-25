@@ -1699,6 +1699,12 @@ export class WorksController {
         // foreign key's `SET NULL` clears it once `completeAppWorkDeletion` runs. The
         // Work's identity and the outcome — including the `Kept: …` notes the service
         // writes into `message` — travel in `details` either way.
+        //
+        // A pending delete's row keeps its **Deleting work** summary: it records the
+        // member's request, and nothing rewrites it. The END of that removal is a
+        // different record — APW-06's `AppRuntimeDeletionService` writes
+        // `app.deploy.removed` (`reason: 'app_work_deleted'`, `kept[]`, APW-06 plan
+        // §9.4) before it calls `completeAppWorkDeletion`, which itself logs nothing.
         const rowRemains = result.status === 'pending' || result.deleting === true;
         this.activityLogService
             .log({

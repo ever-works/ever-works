@@ -18,7 +18,10 @@ operations repository and in the lane's own environment block, never here. Every
 | **Harness unit lane**      | `apps/web/vitest.e2e-harness.config.ts` (`pnpm exec vitest run -c …`)                         | the harness's own specs — fake GitHub, helpers, evidence                                                                                                                                                                                                 | nothing but the repo                                                                                          |
 
 The harness unit lane is the one to run first when something looks wrong: it is fast, needs no
-stack, and covers the fake and the helpers.
+stack, and covers the fake and the helpers. Run it with `pnpm --filter ever-works-web test:e2e-harness`
+(add a name filter such as `flags-on-lane` to run one file). CI runs it in `ci.yml`'s `lint-and-test`
+job, in the step after `pnpm test`, on pushes to `stage` and `main` and on dispatch. `pnpm test` does not
+reach it: `apps/web/vitest.config.ts` includes only `src/**`.
 
 ---
 
@@ -44,7 +47,14 @@ that reads like a defect and is not one.
 32-shard matrix. It is a new gate, so the programme's rule for new gates applies: its first dispatched
 run is the proof that the job itself runs, and until one run of it is green nothing it has not yet shown
 is trusted. On that run the matrix should report the two flags-on files' switch-dependent cases as
-**skipped** (with the reasons in §5), and the flags-on job should report them as **passed**.
+**skipped**, and the flags-on job should report them as **passed**. On the matrix the skips show **by
+count only**: in CI `playwright.config.ts` uses the `github` reporter, which prints skip totals but not
+skip reasons, and no HTML report is written. At the time of writing that is the 7 cases of
+`flow-app-launcher-apps` and the 2 switch cases of `flow-managed-subdomain-allocation` (the cap and the
+allocation boundary), spread across the shards. The named reasons in §5 are visible locally (the default
+`html` reporter) or with `--reporter=json` (each skipped result's `annotations[].description`).
+`--reporter=list` does not help here: it marks a skipped case with `-` and shows WHICH cases skipped,
+never why.
 
 ---
 
@@ -133,7 +143,7 @@ need two switches the matrix keeps **off** on purpose: the launcher's flag-off l
 `EVER_WORKS_APP_LAUNCHER_ENABLED` unset, and `flow-deploy-capability-contract` asserts that an
 `ever-works` create becomes `vercel` while `DEPLOY_EVER_WORKS_ENABLED` is off. So those cases read both
 switches from the API and **skip by name** where they are off, and they run on the `e2e-app-works-flags-on`
-job. Locally that is the stack above plus a fourth process and five variables:
+job. Locally that is the stack above plus a fourth process and the variables below:
 
 ```bash
 # 1b. The platform-catalog fake — the launcher's "versioned catalog". Port 4084, from its OWN variable
@@ -144,16 +154,18 @@ node apps/web/e2e/fakes/platform-catalog/server.mjs &
 curl -s http://127.0.0.1:4084/_control/health     # { status: 'ok', catalogVersion, platforms, … }
 
 # 2. The API exactly as in step 2 above (it already carries DEPLOY_EVER_WORKS_ENABLED=true and the
-#    fakes switch the catalog override is gated on), plus:
+#    fakes switch the catalog override is gated on), plus the lines below. The apps apex is a SIBLING
+#    of EVER_WORKS_DOMAIN, not a subdomain: config.everWorks.apps.getDomain() refuses an explicit apex
+#    that is equal to, under or a parent of the platform domain, so apps.e2e.local would answer null.
 EVER_WORKS_APP_LAUNCHER_ENABLED=true E2E_APP_LAUNCHER_SEED=true \
-EVER_WORKS_APPS_DOMAIN=apps.e2e.local EVER_WORKS_DOMAIN=e2e.local \
+EVER_WORKS_APPS_DOMAIN=apps-e2e.local EVER_WORKS_DOMAIN=e2e.local \
 EVER_WORKS_PLATFORM_CATALOG_BASE_URL=http://127.0.0.1:4084 EVER_WORKS_PLATFORM_CATALOG_ENV=develop \
   … node apps/api/dist/main.js &
 
 # 4. The two files. Playwright needs the apex (it asserts the exact tile URL) and the base URL (it then
 #    requires the catalog to have been READ). APW_E2E_FLAGS_ON_LANE=1 makes a switch that reads off a
 #    failure instead of a skip — without it a mis-set stack reports named skips, not failures.
-APW_E2E_FLAGS_ON_LANE=1 EVER_WORKS_APPS_DOMAIN=apps.e2e.local \
+APW_E2E_FLAGS_ON_LANE=1 EVER_WORKS_APPS_DOMAIN=apps-e2e.local \
 EVER_WORKS_PLATFORM_CATALOG_BASE_URL=http://127.0.0.1:4084 \
 pnpm --filter ever-works-web exec playwright test --project=chromium \
   e2e/flow-app-launcher-apps.spec.ts e2e/flow-managed-subdomain-allocation.spec.ts
@@ -161,8 +173,11 @@ pnpm --filter ever-works-web exec playwright test --project=chromium \
 
 - **The job's env is the matrix's, key for key, plus exactly those deltas.**
   `apps/web/e2e/fakes/platform-catalog/__tests__/flags-on-lane.unit.spec.ts` (harness unit lane) reads
-  `e2e.yml` and fails if the two drift, if either switch appears on the matrix, or if the job stops running
-  exactly the two files. Change a matrix variable and the flags-on job's copy together.
+  `e2e.yml` and fails if the two drift, if either switch appears on the matrix, if the job stops running
+  exactly the two files, or if the job's apps apex is one `config.everWorks.apps.getDomain()` would refuse.
+  Change a matrix variable and the flags-on job's copy together. CI runs this check in `ci.yml`
+  (`lint-and-test`), not in `e2e.yml`, so run
+  `pnpm --filter ever-works-web test:e2e-harness flags-on-lane` yourself after editing either env block.
 - **The fixture is the reader's to accept, not the fake's.** `…/__tests__/server.unit.spec.ts` feeds the
   served `platforms.json` and every icon to the API reader's own parser
   (`apps/api/src/app-launcher/platform-catalog.schema.ts`) and requires them accepted whole, so an edit that

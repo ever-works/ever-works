@@ -354,7 +354,10 @@ describe('CreateWorkDto — App Work fields (APW-01 T5)', () => {
 
     describe('the API pipe contract (whitelist + forbidNonWhitelisted)', () => {
         it('accepts the App create body that T63 measured as a 400', async () => {
-            // The exact shape `flow-template-fork-success.spec.ts` posts.
+            // The fork-field shape the e2e fork specs (`flow-template-fork-success.spec.ts`)
+            // post. The owner login is arbitrary here: the pipe checks the login's SHAPE,
+            // never whose login it is (the e2e specs now post the fixture's `apw-e2e-*`
+            // accounts, not this one).
             const messages = await pipeMessagesOf({
                 ...appBase,
                 repositoryMode: 'fork',

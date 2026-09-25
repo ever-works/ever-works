@@ -20,10 +20,22 @@
  *
  * An operand is looked up by its SPDX id (case-insensitive, exact, a trailing
  * `+` included), then by an `aliases[].match` (case-insensitive, exact) whose
- * target is a listed licence. An input that is not an SPDX expression at all
- * (it has spaces or punctuation, like `The MIT License`) is looked up as a
- * whole against the aliases, which map licence TITLES (`catalog.md` §4). Anything
- * else, and `null`, blank, oversized or malformed input, is `unknown`.
+ * target is a listed licence. An input that does not PARSE as an SPDX expression
+ * (like `The MIT License`, where two plain words side by side fail the parse) is
+ * looked up as a whole against the aliases, which map licence TITLES
+ * (`catalog.md` §4). Anything else, and `null`, blank, oversized or malformed
+ * input, is `unknown`.
+ *
+ * Known edge: the whole-input lookup runs only when parsing fails, and `AND` /
+ * `OR` / `WITH` match in any letter case. So a title whose words alternate with
+ * those operators parses as an expression and never reaches its alias — an
+ * alias `Apache with notice` → `Apache-2.0` is never used, because the input
+ * parses as `Apache WITH notice` and answers `unknown`. None of the seed's
+ * aliases has that shape, and the error goes the safe way (`unknown`, never a
+ * looser class). If a registry ever adds such a title, try the exact whole-input
+ * alias for a multi-token input BEFORE parsing — keeping the per-operand
+ * id-then-alias order for single ids, and keeping `NOASSERTION`'s fixed `red`
+ * out of the alias's reach.
  *
  * The registry's `unknown` block is **never read**: its `class` is advisory
  * display metadata that "never becomes a license class" (`catalog.md` §4).

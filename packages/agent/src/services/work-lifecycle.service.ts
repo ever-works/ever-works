@@ -1805,10 +1805,15 @@ export class WorkLifecycleService {
 
     /**
      * APW-01 T36 (FR-53, plan §9.1) — `app_work.deleted`, once per accepted App Work
-     * delete: when the row goes, or when the App runtime holds it pending (the member's
-     * request is complete either way; `completeAppWorkDeletion` emits nothing, so a
-     * pending delete is never counted twice). The relation and whether the Work
-     * Repository was removed — never its name. A no-op for every other kind.
+     * delete REQUEST: when the row goes, or when the App runtime holds it pending (the
+     * member's request is complete either way). `completeAppWorkDeletion` emits
+     * nothing, so the runtime finishing a pending removal does not count it again. A
+     * member who repeats the delete while the row is still held pending DOES count
+     * again: that request reaches `requestAppWorkRemoval` like the first (the port
+     * answers `pending` once more, typically `already_deleting`), exactly as the
+     * controller writes a second `work.deleted` Activity row for it. The relation and
+     * whether the Work Repository was removed — never its name. A no-op for every
+     * other kind.
      */
     private trackAppWorkDeleted(work: Work, repositoryDeleted: boolean, user: User): void {
         if (!isAppWorkKind(work.kind)) {

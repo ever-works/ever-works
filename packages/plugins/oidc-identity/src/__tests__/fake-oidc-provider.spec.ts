@@ -604,6 +604,10 @@ describe('healthCheck — plan §9.2’s plugin health view', () => {
 
 		expect(health.status).toBe('unhealthy');
 		expect(health.checks?.find((check) => check.name === 'configuration')?.status).toBe('unhealthy');
+		// The same field names `testConnection` reports, and only the missing ones.
+		expect(health.checks?.find((check) => check.name === 'configuration')?.message).toBe(
+			'Not configured: clientId, clientSecret.'
+		);
 		expect(JSON.stringify(health)).not.toContain('ever-id-client-secret');
 		expect(health.checkedAt).toBe(BASE_TIME_MS);
 	});
