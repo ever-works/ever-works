@@ -617,6 +617,16 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
         await this.ensureGenerated(workId);
 
         const snapshot = await this.readSpec(workId);
+        return this.resolveBuildPhase(workId, snapshot, buildServices ?? [], ctx);
+    }
+
+    /** The build phase over one spec snapshot and one service list. */
+    private async resolveBuildPhase(
+        workId: string,
+        snapshot: AppEnvSpecSnapshot | null,
+        buildServices: readonly AppSpecBuildService[],
+        ctx?: AppEnvResolutionContext | null,
+    ): Promise<AppEnvResolutionResult> {
         const scope = await this.buildScope(
             workId,
             snapshot,
@@ -624,7 +634,7 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
             false,
             'your-cluster',
             ctx ?? {},
-            buildServices ?? [],
+            buildServices,
         );
         return this.resolveScope(scope);
     }
@@ -776,11 +786,18 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
      * The current per-name fingerprints of one phase, for T13's `list`.
      *
      * `null` means "cannot answer" and leaves both change flags `false`, which is
-     * T13's documented answer for an unbound or unreadable seam. The build phase
-     * resolves against an EMPTY `build.services[]` — a caller that knows the
-     * Build's services calls `resolveForBuild` itself; `AppEnvService.list` only
-     * needs the entries that resolve without one, and an entry it cannot resolve
-     * simply has no fingerprint.
+     * T13's documented answer for an unbound or unreadable seam.
+     *
+     * The build phase resolves against the effective spec's OWN
+     * `build.services[]` — the list APW-05's prepare runner passes to
+     * `resolveForBuild` (`app-build-prepare.runner.ts` `resolveBuildValues`).
+     * This map is also the verdict's current-inputs term
+     * (`AppBuildsService.readCurrentInputs` → §5.1's `staleInputs` clause), and the
+     * prepare-time hash covers every value the plugin syncs, build-service ones
+     * included. An earlier revision resolved against an EMPTY list, which turned
+     * every build-service reference into `noBuildService`, dropped it from this
+     * map, and left every Build of a Work whose build env reads a build service
+     * permanently `staleInputs`.
      */
     async read(
         workId: string,
@@ -790,7 +807,7 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
         try {
             const resolved =
                 phase === 'build'
-                    ? await this.resolveForBuild(workId, [], ctx ?? null)
+                    ? await this.resolveBuildWithSpecServices(workId, ctx ?? null)
                     : await this.resolveRuntime(
                           workId,
                           {
@@ -814,6 +831,20 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
             );
             return null;
         }
+    }
+
+    /**
+     * {@link resolveForBuild} with the service list taken from the same spec
+     * snapshot the entries come from, so one spec read answers both.
+     */
+    private async resolveBuildWithSpecServices(
+        workId: string,
+        ctx: AppEnvResolutionContext | null,
+    ): Promise<AppEnvResolutionResult> {
+        await this.ensureGenerated(workId);
+
+        const snapshot = await this.readSpec(workId);
+        return this.resolveBuildPhase(workId, snapshot, snapshot?.spec?.build?.services ?? [], ctx);
     }
 
     /* ---------------------------------------------------------------------- *

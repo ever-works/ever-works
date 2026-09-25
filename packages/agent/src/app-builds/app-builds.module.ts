@@ -9,6 +9,7 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkAppSpecStateRepository } from '../database/repositories/work-app-spec-state.repository';
 import { AppSpecService } from '../app-spec/app-spec.service';
 import { AppEnvRuntimeSource } from '../app-env/app-env-runtime.source';
+import { AppEnvModule } from '../app-env/app-env.module';
 import { AppBuildPreparationRepository } from '../database/repositories/app-build-preparation.repository';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import { WorkBuild } from '../entities/work-build.entity';
@@ -50,8 +51,9 @@ import { GitFacadeService } from '../facades/git.facade';
  *
  * It provides and exports the three services, the two repositories and T19's
  * prepare runner this epic owns; everything else this service needs is injected
- * `@Optional()` behind a token this epic does not yet have a binder for, so the
- * module compiles and boots on its own (see `AppBuildsService`'s docstring).
+ * `@Optional()`, so the module compiles and boots on its own (see
+ * `AppBuildsService`'s docstring). Which of those collaborators are bound, and by
+ * what, is the "What is bound here" section below.
  *
  * ## `TypeOrmModule.forFeature` is the fifth registration point
  *
@@ -76,16 +78,37 @@ import { GitFacadeService } from '../facades/git.facade';
  * T17 first shipped this module with every collaborator unbound. Since then:
  *
  * - **bound HERE** (see `providers` below): `APP_BUILD_PLUGIN_RESOLVER` (T16, the
- *   facade), `APP_BUILD_WORK_SOURCE`, `APP_BUILD_SPEC_SOURCE` (APW-03),
+ *   facade) with its `BUILD_TOKEN_SOURCE` / `BUILD_REPOSITORY_FACTS_SOURCE`,
+ *   `APP_BUILD_WORK_SOURCE`, `APP_BUILD_SPEC_SOURCE` (APW-03),
  *   `APP_BUILD_RUNNER_RECIPE_SOURCE` (APW-07), `APP_BUILD_PREPARE_RUNNER` (T19) and
  *   `APP_BUILD_WATCH_RUNNER` (T20);
+ * - **bound by an IMPORT of this module**: APW-07's `AppEnvModule` provides and
+ *   exports the three env collaborators of this module — `APP_ENV_RESOLVER_FINGERPRINTS`
+ *   (`AppBuildsService`, §5.1's current inputs), and the `AppEnvResolver` /
+ *   `AppEnvService` classes the prepare runner (build values) and the watch runner
+ *   (the redactor) inject. It is imported here, not merely somewhere in the API,
+ *   because Nest resolves a provider's dependencies in the module that declares
+ *   the provider and `AppEnvModule` is not `@Global()`. Until 2026-09-26 it was
+ *   imported by no module in the API at all, so in the running API every Build
+ *   was `staleInputs`, every secret-syncing prepare answered
+ *   `buildValuesUnavailable` and every watch without a plugin redactor answered
+ *   `redactorUnavailable` — `apps/api/src/app-builds/app-builds.module.spec.ts`
+ *   composes the graph as the API does and pins all three. `ActivityLogService`,
+ *   `PluginUsageService` and `CacheEntry`'s repository come the same way, from
+ *   `ActivityLogModule`, `UsageModule` and `DatabaseModule`;
  * - **provided ELSEWHERE, never here**: `APP_BUILD_PREPARE_DISPATCHER` /
- *   `APP_BUILD_WATCH_DISPATCHER` (T18) by `buildJobRuntimeProviders()` in
- *   `packages/tasks`' `@Global()` `TriggerModule`, which is what lets them reach
- *   this module's `@Optional()` injections; and `APP_ENV_RESOLVER_FINGERPRINTS` by
- *   `AppEnvModule` — which is neither `@Global()` nor imported here, so from THIS
- *   module's injector that token is absent and `AppBuildsService` takes the
- *   "unbound fingerprints" answer below (routed as a finding, not changed here);
+ *   `APP_BUILD_WATCH_DISPATCHER` (T18), bound by `buildJobRuntimeProviders()` in
+ *   `packages/tasks`' `@Global()` `TriggerModule` AND exported by it — a token a
+ *   global module binds without exporting reaches no other module
+ *   (`trigger.module.ts`, guarded by `trigger.module.spec.ts`); and `EventEmitter2`,
+ *   from the API root's `EventEmitterModule.forRoot()`;
+ * - **resolved lazily, and absent from the API today**: the
+ *   `APP_BUILD_RUNNER_RECIPE_SOURCE` factory looks `AppEnvRuntimeSource` up at call
+ *   time, and only `AppRuntimeEnvModule` provides that class — a module no API
+ *   module imports as of 2026-09-26. The factory then answers "no recipe and
+ *   nothing missing", so a verification job runs with no env (routed as a
+ *   finding: importing `AppRuntimeEnvModule` here would drag `FacadesModule` in
+ *   through `AppDependenciesModule` and stop this module compiling standalone);
  * - **unbound everywhere**: `APP_BUILD_PLATFORM_SETTINGS_WRITER` (§4.12),
  *   `APP_BUILD_EDIT_ACCESS` and `APP_PROVISION_EVENTS_PORT` (APW-04). Binding a
  *   placeholder for any of them would make an unconfigured installation look
@@ -157,6 +180,16 @@ import { GitFacadeService } from '../facades/git.facade';
         // a cycle.
         ActivityLogModule,
         UsageModule,
+        // APW-07's env module, for the three collaborators in this module that
+        // only it provides — see the class docstring's "bound by an IMPORT" group.
+        // It must be imported HERE: Nest resolves a provider's dependencies in the
+        // module that declares the provider, `AppEnvModule` is not `@Global()`, and
+        // until 2026-09-26 nothing in the API imported it at all, so all three were
+        // `undefined` in the running API. A leaf with respect to this module (its
+        // only import is `TypeOrmModule.forFeature`, and nothing it reaches imports
+        // this one), so the graph stays a DAG; and it compiles standalone, so
+        // `app-builds.module.spec.ts` still composes this module on its own.
+        AppEnvModule,
     ],
     providers: [
         AppBuildRepository,

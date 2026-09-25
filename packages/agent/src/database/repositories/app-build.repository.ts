@@ -413,9 +413,11 @@ export class AppBuildRepository {
      * The window is half-open by age, `[minAgeMs, maxAgeMs)`:
      * `queuedAt <= now - minAgeMs AND queuedAt > now - maxAgeMs`. A window three
      * sweep intervals long therefore holds exactly three ticks whatever their
-     * phase WHEN the ticks are exactly one interval apart — and three ±1 when they
-     * drift, as real scheduled ticks do. Either way the window is what bounds the
-     * re-drives of one Build.
+     * phase WHEN the ticks are exactly one interval apart — three ±1 under
+     * schedule jitter, as real scheduled ticks have, and fewer when ticks are
+     * skipped because a hung pass holds the sweep lock (up to
+     * `APP_BUILD_SWEEP_LOCK_MAX_LIFETIME_MS`). The re-drives of one Build are
+     * always bounded above by the window, and always idempotent.
      *
      * `dispatchedAt IS NULL` is the runner's own selection rule
      * (`readRequestedBuilds`) and its dispatch claim: a Build the runner claimed

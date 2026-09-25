@@ -45,7 +45,8 @@ import {
  * The Builds live in a REAL in-memory better-sqlite3 table read through the real
  * `AppBuildRepository`, because the two properties that matter most are window
  * arithmetic — "exactly three re-drives" at exactly periodic ticks (three ±1
- * under real tick jitter) and "lost one millisecond after the deadline, never at
+ * under schedule jitter, fewer when a hung pass holds the lock; always bounded
+ * above by the window) and "lost one millisecond after the deadline, never at
  * it" — and they are only honest when the SQL that bounds the
  * window is the SQL production runs. `AppBuildsService` is a recording double in
  * the unit cases (the sweep's contract with it is two calls: `requestPrepare` and
@@ -278,8 +279,10 @@ describe('AppBuildSweepService', () => {
             // exactly three ticks, whatever their phase, when the ticks are exactly
             // 120 s apart — as they are here. Widening the window by one millisecond
             // (451 s) gives this Build a fourth request. Real ticks drift by a few
-            // seconds, so production sees three ±1; that bound is the window's, and
-            // a re-drive is idempotent.
+            // seconds, so production sees three ±1 under schedule jitter, and fewer
+            // when ticks are skipped because a hung pass holds the lock (up to
+            // APP_BUILD_SWEEP_LOCK_MAX_LIFETIME_MS); always bounded above by the
+            // window, and always idempotent.
             const h = unit();
             const queuedAt = NOW - 10 * MINUTE;
             await seedBuild({ workId: WORK_A, queuedAt: new Date(queuedAt) });

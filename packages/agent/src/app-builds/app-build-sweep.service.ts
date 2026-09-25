@@ -42,11 +42,13 @@ import {
  *    exactly two minutes apart land in it three times whatever their phase —
  *    §9.2's "3 times". Real ticks are not exactly periodic (Trigger's schedule
  *    start latency, worker boot, the RPC hop; `runSweep` reads its clock
- *    API-side, and a tick that finds the lock held runs no pass), so in
+ *    API-side), and a tick that finds the lock held runs no pass. So in
  *    production a Build whose window edge falls near a tick is re-driven three
- *    times ±1 — two or four. That is harmless: a re-drive is idempotent (one
+ *    times ±1 under schedule jitter; fewer when ticks are skipped because a hung
+ *    pass holds the lock (up to {@link APP_BUILD_SWEEP_LOCK_MAX_LIFETIME_MS});
+ *    always bounded above by the window, and always idempotent (one
  *    `requestPrepare` per Work, and the runner's dispatch claim starts a Build at
- *    most once) and still bounded by the window. `requestPrepare` bumps
+ *    most once). `requestPrepare` bumps
  *    `prepareSeq` before it dispatches, so a prepare that is already running
  *    loops once more and picks the Build up instead of being answered `locked`
  *    and forgotten.
@@ -116,7 +118,10 @@ export const APP_BUILD_SWEEP_INTERVAL_MS = 120_000;
 
 /**
  * §9.2 — how many times a requested Build nothing dispatched is re-driven, at
- * exactly periodic ticks; tick jitter makes it three ±1 (see the file header).
+ * exactly periodic ticks. In production it is three ±1 under schedule jitter;
+ * fewer when ticks are skipped because a hung pass holds the lock (up to
+ * {@link APP_BUILD_SWEEP_LOCK_MAX_LIFETIME_MS}); always bounded above by the
+ * window, and always idempotent (see the file header).
  */
 export const APP_BUILD_REDRIVE_ATTEMPTS = 3;
 
@@ -131,8 +136,11 @@ export const APP_BUILD_REDRIVE_MIN_AGE_MS = APP_BUILD_POLL_AFTER_SILENCE_MS;
  * …and is no longer re-driven once it is this old: three sweep intervals past
  * the minimum. The window `[min, max)` holds exactly
  * {@link APP_BUILD_REDRIVE_ATTEMPTS} ticks when they are exactly one interval
- * apart, and one more or one fewer when they drift (see the file header). After
- * it the Build waits for the next prepare of its Work, or for the `lost` rule.
+ * apart: three ±1 under schedule jitter, and fewer when ticks are skipped because
+ * a hung pass holds the lock (up to {@link APP_BUILD_SWEEP_LOCK_MAX_LIFETIME_MS}).
+ * The window is always the upper bound, and a re-drive is always idempotent (see
+ * the file header). After it the Build waits for the next prepare of its Work, or
+ * for the `lost` rule.
  */
 export const APP_BUILD_REDRIVE_MAX_AGE_MS =
     APP_BUILD_REDRIVE_MIN_AGE_MS + APP_BUILD_REDRIVE_ATTEMPTS * APP_BUILD_SWEEP_INTERVAL_MS;

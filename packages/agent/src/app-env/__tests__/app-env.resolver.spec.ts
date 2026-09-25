@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import {
     APP_ENV_TEMPLATE_MAX_DEPTH,
+    computeBuildInputsHash,
     isAppDependencyOutputSecret,
     type AppEnvEntryView,
     type AppSpec,
@@ -13,6 +14,10 @@ import { WorkAppEnvValue } from '../../entities/work-app-env-value.entity';
 import { ENTITIES } from '../../database/_entities-inventory';
 import { WorkAppEnvValueRepository } from '../../database/repositories/work-app-env-value.repository';
 import { PluginSecretEncService } from '../../plugins/services/plugin-secret-enc.service';
+import {
+    computeCurrentInputsHash,
+    fingerprintsToValues,
+} from '../../app-builds/deployable-verdict';
 import { AppEnvCrypto } from '../app-env-crypto';
 import { APP_ENV_SPEC_SOURCE, AppEnvService, type AppEnvSpecSource } from '../app-env.service';
 import {
@@ -1139,6 +1144,44 @@ describe('AppEnvResolver (T14, plan §2.2:110-150, §4.6:422-464)', () => {
                 spec: { read: jest.fn(async () => null) },
             });
             expect(await unreadable.read(WORK, 'runtime')).toEqual({});
+        });
+
+        it('fingerprints the build phase against the spec’s own build.services, so the verdict hash can equal the prepare hash (FR-24)', async () => {
+            // The two terms of §5.1's `staleInputs` clause for a Work whose build
+            // env references a build service:
+            //  - the prepare runner resolves with `spec.build.services`
+            //    (`app-build-prepare.runner.ts` `resolveBuildValues`) and the plugin
+            //    hashes EVERY value it is handed (`secret-sync.ts`
+            //    `computeBuildInputsHash`), build-service ones included;
+            //  - the verdict reads `read(workId, 'build')` through
+            //    `AppBuildsService.readCurrentInputs` and hashes that map.
+            // Resolved against an empty service list, the build-service references
+            // were `noBuildService` and left the map, so the two hashes could never
+            // match and every such Build was `staleInputs`.
+            const spec: AppSpec = {
+                ...fixtureSpec(),
+                build: { strategy: 'dockerfile', services: BUILD_SERVICES },
+            };
+            await seedGenerated();
+            const resolver = resolverFor(spec);
+
+            const prepared = await resolver.resolveForBuild(WORK, spec.build?.services ?? []);
+            const current = await resolver.read(WORK, 'build');
+
+            expect(current).not.toBeNull();
+            expect(current?.BUILD_DATABASE_URL).toBe(
+                value(prepared, 'BUILD_DATABASE_URL').fingerprint,
+            );
+            expect(current?.REDIS_URL).toBe(value(prepared, 'REDIS_URL').fingerprint);
+            expect(current?.S3_ENDPOINT).toBe(value(prepared, 'S3_ENDPOINT').fingerprint);
+            expect(computeCurrentInputsHash(fingerprintsToValues(current ?? {}))).toBe(
+                computeBuildInputsHash(
+                    prepared.values.map((entry) => ({
+                        name: entry.name,
+                        fingerprint: entry.fingerprint,
+                    })),
+                ),
+            );
         });
 
         it('answers another App Work’s names as unset, never as this Work’s values', async () => {

@@ -900,8 +900,9 @@ describe('AppBuildRepository', () => {
      * queued … the job retries 3 times"). The window is half-open, `[min, max)` by
      * AGE: `queuedAt <= now - min` and `queuedAt > now - max`. The sweep passes
      * 90 s and 90 s + 3 × 120 s = 450 s, so exactly three two-minute ticks fall
-     * inside it when the ticks are exactly periodic (three ±1 under real tick
-     * jitter — see `app-build-sweep.service.ts`).
+     * inside it when the ticks are exactly periodic (three ±1 under schedule
+     * jitter, fewer when a hung pass holds the lock; always bounded above by the
+     * window — see `app-build-sweep.service.ts`).
      */
     describe('findUndispatchedRequested (§9.2, the sweep re-drive)', () => {
         const MIN_AGE = APP_BUILD_POLL_AFTER_SILENCE_MS;
