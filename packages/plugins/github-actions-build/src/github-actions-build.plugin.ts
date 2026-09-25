@@ -78,18 +78,20 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  *     just-written workflow file is briefly undispatchable;
  *   - a digest read from the artifact is reported `confirmed: false` **always**.
  *     Confirming it is `checkImageAccess` (T14, below) and the comparison belongs
- *     to the caller;
+ *     to the caller, `AppBuildsService.finalize` (plan §4.8);
  *   - a failure whose log has EXPIRED classifies as `unknown`. GitHub deletes
  *     job logs on the repository's retention schedule, and a Build observed
  *     after that is genuinely unexplainable — reporting `unknown` is the honest
  *     answer, and re-running the Build is the only way to get a better one.
  *
  * `checkImageAccess?` (T14) IS declared now, because it does something: it reads
- * the manifest anonymously, then with the pull token, and checks that token's
- * scopes through `GET /user`. It is the confirming half of §4.8's "only ever
- * confirmed, never believed" — `getBuild` still reports an artifact digest as
- * `confirmed: false` always, and the caller does the comparison, because it is
- * the only party holding both the Build row and the `pullToken` setting.
+ * the manifest through GHCR's token exchange (`ghcr.io/token`, then a `HEAD` with
+ * the registry-issued bearer) — anonymously, then with the pull token presented
+ * to `/token` as Basic credentials — and checks that token's scopes through
+ * `GET /user`. It is the confirming half of §4.8's "only ever confirmed, never
+ * believed" — `getBuild` still reports an artifact digest as `confirmed: false`
+ * always, and `AppBuildsService.finalize` does the comparison, because it is the
+ * only party holding both the Build row and the `pullToken` setting.
  *
  * `listRecentRuns?` (T12's run discovery, §7.4a) is still deliberately **not
  * declared**: it is optional on the contract and a caller materialises the member
@@ -278,7 +280,11 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 					createdByAppWork: input.repository.createdByAppWork
 				},
 				content,
-				lastWrittenWorkflowSha256: input.lastWrittenWorkflowSha256
+				lastWrittenWorkflowSha256: input.lastWrittenWorkflowSha256,
+				// §3.1b's recorded pull request, echoed back when GitHub reports the head's
+				// pull request still open (ACC-05-02). Never what decides that it is open.
+				pullRequestNumber: input.workflowPullRequestNumber ?? null,
+				pullRequestUrl: input.workflowPullRequestUrl ?? null
 			},
 			writer
 		);
@@ -461,8 +467,9 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 				? {
 						// `confirmed: false` without exception. This plugin reads the digest
 						// the member's own CI claimed; confirming it against the registry is
-						// `checkImageAccess` (T14), and a plugin that marked its own input
-						// confirmed would make plan §4.8's "never believed" untrue.
+						// `checkImageAccess` (T14), compared by `AppBuildsService.finalize`,
+						// and a plugin that marked its own input confirmed would make plan
+						// §4.8's "never believed" untrue.
 						image: {
 							repository: result.imageRepository ?? '',
 							digest: result.digest,
@@ -592,8 +599,15 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 	 * believed". `getBuild` reports the digest the member's own CI claimed with
 	 * `confirmed: false`, always; comparing it against the digest this method reads
 	 * from the registry is what makes it true, and that comparison belongs to the
-	 * caller, which is the only party holding both the Build row and the
-	 * installation's `pullToken` setting (`getBuild(ref, auth)` is given neither).
+	 * caller — `AppBuildsService.finalize` — which is the only party holding both
+	 * the Build row and the installation's `pullToken` setting (`getBuild(ref, auth)`
+	 * is given neither).
+	 *
+	 * The registry is read through GHCR's own token exchange (`registry/ghcr-access.ts`):
+	 * a bare manifest `HEAD` is 401 for every image on GHCR, public or not, so a
+	 * public image is only ever seen as public through the anonymous registry token.
+	 * The pull token reaches `ghcr.io/token` (as Basic) and `api.github.com/user`,
+	 * and nothing else.
 	 */
 	async checkImageAccess(input: {
 		readonly imageRepository: string;

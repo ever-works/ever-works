@@ -11,6 +11,7 @@ import {
 	buildSecretName,
 	createBuildValueSecretSync,
 	isSecretLimitError,
+	isSecretNotFoundError,
 	isValidGitHubSecretName,
 	loadSodium,
 	sealSecretValue,
@@ -43,7 +44,13 @@ interface FakePort {
 }
 
 /** A repository port over a real keypair, with every call recorded. */
-async function fakePort(options: { failPut?: (call: number) => Error | null } = {}): Promise<FakePort> {
+async function fakePort(
+	options: {
+		failPut?: (call: number) => Error | null;
+		/** A scripted DELETE answer by name: the error GitHub would throw, or `null` to succeed. */
+		failDelete?: (name: string) => Error | null;
+	} = {}
+): Promise<FakePort> {
 	const _sodium = await loadSodium();
 	await _sodium.ready;
 	const keypair = _sodium.crypto_box_keypair();
@@ -67,6 +74,8 @@ async function fakePort(options: { failPut?: (call: number) => Error | null } = 
 		},
 		async deleteRepoSecret(input) {
 			record.calls.push(`delete:${input.name}`);
+			const failure = options.failDelete?.(input.name);
+			if (failure) throw failure;
 			record.deleted.push(input.name);
 		}
 	};
@@ -321,6 +330,41 @@ describe('secret sync — removal is set arithmetic (FR-16, FR-18)', () => {
 		expect(fake.deleted).not.toContain('EW_SOMETHING');
 	});
 
+	it('counts a previously written name GitHub no longer has as removed, and keeps deleting the rest', async () => {
+		// An owner deleted EW_A by hand, or an earlier preparation deleted it and then
+		// failed before the row was written. GitHub answers the DELETE with 404; the
+		// name is gone either way, and throwing here would fail every later
+		// preparation of the Work on the same stale name, forever.
+		const fake = await fakePort({
+			failDelete: (name) => (name === 'EW_A' ? Object.assign(new Error('Not Found'), { status: 404 }) : null)
+		});
+		const sync = createBuildValueSecretSync({ port: fake.port });
+		const result = await sync.syncBuildValues({ values: [], previouslyWrittenSecretNames: ['EW_A', 'EW_B'] });
+
+		expect(result.secretsRemoved).toEqual(['EW_A', 'EW_B']);
+		expect(fake.calls).toEqual(['getRepoPublicKey', 'delete:EW_A', 'delete:EW_B']);
+		expect(fake.deleted).toEqual(['EW_B']);
+	});
+
+	it('still throws when a DELETE fails for any reason other than the name being gone', async () => {
+		const fake = await fakePort({
+			failDelete: () => Object.assign(new Error('Server Error'), { status: 500 })
+		});
+		const sync = createBuildValueSecretSync({ port: fake.port });
+		await expect(sync.syncBuildValues({ values: [], previouslyWrittenSecretNames: ['EW_A'] })).rejects.toThrow(
+			'Server Error'
+		);
+	});
+
+	it('recognises only a 404 as the name being gone', () => {
+		expect(isSecretNotFoundError(Object.assign(new Error('Not Found'), { status: 404 }))).toBe(true);
+		expect(isSecretNotFoundError(Object.assign(new Error('Server Error'), { status: 500 }))).toBe(false);
+		expect(isSecretNotFoundError(Object.assign(new Error('Forbidden'), { status: 403 }))).toBe(false);
+		expect(isSecretNotFoundError(new Error('Not Found'))).toBe(false);
+		expect(isSecretNotFoundError(null)).toBe(false);
+		expect(isSecretNotFoundError(undefined)).toBe(false);
+	});
+
 	it('deletes a previously written name the moment it stops being referenced', async () => {
 		const fake = await fakePort();
 		const sync = createBuildValueSecretSync({ port: fake.port });
@@ -365,6 +409,21 @@ describe('secret sync — the per-verification prompted secret (plan §4.10)', (
 		const sync = createBuildValueSecretSync({ port: fake.port });
 		expect(await sync.deleteVerifyPromptedSecret()).toEqual({ deleted: true });
 		expect(fake.deleted).toEqual([APP_BUILD_VERIFY_PROMPTED_SECRET]);
+	});
+
+	it('answers deleted:false, never a throw, when the verification secret is already gone', async () => {
+		// The watch runner clears `verifySecretNames` on any answer; a throw would
+		// leave it set, and the orphan pass would retry the same 404 forever.
+		const fake = await fakePort({ failDelete: () => Object.assign(new Error('Not Found'), { status: 404 }) });
+		const sync = createBuildValueSecretSync({ port: fake.port });
+		expect(await sync.deleteVerifyPromptedSecret()).toEqual({ deleted: false });
+		expect(fake.calls).toEqual([`delete:${APP_BUILD_VERIFY_PROMPTED_SECRET}`]);
+	});
+
+	it('still throws when the verification secret DELETE fails for another reason', async () => {
+		const fake = await fakePort({ failDelete: () => Object.assign(new Error('Server Error'), { status: 500 }) });
+		const sync = createBuildValueSecretSync({ port: fake.port });
+		await expect(sync.deleteVerifyPromptedSecret()).rejects.toThrow('Server Error');
 	});
 });
 

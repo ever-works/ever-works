@@ -53,6 +53,14 @@ import type sodiumType from 'libsodium-wrappers';
  * this call wrote. A name that was never written by the platform is never deleted,
  * whatever it looks like — including one that starts with `EW_`, which is how an
  * owner's own repository secret survives a preparation (FR-18).
+ *
+ * A DELETE that GitHub answers with 404 counts as removed: the name is already
+ * gone (an owner deleted it by hand, or an earlier preparation deleted it and
+ * failed before its row was written), and FR-18 is unaffected because the delete
+ * set is still only names the platform wrote. Throwing instead would leave the
+ * name on the row and fail every later preparation on the same 404, forever. A
+ * 404 from the public-key fetch or a `PUT` is NOT tolerated — there it means the
+ * repository itself is gone or not visible.
  */
 
 /** The three repository-secret operations this sync needs, and nothing else (a fake is four lines). */
@@ -192,6 +200,18 @@ export function isSecretLimitError(error: unknown): boolean {
 }
 
 /**
+ * GitHub's answer to a DELETE of a secret that does not exist.
+ *
+ * Only the removal paths use this: by the time they run, the same call has
+ * already fetched the public key (or, for the verification secret, the watch
+ * runner is cleaning up after a Build), so a 404 on the DELETE is the name being
+ * gone, not the repository.
+ */
+export function isSecretNotFoundError(error: unknown): boolean {
+	return (error as { status?: unknown } | null | undefined)?.status === 404;
+}
+
+/**
  * Build the §4.7/§4.10 operations over one repository port.
  *
  * Every operation fetches the public key once, at its own start: a key can rotate
@@ -285,9 +305,15 @@ export function createBuildValueSecretSync(dependencies: SecretSyncDependencies)
 			const removed: string[] = [];
 			for (const name of new Set(input.previouslyWrittenSecretNames)) {
 				if (referenced.has(name)) continue;
-				await port.deleteRepoSecret({ name });
+				try {
+					await port.deleteRepoSecret({ name });
+					logger?.debug?.('build value secret removed', { name });
+				} catch (error) {
+					// Already gone: removed all the same, so the caller drops it from the row.
+					if (!isSecretNotFoundError(error)) throw error;
+					logger?.debug?.('build value secret already absent', { name });
+				}
 				removed.push(name);
-				logger?.debug?.('build value secret removed', { name });
 			}
 
 			logger?.info?.('build values synced', { written: written.length, removed: removed.length });
@@ -312,7 +338,16 @@ export function createBuildValueSecretSync(dependencies: SecretSyncDependencies)
 		},
 
 		async deleteVerifyPromptedSecret(): Promise<{ readonly deleted: boolean }> {
-			await port.deleteRepoSecret({ name: APP_BUILD_VERIFY_PROMPTED_SECRET });
+			try {
+				await port.deleteRepoSecret({ name: APP_BUILD_VERIFY_PROMPTED_SECRET });
+			} catch (error) {
+				// Already gone: an answer, not a failure — the caller clears its record of it.
+				if (!isSecretNotFoundError(error)) throw error;
+				logger?.debug?.('verification prompted secret already absent', {
+					name: APP_BUILD_VERIFY_PROMPTED_SECRET
+				});
+				return { deleted: false };
+			}
 			logger?.debug?.('verification prompted secret removed', { name: APP_BUILD_VERIFY_PROMPTED_SECRET });
 			return { deleted: true };
 		}

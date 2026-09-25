@@ -21,6 +21,7 @@ import {
 	WORKFLOW_PULL_REQUEST_TITLE,
 	WORKFLOW_REMOVAL_PULL_REQUEST_TITLE,
 	WORKFLOW_WRITE_MAX_ATTEMPTS,
+	isPullRequestAlreadyExistsError,
 	repositoryWriteErrorCode,
 	writeWorkflow,
 	type WorkflowWriteInput
@@ -55,9 +56,44 @@ const FIRST_CONTENT = 'name: Ever Works build\njobs:\n  build:\n    runs-on: "ub
 /** A scripted refusal a `commitFiles` call may throw. */
 type ScriptedFailure = { code: 'nonFastForward' | 'refRejectedByRule'; calls: number[] } | null;
 
+/**
+ * How the fake refuses a second pull request for a head that already has an open one.
+ *
+ * `coded` is the contract's shape (`RepositoryWriteErrorCode` `pullRequestExists`,
+ * what a facade-bound writer throws); `github422` is Octokit's own `RequestError`
+ * for GitHub's answer, which is what reaches the writer when nothing translates it.
+ */
+type PullRequestExistsShape = 'coded' | 'github422';
+
+/** GitHub's own sentence for the refusal, as it appears in both shapes. */
+const ALREADY_EXISTS_MESSAGE = `A pull request already exists for ${OWNER}:${APP_BUILD_WORKFLOW_BRANCH}.`;
+
+/** The refusal of a second pull request, in the shape the fake was asked for. */
+function pullRequestExistsError(shape: PullRequestExistsShape): Error {
+	if (shape === 'coded') {
+		return Object.assign(new Error(ALREADY_EXISTS_MESSAGE), { code: 'pullRequestExists' });
+	}
+	// Octokit's RequestError for `POST /repos/{owner}/{repo}/pulls` answering 422.
+	return Object.assign(
+		new Error(
+			`Validation Failed: {"resource":"PullRequest","code":"custom","message":"${ALREADY_EXISTS_MESSAGE}"} - https://docs.github.com/rest/pulls/pulls#create-a-pull-request`
+		),
+		{
+			status: 422,
+			response: {
+				data: {
+					message: 'Validation Failed',
+					errors: [{ resource: 'PullRequest', code: 'custom', message: ALREADY_EXISTS_MESSAGE }]
+				}
+			}
+		}
+	);
+}
+
 interface FakeState {
 	calls: string[];
 	commits: RepositoryCommitInput[];
+	/** Only the pull requests GitHub actually OPENED — a refused create is not one. */
 	pullRequests: Array<Omit<CreatePROptions, 'owner' | 'repo'>>;
 	branchNamesCreated: string[];
 	failCommit: ScriptedFailure;
@@ -81,7 +117,12 @@ function fakeWriter(options: {
 	trackedHead?: string;
 	failCommit?: ScriptedFailure;
 	readBackOverride?: string | null;
+	/** An OPEN pull request GitHub already holds for `ever-works/build-workflow`. */
 	existingPullRequest?: GitPullRequest | null;
+	/** The shape of GitHub's "already exists" refusal (default: the contract's code). */
+	pullRequestExistsShape?: PullRequestExistsShape;
+	/** A refusal `createPullRequest` throws whatever is open — for the errors that must still throw. */
+	failPullRequest?: Error;
 }): { writer: RepositoryWriter; state: FakeState; commitInputs: () => RepositoryCommitInput[] } {
 	const state: FakeState = {
 		calls: [],
@@ -95,6 +136,10 @@ function fakeWriter(options: {
 	};
 	let tracked = options.tracked ?? null;
 	let branch = options.branch ?? null;
+	// GitHub's view of the open pull requests: a seeded one, then every one this
+	// fake opens. A second create for the same head is refused, as GitHub refuses it.
+	const openPullRequests: GitPullRequest[] = options.existingPullRequest ? [options.existingPullRequest] : [];
+	let nextPullRequestNumber = 7;
 
 	const writer: RepositoryWriter = {
 		async getFileContent(path: string, ref?: string): Promise<{ content: string; encoding: string } | null> {
@@ -138,17 +183,25 @@ function fakeWriter(options: {
 		},
 		async createPullRequest(prOptions: Omit<CreatePROptions, 'owner' | 'repo'>): Promise<GitPullRequest> {
 			state.calls.push('createPullRequest');
-			state.pullRequests.push(prOptions);
-			return {
-				number: 7,
+			if (options.failPullRequest) throw options.failPullRequest;
+			if (openPullRequests.some((open) => open.head === prOptions.head && open.state === 'open')) {
+				throw pullRequestExistsError(options.pullRequestExistsShape ?? 'coded');
+			}
+			const number = nextPullRequestNumber;
+			nextPullRequestNumber += 1;
+			const created: GitPullRequest = {
+				number,
 				title: prOptions.title,
 				state: 'open',
 				head: prOptions.head,
 				base: prOptions.base,
-				url: 'https://github.com/ever-works/fixture-app/pull/7',
+				url: `https://github.com/ever-works/fixture-app/pull/${number}`,
 				createdAt: '2026-09-18T00:00:00Z',
 				updatedAt: '2026-09-18T00:00:00Z'
 			};
+			openPullRequests.push(created);
+			state.pullRequests.push(prOptions);
+			return created;
 		}
 	};
 
@@ -156,6 +209,20 @@ function fakeWriter(options: {
 }
 
 const WORKFLOW_PATH = APP_BUILD_WORKFLOW_PATH;
+
+/** The open pull request GitHub holds for the delivery branch, for the cases that start with one. */
+function openPullRequest(number = 7, url = `https://github.com/ever-works/fixture-app/pull/${number}`): GitPullRequest {
+	return {
+		number,
+		title: WORKFLOW_PULL_REQUEST_TITLE,
+		state: 'open',
+		head: APP_BUILD_WORKFLOW_BRANCH,
+		base: TRACKED,
+		url,
+		createdAt: '2026-09-17T00:00:00Z',
+		updatedAt: '2026-09-17T00:00:00Z'
+	};
+}
 
 /** A branch-rules port answering what a test needs, with the rules read counted. */
 function fakeProtection(options: {
@@ -466,7 +533,11 @@ describe('workflow writer — one pull request, reused (ACC-05-02)', () => {
 	});
 
 	it('adds no commit when the pull request branch already carries the bytes', async () => {
-		const { writer, state } = fakeWriter({ tracked: FIRST_CONTENT, branch: CONTENT });
+		const { writer, state } = fakeWriter({
+			tracked: FIRST_CONTENT,
+			branch: CONTENT,
+			existingPullRequest: openPullRequest(7, 'https://example.invalid/pr/7')
+		});
 		const result = await writeWorkflow(
 			writeInput({ pullRequestNumber: 7, pullRequestUrl: 'https://example.invalid/pr/7' }),
 			writer,
@@ -490,6 +561,151 @@ describe('workflow writer — one pull request, reused (ACC-05-02)', () => {
 		expect(state.pullRequests[0].head).toBe(APP_BUILD_WORKFLOW_BRANCH);
 		expect(state.pullRequests[0].base).toBe(TRACKED);
 		expect(state.branchNamesCreated).toContain(APP_BUILD_WORKFLOW_BRANCH);
+	});
+
+	// No production caller had a stored number to pass (the prepare input carried
+	// none), so every PR-path preparation after the first called create, and
+	// GitHub's "already exists" escaped as a thrown 422. GitHub, not the stored
+	// number, is what says the open pull request is there.
+	it.each<PullRequestExistsShape>(['coded', 'github422'])(
+		'adopts the open pull request GitHub reports, with no stored number (%s refusal)',
+		async (shape) => {
+			const { writer, state } = fakeWriter({
+				tracked: FIRST_CONTENT,
+				existingPullRequest: openPullRequest(),
+				pullRequestExistsShape: shape
+			});
+			const result = await writeWorkflow(
+				writeInput({
+					repository: { owner: OWNER, repo: REPO, trackedBranch: TRACKED, createdByAppWork: false }
+				}),
+				writer
+			);
+
+			expect(result.state).toBe('pullRequestUpdated');
+			expect(result.storedWorkflowSha256).toBeNull();
+			// Nothing to echo back: the writer never invents a number or a link.
+			expect(result).not.toHaveProperty('pullRequestNumber');
+			expect(result).not.toHaveProperty('pullRequestUrl');
+			expect(state.pullRequests).toEqual([]);
+			expect(state.commits.map((commit) => commit.branch)).toEqual([APP_BUILD_WORKFLOW_BRANCH]);
+		}
+	);
+
+	it('echoes the stored pull request back when GitHub reports it still open', async () => {
+		const { writer, state } = fakeWriter({ tracked: FIRST_CONTENT, existingPullRequest: openPullRequest() });
+		const result = await writeWorkflow(
+			writeInput({
+				repository: { owner: OWNER, repo: REPO, trackedBranch: TRACKED, createdByAppWork: false },
+				pullRequestNumber: 7,
+				pullRequestUrl: 'https://github.com/ever-works/fixture-app/pull/7'
+			}),
+			writer
+		);
+
+		expect(result).toMatchObject({
+			state: 'pullRequestUpdated',
+			pullRequestNumber: 7,
+			pullRequestUrl: 'https://github.com/ever-works/fixture-app/pull/7'
+		});
+		expect(state.calls).toContain('createPullRequest');
+		expect(state.pullRequests).toEqual([]);
+	});
+
+	it('opens a new pull request when the stored one was closed, never "updating" a closed one', async () => {
+		// The stored #3 is closed: GitHub has no open pull request for the head, so
+		// the create succeeds. Trusting the stored number would leave the Builds
+		// waiting on a pull request nobody can merge.
+		const { writer, state } = fakeWriter({ tracked: FIRST_CONTENT });
+		const result = await writeWorkflow(
+			writeInput({
+				repository: { owner: OWNER, repo: REPO, trackedBranch: TRACKED, createdByAppWork: false },
+				pullRequestNumber: 3,
+				pullRequestUrl: 'https://github.com/ever-works/fixture-app/pull/3'
+			}),
+			writer
+		);
+
+		expect(result.state).toBe('pullRequestOpened');
+		expect(result.pullRequestNumber).toBe(7);
+		expect(result.pullRequestUrl).toBe('https://github.com/ever-works/fixture-app/pull/7');
+		expect(state.pullRequests).toHaveLength(1);
+	});
+
+	it('keeps editedByHand when a hand-edited file finds its pull request already open', async () => {
+		const { writer } = fakeWriter({ tracked: 'hand edited\n', existingPullRequest: openPullRequest() });
+		const result = await writeWorkflow(
+			writeInput({ pullRequestNumber: 7, pullRequestUrl: 'https://github.com/ever-works/fixture-app/pull/7' }),
+			writer
+		);
+		expect(result.state).toBe('editedByHand');
+		expect(result.pullRequestNumber).toBe(7);
+	});
+
+	it('still throws a 422 that is not "already exists"', async () => {
+		const noCommits = Object.assign(
+			new Error(
+				'Validation Failed: {"resource":"PullRequest","code":"custom","message":"No commits between main and ever-works/build-workflow"}'
+			),
+			{
+				status: 422,
+				response: {
+					data: {
+						message: 'Validation Failed',
+						errors: [
+							{
+								resource: 'PullRequest',
+								code: 'custom',
+								message: 'No commits between main and ever-works/build-workflow'
+							}
+						]
+					}
+				}
+			}
+		);
+		const { writer } = fakeWriter({ tracked: FIRST_CONTENT, failPullRequest: noCommits });
+		await expect(
+			writeWorkflow(
+				writeInput({
+					repository: { owner: OWNER, repo: REPO, trackedBranch: TRACKED, createdByAppWork: false }
+				}),
+				writer
+			)
+		).rejects.toBe(noCommits);
+	});
+
+	it('recognises "already exists" by the contract code first, and by the GitHub 422 only as a fallback', () => {
+		expect(repositoryWriteErrorCode(Object.assign(new Error('x'), { code: 'pullRequestExists' }))).toBe(
+			'pullRequestExists'
+		);
+		expect(repositoryWriteErrorCode(Object.assign(new Error('x'), { reason: 'pullRequestExists' }))).toBe(
+			'pullRequestExists'
+		);
+		expect(isPullRequestAlreadyExistsError(pullRequestExistsError('coded'))).toBe(true);
+		expect(isPullRequestAlreadyExistsError(pullRequestExistsError('github422'))).toBe(true);
+		// The errors[] shape alone, with a top-level message that says nothing.
+		expect(
+			isPullRequestAlreadyExistsError(
+				Object.assign(new Error('Validation Failed'), {
+					status: 422,
+					response: { data: { errors: [{ message: ALREADY_EXISTS_MESSAGE }] } }
+				})
+			)
+		).toBe(true);
+		// The wording without the 422 is not enough, and a 422 without the wording is not either.
+		expect(isPullRequestAlreadyExistsError(new Error(ALREADY_EXISTS_MESSAGE))).toBe(false);
+		expect(
+			isPullRequestAlreadyExistsError(
+				Object.assign(new Error('Validation Failed: No commits between main and ever-works/build-workflow'), {
+					status: 422
+				})
+			)
+		).toBe(false);
+		expect(isPullRequestAlreadyExistsError(Object.assign(new Error('x'), { code: 'refRejectedByRule' }))).toBe(
+			false
+		);
+		expect(isPullRequestAlreadyExistsError(null)).toBe(false);
+		expect(isPullRequestAlreadyExistsError(undefined)).toBe(false);
 	});
 });
 
@@ -588,7 +804,10 @@ describe('workflow writer — the removal no build and no check leaves (T42, FR-
 	});
 
 	it('updates the one open pull request instead of opening a second', async () => {
-		const { writer, state } = fakeWriter({ tracked: CONTENT });
+		const { writer, state } = fakeWriter({
+			tracked: CONTENT,
+			existingPullRequest: openPullRequest(7, 'https://example.invalid/pr/7')
+		});
 		const result = await writeWorkflow(
 			writeInput({
 				content: '',
@@ -621,7 +840,11 @@ describe('workflow writer — the removal no build and no check leaves (T42, FR-
 	});
 
 	it('adds no commit to the delivery branch when it already carries the empty content', async () => {
-		const { writer, state } = fakeWriter({ tracked: CONTENT, branch: '' });
+		const { writer, state } = fakeWriter({
+			tracked: CONTENT,
+			branch: '',
+			existingPullRequest: openPullRequest(7, 'https://example.invalid/pr/7')
+		});
 		const result = await writeWorkflow(
 			writeInput({
 				content: '',

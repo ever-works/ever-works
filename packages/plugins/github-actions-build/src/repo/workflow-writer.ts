@@ -27,11 +27,17 @@ import { isBranchProtected, type BranchProtectionPort, type BranchProtectionVerd
  * | **No workflow content** (T42: no build and no check remains)   | pull request — the removal of §4.6 step 8, never a direct commit (FR-70) |
  *
  * The pull request path reuses **one** pull request: `ever-works/build-workflow` is
- * created from the tracked head when absent, the commit lands on it, and a stored
- * `pullRequestNumber` means the open pull request is updated rather than a second
- * one opened (ACC-05-02). A second and a third preparation therefore leave exactly
- * one open pull request, and a preparation whose bytes are already on that branch
- * commits nothing at all.
+ * created from the tracked head when absent, the commit lands on it, and the pull
+ * request is then ALWAYS asked for. Reuse is proven by GitHub, never assumed from
+ * a stored number: when an open pull request already exists for that head, the
+ * create is refused with `pullRequestExists` (the contract's code, or GitHub's own
+ * 422 "A pull request already exists" when nothing translated it), and that
+ * refusal is what `pullRequestUpdated` means (ACC-05-02). The stored
+ * `pullRequestNumber`/`pullRequestUrl` are only echoed back so the reused pull
+ * request keeps its link; a stored pull request the owner CLOSED is therefore
+ * replaced by a new one rather than "updated" forever. A second and a third
+ * preparation leave exactly one open pull request, and a preparation whose bytes
+ * are already on that branch commits nothing at all.
  *
  * ## The refusals
  *
@@ -130,7 +136,11 @@ export interface WorkflowWriteInput {
 	readonly content: string;
 	/** The workflow sha256 the platform last wrote, or `null` — the other half of hand-edit detection (FR-9). */
 	readonly lastWrittenWorkflowSha256: string | null;
-	/** The pull request the platform already has open for this App Work, when there is one. */
+	/**
+	 * The pull request the platform recorded for this App Work (§3.1b), when there is one.
+	 * Echoed back when GitHub reports an open pull request for the head; never used to
+	 * decide that one is open.
+	 */
 	readonly pullRequestNumber?: number | null;
 	/** That pull request's URL, echoed back on the reuse path (the writer never re-reads it). */
 	readonly pullRequestUrl?: string | null;
@@ -193,13 +203,45 @@ async function readBranchHead(writer: RepositoryWriter, branch: string): Promise
 	return existing.commit;
 }
 
-/** The refusal code of a thrown write error, if it is one of the two the contract names. */
+/** The refusal code of a thrown write error, if it is one of the codes the contract names. */
 export function repositoryWriteErrorCode(error: unknown): RepositoryWriteErrorCode | null {
 	const candidate = error as { code?: unknown; reason?: unknown } | null | undefined;
 	for (const value of [candidate?.code, candidate?.reason]) {
-		if (value === 'nonFastForward' || value === 'refRejectedByRule') return value;
+		if (value === 'nonFastForward' || value === 'refRejectedByRule' || value === 'pullRequestExists') return value;
 	}
 	return null;
+}
+
+/** GitHub's wording for a second pull request on a head that already has an open one. */
+const PULL_REQUEST_ALREADY_EXISTS = /pull request already exists/i;
+
+/**
+ * True when a `createPullRequest` refusal says the head already has an OPEN pull request.
+ *
+ * Primarily the contract's code (`pullRequestExists`, what a facade-bound writer
+ * throws). The fallback is GitHub's own answer as Octokit throws it — status 422
+ * AND the "already exists" wording in the message or in any `errors[].message` —
+ * because a writer bound straight over the github plugin passes the `RequestError`
+ * through untranslated. Both halves are required: another 422 ("No commits
+ * between …") must still throw, and so must the wording without the status.
+ */
+export function isPullRequestAlreadyExistsError(error: unknown): boolean {
+	if (repositoryWriteErrorCode(error) === 'pullRequestExists') return true;
+	const candidate = error as
+		| {
+				status?: unknown;
+				message?: unknown;
+				response?: { data?: { message?: unknown; errors?: unknown } };
+		  }
+		| null
+		| undefined;
+	if (candidate?.status !== 422) return false;
+	const messages: unknown[] = [candidate.message, candidate.response?.data?.message];
+	const errors = candidate.response?.data?.errors;
+	if (Array.isArray(errors)) {
+		for (const entry of errors) messages.push((entry as { message?: unknown } | null)?.message);
+	}
+	return messages.some((message) => typeof message === 'string' && PULL_REQUEST_ALREADY_EXISTS.test(message));
 }
 
 /** One file, ready for {@link RepositoryWriter.commitFiles}. */
@@ -340,7 +382,6 @@ async function pullRequestDelivery(
 	copy: DeliveryCopy = DELIVERY_COPY
 ): Promise<WorkflowWriteResult> {
 	const { trackedBranch } = input.repository;
-	const reusedNumber = input.pullRequestNumber ?? null;
 
 	try {
 		const branch = await writer.createBranch(APP_BUILD_WORKFLOW_BRANCH, trackedBranch);
@@ -359,27 +400,33 @@ async function pullRequestDelivery(
 			if (!readBack) return workflowWriteFailed('readBackMismatch');
 		}
 
-		if (reusedNumber !== null) {
+		// Always ask: only GitHub knows whether a pull request for this head is still
+		// open. A stored number the owner closed would otherwise be "updated" forever.
+		try {
+			const pullRequest = await writer.createPullRequest({
+				title: copy.title,
+				head: APP_BUILD_WORKFLOW_BRANCH,
+				base: trackedBranch,
+				body: copy.body
+			});
+			return {
+				state: handEdited ? 'editedByHand' : 'pullRequestOpened',
+				pullRequestNumber: pullRequest.number,
+				pullRequestUrl: pullRequest.url,
+				storedWorkflowSha256: null
+			};
+		} catch (error) {
+			// Anything else — including another 422 — goes to the outer mapping below.
+			if (!isPullRequestAlreadyExistsError(error)) throw error;
+			// The open pull request now carries the commit above: reuse it (ACC-05-02),
+			// echoing the recorded number and link when there are any.
 			return {
 				state: handEdited ? 'editedByHand' : 'pullRequestUpdated',
-				pullRequestNumber: reusedNumber,
+				...(input.pullRequestNumber != null ? { pullRequestNumber: input.pullRequestNumber } : {}),
 				...(input.pullRequestUrl ? { pullRequestUrl: input.pullRequestUrl } : {}),
 				storedWorkflowSha256: null
 			};
 		}
-
-		const pullRequest = await writer.createPullRequest({
-			title: copy.title,
-			head: APP_BUILD_WORKFLOW_BRANCH,
-			base: trackedBranch,
-			body: copy.body
-		});
-		return {
-			state: handEdited ? 'editedByHand' : 'pullRequestOpened',
-			pullRequestNumber: pullRequest.number,
-			pullRequestUrl: pullRequest.url,
-			storedWorkflowSha256: null
-		};
 	} catch (error) {
 		// A refusal on the pull request path is terminal: `workflowWriteFailed` with
 		// the branch-rules cause, and never a second branch or a second pull request.

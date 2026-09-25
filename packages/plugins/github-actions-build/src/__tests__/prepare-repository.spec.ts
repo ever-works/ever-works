@@ -1,4 +1,4 @@
-import { APP_BUILD_WORKFLOW_PATH } from '@ever-works/contracts';
+import { APP_BUILD_WORKFLOW_BRANCH, APP_BUILD_WORKFLOW_PATH } from '@ever-works/contracts';
 import type { BuildAuth, PrepareRepositoryInput, RepositoryWriter } from '@ever-works/plugin';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -71,6 +71,75 @@ function fakeWriter(existing: string | null = null) {
 
 	return writer;
 }
+
+/** The pull request URL GitHub hands out for the first pull request on the delivery branch. */
+const FIRST_PULL_REQUEST_URL = 'https://github.com/someone-else/their-app/pull/7';
+
+/**
+ * A writer that behaves like GitHub where {@link fakeWriter} does not need to:
+ * the tracked branch, the delivery branch and each commit hold their own bytes,
+ * and a second pull request for a head that already has an OPEN one is refused —
+ * with the contract's `pullRequestExists` code, or as Octokit's raw 422.
+ */
+function gitHubLikeWriter(options: { refusal?: 'coded' | 'github422' } = {}) {
+	let tracked: string | null = null;
+	let deliveryBranch: string | null = null;
+	const commits = new Map<string, string>();
+	let openPullRequest: { number: number; url: string } | null = null;
+	const opened: number[] = [];
+
+	const alreadyExists = () => {
+		const message = `A pull request already exists for someone-else:${APP_BUILD_WORKFLOW_BRANCH}.`;
+		return options.refusal === 'github422'
+			? Object.assign(new Error(`Validation Failed: {"message":"${message}"}`), {
+					status: 422,
+					response: { data: { message: 'Validation Failed', errors: [{ message }] } }
+				})
+			: Object.assign(new Error(message), { code: 'pullRequestExists' });
+	};
+
+	const writer = {
+		getFileContent: vi.fn(async (path: string, ref?: string) => {
+			if (path !== APP_BUILD_WORKFLOW_PATH) return null;
+			const content =
+				ref === undefined
+					? tracked
+					: ref === APP_BUILD_WORKFLOW_BRANCH
+						? deliveryBranch
+						: (commits.get(ref) ?? null);
+			return content === null ? null : { content, encoding: 'utf-8' };
+		}),
+		commitFiles: vi.fn(async (request: { branch: string; files: Array<{ content: string }> }) => {
+			const sha = `commit-${commits.size + 1}`;
+			const content = request.files[0].content;
+			if (request.branch === APP_BUILD_WORKFLOW_BRANCH) deliveryBranch = content;
+			else tracked = content;
+			commits.set(sha, content);
+			return { commitSha: sha };
+		}),
+		createBranch: vi.fn(async (name: string) => ({ name, commit: `${name}-head`, isDefault: false })),
+		createPullRequest: vi.fn(async () => {
+			if (openPullRequest) throw alreadyExists();
+			openPullRequest = { number: 7, url: FIRST_PULL_REQUEST_URL };
+			opened.push(openPullRequest.number);
+			return { ...openPullRequest, state: 'open' };
+		})
+	} as unknown as RepositoryWriter & {
+		commitFiles: ReturnType<typeof vi.fn>;
+		createPullRequest: ReturnType<typeof vi.fn>;
+	};
+
+	return { writer, opened };
+}
+
+/** A LINKED repository: not ours to write into, so every delivery is a pull request (R-4). */
+const LINKED_REPOSITORY: PrepareRepositoryInput['repository'] = {
+	owner: 'someone-else',
+	repo: 'their-app',
+	visibility: 'public',
+	trackedBranch: 'main',
+	createdByAppWork: false
+};
 
 /** A secret port that records every write, so "no secret was written" is checkable. */
 function fakeSecretPort() {
@@ -241,5 +310,63 @@ describe('prepareRepository (plan §4.6)', () => {
 		// will clean up, in a repository the platform may not own.
 		expect(order[0]).toBe('commit');
 		expect(order).toContain('secret');
+	});
+
+	it('counts a previously written secret GitHub no longer has as removed, rather than failing the preparation', async () => {
+		// The DELETE answers 404 for a name an owner removed by hand. Throwing kept
+		// the name on the row, so every later preparation failed on the same 404.
+		const port = fakeSecretPort();
+		port.deleteRepoSecret.mockRejectedValueOnce(Object.assign(new Error('Not Found'), { status: 404 }));
+
+		const result = await new TestPlugin(port).prepareRepository(
+			input({ previouslyWrittenSecretNames: ['EW_OLD'] }),
+			AUTH,
+			fakeWriter()
+		);
+
+		expect(result.secretsRemoved).toEqual(['EW_OLD']);
+		expect(port.deleteRepoSecret).toHaveBeenCalledWith({ name: 'EW_OLD' });
+	});
+});
+
+describe('prepareRepository — a second preparation reuses the open pull request (ACC-05-02)', () => {
+	it('adopts the open pull request GitHub reports, and echoes the recorded link back', async () => {
+		const { writer, opened } = gitHubLikeWriter();
+		const plugin = new TestPlugin(fakeSecretPort());
+
+		const first = await plugin.prepareRepository(input({ repository: LINKED_REPOSITORY }), AUTH, writer);
+		expect(first.workflow.state).toBe('pullRequestOpened');
+		expect(first.workflow.pullRequestUrl).toBe(FIRST_PULL_REQUEST_URL);
+
+		// What the prepare runner hands back from §3.1b's row on the next preparation.
+		const second = await plugin.prepareRepository(
+			input({
+				repository: LINKED_REPOSITORY,
+				workflowPullRequestNumber: 7,
+				workflowPullRequestUrl: first.workflow.pullRequestUrl
+			}),
+			AUTH,
+			writer
+		);
+
+		expect(second.workflow.state).toBe('pullRequestUpdated');
+		expect(second.workflow.pullRequestUrl).toBe(FIRST_PULL_REQUEST_URL);
+		expect(second.blocked).toBeUndefined();
+		// Asked twice, opened once: GitHub's refusal is what proved the reuse.
+		expect(writer.createPullRequest).toHaveBeenCalledTimes(2);
+		expect(opened).toEqual([7]);
+	});
+
+	it('still resolves when the row recorded no pull request and GitHub answers its raw 422', async () => {
+		const { writer, opened } = gitHubLikeWriter({ refusal: 'github422' });
+		const plugin = new TestPlugin(fakeSecretPort());
+
+		await plugin.prepareRepository(input({ repository: LINKED_REPOSITORY }), AUTH, writer);
+		const second = await plugin.prepareRepository(input({ repository: LINKED_REPOSITORY }), AUTH, writer);
+
+		expect(second.workflow.state).toBe('pullRequestUpdated');
+		// No recorded link to echo: the runner keeps the one its row already holds.
+		expect(second.workflow.pullRequestUrl).toBeUndefined();
+		expect(opened).toEqual([7]);
 	});
 });

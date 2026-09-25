@@ -4,21 +4,30 @@
  *
  * Two questions, and they are asked of two different hosts:
  *
- *  - **the registry** (`ghcr.io`) — a manifest `HEAD` for `sha-<sha>`, first
- *    anonymously and then with the token. Anonymous 200 means the package is
- *    public; anonymous 401/404 and authenticated 200 means private-but-readable;
- *    neither means not readable, which is `image_unresolvable` downstream;
+ *  - **the registry** (`ghcr.io`) — a manifest `HEAD` for `sha-<sha>`, through
+ *    the Docker Registry v2 token flow (plan §4.12): `GET /token?service=ghcr.io&
+ *    scope=repository:<name>:pull` issues a short-lived registry token, and the
+ *    `HEAD` carries THAT as its bearer. First anonymously, then with the pull
+ *    token presented to `/token` as Basic credentials. A bare `HEAD` is never
+ *    enough: GHCR answers one 401 for every image, public or not (checked live
+ *    2026-09-25), so skipping the exchange read every public image as private.
+ *    Anonymous 200 means the package is public; anonymous refusal and
+ *    authenticated 200 means private-but-readable; neither means not readable,
+ *    which is `image_unresolvable` downstream;
  *  - **the API** (`api.github.com`) — `GET /user`, read only for its
  *    `x-oauth-scopes` header, which is the only way to tell a classic token's
  *    scopes without trying an operation and seeing what breaks.
  *
- * ## The token is sent to exactly two hosts, and the spec proves it
+ * ## The pull token is sent to exactly two endpoints, and the spec proves it
  *
- * `api.github.com` and `ghcr.io`. A pull token is a credential that can read
- * every private package an account can, so a redirect followed to a third host
- * with the `Authorization` header still attached is a credential leak. Every
- * request below is built from a literal base and `redirect: 'manual'`; nothing
- * takes a URL from a response.
+ * `api.github.com/user` and `ghcr.io/token`. A pull token is a credential that
+ * can read every private package an account can, so a redirect followed to a
+ * third host with the `Authorization` header still attached is a credential
+ * leak. Every request below is built from a literal base and
+ * `redirect: 'manual'`; nothing takes a URL from a response, and a 3xx from
+ * `/token` is a refusal, not a token. The manifest `HEAD` carries only the
+ * registry-issued token, never the pull token itself. No token and no response
+ * body is ever logged.
  *
  * ## Why the scope check is `read:packages` EXACTLY, and why an absent header
  * ## is a refusal
@@ -43,6 +52,15 @@ export const GHCR_HOST = 'https://ghcr.io';
 
 /** The one scope a pull token may carry, exactly (plan §4.12). */
 export const REQUIRED_PULL_TOKEN_SCOPE = 'read:packages';
+
+/**
+ * The Basic-auth username a pull token is presented under at `ghcr.io/token`.
+ *
+ * The same username plan §4.12's cluster pull credential uses. GHCR authenticates
+ * a PAT by the password half; this name is not verified against a real token
+ * here, and must be checked once live before T14 is called done.
+ */
+export const GHCR_TOKEN_USERNAME = 'x-access-token';
 
 /** The OCI manifest types a `HEAD` must accept for GHCR to answer at all. */
 const MANIFEST_ACCEPT = [
@@ -73,13 +91,19 @@ export interface GhcrAccessResult {
 	readonly digest?: string;
 }
 
-/** The one HTTP seam, so every rule here is provable without a socket. */
+/**
+ * The one HTTP seam, so every rule here is provable without a socket.
+ *
+ * `json()` is read only from `ghcr.io/token`'s 200 answer — the one body this
+ * module needs; the real `fetch` `Response` satisfies the shape as it is.
+ */
 export type GhcrFetch = (
 	url: string,
 	init: { readonly method: string; readonly headers: Record<string, string>; readonly redirect: 'manual' }
 ) => Promise<{
 	readonly status: number;
 	readonly headers: { get(name: string): string | null };
+	json(): Promise<unknown>;
 }>;
 
 /**
@@ -136,6 +160,51 @@ export interface CheckImageAccessInput {
 }
 
 /**
+ * A registry token for pulling `name`, from GHCR's own token endpoint, or `null`.
+ *
+ * Anonymous without `pullToken`; with it, the pull token is presented as Basic
+ * credentials — the Docker client's own exchange — and it goes nowhere else on
+ * `ghcr.io`. `name` is {@link parseGhcrReference}'s validated repository name,
+ * so the URL is built from a literal base and nothing from a response. Anything
+ * but a 200 carrying a non-empty `token` (or `access_token`) is `null`: a 3xx is
+ * never followed and never read, and a malformed body is not a throw. The token
+ * and the body are never logged.
+ */
+async function requestRegistryToken(name: string, fetchImpl: GhcrFetch, pullToken?: string): Promise<string | null> {
+	const query = new URLSearchParams({ service: 'ghcr.io', scope: `repository:${name}:pull` });
+	const headers: Record<string, string> = { accept: 'application/json' };
+	if (pullToken) {
+		headers.authorization = `Basic ${Buffer.from(`${GHCR_TOKEN_USERNAME}:${pullToken}`, 'utf-8').toString('base64')}`;
+	}
+
+	const response = await fetchImpl(`${GHCR_HOST}/token?${query.toString()}`, {
+		method: 'GET',
+		headers,
+		redirect: 'manual'
+	});
+	if (response.status !== 200) return null;
+
+	let body: unknown;
+	try {
+		body = await response.json();
+	} catch {
+		return null;
+	}
+	const candidate = body as { token?: unknown; access_token?: unknown } | null | undefined;
+	const token = candidate?.token ?? candidate?.access_token;
+	return typeof token === 'string' && token.length > 0 ? token : null;
+}
+
+/** The manifest `HEAD`, with the registry-issued bearer — never the pull token itself. */
+function headManifest(path: string, registryToken: string, fetchImpl: GhcrFetch) {
+	return fetchImpl(`${GHCR_HOST}${path}`, {
+		method: 'HEAD',
+		headers: { accept: MANIFEST_ACCEPT, authorization: `Bearer ${registryToken}` },
+		redirect: 'manual'
+	});
+}
+
+/**
  * Can the image be read, and by whom?
  *
  * Anonymous first, always: a public package is readable by everyone and the
@@ -143,20 +212,23 @@ export interface CheckImageAccessInput {
  * anonymous fails is the token tried, and only then is the token's shape
  * checked — a public image needs no token and reporting one as broken would be
  * noise.
+ *
+ * Both reads go through `ghcr.io/token` first (see the module docstring): the
+ * anonymous one for an anonymous registry token, the authenticated one with the
+ * pull token as Basic credentials. A `/token` refusal is "not readable this way",
+ * never a throw.
  */
 export async function checkImageAccess(input: CheckImageAccessInput, fetchImpl: GhcrFetch): Promise<GhcrAccessResult> {
-	const path = manifestPath(input.imageRepository, input.tag);
-	if (!path) {
+	const reference = parseGhcrReference(input.imageRepository, input.tag);
+	if (!reference) {
 		return { visibility: 'unknown', readable: false };
 	}
+	const path = registryManifestPath(reference);
 
-	const anonymous = await fetchImpl(`${GHCR_HOST}${path}`, {
-		method: 'HEAD',
-		headers: { accept: MANIFEST_ACCEPT },
-		redirect: 'manual'
-	});
+	const anonymousToken = await requestRegistryToken(reference.name, fetchImpl);
+	const anonymous = anonymousToken ? await headManifest(path, anonymousToken, fetchImpl) : null;
 
-	if (anonymous.status === 200) {
+	if (anonymous?.status === 200) {
 		const digest = anonymous.headers.get('docker-content-digest');
 		return {
 			visibility: 'public',
@@ -172,13 +244,10 @@ export async function checkImageAccess(input: CheckImageAccessInput, fetchImpl: 
 	}
 
 	const tokenCheck = await checkPullToken(input.pullToken, fetchImpl);
-	const authenticated = await fetchImpl(`${GHCR_HOST}${path}`, {
-		method: 'HEAD',
-		headers: { accept: MANIFEST_ACCEPT, authorization: `Bearer ${input.pullToken}` },
-		redirect: 'manual'
-	});
+	const registryToken = await requestRegistryToken(reference.name, fetchImpl, input.pullToken);
+	const authenticated = registryToken ? await headManifest(path, registryToken, fetchImpl) : null;
 
-	const readable = authenticated.status === 200;
+	const readable = authenticated?.status === 200;
 	const digest = readable ? authenticated.headers.get('docker-content-digest') : null;
 
 	return {
@@ -200,6 +269,24 @@ export async function checkImageAccess(input: CheckImageAccessInput, fetchImpl: 
  * the honest answer for an image this plugin cannot speak for.
  */
 export function manifestPath(imageRepository: string, tag: string): string | null {
+	const reference = parseGhcrReference(imageRepository, tag);
+	return reference ? registryManifestPath(reference) : null;
+}
+
+/** A GHCR repository name and tag this plugin may send a request about — both already validated. */
+interface GhcrReference {
+	/** `<owner>/<repo>[/…]`, lower-cased: the `/v2/<name>/…` segment and the `/token` scope's name. */
+	readonly name: string;
+	readonly tag: string;
+}
+
+/**
+ * The validated name and tag, or `null` for anything {@link manifestPath} refuses.
+ *
+ * Shared by the manifest path and the `/token` scope, so the two can never name
+ * different repositories and neither is built from anything unvalidated.
+ */
+function parseGhcrReference(imageRepository: string, tag: string): GhcrReference | null {
 	const repository = (imageRepository ?? '').trim().toLowerCase();
 	const reference = (tag ?? '').trim();
 	if (repository.length === 0 || reference.length === 0) return null;
@@ -212,5 +299,10 @@ export function manifestPath(imageRepository: string, tag: string): string | nul
 	if (!/^[a-z0-9._-]+(\/[a-z0-9._-]+)+$/.test(name)) return null;
 	if (!/^[A-Za-z0-9._-]+$/.test(reference)) return null;
 
-	return `/v2/${name}/manifests/${reference}`;
+	return { name, tag: reference };
+}
+
+/** `/v2/<name>/manifests/<tag>` for an already-validated reference. */
+function registryManifestPath(reference: GhcrReference): string {
+	return `/v2/${reference.name}/manifests/${reference.tag}`;
 }
