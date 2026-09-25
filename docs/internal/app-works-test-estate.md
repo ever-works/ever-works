@@ -266,6 +266,12 @@ real open item, not a formatting gap.
 | `EVER_WORKS_E2E_FAKES`, `APW_E2E_GITHUB_FAKE_URL`                | no           | PR lanes only — no external value needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `APW_E2E_KIND_KUBECONFIG_PATH`                                   | no           | PR-cluster lane only — generated locally, mirrors `KUBECONFIG_E2E_PATH`                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
+**Update, 2026-09-26.** The Blueprints named in the `APW_E2E_UMAMI_REPO` / `APW_E2E_CALDIY_REPO` row have changed
+since this survey: the Cal Blueprint is now `ever-works/cal-template` (renamed from `cal-diy-template`), and it and
+`ever-works/umami-template` are **public** with the topic `ever-works-app-blueprint`. The two variable names are
+unchanged (they are ACCEPTANCE.md's), and the long-lived fork-space repositories they name still have to be
+created once by a person.
+
 ### 4.4 Platform-side switches the lanes depend on (deployment configuration, not lane secrets)
 
 The lanes cannot pass without these on the **dev** and **stage** deployments. They are process environment /
@@ -360,6 +366,11 @@ Only `main` exists. The dev and stage catalog pin therefore has nothing to point
 `private=true`, `ever-works/app-fixture-hello-template` `private=true`, `ever-works/cal-diy-template`
 `private=true`, `ever-works/umami-template` `private=true` — all with default branch `main`, all matching the
 "already exists, do not re-create" table.
+
+Re-measured 2026-09-26: `ever-works/templates` still has only `main`. `ever-works/platforms`,
+`ever-works/umami-template` and `ever-works/cal-template` (the renamed `cal-diy-template`) are now **public**;
+`ever-works/app-fixture-hello-template` is still private and is not part of the catalog. `ever-works/templates` is
+now a pure listing (`manifest.json`, schemas, `licenses.yml` and a validator) with no per-template folders.
 
 ### 5.5 The connected account's token cannot do every step in the permission matrix
 
@@ -601,3 +612,4 @@ $r = Invoke-WebRequest 'https://api.github.com/user' -Headers @{ Authorization =
 | Date       | Change                                                                                                                                                                                                                           |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-17 | Created. Two Organizations (`app-works-dev`, `app-works-stage`) provisioned under the pre-existing Tenant; GitHub fork space identified as the connected `evereq` OAuth account; gaps recorded in §5. Not committed, not pushed. |
+| 2026-09-26 | Repository names and visibility re-measured (§4.3 note, §5.4): `cal-template` (was `cal-diy-template`), `umami-template` and `platforms` public; the fixture template private.                                                   |

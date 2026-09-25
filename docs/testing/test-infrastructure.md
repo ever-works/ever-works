@@ -339,14 +339,35 @@ in a `beforeEach`.
 
 ## CI Workflows
 
-| Workflow                              | File                            | Triggers                                                          | What it runs                                                                                                                                                    |
-| ------------------------------------- | ------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lint, build, unit + integration tests | `.github/workflows/ci.yml`      | every push + every PR to `main` / `develop` / `stage`             | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**) |
-| Playwright e2e                        | `.github/workflows/e2e.yml`     | push to `develop` / `stage` / `main` + manual `workflow_dispatch` | Boots a dev API + Web, then runs every spec under `apps/web/e2e/`                                                                                               |
-| k8s plugin e2e                        | `.github/workflows/k8s-e2e.yml` | manual + PRs touching `packages/plugins/k8s`                      | k8s-specific provider tests                                                                                                                                     |
+| Workflow                              | File                            | Triggers                                              | What it runs                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint, build, unit + integration tests | `.github/workflows/ci.yml`      | every push + every PR to `main` / `develop` / `stage` | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**), then the App Works e2e harness unit specs (`pnpm --filter ever-works-web test:e2e-harness`) |
+| Playwright e2e                        | `.github/workflows/e2e.yml`     | push to `stage` + manual `workflow_dispatch`          | Boots a dev API + Web, then runs every spec under `apps/web/e2e/` across 32 shards; a second job, `e2e-app-works-flags-on`, runs the two App Works specs that need switches the shards keep off                                                              |
+| k8s plugin e2e                        | `.github/workflows/k8s-e2e.yml` | manual + PRs touching `packages/plugins/k8s`          | k8s-specific provider tests                                                                                                                                                                                                                                  |
 
-The Playwright workflow is deliberately gated to long-lived branches and
-manual dispatch because a full run takes ~30 min on `ubicloud-standard-8`.
+The Playwright workflow is deliberately gated to `stage` pushes and
+manual dispatch: it has no `pull_request` trigger and no `develop` or
+`main` push trigger, because its 32 shards ask the runner pool for a lot
+of capacity at once (the reasoning is in the workflow file's header).
 For PR-time fast feedback, push to a feature branch and use the
 **Run workflow** button on the E2E Tests workflow if you need to verify
 something before merge.
+
+The 32-shard matrix runs with the App Launcher and the Ever Works deploy
+provider switched **off**, on purpose: the launcher's flag-off lane and
+`flow-deploy-capability-contract.spec.ts` need them off. The
+`e2e-app-works-flags-on` job runs in the same workflow on one shard with
+`EVER_WORKS_APP_LAUNCHER_ENABLED=true`, `DEPLOY_EVER_WORKS_ENABLED=true`,
+an apps apex and a checked-in platform-catalog fixture server
+(`apps/web/e2e/fakes/platform-catalog/`, port 4084), and runs only
+`flow-app-launcher-apps.spec.ts` and `flow-managed-subdomain-allocation.spec.ts`.
+Those two specs read the switches from the API: on the matrix they skip
+the cases by name, and on the flags-on job `APW_E2E_FLAGS_ON_LANE=1`
+turns a switch that reads off into a failure, so that job cannot go green
+by skipping. Its environment is the matrix's plus seven named deltas, and
+`apps/web/e2e/fakes/platform-catalog/__tests__/flags-on-lane.unit.spec.ts`
+fails on any other difference, so edit the two together. That spec also
+fails when the apps apex is one `config.everWorks.apps.getDomain()` refuses:
+an apex under `EVER_WORKS_DOMAIN` (`apps.e2e.local` under `e2e.local`) is
+refused, so the job uses `apps-e2e.local`. It runs in `ci.yml`'s harness
+step above.

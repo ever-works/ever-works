@@ -68,6 +68,7 @@ as well as the line, so a moved line is re-findable: search the heading, then re
 | ------------------------------------------------- | ------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
 | `work_deployments`                                | APW-06 | `1792060000000` | 5 nullable columns: `buildId`, `componentStatuses`, `smokeResult`, `appTarget`, `appRender`                                        | rides the existing `deployments.jsonl`        | [`APW-06/plan.md`](./APW-06-app-runtime/plan.md) §7.1 · §7.3  |
 | `tasks`                                           | APW-08 | `1792080000000` | 6 columns: `mergeCommitSha`, `deliveryState`, `deliveryBuildId`, `deliveryDeploymentId`, `deliveryUpdatedAt`, `deliveryClosedById` | rides the existing `data/tasks/tasks.jsonl`   | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.1         |
+| `tasks`                                           | APW-08 | `1792110100000` | 1 column: `branchGuardRefusal` text NULL (added 2026-09-25; stamped outside the APW-08 block, see §4)                              | rides the existing `data/tasks/tasks.jsonl`   | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.5         |
 | `goals`                                           | APW-08 | `1792080100000` | 1 column: `workId uuid NULL`                                                                                                       | rides `data/missions/goals.jsonl`             | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.2         |
 | `missions`                                        | APW-08 | `1792080200000` | 3 columns: `outputMode`, `taskOutput`, `taskOutputNoticeAt`                                                                        | rides `data/missions/missions.jsonl`          | [`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §3.3         |
 | `organizations`                                   | APW-04 | `1792040100000` | 1 column: `appProvisionCaps` (simple-json, nullable)                                                                               | rides `data/organizations/organization.jsonl` | [`APW-04/tasks.md`](./APW-04-app-provisioner/tasks.md) T41    |
@@ -493,19 +494,21 @@ nullable columns and the index on `buildId`; `down()` drops only them.
 
 ### 3.2 `tasks` — APW-08
 
-| Column                 | Type             | Default | Why                                                                       |
-| ---------------------- | ---------------- | ------- | ------------------------------------------------------------------------- |
-| `mergeCommitSha`       | varchar(64) NULL | NULL    | the commit a Build/Deployment must contain                                |
-| `deliveryState`        | varchar(24) NULL | NULL    | one of `TASK_DELIVERY_STATES`; `NULL` = not tracked (every existing Task) |
-| `deliveryBuildId`      | uuid NULL        | NULL    | `work_builds.id` that decided the state — no FK                           |
-| `deliveryDeploymentId` | uuid NULL        | NULL    | `work_deployments.id` that decided it — no FK                             |
-| `deliveryUpdatedAt`    | timestamptz NULL | NULL    | reconciler ordering and stale detection                                   |
-| `deliveryClosedById`   | uuid NULL        | NULL    | who chose **Close anyway**                                                |
+| Column                 | Type             | Default | Why                                                                           |
+| ---------------------- | ---------------- | ------- | ----------------------------------------------------------------------------- |
+| `mergeCommitSha`       | varchar(64) NULL | NULL    | the commit a Build/Deployment must contain                                    |
+| `deliveryState`        | varchar(24) NULL | NULL    | one of `TASK_DELIVERY_STATES`; `NULL` = not tracked (every existing Task)     |
+| `deliveryBuildId`      | uuid NULL        | NULL    | `work_builds.id` that decided the state — no FK                               |
+| `deliveryDeploymentId` | uuid NULL        | NULL    | `work_deployments.id` that decided it — no FK                                 |
+| `deliveryUpdatedAt`    | timestamptz NULL | NULL    | reconciler ordering and stale detection                                       |
+| `deliveryClosedById`   | uuid NULL        | NULL    | who chose **Close anyway**                                                    |
+| `branchGuardRefusal`   | text NULL        | NULL    | why the change rules refused a change that reached the remote (≤ 4,000 chars) |
 
 Indexes: `idx_tasks_delivery_due (deliveryState, deliveryUpdatedAt)` and `uq_tasks_work_merge_commit
 (workId, mergeCommitSha)` UNIQUE **partial** `WHERE "mergeCommitSha" IS NOT NULL` — makes "merge recorded
 once" (S29) a database guarantee. Migrations `1792080000000-AddTaskDeliveryState.ts`,
-`1792080100000-AddGoalWorkScope.ts`, `1792080200000-AddMissionTaskOutput.ts`.
+`1792080100000-AddGoalWorkScope.ts`, `1792080200000-AddMissionTaskOutput.ts`; `branchGuardRefusal` is added by
+`1792110100000-AddTaskBranchGuardRefusal.ts` (added 2026-09-25, see §4).
 
 ### 3.3 `goals` — APW-08
 
@@ -574,9 +577,15 @@ newest migration on `develop` when the programme was authored was
 | 15    | `1792100100000-CreateAppsTierQuarantineAndSignals.ts`                                              | APW-10 | 01              |
 | 16    | `1792100200000-CreateAppsTierQuotaAndMetering.ts`                                                  | APW-10 | 02              |
 | 17    | `1792110000000-CreateAppLauncherPreferences.ts`                                                    | APW-11 | 00              |
+| 17a   | `1792110100000-AddTaskBranchGuardRefusal.ts` (1 column on `tasks`: `branchGuardRefusal text NULL`) | APW-08 | 11/01           |
 | 18    | `1792120000000-CreateExternalIdentities.ts`                                                        | APW-12 | 00              |
 | 19    | `1792120100000-AddExternalIdentityToSessions.ts`                                                   | APW-12 | 01              |
 | —     | _(none)_                                                                                           | APW-13 | —               |
+
+**Row 17a (added 2026-09-25).** `1792110100000-AddTaskBranchGuardRefusal.ts` belongs to APW-08 but is stamped after
+APW-11's `1792110000000` by coordinator direction, because APW-08's slots `1792080000000`–`1792080300000` stay reserved
+for their planned migrations. It is one nullable `ADD COLUMN` with no dependency on anything APW-11 did, and it rides
+the existing `data/tasks/tasks.jsonl` export.
 
 **The re-stamp procedure (binding).** Every plan repeats it and every task carries it:
 

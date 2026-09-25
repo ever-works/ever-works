@@ -39,7 +39,8 @@ that section.
 
 **Pages that are drafts stay where they are until their gate passes.** `docs/specs/features/app-works/`
 is a spec tree, not a published directory — nothing under it is served by the docs site — so a draft can live
-there safely, which is exactly what both existing drafts do.
+there safely, which is exactly what both existing drafts do. _(Corrected 2026-09-26: the spec tree **is**
+served, as orphan pages the sidebar does not list — see §10 item 9. The drafts are still unlisted and unpublished.)_
 
 ---
 
@@ -371,6 +372,18 @@ Two further corrections that are **not** renames and must not become renames:
 | 6   | Correct the stale catalog repository name in [TRACKER.md](./TRACKER.md) `:16` (§9).                                                                                                 | program lead      | —                                                    |
 | 7   | Decide the launcher web component's publication location, which changes where its documentation lives (README §8 question 7; [CLARIFICATIONS.md](./CLARIFICATIONS.md) `CL-48`).     | owner             | the owner's answer                                   |
 | 8   | Decide whether the App Works pages join the manual's `start-here` section or a program-specific order — §6.4 places them by reader intent, and the manual's six sections are fixed. | program lead      | —                                                    |
+| 9   | Decide whether `docs/specs/**` and `docs/internal/**` may stay URL-reachable on docs.ever.works (they are served as orphan pages today — see the note below this table).            | owner             | —                                                    |
+
+**Item 9, the evidence (recorded 2026-09-26; nothing was changed).** The docs site serves every markdown file under
+`docs/`, whether or not the sidebar lists it: `apps/docs/docusaurus.config.ts:128-143` sets `path: '../../docs/'` and
+`routeBasePath: '/'` with no `exclude`, and `.deploy/docker/docs/Dockerfile:58` copies all of `docs/` into the image.
+Only `_`-prefixed directories (`_build-artifacts/`, for example) are skipped, by Docusaurus's default exclude. Checked
+live on 2026-09-26: `https://docs.ever.works/internal/COVERAGE-STATUS` (after a trailing-slash redirect) and
+`https://docs.ever.works/specs/` answer `200`, and a made-up path answers `404`. So `docs/specs/**` and `docs/internal/**` are **reachable orphan pages** — hidden
+from the navigation, not from the site — and once this branch reaches `main` the whole App Works spec tree and
+`docs/internal/app-works-*.md` become URL-reachable. This corrects §1's sentence that nothing under the spec tree is
+served. The owner decides whether that is acceptable, or whether the docs build should exclude those trees; this plan
+does not act on it.
 
 ---
 

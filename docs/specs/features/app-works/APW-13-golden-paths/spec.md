@@ -423,12 +423,12 @@ and, from a user browsing the Apps catalog:
 
 ### 5.1 Already in Ever Works — extended here
 
-| Entity                            | Today                                                                    | This epic adds                                                                                       |
-| --------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **App Blueprint** (catalog entry) | Defined by APW-03: maps upstream repositories to a Blueprint repository. | Three Blueprints; the verification evidence and status that the catalog displays.                    |
-| **Blueprint repository**          | Defined by the program: one App Blueprint, never upstream source.        | `ever-works/app-fixture-hello-template`, `ever-works/umami-template`, `ever-works/cal-diy-template`. |
-| **App Work, Build, Deployment**   | Defined by APW-01, APW-05, APW-06.                                       | Nothing — the lanes create and read them exactly as a user does.                                     |
-| **Activity**                      | The record of what happened.                                             | Nothing — it is the lanes' primary evidence.                                                         |
+| Entity                            | Today                                                                    | This epic adds                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| **App Blueprint** (catalog entry) | Defined by APW-03: maps upstream repositories to a Blueprint repository. | Three Blueprints; the verification evidence and status that the catalog displays.                |
+| **Blueprint repository**          | Defined by the program: one App Blueprint, never upstream source.        | `ever-works/app-fixture-hello-template`, `ever-works/umami-template`, `ever-works/cal-template`. |
+| **App Work, Build, Deployment**   | Defined by APW-01, APW-05, APW-06.                                       | Nothing — the lanes create and read them exactly as a user does.                                 |
+| **Activity**                      | The record of what happened.                                             | Nothing — it is the lanes' primary evidence.                                                     |
 
 ### 5.2 New
 

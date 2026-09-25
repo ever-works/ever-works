@@ -251,6 +251,11 @@ At most 3 provider reads on the probe path (FR-43); results cached `apps-bluepri
 for 1 h (hit) / 10 min (miss). APW-01's `POST /api/works/app-source/inspect` calls `resolve`; APW-03 exposes no
 separate resolve endpoint, and resolving records no Activity (inspect has no side effects).
 
+_Clarified 2026-09-25 (T26's first slice, `781f9a2e5`)._ An explicit id with no manifest ⇒ the probe name
+`ever-works/<blueprintId>-template` (`catalog.md` §5 naming), and the file must name that id. Every path reads only
+`.works/works.yml` (`APP_BLUEPRINT_SPEC_PATH`). The cache is **in-process** (500 entries, oldest evicted, same TTLs)
+rather than a `CACHE_MANAGER` key, because `AppWorksModule`, where the adapter is bound, has no cache module.
+
 **Apply** — `AppBlueprintApplyService` _(new)_, always inside job `app-blueprint-apply`:
 
 0. **Request** (`request(workId, blueprintId, { userId, matchSource, confirmForkMatch })`, synchronous, before

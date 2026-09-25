@@ -630,6 +630,9 @@ export interface PrepareRepositoryInput {
 	readonly values: readonly BuildValue[];
 	readonly previouslyWrittenSecretNames: readonly string[];
 	readonly lastWrittenWorkflowSha256: string | null;
+	/** The workflow pull request §3.1b recorded; echoed back on `pullRequestExists` (added 2026-09-25, ACC-05-02). */
+	readonly workflowPullRequestNumber?: number | null;
+	readonly workflowPullRequestUrl?: string | null;
 	readonly settings: Record<string, unknown>;
 	/** spec.checks[] (APW-03 schema §17), already validated; empty → no checks job (R-9). */
 	readonly checks: ReadonlyArray<{ name: string; command: string; required: boolean; timeoutSeconds: number }>;
@@ -684,7 +687,8 @@ export interface BuildSnapshot {
 	readonly checksBillableMinutes?: number; // jobs of the `checks` matrix (R-9); never affects `status`
 	readonly runnerLabel?: string;
 	readonly logsUrl?: string;
-	readonly image?: { repository: string; digest: string; tags: string[]; confirmed: boolean };
+	// `pushLogDigest?` (added 2026-09-25): the digest the build job's `Push` step logged — §4.8's no-token fallback
+	readonly image?: { repository: string; digest: string; tags: string[]; confirmed: boolean; pushLogDigest?: string };
 	readonly secretCheck?: 'passed' | 'failed' | 'not_needed';
 	readonly failure?: { class: string; detail?: Record<string, unknown>; excerpt: string[] };
 	readonly verification?: {
@@ -749,6 +753,16 @@ export function isBuildPlugin(plugin: IPlugin): plugin is IBuildPlugin {
 plugin; `prepareRepository` receives a `RepositoryWriter` (`getFileContent`, `commitFiles`, `createBranch`,
 `createPullRequest`) bound by the facade to `GitFacadeService`, so there is one clone-free commit implementation
 (APW-03's `commitFiles?`). `checkImageAccess?` and the writer parameter are additive to the CONTRACTS row.
+
+**The pull-request fields (added 2026-09-25, `e74f6e045`; ACC-05-02).** `PrepareRepositoryInput` carries the
+preparation row's `workflowPullRequestNumber` / `workflowPullRequestUrl` (§3.1b), and the runner passes them on every
+pass. The plugin always calls `createPullRequest` on the pull-request path (§4.6 step 3); a refusal with the writer's
+`pullRequestExists` code (`RepositoryWriteErrorCode` in `packages/plugin/src/contracts/capabilities/build.interface.ts`,
+or GitHub's raw 422 "A pull request already exists" as a fallback) means the head already has an **open** pull request,
+and the plugin answers `pullRequestUpdated` with the recorded number and URL echoed back. The recorded values are
+never used to decide that a pull request is still open — only the provider can say that — so a recorded pull request
+that was closed gets a new one. `BuildSnapshot.image.pushLogDigest?` (added 2026-09-25, `5a75913bc`) is §4.8's
+no-token fallback, carried to the platform instead of being decided by the plugin.
 
 ### 4.2 Registration
 
@@ -1311,7 +1325,8 @@ polling (a **Refresh** button remains). Filters, page and open drawer (`?build=<
 
 `packages/agent/src/tasks/app-build-prepare-dispatcher.ts` + `app-build-prepare.types.ts` (`{ workId, buildId?,
 reason: 'specApplied' | 'envChanged' | 'rebuild' | 'verification' | 'pullTokenSaved' | 'workflowMerged' |
-'settingsChanged' | 'actionsEnabled' | 'coalesced' }`) and
+'settingsChanged' | 'actionsEnabled' | 'coalesced' | 'sweep' }` — `sweep` is the sweep's re-drive of a requested Build
+nothing dispatched, §9.2, added 2026-09-25) and
 `app-build-watch-dispatcher.ts` + `app-build-watch.types.ts` (`{ buildId, reason: 'event' | 'dispatched' | 'sweep' }`),
 each with a `Symbol()` token, exported from `packages/agent/src/tasks/index.ts` and listed in `_tasks-symbols.ts`.
 Both interfaces follow `work-import-dispatcher.ts` and return `Promise<string | null>` — `null` means "no runtime took
@@ -1326,6 +1341,8 @@ they run `AppBuildPrepareRunner.run(payload)` / `AppBuildWatchRunner.run(payload
   (FR-41) and §7.5's 200 ms database budget both still hold;
 - overlap is guarded by exactly the same `app-build-prepare:<workId>` lock and `watchLeaseUntil` lease, so an in-process
   run and a dispatched one cannot double-fire;
+- a prepare requested while an in-process prepare of the same Work is running is re-run once, as `coalesced`, after
+  it settles — never concurrently (clarified 2026-09-25);
 - in-process watch runs are capped at 10 at a time per API process; the excess is left to the next sweep tick, which
   already covers every silent non-terminal Build (§7.4);
 - telemetry counter `app_build_dispatch_fallback` (`job: prepare | watch`), added to §9.1.
@@ -1354,6 +1371,10 @@ they run `AppBuildPrepareRunner.run(payload)` / `AppBuildWatchRunner.run(payload
    bootstrap file of §4.6 step 0 before dispatching. `app-build-prepare` is where the Provisioner's "no workflow yet"
    case stops being a dead end.
 6. For a requested manual/verification Build: `startBuild`, persist `dispatchedAt`, dispatch `app-build-watch`.
+   A Build is claimed before `startBuild` (added 2026-09-25):
+   `UPDATE … SET dispatchedAt = :now WHERE id = :id AND status = 'queued' AND dispatchedAt IS NULL` (0 rows → not
+   started). A `startBuild` that throws releases the claim only while
+   `status = 'queued' AND providerRunId IS NULL AND dispatchedAt = :claimedAt`.
 7. **Retry blocked Builds (added 2026-09-17, `APW05-G15`).** Every prepare run does this once steps 1–5 finish with no
    repository-level block. It selects the App Work's `blocked` Builds with trigger `manual`, newest first — verification
    Builds are never touched (APW-04 asks again through `startVerification`, because the plan is not stored), and push and
@@ -1368,7 +1389,9 @@ buildId?)` is the only way anything asks for a prepare — the listeners, Rebuil
 use it. It first saves its own durable change (the Build row, or APW-07/APW-03 state already committed before the event
 fires), then bumps the preparation row's `prepareSeq` (§3.1b), and only after that dispatches. `app-build-prepare`
 therefore runs, at most, three passes against `DistributedTaskLockService` key `app-build-prepare:<workId>` (held ≤ 5
-minutes):
+minutes: `ttlMs` = `maxLifetimeMs` = 5 min, so the heartbeat stops at the hard deadline; a pass starts no new provider
+call — delivery, `setActionsPermissions`, `startBuild` — after 4 min 30 s, reports `leaseExpired`, and dispatches one
+`coalesced` prepare — clarified 2026-09-25):
 
 - each pass reads the row's `prepareSeq` before it starts and compares it after it finishes;
 - the pass numbers Builds from the database — every `queued` manual or verification Build of the Work with
@@ -1376,7 +1399,9 @@ minutes):
 - a dispatch that cannot acquire the lock exits as `skipped`; that is safe because the requester's `prepareSeq` bump is
   already durable and the holder re-reads it after releasing;
 - if `prepareSeq` moved again after the third pass, one `app-build-prepare { reason: 'coalesced' }` is dispatched and the
-  job exits.
+  job exits. That dispatch — the only one a run makes — is made after the lock is released; the holder also makes it
+  when its re-read after releasing shows `prepareSeq` moved since its last reading, or when the pass reached its lease
+  deadline. A run that failed before its first `prepareSeq` read makes no coalesced dispatch (clarified 2026-09-25).
 
 `DistributedTaskLockService.runExclusive`, `refresh` and `release` keep their current shape (the lock value stays the
 token); the coalescing signal is the row column, not a flag on the lock.
@@ -1400,7 +1425,10 @@ checksBillableMinutes } })`), publish the terminal event (§7.8 — the explicit
 
 Selects up to 200 Builds with `status IN (queued, running)` and `lastObservedAt < now() − 90 s` (or NULL and
 `dispatchedAt < now() − 90 s`), oldest first, and dispatches `app-build-watch` for each. Builds past `startedAt +
-timeoutMinutes + 30` (or `queuedAt + 5 min + timeoutMinutes + 30` when never adopted) are failed as `lost`. Also
+timeoutMinutes + 30` (or `max(queuedAt, dispatchedAt) + 5 min + timeoutMinutes + 30` when never adopted — the
+never-adopted clock starts at the later of the two, clarified 2026-09-25) are failed as `lost`. A queued manual or
+verification Build with `dispatchedAt` NULL and a queue age in [90 s, 450 s) gets `requestPrepare(workId, 'sweep')`,
+once per Work per tick; that is §9.2's "3 times" (added 2026-09-25). Also
 re-checks `digestUnconfirmed` Builds whose App Work gained a pull token, and deletes a verification Build's per-run
 prompted-value secret still present `30 + 10` minutes after `startedAt` (§4.10). Task file
 `packages/tasks/src/tasks/trigger/app-build-sweep.task.ts`, same shape as `deploy-ready-poller.task.ts`.
@@ -1412,11 +1440,13 @@ pass from the API process:
 - `@Cron(APP_BUILD_SWEEP_CRON)` with `APP_BUILD_SWEEP_CRON = '*/2 * * * *'` exported from
   `packages/contracts/src/apps/builds.ts` and used by the Trigger.dev task too, so the two can never drift;
 - it returns early when `config.trigger.shouldUseTrigger()` is true, so exactly one of the two runs the pass;
-- the pass is wrapped in `DistributedTaskLockService.runExclusive('app-builds:sweep', …, { ttlMs: 90_000, onLocked: debug
-log })` and calls `AppBuildSweepService.sweep()`;
+- it calls `AppBuildSweepService.runSweep()`, which takes
+  `runExclusive('app-builds:sweep', …, { ttlMs: 90_000, maxLifetimeMs: 300_000 })` inside the service (changed
+  2026-09-25: the Trigger.dev task reaches the service over the internal RPC hop, where a lock callback cannot cross,
+  so neither caller wraps it in a second `runExclusive`);
 - its watch dispatches go through `dispatchWatch`, so they take the in-process fallback above when they return `null`;
-- same gating and lock shape as `SkillReadinessSweepCronService`; registered in
-  `apps/api/src/app-builds/app-builds.module.ts`.
+- same gating as `SkillReadinessSweepCronService` (the lock, unlike there, is taken inside the service, so the cron
+  wraps nothing in `runExclusive`); registered in `apps/api/src/app-builds/app-builds.module.ts`.
 
 ### 7.4a Run discovery — **(added 2026-09-17, `APW05-G01`/`GAP-07`)**
 
@@ -1624,7 +1654,7 @@ or checks, no repository names, no commit messages, no check commands.
 
 | Failure                                              | Behaviour                                                                                                                                                                                                                                                                |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GitHub API 5xx / rate limit during prepare           | Job retries with the runtime's backoff 3 times over 10 minutes; a requested Build stays `queued`.                                                                                                                                                                        |
+| GitHub API 5xx / rate limit during prepare           | A requested Build stays `queued`, and the "3 times" retry is delivered by the sweep's re-drive (§7.4: `requestPrepare(workId, 'sweep')` while the queue age is in [90 s, 450 s)), not by job-runtime retries (clarified 2026-09-25).                                     |
 | Git connection revoked                               | `blocked gitConnectionMissing`; Activity names the App Work, not the token.                                                                                                                                                                                              |
 | Repository archived, deleted or access lost          | `blocked repositoryUnavailable`; the sweep stops polling its Builds after marking them `lost`.                                                                                                                                                                           |
 | Webhook delivered twice                              | Unique `(plugin, runId, attempt)` makes the second upsert a no-op.                                                                                                                                                                                                       |

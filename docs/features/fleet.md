@@ -582,8 +582,12 @@ The Task's **primary** repository is a Work repository, not a Settings → Repos
 takes its env files (and its env grants, below) from the enabled entry for **the same repository on
 the same host** as the clone URL your Git provider reports for it. Spellings that differ only by
 `.git`, a trailing slash, letter case or HTTPS/SSH form are the same entry; an entry for the same
-`owner/repository` on **another host** — a mirror — is not, and its files and grants never reach the
-primary (the API log says so, naming both hosts). Register the entry on the provider's own clone host.
+`owner/repository` on **another host** — a mirror — is not, so the primary takes neither its files
+nor its grants (the API log says so, naming both hosts). Register the entry on the provider's own
+clone host. One exception: if that mirror entry is also **attached to the run's Agent**, or listed
+as one of the Task's **extra repositories**, it is not mounted (the Task already has that repository
+as its primary), but its env grants still join the run's grants, like every repository of the
+run's — see _Env grants_ below.
 Two enabled entries for the primary **refuse the plan** and name both: disable or remove all but one,
 so which `.env` lands in the checkout is never decided by listing order.
 

@@ -93,13 +93,13 @@ Licenses that require offering source to network users produce a visible source 
   the old name is an alias and GitHub reports the repository under its new name.
 - **S3 — A fresh fork gets the Blueprint as a commit.** **Given** the user creates a Fork App Work with the
   Cal.diy Blueprint, **when** the fork is ready, **then** one commit titled
-  `chore(ever-works): apply App Blueprint cal-diy 1.0.0` adds `.works/works.yml` — the recorded source and the
+  `chore(ever-works): apply App Blueprint cal 1.0.0` adds `.works/works.yml` — the recorded source and the
   Blueprint's App spec together — and the Blueprint's overlay files, made without cloning the repository; Activity
   records **Blueprint matched** before **Blueprint applied**; and Settings → App spec shows **App spec is valid.**
   within 60 seconds.
 - **S4 — A linked repository gets a pull request.** **Given** a Link App Work on the user's own
   repository, **when** a Blueprint is applied, **then** nothing is pushed to the default branch; a pull
-  request from `ever-works/blueprint/cal-diy-1.0.0` is opened and linked from the App spec page.
+  request from `ever-works/blueprint/cal-1.0.0` is opened and linked from the App spec page.
 - **S5 — A hand edit is checked on push.** **Given** a valid effective spec, **when** the user pushes a
   commit that renames `port` to `replica` on the `web` component, **then** within 60 seconds the page reads **The App
   spec on main has 2 errors.**, lists `unknown_field` at `components › web › replica` (line 41, "Did you
@@ -692,7 +692,7 @@ action, focus returns to the opener.
 
 **Resolution, apply, upgrade**
 
-- [ ] **ACC-03-23** `calcom/cal.com` and `CALCOM/CAL.DIY` both resolve to `cal-diy`.
+- [ ] **ACC-03-23** `calcom/cal.com` and `CALCOM/CAL.DIY` both resolve to `cal`.
 - [ ] **ACC-03-24** A fork of a listed upstream resolves only with confirmation; an excluded tag resolves with the ref reason.
 - [ ] **ACC-03-25** The probe finds a topic-carrying template repository as Unlisted and ignores one without the topic, using at most 3 provider reads.
 - [ ] **ACC-03-26** A fresh Fork App Work receives exactly one commit with the spec and add-only overlays; a Link App Work receives a pull request and no push to its default branch.

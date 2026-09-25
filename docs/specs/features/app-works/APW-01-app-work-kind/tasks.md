@@ -888,7 +888,14 @@ _Refines spec FR-9 (all organizations) and adds the P2 items in [plan §11](./pl
 
 # Cross-phase closing tasks
 
-- [ ] **T36. Telemetry.**
+- [x] **T36. Telemetry.**
+      **Status (2026-09-25): done** (`781f9a2e5`). Landed: `packages/agent/src/app-works/app-works-telemetry.service.ts`
+      (`APP_WORKS_TELEMETRY_SINK`, `APP_WORKS_TELEMETRY_EVENTS`, `AppWorksTelemetryService`, `appWorkCreateOutcomeOf`),
+      provided and exported by `AppWorksModule`; emitters in the inspector, the create service, the ready handler and
+      `WorkLifecycleService.deleteWork`; API binding `AppWorksTelemetryBindingModule` (`@Global`, `useExisting`
+      `AnalyticsService`) imported by `ApiModule`. Specs: `__tests__/app-works.telemetry.spec.ts` (30 cases) and
+      `apps/api/src/telemetry/app-works-telemetry-binding.module.spec.ts`. The Done-when grep is empty. The outcome
+      union gained `failed` (plan §9.1).
       **Create** `packages/agent/src/app-works/app-works-telemetry.service.ts` — `AppWorksTelemetryService` with
       `track(event, props)` over an injected, `@Optional()`, env-configured sink
       (`APP_WORKS_TELEMETRY_SINK`, bound by the API to the existing PostHog client exactly as

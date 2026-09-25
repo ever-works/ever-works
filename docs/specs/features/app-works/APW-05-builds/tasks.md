@@ -292,6 +292,14 @@ page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`
       **Done when**: `pnpm --filter @ever-works/github-actions-build-plugin test -- failure-classifier` is green.
 
 - [ ] **T14. Registry access and the pull token.**
+      **Status (2026-09-25, wave 2):** the GHCR token exchange is in `ghcr-access.ts` (anonymous `/token` then `HEAD`
+      with the registry bearer; for a pull token, `/token` with Basic `x-access-token:<PAT>`), and the confirming half
+      is implemented and review-hardened: `AppBuildsService.finalize` confirms the digest through the facade binding's
+      `checkImageAccess` (bounded by `APP_BUILD_DIGEST_READ_TIMEOUT_MS`, 15 s), confirmation survives repeated
+      observations, a later confirmation clears a `digestMismatch`, a `manual`/`verification` Build keeps its dispatched
+      commit, and plan §4.8's no-token fallback reads `BuildSnapshot.image.pushLogDigest`. Still open: a caller for
+      `reconfirmDigest` (the §7.4 sweep recheck and the pull-token-save recheck), and the private path verified with a
+      real classic `read:packages` token (operator).
       **Create** `packages/plugins/github-actions-build/src/registry/ghcr-access.ts` — anonymous and token-authenticated
       manifest `HEAD` for `sha-<sha>`; token check via `GET /user` requiring `x-oauth-scopes` exactly `read:packages`;
       absent header → refused (fine-grained); expiry header parsed.
@@ -343,6 +351,11 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
       **Done when**: `pnpm --filter @ever-works/agent test -- build.facade` is green.
 
 - [ ] **T17. `AppBuildsService` and the deployable verdict.**
+      **Status (2026-09-25, wave 2):** `finalize`'s digest confirmation (T14's confirming half) and
+      `reconfirmDigest(buildId, { pushLogDigest? })`, which re-settles a `digestUnconfirmed` Build without publishing an
+      event, are implemented; nothing calls `reconfirmDigest` yet (the §7.4 sweep recheck and the pull-token-save
+      recheck). `requestRebuild` now goes through `requestPrepare`, so the `prepareSeq` bump lands before the dispatch,
+      and the in-process fallback re-runs a prepare requested while one is in flight once, as `coalesced` (plan §7.1).
       **Create** `packages/agent/src/app-builds/app-builds.service.ts` (`requestPrepare` with the `prepareSeq` marker of
       plan §7.2, `recordProviderRun(workId, run, source)` — the shared accept rules of plan §7.5, `requestRebuild` with
       10 s dedupe and 10/hour limit,
@@ -479,16 +492,27 @@ APP_BUILD_SWEEP_CRON })` from `@ever-works/contracts`, same shape as
       `packages/tasks/src/tasks/trigger/deploy-ready-poller.task.ts`), and **run discovery before the silent pass** by
       calling T21a's `AppBuildRunDiscoveryService` ([plan §7.4a](./plan.md), `APW05-G01`).
       **Create also** `apps/api/src/app-builds/app-build-sweep-cron.service.ts` — the same pass from the API process when
-      Trigger.dev is not the configured runtime, gated on `config.trigger.shouldUseTrigger()` and wrapped in
-      `DistributedTaskLockService.runExclusive('app-builds:sweep', …, { ttlMs: 90_000 })`, like
-      `SkillReadinessSweepCronService`; register it in `apps/api/src/app-builds/app-builds.module.ts`
-      ([plan §7.4](./plan.md), `APW05-G20`).
+      Trigger.dev is not the configured runtime, gated on `config.trigger.shouldUseTrigger()`, like
+      `SkillReadinessSweepCronService`: the cron calls `AppBuildSweepService.runSweep()`, which takes `app-builds:sweep`
+      itself (ttl 90 s); the cron does not wrap it in a second `runExclusive`, because the Trigger task reaches the
+      service over RPC, where a lock callback cannot cross (corrected 2026-09-25). Register it in
+      `apps/api/src/app-builds/app-builds.module.ts` (**new**, created by T21; T23 and T24 extend it) and import
+      `AppBuildsModule` in `apps/api/src/api.module.ts` ([plan §7.4](./plan.md), `APW05-G20`).
+      **Status (2026-09-25, first slice):** `AppBuildSweepService` runs two passes under `app-builds:sweep` (90 s
+      lease, 5 min hard lifetime): the §9.2 re-drive (a queued manual or verification Build with `dispatchedAt IS NULL`
+      and a queue age in [90 s, 450 s) gets `requestPrepare(workId, 'sweep')` once per Work) and the never-adopted
+      half of §7.4's lost rule (`providerRunId IS NULL`, open, past `max(queuedAt, dispatchedAt) + 5 min +
+      timeoutMinutes + 30` → `markLost`, then `finalize` only for rows the pass moved). The Trigger task and the API
+      cron fallback both call `runSweep()`. Still open in T21: the silent-Build watch dispatch, the adopted half of the
+      lost rule (`startedAt + timeoutMinutes + 30`), the `digestUnconfirmed` recheck, deleting orphaned verification
+      secrets and T21a's discovery — all in the same service. Dormant in production until a Work can be prepared (the
+      facade answers `pluginUnavailable`).
       **Test**: `packages/agent/src/app-builds/__tests__/app-build-sweep.service.spec.ts` — 250 silent Builds → 200
       dispatched, oldest first; a Build silent for 91 s is dispatched so a terminal status lands within the next 2-minute
       tick (≤ 3 min, ACC-05-11); lost thresholds for adopted and never-adopted Builds; `digestUnconfirmed` rechecked after
       a pull token is saved; an orphaned verification secret is deleted.
       `apps/api/src/app-builds/app-build-sweep-cron.service.spec.ts` — skipped when `shouldUseTrigger()` is true; runs
-      `sweep()` once under the lock when false; a held lock means skip; a sweep error is logged, not thrown; a watch
+      `runSweep()` once when false (the service takes the lock); a held lock means skip; a sweep error is logged, not thrown; a watch
       dispatch returning `null` runs the watch runner in-process with at most 10 concurrent (`APW05-G20`).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-build-sweep.service` and
       `pnpm --filter ever-works-api test -- app-build-sweep-cron.service` are green.
@@ -525,14 +549,15 @@ APP_BUILD_SWEEP_CRON })` from `@ever-works/contracts`, same shape as
       **Create** `apps/api/src/app-builds/app-builds.controller.ts`, `apps/api/src/app-builds/dto/app-builds.dto.ts`
       (`ListAppBuildsQueryDto` with `page`, `pageSize` 1–100, `status`, `trigger`, `branch`, `pullRequest`;
       `CreateAppBuildDto` with optional 40-hex `commitSha`; **`SaveAppBuildPullTokenDto` with a `token` string, for the
-      new `PUT /api/works/:id/builds/pull-token` route of plan §5 — `APW05-G07`**),
-      `apps/api/src/app-builds/app-builds.module.ts`.
+      new `PUT /api/works/:id/builds/pull-token` route of plan §5 — `APW05-G07`**).
+      **Modify** `apps/api/src/app-builds/app-builds.module.ts` — it already exists (created by T21 for the sweep cron,
+      corrected 2026-09-25); add the controller to it.
       Routes and codes exactly as [plan §5](./plan.md); `ensureCanView` / `ensureCanEdit` from
       `packages/agent/src/services/work-ownership.service.ts`; non-`app` kind → 404. **The list response's
       `workflow` field reads the preparation row** (`{ state: 'none', pullRequestUrl: null }` when there is none —
       `APW05-G03`), and the pull-token route delegates to `AppBuildPullTokenService`, returning its stable codes and never
       the token (`APW05-G07`).
-      **Modify** `apps/api/src/api.module.ts` to import `AppBuildsModule`.
+      `apps/api/src/api.module.ts` already imports `AppBuildsModule` (T21), so nothing is added there.
       **Test**: `apps/api/src/app-builds/app-builds.controller.spec.ts` — foreign id 404 on read, Rebuild and Cancel
       (ACC-05-24); viewer 403 on POST routes with code; 202 shape with `deduped` and a second POST inside 10 s returning the
       same Build (ACC-05-08); 429 `rebuildRateLimited` with `retryAfterMinutes`; 202 on cancel of a running Build and 409
@@ -735,8 +760,11 @@ BuildDetailDrawer` are green.
 # Cross-phase closing tasks
 
 - [ ] **T38. Telemetry.**
-      **Create** `packages/agent/src/app-builds/app-builds.telemetry.ts` emitting the events in [plan §9.1](./plan.md) through
-      the existing monitoring package; **Modify** `packages/agent/src/app-builds/app-builds.service.ts`,
+      **Create** `packages/agent/src/app-builds/app-builds.telemetry.ts` emitting the events in [plan §9.1](./plan.md)
+      through APW-01 T36's pattern: an `@Optional()` sink token bound by the API — reuse `APP_WORKS_TELEMETRY_SINK` /
+      `AppWorksTelemetryService` (`packages/agent/src/app-works/app-works-telemetry.service.ts`) rather than importing
+      the monitoring package, on which `packages/agent` takes no dependency (corrected 2026-09-25); **Modify**
+      `packages/agent/src/app-builds/app-builds.service.ts`,
       `app-build-sweep.service.ts` and `packages/plugins/github-actions-build/src/repo/workflow-writer.ts` (via a callback)
       to call it.
       **Test**: `packages/agent/src/app-builds/__tests__/app-builds.telemetry.spec.ts` — no event payload contains an env

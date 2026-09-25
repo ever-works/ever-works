@@ -246,8 +246,9 @@ cross-process serialization is unnecessary because the working copy is per proce
       the safety gate: the P0 adapter adds no gate of its own, and an Agent with an explicit `off` / `draft` / `ask`
       rung for that category is refused or held before the adapter runs. The P0 fix still ships for their other
       callers; on an App Work the adapter cannot bypass the change guard — `commitToRepo` refuses protected paths and
-      `.github/workflows/**` (`AppChangeGuard.assertPathsAllowed`) and `openPullRequest` runs
-      `AppChangeGuard.evaluate` before `createPullRequest` (T17).
+      `.github/workflows/**` (`AppWorkChangeGate.checkPaths` over the call's own files and content; as built,
+      2026-09-26) and `openPullRequest` runs `AppWorkChangeGate.evaluate` before `createPullRequest` (T17). Neither
+      tool reads `APP_WORKS_CLOUD_PUSH_ENABLED` (§2.5).
 - **Checks on a Fleet node.** `readFleetRepoDeclaredCommands` learns `kind: 'app'`: it parses `spec.checks`
   (mapped to `TaskAcceptanceCheck`: **the id the existing parser already mints — `repo/` + the declaration's
   position** — `kind: 'custom'`, `required`, `timeoutSec = timeoutSeconds` from APW-03's schema range 60–7,200,
@@ -444,6 +445,45 @@ APW-03's `isProtectedPath(spec, path)` so both epics match globs identically. Ap
 invalid head spec is itself a refusal. Size = Σ(additions + deletions) over non-lockfile
 files. Called from `finalizeRun` (before `openPullRequestForBranch`) and `finalizeRemotePush` (same place).
 Refusal → `branchState` stays `pushed`, Task → `BLOCKED`, `postSystemMessage` with the exact copy.
+
+**The cloud path is judged before the push, and is off by default (owner decision 2026-09-25, `86e1a3ddf`).**
+`TaskWorkspaceService.finalizeRun` no longer pushes an App Work branch before the change gate judges it. For an App
+Work with the gate bound, the cloud (API-side) run is committed locally (`push: false`), and then:
+
+- **Default — refused.** Until FR-12's isolated-run admission (T12) lands, cloud App Work pushes are off: nothing is
+  pushed, no pull request is opened, and the Task is blocked (`blocked-by-guard`) with a message naming FR-12 / T12
+  and the two ways forward (an enrolled Fleet node, or an operator allowing cloud pushes).
+- **`APP_WORKS_CLOUD_PUSH_ENABLED=true`** (exactly `'true'`, read per call through
+  `config.everWorks.apps.cloudPushEnabled()` from the API process's environment, never captured at import; a changed
+  value takes effect when the API restarts or is redeployed) turns on judge-before-push:
+  `WorkspaceFacadeService.branchChanges` reads the merge-base diff paths (`--no-renames`, both sides of a rename) and
+  the committed `.works/works.yml` blob at the local head sha; `AppWorkChangeGate.checkPaths` judges them with the
+  Task's labels (`AppWorkChangePathsInput.taskLabels`, the same app-provision parity as `evaluate`);
+  `finalize({ push: true, publishSha })` publishes exactly the judged sha and never runs `add -A` again, and
+  `finalizeRun` throws — recording neither `pushed` nor a pull request — when the provider reports any other head.
+  The post-push `evaluate` (size rule plus provider diff) and the pull-request tail are unchanged.
+- sandbox-workspace and local-workspace implement `branchChanges` and `publishSha`, and read git objects literally
+  (`--no-replace-objects -c core.commitGraph=false`, `GIT_GRAFT_FILE` pointed at a non-existent path, and
+  `--ignore-submodules=none`), so a replace ref, a graft, a forged commit-graph or a submodule ignore setting cannot
+  make the judge read something other than what `git push` sends; a planted graft fails closed. A provider without
+  `branchChanges` is refused by the facade, so with the switch on a stale plugin dist blocks every cloud App Work
+  finalize rather than pushing unjudged.
+- Fleet paths are unchanged: a node still pushes before the platform judges the branch, with a `contents: write`-only
+  push credential, and the merge gate re-judges the head.
+- The switch covers `finalizeRun` only; it is its sole reader
+  (`packages/agent/src/tasks-domain/task-workspace.service.ts:1693`). The agent tool `commitToRepo` still commits and
+  pushes an App Work **feature** branch from the API whatever the switch says, after refusing the base branch and
+  judging the call's own files and content with `checkPaths` (`apps/api/src/agents/agents.module.ts:1183-1223`, push
+  at `:1353`); `openPullRequest` pushes nothing and runs `evaluate` before it opens a pull request (`:1492-1523`). The
+  evolve loop does not use either tool (§2.3, "Finalize, not tools"). Whether the switch should also hold the tools is
+  open for the owner.
+- **Residual (recorded, not closed).** Both judgements — pre-push `branchChanges` and the post-push compare — use
+  merge-base semantics, the pull request's view. A head cut from an **old** ancestor of the base is judged only by
+  what it changed since that ancestor, so a workflow file that the ancestor carried and the base later removed can be
+  published unnamed, and an `on: push` trigger in it runs on the push. Closing it needs a history-free comparison of
+  the protected paths against a trusted remote task-branch tip, which neither the workspace contract nor the handle
+  carries today (candidate: the tip sha on `WorkspaceHandle` at provision time, plus a protected-path tree check in the
+  gate). The post-push compare also still names the branch, not the sha (`guardAppChange`'s docstring).
 
 **`maxPullRequestChangedFiles` is honoured, not dropped (APW08-G22).** APW-03's schema §18 declares
 `agents.maxPullRequestChangedFiles` (default 50, 1–500) and no epic enforces it, while FR-21 uses 300 files.
@@ -712,6 +752,17 @@ and is exported from `packages/contracts/src/apps/index.ts` (created by APW-03 T
 | 01   | `apps/api/src/migrations/1792080100000-AddGoalWorkScope.ts` _(new)_      | P2    | `ADD COLUMN "workId" uuid NULL` on `goals`; `idx_goals_work`.                                                                                                                                                                                                                                                                                     |
 | 02   | `apps/api/src/migrations/1792080200000-AddMissionTaskOutput.ts` _(new)_  | P2    | `outputMode varchar(8) NOT NULL DEFAULT 'ideas'`, `taskOutput text NULL`, `taskOutputNoticeAt` on `missions`.                                                                                                                                                                                                                                     |
 | 03   | `apps/api/src/migrations/1792080300000-AddTaskChatMessageKey.ts` _(new)_ | P1    | `messageKey varchar(64) NULL`, `messageParams simple-json NULL` on `task_chat_messages`; `authorId` made **nullable** (widening only — every existing row keeps its value) together with a `system` `authorType`; a `followUpKey varchar(120) NULL` column plus `uq_tasks_follow_up_key` UNIQUE on `tasks` for APW08-G23's server-side dedup key. |
+
+**Primary-branch refusal marker (added 2026-09-25, `86e1a3ddf`).** `tasks.branchGuardRefusal` (text, nullable;
+migration `apps/api/src/migrations/1792110100000-AddTaskBranchGuardRefusal.ts`, stamped after APW-11's
+`1792110000000` by coordinator direction because this block's slots 00–03 stay reserved for the migrations above; one
+`ADD COLUMN`, no index, no backfill). `refuseChange` records the refusal text (capped at 4,000 characters) only when
+the refused change reached the remote: the post-push gate, or a node reporting a branch that is not the Task's own. A
+refusal before the push (cloud judge-before-push, or cloud pushes off — §2.5) neither writes nor clears it. It is
+cleared when a later full-branch judgement allows the branch, and on discard. The Task page's branch panel shows it as
+a refusal banner (`TaskBranchSection`, `task-guard-refusal-banner`), hidden once the branch is merged, cleaned or
+discarded, or the pull request is merged. Linked (non-primary) repositories carry the same fact per entry
+(`TaskLinkedPullRequest.refusedByGuard`).
 
 `down()` drops only what `up()` added. Every column guarded with `table.findColumnByName` like
 `1789900000000-AddWorkRepoDeclaredCommands.ts`, so re-runs are no-ops. SQLite: the partial unique index uses the

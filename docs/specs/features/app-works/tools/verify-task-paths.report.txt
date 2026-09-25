@@ -5,11 +5,11 @@ not been built yet; this tree is not consistent about marking which task creates
 "absent" cannot be read as "the task text is wrong". The crisp signal is the last section:
 a path a task marks as new that already exists means that surface has landed.
 
-epics: 13 · tasks: 699 · root-anchored paths: 2668 · package-relative skipped: 202
+epics: 13 · tasks: 699 · root-anchored paths: 2673 · package-relative skipped: 215
 
-present: 1641 · absent: 1027 · of the absent, another task says it creates them: 698
+present: 1684 · absent: 989 · of the absent, another task says it creates them: 679
 
-## LANDED SURFACE — marked "new", already in the repository (247)
+## LANDED SURFACE — marked "new", already in the repository (266)
 
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
 - APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
@@ -22,6 +22,7 @@ present: 1641 · absent: 1027 · of the absent, another task says it creates the
 - APW-01-app-work-kind T17 — `apps/api/src/works/app-source.controller.ts`
 - APW-01-app-work-kind T20 — `apps/web/src/lib/work-kinds/flag-gated-kinds.ts`
 - APW-01-app-work-kind T39 — `packages/agent/src/app-works/app-work-deletion.port.ts`
+- APW-01-app-work-kind T36 — `packages/agent/src/app-works/app-works-telemetry.service.ts`
 - APW-02-fork-lifecycle T9 — `packages/plugin/src/contracts/capabilities/git-provider.app-forks.ts`
 - APW-02-fork-lifecycle T11 — `packages/contracts/src/apps/app-upstream.ts`
 - APW-02-fork-lifecycle T11 — `packages/contracts/src/apps/index.ts`
@@ -61,6 +62,9 @@ present: 1641 · absent: 1027 · of the absent, another task says it creates the
 - APW-03-app-spec-and-catalog T18 — `apps/web/src/components/works/detail/settings/app-spec/app-spec-messages.unit.spec.ts`
 - APW-03-app-spec-and-catalog T19 — `apps/web/e2e/flow-app-spec-settings.spec.ts`
 - APW-03-app-spec-and-catalog T19 — `apps/web/e2e/flow-app-spec-recheck.spec.ts`
+- APW-03-app-spec-and-catalog T26 — `packages/agent/src/apps-catalog/app-blueprint-resolver.service.ts`
+- APW-03-app-spec-and-catalog T26 — `packages/agent/src/apps-catalog/app-source-catalog.adapter.ts`
+- APW-03-app-spec-and-catalog T39 — `packages/agent/src/app-license/spdx-expression.ts`
 - APW-04-app-provisioner T2 — `packages/agent/src/agents/repo-agent-template.reader.ts`
 - APW-04-app-provisioner T2 — `packages/agent/src/agents/__tests__/agent-templates.repo-template.spec.ts`
 - APW-04-app-provisioner T6 — `packages/contracts/src/apps/app-provisioning.ts`
@@ -81,10 +85,16 @@ present: 1641 · absent: 1027 · of the absent, another task says it creates the
 - APW-05-builds T8 — `packages/plugins/github-actions-build/src/workflow/generator.ts`
 - APW-05-builds T9 — `packages/plugins/github-actions-build/src/repo/branch-protection.ts`
 - APW-05-builds T10 — `packages/plugins/github-actions-build/src/repo/secret-sync.ts`
+- APW-05-builds T11 — `packages/plugins/github-actions-build/src/runner/runner-selector.ts`
+- APW-05-builds T12 — `packages/plugins/github-actions-build/src/runs/run-correlator.ts`
+- APW-05-builds T13 — `packages/plugins/github-actions-build/src/runs/failure-classifier.ts`
+- APW-05-builds T14 — `packages/plugins/github-actions-build/src/registry/ghcr-access.ts`
 - APW-05-builds T17 — `packages/agent/src/app-builds/app-builds.service.ts`
 - APW-05-builds T18 — `packages/agent/src/tasks/app-build-prepare-dispatcher.ts`
 - APW-05-builds T19 — `packages/agent/src/app-builds/app-build-prepare.runner.ts`
 - APW-05-builds T20 — `packages/agent/src/app-builds/app-build-watch.runner.ts`
+- APW-05-builds T21 — `packages/agent/src/app-builds/app-build-sweep.service.ts`
+- APW-05-builds T21 — `apps/api/src/app-builds/app-builds.module.ts`
 - APW-05-builds T41 — `packages/plugins/github-actions-build/src/workflow/checks-job.ts`
 - APW-06-app-runtime T1 — `packages/contracts/src/apps/app-runtime.ts`
 - APW-06-app-runtime T2 — `packages/plugin/src/contracts/capabilities/app-deployment.types.ts`
@@ -102,6 +112,11 @@ present: 1641 · absent: 1027 · of the absent, another task says it creates the
 - APW-06-app-runtime T11 — `packages/plugins/k8s/src/app/app-kubeconfig.guard.ts`
 - APW-06-app-runtime T12 — `packages/plugins/k8s/src/app/app-deployer.ts`
 - APW-06-app-runtime T13 — `packages/plugins/k8s/src/app/app-status.reader.ts`
+- APW-06-app-runtime T17 — `packages/agent/src/entities/work-app-runtime-state.entity.ts`
+- APW-06-app-runtime T17 — `packages/agent/src/database/repositories/work-app-runtime-state.repository.ts`
+- APW-06-app-runtime T17 — `packages/agent/src/database/repositories/__tests__/work-app-runtime-state.repository.spec.ts`
+- APW-06-app-runtime T18 — `apps/api/src/migrations/1792060000000-ExtendWorkDeploymentsForApps.ts`
+- APW-06-app-runtime T18 — `apps/api/src/migrations/1792060100000-CreateWorkAppRuntimeStates.ts`
 - APW-06-app-runtime T20 — `packages/agent/src/facades/app-runtime.facade.ts`
 - APW-06-app-runtime T20 — `packages/agent/src/app-runtime/worker-context.ts`
 - APW-06-app-runtime T20 — `packages/agent/src/facades/__tests__/app-runtime.facade.spec.ts`
@@ -158,6 +173,10 @@ present: 1641 · absent: 1027 · of the absent, another task says it creates the
 - APW-07-app-env-and-dependencies T35 — `packages/contracts/src/apps/tenant-postgres-ddl.ts`
 - APW-08-evolve-loop T2 — `apps/api/src/agents/work-commit-lock.ts`
 - APW-08-evolve-loop T2 — `apps/api/src/agents/work-commit-lock.spec.ts`
+- APW-08-evolve-loop T10 — `packages/agent/src/app-works/app-work-rules.service.ts`
+- APW-08-evolve-loop T10 — `packages/agent/src/app-works/__tests__/app-work-rules.service.spec.ts`
+- APW-08-evolve-loop T17 — `packages/agent/src/app-works/app-change-guard.ts`
+- APW-08-evolve-loop T17 — `packages/agent/src/app-works/__tests__/app-change-guard.spec.ts`
 - APW-09-upstream-pull-requests T1 — `packages/plugins/github/src/__tests__/github-api.service.cross-repo.spec.ts`
 - APW-09-upstream-pull-requests T4 — `packages/agent/src/facades/__tests__/git.facade.member-token.spec.ts`
 - APW-09-upstream-pull-requests T9 — `packages/agent/src/upstream-pull-requests/upstream-pull-requests.module.ts`
@@ -263,37 +282,37 @@ present: 1641 · absent: 1027 · of the absent, another task says it creates the
 
 | Epic | Named | Landed paths (marked new, exists) | Landed tasks | Tasks |
 | ---- | ----- | --------------------------------- | ------------ | ----- |
-| APW-01-app-work-kind | 54 | 11 | 8 | 44 |
+| APW-01-app-work-kind | 53 | 12 | 9 | 44 |
 | APW-02-fork-lifecycle | 47 | 19 | 15 | 53 |
-| APW-03-app-spec-and-catalog | 123 | 20 | 15 | 59 |
+| APW-03-app-spec-and-catalog | 118 | 23 | 17 | 59 |
 | APW-04-app-provisioner | 122 | 12 | 5 | 60 |
-| APW-05-builds | 74 | 13 | 13 | 48 |
-| APW-06-app-runtime | 143 | 49 | 27 | 73 |
+| APW-05-builds | 65 | 19 | 18 | 48 |
+| APW-06-app-runtime | 140 | 54 | 29 | 73 |
 | APW-07-app-env-and-dependencies | 66 | 21 | 20 | 48 |
-| APW-08-evolve-loop | 122 | 2 | 1 | 56 |
+| APW-08-evolve-loop | 121 | 6 | 3 | 56 |
 | APW-09-upstream-pull-requests | 91 | 4 | 4 | 46 |
 | APW-10-apps-hosting-tier | 148 | 6 | 4 | 53 |
 | APW-11-app-launcher | 72 | 48 | 22 | 33 |
 | APW-12-ever-id | 121 | 9 | 6 | 53 |
 | APW-13-golden-paths | 91 | 33 | 24 | 73 |
 
-Landed tasks **164 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
+Landed tasks **176 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
 
-## ABSENT PATHS (1027) — grouped by epic
+## ABSENT PATHS (989) — grouped by epic
 
 Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
 in the repository would be noise. Pass `--full` to print every path to stdout instead.
 
 - APW-10-apps-hosting-tier: 142
-- APW-08-evolve-loop: 120
+- APW-08-evolve-loop: 115
 - APW-12-ever-id: 112
 - APW-04-app-provisioner: 110
-- APW-03-app-spec-and-catalog: 103
-- APW-06-app-runtime: 94
+- APW-03-app-spec-and-catalog: 95
 - APW-09-upstream-pull-requests: 87
-- APW-05-builds: 61
+- APW-06-app-runtime: 86
 - APW-13-golden-paths: 58
+- APW-05-builds: 46
 - APW-07-app-env-and-dependencies: 45
-- APW-01-app-work-kind: 43
+- APW-01-app-work-kind: 41
 - APW-02-fork-lifecycle: 28
 - APW-11-app-launcher: 24

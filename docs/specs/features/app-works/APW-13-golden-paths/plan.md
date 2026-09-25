@@ -77,9 +77,9 @@ Existing test coverage of the building blocks App Works reuses is inventoried, f
   │ app-fixture-hello        (template repo)    │────►│ <e2e-upstream-org>/app-fixture-gen-<runId>  │ generated per run
   │ app-fixture-hello-template (Blueprint)      │     │ <e2e-upstream-org>/app-fixture-hello        │ stable, catalog-matched
   │ umami-template           (Blueprint)        │     │ <e2e-upstream-org>/app-fixture-injection    │ hostile fixture
-  │ cal-diy-template         (Blueprint)        │     │ <e2e-upstream-org>/app-fixture-license-*    │
-  │ apps  (catalog: manifest, e2e branch,       │     │ <e2e-fork-org>/{umami,cal-diy}              │ created once by a person
-  │        verification evidence)               │     │ <e2e-user>  (customer machine user)         │
+  │ cal-template             (Blueprint)        │     │ <e2e-upstream-org>/app-fixture-license-*    │
+  │ templates (listing: manifest, e2e branch,   │     │ <e2e-fork-org>/{umami,cal-diy}              │ created once by a person
+  │           verification evidence)            │     │ <e2e-user>  (customer machine user)         │
   └─────────────────────────────────────────────┘     └─────────────────────────────────────────────┘
                      ▲ evidence PRs                                    ▲ forks / PRs / pushes
                      │                                                 │
@@ -141,7 +141,7 @@ requests the lanes open:
 ```jsonc
 {
 	"schema": "ever-works/templates/schema/evidence.schema.json",
-	"blueprint": { "id": "cal-diy", "version": "0.1.0", "sha": "<40>" },
+	"blueprint": { "id": "cal", "version": "0.1.0", "sha": "<40>" },
 	"upstream": { "repo": "calcom/cal.diy", "sha": "<40>", "kind": "pin" }, // or "canary"
 	"license": { "spdx": "MIT", "class": "green" }, // the class this run's app.license.classified observed
 	"platform": { "environment": "stage", "version": "<api /api/version>" },
@@ -363,8 +363,11 @@ the per-run copy, so no test-infrastructure address is ever committed to a publi
 
 ## 6. Umami — `ever-works/umami-template`
 
-Draft: [`blueprints/umami/.works/works.yml`](./blueprints/umami/.works/works.yml) · sources:
-[`blueprints/umami/README.md`](./blueprints/umami/README.md). Read at release `v3.4.0` (commit `ec0ff503…`).
+Source: the live repository [`ever-works/umami-template`](https://github.com/ever-works/umami-template) — its App
+spec [`.works/works.yml`](https://github.com/ever-works/umami-template/blob/main/.works/works.yml) and sources in its
+[`README.md`](https://github.com/ever-works/umami-template/blob/main/README.md) (public, topic
+`ever-works-app-blueprint`, id `umami`; since 2026-09-25 the in-tree draft under `blueprints/umami/` is retired). Read
+at release `v3.4.0` (commit `ec0ff503…`).
 
 | Fact (verified by reading)                                                                               | Decision                                                                           |
 | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -397,10 +400,13 @@ keeps its own direct assertion as an addition. No `TODO(verify, APW-06)` remains
 
 ---
 
-## 7. Cal.diy — `ever-works/cal-diy-template`
+## 7. Cal.diy — `ever-works/cal-template`
 
-Draft: [`blueprints/cal-diy/.works/works.yml`](./blueprints/cal-diy/.works/works.yml) · sources and refresh procedure:
-[`blueprints/cal-diy/README.md`](./blueprints/cal-diy/README.md). Read at `calcom/cal.diy@6bc45298…` (2026-09-14).
+Source: the live repository [`ever-works/cal-template`](https://github.com/ever-works/cal-template) (formerly
+`cal-diy-template`, renamed 2026-09-25; public, topic `ever-works-app-blueprint`, Blueprint id `cal`) — its App spec
+[`.works/works.yml`](https://github.com/ever-works/cal-template/blob/main/.works/works.yml) and the sources and refresh
+procedure in its [`README.md`](https://github.com/ever-works/cal-template/blob/main/README.md); the in-tree draft under
+`blueprints/cal-diy/` is retired. Read at `calcom/cal.diy@6bc45298…` (2026-09-14).
 
 ### 7.1 Decisions and the facts behind them
 

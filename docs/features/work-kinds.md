@@ -36,7 +36,7 @@ The **Store** chip you see next to the kinds is not a kind. On the hosted platfo
 :::tip Feature flags
 Each chip is gated by a `works-<kind>` PostHog flag evaluated server-side (`apps/web/src/lib/feature-flags/work-kinds.ts`). The gate fails **open**: no PostHog key, a missing flag, a timeout or an error all leave the chip enabled, so self-hosted installs get every kind. Only a flag that resolves strictly to `false` turns a chip into "Soon", and a flag-disabled kind cannot be deep-linked through `?kind=` either.
 
-**`app` is the one exception — it fails closed.** The App surface is unfinished, so "we could not tell" must mean _absent_: the **App** chip renders only when the `works-app` flag resolves strictly to `true` **and** the API-side instance gate (`EVER_WORKS_APP_WORKS_ENABLED`, default `false`) has not turned App Works off. Every other `works-<kind>` flag keeps the fail-open behaviour above.
+**`app` is the one exception — it fails closed.** The App surface is unfinished, so "we could not tell" must mean _absent_. With PostHog configured, the **App** chip renders only when the `works-app` flag resolves strictly to `true`; a missing flag, a timeout or an error hides it. With no PostHog key there is no flag to ask, and the chip follows the web deployment's own `EVER_WORKS_APP_WORKS_ENABLED` (on only for exactly `true`, default off). The API checks its own copy of that variable before it inspects a repository for, or creates, an App Work, so set it on both deployments and keep the flag in step with it. Every other `works-<kind>` flag keeps the fail-open behaviour above.
 :::
 
 ## Capability matrix

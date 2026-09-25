@@ -1218,6 +1218,20 @@ unblock APW-07 P1. Numbers continue from T68._
       registering task.
 
 - [ ] **T71 (P1, lands with T20 and T32). The isolated App runtime worker (APW06-G02).**
+      **Status (2026-09-25, wave 2, worker-deploy-sources):** `TriggerAppRuntimeModule` binds `APP_DEPLOY_SPEC_SOURCE`
+      to `createRemoteProxy(api, 'AppSpecService')` and `APP_DEPLOY_BUILD_SOURCE` to
+      `createRemoteProxy(api, 'AppDeployBuildSourceAdapter')` — plan §6.4's "Proxied" rows for APW-05's `WorkBuild`
+      reads and the spec read. API side: `AppDeployRequestModule` exports the `AppDeployBuildSourceAdapter` class,
+      `TriggerInternalModule` imports `AppDeployRequestModule`, and `TriggerInternalController` registers
+      `remoteMap.AppDeployBuildSourceAdapter` (allow-list: `getBuild`, `listDeployableBuilds`). The worker's
+      render-input builder, `AppHostsService` and `AppHealthService` now read the spec and the Build over the internal
+      RPC hop. Still open before a worker deploy can pass §5.6 step 1: (a) `APP_DEPLOY_DISPATCHER_AVAILABILITY` is
+      unbound in the worker, so `AppDeployPreconditionsService.evaluate` answers `worker_not_isolated` at step 1 for
+      every dequeued Deployment, before any spec or Build read — this needs a §5.1/§5.6 decision on how the re-check
+      treats the dispatcher gate inside the isolated worker (for example, skip it when the request carries the
+      lock-holding `deploymentId`); (b) `WORK_APP_RUNTIME_STATES` is unbound in the worker (runtime-state warning);
+      (c) `APP_RUNTIME_ENV_SOURCE`, `APP_IMAGE_PULL_CREDENTIAL_SOURCE`, `APP_RUNTIME_TARGET` and `APPS_TIER_POLICY` are
+      still default-ports fail-closed stubs (T73/T44).
       **Create** `packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts` _(new)_ exactly as plan §6.4,
       modelled on `trigger-workflow-run.module.ts` but importing **no** `DatabaseModule`, **no** TypeORM `DataSource` and
       no Redis client. It provides the local services of plan §6.4's table, proxies the rest through

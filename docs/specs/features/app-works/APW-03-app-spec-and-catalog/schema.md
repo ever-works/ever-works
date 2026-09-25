@@ -553,13 +553,7 @@ kind: app
 name: Cal.diy (community build)
 spec:
     source: { relation: fork, upstream: { repo: calcom/cal.diy, defaultBranch: main }, branch: main }
-    blueprint:
-        {
-            id: cal-diy,
-            version: 1.0.0,
-            repo: ever-works/cal-diy-template,
-            sha: 0123456789abcdef0123456789abcdef01234567
-        }
+    blueprint: { id: cal, version: 1.0.0, repo: ever-works/cal-template, sha: 0123456789abcdef0123456789abcdef01234567 }
     license: { spdx: MIT, class: green, source: blueprint, notice: 'Cal.diy® is a trademark of Cal.com, Inc.' }
     display: { name: 'Cal.diy (community build)', protectedPaths: ['apps/web/public/brand/**'] }
     build:

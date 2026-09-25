@@ -479,7 +479,7 @@ and never skipped — so ACC-10-02 can be observed at T22 while the gate correct
 > because both ends of the tier import them (the platform writes `Work`, the controller reconciles
 > it) and `apps/*` in this monorepo means "a thing that starts a process". The rows below that name
 > `src/crds/*` and `deploy/crds/*` therefore belong to that package; everything else stays here. See
-> [`apps/hosting-operator/README.md`](../../../../apps/hosting-operator/README.md).
+> [`apps/hosting-operator/README.md`](../../../../../apps/hosting-operator/README.md).
 
 ```
 src/main.ts                    leader election (Lease), informers, reconcile loop, /healthz

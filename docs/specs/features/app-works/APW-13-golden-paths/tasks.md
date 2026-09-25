@@ -342,9 +342,15 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 ## P1.4 — Umami and Cal.diy Blueprints
 
 - [ ] **T27. `ever-works/umami-template`.**
-      **Create** from `docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/`; topic; `validate.yml`. After
-      the first nightly run, resolve each item of its README's "Unverified" list in the same repository and update the
-      draft here. The Blueprint's `web` component declares `runAsUser: 1001` once APW-03's `components[].runAsUser`
+      **Status (2026-09-26):** the repository exists and is the source —
+      [`ever-works/umami-template`](https://github.com/ever-works/umami-template), public, topic
+      `ever-works-app-blueprint`, Blueprint id `umami`, its App spec only at `.works/works.yml`; `ever-works/templates`
+      lists it as a `placeholder` (no release tag yet). It was created from this epic's draft under `blueprints/umami/`,
+      which is retired. Still open: the repository's own `validate.yml`, the relation record below, the first
+      `v<version>` tag, and the nightly run.
+      **Modify** [`ever-works/umami-template`](https://github.com/ever-works/umami-template) (created from the draft,
+      see the status line); `validate.yml`. After the first nightly run, resolve each item of its README's
+      "Unverified" list in the same repository. The Blueprint's `web` component declares `runAsUser: 1001` once APW-03's `components[].runAsUser`
       exists (T61's field request) — the image sets its user by name.
       **Record the relation** (added 2026-09-17): the Blueprint declares `source.relation: fork` and the golden-path lane
       states which relation each run uses; applying the Blueprint to a **Link** App Work strips
@@ -354,9 +360,17 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
       `default-admin-refused` smoke (`POST /api/auth/login`, expecting `401`) passes in the same run.
       **Done when**: ACC-13-05 and ACC-13-06 are green once.
 
-- [ ] **T28. `ever-works/cal-diy-template`.**
-      **Create** from `docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/`; topic; `validate.yml`.
-      Re-read the facts table at the then-current pin before creating (refresh procedure in its README). Resolve the
+- [ ] **T28. `ever-works/cal-template` (formerly `cal-diy-template`).**
+      **Status (2026-09-26):** the repository exists and is the source —
+      [`ever-works/cal-template`](https://github.com/ever-works/cal-template), renamed from `cal-diy-template` on
+      2026-09-25, public, topic `ever-works-app-blueprint`, Blueprint id `cal` (metadata-only shape over the upstream
+      `calcom/cal.diy`), its App spec only at `.works/works.yml`, with no root `app-spec.yml`; `ever-works/templates`
+      lists it as a `placeholder` (no release tag yet). It was created from this epic's draft under `blueprints/cal-diy/`,
+      which is retired. Still open: the repository's own `validate.yml`, the relation record below, the first
+      `v<version>` tag, and the T46 build step.
+      **Modify** [`ever-works/cal-template`](https://github.com/ever-works/cal-template) (created from the draft, see
+      the status line); `validate.yml`. Re-read the facts table at the then-current pin (refresh procedure in its
+      README). Resolve the
       open coordination items of [plan §13](./plan.md) with APW-05, APW-06 and APW-07 in their PRs, not here.
       **Record the relation** (added 2026-09-17): the Cal.diy golden path accepts **Link** (ACC-E2E-14), so the Blueprint's
       `upstreamSync` block must survive Link apply — either APW-03's apply rule strips it for a link (recorded in
@@ -369,7 +383,9 @@ lanes, every Wave 1 scenario of ACCEPTANCE §1–§2, and the verification evide
 - [ ] **T29. Catalog content.**
       **Create** in `ever-works/templates` (CONTRACTS §7: the listing repository, renamed from `ever-works/apps`, and the
       name ACCEPTANCE §0.3's test-catalog row uses): branch `e2e` whose `manifest.json` adds the test upstreams of
-      ACCEPTANCE §0.3; `candidate` entries for the three Blueprints on `main`; an `evidence/` directory with a README (the
+      ACCEPTANCE §0.3; `candidate` entries for the three Blueprints on `main` (**changed 2026-09-26:** two — Cal and Umami;
+      the fixture Blueprint `ever-works/app-fixture-hello-template` stays private and is not part of the catalog, owner
+      decision); an `evidence/` directory with a README (the
       path APW-03 `catalog.md` §3.2 defines). The `e2e` branch also lists the generated upstream prefix
       `<e2e-upstream-org>/app-fixture-gen-*` (added 2026-09-17, spec FR-9) so a per-run upstream still resolves from a
       verified Blueprint (ACC-13-21).
@@ -833,7 +849,7 @@ one._
       **Done when**: ACC-13-16 is green with the per-job table in force and the numbers in the evidence match the summary.
 
 - [ ] **T72. Cal.diy non-root variant and the root precondition (spec FR-26, R-27).**
-      **Create** `ever-works/cal-diy-template:variants/nonroot.Dockerfile` and its README row — a fork-side Dockerfile
+      **Create** `ever-works/cal-template:variants/nonroot.Dockerfile` and its README row — a fork-side Dockerfile
       that adds a numeric non-root `USER` owning `apps/web/.next` and `apps/web/public`, so the managed tier stays open to
       Cal.diy. Marked unverified until a lane run passes.
       **Modify** `apps/web/e2e/flow-app-works-live-cal-diy-golden-path.spec.ts` (T46) — assert the App Work's deploy target

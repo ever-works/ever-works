@@ -416,6 +416,17 @@ gate._
 _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
 
 - [ ] **T22. Git provider additions for catalogs.**
+      **Status (2026-09-25): partially done.** `GitRepository.topics?` is in the contract (`e74f6e045`) and the GitHub
+      plugin maps it (an absent key means "not reported", `[]` means "no topics", non-string entries are dropped);
+      `commitFiles?` and `getFileWebUrl?` are not declared yet. Shipped beside it: the pure licence classifier
+      (`classifyLicenseExpression` in `packages/agent/src/app-license/license-classify.ts`, with `NOASSERTION` fixed
+      red — `catalog.md` §4) and `AppSourceCatalogAdapter`, bound to `APP_SOURCE_CATALOG_PORT` in the packages/agent
+      `AppWorksModule` rather than an `apps-catalog.module.ts`. The adapter classifies on the bundled seed snapshot —
+      a typed `.ts` constant (`license-registry.snapshot.ts`, a verbatim copy of `ever-works/templates@46d12bb`'s
+      `licenses.yml`, not yet legal-reviewed) instead of plan §2.6's `license-registry.snapshot.yml`, because
+      `nest build -b swc` copies no non-TS assets. Open: the live / last-good registry read (T24/T38), obligations
+      output, the forced `managedHosting: false` for a snapshot classification (FR-38), and the Blueprint match, held
+      behind the apply gate until T28 binds `APP_BLUEPRINT_APPLY_SERVICE`.
       **Modify** `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` — `GitRepository.topics?`,
       `commitFiles?`, `getFileWebUrl?` exactly as [plan §7](./plan.md).
       **Modify** `packages/plugins/github/src/github-api.service.ts` (map `topics`; Git Data API commit with
@@ -475,6 +486,15 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `GET /api/apps-catalog` answers without authentication with the cache header.
 
 - [ ] **T26. Blueprint resolver.**
+      **Status (2026-09-25): explicit (FR-81) and probe (FR-43) paths done** in `AppBlueprintResolverService`
+      (`781f9a2e5`): ≤ 3 reads, a 1 h / 10 min in-process cache (500 entries, oldest evicted; it replaces plan §2.5's
+      `CACHE_MANAGER` key because `AppWorksModule` has no cache module), SSRF-contained to `ever-works/<[a-z0-9-]>` and
+      `.works/works.yml` (`APP_BLUEPRINT_SPEC_PATH` — the only file the resolver reads). Acceptance also requires a
+      public repository, an `ever-works/` `fullName` after redirects, the topic `ever-works-app-blueprint`, root
+      `kind: app` and `spec.blueprint.repo` equal to the repository. Credential: the GitHub App installation on
+      `ever-works`, else `EVER_WORKS_APPS_CATALOG_TOKEN`, else `GITHUB_TOKEN`. A match is held behind the apply gate
+      until T28 binds `APP_BLUEPRINT_APPLY_SERVICE` in the packages/agent `AppWorksModule` graph. Open: manifest lookup,
+      aliases and rename re-lookup, fork network, ref constraints.
       **Create** `packages/agent/src/apps-catalog/app-blueprint-resolver.service.ts` per plan §2.5 (index of repos
       and aliases, `getRepository` rename; fork networks matched by the root `source` repository and then `parent`;
       explicit `blueprintId` path — `source: explicit`, no ref check for an unlisted repository, never verified; probe
@@ -490,7 +510,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       task binds it and declares no port of its own. If `packages/agent/src/app-runtime/ports.ts` is absent, create
       it from CONTRACTS §3 verbatim (see "How to use").
       **Test**: `packages/agent/src/apps-catalog/__tests__/app-blueprint-resolver.spec.ts` — `calcom/cal.com` and
-      `CALCOM/CAL.DIY` resolve to `cal-diy` (ACC-03-23); a fork of a listed upstream needs confirmation and an
+      `CALCOM/CAL.DIY` resolve to `cal` (ACC-03-23); a fork of a listed upstream needs confirmation and an
       excluded tag gives the ref reason (ACC-03-24); the probe finds a topic-carrying template as Unlisted with ≤ 3
       reads (ACC-03-25); an explicit id for a per-run generated repository resolves with `source: explicit` and an
       unknown id gives `blueprintNotFound` (ACC-03-44); a fork of a fork resolves through the root `source`
@@ -594,6 +614,17 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: APW-01 can mount it with no change to the component.
 
 - [ ] **T33. The `ever-works/templates` catalog repository** _(outside this monorepo)_.
+      **Status (2026-09-26):** the repository is a **pure listing** (its PRs #1 `542a96c` and #2 `8437f29`,
+      2026-09-25): `manifest.json` (one row per `-template` repository, website and app alike — the app rows `cal` →
+      `ever-works/cal-template` (metadata-only) and `umami` → `ever-works/umami-template`, both `placeholder`),
+      `schema/templates-manifest.schema.json`, `schema/app-spec.schema.json`, `licenses.yml`, and a validator
+      (`tools/validate-specs.mjs`, run by its `validate.yml` workflow on push to `main`, on pull requests and weekly)
+      that fetches each app row's own
+      `.works/works.yml` from its template repository and validates it. It holds **no per-template folders and no copy
+      of any App spec**; the spec lives only in the template repository's `.works/works.yml`, which is the only file the
+      platform's resolver reads (`APP_BLUEPRINT_SPEC_PATH`). The fixture Blueprint `ever-works/app-fixture-hello-template`
+      stays private and is not listed. `CONTRIBUTING.md` and `README.md` exist; the rest of this task (checks C1–C12 in
+      its `validate.mjs` script, `release.yml`, `verify-expiry.yml`, `CODEOWNERS`, as below) is still the target.
       **Create** in `ever-works/templates` — **the repository that exists (2026-09-17); the earlier drafts called it
       `ever-works/apps`, and `EVER_WORKS_APPS_CATALOG_REPO` accepts either value, so the older name keeps working
       and nothing is renamed away** — `manifest.json` (`schemaVersion: 1`, empty `apps`), `licenses.yml`
@@ -611,7 +642,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       `CONTRIBUTING.md`, `README.md`.
       **Test**: `scripts/__tests__/validate.test.mjs` in that repository (`node --test scripts/__tests__`) — one failing
       fixture per check C1–C12, including a `red` entry (C5) and an amber `allowed: true` entry without an agreement
-      (C6), and the three APW-13 Blueprint drafts passing the C4 leg.
+      (C6), and the listed Blueprint repositories' own `.works/works.yml` passing the C4 leg (the APW-13 drafts were
+      the source until the live repositories replaced them, 2026-09-25).
       **Done when**: the repository is public, `validate.yml` is required on `main`, and the platform reads an
       empty catalog as `available: true` with zero entries.
 
@@ -929,6 +961,12 @@ test -- app-spec` stays green.
       repository's `package.json` names its exact version.
 
 - [ ] **T58 (P2, lands with T33). Validate every Blueprint draft in `blueprint` mode.**
+      **Note (2026-09-26):** the `cal-diy/` and `umami/` drafts under `APW-13-golden-paths/blueprints/` are being
+      retired: the live repositories [`ever-works/cal-template`](https://github.com/ever-works/cal-template) (formerly
+      `cal-diy-template`) and [`ever-works/umami-template`](https://github.com/ever-works/umami-template) are the
+      source, and `ever-works/templates`' CI validates their own `.works/works.yml` (T33 status). Once they are gone
+      this walk covers the drafts still present (the private `app-fixture-hello` fixture) and "all three drafts" below
+      reads "every draft present".
       **Create** `packages/agent/src/works-config/schema/__tests__/blueprint-drafts.spec.ts` — walks
       `docs/specs/features/app-works/APW-13-golden-paths/blueprints/*/.works/works.yml` and validates each in
       **`blueprint` mode**, which schema.md §3's corrected row defines as allowing and expecting `source` and
@@ -955,7 +993,8 @@ test -- app-spec` stays green.
       `additionalProperties: false` with `patternProperties` `'^x-'` for extension keys. Structural only — the
       cross-field rules (schema.md §22) stay in code, and the file's header comment says so.
       **Create** `docs/specs/features/app-works/contracts/fixtures/app-spec/valid/*.yml` — the three Blueprint
-      drafts under `APW-13-golden-paths/blueprints/` plus schema.md §24.1, §24.2 and §24.3.
+      drafts under `APW-13-golden-paths/blueprints/` plus schema.md §24.1, §24.2 and §24.3 (see T58's note: the live
+      repositories' `.works/works.yml` replace the retired Cal and Umami drafts).
       **Create** `docs/specs/features/app-works/contracts/fixtures/app-spec/invalid/<code>.yml` — one file per
       structural issue code and one per rule in schema.md §22, each with a `# expect: <code>` header, so a failure
       names the file that must report it.

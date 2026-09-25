@@ -247,6 +247,8 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       **Done when**: all four specs are green and the pre-existing `task-isolation.spec.ts` passes unchanged.
 
 - [ ] **T12. Isolated-run admission.**
+      **Note (2026-09-25):** T12's cloud admission is what lets `APP_WORKS_CLOUD_PUSH_ENABLED` default on; until then
+      `finalizeRun` refuses to publish App Work branches from cloud runs (T17 status, plan §2.5).
       **Depends on** APW-04's `IPipelinePlugin.enforcesRuntimeNetworking?: boolean` (CONTRACTS §3); if APW-04 has not
       landed, add that optional field to `packages/plugin/src/contracts/capabilities/pipeline-plugin.interface.ts`
       exactly as APW-04 specifies and set it only in `packages/plugins/claude-managed-agent/` — the one pipeline that
@@ -401,6 +403,29 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 ## P1.5 — Guard, instructions, merge
 
 - [ ] **T17. `AppChangeGuard`.**
+      **Status (2026-09-25, wave 2, `86e1a3ddf`):**
+      _Cloud path:_ judged before the push (`checkPaths` over `IWorkspacePlugin.branchChanges`, then publish by
+      `publishSha`). Default-off behind `APP_WORKS_CLOUD_PUSH_ENABLED` until T12 lands (owner decision 2026-09-25);
+      when T12 lands, revisit the default. The switch holds `finalizeRun` only: the agent tool `commitToRepo` still
+      pushes an App Work feature branch after a pre-push `checkPaths` of the call's own files (plan §2.5). The residual that the post-push compare still names the branch, not the sha,
+      is recorded in `guardAppChange`'s docstring.
+      _Residual (plan §2.5):_ both judgements (pre-push `branchChanges` and the post-push compare) use merge-base
+      semantics, the pull request's view. A head cut from an old ancestor of the base is judged only by what it changed
+      since that ancestor, so a workflow file that the ancestor carried and the base later removed (for example for
+      security) can be published unnamed, and an `on: push` trigger in it runs on the push. Closing this needs a
+      history-free comparison of the protected paths against a trusted remote task-branch tip, which neither the
+      workspace contract nor the handle carries today. Candidate follow-up: add the tip sha at provision time to
+      `WorkspaceHandle`, and add a protected-path tree check to the gate.
+      _Primary-branch refusal marker:_ `tasks.branchGuardRefusal` (text, nullable; migration
+      `1792110100000-AddTaskBranchGuardRefusal`) — `refuseChange` records the refusal text (capped at 4,000
+      characters) only when the refused change reached the remote (the post-push gate, or a node reporting a branch
+      that is not the Task's own); a refusal before the push neither writes nor clears it; cleared when a later
+      full-branch judgement allows the branch, and on discard. The Task page's branch panel shows it as a refusal
+      banner (`TaskBranchSection`, `task-guard-refusal-banner`), hidden once the branch is merged, cleaned or
+      discarded, or the pull request is merged ([plan §3.5](./plan.md)).
+      _Fleet path:_ unchanged — a node still pushes before the platform judges the branch; the per-job push credential
+      is `contents: write` only (pinned in `fleet-push-credential.service.spec.ts`, never `workflows`), and the merge
+      gate re-judges the head.
       **Create** `packages/agent/src/app-works/app-change-guard.ts` (new) — [plan §2.5](./plan.md): compare diff
       (`{ maxFiles: 300, maxBytes: 0 }`, refuse on `totalFiles >= 300` **or** `files.length < totalFiles` — never on
       `truncated` alone, because `capDiffFiles` also sets it when patch text exceeds the 256 KiB default and a

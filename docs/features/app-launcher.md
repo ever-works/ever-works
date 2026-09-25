@@ -1,3 +1,10 @@
+---
+id: app-launcher
+title: App Launcher
+sidebar_label: App Launcher
+description: The top-bar row of tiles that opens the Ever apps and your live Works — what appears and why, your pins, hides and order, the clients that share one list, and the installation switch that turns it off.
+---
+
 # App Launcher
 
 The App Launcher is the row of tiles in the top bar that opens the Ever apps and the Works you have deployed.
@@ -66,7 +73,10 @@ there is one place that stores it.
 ## Turning it off
 
 The launcher is switched off per installation — an operator sets `EVER_WORKS_APP_LAUNCHER_ENABLED` — and when it
-is off every launcher route answers **404**, exactly as though it had never been mounted. Nothing is deleted:
+is off every launcher route answers a signed-in caller **404**, exactly as though it had never been mounted; the
+public catalog of Ever apps answers **404** to everyone. One difference remains for a caller who is not signed in:
+the signed-in routes (`/api/me/apps`) check the session first, so that caller gets the usual **401** there, as it
+would with the launcher on. Nothing is deleted:
 turning it back on returns the same tiles, in the same order, with the same pins and hides. The public
 configuration endpoint publishes the same switch as `features.appLauncherEnabled` so a client can hide the surface
 without guessing.

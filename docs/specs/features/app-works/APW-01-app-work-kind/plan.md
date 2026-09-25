@@ -917,7 +917,10 @@ sourceRepository.blueprintMatchSource ?? 'explicit', confirmForkMatch: false })`
     `blueprintId` given ⇒ the explicit path (APW-03 FR-81); omitted ⇒ the program's D4 resolution order
     (manifest → alias → fork network → probe). Injected `@Optional()`. The license preview uses the matched entry's
     class when a Blueprint matched (`source: 'blueprint'`), else `classifyLicense(getRepository().licenseSpdx)`
-    (`source: 'detected'`). Unbound or throwing ⇒ `blueprint.status = 'unavailable'`,
+    (`source: 'detected'`). `license.spdx` is `'NOASSERTION'` when the provider reported a licence it cannot name
+    (plugin contract `licenseSpdx: null`) and `null` only when no licence was reported (`detectedLicenseSpdx` in
+    `packages/agent/src/app-license/license-classify.ts`); `NOASSERTION` classifies **red**, a fixed platform rule
+    (APW-03 `catalog.md` §4, owner decision 2026-09-25). Unbound or throwing ⇒ `blueprint.status = 'unavailable'`,
     `license.class = 'unknown'` — never a guessed class. This epic never reads the Apps catalog repository itself
     and depends on APW-03's resolver only through the token. `prompts` and `displayName` are what the preview
     renders and what `appEnv` answers (FR-55); no read path ever returns a stored value.
@@ -1041,17 +1044,35 @@ dashboard.activity.filters.types.appSource            "App source"
 
 ## 9. Telemetry and failure modes
 
-### 9.1 Events (PostHog through the monitoring package — counters, codes and ids only)
+### 9.1 Events (PostHog through `AppWorksTelemetryService` over the `APP_WORKS_TELEMETRY_SINK` token, which the API binds to `AnalyticsService` in `apps/api/src/telemetry/app-works-telemetry-binding.module.ts` — counters, codes and ids only; the user id is the PostHog distinct id, never a property)
 
 | Event                      | Properties                                                                                                                 |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `app_source.inspected`     | `{ defaultMode, modesAvailable: string[], reasons: string[], blueprint: status, licenseClass, durationMs, providerCalls }` |
 | `app_work.create_started`  | `{ mode, deployTarget: 'none' \| 'your-cluster' \| 'ever-works-apps', adoptedExistingFork }`                               |
-| `app_work.create_finished` | `{ mode, outcome: 'created' \| 'already_existed' \| 'refused', reason?, durationMs }`                                      |
+| `app_work.create_finished` | `{ mode, outcome: 'created' \| 'already_existed' \| 'refused' \| 'failed', reason?, durationMs }`                          |
 | `app_work.source_ready`    | `{ mode, preparingMs, setupPullRequest: boolean }`                                                                         |
 | `app_work.deleted`         | `{ mode, repositoryDeleted: boolean }`                                                                                     |
 
 No repository name, URL, owner, token or file content in any payload.
+
+**`app_work.create_finished` (amended 2026-09-25, T36).** `reason` is the closed-set reason code; `http_<status>` for
+a refusal with no code (Nest validation 400, the per-user slug 409). `failed` is an unexpected fault: reason
+`unexpected`, or `http_<status>` for a 5xx without a code (`appWorkCreateOutcomeOf` in
+`packages/agent/src/app-works/app-works-telemetry.service.ts`).
+
+**Emission points (T36).** `app_source.inspected` once per inspect answer, including a cache hit (`providerCalls` 0),
+and never for a validation refusal. `app_work.create_started` once the request has passed validation and the fresh
+inspection (after step 6a), so a request refused earlier has a `create_finished` without a `create_started`.
+`adoptedExistingFork` is the fork the inspection found in the chosen owner. `app_work.create_finished` exactly once per
+create call. `app_work.source_ready` beside each success Activity row (`initialized` / `unchanged` /
+`waiting_for_setup_pr`), so a link emits it at least twice, first with `setupPullRequest` true and then false after the
+merge (it counts hand-offs, not Works); `preparingMs` is measured from `work_upstream_states.readinessStartedAt` and is
+null when that is absent. `app_work.deleted` when the row goes or the App runtime holds the delete pending, never again
+from `completeAppWorkDeletion` (a repeated delete request while the row is still pending does emit again);
+`repositoryDeleted` = the Work Repository (website role) was removed. Unbound sink, or
+PostHog not configured ⇒ counted and dropped, with only a count logged. Events flow only in the API process; the
+worker and CLI graphs count and drop them by design.
 
 ### 9.2 Failure modes and the chosen behaviour
 

@@ -161,6 +161,14 @@ website and app alike, plus a JSON Schema), `licenses.yml` and CI. It is "mostly
 the **pin** (`template.sha`), the licence class, trademark and protected-path data, the managed-hosting decision
 and the verification evidence, and it is what makes a template **listed** (badged and searchable). It is not what
 makes a template exist, and a listing row never overrides what a template repository says about itself.
+The listing holds **no per-template folders and no copy of any template's App spec** (since 2026-09-25): each spec
+lives only in its own repository's `.works/works.yml`, which is today the one file the platform's Blueprint resolver
+reads (`APP_BLUEPRINT_SPEC_PATH`, `packages/agent/src/apps-catalog/app-blueprint-resolver.service.ts`; the
+`.works/template.yml` shape above is read by the listing's validator, not yet by the platform), and the listing's CI
+fetches `.works/works.yml` from each app row's repository to validate it. The live App Blueprints are `ever-works/cal-template`
+(formerly `cal-diy-template`; Blueprint id `cal`) and `ever-works/umami-template` (id `umami`), both public with the
+topic `ever-works-app-blueprint`; the acceptance fixture's `ever-works/app-fixture-hello-template` stays private and is
+not part of the catalog.
 **Two shapes.** An app template is either **code-bearing** — the template repository holds the whole codebase,
 kept in sync as a **public fork of the original project** with our metadata added, so provisioning forks **one**
 repository and that fork is the App Work's Work Repository — or **metadata-only** — the template repository holds

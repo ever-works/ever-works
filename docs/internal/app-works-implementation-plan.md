@@ -52,6 +52,16 @@ bindings) and checkout-directory key uniqueness.
 | 7   | Publishing home of the App Launcher web component and platform catalog                                                                                                                                                                                                                                                                                                                                                                                                                     | catalog: `ever-works/platforms` (**create it**); component package home still open — `ever-co` at P2 per I-02                                                                                   | APW-11 P2              |
 | 8   | Legal review of `licenses.yml` classes                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **Yes, 100%** — reviewed before launch; Cal.diy uses the MIT community edition                                                                                                                  | managed hosting        |
 
+**Follow-up to decision 2 (owner decisions, measured 2026-09-26).** The Cal Blueprint repository is
+**`ever-works/cal-template`** (formerly `cal-diy-template`; Blueprint id `cal`, upstream `calcom/cal.diy`), and Umami's is
+**`ever-works/umami-template`** (id `umami`). Both are **public**, not private, with the topic
+`ever-works-app-blueprint`, and each keeps its App spec at `.works/works.yml`. The fixture's
+`ever-works/app-fixture-hello-template` stays **private** and is not part of the catalog. `ever-works/templates` is a
+pure listing — `manifest.json`, its schemas, `licenses.yml` and a validator that fetches each app row's own
+`.works/works.yml` — and holds no per-template folders
+([templates PR #1](https://github.com/ever-works/templates/pull/1)). Row 2 above and §4's step 7 keep their
+2026-09-17 wording as the record of what was decided then.
+
 ---
 
 ## 3. Wave 0 — independent fixes (ship first, small PRs)

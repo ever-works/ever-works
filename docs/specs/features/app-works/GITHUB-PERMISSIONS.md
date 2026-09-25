@@ -59,6 +59,19 @@ Two rules that apply to every row:
 | **Fleet push credential**         | The platform, narrowed per repository id                    | `contents: write` only — it cannot change workflow files and cannot open a pull request by itself               | `EXISTING-SUBSTRATE.md:77`; `APW-02-fork-lifecycle/plan.md:586-587` states this epic never uses it                                                                      |
 | **Per-App-Work image pull token** | The App Work owner, one token per App Work                  | Pulls one private GHCR package; nothing else                                                                    | `APW-05-builds/spec.md:326-329`, `CONTRACTS.md:321`                                                                                                                     |
 
+**The Fleet push credential, as measured (2026-09-25, APW-08 T17).** Its `contents: write`-only grant is pinned
+exactly in `apps/api/src/fleet/__tests__/fleet-push-credential.service.spec.ts`, and both the service and the spec
+carry a "never add `workflows`" comment tied to T17: a Fleet node pushes **before** the platform judges the branch
+(`finalizeRemotePush`, then the merge gate re-judges the head), so this grant is what keeps workflow files off the
+Task branch in the meantime. Protected non-workflow paths and guarded spec blocks can still reach the branch before
+judgement; they execute nothing. **Not yet verified live:** that GitHub refuses a workflow-file push from a
+`contents: write` installation token. Operator check: mint such a token for a scratch repository in an Ever Works
+organization, push a commit touching `.github/workflows/x.yml`, and expect "refusing to allow a GitHub App to create
+or update workflow". The Task finalize of a cloud (API-side) run (`finalizeRun`) no longer pushes unjudged: its push is
+off by default and, when enabled, judged before the push ([APW-08 plan](./APW-08-evolve-loop/plan.md) §2.5). The agent
+tool `commitToRepo` is not behind that switch: it pushes an App Work feature branch from the API after a pre-push check
+of the call's own files ([THREAT-MODEL.md](./THREAT-MODEL.md) T-03).
+
 ---
 
 ## 2. Permission matrix — one row per step or flow
