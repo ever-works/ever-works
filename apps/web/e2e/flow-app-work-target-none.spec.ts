@@ -89,6 +89,15 @@ import { connectCustomerGitHub } from './helpers/github-connection';
  * rather than the platform. In CI the shard already runs `PLAYWRIGHT_WORKERS=1`
  * (`playwright.config.ts:49-53`), where this setting is a no-op. No assertion is weakened
  * by it.
+ *
+ * Serial also means a red case skips every case after it. In E2E run 36187829618 (shard 7,
+ * commit c7ca76c2f) the None-target create case failed at its step 4, so the four cases after
+ * it — "the app-target and build surfaces this case names are not mounted", "the literal
+ * "none" is refused …", "GET /api/me/apps without includeHidden does not list the None-target
+ * Work" and "a None-target create writes its fork request and nothing else to GitHub" — were
+ * reported "did not run". The run before it (ebed2548d) died installing browsers, so those four
+ * have not run at a recent commit: a red in them on the next lane run is not evidence against
+ * the step-4 re-pin, and needs its own triage.
  */
 test.describe.configure({ mode: 'serial' });
 
@@ -371,11 +380,27 @@ test.describe('ACC-E2E-11 — a None-target App Work is created, and nothing is 
             'nothing was deployed for a None-target Work',
         ).toEqual([]);
 
-        // 4. … and the explicit deploy route refuses for the plugin's own reason rather
-        //    than deploying. This is the PR lane's honest half of "no deploy": the app
-        //    target guard the case names is APW-06 FR-2's and is not mounted here
-        //    (`/app-target` answers 404, asserted below), so the refusal that exists is the
-        //    legacy token check. Reported as a finding.
+        // 4. … and the explicit deploy route refuses BECAUSE the target is None, rather than
+        //    deploying.
+        //
+        //    Re-pinned 2026-09-26. This step first pinned `400 "Deployment token is
+        //    required"` — the legacy website token check — and said so as a finding: the App
+        //    target guard R-12 / APW-06 FR-2 names was not reachable from this route, so the
+        //    only refusal was a website one that said nothing about the target. That gap is now
+        //    closed on this branch by APW-06 T34 (`tasks.md:609-625`, 0f221ba34 + 1076e17d9):
+        //    the legacy `POST /api/deploy/works/:id` sends an App Work straight to the App path
+        //    before any website provider check (`DeployController.deploy` →
+        //    `DeployController.deployAppWork` → `DeployService.deploy` →
+        //    `DeployService.deployAppWork` → `AppDeployRequestService.request`; cited by symbol
+        //    because the line numbers moved with 81552d009), whose FR-24 preconditions answer
+        //    `target_none` for a Work with no target and stop there
+        //    (`AppDeployPreconditionsService.checkLifecycle` records it, and `evaluate` returns
+        //    before any later check). The request service creates NO row on a precondition
+        //    refusal (step 2, `APP_DEPLOY_PRECONDITIONS`, of the order table in
+        //    `app-deploy-request.service.ts`'s header: "422 · no row"), so this is the
+        //    documented "nothing is deployed" (FR-2) at the route itself — measured
+        //    on the lane as `422 {"status":"error","code":"APP_DEPLOY_PRECONDITIONS","unmet":
+        //    [{"code":"target_none",…}]}` (E2E run 36187829618, shard 7).
         const deploy = await deployAppWork(request, {
             token: user.access_token,
             workId: work.workId,
@@ -383,9 +408,36 @@ test.describe('ACC-E2E-11 — a None-target App Work is created, and nothing is 
         });
         expect(
             deploy.status,
-            `POST /api/deploy/works/:id answered ${deploy.status}: ${deploy.text.slice(0, 200)}`,
-        ).toBe(400);
-        expect(deploy.text).toContain('Deployment token is required');
+            `POST /api/deploy/works/:id answered ${deploy.status}: ${deploy.text.slice(0, 400)}`,
+        ).toBe(422);
+        const refusal = (deploy.json ?? {}) as {
+            status?: string;
+            code?: string;
+            unmet?: Array<{ code?: string }>;
+        };
+        expect(refusal.status).toBe('error');
+        expect(refusal.code, 'the App path’s precondition refusal, not a website one').toBe(
+            'APP_DEPLOY_PRECONDITIONS',
+        );
+        expect(
+            (refusal.unmet ?? []).map((entry) => entry.code),
+            'R-12: the refusal names the None target, and target_none ends the evaluation',
+        ).toEqual(['target_none']);
+        expect(
+            deploy.text,
+            'the website token check is no longer what answers for an App Work',
+        ).not.toContain('token is required');
+
+        // … and the refusal left no Deployment behind: the same read as step 3, after it.
+        const afterRefusal = await listDeployments(request, {
+            token: user.access_token,
+            workId: work.workId,
+        });
+        expect(afterRefusal.status).toBe(200);
+        expect(
+            (afterRefusal.json as { deployments?: unknown[] }).deployments ?? [],
+            'a refused None-target deploy creates no Deployment row',
+        ).toEqual([]);
 
         // 5. Activity: "no `app.deploy.*` and no `app.change.live`".
         const after = await activityActions(request, user.access_token);

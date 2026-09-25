@@ -117,6 +117,14 @@ function pollHref(workId: string): string {
     return `/api/works/${workId}/app-spec`;
 }
 
+/**
+ * The per-tab workspace selector `browserApiFetch` stamps on every browser→BFF call
+ * (`applyBrowserWorkspaceScope` in `lib/api/browser-api.ts`), as the poll sends it from an unprefixed (personal) URL. Both
+ * Works here are created with `organization: false`, so `personal` is the selector the real page
+ * would serialize — the same constant develop's `flow-work-deploy-state.spec.ts` sends.
+ */
+const BROWSER_PERSONAL_SELECTOR = { 'x-ever-workspace': 'personal' } as const;
+
 /** The three tabs every kind gets, and the control that the nav rendered at all. */
 function siblingHrefs(workId: string): string[] {
     return [
@@ -464,39 +472,52 @@ test('ACC-03-39 (plan §5.1:604) — both kinds withhold the tab’s address, an
  * The poll is `browserApiFetch('/api/works/<id>/app-spec')` on the **web** origin
  * (`AppSpecPageClient.tsx:88`), served by `apps/web/src/app/api/works/[id]/app-spec/route.ts`.
  * That route is the same-origin read door for the five-second poll, and it is reachable on this
- * lane even though the page that starts the poll is not — so both of its answers are pinned here.
+ * lane even though the page that starts the poll is not — so every one of its answers is pinned
+ * here.
  *
- * ## The authenticated half is a build-wide refusal, measured, and it is not this epic's
+ * ## The selector is part of the poll — the earlier "build-wide empty 500" was its absence
  *
- * The route's contract is "forward the API's `404` unchanged" (`route.ts:50-59`), and the API does
- * answer that `404`. What this lane's web process answers instead is an **empty `500`** — for an
- * app-spec poll *and* for three sibling BFF poll routes that predate this epic, which is the control
- * that keeps this from being read as an App-spec defect. Measured 2026-09-19 against the running
- * production build (`next start`, port 3211) with the seeded session cookie, four for four:
+ * This case first pinned the authenticated read as an **empty `500`** (measured 2026-09-19, for the
+ * app-spec poll and for three sibling BFF poll routes alike) and read it as a build-wide refusal.
+ * It was not: `browserApiFetch` stamps the per-tab `x-ever-workspace` selector on **every** call
+ * (`applyBrowserWorkspaceScope` in `lib/api/browser-api.ts`), and `serverFetch` — which
+ * `getAuthFromCookie()` reaches through `authAPI.getProfile()` — fails closed without it (its
+ * `selectedScope` resolution in `lib/api/server-api.ts`: `parseWorkspaceSelector` throws
+ * `Invalid workspace scope`). The raw context below sent no selector, and the throw escaped
+ * each handler because `getAuthFromCookie()` sits before its `try`: Next answers an unhandled
+ * route-handler throw with a 0-byte `500`.
+ *
+ * Root-caused and fixed on this branch (88d1ee1b3, then the Upstream route alongside this re-pin):
+ * both App Works poll routes now catch it — and only it: a throw while the selector parses is
+ * rethrown — and answer the house `400 { error: 'Invalid workspace scope' }` that every `bffProxy`
+ * route answers (its catch around `applyBffWorkspaceScope`, `lib/api/bff-proxy.ts`). The old pin was
+ * never re-measured after 88d1ee1b3 landed and went red on the first lane run that reached it
+ * (E2E run 36187829618, shard 7: `400 {"error":"Invalid workspace scope"}`). So the pins are now:
  *
  * ```
- * /api/works/<id>/app-spec                       -> 500, 0-byte body
- * /api/works/<id>/upstream                       -> 500, 0-byte body
- * /api/works/<id>/deploy/status                  -> 500, 0-byte body
- * /api/works/<id>/comparisons/generation-status  -> 500, 0-byte body
+ * with the browser's selector (x-ever-workspace: personal):
+ *   /api/works/<id>/app-spec                       -> 404, the API's not_found body forwarded verbatim
+ * without it:
+ *   /api/works/<id>/app-spec                       -> 400 { error: 'Invalid workspace scope' }
+ *   /api/works/<id>/upstream                       -> 400 { error: 'Invalid workspace scope' }
+ *   /api/works/<id>/deploy/status                  -> 500, 0-byte body   (develop's route, unchanged)
+ *   /api/works/<id>/comparisons/generation-status  -> 500, 0-byte body   (develop's route, unchanged)
+ * anonymous:
+ *   /api/works/<id>/app-spec                       -> 401 { status: 'error', code: 'unauthorized' }
  * ```
  *
- * A 0-byte body is what Next.js answers for an **unhandled** throw inside a route handler, so the
- * throw is before the handler's own `try` — i.e. in `getAuthFromCookie()` (`route.ts:40`) or in
- * `serverFetch`'s own prologue (`server-api.ts:106-113`, which calls `headers()` and
- * `getTranslations('api.errors')` outside any `try`). The anonymous path never reaches either and
- * answers the documented `401 {"status":"error","code":"unauthorized"}`. Root-causing it needs the
- * web process's own stderr, which this lane does not expose; the measurement, the four-route
- * control and the two candidate call sites are recorded here and in T19's report.
- *
- * The assertions below pin **both** measured answers rather than the source's intent, so a build
- * that starts forwarding the `404` fails this test loudly and gets updated deliberately.
+ * The last two header-less rows are not this epic's routes: they still call `getAuthFromCookie()`
+ * outside a `try` (the first statement of the `GET` in `deploy/status/route.ts` and in
+ * `comparisons/generation-status/route.ts`), and
+ * their browser callers send the selector, so the empty `500` is only reachable by a raw caller.
+ * They stay pinned as measured so a change to them is seen here and updated deliberately.
  */
-test('the tab’s poll read (`/api/works/:id/app-spec` on the web origin): anonymous is 401 `unauthorized`; an authenticated call is the build-wide empty 500 the three sibling poll routes also answer', async ({
+test('the tab’s poll read (`/api/works/:id/app-spec` on the web origin): anonymous is 401 `unauthorized`; with the browser’s workspace selector the API’s 404 is forwarded; without it the house 400', async ({
     playwright,
 }) => {
     const origin = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
-    // The poll is cookie-authenticated (`route.ts:40`), so the context that calls it must carry the
+    // The poll is cookie-authenticated (the `getAuthFromCookie()` call in `app-spec/route.ts`'s
+    // `GET`), so the context that calls it must carry the
     // same session the browser does — the seeded user's storage state, which the `chromium` project
     // loads for every spec (`playwright.config.ts:102`).
     const owner = await playwright.request.newContext({
@@ -515,40 +536,86 @@ test('the tab’s poll read (`/api/works/:id/app-spec` on the web origin): anony
     try {
         const { appId } = await ensureFixtures(owner);
 
-        // 1. The authenticated poll, exactly as `AppSpecPageClient` issues it.
+        // 1. The authenticated poll, exactly as `AppSpecPageClient` issues it: `browserApiFetch`
+        //    stamps the per-tab selector, and a Work created with `organization: false` is read from
+        //    an unprefixed URL, whose selector is `personal` (`workspace-scope.ts`,
+        //    `serializeWorkspaceScope`). The route's contract is "forward the API's refusal
+        //    unchanged" (`route.ts`), and the API's answer for this App Work is the no-state-row
+        //    `404` step 1 of ACC_03_39_ADDRESS reads directly — so the poll must read the same one.
         const polled: APIResponse = await readWithTransportRetry(() =>
-            owner.get(pollHref(appId), { failOnStatusCode: false }),
+            owner.get(pollHref(appId), {
+                headers: BROWSER_PERSONAL_SELECTOR,
+                failOnStatusCode: false,
+            }),
         );
         const polledBody = await polled.text();
         expect(
             polled.status(),
             `the authenticated poll read answered ${polled.status()} with ${JSON.stringify(polledBody)}. ` +
-                'Measured on this lane: 500 with an empty body — the API answers 404 not_found ' +
-                '("…has no App spec state yet.") and the BFF handler never forwards it.',
-        ).toBe(500);
+                `Expected the API's own ${NO_STATE_ROW.status} ${NO_STATE_ROW.code} ` +
+                '("…has no App spec state yet."), forwarded by the BFF handler unchanged.',
+        ).toBe(NO_STATE_ROW.status);
         expect(
-            polledBody,
-            'an empty body is Next’s answer for an unhandled throw, i.e. before the handler’s own catch',
-        ).toBe('');
+            JSON.parse(polledBody) as Record<string, unknown>,
+            'the refusal is forwarded as the API wrote it — code and message, not a re-worded error',
+        ).toMatchObject({
+            status: 'error',
+            code: NO_STATE_ROW.code,
+            message: NO_STATE_ROW.message(appId),
+        });
 
-        // 2. The control: three sibling BFF poll routes, none of them this epic's, answer the same
-        //    thing in the same session — so the refusal is a property of this build's authenticated
-        //    route handlers, not of the App spec route.
-        for (const sibling of [
-            `/api/works/${appId}/upstream`,
-            `/api/works/${appId}/deploy/status`,
-            `/api/works/${appId}/comparisons/generation-status`,
-        ]) {
+        // 2. The same session WITHOUT the selector — what a raw caller sends, and what this case
+        //    used to send and misread as a build-wide refusal. `serverFetch` fails closed, and the
+        //    route answers the house `400` every `bffProxy` route answers (88d1ee1b3), where it
+        //    used to let the throw escape as an empty 500. This is the one row of this case a lane
+        //    has measured: E2E run 36187829618 (shard 7) answered exactly this 400 to the old
+        //    header-less first read, which is what turned the empty-500 pin red.
+        const unscoped: APIResponse = await readWithTransportRetry(() =>
+            owner.get(pollHref(appId), { failOnStatusCode: false }),
+        );
+        expect(
+            { status: unscoped.status(), body: await unscoped.text() },
+            'no workspace selector: the house 400 envelope, never an empty 500',
+        ).toEqual({ status: 400, body: JSON.stringify({ error: 'Invalid workspace scope' }) });
+
+        // 3. The sibling poll routes, header-less, in the same session. The Upstream card's poll
+        //    route is this epic's (APW-02 T30) and answers the same house 400 as the App spec poll;
+        //    the other two are develop's, still resolve the session outside a `try`, and so still
+        //    answer Next's 0-byte 500 for an unhandled throw. None of these three rows has been
+        //    measured at a recent commit — run 36187829618 failed at the first read and never
+        //    reached this loop:
+        //      - the Upstream 400 is proven by its route unit spec
+        //        (`src/app/api/works/[id]/upstream/route.unit.spec.ts`) and awaits a lane run;
+        //      - the two develop rows were last measured on 2026-09-19 (empty 500). Neither route,
+        //        nor `lib/auth/index.ts`, `lib/api/server-api.ts` or `lib/workspace-scope.ts`, has
+        //        changed since 35e7aff64, so the pin is carried forward by that reading of the code,
+        //        not by a new measurement.
+        //    A change to any of the three routes shows up here and is re-pinned deliberately.
+        const siblings: Array<{ path: string; expected: { status: number; body: string } }> = [
+            {
+                path: `/api/works/${appId}/upstream`,
+                expected: {
+                    status: 400,
+                    body: JSON.stringify({ error: 'Invalid workspace scope' }),
+                },
+            },
+            { path: `/api/works/${appId}/deploy/status`, expected: { status: 500, body: '' } },
+            {
+                path: `/api/works/${appId}/comparisons/generation-status`,
+                expected: { status: 500, body: '' },
+            },
+        ];
+        for (const sibling of siblings) {
             const response: APIResponse = await readWithTransportRetry(() =>
-                owner.get(sibling, { failOnStatusCode: false }),
+                owner.get(sibling.path, { failOnStatusCode: false }),
             );
             expect(
                 { status: response.status(), body: await response.text() },
-                `${sibling} answers what the app-spec poll answers`,
-            ).toEqual({ status: 500, body: '' });
+                `${sibling.path} without the workspace selector`,
+            ).toEqual(sibling.expected);
         }
 
-        // 3. The anonymous half is the contract the route documents and does apply: no session, no
+        // 4. The anonymous half is the contract the route documents and does apply: no session, no
         //    upstream call, `401` with the route's own code.
         const refused: APIResponse = await anonymous.get(pollHref(appId), {
             failOnStatusCode: false,
