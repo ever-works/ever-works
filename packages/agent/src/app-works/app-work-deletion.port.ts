@@ -6,15 +6,23 @@
  * policies and its environment Secret) on whatever target it deploys to, ask the App
  * dependency layer to release or deprovision what it holds, and — only when the member
  * asked — delete the stored data. That work belongs to **APW-06**
- * (`AppRuntimeDeletionService`, which binds this token) and **APW-07** (App
- * dependencies); it does not exist yet.
+ * (`AppRuntimeDeletionService`, `packages/agent/src/app-runtime/app-runtime-deletion.service.ts`)
+ * and **APW-07** (App dependencies). The service exists, and its
+ * `APP_WORK_DELETION_PORT_PROVIDER` is the binding of THIS token; no API module provides
+ * it yet (APW-06 T33 adds it), so in a running API the token is still unbound.
  *
  * So this epic declares the SEAM and nothing else, exactly as it did for
  * `APP_SOURCE_CATALOG_PORT` (T11) and `APP_PROMPTED_VALUES_PORT` (T11): a symbol, a
  * request shape, an outcome shape, and the rule that an unbound token means "the App
  * runtime is not here yet, so nothing can be running" — which is why
  * `WorkLifecycleService.deleteWork` treats unbound as `done` and keeps today's
- * behaviour byte-identical until APW-06 merges.
+ * behaviour byte-identical until the binding lands.
+ *
+ * 🛑 **This file is the ONLY declaration of the token.** The runtime imports it from
+ * here and re-exports it; it once declared its own `Symbol('APP_WORK_DELETION_PORT')`,
+ * which Nest treats as a different token, so its provider could never have reached the
+ * injection in `WorkLifecycleService`. `app-works-port-dormancy.spec.ts` fails on any
+ * two `Symbol()` declarations under `packages/agent/src` that share a description.
  *
  * ## The contract, in two sentences
  *
@@ -29,9 +37,9 @@
  * is called, so a `true` here means "the member ticked the box AND typed the slug".
  * Passing the raw DTO through would let a future second caller re-decide that.
  *
- * Nothing here is persisted, fetched or dialled: plain JSON shapes and one symbol, so
- * `packages/agent` never compiles against a module APW-06 has not written yet (the
- * same reason the sibling ports live beside their tokens).
+ * Nothing here is persisted, fetched or dialled: plain JSON shapes and one symbol, and
+ * the file imports nothing — so the App runtime can import the token from here without
+ * adding an import cycle (the same reason the sibling ports live beside their tokens).
  */
 
 /** What the App runtime is asked to remove, and for whom. */

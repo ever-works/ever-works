@@ -19,6 +19,13 @@
  * a repository or a fork: the fork / private-copy decision stays APW-01's and is carried out in its
  * own request (`plan.md:1483-1484`).
  *
+ * The token is APW-01's own (`packages/agent/src/app-works/app-work-deletion.port.ts`), imported
+ * and re-exported here — never a second `Symbol()` of the same name, which Nest would treat as a
+ * different token. The binding is {@link APP_WORK_DELETION_PORT_PROVIDER}; no API module provides
+ * it yet (APW-06 T33 adds it to the API's ports module, and the `APP_CLUSTER_OP_DISPATCHER` and
+ * `APP_WORK_DELETION_COMPLETION` bindings it relies on are unbound too), and until then the port is
+ * unbound, which `deleteWork` takes as "no App runtime, so nothing can be running".
+ *
  * ## The two halves, and the process each runs in
  *
  * 1. **API** — {@link AppRuntimeDeletionService.preview} (what the delete dialog lists) and
@@ -75,15 +82,16 @@
  *
  * ## The seams this file declares provisionally
  *
- * Three collaborators the plan hands this task by name do not exist in this tree yet, so each is
- * declared here with **the exact name and shape its owner fixes**, in a clearly-marked block at the
- * bottom of this file, and marked with what the swap is (the programme's established pattern —
- * `AppUpstreamStateService`'s three provisional tokens, `APW-02 T23`; the git facade's APW-09 T02
- * block; `app-fork-ready-handler.port.ts`):
+ * The collaborators the plan hands this task by name were not in this tree when it was written, so
+ * each was declared here with **the exact name and shape its owner fixes**, in a clearly-marked
+ * block further down this file, and marked with what the swap is (the programme's established
+ * pattern — `AppUpstreamStateService`'s three provisional tokens, `APW-02 T23`; the git facade's
+ * APW-09 T02 block; `app-fork-ready-handler.port.ts`):
  *
  * 1. **APW-01 T39** — `APP_WORK_DELETION_PORT`, `AppWorkDeletionRequest`, `AppWorkDeletionOutcome`,
- *    `AppWorkDeletionPort` (`APW-01/plan.md:959-976`; the file APW-01 creates is
- *    `packages/agent/src/app-works/app-work-deletion.port.ts`).
+ *    `AppWorkDeletionPort` (`APW-01/plan.md:959-976`). ✅ **Swapped**: T39 landed
+ *    `packages/agent/src/app-works/app-work-deletion.port.ts`, and the four names are now imported
+ *    from it and re-exported — no local declaration remains.
  * 2. **APW-01 T39** — `completeAppWorkDeletion(workId)` (`APW-01/plan.md:980-982`), reached here
  *    through the {@link APP_WORK_DELETION_COMPLETION} seam.
  * 3. **APW-07 T16** — `AppDependenciesService.onAppWorkDeleting(workId, { deleteStoredData })` and
@@ -103,6 +111,18 @@ import type { AppDestroyResult, AppTargetRef } from '@ever-works/plugin';
 import type { Work } from '../entities/work.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WORK_APP_RUNTIME_STATES } from '../app-launcher/app-launcher.service';
+// APW-01 T39 — the deletion port and its DI token, IMPORTED from the file that owns them. This
+// import is the swap the old provisional block promised: while this module declared its own
+// `Symbol('APP_WORK_DELETION_PORT')`, `APP_WORK_DELETION_PORT_PROVIDER` bound a token that
+// `WorkLifecycleService` never injected (see the block above `APP_WORK_DELETION_COMPLETION`).
+// Re-exported below under the same names, so the `./app-runtime` barrel and every existing import
+// path keep compiling. The port file imports nothing, so this adds no import cycle.
+import {
+    APP_WORK_DELETION_PORT,
+    type AppWorkDeletionOutcome,
+    type AppWorkDeletionPort,
+    type AppWorkDeletionRequest,
+} from '../app-works/app-work-deletion.port';
 import { APP_RUNTIME_EVENT_SINK, type AppRuntimeEventSink } from './ports';
 
 /* -------------------------------------------------------------------------- *
@@ -273,49 +293,25 @@ export interface AppWorkDeletionOpResult {
  * Provisional seams — every one of them is another owner's, named as its owner fixes it
  * -------------------------------------------------------------------------- */
 
-// ── provisional — APW-01 T39 ─────────────────────────────────────────────────
+// ── APW-01 T39 — the deletion port, OWNED by `app-works/app-work-deletion.port.ts` ──
 //
-// `packages/agent/src/app-works/app-work-deletion.port.ts` does not exist in this tree: APW-01 owns
-// the file (`APW-01/plan.md:954-976`) and its task has not landed. The three names below are that
-// plan's, verbatim, so the swap when T39 lands is an import and nothing else:
+// This block used to declare `AppWorkDeletionRequest`, `AppWorkDeletionOutcome`,
+// `AppWorkDeletionPort` and `APP_WORK_DELETION_PORT` itself, "provisionally, until T39 lands".
+// T39 landed (033e77dfa) with its own `Symbol('APP_WORK_DELETION_PORT')` and this block stayed, so
+// the tree carried TWO tokens with one name — and a Nest token is compared by identity.
+// `APP_WORK_DELETION_PORT_PROVIDER` provided this file's twin, `WorkLifecycleService` injects
+// APW-01's, so the day the provider is added to the API graph the `@Optional()` injection would
+// still be `undefined`: `deleteWork` takes that as "no App runtime, nothing can be running",
+// deletes the row, and a deployed App Work's workloads keep running (§9.8:1519-1522, R-15). The
+// dormancy register keys tokens by description, so it would even have reported the port as BOUND.
 //
-//     import {
-//         APP_WORK_DELETION_PORT,
-//         type AppWorkDeletionOutcome,
-//         type AppWorkDeletionPort,
-//         type AppWorkDeletionRequest,
-//     } from '../app-works/app-work-deletion.port';
-//
-// 🛑 The token matters most: `Symbol('APP_WORK_DELETION_PORT')` here and APW-01's own
-// `Symbol('APP_WORK_DELETION_PORT')` are **different tokens**, so leaving both in place would let
-// APW-01's `@Optional()` injection silently resolve to nothing — deletion would proceed, the row
-// would be deleted, and the workloads would keep running (§9.8:1519-1522).
-
-/** APW-01 T39 (`APW-01/plan.md:960-964`) — the request the delete dialog produces. */
-export interface AppWorkDeletionRequest {
-    workId: string;
-    userId: string;
-    /** `true` only on the explicit flag; the typed slug is confirmed by the web dialog. */
-    deleteStoredData: boolean;
-}
-
-/** APW-01 T39 (`APW-01/plan.md:965-970`). */
-export interface AppWorkDeletionOutcome {
-    /** `done`: nothing left to remove, delete the row now. `pending`: removal dispatched, keep it. */
-    status: 'pending' | 'done';
-    target: AppDeployTarget;
-    /** A reason code only, never a value. */
-    reason?: string;
-}
-
-/** APW-01 T39 (`APW-01/plan.md:971-974`) — what `WorkLifecycleService.deleteWork` injects. */
-export interface AppWorkDeletionPort {
-    /** Never touches a repository. Idempotent while a deletion is already pending. */
-    requestDeletion(input: AppWorkDeletionRequest): Promise<AppWorkDeletionOutcome>;
-}
-
-/** DI token for {@link AppWorkDeletionPort} — owned by APW-01 T39. */
-export const APP_WORK_DELETION_PORT = Symbol('APP_WORK_DELETION_PORT');
+// The four names now come from the owner's file (the C8 fix's pattern, f6fadb7b2) and are
+// re-exported here so nothing that imports them from this file or the `./app-runtime` barrel has
+// to move. The shapes are the owner's; `AppWorkDeletionOutcome['target']` is the same three
+// strings as `AppDeployTarget`. `app-works-port-dormancy.spec.ts` now fails on any two `Symbol()`
+// declarations under `packages/agent/src` that share a description.
+export { APP_WORK_DELETION_PORT };
+export type { AppWorkDeletionOutcome, AppWorkDeletionPort, AppWorkDeletionRequest };
 
 // ── provisional — APW-01 T39, the completion edge ────────────────────────────
 //
@@ -1356,6 +1352,10 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
 /**
  * The `APP_WORK_DELETION_PORT` binding, ready for the API's ports module to spread into its
  * `providers` (plan §9.8:1533-1536).
+ *
+ * `provide` is APW-01's token itself — imported from `app-work-deletion.port.ts`, the same Symbol
+ * `WorkLifecycleService` injects — and the spec asserts that by identity and through a real Nest
+ * container, because a same-named twin would print identically and bind nothing.
  *
  * Three properties, and all three are the plan's:
  *

@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import ts from 'typescript';
 import { AppBuildsModule } from '../../app-builds/app-builds.module';
 import { AppDependenciesModule } from '../../app-dependencies/app-dependencies.module';
 import { AppEnvModule } from '../../app-env/app-env.module';
@@ -392,5 +395,131 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect([...UNBOUND]).toEqual([...UNBOUND].sort());
         expect([...BOUND]).toEqual([...BOUND].sort());
         expect(UNBOUND.filter((name) => BOUND.includes(name))).toEqual([]);
+    });
+});
+
+/* -------------------------------------------------------------------------- *
+ * One Symbol per name — the class of defect this register cannot see
+ * -------------------------------------------------------------------------- */
+
+/**
+ * `packages/agent/src`, the tree the scan below reads.
+ *
+ * This spec lives in `src/app-runtime/__tests__/`, so the root is two levels up.
+ */
+const AGENT_SRC = join(__dirname, '..', '..');
+
+/** One `Symbol('…')` call with a literal description, where it is written. */
+interface SymbolDeclaration {
+    description: string;
+    at: string;
+}
+
+/**
+ * Every `Symbol('literal')` call in one source text, read through the TypeScript parser — so a
+ * `Symbol('X')` inside a comment or a string is NOT a declaration (several files quote a token's
+ * text in prose), and `Symbol.for('X')`, which is one shared symbol by design, is never counted.
+ */
+function symbolDeclarationsIn(fileName: string, text: string): SymbolDeclaration[] {
+    const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, false);
+    const found: SymbolDeclaration[] = [];
+    const visit = (node: ts.Node): void => {
+        if (
+            ts.isCallExpression(node) &&
+            ts.isIdentifier(node.expression) &&
+            node.expression.text === 'Symbol' &&
+            node.arguments.length === 1 &&
+            ts.isStringLiteralLike(node.arguments[0])
+        ) {
+            const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+            found.push({
+                description: (node.arguments[0] as ts.StringLiteralLike).text,
+                at: `${fileName}:${line + 1}`,
+            });
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return found;
+}
+
+/** The production `.ts` files under `dir` — specs and `__tests__` build their own controls. */
+function productionSourceFiles(dir: string): string[] {
+    const files: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
+            files.push(...productionSourceFiles(path));
+        } else if (
+            entry.name.endsWith('.ts') &&
+            !entry.name.endsWith('.spec.ts') &&
+            !entry.name.endsWith('.d.ts')
+        ) {
+            files.push(path);
+        }
+    }
+    return files;
+}
+
+/** Descriptions declared more than once, each with every place it is declared. */
+function duplicatedDescriptions(declarations: SymbolDeclaration[]): Record<string, string[]> {
+    const byDescription = new Map<string, string[]>();
+    for (const { description, at } of declarations) {
+        byDescription.set(description, [...(byDescription.get(description) ?? []), at]);
+    }
+    return Object.fromEntries([...byDescription].filter(([, places]) => places.length > 1));
+}
+
+describe('no two Symbol() tokens in packages/agent/src share a description', () => {
+    // A Nest token is compared by IDENTITY, and a `Symbol('X')` in one file and another
+    // `Symbol('X')` in a second file are two tokens that PRINT identically. When a provisional
+    // seam re-declares its owner's token, the owner's binding never reaches the injection, every
+    // `@Optional()` consumer stays `undefined`, and nothing fails — C8 (the two APW-05
+    // dispatchers) and `APP_WORK_DELETION_PORT` (APW-06's provider vs APW-01's injection, which
+    // would have let an App Work's row go while its workloads kept running) were both this.
+    //
+    // The register above cannot catch it: it keys tokens by DESCRIPTION, so a provider of the
+    // wrong twin would even be reported as BOUND. This scan is what makes the name unique.
+
+    it('detects a same-named pair and ignores comments, strings and Symbol.for (control)', () => {
+        const control = [
+            "// const inALineComment = Symbol('CONTROL_TOKEN');",
+            "/* const inABlockComment = Symbol('CONTROL_TOKEN'); */",
+            'const inAString = "Symbol(\'CONTROL_TOKEN\')";',
+            "const shared = Symbol.for('CONTROL_TOKEN');",
+            "export const FIRST = Symbol('CONTROL_TOKEN');",
+            'export const SECOND = Symbol(`CONTROL_TOKEN`);',
+            "export const UNIQUE = Symbol('UNIQUE_CONTROL_TOKEN');",
+        ].join('\n');
+
+        const declarations = symbolDeclarationsIn('control.ts', control);
+
+        expect(declarations).toEqual([
+            { description: 'CONTROL_TOKEN', at: 'control.ts:5' },
+            { description: 'CONTROL_TOKEN', at: 'control.ts:6' },
+            { description: 'UNIQUE_CONTROL_TOKEN', at: 'control.ts:7' },
+        ]);
+        expect(duplicatedDescriptions(declarations)).toEqual({
+            CONTROL_TOKEN: ['control.ts:5', 'control.ts:6'],
+        });
+    });
+
+    it('finds every description declared exactly once', () => {
+        const declarations = productionSourceFiles(AGENT_SRC).flatMap((file) =>
+            symbolDeclarationsIn(
+                relative(AGENT_SRC, file).split('\\').join('/'),
+                readFileSync(file, 'utf8'),
+            ),
+        );
+
+        // Vacuity guard: the tree declares a hundred-odd tokens. If the walk or the parse
+        // broke, an empty scan would pass the assertion below by accident.
+        expect(declarations.length).toBeGreaterThan(50);
+        expect(declarations.map((d) => d.description)).toContain('APP_WORK_DELETION_PORT');
+
+        // If this fails, import the owner's token (and re-export it under the same name if a
+        // barrel needs it) instead of declaring a second `Symbol()` — the C8 fix, f6fadb7b2.
+        expect(duplicatedDescriptions(declarations)).toEqual({});
     });
 });

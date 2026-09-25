@@ -38,8 +38,17 @@ import {
     type AppsDomainDnsService,
     type AppClusterOpDispatcher,
 } from '../app-runtime-deletion.service';
+// APW-01 T39 — the OWNER's token, imported under its own file's name so the identity
+// assertions below compare the runtime's binding with what `WorkLifecycleService` injects,
+// rather than with this file's re-export of it.
+import {
+    APP_WORK_DELETION_PORT as APW01_APP_WORK_DELETION_PORT,
+    type AppWorkDeletionPort as Apw01AppWorkDeletionPort,
+} from '../../app-works/app-work-deletion.port';
 import type { AppDestroyResult, AppTargetRef } from '@ever-works/plugin';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
 import type { AppRuntimeEventSink } from '../ports';
 
 /* -------------------------------------------------------------------------- *
@@ -1037,6 +1046,83 @@ describe('the APP_WORK_DELETION_PORT binding is the lazy, cycle-safe one §9.8 f
         expect(h.dependencyCalls).toEqual([
             { method: 'onAppWorkDeleting', opts: { deleteStoredData: false } },
         ]);
+    });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The port's token is APW-01's — one Symbol, not two that share a name
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The consumer shape `WorkLifecycleService` has (`work-lifecycle.service.ts`, its last
+ * constructor parameter): `@Optional()` and injected by APW-01's own token. A synthetic class,
+ * so this proves the DI edge without booting the Work lifecycle's whole graph.
+ */
+@Injectable()
+class Apw01DeletionPortConsumer {
+    constructor(
+        @Optional()
+        @Inject(APW01_APP_WORK_DELETION_PORT)
+        readonly port?: Apw01AppWorkDeletionPort,
+    ) {}
+}
+
+describe('APP_WORK_DELETION_PORT_PROVIDER provides the token APW-01 injects', () => {
+    // The defect this closes: this file used to declare its own
+    // `Symbol('APP_WORK_DELETION_PORT')` while `app-work-deletion.port.ts` declared another.
+    // A Nest token is compared by IDENTITY, so the provider bound a token nobody injected and
+    // `WorkLifecycleService`'s `@Optional()` port stayed `undefined` — which `deleteWork` takes as
+    // "no App runtime, delete the row now", leaving a deployed App Work's workloads running.
+    // The two Symbols print identically; only identity tells them apart.
+
+    it('is the very Symbol app-work-deletion.port.ts declares', () => {
+        expect(APP_WORK_DELETION_PORT_PROVIDER.provide).toBe(APW01_APP_WORK_DELETION_PORT);
+        expect(APP_WORK_DELETION_PORT).toBe(APW01_APP_WORK_DELETION_PORT);
+        // Negative control: a same-named Symbol is a different token, so the two assertions
+        // above cannot pass by description alone.
+        expect(APW01_APP_WORK_DELETION_PORT).not.toBe(Symbol('APP_WORK_DELETION_PORT') as unknown);
+    });
+
+    it('reaches an @Optional() @Inject(APW-01 token) consumer in a real Nest container', async () => {
+        const requests: unknown[] = [];
+        const fakeService = {
+            requestDeletion: async (input: unknown) => {
+                requests.push(input);
+                return { status: 'pending', target: TARGET_CLUSTER, reason: 'dispatched' };
+            },
+        };
+
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                APP_WORK_DELETION_PORT_PROVIDER,
+                { provide: AppRuntimeDeletionService, useValue: fakeService },
+                Apw01DeletionPortConsumer,
+            ],
+        }).compile();
+
+        try {
+            const consumer = moduleRef.get(Apw01DeletionPortConsumer);
+
+            // Undefined here is the whole defect: `deleteWork` would delete the row at once.
+            expect(consumer.port).toBeDefined();
+
+            const outcome = await consumer.port.requestDeletion({
+                workId: 'work-1',
+                userId: 'user-1',
+                deleteStoredData: true,
+            });
+
+            expect(outcome).toEqual({
+                status: 'pending',
+                target: TARGET_CLUSTER,
+                reason: 'dispatched',
+            });
+            expect(requests).toEqual([
+                { workId: 'work-1', userId: 'user-1', deleteStoredData: true },
+            ]);
+        } finally {
+            await moduleRef.close();
+        }
     });
 });
 
