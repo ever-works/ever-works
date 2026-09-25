@@ -94,6 +94,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { SafetyApiModule } from './safety/safety.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
+import { AppWorksTelemetryBindingModule } from './telemetry/app-works-telemetry-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
@@ -105,6 +106,9 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 // agent package's AppUpstreamStateService, and each refusal travels as §4.1's
 // `{ status: 'error', code, message, details? }` body.
 import { AppWorksModule } from './app-works/app-works.module';
+// APW-05 T21 (first slice) — the API-side Builds module: today the two-minute
+// Builds sweep when Trigger.dev is not the runtime (plan §7.4). T23/T24 extend it.
+import { AppBuildsModule } from './app-builds/app-builds.module';
 // APW-09 T43 (FR-43, XC-18) — the credential of record: the read, the pause, the
 // handover, and the durable store the handover writes. Agent-side, so the whole
 // epic's later routes reach it by importing the agent module directly.
@@ -185,6 +189,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
                     registryGithubUrl: config.plugins.registryGithubUrl(),
                     registryToken: config.plugins.registryToken(),
                     installDir: config.plugins.installDir(),
+                    // EW-693 T27 — bounds the boot warmup (default 60 s).
+                    warmupTimeoutMs: config.plugins.warmupTimeoutMs(),
+                    // EW-693 T26 — both OFF unless set (today's behaviour).
+                    facadeInstallOnUse: config.plugins.facadeInstallOnUse(),
+                    sandboxSessionsViaJobRuntime: config.plugins.sandboxSessionsViaJobRuntime(),
                 };
             },
         }),
@@ -352,6 +361,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         BillingApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
+        AppWorksTelemetryBindingModule,
         UploadsModule,
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
@@ -377,6 +387,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // AppWorksModule, which is what `TriggerInternalModule` imports for its
         // remote-proxy targets (T27/T28). Nothing above or below moves.
         AppWorksModule,
+        // APW-05 T21 (first slice) — additive: `AppBuildSweepCronService`, the Builds
+        // sweep from this process when Trigger.dev is not the runtime (its `@Cron`
+        // fires through `ScheduleModule.forRoot()` above). Nothing above or below moves.
+        AppBuildsModule,
         // APW-09 T43 (FR-43, XC-18) — additive: the credential of record. The
         // module provides `UpstreamCredentialService` and the durable store a
         // handover writes, and binds `UPSTREAM_CREDENTIAL_STORE` to it, so a
@@ -500,7 +514,9 @@ export class ApiModule implements OnApplicationBootstrap {
      * optimisation only. We run warmup BEFORE the API begins serving so
      * the readiness probe in k8s flips green only after the store is
      * primed (`startupProbe.initialDelaySeconds` covers the worst-case
-     * warmup time; see `.deploy/k8s/k8s-manifest.prod.yaml`).
+     * warmup time; see `.deploy/k8s/k8s-manifest.prod.yaml`). Each plugin's
+     * fetch is bounded by `PLUGIN_WARMUP_TIMEOUT_MS` (default 60 s; EW-693
+     * T27), so a hanging registry cannot hold the boot indefinitely.
      */
     async onApplicationBootstrap(): Promise<void> {
         await this.pluginBootstrap.bootstrap();

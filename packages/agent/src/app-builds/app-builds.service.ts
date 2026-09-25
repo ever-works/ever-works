@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import {
+    APP_BUILD_DEPLOYABLE_TRIGGERS,
     APP_BUILD_LIST_MAX_PAGE_SIZE,
     APP_BUILD_REBUILD_DEDUPE_MS,
     APP_BUILD_REBUILDS_PER_HOUR,
@@ -57,6 +58,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { PluginUsageCapability } from '../entities/plugin-usage-event.entity';
 import { UsageOutcome, UsagePayer } from '../entities/_types';
 import { WorkBuild } from '../entities/work-build.entity';
+import type { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
 import { APP_BUILD_EVENT_CLASSES, type AppBuildEventClass } from '../events/app-build.events';
 import { PluginUsageService } from '../usage/plugin-usage.service';
 // APW-05 T18 — the two dispatcher ports and their DI tokens, IMPORTED from the files
@@ -76,6 +78,7 @@ import {
 import {
     evaluateBuildVerdict,
     fingerprintsToValues,
+    type AppBuildVerdict,
     type AppBuildVerdictRow,
 } from './deployable-verdict';
 
@@ -83,7 +86,12 @@ import {
  * Job payloads, dispatchers and the in-process fallback (§7.1, APW05-G20)
  * -------------------------------------------------------------------------- */
 
-/** Why a prepare was asked for (`plan.md:1312-1314`), plus §7.2's coalescing reason. */
+/**
+ * Why a prepare was asked for (`plan.md:1312-1314`), plus §7.2's coalescing
+ * reason and the sweep's re-drive of a requested Build nothing dispatched
+ * (`sweep` — §9.2's "the job retries 3 times", delivered by
+ * `AppBuildSweepService` rather than by the job runtime; see that file).
+ */
 export const APP_BUILD_PREPARE_REASONS = [
     'specApplied',
     'envChanged',
@@ -94,6 +102,7 @@ export const APP_BUILD_PREPARE_REASONS = [
     'settingsChanged',
     'actionsEnabled',
     'coalesced',
+    'sweep',
 ] as const;
 
 /** One `app-build-prepare` reason. */
@@ -790,6 +799,118 @@ export interface AppBuildFinalizeResult {
     readonly notDeployableReason: AppBuildNotDeployableReason | null;
 }
 
+/**
+ * APW-05 T14 remainder — evidence about a Build's image that arrives with an
+ * observation rather than from its row.
+ *
+ * `pushLogDigest` is `BuildSnapshot.image.pushLogDigest`: the digest the build
+ * job's Push step logged. It is weighed only when the registry ANSWERS that the
+ * image cannot be read (plan §4.8's no-token fallback) — never when the registry
+ * read fails, and never when there is no registry read at all. There is no
+ * column for it: {@link AppBuildsService.applySnapshot} hands it to `finalize`
+ * with the terminal snapshot it arrived in, and a later
+ * {@link AppBuildsService.reconfirmDigest} is given it again by its caller.
+ */
+export interface AppBuildDigestEvidence {
+    readonly pushLogDigest?: string;
+}
+
+/**
+ * How long `finalize` (and `reconfirmDigest`) wait for the registry read of T14's
+ * digest confirmation before treating it as unconfirmed.
+ *
+ * `checkImageAccess` sends up to two requests to ghcr.io (the anonymous `/token`,
+ * then the manifest `HEAD`) with no signal of their own, and `finalize` runs after
+ * the terminal claim inside the watch lease (`APP_BUILD_WATCH_LEASE_MS`, two
+ * minutes). A hung registry therefore costs the confirmation, exactly like a read
+ * that throws — never the settlement, and never the lease.
+ */
+export const APP_BUILD_DIGEST_READ_TIMEOUT_MS = 15_000;
+
+/**
+ * Whether an observation keeps the row's commit rather than the run's `head_sha`.
+ *
+ * The platform dispatches a `manual` or `verification` Build with the row's own
+ * `commitSha` as `ew_sha`, and the workflow checks out and tags exactly that
+ * commit (`sha-<ew_sha>`). A `workflow_dispatch` run's `head_sha` is the tracked
+ * branch's head at dispatch time instead, so for a Build of an older commit it
+ * names a commit that was not built — and T14 would then read the wrong `sha-`
+ * tag, which exists with another digest whenever a push Build built the head
+ * (a false `digestMismatch` that a Rebuild of the same commit only repeats).
+ */
+function keepsDispatchedCommit(row: WorkBuild): boolean {
+    return (row.trigger === 'manual' || row.trigger === 'verification') && Boolean(row.commitSha);
+}
+
+/**
+ * The image fields one observation writes.
+ *
+ * The snapshot's `confirmed` flag and repository are the plugin's (the
+ * github-actions plugin reports every digest `confirmed: false`, spelled as the
+ * artifact spelled it); a confirmation is the PLATFORM's (`confirmDigest`, which
+ * also pins `imageRepository` to the derived repository APW-06's deploy reference
+ * is built from). The watch runner delivers a terminal snapshot more than once,
+ * and the observation is written before the terminal claim refuses the repeat,
+ * so a repeat that copied those fields would undo the confirmation with nothing
+ * left to redo it. A confirmed row observed with the SAME digest therefore keeps
+ * its repository, digest and confirmation; a different digest is a different
+ * claim, and is taken unconfirmed.
+ */
+function observedImage(
+    row: WorkBuild,
+    image: NonNullable<BuildSnapshot['image']>,
+): Partial<WorkBuild> {
+    if (row.digestConfirmed && row.imageDigest === image.digest) {
+        return { imageTags: image.tags };
+    }
+    return {
+        imageRepository: image.repository,
+        imageDigest: image.digest,
+        imageTags: image.tags,
+        digestConfirmed: image.confirmed,
+    };
+}
+
+/**
+ * `read`, or a rejection once {@link APP_BUILD_DIGEST_READ_TIMEOUT_MS} passes with
+ * no answer. The read itself is not cancelled (the binding takes no signal); its
+ * late answer is simply ignored, and `Promise.race` has already subscribed to it,
+ * so a late rejection is not an unhandled one.
+ */
+async function withinDigestReadTimeout<T>(read: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+            () => reject(new Error(`no answer within ${APP_BUILD_DIGEST_READ_TIMEOUT_MS} ms`)),
+            APP_BUILD_DIGEST_READ_TIMEOUT_MS,
+        );
+        // Never the reason a worker process stays alive.
+        timer.unref?.();
+    });
+    try {
+        return await Promise.race([read, timeout]);
+    } finally {
+        if (timer !== undefined) clearTimeout(timer);
+    }
+}
+
+/**
+ * What `reconfirmDigest` answers.
+ *
+ * `reconfirmed` means the digest is confirmed now and the verdict was settled
+ * again — which can still be `deployable: false` when another clause no longer
+ * holds (the build values rotated since, say). `unconfirmed` means the row was
+ * left `digestUnconfirmed` (with `failureClass: 'digestMismatch'` recorded when
+ * the registry reported a different digest).
+ */
+export interface AppBuildReconfirmResult {
+    readonly reconfirmed: boolean;
+    readonly reason: 'reconfirmed' | 'notFound' | 'notDigestUnconfirmed' | 'unconfirmed';
+    readonly build: WorkBuild | null;
+    readonly deployable: boolean;
+    readonly notDeployableReason: AppBuildNotDeployableReason | null;
+}
+
 /** Why a provider run produced no Build — the accept rules of §7.5. */
 export type AppBuildRunRefusal =
     | 'unknownWork'
@@ -904,10 +1025,21 @@ export function toAppBuildSummary(build: WorkBuild): AppBuildSummary {
  *
  * ## The verdict is computed here and nowhere else
  *
- * {@link finalize} is the only caller of `evaluateBuildVerdict`, and it writes
- * `deployable` + `notDeployableReason` in the same patch as `completedAt`. "The
- * verdict, recomputed at completion (§5.1) — never set before then"
- * (`work-build.entity.ts:228-230`) is therefore true by construction.
+ * {@link finalize} computes the verdict (through `verdictFor`, the only caller of
+ * `evaluateBuildVerdict`) and writes `deployable` + `notDeployableReason` in the
+ * same patch as `completedAt`. "The verdict, recomputed at completion (§5.1) —
+ * never set before then" (`work-build.entity.ts:228-230`) is therefore true by
+ * construction. The one other writer is {@link reconfirmDigest}, and it only
+ * re-settles a verdict `finalize` already wrote as `digestUnconfirmed` (§7.4's
+ * recheck), through the same helper.
+ *
+ * ## The digest is confirmed here, never believed (plan §4.8, T14)
+ *
+ * The build plugin reports the artifact's digest `confirmed: false`: it is the
+ * member's own CI's claim. {@link finalize} reads the image through the
+ * binding's `checkImageAccess` and only an equal registry digest (or, when the
+ * registry answers that it cannot be read, an equal Push-step log digest)
+ * confirms it — see `confirmDigest`.
  *
  * ## Idempotency: the terminal claim, then the verdict guard
  *
@@ -945,8 +1077,12 @@ export function toAppBuildSummary(build: WorkBuild): AppBuildSummary {
 export class AppBuildsService {
     private readonly logger = new Logger(AppBuildsService.name);
 
-    /** In-process fallback runs in flight, so a slow dispatcher cannot pile them up. */
-    private readonly inProcessRuns = new Set<string>();
+    /**
+     * In-process fallback runs in flight, so a slow dispatcher cannot pile them
+     * up. `rerun` marks a prepare that was asked for while its Work's run was in
+     * flight (see {@link runInProcess}).
+     */
+    private readonly inProcessRuns = new Map<string, { rerun: boolean }>();
 
     constructor(
         private readonly builds: AppBuildRepository,
@@ -1037,22 +1173,41 @@ export class AppBuildsService {
         return { prepareSeq, dispatched };
     }
 
-    /** The `prepareSeq` bump of §7.2 — read, merge, write. No row ⇒ nothing to bump. */
+    /**
+     * The `prepareSeq` bump of §7.2 — read, merge, write. No row ⇒ nothing to bump.
+     *
+     * Never throws: the requester's own durable write is already committed, so a
+     * failure to READ or to advance the coalescing marker must cost the marker,
+     * never the request — the caller dispatches either way. The answer is the
+     * marker after the bump, the old marker when only the write failed, and `0`
+     * when the row could not be read at all.
+     *
+     * The merge names `prepareSeq` ALONE. The row's other columns belong to the
+     * prepare, which writes them without this path's lock; echoing back a
+     * `buildPluginId` read before a racing prepare changed it would revert that
+     * prepare. `buildPluginId` is only needed to CREATE a row, and a Work with no
+     * row returns before the write.
+     */
     private async bumpPrepareSeq(workId: string): Promise<number> {
-        const row = await this.preparations.findByWork(workId);
+        let row: WorkBuildPreparation | null;
+        try {
+            row = await this.preparations.findByWork(workId);
+        } catch (error) {
+            this.logger.warn(
+                `App builds: reading prepareSeq for work ${workId} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); the prepare is still dispatched.`,
+            );
+            return 0;
+        }
         if (!row) {
             return 0;
         }
         const next = (row.prepareSeq ?? 0) + 1;
         try {
-            await this.preparations.upsertAfterPrepare(workId, {
-                buildPluginId: row.buildPluginId,
-                prepareSeq: next,
-            });
+            await this.preparations.upsertAfterPrepare(workId, { prepareSeq: next });
             return next;
         } catch (error) {
-            // The requester's own durable write is already committed; a failure to
-            // advance the coalescing marker must not lose the request.
             this.logger.warn(
                 `App builds: bumping prepareSeq for work ${workId} failed (${
                     error instanceof Error ? error.message : String(error)
@@ -1082,7 +1237,15 @@ export class AppBuildsService {
         if (runId !== null) {
             return true;
         }
-        this.runInProcess('prepare', payload.workId, () => this.prepareRunner?.run(payload));
+        this.runInProcess(
+            'prepare',
+            payload.workId,
+            () => this.prepareRunner?.run(payload),
+            // The one re-run a request that met a run in flight earns (§7.2's
+            // coalesced dispatch): the Builds come from the database, so the
+            // reason is all it needs.
+            () => this.prepareRunner?.run({ workId: payload.workId, reason: 'coalesced' }),
+        );
         return false;
     }
 
@@ -1121,30 +1284,58 @@ export class AppBuildsService {
      * time; for watch that is §7.1's "capped at 10 concurrent runs per API process"
      * with the excess left to the next sweep tick, which already covers every
      * silent non-terminal Build (§7.4).
+     *
+     * A PREPARE asked for while its Work's run is in flight is not dropped: it
+     * marks the run, and when the run settles `rerun` runs once more (however many
+     * requests marked it). Dropping it lost the request whenever the run had
+     * already taken its last `prepareSeq` reading — including the runner's OWN
+     * coalesced dispatch, which is always made from inside the run that holds the
+     * marker. The re-run is never concurrent with the run it follows, so the
+     * §7.2 lock is not what keeps the two apart. A watch keeps the drop: the sweep
+     * re-drives it.
      */
     private runInProcess(
         job: 'prepare' | 'watch',
         key: string,
         call: () => Promise<unknown> | undefined,
+        rerun?: () => Promise<unknown> | undefined,
     ): void {
         const marker = `${job}:${key}`;
-        if (this.inProcessRuns.has(marker)) {
+        const inFlight = this.inProcessRuns.get(marker);
+        if (inFlight) {
+            if (rerun) inFlight.rerun = true;
             return;
         }
-        this.inProcessRuns.add(marker);
+        const state = { rerun: false };
+        this.inProcessRuns.set(marker, state);
         void (async () => {
             try {
-                await call();
-            } catch (error) {
-                this.logger.warn(
-                    `App builds: the in-process ${job} run for ${key} failed (${
-                        error instanceof Error ? error.message : String(error)
-                    }).`,
-                );
+                await this.settleInProcess(job, key, call);
+                while (rerun && state.rerun) {
+                    state.rerun = false;
+                    await this.settleInProcess(job, key, rerun);
+                }
             } finally {
                 this.inProcessRuns.delete(marker);
             }
         })();
+    }
+
+    /** One in-process run, its failure logged rather than thrown. */
+    private async settleInProcess(
+        job: 'prepare' | 'watch',
+        key: string,
+        call: () => Promise<unknown> | undefined,
+    ): Promise<void> {
+        try {
+            await call();
+        } catch (error) {
+            this.logger.warn(
+                `App builds: the in-process ${job} run for ${key} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+        }
     }
 
     /* ---------------------------------------------------------------------- *
@@ -1365,9 +1556,13 @@ export class AppBuildsService {
      * `retryAfterMinutes`, counted from the OLDEST rebuild inside the window so the
      * answer is a real wait and not a rounded-up hour.
      *
-     * ⚠️ **The insert is the last thing that is awaited.** The prepare dispatch is
+     * ⚠️ **The insert is the last thing that is awaited.** The prepare request is
      * fired with `void …` (see {@link dispatchPrepare}), which is what keeps FR-41's
-     * two-second budget when the job runtime is slow.
+     * two-second budget when the job runtime is slow. It goes through
+     * {@link requestPrepare}, so §7.2's order holds inside that unawaited chain:
+     * the Build row (the durable change), then the `prepareSeq` bump, then the
+     * dispatch. Without the bump a Rebuild whose dispatch met a running pass was
+     * answered `locked` and waited for an unrelated prepare.
      */
     async requestRebuild(
         workId: string,
@@ -1426,7 +1621,16 @@ export class AppBuildsService {
         await this.publish(build, 'app.build.queued');
 
         // 🛑 Not awaited — FR-41's two-second budget. See the method docstring.
-        void this.dispatchPrepare({ workId, buildId: build.id, reason: 'rebuild' });
+        // Through `requestPrepare`, so the `prepareSeq` bump lands BEFORE the
+        // dispatch: a pass already holding the Work's lock then sees this Rebuild
+        // when it re-reads the marker, even though this dispatch answers `locked`.
+        void this.requestPrepare(workId, 'rebuild', build.id).catch((error: unknown) =>
+            this.logger.warn(
+                `App builds: the prepare of Rebuild ${build.id} (work ${workId}) could not be requested (${
+                    error instanceof Error ? error.message : String(error)
+                }); the Build stays queued for the next prepare.`,
+            ),
+        );
 
         return { ok: true, build, deduped: false };
     }
@@ -1723,7 +1927,10 @@ export class AppBuildsService {
      *   2. **The observation** — every field the snapshot carries, and the row's own
      *      status: `queued` is only ever the insert's value, so an open row advances
      *      to the snapshot's status (or to `running` when the snapshot is already
-     *      terminal — the terminal status itself is claimed in step 4).
+     *      terminal — the terminal status itself is claimed in step 4). Two things
+     *      the platform recorded are not the snapshot's to overwrite: the commit a
+     *      `manual`/`verification` Build was dispatched at (`keepsDispatchedCommit`)
+     *      and a digest confirmation T14 made (`observedImage`).
      *   3. **Started** — `startedAt` is claimed with a conditional UPDATE
      *      (`AND "startedAt" IS NULL`), so `app.build.started` is published exactly
      *      once across repeated `running` snapshots (§7.8:1565-1568).
@@ -1749,9 +1956,14 @@ export class AppBuildsService {
         }
 
         const terminal = isTerminalBuildStatus(snapshot.status);
+        // Read BEFORE the observation is built: the commit and the image fields it
+        // writes depend on what the platform already recorded on the row.
+        const current = await this.requireRow(buildId);
         const observation: Partial<WorkBuild> = {
             ...(snapshot.branch ? { branch: snapshot.branch } : {}),
-            ...(snapshot.commitSha ? { commitSha: snapshot.commitSha } : {}),
+            ...(snapshot.commitSha && !keepsDispatchedCommit(current)
+                ? { commitSha: snapshot.commitSha }
+                : {}),
             ...(snapshot.pullRequestNumber !== undefined
                 ? { pullRequestNumber: snapshot.pullRequestNumber }
                 : {}),
@@ -1763,14 +1975,7 @@ export class AppBuildsService {
             ...(snapshot.checksBillableMinutes !== undefined
                 ? { checksBillableMinutes: snapshot.checksBillableMinutes }
                 : {}),
-            ...(snapshot.image
-                ? {
-                      imageRepository: snapshot.image.repository,
-                      imageDigest: snapshot.image.digest,
-                      imageTags: snapshot.image.tags,
-                      digestConfirmed: snapshot.image.confirmed,
-                  }
-                : {}),
+            ...(snapshot.image ? observedImage(current, snapshot.image) : {}),
             ...(snapshot.secretCheck ? { secretCheck: snapshot.secretCheck } : {}),
             ...(snapshot.verification
                 ? {
@@ -1790,7 +1995,6 @@ export class AppBuildsService {
             lastObservedAt: new Date(),
         };
 
-        const current = await this.requireRow(buildId);
         const open = !isTerminalBuildStatus(current.status);
         await this.persist(current, {
             ...observation,
@@ -1818,7 +2022,12 @@ export class AppBuildsService {
             return this.rowById(buildId);
         }
 
-        const result = await this.finalize(buildId);
+        // T14 remainder: the Push-step digest travels with the terminal snapshot it
+        // arrived in, because there is no column for it (see AppBuildDigestEvidence).
+        const result = await this.finalize(
+            buildId,
+            snapshot.image?.pushLogDigest ? { pushLogDigest: snapshot.image.pushLogDigest } : {},
+        );
         return result.build ?? (await this.rowById(buildId));
     }
 
@@ -1829,8 +2038,16 @@ export class AppBuildsService {
      * Refuses when the verdict is already settled, which is the idempotency guard
      * the class docstring explains. `blocked` is not terminal and is finalised by
      * nothing: it publishes no event at all.
+     *
+     * The digest is confirmed first (plan §7.3:1392 "On a terminal transition:
+     * confirm digest", `confirmDigest`), and its outcome is written in the same
+     * patch as the verdict. A registry that throws costs the confirmation, never
+     * the finalisation: the Build still settles and still publishes.
      */
-    async finalize(buildId: string): Promise<AppBuildFinalizeResult> {
+    async finalize(
+        buildId: string,
+        evidence: AppBuildDigestEvidence = {},
+    ): Promise<AppBuildFinalizeResult> {
         const row = await this.rowById(buildId);
         if (!row) {
             return {
@@ -1861,36 +2078,9 @@ export class AppBuildsService {
             };
         }
 
-        const context = await this.readWork(row.workId);
-        const spec = context ? await this.readSpec(row.workId, row.commitSha) : null;
-        const buildKind = (await this.resolvePlugin(row.workId))?.buildKind ?? 'github-actions';
-        const currentValues = await this.readCurrentInputs(row.workId);
-
-        const verdictRow: AppBuildVerdictRow = {
-            status: row.status,
-            trigger: row.trigger,
-            branch: row.branch,
-            // §5.1's `specValidAtCommit`: read now when the row never recorded it.
-            // A failed or cancelled Build is not deployable on the first clause, so
-            // the extra spec read is skipped for it.
-            specValidAtCommit:
-                row.specValidAtCommit ??
-                (row.status === 'succeeded' ? (spec?.valid ?? null) : null),
-            secretsSyncedAt: row.secretsSyncedAt ?? null,
-            startedAt: row.startedAt ?? null,
-            buildInputsHash: row.buildInputsHash ?? null,
-            secretCheck: row.secretCheck ?? null,
-            digestConfirmed: row.digestConfirmed,
-        };
-
-        const verdict = evaluateBuildVerdict({
-            build: verdictRow,
-            trackedBranch: context?.trackedBranch ?? row.branch,
-            currentValues,
-            buildKind,
-            signatureState: null,
-            scan: null,
-        });
+        const binding = await this.resolvePlugin(row.workId);
+        const digest = await this.confirmDigest(row, binding, evidence);
+        const { verdict, context } = await this.verdictFor(row, binding, digest.confirmed);
 
         const usageEventId = await this.recordReceipt(
             row,
@@ -1898,6 +2088,7 @@ export class AppBuildsService {
         );
 
         const settled = await this.persist(row, {
+            ...digest.patch,
             completedAt: row.completedAt ?? new Date(),
             deployable: verdict.deployable,
             notDeployableReason: verdict.notDeployableReason,
@@ -1916,6 +2107,225 @@ export class AppBuildsService {
             deployable: verdict.deployable,
             notDeployableReason: verdict.notDeployableReason,
         };
+    }
+
+    /**
+     * APW-05 T14 remainder — re-check a Build that settled as `digestUnconfirmed`.
+     *
+     * Plan §7.4 ("re-checks `digestUnconfirmed` Builds whose App Work gained a
+     * pull token") and §4.8 ("rechecked on token save"). {@link finalize} is
+     * one-shot, so without this a Build whose registry read failed, or whose image
+     * was private when it finished, could never become deployable short of a
+     * rebuild. `evidence` is the caller's, exactly as for {@link finalize}.
+     *
+     * Only a row whose verdict is `digestUnconfirmed` is touched. A confirmed
+     * digest re-settles the WHOLE verdict through the same helper `finalize`
+     * uses, so a clause that stopped holding since (a rotated build value) is
+     * reported rather than skipped. It publishes nothing and records no receipt:
+     * §7.8's map is keyed on status transitions and this is not one — so T35's
+     * build-succeeded auto-deploy does not fire for a late confirmation, and a
+     * member deploys that Build by hand. No caller is bound yet: the sweep's
+     * recheck pass and the pull-token save are where it belongs.
+     */
+    async reconfirmDigest(
+        buildId: string,
+        evidence: AppBuildDigestEvidence = {},
+    ): Promise<AppBuildReconfirmResult> {
+        const row = await this.rowById(buildId);
+        if (!row) {
+            return {
+                reconfirmed: false,
+                reason: 'notFound',
+                build: null,
+                deployable: false,
+                notDeployableReason: null,
+            };
+        }
+        if (row.notDeployableReason !== 'digestUnconfirmed') {
+            return {
+                reconfirmed: false,
+                reason: 'notDigestUnconfirmed',
+                build: row,
+                deployable: row.deployable,
+                notDeployableReason:
+                    (row.notDeployableReason as AppBuildNotDeployableReason | null) ?? null,
+            };
+        }
+
+        const binding = await this.resolvePlugin(row.workId);
+        const digest = await this.confirmDigest(row, binding, evidence);
+        if (!digest.confirmed) {
+            const kept =
+                Object.keys(digest.patch).length > 0 ? await this.persist(row, digest.patch) : row;
+            return {
+                reconfirmed: false,
+                reason: 'unconfirmed',
+                build: kept,
+                deployable: false,
+                notDeployableReason: 'digestUnconfirmed',
+            };
+        }
+
+        const { verdict } = await this.verdictFor(row, binding, true);
+        const settled = await this.persist(row, {
+            ...digest.patch,
+            deployable: verdict.deployable,
+            notDeployableReason: verdict.notDeployableReason,
+        });
+        return {
+            reconfirmed: true,
+            reason: 'reconfirmed',
+            build: settled,
+            deployable: verdict.deployable,
+            notDeployableReason: verdict.notDeployableReason,
+        };
+    }
+
+    /**
+     * §5.1's verdict for one terminal row — the one place `evaluateBuildVerdict` is
+     * called, for {@link finalize} and {@link reconfirmDigest} alike.
+     *
+     * `digestConfirmed` is passed in rather than read off the row, because the
+     * confirmation of this very call has not been written yet: it goes into the
+     * same patch as the verdict.
+     */
+    private async verdictFor(
+        row: WorkBuild,
+        binding: AppBuildPluginBinding | null,
+        digestConfirmed: boolean,
+    ): Promise<{ verdict: AppBuildVerdict; context: AppBuildWorkContext | null }> {
+        const context = await this.readWork(row.workId);
+        const spec = context ? await this.readSpec(row.workId, row.commitSha) : null;
+        const buildKind = binding?.buildKind ?? 'github-actions';
+        const currentValues = await this.readCurrentInputs(row.workId);
+
+        const verdictRow: AppBuildVerdictRow = {
+            status: row.status,
+            trigger: row.trigger,
+            branch: row.branch,
+            // §5.1's `specValidAtCommit`: read now when the row never recorded it.
+            // A failed or cancelled Build is not deployable on the first clause, so
+            // the extra spec read is skipped for it.
+            specValidAtCommit:
+                row.specValidAtCommit ??
+                (row.status === 'succeeded' ? (spec?.valid ?? null) : null),
+            secretsSyncedAt: row.secretsSyncedAt ?? null,
+            startedAt: row.startedAt ?? null,
+            buildInputsHash: row.buildInputsHash ?? null,
+            secretCheck: row.secretCheck ?? null,
+            digestConfirmed,
+        };
+
+        const verdict = evaluateBuildVerdict({
+            build: verdictRow,
+            trackedBranch: context?.trackedBranch ?? row.branch,
+            currentValues,
+            buildKind,
+            signatureState: null,
+            scan: null,
+        });
+        return { verdict, context };
+    }
+
+    /**
+     * APW-05 T14 — confirm the artifact's digest against the registry (plan §4.8).
+     *
+     * The digest on the row is the member's own CI's claim (the plugin reports it
+     * `confirmed: false`, always), so it is only ever confirmed, never believed:
+     *
+     *  - a row already `digestConfirmed` stays confirmed, with no registry read (a
+     *    plugin that can vouch for its own digest keeps doing so);
+     *  - only a `succeeded` `push`/`manual` Build with a digest and a commit is
+     *    read at all — nothing else can be deployable, so nothing else is worth a
+     *    registry request;
+     *  - the registry is read through the binding's `checkImageAccess`, for the
+     *    PLATFORM-derived repository and the Build's own `sha-<commitSha>` tag,
+     *    with no pull token (none can be stored yet: the §4.12 writer is unbound).
+     *    An artifact that names a different repository is not read at all — a
+     *    member's CI does not get to choose which image the platform confirms;
+     *  - registry digest equal → confirmed, and the row's `imageRepository` is
+     *    pinned to the derived repository, which is what APW-06's deploy
+     *    reference is built from (a `digestMismatch` recorded by an earlier read
+     *    is cleared); unequal → `failureClass: 'digestMismatch'`;
+     *  - registry answered but unreadable (a private image with no pull token) →
+     *    confirmed only when the Push-step log digest equals the artifact digest
+     *    (the no-token fallback); otherwise unconfirmed until a recheck;
+     *  - no binding, no member, no repository, a read that throws, or one with no
+     *    answer inside {@link APP_BUILD_DIGEST_READ_TIMEOUT_MS} → unconfirmed.
+     *    Neither propagates: `finalize` must still settle, inside its lease.
+     */
+    private async confirmDigest(
+        row: WorkBuild,
+        binding: AppBuildPluginBinding | null,
+        evidence: AppBuildDigestEvidence,
+    ): Promise<{ readonly confirmed: boolean; readonly patch: Partial<WorkBuild> }> {
+        if (row.digestConfirmed) return { confirmed: true, patch: {} };
+        const unconfirmed = { confirmed: false, patch: {} };
+        if (
+            row.status !== 'succeeded' ||
+            !(APP_BUILD_DEPLOYABLE_TRIGGERS as readonly string[]).includes(row.trigger) ||
+            !row.imageDigest ||
+            !row.commitSha
+        ) {
+            return unconfirmed;
+        }
+
+        const repository = binding?.imageRepository ?? null;
+        if (!binding || !repository || typeof binding.checkImageAccess !== 'function') {
+            return unconfirmed;
+        }
+        const claimed = (row.imageRepository ?? '').trim().toLowerCase();
+        if (claimed !== repository.toLowerCase()) {
+            this.logger.warn(
+                `App builds: Build ${row.id} (work ${row.workId}) reports its image in a repository the platform did not derive; its digest is not confirmed.`,
+            );
+            return unconfirmed;
+        }
+
+        let answer: Awaited<ReturnType<NonNullable<AppBuildPluginBinding['checkImageAccess']>>>;
+        try {
+            answer = await withinDigestReadTimeout(
+                binding.checkImageAccess({
+                    imageRepository: repository,
+                    tag: `sha-${row.commitSha}`,
+                }),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `App builds: reading the image of Build ${row.id} (work ${row.workId}) from the registry failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); its digest stays unconfirmed.`,
+            );
+            return unconfirmed;
+        }
+
+        // A `digestMismatch` an earlier read recorded (finalize, or a previous
+        // recheck) is this method's own verdict, and a confirmation withdraws it:
+        // `failureClass` is shown on the Build whatever its status, so a deployable
+        // Build must not keep saying its image could not be confirmed.
+        const confirmed = {
+            confirmed: true,
+            patch: {
+                digestConfirmed: true,
+                imageRepository: repository,
+                ...(row.failureClass === 'digestMismatch' ? { failureClass: null } : {}),
+            },
+        };
+        if (answer.readable && answer.digest) {
+            if (answer.digest === row.imageDigest) return confirmed;
+            this.logger.warn(
+                `App builds: the registry reports a different digest for Build ${row.id} (work ${row.workId}) than its artifact claimed (digestMismatch).`,
+            );
+            return { confirmed: false, patch: { failureClass: 'digestMismatch' } };
+        }
+        if (
+            !answer.readable &&
+            evidence.pushLogDigest !== undefined &&
+            evidence.pushLogDigest === row.imageDigest
+        ) {
+            return confirmed;
+        }
+        return unconfirmed;
     }
 
     /**

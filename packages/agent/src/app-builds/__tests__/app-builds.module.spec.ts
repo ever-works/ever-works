@@ -14,6 +14,7 @@ import {
     AppBuildsService,
 } from '../app-builds.service';
 import { AppBuildWatchRunner } from '../app-build-watch.runner';
+import { AppBuildSweepService } from '../app-build-sweep.service';
 
 /**
  * APW-05 T19 — the Builds module, pinned against a REAL Nest container.
@@ -92,6 +93,14 @@ describe('AppBuildsModule', () => {
         expect(binding?.useExisting).toBeUndefined();
     });
 
+    it('provides and exports the sweep service, so the API cron and the RPC channel can reach it', () => {
+        // APW-05 T21 (first slice). `apps/api`'s `AppBuildSweepCronService` and the
+        // trigger-internal controller's `remoteMap` both inject it from this module;
+        // provided but not exported, both would resolve nothing.
+        expect(metadata('providers')).toContain(AppBuildSweepService);
+        expect(metadata('exports')).toContain(AppBuildSweepService);
+    });
+
     it('registers both of the epic’s tables through TypeOrmModule.forFeature', () => {
         for (const entity of [WorkBuild, WorkBuildPreparation]) {
             const feature = metadata('imports').find((entry) =>
@@ -132,6 +141,18 @@ describe('AppBuildsModule', () => {
             builds.findPage(WORK_ID, { status: ['queued'] }, 1, 20),
         ).resolves.toMatchObject({ rows: [], total: 0 });
         expect(moduleRef.get(AppBuildsService)).toBeInstanceOf(AppBuildsService);
+
+        // T21 — the sweep composes from this module alone (its four collaborators
+        // are all provided here), and a tick over the empty table runs both passes
+        // under the real `app-builds:sweep` lock and finds nothing to do.
+        const sweeps = moduleRef.get(AppBuildSweepService);
+        expect(sweeps).toBeInstanceOf(AppBuildSweepService);
+        await expect(sweeps.runSweep()).resolves.toMatchObject({
+            skipped: null,
+            passesFailed: 0,
+            redriveRequested: 0,
+            lostMarked: 0,
+        });
 
         // (3) the fallback's own entry point: the token, then `run` on whatever
         // it answered — the ModuleRef lookup happens at call time, which is what
@@ -210,5 +231,8 @@ describe('app-builds barrel', () => {
         expect(barrel.APP_BUILD_PREPARE_RUNNER).toBe(APP_BUILD_PREPARE_RUNNER);
         expect(typeof barrel.selectBuildRunner).toBe('function');
         expect(typeof barrel.unionMinusRemoved).toBe('function');
+        // T21's first slice — what `apps/api` imports by name.
+        expect(barrel.AppBuildSweepService).toBe(AppBuildSweepService);
+        expect(barrel.APP_BUILD_SWEEP_LOCK_KEY).toBe('app-builds:sweep');
     });
 });

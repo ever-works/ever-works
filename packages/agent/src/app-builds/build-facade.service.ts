@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { AppBuildKind } from '@ever-works/contracts';
+import { APP_BUILD_IMAGE_NAME, type AppBuildKind } from '@ever-works/contracts';
 import type { BuildAuth, BuildRef, IBuildPlugin, StartBuildInput } from '@ever-works/plugin';
 
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -52,11 +52,18 @@ export const BUILD_REPOSITORY_FACTS_SOURCE = Symbol('BUILD_REPOSITORY_FACTS_SOUR
  *
  * ## The image repository is derived, not configured
  *
- * `ghcr.io/<owner>/<repo>` in lower case, from the Work's own repository
- * coordinates. GHCR requires lower case and rejects anything else, and deriving
- * it means an App Work has a working image repository without anybody
- * configuring one. A plugin whose settings name an explicit repository overrides
- * it — that is the plugin's business, and this facade does not second-guess it.
+ * `ghcr.io/<owner>/<repo>/ever-works-app` (`APP_BUILD_IMAGE_NAME`) in lower
+ * case, from the Work's own repository coordinates — exactly the `EW_IMAGE` the
+ * generated workflow pushes (`buildImageRepository` in the github-actions-build
+ * plugin). GHCR requires lower case and rejects anything else, and deriving it
+ * means an App Work has a working image repository without anybody configuring
+ * one. It is also the ONLY repository {@link AppBuildPluginBinding.checkImageAccess}
+ * will read: the binding is Work-bound, so a caller cannot point the registry
+ * read (or a pull token) at somebody else's image.
+ *
+ * Until 2026-09-25 this was `ghcr.io/<owner>/<repo>`, one path segment short of
+ * where the workflow pushes, so any registry check through the binding looked up
+ * an image that never exists (APW-05 T14).
  */
 @Injectable()
 export class BuildFacadeService implements AppBuildPluginResolver {
@@ -171,12 +178,14 @@ export class BuildFacadeService implements AppBuildPluginResolver {
               }
             : null;
 
+        const imageRepository = repository
+            ? `ghcr.io/${repository.owner}/${repository.repo}/${APP_BUILD_IMAGE_NAME}`.toLowerCase()
+            : null;
+
         return {
             pluginId: plugin.id,
             buildKind: plugin.buildKind,
-            imageRepository: repository
-                ? `ghcr.io/${repository.owner}/${repository.repo}`.toLowerCase()
-                : null,
+            imageRepository,
 
             startBuild: async (input) => {
                 if (!repositoryRef) return null;
@@ -205,6 +214,34 @@ export class BuildFacadeService implements AppBuildPluginResolver {
                     auth,
                 );
             },
+
+            // APW-05 T14 — the registry read that confirms a Build's digest (plan
+            // §4.8) and validates a pull token (§4.12). Declared only when the
+            // plugin has the member AND the Work has an image to read, so a caller
+            // that materialises it can rely on both.
+            ...(imageRepository && typeof plugin.checkImageAccess === 'function'
+                ? {
+                      checkImageAccess: async (input: {
+                          readonly imageRepository: string;
+                          readonly tag: string;
+                          readonly pullToken?: string;
+                      }) => {
+                          if (input.imageRepository.toLowerCase() !== imageRepository) {
+                              // Work-bound, like every other member: the binding reads
+                              // the image it resolved and no other. Refused before the
+                              // pull token is sent anywhere.
+                              throw new Error(
+                                  `BuildFacadeService: ${input.imageRepository} is not this Work's image repository.`,
+                              );
+                          }
+                          return plugin.checkImageAccess!({
+                              imageRepository,
+                              tag: input.tag,
+                              ...(input.pullToken ? { pullToken: input.pullToken } : {}),
+                          });
+                      },
+                  }
+                : {}),
         };
     }
 

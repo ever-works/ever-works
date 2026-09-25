@@ -1,6 +1,8 @@
 import { Injectable, Module, OnModuleInit } from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
 import {
+    APP_DEPLOY_BUILD_SOURCE,
+    APP_DEPLOY_SPEC_SOURCE,
     APP_DEPLOY_TARGET_RESOLVER,
     APP_IMAGE_PULL_CREDENTIAL_SOURCE,
     APP_RUNTIME_DELETION_FACADE,
@@ -86,9 +88,21 @@ import { createRemoteProxy } from '../remote-proxy';
  * | `AppRuntimeFacadeService` (T20) | `WorkRepository`, `WorkDeploymentRepository`, `WorkCustomDomainRepository` |
  * | `AppDeployPreconditionsService`, `AppLicenseGate` (T21) | `DistributedTaskLockService` — it injects `@InjectRepository(CacheEntry)` NON-optionally, so it can only be a proxy here |
  * | `AppRenderInputBuilder` (T22), `AppPublicSmokeService` (T23) | `NotificationService` — Activity and notifications are written in the API process |
- * | `AppHostsService`, `AppDomainsService` (T26), `AppDeployOrchestrator` (T25) | |
- * | `AppRuntimeDeletionService` (T58), `AppVerificationTargetService` (T60) | |
+ * | `AppHostsService`, `AppDomainsService` (T26), `AppDeployOrchestrator` (T25) | `APP_DEPLOY_SPEC_SOURCE` → the API's `AppSpecService` (§5.1's spec at a commit) |
+ * | `AppRuntimeDeletionService` (T58), `AppVerificationTargetService` (T60) | `APP_DEPLOY_BUILD_SOURCE` → the API's `AppDeployBuildSourceAdapter` (APW-05's `WorkBuild` reads) |
  * | `DeployFacadeService` (§6.4:979 — the plugin settings that hold the kubeconfig) | |
+ *
+ * The last two are the API's OWN bindings of the same tokens (`AppDeployRequestModule`), reached by
+ * name, so the worker's §5.1 re-check and render input read the spec and the Build exactly as the
+ * API's deploy route does. Unbound (before 2026-09-25), the render-input builder answered
+ * `no_green_build` for every Build-backed Deployment and `spec_unavailable` for every other one,
+ * and `AppHealthService` had no component list to judge.
+ *
+ * ⚠ Binding them does NOT yet let the worker's §5.1 re-check pass: `APP_DEPLOY_DISPATCHER_AVAILABILITY`
+ * is unbound in this module, so `AppDeployPreconditionsService.evaluate` still stops at its step 1
+ * with `worker_not_isolated` — before it reads the spec or the Build — for every dequeued
+ * Deployment. What "an isolated dispatcher is available" means inside the isolated worker itself is
+ * a §5.1/§5.6 decision this module does not make on its own.
  *
  * ## 🛑 The two §6.4 rows that CANNOT be wired yet, and what is bound instead
  *
@@ -120,7 +134,8 @@ import { createRemoteProxy } from '../remote-proxy';
  * - `WORK_APP_RUNTIME_STATES`' binding (`WorkAppRuntimeStateRepository`) — APW-06 **T17**; the token
  *   itself is APW-11 T5's (`packages/agent/src/app-launcher/app-launcher.service.ts:223`) and is
  *   deliberately **not** re-declared here.
- * - APW-05's `WorkBuild` reads and APW-03's `AppLicenseService` (T29/T30's `APP_LICENSE_SERVICE`).
+ * - APW-03's `AppLicenseService` (T29/T30's `APP_LICENSE_SERVICE`). (APW-05's `WorkBuild` reads were
+ *   on this list until 2026-09-25; they are proxied above.)
  *
  * **APW-06 T70's three classes and T27's service are provided below** (added 2026-09-18):
  * `AppClusterOpRouter` plus the `AppLifecycleOpsService` and `AppSmokeService` it and the
@@ -150,13 +165,16 @@ export class AppClusterWorkerContextBootstrap implements OnModuleInit {
     }
 }
 
-/** The remote name each proxied repository dials on `TriggerInternalController.remoteMap`. */
+/** The remote name each proxied provider dials on `TriggerInternalController.remoteMap`. */
 export const APP_RUNTIME_REMOTE_PROXIES = [
     'WorkRepository',
     'WorkDeploymentRepository',
     'WorkCustomDomainRepository',
     'DistributedTaskLockService',
     'NotificationService',
+    // §5.1's two reads, bound below to `APP_DEPLOY_SPEC_SOURCE` / `APP_DEPLOY_BUILD_SOURCE`.
+    'AppSpecService',
+    'AppDeployBuildSourceAdapter',
 ] as const;
 
 /**
@@ -246,6 +264,25 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
             provide: NotificationService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'NotificationService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // §5.1's two reads (plan §6.4: APW-05's `WorkBuild` reads are "Proxied"), dialled by name
+        // to the API's OWN bindings of the same tokens (`AppDeployRequestModule`): the effective
+        // App spec at a commit (`AppSpecService.getEffectiveSpec`, the proxy
+        // `app-spec-evaluate.task.ts` already uses) and the Build a Deployment names plus the
+        // Work's deployable green Builds (`AppDeployBuildSourceAdapter`). Both read rows, so
+        // neither can be local here. The preconditions pass, the render-input builder,
+        // `AppHostsService` and `AppHealthService` inject them.
+        {
+            provide: APP_DEPLOY_SPEC_SOURCE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppSpecService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_DEPLOY_BUILD_SOURCE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppDeployBuildSourceAdapter'),
             inject: [TriggerInternalApiClient],
         },
 

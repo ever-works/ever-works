@@ -47,14 +47,14 @@ import { AppRuntimeStateModule } from '../app-runtime-state.module';
  * ## ⚠ The scope is THIS PACKAGE, and {@link UNBOUND} does not mean "dormant
  * ## everywhere"
  *
- * `packages/tasks`' own `TriggerAppRuntimeModule` binds eleven of these tokens
+ * `packages/tasks`' own `TriggerAppRuntimeModule` binds thirteen of these tokens
  * for the isolated App cluster worker — the process that actually reaches a
  * cluster. This file cannot see them: `packages/tasks` depends on
  * `packages/agent`, so importing that module here would invert the dependency.
  *
  * A token in {@link UNBOUND} therefore means **"no module in `packages/agent`
  * provides it"**, which is the right question for the API's graph and the wrong
- * one for the worker's. {@link WORKER_BOUND} names the eleven so a reader of
+ * one for the worker's. {@link WORKER_BOUND} names the thirteen so a reader of
  * this register is not misled into re-binding something that is already bound
  * somewhere it belongs better — `AppRuntimeFacadeService` is worker-ONLY by
  * design (`requireAppClusterWorkerContext`), so its tokens must NOT move here.
@@ -204,6 +204,16 @@ const BOUND: readonly string[] = [
     // nothing to generate, for every App Work.
     'APP_ENV_SPEC_SOURCE',
     'APP_RUNTIME_ENV_SOURCE',
+    // APW-03 T26 (explicit + probe halves) — `AppSourceCatalogAdapter`, bound
+    // 2026-09-25 by `AppWorksModule`, beside the inspector and the create service
+    // that inject it. Unbound, every inspect answered Blueprint `unavailable` and
+    // licence class `unknown`, and every explicit `blueprintId` was refused
+    // `400 blueprint_mismatch`. Now, wherever the platform holds a GitHub
+    // credential for the ever-works catalog, the create preview carries a real
+    // licence class (and `none` for a repository no Blueprint names), while a Blueprint
+    // MATCH stays behind the apply gate until `APP_BLUEPRINT_APPLY_SERVICE`
+    // (T28) is bound — without it a match would fail the Work's readiness.
+    'APP_SOURCE_CATALOG_PORT',
     // APW-05 T16's two credential/fact ports, provided by `AppBuildsModule`
     // (2026-09-22). Declared by `build-facade.service.ts`, so they belong in this
     // register like any other port — a new token in NEITHER list fails the last
@@ -218,10 +228,11 @@ const BOUND: readonly string[] = [
  * What `packages/tasks`' `TriggerAppRuntimeModule` binds, for the isolated App
  * cluster worker.
  *
- * Every one of these also appears in {@link UNBOUND}, and that is not a
+ * Every one of these but three also appears in {@link UNBOUND}, and that is not a
  * contradiction — see the scope note in this file's header. They are listed
  * here so the register cannot be read as "nothing provides these anywhere",
- * which is the mistake it would otherwise invite.
+ * which is the mistake it would otherwise invite. The three that are in
+ * {@link BOUND} instead are the allow-listed overlap the case below names.
  *
  * Six are bound to real classes:
  *
@@ -237,10 +248,17 @@ const BOUND: readonly string[] = [
  * (`AppRuntimeEnvModule`), and the worker deliberately does not — the worker
  * holds no DataSource, so the env service and resolver behind it cannot read a
  * row there. Two different answers for two different processes, both correct.
+ *
+ * Two are **proxied by name to the API's own binding** (2026-09-25):
+ * `APP_DEPLOY_SPEC_SOURCE` to `AppSpecService` and `APP_DEPLOY_BUILD_SOURCE` to
+ * `AppDeployBuildSourceAdapter`, the very providers `AppDeployRequestModule`
+ * binds here. One implementation reached from two processes, not two instances.
  */
 const WORKER_BOUND: readonly string[] = [
     'APPS_TIER_POLICY',
+    'APP_DEPLOY_BUILD_SOURCE',
     'APP_DEPLOY_HOST_SOURCE',
+    'APP_DEPLOY_SPEC_SOURCE',
     'APP_DEPLOY_TARGET_RESOLVER',
     'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
     'APP_RUNTIME_DELETION_FACADE',
@@ -305,7 +323,6 @@ const UNBOUND: readonly string[] = [
     'APP_RUNTIME_NOTIFICATIONS',
     'APP_RUNTIME_TARGET',
     'APP_RUNTIME_VERIFICATION_FACADE',
-    'APP_SOURCE_CATALOG_PORT',
     'APP_SPEC_DISPLAY_NAMES',
     'APP_TARGET_UPDATED_PORT',
     'APP_UPSTREAM_LICENSE_SERVICE',
@@ -357,12 +374,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         // The register's headline, and it is about THIS PACKAGE — see the
         // scope note in the header and `WORKER_BOUND`. It is an assertion
         // and not a log line so
-        // that it cannot drift: **47 of the 68 tokens in these two lists are
-        // dormant**, and the 21 that are not are named in `BOUND`. It was 62 of
+        // that it cannot drift: **46 of the 68 tokens in these two lists are
+        // dormant**, and the 22 that are not are named in `BOUND`. It was 62 of
         // 68 on 2026-09-21; APW-07's seven, APW-06's five and APW-05's three
-        // moved across on 2026-09-22.
-        expect(UNBOUND).toHaveLength(47);
-        expect(BOUND).toHaveLength(21);
+        // moved across on 2026-09-22, and APW-03's catalog port on 2026-09-25.
+        expect(UNBOUND).toHaveLength(46);
+        expect(BOUND).toHaveLength(22);
     });
 
     it('names where the worker binds what this package does not', () => {
@@ -371,13 +388,22 @@ describe('App Works port dormancy register (§5.10)', () => {
         //
         // A token bound in BOTH packages is usually a defect — two instances of
         // a cluster facade is a way to hand two consumers different plugins —
-        // so the overlap is an allow-list of one, with its reason:
+        // so the overlap is an allow-list of three, each with its reason:
         //
         //   `APP_RUNTIME_ENV_SOURCE` is the REAL `AppEnvRuntimeSource` here and
         //   a fail-closed stub in the worker, because the worker holds no
         //   DataSource and the env service behind it cannot read a row there.
         //   Two processes, two correct answers.
-        const BOUND_IN_BOTH: readonly string[] = ['APP_RUNTIME_ENV_SOURCE'];
+        //
+        //   `APP_DEPLOY_BUILD_SOURCE` and `APP_DEPLOY_SPEC_SOURCE` are NOT a
+        //   second instance: the worker binds each to a `createRemoteProxy` of
+        //   the API's own provider (`AppDeployBuildSourceAdapter`,
+        //   `AppSpecService`), so both processes read through one implementation.
+        const BOUND_IN_BOTH: readonly string[] = [
+            'APP_DEPLOY_BUILD_SOURCE',
+            'APP_DEPLOY_SPEC_SOURCE',
+            'APP_RUNTIME_ENV_SOURCE',
+        ];
 
         const overlap = BOUND.filter((name) => WORKER_BOUND.includes(name));
         expect(overlap).toEqual([...BOUND_IN_BOTH]);

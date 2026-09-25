@@ -39,6 +39,7 @@ import {
     APP_DEPLOY_SPEC_SOURCE,
     AppDeployPreconditionsService,
 } from '../app-deploy-preconditions.service';
+import { AppDeployBuildSourceAdapter } from '../app-deploy-build.source';
 import { AppSpecService } from '../../app-spec/app-spec.service';
 import { WORK_APP_RUNTIME_STATES } from '../../app-launcher/app-launcher.service';
 
@@ -130,6 +131,58 @@ describe('AppDeployRequestModule', () => {
         expect(moduleRef.get(APP_DEPLOY_SPEC_SOURCE, { strict: false })).toBeInstanceOf(
             AppSpecService,
         );
+
+        await moduleRef.close();
+    });
+
+    it('exports the Build source CLASS for the worker’s RPC target — and neither §5.1 token', async () => {
+        // The API's `TriggerInternalController` publishes the adapter by name, so the isolated
+        // App runtime worker (no DataSource) can proxy `APP_DEPLOY_BUILD_SOURCE` to it. The
+        // class, not the token: exporting a token would bind it in every importer's scope
+        // (`WorksModule`, `DeployModule`) as a side effect nobody asked for.
+        const exported = (Reflect.getMetadata('exports', AppDeployRequestModule) ??
+            []) as unknown[];
+
+        expect(exported).toContain(AppDeployBuildSourceAdapter);
+        expect(exported).not.toContain(APP_DEPLOY_BUILD_SOURCE);
+        expect(exported).not.toContain(APP_DEPLOY_SPEC_SOURCE);
+
+        // And it is the SAME instance the token resolves (`useExisting`), so the worker's reads
+        // and the API's own §5.1 pass go through one adapter.
+        const moduleRef = await compile();
+        expect(moduleRef.get(AppDeployBuildSourceAdapter)).toBe(
+            moduleRef.get(APP_DEPLOY_BUILD_SOURCE, { strict: false }),
+        );
+
+        await moduleRef.close();
+    });
+
+    it('gives the exported adapter exactly the two reads the port declares — its whole RPC surface', async () => {
+        // This IS the remote surface the API publishes: `TriggerInternalController` registers
+        // the adapter instance by name and auto-derives its allow-list from every
+        // function-valued name on the instance and its prototype chain (stopping at
+        // `Object.prototype`). The controller's own spec mocks the app-runtime barrel, so it
+        // only ever sees a double; this case pins the REAL class. A public method added here
+        // later becomes callable over the internal RPC channel, so it must fail this case first.
+        const moduleRef = await compile();
+        const adapter = moduleRef.get(AppDeployBuildSourceAdapter) as unknown as Record<
+            string,
+            unknown
+        >;
+
+        const names = new Set<string>(Object.getOwnPropertyNames(adapter));
+        for (
+            let proto: object | null = Object.getPrototypeOf(adapter);
+            proto && proto !== Object.prototype;
+            proto = Object.getPrototypeOf(proto)
+        ) {
+            for (const name of Object.getOwnPropertyNames(proto)) names.add(name);
+        }
+        const callable = [...names]
+            .filter((name) => name !== 'constructor' && typeof adapter[name] === 'function')
+            .sort();
+
+        expect(callable).toEqual(['getBuild', 'listDeployableBuilds']);
 
         await moduleRef.close();
     });

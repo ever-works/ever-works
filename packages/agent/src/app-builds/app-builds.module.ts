@@ -17,6 +17,7 @@ import { UsageModule } from '../usage/usage.module';
 import { AppBuildPullTokenService } from './app-build-pull-token.service';
 import { AppBuildPrepareRunner } from './app-build-prepare.runner';
 import { AppBuildWatchRunner } from './app-build-watch.runner';
+import { AppBuildSweepService } from './app-build-sweep.service';
 import {
     APP_BUILD_PLUGIN_RESOLVER,
     APP_BUILD_PREPARE_RUNNER,
@@ -111,6 +112,18 @@ import { GitFacadeService } from '../facades/git.facade';
  * `DistributedTaskLockService` injects non-optionally; the lock itself is
  * provided locally exactly as `AppSpecModule`, `AppWorksModule` and
  * `CommunityPrModule` provide it.
+ *
+ * ## T21 — the sweep service joins them (first slice)
+ *
+ * `AppBuildSweepService` is provided and exported here because both of its
+ * callers live outside this module: `apps/api`'s `AppBuildSweepCronService`
+ * (the pass when Trigger.dev is not the runtime) and the trigger-internal
+ * controller's `remoteMap` (the `app-build-sweep` task's RPC target). Every one
+ * of its collaborators — `AppBuildRepository`, `AppBuildsService`,
+ * `DistributedTaskLockService` and the `APP_BUILD_SPEC_SOURCE` factory — is
+ * already provided in this module, so it adds no import: importing
+ * `AppSpecModule` or `FacadesModule` here would stop
+ * `app-builds.module.spec.ts` compiling this module standalone.
  */
 @Module({
     imports: [
@@ -137,6 +150,9 @@ import { GitFacadeService } from '../facades/git.facade';
         AppBuildsService,
         AppBuildPullTokenService,
         AppBuildPrepareRunner,
+        // APW-05 T21 (first slice) — the sweep's re-drive and never-adopted `lost`
+        // passes; see the class docstring's T21 section.
+        AppBuildSweepService,
         // APW-05 T16 — the resolver four services in this epic inject and nothing
         // provided until 2026-09-21, so every one of them took its
         // `pluginUnavailable` branch and no Build could be requested at all.
@@ -310,6 +326,7 @@ import { GitFacadeService } from '../facades/git.facade';
         AppBuildPullTokenService,
         AppBuildPrepareRunner,
         AppBuildWatchRunner,
+        AppBuildSweepService,
         // Exported as well as provided: a token bound in `providers` and absent
         // from `exports` resolves to `undefined` at every `@Optional() @Inject()`
         // site in another module, silently — which is exactly the defect

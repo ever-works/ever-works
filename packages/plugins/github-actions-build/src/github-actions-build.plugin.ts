@@ -14,7 +14,12 @@ import type {
 	RepositoryWriter,
 	StartBuildInput
 } from '@ever-works/plugin';
-import { APP_BUILD_WORKFLOW_PATH, computeBuildInputsHash, type AppBuildKind } from '@ever-works/contracts';
+import {
+	APP_BUILD_DEPLOYABLE_TRIGGERS,
+	APP_BUILD_WORKFLOW_PATH,
+	computeBuildInputsHash,
+	type AppBuildKind
+} from '@ever-works/contracts';
 import { Octokit } from 'octokit';
 
 import {
@@ -29,6 +34,7 @@ import { failingStep, observeRun, BUILD_JOB_NAME } from './runs/run-observer.js'
 import { readResultArtifact, type BuildResultArtifact } from './runs/result-artifact.js';
 import { classifyFailure } from './runs/failure-classifier.js';
 import { readJobLogTail } from './runs/log-tail.js';
+import { extractPushLogDigest } from './runs/push-digest.js';
 import { checkImageAccess as checkGhcrAccess, type GhcrAccessResult, type GhcrFetch } from './registry/ghcr-access.js';
 import { selectRunner } from './runner/runner-selector.js';
 import { generateWorkflow } from './workflow/generator.js';
@@ -78,7 +84,10 @@ import { gitHubActionsBuildSettingsSchema, type GitHubActionsBuildSettings } fro
  *     just-written workflow file is briefly undispatchable;
  *   - a digest read from the artifact is reported `confirmed: false` **always**.
  *     Confirming it is `checkImageAccess` (T14, below) and the comparison belongs
- *     to the caller, `AppBuildsService.finalize` (plan §4.8);
+ *     to the caller, `AppBuildsService.finalize` (plan §4.8). For a succeeded
+ *     push or manual run the snapshot also carries `image.pushLogDigest`, the
+ *     digest the build job's Push step logged (`runs/push-digest.ts`), which the
+ *     caller weighs only when the registry cannot be read;
  *   - a failure whose log has EXPIRED classifies as `unknown`. GitHub deletes
  *     job logs on the repository's retention schedule, and a Build observed
  *     after that is genuinely unexplainable — reporting `unknown` is the honest
@@ -461,6 +470,15 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 				? await this.classifyRunFailure({ port, repository, run, jobs, snapshot, result, redact })
 				: null;
 
+		// T14 remainder — the digest the build job's Push step logged (plan §4.8's
+		// no-token fallback). Only for a succeeded run that reported an image and
+		// could be deployed: a pull request never pushes (FR-11) and a verification
+		// run skips the Push step, so reading their logs would buy nothing.
+		const pushLogDigest =
+			result && snapshot.status === 'succeeded' && isPushingTrigger(snapshot.trigger)
+				? await this.readPushLogDigest({ port, repository, jobs, sha: snapshot.commitSha })
+				: undefined;
+
 		return {
 			...snapshot,
 			...(result
@@ -469,12 +487,15 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 						// the member's own CI claimed; confirming it against the registry is
 						// `checkImageAccess` (T14), compared by `AppBuildsService.finalize`,
 						// and a plugin that marked its own input confirmed would make plan
-						// §4.8's "never believed" untrue.
+						// §4.8's "never believed" untrue. `pushLogDigest` is evidence the
+						// agent weighs only when the registry cannot be read; it confirms
+						// nothing here either.
 						image: {
 							repository: result.imageRepository ?? '',
 							digest: result.digest,
 							tags: [...(result.tags ?? [])],
-							confirmed: false
+							confirmed: false,
+							...(pushLogDigest ? { pushLogDigest } : {})
 						},
 						...(result.secretCheck ? { secretCheck: result.secretCheck } : {})
 					}
@@ -538,6 +559,28 @@ export class GitHubActionsBuildPlugin implements IBuildPlugin {
 			},
 			redact
 		);
+	}
+
+	/**
+	 * APW-05 T14 remainder — the digest the build job's `Push` step logged for
+	 * this Build's `sha-<sha>` tag, or `undefined`.
+	 *
+	 * The BUILD job's log, because that is the job holding the Push step; read as
+	 * the same bounded tail T13 reads (the Push step is near the end of the job,
+	 * followed only by the result write and the upload). An unreadable or expired
+	 * log is `''` from `readJobLogTail`, so this never fails an observation — it
+	 * only costs the fallback. Which lines count is `runs/push-digest.ts`'s rule.
+	 */
+	private async readPushLogDigest(input: {
+		readonly port: ActionsRunsPort;
+		readonly repository: ActionsRepositoryRef;
+		readonly jobs: readonly ActionsJob[];
+		readonly sha: string;
+	}): Promise<string | undefined> {
+		const buildJob = input.jobs.find((job) => job.name === BUILD_JOB_NAME);
+		if (!buildJob) return undefined;
+		const log = await readJobLogTail(input.port, { repository: input.repository, jobId: buildJob.id });
+		return extractPushLogDigest(log, input.sha);
 	}
 
 	/**
@@ -665,6 +708,15 @@ function resourcesOf(build: AppBuildBlock | null | undefined): { memoryGiB?: num
 		...(typeof resources.memoryGiB === 'number' ? { memoryGiB: resources.memoryGiB } : {}),
 		...(typeof resources.cpu === 'number' ? { vcpu: resources.cpu } : {})
 	};
+}
+
+/**
+ * A trigger whose run pushes an image: `push` and `manual`, the deployable
+ * triggers of plan §5.1. A pull request never pushes (FR-11) and a verification
+ * run skips the Push step (FR-54).
+ */
+function isPushingTrigger(trigger: BuildSnapshot['trigger']): boolean {
+	return (APP_BUILD_DEPLOYABLE_TRIGGERS as readonly string[]).includes(trigger);
 }
 
 /**

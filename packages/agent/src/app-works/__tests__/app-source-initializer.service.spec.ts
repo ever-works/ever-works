@@ -1336,21 +1336,55 @@ describe('AppSourceInitializerService (APW-01 T15)', () => {
             );
         });
 
-        it('publishes the handler on the internal RPC channel, appended LAST', () => {
+        it('publishes the handler on the internal RPC channel, with only @Optional() after it', () => {
             expect(dense(controller)).toContain(
                 'privatereadonlyappSourceInitializerService?:AppSourceInitializerService',
             );
             expect(dense(controller)).toContain(
                 'AppSourceInitializerService:this.appSourceInitializerService',
             );
-            // The arity rule: the parameter is the LAST one, so every positional
-            // `new TriggerInternalController(...)` in the specs keeps compiling.
-            const params = controller.slice(
-                controller.indexOf('constructor('),
-                controller.indexOf(') {}', controller.indexOf('constructor(')),
+            // The arity rule: the parameter was appended LAST and `@Optional()`, so every
+            // positional `new TriggerInternalController(...)` in the specs keeps compiling.
+            // This pin used to read "the handler is the final `@Optional()`". It stopped
+            // being the last parameter when APW-05 T21 (`AppBuildSweepService`) and APW-06
+            // §5.1 (`AppDeployBuildSourceAdapter`) were appended after it under the same
+            // rule, so the pin now asserts the rule itself: the handler is `@Optional()`, and
+            // so is EVERY constructor parameter declared after it. A required parameter
+            // appended after it, or the handler losing `@Optional()`, still fails here.
+            const start = controller.indexOf('constructor(') + 'constructor('.length;
+            const parameterList = controller
+                .slice(start, controller.indexOf(') {}', start))
+                // Comments name `@Optional()` and carry commas and parentheses; only the
+                // declarations count.
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .replace(/\/\/.*$/gm, '');
+            // One entry per parameter: split at commas outside any (), [], {} or <>, so a
+            // generic type or an `@Inject(forwardRef(() => X))` stays in one piece.
+            const parameters: string[] = [];
+            let depth = 0;
+            let current = '';
+            for (let i = 0; i < parameterList.length; i++) {
+                const ch = parameterList[i];
+                if ('([{<'.includes(ch)) depth++;
+                else if (')]}'.includes(ch) || (ch === '>' && parameterList[i - 1] !== '='))
+                    depth--;
+                if (ch === ',' && depth === 0) {
+                    parameters.push(dense(current));
+                    current = '';
+                } else {
+                    current += ch;
+                }
+            }
+            parameters.push(dense(current));
+            const declared = parameters.filter(Boolean);
+
+            const handlerAt = declared.indexOf(
+                '@Optional()privatereadonlyappSourceInitializerService?:AppSourceInitializerService',
             );
-            const lastOptional = params.lastIndexOf('@Optional()');
-            expect(params.slice(lastOptional)).toContain('appSourceInitializerService');
+            expect(handlerAt).toBeGreaterThan(-1);
+            for (const later of declared.slice(handlerAt + 1)) {
+                expect(later).toContain('@Optional()');
+            }
         });
 
         it('does NOT add onDataRepositoryReady to the retry-safe remote methods', () => {

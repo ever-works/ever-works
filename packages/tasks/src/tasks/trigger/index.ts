@@ -113,6 +113,12 @@ export * from './app-build-prepare.task';
 // API-side, so the task resolves it over the internal RPC channel — see the
 // file's header for the two registrations that live outside this package.
 export * from './app-build-watch.task';
+// APW-05 T21 (first slice) — the Builds sweep, every two minutes (plan §7.4). It
+// re-drives a requested Build nothing dispatched (§9.2) and fails a never-adopted
+// Build as `lost`; every pass is `AppBuildSweepService.runSweep`, API-side under
+// its own `app-builds:sweep` lock, reached over the internal RPC channel. When
+// Trigger.dev is not the runtime the API's `AppBuildSweepCronService` runs it.
+export * from './app-build-sweep.task';
 // C10 — one readiness run of one App Work (APW-02 plan §6.2). The job that turns
 // a fork REQUEST into a READY repository: the private-copy push, FR-18's poll
 // schedule, Actions hygiene and the setup hand-off. It resolves

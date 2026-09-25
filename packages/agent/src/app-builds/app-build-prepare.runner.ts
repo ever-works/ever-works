@@ -79,6 +79,28 @@ import {
  * third pass, one `app-build-prepare { reason: 'coalesced' }` is dispatched and
  * the job exits.
  *
+ * That dispatch is made AFTER the lock is released, never under it, and it is
+ * the only one a run makes. {@link AppBuildPrepareRunner.run} re-reads
+ * `prepareSeq` once the lock is gone and dispatches when the loop asked for it,
+ * when the marker moved since the loop's last reading, or when the pass ran out
+ * of lease. The re-read is what makes `skipped: locked` lossless: a requester
+ * bumps BEFORE it tries the lock, so a requester that saw `locked` bumped before
+ * the release, and therefore before this re-read — including one that arrived
+ * after the loop's last reading, which the loop alone never saw. A run that
+ * failed before its FIRST `prepareSeq` read dispatches nothing, so a persistent
+ * read fault cannot re-dispatch the job without end (see
+ * `coalesceAfterRelease`).
+ *
+ * "Held ≤ 5 minutes" is enforced: the lock is taken with `maxLifetimeMs` = its
+ * 5-minute TTL, so the heartbeat stops at a hard deadline and the lease lapses
+ * there. A pass starts no new provider call (a delivery, `setActionsPermissions`,
+ * a `startBuild`) after `TTL - APP_BUILD_PREPARE_LEASE_MARGIN_MS`; a run that
+ * reached that point reports `leaseExpired` and asks for one coalesced prepare,
+ * which picks up the Builds it left `queued` under a fresh lease. A call already
+ * in flight at the deadline is not aborted (no signal reaches the provider
+ * client), and a delivery that completes still writes its row — that row is the
+ * record of what the provider now holds.
+ *
  * The Builds a pass acts on are numbered **from the database** — every `queued`
  * manual or verification Build of the Work with `dispatchedAt IS NULL` — and
  * never from the payload's optional `buildId`, so a coalesced dispatch loses
@@ -93,8 +115,9 @@ import {
  * `workUnavailable` (`APP_BUILD_WORK_SOURCE`), `pluginUnavailable`
  * (`APP_BUILD_PLUGIN_RESOLVER`), `specUnavailable` (`APP_BUILD_SPEC_SOURCE`),
  * `buildValuesUnavailable` (APW-07's `AppEnvResolver`), `lockUnavailable`
- * (`DistributedTaskLockService`), `locked` (another pass holds the Work) and
- * `nothingToPrepare` (the strategy gate found nothing to deliver).
+ * (`DistributedTaskLockService`), `locked` (another pass holds the Work),
+ * `nothingToPrepare` (the strategy gate found nothing to deliver) and
+ * `leaseExpired` (the pass ran out of lock lease; a coalesced prepare follows).
  *
  * ## A blocked Build still gets its workflow
  *
@@ -110,10 +133,30 @@ import {
  * 5xx "3 times over 10 minutes"; that is NOT delivered — the worker task returns
  * the failure instead of rethrowing it (decided 2026-09-24, see
  * `packages/tasks/src/tasks/trigger/app-build-prepare.task.ts`, "Budget"), and
- * the in-process fallback runs once. Nothing re-drives a failed prepare today:
- * a requested Build stays `queued` until the Work is prepared again. Nor is
- * "nothing written" true at that point — the provider may already hold the
- * workflow commit or pull request and some secrets.
+ * the in-process fallback runs once. Nothing in this file re-drives a failed
+ * prepare: a requested Build stays `queued` until the Work is prepared again.
+ * Nor is "nothing written" true at that point — the provider may already hold
+ * the workflow commit or pull request and some secrets.
+ *
+ * ## A Build is claimed before it is started
+ *
+ * `startBuild` (the `workflow_dispatch`) is preceded by a conditional claim —
+ * `dispatchedAt` stamped `WHERE status = 'queued' AND dispatchedAt IS NULL` —
+ * so THIS RUNNER starts a Build at most once whatever happens after the
+ * provider call: a database error, a crash, or a second pass that read the same
+ * Build. A `startBuild` that THROWS releases the claim (only while the row is
+ * still the one this call stamped), so a re-drive retries it; a failed release
+ * leaves the claim in place and the Build ends `lost`, which fails safe.
+ *
+ * Two starts the claim does not cover. A `startBuild` that throws AFTER the
+ * provider accepted the dispatch (a client timeout) is released like any other
+ * throw, so a re-drive can start a second run, which adoption ignores as
+ * uncorrelated. And `AppBuildsService.startVerification` starts its
+ * verification Build itself: it inserts the row `queued` with `dispatchedAt`
+ * NULL and calls `startBuild` WITHOUT claiming it, so a pass running at that
+ * moment can read that Build, claim it and start a second verify run (without
+ * the verification plan). That race predates the claim and is routed, not
+ * fixed here.
  *
  * ## What this file does not do
  *
@@ -137,11 +180,21 @@ export function appBuildPrepareLockKey(workId: string): string {
 }
 
 /**
- * The lock's lease (`plan.md:1370`: "held ≤ 5 minutes"). A LEASE, renewed by the
- * lock service's heartbeat while the pass runs (up to its 24 h default lifetime,
- * since no `maxLifetimeMs` is passed) — not a cap on how long a pass may run.
+ * The lock's lease AND its hard cap (`plan.md:1370`: "held ≤ 5 minutes"). The
+ * lock is taken with `ttlMs` = `maxLifetimeMs` = this value, so the heartbeat
+ * renews it at 100 s and 200 s and stops at the 5-minute deadline — it is never
+ * renewed for the lock service's 24 h default lifetime. A pass starts no new
+ * provider call after `TTL - APP_BUILD_PREPARE_LEASE_MARGIN_MS`.
  */
 export const APP_BUILD_PREPARE_LOCK_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * How long before the lock's hard deadline a pass stops STARTING provider calls:
+ * enough for one `startBuild` (its `workflow_dispatch` plus the single
+ * correlation read) and the row writes around it, so the last call a pass starts
+ * normally ends while the lock is still held.
+ */
+export const APP_BUILD_PREPARE_LEASE_MARGIN_MS = 30_000;
 
 /** How many passes one dispatch may run before it coalesces (`plan.md:1373`). */
 export const APP_BUILD_PREPARE_MAX_PASSES = 3;
@@ -245,6 +298,10 @@ export const APP_BUILD_PREPARE_SKIP_REASONS = [
     'lockUnavailable',
     'locked',
     'nothingToPrepare',
+    // The pass reached `TTL - APP_BUILD_PREPARE_LEASE_MARGIN_MS` and started
+    // nothing more; one coalesced prepare continues under a fresh lease. Reported
+    // with `status: 'prepared'` when a delivery landed first, `skipped` otherwise.
+    'leaseExpired',
 ] as const;
 
 /** One skip reason. */
@@ -260,7 +317,11 @@ export interface AppBuildPrepareRunResult {
     readonly reason: string | null;
     /** How many passes ran (1…{@link APP_BUILD_PREPARE_MAX_PASSES}). */
     readonly passes: number;
-    /** True when a fourth, coalescing dispatch was asked for (`plan.md:1378`). */
+    /**
+     * True when this run asked for its one coalescing dispatch (`plan.md:1378`),
+     * made after the lock was released: the marker still moved after the third
+     * pass, it moved while the lock was held, or the lease ran out.
+     */
     readonly coalesced: boolean;
     /** True when `prepareRepository` delivered (or proved) a workflow on this run. */
     readonly prepared: boolean;
@@ -581,9 +642,33 @@ function skipped(reason: AppBuildPrepareSkipReason): PassOutcome {
 /** What {@link AppBuildPrepareRunner.passLoop} answers. */
 interface AppBuildPrepareLoopResult {
     readonly passes: number;
-    readonly coalesced: boolean;
     readonly skipReason: AppBuildPrepareSkipReason | null;
     readonly last: PassOutcome;
+    /** True when any pass of this run delivered (or proved) a workflow. */
+    readonly delivered: boolean;
+}
+
+/**
+ * The lock lease one run holds: the instant after which it starts no new
+ * provider call, and whether it reached it.
+ */
+interface AppBuildPrepareLease {
+    deadline: number;
+    expired: boolean;
+}
+
+/**
+ * What the loop saw, kept OUTSIDE its result so the after-release re-read works
+ * even when a pass throws: whether the lock was taken, whether the loop ever
+ * completed a `prepareSeq` read, its last reading, and whether the third pass
+ * asked to coalesce.
+ */
+interface AppBuildPrepareObserved {
+    acquired: boolean;
+    /** True once the loop's first `prepareSeq` read succeeded; `lastSeq` means nothing before. */
+    seqRead: boolean;
+    lastSeq: number;
+    coalesce: boolean;
 }
 
 @Injectable()
@@ -654,30 +739,79 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             return this.result({ status: 'skipped', workId, reason: 'lockUnavailable' });
         }
 
-        const lock = await this.locks.runExclusive<AppBuildPrepareLoopResult>(
-            appBuildPrepareLockKey(workId),
-            () => this.passLoop(workId, payload),
-            {
-                ttlMs: APP_BUILD_PREPARE_LOCK_TTL_MS,
-                onLocked: () =>
-                    this.logger.debug(
-                        `App builds: another pass holds ${appBuildPrepareLockKey(workId)}; this dispatch exits as skipped.`,
-                    ),
-            },
-        );
+        const lease: AppBuildPrepareLease = { deadline: 0, expired: false };
+        const observed: AppBuildPrepareObserved = {
+            acquired: false,
+            seqRead: false,
+            lastSeq: 0,
+            coalesce: false,
+        };
+        let coalesced = false;
+        let lock: { acquired: boolean; result?: AppBuildPrepareLoopResult };
+        try {
+            lock = await this.locks.runExclusive<AppBuildPrepareLoopResult>(
+                appBuildPrepareLockKey(workId),
+                () => {
+                    observed.acquired = true;
+                    // Counted from the moment the lock is held: the lock service
+                    // stamps its own hard deadline a few milliseconds earlier, so
+                    // the margin absorbs the difference.
+                    lease.deadline =
+                        Date.now() +
+                        APP_BUILD_PREPARE_LOCK_TTL_MS -
+                        APP_BUILD_PREPARE_LEASE_MARGIN_MS;
+                    return this.passLoop(workId, payload, lease, observed);
+                },
+                {
+                    ttlMs: APP_BUILD_PREPARE_LOCK_TTL_MS,
+                    // "held ≤ 5 minutes" (`plan.md:1370`): without this the
+                    // heartbeat renews the lease for the lock service's 24 h
+                    // default, and every other prepare of the Work answers `locked`
+                    // for as long as a stuck holder lives.
+                    maxLifetimeMs: APP_BUILD_PREPARE_LOCK_TTL_MS,
+                    onLocked: () =>
+                        this.logger.debug(
+                            `App builds: another pass holds ${appBuildPrepareLockKey(workId)}; this dispatch exits as skipped.`,
+                        ),
+                },
+            );
+        } finally {
+            // AFTER the release — also when a pass threw: the requests that met
+            // the lock while this run held it are only safe if it looks again.
+            if (observed.acquired) {
+                coalesced = await this.coalesceAfterRelease(workId, observed, lease);
+            }
+        }
 
         if (!lock.acquired || !lock.result) {
             return this.result({ status: 'skipped', workId, reason: 'locked' });
         }
 
         const outcome = lock.result;
+        if (lease.expired) {
+            // The run stopped starting work at its deadline. A delivery that
+            // landed first still counts as prepared; the Builds it left `queued`
+            // belong to the coalesced prepare dispatched above.
+            return this.result({
+                status: outcome.delivered ? 'prepared' : 'skipped',
+                workId,
+                reason: 'leaseExpired',
+                passes: outcome.passes,
+                coalesced,
+                prepared: outcome.delivered,
+                workflowState: outcome.last.workflowState,
+                secretSyncRan: outcome.last.secretSyncRan,
+                dispatched: outcome.last.dispatched,
+                blocked: outcome.last.blocked,
+            });
+        }
         return this.result({
             status: outcome.skipReason ? 'skipped' : 'prepared',
             workId,
             reason: outcome.skipReason,
             passes: outcome.passes,
-            coalesced: outcome.coalesced,
-            prepared: outcome.last.prepared,
+            coalesced,
+            prepared: outcome.delivered,
             workflowState: outcome.last.workflowState,
             secretSyncRan: outcome.last.secretSyncRan,
             dispatched: outcome.last.dispatched,
@@ -686,46 +820,141 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
     }
 
     /**
+     * The re-read of `plan.md:1366-1382` — "the holder re-reads it after
+     * releasing" — and the ONE coalescing dispatch a run may make.
+     *
+     * It dispatches when the loop asked for it (the marker still moved after the
+     * third pass), when the pass ran out of lease, or when the marker moved since
+     * the loop's last reading: a requester that met the lock bumped before it
+     * tried it, so its bump is visible here.
+     *
+     * 🛑 **Bounded.** A run whose loop never completed a `prepareSeq` read
+     * dispatches NOTHING, whatever the re-read says: it has no reading to compare
+     * with, it did no work (that read is the loop's first statement), and the
+     * fault that stopped it stops the next run the same way. Dispatching there
+     * made an unbounded chain — each run took the lock, failed the same read and
+     * dispatched the next (a busy loop under the in-process fallback). A
+     * non-UUID `workId` on Postgres is one such fault: the lock key is varchar,
+     * `work_build_preparations.workId` is `uuid`. The run's own failure still
+     * propagates to its caller. What that gives up is a request that met the lock
+     * inside the one failed read — the same as a failed prepare's own request,
+     * which this file never re-drives either.
+     *
+     * A re-read that fails AFTER the loop read the marker dispatches anyway — a
+     * spare prepare re-delivers idempotently, a lost one waits for an unrelated
+     * request — and the chain that can follow needs every next run's FIRST read
+     * to succeed, so a persistent read fault ends it at the next run. Not
+     * awaited: it is a fresh run of this same job.
+     */
+    private async coalesceAfterRelease(
+        workId: string,
+        observed: AppBuildPrepareObserved,
+        lease: AppBuildPrepareLease,
+    ): Promise<boolean> {
+        if (!observed.seqRead) {
+            // `coalesce` and `lease.expired` are only ever set after that read, so
+            // neither can ask for a dispatch here.
+            this.logger.warn(
+                `App builds: the prepare of work ${workId} failed before it read prepareSeq; ` +
+                    'no coalesced prepare is dispatched, so a persistent read fault cannot re-dispatch it without end.',
+            );
+            return false;
+        }
+        let moved = true;
+        try {
+            moved = (await this.readPrepareSeq(workId)) !== observed.lastSeq;
+        } catch (error) {
+            this.logger.warn(
+                `App builds: re-reading prepareSeq of work ${workId} after the prepare failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); a coalesced prepare is dispatched so no request is lost.`,
+            );
+        }
+        if (!observed.coalesce && !lease.expired && !moved) {
+            return false;
+        }
+        void Promise.resolve(this.service.dispatchPrepare({ workId, reason: 'coalesced' })).catch(
+            (error: unknown) =>
+                this.logger.warn(
+                    `App builds: the coalesced prepare of work ${workId} could not be dispatched (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                ),
+        );
+        return true;
+    }
+
+    /**
      * The loop: at most {@link APP_BUILD_PREPARE_MAX_PASSES} passes, each bracketed
      * by a `prepareSeq` read (`plan.md:1373-1379`).
      *
      * A pass that skipped leaves the loop immediately — the reason names a missing
-     * port or nothing to prepare, and repeating it would only burn the lock.
+     * port or nothing to prepare, and repeating it would only burn the lock. No
+     * pass starts once the lease is spent. The loop itself dispatches nothing: it
+     * records its last reading and whether it wants to coalesce in `observed`, and
+     * `run` makes the one dispatch after the lock is released.
      */
     private async passLoop(
         workId: string,
         payload: AppBuildPrepareJobPayload,
+        lease: AppBuildPrepareLease,
+        observed: AppBuildPrepareObserved,
     ): Promise<AppBuildPrepareLoopResult> {
         let passes = 0;
         let last: PassOutcome = skipped('nothingToPrepare');
         let skipReason: AppBuildPrepareSkipReason | null = null;
-        let coalesced = false;
+        let delivered = false;
         let seqBefore = await this.readPrepareSeq(workId);
+        observed.lastSeq = seqBefore;
+        observed.seqRead = true;
 
         while (passes < APP_BUILD_PREPARE_MAX_PASSES) {
+            if (!this.leaseLeft(lease, workId, 'another pass')) {
+                skipReason = 'leaseExpired';
+                break;
+            }
             passes += 1;
-            last = await this.pass(workId, payload);
+            last = await this.pass(workId, payload, lease);
+            delivered = delivered || last.prepared;
             if (last.skipReason) {
                 skipReason = last.skipReason;
                 break;
             }
 
             const seqAfter = await this.readPrepareSeq(workId);
+            observed.lastSeq = seqAfter;
             if (seqAfter === seqBefore) {
                 break;
             }
             seqBefore = seqAfter;
 
             if (passes === APP_BUILD_PREPARE_MAX_PASSES) {
-                // `plan.md:1378`: one coalescing dispatch, and the job exits. It is
-                // NOT awaited — it is a fresh run of this same job, and waiting
-                // for it here would nest the lock.
-                coalesced = true;
-                void this.service.dispatchPrepare({ workId, reason: 'coalesced' });
+                // `plan.md:1378`: one coalescing dispatch, and the job exits —
+                // made by `run` once the lock is released.
+                observed.coalesce = true;
             }
         }
 
-        return { passes, coalesced, skipReason, last };
+        return { passes, skipReason, last, delivered };
+    }
+
+    /**
+     * May this pass START another provider call? `false` once the lease's
+     * deadline has passed, and the lease remembers it so the run reports
+     * `leaseExpired` and coalesces.
+     */
+    private leaseLeft(lease: AppBuildPrepareLease, workId: string, what: string): boolean {
+        if (Date.now() < lease.deadline) {
+            return true;
+        }
+        if (!lease.expired) {
+            lease.expired = true;
+            this.logger.warn(
+                `App builds: the prepare of work ${workId} reached its lock lease deadline; ${what} is not started ` +
+                    'and a coalesced prepare continues under a fresh lease.',
+            );
+        }
+        return false;
     }
 
     /** The row's coalescing marker; a Work with no row has nothing to coalesce with (§7.2:1000-1006). */
@@ -738,7 +967,11 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
      * One pass — plan §7.2 steps 1…7
      * ---------------------------------------------------------------------- */
 
-    private async pass(workId: string, payload: AppBuildPrepareJobPayload): Promise<PassOutcome> {
+    private async pass(
+        workId: string,
+        payload: AppBuildPrepareJobPayload,
+        lease: AppBuildPrepareLease,
+    ): Promise<PassOutcome> {
         const context = await this.readWork(workId);
         if (!context) {
             return skipped('workUnavailable');
@@ -859,6 +1092,9 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
                     'missingBuildValues',
                     { names: resolved.missing },
                 );
+                if (!this.leaseLeft(lease, workId, 'the workflow delivery')) {
+                    return { ...skipped('leaseExpired'), blocked: blocked.length };
+                }
                 const delivered = await this.writeWorkflow(workId, context, binding, row, {
                     spec,
                     specHash: specRead?.specHash ?? null,
@@ -900,6 +1136,13 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             }
         }
 
+        // The lease: no provider call starts after `TTL - margin` (plan §7.2's
+        // "held ≤ 5 minutes"). Everything above is a read, so a pass stopped here
+        // has changed nothing and the coalesced prepare starts it again.
+        if (!this.leaseLeft(lease, workId, 'the workflow delivery')) {
+            return skipped('leaseExpired');
+        }
+
         // §7.2 step 7's precondition: `setActionsPermissions?` runs BEFORE the
         // blocked-Build retry, on the one reason that means "the owner just turned
         // Actions on" (`APW05-G15`, plan §4.6 step 6). Best-effort — what the
@@ -917,6 +1160,9 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         }
 
         // Step 5 and 5a — the delivery, then ONE transaction for the row.
+        if (!this.leaseLeft(lease, workId, 'the workflow delivery')) {
+            return skipped('leaseExpired');
+        }
         const now = new Date();
         const delivery = verification
             ? await this.deliverForVerification(workId, context, binding, row, specRead, now)
@@ -980,6 +1226,7 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
                 context,
                 requested,
                 blockedIds,
+                lease,
             );
             dispatched += started.dispatched;
         }
@@ -993,7 +1240,14 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             !runnerBlocked &&
             !gate.blockedReason
         ) {
-            const retried = await this.retryBlockedBuild(workId, binding, context, specRead, gate);
+            const retried = await this.retryBlockedBuild(
+                workId,
+                binding,
+                context,
+                specRead,
+                gate,
+                lease,
+            );
             dispatched += retried.dispatched;
         }
 
@@ -1097,6 +1351,12 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             // sync" has to mean at this seam (§4.7:916-917, FR-18).
             previouslyWrittenSecretNames: input.secretSyncRuns ? [...previous] : [],
             lastWrittenWorkflowSha256: row?.workflowSha256 ?? null,
+            // §3.1b's recorded workflow pull request, echoed so the plugin can
+            // ADOPT the open one (ACC-05-02, plan §4.6 step 3 "or reuse the open
+            // one") instead of asking GitHub for a second and getting its 422.
+            // Whether it is still open is GitHub's answer, not this row's.
+            workflowPullRequestNumber: row?.workflowPullRequestNumber ?? null,
+            workflowPullRequestUrl: row?.workflowPullRequestUrl ?? null,
             settings: { ...(binding.settings ?? {}) },
             checks: [...input.checks],
             ...(input.bootstrap ? { bootstrap: true } : {}),
@@ -1424,13 +1684,14 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
     }
 
     /**
-     * Step 6 — one `startBuild` per requested Build, then `dispatchedAt`, then the
-     * watch dispatch (§7.2 step 6).
+     * Step 6 — one claimed `startBuild` per requested Build, then the watch
+     * dispatch (§7.2 step 6).
      *
      * `alreadyBlocked` is this pass's own block set: a Build blocked moments ago in
      * the same pass must not be dispatched, whatever the gate says about the others.
-     * A `startBuild` that fails leaves the Build `queued` for the runtime's next
-     * attempt (§9.2) and is not a block.
+     * A `startBuild` that fails releases its claim and leaves the Build `queued`
+     * with `dispatchedAt` NULL, so the next prepare (or the sweep's re-drive)
+     * retries it (§9.2); it is not a block.
      */
     private async startRequestedBuilds(
         workId: string,
@@ -1438,21 +1699,50 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         context: AppBuildWorkContext,
         builds: readonly WorkBuild[],
         alreadyBlocked: ReadonlySet<string>,
+        lease: AppBuildPrepareLease,
     ): Promise<{ dispatched: number }> {
         let dispatched = 0;
         for (const build of builds) {
             if (alreadyBlocked.has(build.id)) continue;
-            if (await this.startBuild(workId, binding, context, build)) dispatched += 1;
+            if (await this.startBuild(workId, binding, context, build, lease)) dispatched += 1;
         }
         return { dispatched };
     }
 
-    /** One `startBuild` call plus its two writes. `false` when it could not be dispatched. */
+    /**
+     * One Build: claim it, start it, record the run. `false` when it was not
+     * dispatched by this call.
+     *
+     * 1. **The claim** — `dispatchedAt` is stamped `WHERE status = 'queued' AND
+     *    dispatchedAt IS NULL` BEFORE the provider is asked. 0 rows means another
+     *    pass (or a cancel) already has the Build, and nothing is started. This is
+     *    what closes the duplicate-run window the worker task names: once the
+     *    provider has the run, no failure after it can make the Build selectable
+     *    again (`readRequestedBuilds` picks `dispatchedAt IS NULL`). It orders
+     *    this runner's passes only: a verification Build that
+     *    `AppBuildsService.startVerification` starts itself is not claimed there
+     *    (see the file header).
+     * 2. **`startBuild`.** If it THROWS, the claim is released — only while the
+     *    row is still exactly the one this call stamped (`queued`, no run id, the
+     *    same `dispatchedAt`) — so a re-drive retries the Build. A release that
+     *    fails leaves the claim: the Build is never re-dispatched and ends `lost`,
+     *    which fails safe. A failure the provider reports AFTER accepting the
+     *    dispatch (a client timeout) is still released: that can start a second
+     *    run, which adoption then ignores as uncorrelated.
+     * 3. **The run** — `providerRunId` and the provider's `dispatchedAt` (else the
+     *    claim's). A throw here is logged, not propagated: the claim already
+     *    prevents a second start, and `display_title` adoption plus the watch still
+     *    link the run.
+     *
+     * No new `startBuild` begins once the lease is spent: the Build stays `queued`
+     * with `dispatchedAt` NULL for the coalesced prepare.
+     */
     private async startBuild(
         workId: string,
         binding: AppBuildPreparePluginBinding,
         context: AppBuildWorkContext,
         build: WorkBuild,
+        lease: AppBuildPrepareLease,
     ): Promise<boolean> {
         if (!binding.startBuild) {
             this.logger.warn(
@@ -1460,8 +1750,25 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             );
             return false;
         }
+        if (!this.leaseLeft(lease, workId, `startBuild for build ${build.id}`)) {
+            return false;
+        }
 
-        let dispatchedAt = new Date();
+        const claimedAt = new Date();
+        const claimed = await this.patchBuild(
+            build.id,
+            { dispatchedAt: claimedAt },
+            ['queued'],
+            [{ sql: 'dispatchedAt IS NULL' }],
+        );
+        if (!claimed) {
+            this.logger.debug(
+                `App builds: build ${build.id} is already claimed or no longer 'queued'; it is not started again.`,
+            );
+            return false;
+        }
+
+        let dispatchedAt = claimedAt;
         let providerRunId: string | null = null;
         try {
             const answer = await binding.startBuild({
@@ -1473,27 +1780,38 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             providerRunId = answer?.providerRunId ?? null;
             if (answer?.dispatchedAt) dispatchedAt = new Date(answer.dispatchedAt);
         } catch (error) {
-            // The provider call threw: the Build keeps its `queued` status and the
-            // run's next attempt retries. §9.2's "a requested Build stays queued"
-            // is this branch.
+            // The provider call threw: release the claim so the Build keeps its
+            // `queued` status with `dispatchedAt` NULL and the next prepare retries
+            // it. §9.2's "a requested Build stays queued" is this branch.
             this.logger.warn(
                 `App builds: startBuild for build ${build.id} failed (${
                     error instanceof Error ? error.message : String(error)
                 }); the Build stays queued.`,
             );
+            await this.releaseDispatchClaim(build.id, claimedAt);
             return false;
         }
 
-        const claimed = await this.patchBuild(
-            build.id,
-            { ...(providerRunId ? { providerRunId } : {}), dispatchedAt },
-            ['queued'],
-        );
-        if (!claimed) {
+        let recorded = false;
+        try {
+            recorded = await this.patchBuild(
+                build.id,
+                { ...(providerRunId ? { providerRunId } : {}), dispatchedAt },
+                ['queued'],
+            );
+        } catch (error) {
+            this.logger.warn(
+                `App builds: recording the run of build ${build.id} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); the Build keeps its dispatch claim, so it is not started again, and adoption links the run.`,
+            );
+            recorded = true;
+        }
+        if (!recorded) {
             // The row left `queued` while the provider was being asked (a
-            // cancellation, a sweep, another pass). This pass does not own the
-            // Build any more, so it neither records the dispatch nor asks for a
-            // watch: the watch would only re-read a row this pass did not move.
+            // cancellation, a sweep). This pass does not own the Build any more,
+            // so it neither records the dispatch nor asks for a watch: the watch
+            // would only re-read a row this pass did not move.
             this.logger.debug(
                 `App builds: build ${build.id} was no longer 'queued' when its dispatch landed; no dispatch is recorded.`,
             );
@@ -1502,6 +1820,36 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
 
         await this.service.dispatchWatch({ buildId: build.id, reason: 'dispatched' });
         return true;
+    }
+
+    /**
+     * Undo a dispatch claim after `startBuild` threw — only while the row is still
+     * exactly what the claim left: `queued`, no run id, and the `dispatchedAt` this
+     * call stamped (bound as epoch ms, the column's storage). A failed release is
+     * logged and left: the claim then keeps the Build from ever being started
+     * twice, and the sweep ends it `lost`.
+     */
+    private async releaseDispatchClaim(buildId: string, claimedAt: Date): Promise<void> {
+        try {
+            await this.patchBuild(
+                buildId,
+                { dispatchedAt: null },
+                ['queued'],
+                [
+                    { sql: 'providerRunId IS NULL' },
+                    {
+                        sql: 'dispatchedAt = :claimedAt',
+                        params: { claimedAt: claimedAt.getTime() },
+                    },
+                ],
+            );
+        } catch (error) {
+            this.logger.warn(
+                `App builds: releasing the dispatch claim of build ${buildId} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); it is not retried and will end as lost.`,
+            );
+        }
     }
 
     /**
@@ -1525,8 +1873,14 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         context: AppBuildWorkContext,
         specRead: { readonly commitSha: string | null } | null,
         gate: { readonly blockedReason: AppBuildBlockedReason | null },
+        lease: AppBuildPrepareLease,
     ): Promise<{ dispatched: number; blocked: number }> {
         if (gate.blockedReason) return { dispatched: 0, blocked: 0 };
+        // A retry past the lease deadline would re-queue a Build it cannot start;
+        // the coalesced prepare that follows retries it under a fresh lease.
+        if (!this.leaseLeft(lease, workId, 'the blocked-Build retry')) {
+            return { dispatched: 0, blocked: 0 };
+        }
 
         const page = await this.builds.findPage(
             workId,
@@ -1575,7 +1929,13 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         };
         await this.service.publish(requeuedRow as WorkBuild, 'app.build.queued');
 
-        const started = await this.startBuild(workId, binding, context, requeuedRow as WorkBuild);
+        const started = await this.startBuild(
+            workId,
+            binding,
+            context,
+            requeuedRow as WorkBuild,
+            lease,
+        );
         return { dispatched: started ? 1 : 0, blocked: 0 };
     }
 
@@ -1605,12 +1965,18 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
      * `affected === 1` is the caller's answer. Written through the query builder on
      * the entity's own repository, exactly as `AppBuildRepository.claimWatchLease`
      * is — `APW05-G10`'s driver-agnostic rule: no raw statement, no
-     * dialect-specific fragment.
+     * dialect-specific fragment. `also` adds further arms to the claim (the
+     * dispatch claim's `dispatchedAt IS NULL`); their bare property names are
+     * escaped per driver by the update builder, like `status` is.
      */
     private async patchBuild(
         id: string,
         fields: Partial<WorkBuild>,
         status: readonly string[],
+        also: ReadonlyArray<{
+            readonly sql: string;
+            readonly params?: Record<string, unknown>;
+        }> = [],
     ): Promise<boolean> {
         if (!this.rows) {
             this.logger.warn(
@@ -1618,13 +1984,16 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             );
             return false;
         }
-        const result = await this.rows
+        let query = this.rows
             .createQueryBuilder()
             .update(WorkBuild)
             .set(fields)
             .where('id = :id', { id })
-            .andWhere('status IN (:...statuses)', { statuses: [...status] })
-            .execute();
+            .andWhere('status IN (:...statuses)', { statuses: [...status] });
+        for (const arm of also) {
+            query = query.andWhere(arm.sql, arm.params ?? {});
+        }
+        const result = await query.execute();
         return (result.affected ?? 0) === 1;
     }
 

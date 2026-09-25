@@ -30,6 +30,14 @@ import { serializeOnSingleConnection } from './single-connection-write-queue';
  * update rather than surfaced as a failure. The unique violation is detected
  * across drivers exactly as `CreditLedgerRepository.isUniqueViolation` does.
  *
+ * A merge writes only the columns its patch names (see `apply`): the prepare and
+ * `requestPrepare`'s bump write the same row without a shared lock. The two
+ * patches name disjoint columns — the bump `prepareSeq` alone, the prepare
+ * everything BUT `prepareSeq` — so neither can put back a column the other
+ * changed after it read the row. A caller that names a column it only read (and
+ * does not own) can still revert a racing writer's value; this method cannot
+ * tell such an echo from a write.
+ *
  * ## `prepareSeq` is deliberately NOT touched here
  *
  * `plan.md:417` gives that column one writer: every `requestPrepare` bumps it,
@@ -103,14 +111,39 @@ export class AppBuildPreparationRepository {
         });
     }
 
-    /** Merge a patch onto a loaded row and store it. */
+    /**
+     * Merge a patch onto a loaded row and store ONLY the patch's own columns.
+     *
+     * The row was read before this write, and the table has two writers that do
+     * not share a lock: the prepare (its §3.1b result) and `requestPrepare` (the
+     * `prepareSeq` bump). Saving the whole loaded entity would write back every
+     * column as it was READ — TypeORM's `save` diffs the entity against a fresh
+     * read, so a stale `prepareSeq` differs and is written — and a bump that
+     * landed in between would be reverted (and the reverse: a bump's save would
+     * put back a stale `workflowState`). So the entity handed to `save` carries
+     * the id and the patch's keys only; TypeORM skips an `undefined` property
+     * when it computes the changed columns, so nothing the patch did not name is
+     * written. `undefined` values are dropped first (a `null` still clears a
+     * column), and an empty patch writes nothing.
+     */
     private async apply(
         row: WorkBuildPreparation,
         patch: WorkBuildPreparationPatch,
     ): Promise<WorkBuildPreparation> {
-        this.repository.merge(row, patch);
+        const changes: WorkBuildPreparationPatch = {};
+        for (const [key, value] of Object.entries(patch)) {
+            if (value !== undefined) {
+                (changes as Record<string, unknown>)[key] = value;
+            }
+        }
+        this.repository.merge(row, changes);
+        if (Object.keys(changes).length === 0) {
+            return row;
+        }
 
-        return this.repository.save(row);
+        await this.repository.save({ id: row.id, ...changes } as WorkBuildPreparation);
+
+        return (await this.findByWork(row.workId)) ?? row;
     }
 
     /**

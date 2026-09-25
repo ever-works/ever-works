@@ -13,6 +13,7 @@ import {
     APP_BUILD_NUMBER_RETRIES,
     APP_BUILD_OPEN_STATUSES,
     APP_BUILD_ORPHANED_VERIFY_SECRET_MS,
+    APP_BUILD_REQUESTED_TRIGGERS,
     AppBuildRepository,
 } from '../app-build.repository';
 
@@ -774,6 +775,250 @@ describe('AppBuildRepository', () => {
 
         it('opens no status outside the two the sweep owns', () => {
             expect([...APP_BUILD_OPEN_STATUSES]).toEqual(['queued', 'running']);
+        });
+    });
+
+    /**
+     * T21's first slice — the sweep's re-drive read (§9.2 "a requested Build stays
+     * queued … the job retries 3 times"). The window is half-open, `[min, max)` by
+     * AGE: `queuedAt <= now - min` and `queuedAt > now - max`. The sweep passes
+     * 90 s and 90 s + 3 × 120 s = 450 s, so exactly three two-minute ticks fall
+     * inside it.
+     */
+    describe('findUndispatchedRequested (§9.2, the sweep re-drive)', () => {
+        const MIN_AGE = APP_BUILD_POLL_AFTER_SILENCE_MS;
+        const MAX_AGE = 450 * SECOND;
+
+        beforeEach(async () => {
+            await seedWork(WORK_A);
+        });
+
+        const queuedAgo = (ms: number) => new Date(NOW - ms);
+
+        it('selects a queued manual or verification Build 91 s and 449 s old, oldest first', async () => {
+            const young = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: queuedAgo(91 * SECOND),
+            });
+            const old = await seedBuild({
+                workId: WORK_A,
+                number: 2,
+                trigger: 'verification',
+                queuedAt: queuedAgo(449 * SECOND),
+            });
+
+            const rows = await repository.findUndispatchedRequested(
+                NOW,
+                MIN_AGE,
+                MAX_AGE,
+                APP_BUILD_SWEEP_BATCH,
+            );
+
+            expect(rows.map((row) => row.id)).toEqual([old.id, young.id]);
+        });
+
+        it('includes exactly 90 s, excludes 89 s, and excludes exactly 450 s — the old end is open', async () => {
+            const atMin = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: queuedAgo(MIN_AGE),
+            });
+            const tooYoung = await seedBuild({
+                workId: WORK_A,
+                number: 2,
+                trigger: 'manual',
+                queuedAt: queuedAgo(89 * SECOND),
+            });
+            const atMax = await seedBuild({
+                workId: WORK_A,
+                number: 3,
+                trigger: 'manual',
+                queuedAt: queuedAgo(MAX_AGE),
+            });
+
+            const ids = (
+                await repository.findUndispatchedRequested(NOW, MIN_AGE, MAX_AGE, 200)
+            ).map((row) => row.id);
+
+            expect(ids).toEqual([atMin.id]);
+            expect(ids).not.toContain(tooYoung.id);
+            expect(ids).not.toContain(atMax.id);
+        });
+
+        it('never selects a dispatched Build, a push or pull-request Build, or any status but queued', async () => {
+            const age = queuedAgo(120 * SECOND);
+            await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: age,
+                // The dispatch claim (or a real dispatch) stamped it: the runner
+                // already owns this Build, and a re-drive would start it twice.
+                dispatchedAt: new Date(NOW - 100 * SECOND),
+            });
+            await seedBuild({ workId: WORK_A, number: 2, trigger: 'push', queuedAt: age });
+            await seedBuild({ workId: WORK_A, number: 3, trigger: 'pull_request', queuedAt: age });
+            for (const [index, status] of (
+                ['running', 'blocked', 'succeeded', 'failed', 'cancelled'] as const
+            ).entries()) {
+                await seedBuild({
+                    workId: WORK_A,
+                    number: 10 + index,
+                    trigger: 'manual',
+                    status,
+                    queuedAt: age,
+                });
+            }
+
+            expect(await repository.findUndispatchedRequested(NOW, MIN_AGE, MAX_AGE, 200)).toEqual(
+                [],
+            );
+        });
+
+        it('never selects a Build with no queuedAt', async () => {
+            await seedBuild({ workId: WORK_A, number: 1, trigger: 'manual' });
+
+            expect(await repository.findUndispatchedRequested(NOW, MIN_AGE, MAX_AGE, 200)).toEqual(
+                [],
+            );
+        });
+
+        it('returns the oldest 200 of 205, and clamps a larger ask to the sweep batch', async () => {
+            const rows = dataSource.getRepository(WorkBuild);
+            await rows.save(
+                Array.from({ length: 205 }, (_, index) =>
+                    rows.create({
+                        workId: WORK_A,
+                        number: index + 1,
+                        buildPluginId: 'github-actions',
+                        status: 'queued' as const,
+                        trigger: 'manual' as const,
+                        branch: 'main',
+                        commitSha: SHA_A,
+                        // Build #1 is the oldest (300 s); #205 the youngest (96 s).
+                        queuedAt: new Date(NOW - (300 - index) * SECOND),
+                    }),
+                ),
+            );
+
+            const page = await repository.findUndispatchedRequested(NOW, MIN_AGE, MAX_AGE, 1_000);
+
+            expect(page).toHaveLength(APP_BUILD_SWEEP_BATCH);
+            expect(page[0].number).toBe(1);
+            expect(page[APP_BUILD_SWEEP_BATCH - 1].number).toBe(APP_BUILD_SWEEP_BATCH);
+        });
+
+        it('returns nothing for a non-positive limit', async () => {
+            await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: queuedAgo(120 * SECOND),
+            });
+
+            expect(await repository.findUndispatchedRequested(NOW, MIN_AGE, MAX_AGE, 0)).toEqual(
+                [],
+            );
+        });
+
+        it('names the two triggers a platform-requested Build carries', () => {
+            expect([...APP_BUILD_REQUESTED_TRIGGERS]).toEqual(['manual', 'verification']);
+        });
+    });
+
+    /**
+     * T21's never-adopted half of §7.4's lost rule (`queuedAt + 5 min +
+     * timeoutMinutes + 30`). The repository only pre-filters by one cutoff; the
+     * per-Build timeout is the sweep's arithmetic.
+     */
+    describe('findNeverAdoptedQueuedBefore (§7.4, never adopted)', () => {
+        beforeEach(async () => {
+            await seedWork(WORK_A);
+        });
+
+        const CUTOFF = NOW - 40 * MINUTE;
+
+        it('selects open manual and verification Builds with no run id queued before the cutoff', async () => {
+            const queued = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: new Date(CUTOFF - 3 * MINUTE),
+            });
+            const dispatched = await seedBuild({
+                workId: WORK_A,
+                number: 2,
+                trigger: 'verification',
+                queuedAt: new Date(CUTOFF - 2 * MINUTE),
+                dispatchedAt: new Date(CUTOFF - 2 * MINUTE),
+            });
+            const running = await seedBuild({
+                workId: WORK_A,
+                number: 3,
+                trigger: 'manual',
+                status: 'running',
+                queuedAt: new Date(CUTOFF - 1 * MINUTE),
+            });
+
+            const rows = await repository.findNeverAdoptedQueuedBefore(
+                CUTOFF,
+                APP_BUILD_SWEEP_BATCH,
+            );
+
+            expect(rows.map((row) => row.id)).toEqual([queued.id, dispatched.id, running.id]);
+        });
+
+        it('excludes an adopted Build, a terminal or blocked one, push and pull-request Builds, and the cutoff itself', async () => {
+            const old = new Date(CUTOFF - 60 * MINUTE);
+            await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: old,
+                providerRunId: 'run-1',
+            });
+            for (const [index, status] of (
+                ['blocked', 'succeeded', 'failed', 'cancelled'] as const
+            ).entries()) {
+                await seedBuild({
+                    workId: WORK_A,
+                    number: 10 + index,
+                    trigger: 'manual',
+                    status,
+                    queuedAt: old,
+                });
+            }
+            await seedBuild({ workId: WORK_A, number: 20, trigger: 'push', queuedAt: old });
+            await seedBuild({ workId: WORK_A, number: 21, trigger: 'pull_request', queuedAt: old });
+            await seedBuild({
+                workId: WORK_A,
+                number: 22,
+                trigger: 'manual',
+                // Strictly older than the cutoff: `queuedAt < :cutoff`.
+                queuedAt: new Date(CUTOFF),
+            });
+            await seedBuild({ workId: WORK_A, number: 23, trigger: 'manual' });
+
+            expect(await repository.findNeverAdoptedQueuedBefore(CUTOFF, 200)).toEqual([]);
+        });
+
+        it('returns the oldest first and honours the limit', async () => {
+            for (const [index, minutes] of [90, 80, 70].entries()) {
+                await seedBuild({
+                    workId: WORK_A,
+                    number: index + 1,
+                    trigger: 'manual',
+                    queuedAt: new Date(CUTOFF - minutes * MINUTE),
+                });
+            }
+
+            const rows = await repository.findNeverAdoptedQueuedBefore(CUTOFF, 2);
+
+            expect(rows.map((row) => row.number)).toEqual([1, 2]);
+            expect(await repository.findNeverAdoptedQueuedBefore(CUTOFF, 0)).toEqual([]);
         });
     });
 

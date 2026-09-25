@@ -44,7 +44,11 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * `APP_DEPLOY_BUILD_SOURCE` is bound too: `AppDeployBuildSourceAdapter` over
  * APW-05's `AppBuildRepository`. Unbound, §5.1 answered `no_green_build` for
  * every App Work whether or not it had one, so a Build that succeeded could
- * never be deployed.
+ * never be deployed. The adapter class is also EXPORTED, for one consumer: the
+ * API's `TriggerInternalController`, which publishes it by name so the isolated
+ * App runtime worker (`TriggerAppRuntimeModule`, no DataSource) can proxy the
+ * same two reads — exactly as it already proxies `AppSpecService` for
+ * `APP_DEPLOY_SPEC_SOURCE`.
  *
  * `APP_DEPLOY_SPEC_SOURCE` → APW-03's `AppSpecService`, which is why this module
  * imports `AppSpecModule`. That import brings `DatabaseModule`, `FacadesModule`
@@ -126,6 +130,16 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
         { provide: APP_DEPLOY_SPEC_SOURCE, useExisting: AppSpecService },
         ...buildAppDeployDispatcherProviders(),
     ],
-    exports: [AppDeployPreconditionsService, AppDeployRequestService, APP_DEPLOY_DEPLOYMENT_STORE],
+    exports: [
+        AppDeployPreconditionsService,
+        AppDeployRequestService,
+        APP_DEPLOY_DEPLOYMENT_STORE,
+        // The CLASS, not the token: the API's `TriggerInternalController` publishes it
+        // as the remote target `AppDeployBuildSourceAdapter`, which the isolated App
+        // runtime worker's `APP_DEPLOY_BUILD_SOURCE` proxies (it owns no DataSource, so
+        // it cannot read `work_builds` itself). Exporting the token instead would bind
+        // `APP_DEPLOY_BUILD_SOURCE` in every importer's scope as a side effect.
+        AppDeployBuildSourceAdapter,
+    ],
 })
 export class AppDeployRequestModule {}

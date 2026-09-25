@@ -50,8 +50,9 @@ import { serializeOnSingleConnection } from './single-connection-write-queue';
  *
  * ## Every instant here is epoch milliseconds, not a `Date`
  *
- * `claimWatchLease`, `findSilentNonTerminal` and `findWithOrphanedVerifySecrets`
- * take plain numbers, and every predicate compares the `bigint` columns the
+ * `claimWatchLease`, `findSilentNonTerminal`, `findWithOrphanedVerifySecrets`,
+ * `findUndispatchedRequested` and `findNeverAdoptedQueuedBefore` take plain
+ * numbers, and every predicate compares the `bigint` columns the
  * entity stores. A `Date` bound into a query-builder predicate is passed to the
  * driver verbatim — better-sqlite3 refuses to bind one at all, and PostgreSQL
  * would be asked to compare a `bigint` with a `timestamptz`. Dates appear only
@@ -85,6 +86,16 @@ export const APP_BUILD_NUMBER_RETRIES = 3;
  * own T2 surface, not this file's.
  */
 export const APP_BUILD_OPEN_STATUSES: readonly AppBuildStatus[] = ['queued', 'running'];
+
+/**
+ * The two triggers of a Build the PLATFORM asks for — a Rebuild and a
+ * verification (plan §7.2:1374-1375). Only these are started by
+ * `workflow_dispatch` and adopted later by their display title, so only these can
+ * be stuck undispatched (§9.2) or never adopted (§7.4); a push or pull-request
+ * Build is created FROM its run and carries the run id from the start. Local for
+ * the same reason as {@link APP_BUILD_OPEN_STATUSES}.
+ */
+export const APP_BUILD_REQUESTED_TRIGGERS: readonly AppBuildTrigger[] = ['manual', 'verification'];
 
 /**
  * How long a verification Build's per-run prompted-value secret may outlive
@@ -392,6 +403,82 @@ export class AppBuildRepository {
                 .take(take)
                 .getMany()
         );
+    }
+
+    /**
+     * Up to `limit` requested Builds nothing has dispatched, queued between
+     * `minAgeMs` and `maxAgeMs` ago — the sweep's re-drive (§9.2: "a requested
+     * Build stays queued" and the job is retried 3 times), oldest first.
+     *
+     * The window is half-open by age, `[minAgeMs, maxAgeMs)`:
+     * `queuedAt <= now - minAgeMs AND queuedAt > now - maxAgeMs`. A window three
+     * sweep intervals long therefore holds exactly three ticks whatever their
+     * phase, which is what bounds the re-drives of one Build.
+     *
+     * `dispatchedAt IS NULL` is the runner's own selection rule
+     * (`readRequestedBuilds`) and its dispatch claim: a Build the runner claimed
+     * or started is never re-driven, so a re-drive cannot start a Build twice.
+     */
+    async findUndispatchedRequested(
+        nowMs: number,
+        minAgeMs: number,
+        maxAgeMs: number,
+        limit: number,
+    ): Promise<WorkBuild[]> {
+        const take = this.batchSize(limit);
+        if (take === 0) {
+            return [];
+        }
+
+        const newest = nowMs - Math.max(0, minAgeMs);
+        const oldest = nowMs - Math.max(0, maxAgeMs);
+
+        return this.repository
+            .createQueryBuilder('build')
+            .where('build.status = :queued', { queued: 'queued' })
+            .andWhere('build.trigger IN (:...triggers)', {
+                triggers: [...APP_BUILD_REQUESTED_TRIGGERS],
+            })
+            .andWhere('build.dispatchedAt IS NULL')
+            .andWhere('build.queuedAt <= :newest', { newest })
+            .andWhere('build.queuedAt > :oldest', { oldest })
+            .orderBy('build.queuedAt', 'ASC')
+            .addOrderBy('build.id', 'ASC')
+            .take(take)
+            .getMany();
+    }
+
+    /**
+     * Up to `limit` open requested Builds that no provider run was ever adopted
+     * for (`providerRunId IS NULL`), queued strictly before `cutoffMs` — the
+     * candidates for §7.4's never-adopted `lost` rule (`queuedAt + 5 min +
+     * timeoutMinutes + 30`), oldest first.
+     *
+     * One cutoff only: `timeoutMinutes` is per App spec, so the sweep passes the
+     * cutoff of the SHORTEST legal timeout and applies each Build's own deadline
+     * itself. A `blocked` Build is not open and is never selected — it waits for
+     * its owner, not for a provider.
+     */
+    async findNeverAdoptedQueuedBefore(cutoffMs: number, limit: number): Promise<WorkBuild[]> {
+        const take = this.batchSize(limit);
+        if (take === 0) {
+            return [];
+        }
+
+        return this.repository
+            .createQueryBuilder('build')
+            .where('build.status IN (:...statuses)', {
+                statuses: [...APP_BUILD_OPEN_STATUSES],
+            })
+            .andWhere('build.providerRunId IS NULL')
+            .andWhere('build.trigger IN (:...triggers)', {
+                triggers: [...APP_BUILD_REQUESTED_TRIGGERS],
+            })
+            .andWhere('build.queuedAt < :cutoff', { cutoff: cutoffMs })
+            .orderBy('build.queuedAt', 'ASC')
+            .addOrderBy('build.id', 'ASC')
+            .take(take)
+            .getMany();
     }
 
     /**

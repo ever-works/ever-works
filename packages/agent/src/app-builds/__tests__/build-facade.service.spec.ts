@@ -1,3 +1,4 @@
+import { APP_BUILD_IMAGE_NAME } from '@ever-works/contracts';
 import type { IBuildPlugin } from '@ever-works/plugin';
 
 import {
@@ -84,8 +85,116 @@ describe('BuildFacadeService (APW-05 T16)', () => {
     it('derives the image repository, lower-cased, because GHCR rejects anything else', async () => {
         const binding = await facade({ tokens }).resolve(WORK_ID, USER_ID);
 
-        // `Acme-Org/Their-App` on GitHub; `ghcr.io/acme-org/their-app` as an image.
-        expect(binding?.imageRepository).toBe('ghcr.io/acme-org/their-app');
+        // `Acme-Org/Their-App` on GitHub; `ghcr.io/acme-org/their-app/ever-works-app`
+        // as an image.
+        //
+        // Pinned value changed (APW-05 T14): this case used to pin
+        // `ghcr.io/acme-org/their-app`, which is NOT where the build pushes. The
+        // generated workflow pushes `EW_IMAGE` =
+        // `ghcr.io/<owner>/<repo>/${APP_BUILD_IMAGE_NAME}` (the plugin's
+        // `buildImageRepository`), so a registry check through the old value
+        // looked up an image that never exists.
+        expect(binding?.imageRepository).toBe(`ghcr.io/acme-org/their-app/${APP_BUILD_IMAGE_NAME}`);
+        expect(binding?.imageRepository).toBe('ghcr.io/acme-org/their-app/ever-works-app');
+    });
+
+    describe('checkImageAccess — the registry read T14 confirms a digest with', () => {
+        it('delegates to the plugin when it declares the member', async () => {
+            const checkImageAccess = jest.fn(async (..._args: unknown[]) => ({
+                visibility: 'public' as const,
+                readable: true,
+                digest: `sha256:${'d'.repeat(64)}`,
+            }));
+            const binding = await facade({
+                tokens,
+                plugins: [buildPlugin({ checkImageAccess })],
+            }).resolve(WORK_ID, USER_ID);
+
+            const answer = await binding?.checkImageAccess?.({
+                imageRepository: 'ghcr.io/acme-org/their-app/ever-works-app',
+                tag: `sha-${'a'.repeat(40)}`,
+                pullToken: 'ghp-not-a-real-pull-token',
+            });
+
+            expect(answer).toEqual({
+                visibility: 'public',
+                readable: true,
+                digest: `sha256:${'d'.repeat(64)}`,
+            });
+            expect(checkImageAccess).toHaveBeenCalledTimes(1);
+            expect(checkImageAccess.mock.calls[0][0]).toEqual({
+                imageRepository: 'ghcr.io/acme-org/their-app/ever-works-app',
+                tag: `sha-${'a'.repeat(40)}`,
+                pullToken: 'ghp-not-a-real-pull-token',
+            });
+        });
+
+        it('omits the pull token when the caller has none', async () => {
+            const checkImageAccess = jest.fn(async (..._args: unknown[]) => ({
+                visibility: 'private' as const,
+                readable: false,
+            }));
+            const binding = await facade({
+                tokens,
+                plugins: [buildPlugin({ checkImageAccess })],
+            }).resolve(WORK_ID, USER_ID);
+
+            await binding?.checkImageAccess?.({
+                imageRepository: 'ghcr.io/acme-org/their-app/ever-works-app',
+                tag: 'sha-x',
+            });
+
+            expect(checkImageAccess.mock.calls[0][0]).toEqual({
+                imageRepository: 'ghcr.io/acme-org/their-app/ever-works-app',
+                tag: 'sha-x',
+            });
+        });
+
+        it('refuses a repository the binding did not resolve — it is Work-bound', async () => {
+            const checkImageAccess = jest.fn(async (..._args: unknown[]) => ({
+                visibility: 'public' as const,
+                readable: true,
+            }));
+            const binding = await facade({
+                tokens,
+                plugins: [buildPlugin({ checkImageAccess })],
+            }).resolve(WORK_ID, USER_ID);
+
+            await expect(
+                binding?.checkImageAccess?.({
+                    imageRepository: 'ghcr.io/somebody-else/their-app/ever-works-app',
+                    tag: 'sha-x',
+                    pullToken: 'ghp-not-a-real-pull-token',
+                }),
+            ).rejects.toThrow(/not this Work's image repository/);
+            expect(checkImageAccess).not.toHaveBeenCalled();
+        });
+
+        it('is absent when the plugin declares no such member', async () => {
+            const binding = await facade({
+                tokens,
+                plugins: [buildPlugin({ checkImageAccess: undefined })],
+            }).resolve(WORK_ID, USER_ID);
+
+            expect(binding).not.toBeNull();
+            expect(binding?.checkImageAccess).toBeUndefined();
+            expect('checkImageAccess' in (binding ?? {})).toBe(false);
+        });
+
+        it('is absent when the Work has no repository, so there is no image to read', async () => {
+            const checkImageAccess = jest.fn(async (..._args: unknown[]) => ({
+                visibility: 'public' as const,
+                readable: true,
+            }));
+            const binding = await facade({
+                tokens,
+                plugins: [buildPlugin({ checkImageAccess })],
+                found: work({ getWebsiteRepo: () => '' }),
+            }).resolve(WORK_ID, USER_ID);
+
+            expect(binding?.imageRepository).toBeNull();
+            expect(binding?.checkImageAccess).toBeUndefined();
+        });
     });
 
     it('reads the WORK Repository (`website` role), not the `data` role', async () => {
@@ -99,7 +208,9 @@ describe('BuildFacadeService (APW-05 T16)', () => {
         }).resolve(WORK_ID, USER_ID);
 
         expect(getWebsiteRepo).toHaveBeenCalled();
-        expect(binding?.imageRepository).toBe('ghcr.io/acme/the-app-code');
+        // Pinned value changed (APW-05 T14): `/ever-works-app` is the image name
+        // inside the repository's package space — see the case above.
+        expect(binding?.imageRepository).toBe('ghcr.io/acme/the-app-code/ever-works-app');
     });
 
     describe('the refusals — every one answers null, none throws', () => {

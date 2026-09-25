@@ -119,3 +119,7 @@ export * from './app-health.service';
 // where it is needed.
 export * from './app-runtime-state.module';
 export * from './app-deploy-request.module';
+// APW-06 §5.1 — the Build source's class, by name only: the API's internal Trigger
+// controller publishes it as the remote target the isolated App runtime worker's
+// `APP_DEPLOY_BUILD_SOURCE` proxies. Its helpers stay file-private to this folder.
+export { AppDeployBuildSourceAdapter } from './app-deploy-build.source';

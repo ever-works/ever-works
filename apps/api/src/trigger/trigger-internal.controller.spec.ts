@@ -48,7 +48,16 @@ jest.mock('@ever-works/agent/app-spec', () => ({
 jest.mock('@ever-works/agent/app-builds', () => ({
     AppBuildPrepareRunner: class AppBuildPrepareRunner {},
     AppBuildWatchRunner: class AppBuildWatchRunner {},
+    // APW-05 T21 — the `app-build-sweep` task's RPC target, stubbed for the same reason.
+    AppBuildSweepService: class AppBuildSweepService {},
     AppBuildsModule: class AppBuildsModule {},
+}));
+// APW-06 §5.1 — the controller imports `AppDeployBuildSourceAdapter` from the app-runtime
+// barrel as the Build source the isolated App runtime worker proxies. The real barrel reaches
+// the Build entity, the render builder and the cluster facades, none of which this suite needs
+// in order to assert that the remote target is registered and reachable; a token here only.
+jest.mock('@ever-works/agent/app-runtime', () => ({
+    AppDeployBuildSourceAdapter: class AppDeployBuildSourceAdapter {},
 }));
 // FU-2 post-CI fix: trigger-internal.controller.ts imports the
 // AgentScheduleDispatcherService from `@ever-works/agent/agents` and
@@ -126,6 +135,8 @@ jest.mock('@ever-works/agent/plugins', () => ({
     PluginRepository: class PluginRepository {},
     UserPluginRepository: class UserPluginRepository {},
     WorkPluginRepository: class WorkPluginRepository {},
+    // EW-693 T27 (a6) — the worker's allowlist reads, exposed read-only.
+    PluginAllowlistRepository: class PluginAllowlistRepository {},
 }));
 // Event-ingest spine (Wave 6) — the controller imports EventIngestService
 // from the ingest barrel; stub it so the real barrel (entity chain →
@@ -226,6 +237,15 @@ describe('TriggerInternalController', () => {
     let appForkReadinessRunner: any;
     // APW-01 T15 — the ready handler behind that run's setup hand-off.
     let appSourceInitializerService: any;
+    // APW-05 T21 — the `app-build-sweep` task's service: the passes write rows and
+    // take the `app-builds:sweep` lock, so they run API-side.
+    let appBuildSweepService: any;
+    // APW-06 §5.1 — the Build source the isolated App runtime worker's
+    // `APP_DEPLOY_BUILD_SOURCE` proxies: it reads `work_builds`, so it runs API-side.
+    let appDeployBuildSourceAdapter: any;
+    // EW-693 T27 (a6) — the allowlist repository behind the worker's read-only
+    // `PluginAllowlistReader`.
+    let pluginAllowlistRepository: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -341,6 +361,12 @@ describe('TriggerInternalController', () => {
             appForkReadinessRunner,
             // APW-01 T15 — the ready handler, appended after it, same rule.
             appSourceInitializerService,
+            // APW-05 T21 — the Builds sweep, appended LAST, same rule.
+            appBuildSweepService,
+            // APW-06 §5.1 — the worker's Build source, appended after it, same rule.
+            appDeployBuildSourceAdapter,
+            // EW-693 T27 (a6) — the allowlist repository, appended LAST, same rule.
+            pluginAllowlistRepository,
         );
         c.onModuleInit();
         return c;
@@ -454,6 +480,43 @@ describe('TriggerInternalController', () => {
                 result: 'failed',
                 reason: payload.workId === 'work-1' ? 'spec_state_unavailable' : 'work_not_found',
             })),
+        };
+
+        // APW-05 T21 — the real method the RPC hop must reach (`runSweep`, the one
+        // member the task's seam declares). The API reads its own clock, so the
+        // worker sends no argument.
+        appBuildSweepService = {
+            name: 'AppBuildSweepService',
+            runSweep: jest.fn(() => ({ skipped: null, redriveRequested: 1, lostMarked: 0 })),
+        };
+
+        // APW-06 §5.1 — the two reads `AppDeployBuildSource` declares, and nothing else:
+        // `getBuild` (the Build a Deployment names) and `listDeployableBuilds` (the Work's
+        // green deployable Builds, newest first).
+        appDeployBuildSourceAdapter = {
+            name: 'AppDeployBuildSourceAdapter',
+            getBuild: jest.fn((workId: string, buildId: string) => ({
+                id: buildId,
+                commitSha: `${workId}-sha`,
+                status: 'succeeded',
+                trigger: 'push',
+                imageReference: 'ghcr.io/acme/app@sha256:abc',
+            })),
+            listDeployableBuilds: jest.fn(() => []),
+        };
+
+        // EW-693 T27 (a6) — a whole repository, writes included: the reader
+        // must expose only `findByPackageName`.
+        pluginAllowlistRepository = {
+            name: 'PluginAllowlistRepository',
+            findByPackageName: jest.fn((packageName: string) =>
+                packageName === '@acme/cool-plugin'
+                    ? { packageName, versionRange: '^2.0.0', enabled: true, source: 'npm' }
+                    : null,
+            ),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
         };
 
         controller = buildController();
@@ -1087,6 +1150,50 @@ describe('TriggerInternalController', () => {
      * reason is the same: before the entry existed there was nothing to call, so the App
      * spec state row could never be created (C32).
      */
+    /**
+     * APW-05 T21 (first slice) — `packages/tasks/src/tasks/trigger/app-build-sweep.task.ts`
+     * proxies exactly this name, because a Trigger worker owns no `DataSource` and the
+     * sweep's passes write `work_builds`, take the `app-builds:sweep` lock (a callback,
+     * which cannot cross the hop — so `runSweep` takes it API-side) and finalise a lost
+     * Build through the Activity writer. With the name absent the proxy's call rejects
+     * with `Unknown remote target: AppBuildSweepService` and every tick reports
+     * `failed` — visible, but no stuck Build would ever be re-driven on a Trigger install.
+     */
+    describe('the APW-05 T21 app-build-sweep remote target', () => {
+        it('registers AppBuildSweepService so the scheduled sweep can run at all', () => {
+            expect((controller as any).remoteMap.AppBuildSweepService).toBe(appBuildSweepService);
+        });
+
+        it('reaches `runSweep` — the one member the task’s seam declares — over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppBuildSweepService',
+                method: 'runSweep',
+                args: superjson.serialize([]) as any,
+            });
+
+            expect(appBuildSweepService.runSweep).toHaveBeenCalledWith();
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                skipped: null,
+                redriveRequested: 1,
+                lostMarked: 0,
+            });
+        });
+
+        it('derives an allow-list that contains `runSweep` and refuses an unknown method', async () => {
+            expect(
+                (controller as any).allowedMethods.AppBuildSweepService as Set<string>,
+            ).toContain('runSweep');
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppBuildSweepService',
+                    method: 'doesNotExist',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow('Method not in allow-list for AppBuildSweepService: doesNotExist');
+        });
+    });
+
     describe('the APW-01 T15 app-source-initializer remote target', () => {
         it('registers AppSourceInitializerService so the ready hand-off can happen at all', () => {
             expect((controller as any).remoteMap.AppSourceInitializerService).toBe(
@@ -1139,6 +1246,169 @@ describe('TriggerInternalController', () => {
                     args: superjson.serialize([{ workId: 'work-1' }]) as any,
                 }),
             ).rejects.toThrow('Unknown remote target: AppSourceInitializerService');
+        });
+    });
+
+    /**
+     * APW-06 §5.1 / plan §6.4 — `TriggerAppRuntimeModule` binds `APP_DEPLOY_BUILD_SOURCE` to a
+     * proxy of exactly this name, because the worker owns no `DataSource` and the adapter reads
+     * `work_builds`. Without the entry the orchestrator's §5.1 re-check and the render-input
+     * builder in the worker could not read the Build a Deployment names: the builder answered
+     * `no_green_build` ("could not be read") for every Build-backed Deployment. Its sibling,
+     * `APP_DEPLOY_SPEC_SOURCE`, dials the `AppSpecService` entry asserted above.
+     */
+    describe('the APW-06 §5.1 app-deploy build-source remote target', () => {
+        it('registers AppDeployBuildSourceAdapter so the worker can read the Build at all', () => {
+            expect((controller as any).remoteMap.AppDeployBuildSourceAdapter).toBe(
+                appDeployBuildSourceAdapter,
+            );
+        });
+
+        it('reaches `getBuild` over the RPC hop and passes the snapshot back untouched', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppDeployBuildSourceAdapter',
+                method: 'getBuild',
+                args: superjson.serialize(['work-1', 'build-1']) as any,
+            });
+
+            expect(appDeployBuildSourceAdapter.getBuild).toHaveBeenCalledWith('work-1', 'build-1');
+            expect(superjson.deserialize(response.result as any)).toEqual({
+                id: 'build-1',
+                commitSha: 'work-1-sha',
+                status: 'succeeded',
+                trigger: 'push',
+                imageReference: 'ghcr.io/acme/app@sha256:abc',
+            });
+        });
+
+        it('derives an allow-list of exactly the two reads the port declares', async () => {
+            expect(
+                [
+                    ...((controller as any).allowedMethods
+                        .AppDeployBuildSourceAdapter as Set<string>),
+                ].sort(),
+            ).toEqual(['getBuild', 'listDeployableBuilds']);
+
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppDeployBuildSourceAdapter',
+                method: 'listDeployableBuilds',
+                args: superjson.serialize(['work-1']) as any,
+            });
+            expect(appDeployBuildSourceAdapter.listDeployableBuilds).toHaveBeenCalledWith('work-1');
+            expect(superjson.deserialize(response.result as any)).toEqual([]);
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppDeployBuildSourceAdapter',
+                    method: 'doesNotExist',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow(
+                'Method not in allow-list for AppDeployBuildSourceAdapter: doesNotExist',
+            );
+        });
+
+        it('appends the adapter after the T21 sweep, @Optional(), with only @Optional() after it', () => {
+            // The arity rule every App entry above follows, asserted from the decorator's own
+            // metadata: a mid-list insertion would shift every positional construction in this
+            // file, and a non-optional one would stop an installation without the module booting.
+            // It pins the RULE, not "nothing follows the adapter": a later append under the same
+            // rule must not turn this red (the way "the LAST parameter" pins did when T21 and
+            // this entry were appended after APW-01 T15's handler).
+            const paramTypes: unknown[] =
+                Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
+            const optionalIndices: number[] =
+                Reflect.getMetadata('optional:paramtypes', TriggerInternalController) ?? [];
+            const indexOf = (name: string) =>
+                paramTypes.findIndex((type) => (type as { name?: string })?.name === name);
+            const adapterAt = indexOf('AppDeployBuildSourceAdapter');
+
+            expect(adapterAt).toBeGreaterThan(indexOf('AppBuildSweepService'));
+            expect(indexOf('AppBuildSweepService')).toBeGreaterThan(-1);
+            for (let index = adapterAt; index < paramTypes.length; index++) {
+                expect(optionalIndices).toContain(index);
+            }
+        });
+    });
+
+    // -------------------------------------------------------------------
+    // EW-693 T27 (a6) — the worker's allowlist reads
+    // -------------------------------------------------------------------
+
+    /**
+     * Owner decision: third-party allowlisted packages may run in the worker.
+     * The worker's installer checks the allowlist BEFORE any download (FR-11)
+     * but owns no DataSource, so it reads the allowlist over this hop — through
+     * a reader that exposes ONE method. The repository itself is not a remote
+     * target: its write methods would otherwise be callable from a worker.
+     */
+    describe('the T27 PluginAllowlistReader remote target', () => {
+        it('reaches findByPackageName over the RPC hop', async () => {
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'PluginAllowlistReader',
+                method: 'findByPackageName',
+                args: superjson.serialize(['@acme/cool-plugin']) as any,
+            });
+
+            expect(pluginAllowlistRepository.findByPackageName).toHaveBeenCalledWith(
+                '@acme/cool-plugin',
+            );
+            expect(superjson.deserialize(response.result as any)).toMatchObject({
+                packageName: '@acme/cool-plugin',
+                enabled: true,
+            });
+        });
+
+        it.each(['create', 'update', 'delete', 'name'])(
+            'refuses %s — the reader exposes findByPackageName only',
+            async (method) => {
+                await expect(
+                    controller.callRemote(VALID_SECRET, {
+                        name: 'PluginAllowlistReader',
+                        method,
+                        args: superjson.serialize([]) as any,
+                    }),
+                ).rejects.toThrow(`Method not in allow-list for PluginAllowlistReader: ${method}`);
+                expect(pluginAllowlistRepository.create).not.toHaveBeenCalled();
+                expect(pluginAllowlistRepository.update).not.toHaveBeenCalled();
+                expect(pluginAllowlistRepository.delete).not.toHaveBeenCalled();
+            },
+        );
+
+        it('does not expose the repository itself', async () => {
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'PluginAllowlistRepository',
+                    method: 'findByPackageName',
+                    args: superjson.serialize(['@acme/cool-plugin']) as any,
+                }),
+            ).rejects.toThrow('Unknown remote target: PluginAllowlistRepository');
+        });
+
+        it('answers the loud "Unknown remote target" when no allowlist repository is bound', async () => {
+            pluginAllowlistRepository = undefined;
+            const unbound = buildController();
+
+            await expect(
+                unbound.callRemote(VALID_SECRET, {
+                    name: 'PluginAllowlistReader',
+                    method: 'findByPackageName',
+                    args: superjson.serialize(['@acme/cool-plugin']) as any,
+                }),
+            ).rejects.toThrow('Unknown remote target: PluginAllowlistReader');
+        });
+
+        it('appends the repository LAST and @Optional()', () => {
+            const paramTypes: unknown[] =
+                Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
+            const optionalIndices: number[] =
+                Reflect.getMetadata('optional:paramtypes', TriggerInternalController) ?? [];
+            const at = paramTypes.findIndex(
+                (type) => (type as { name?: string })?.name === 'PluginAllowlistRepository',
+            );
+
+            expect(at).toBe(paramTypes.length - 1);
+            expect(optionalIndices).toContain(at);
         });
     });
 });

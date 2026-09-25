@@ -129,6 +129,7 @@ import { NotificationsModule } from '@ever-works/agent/notifications';
 import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { MissionsModule } from '@ever-works/agent/missions';
+import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { TriggerInternalModule } from './trigger-internal.module';
@@ -148,6 +149,14 @@ describe('TriggerInternalModule', () => {
                 MissionsModule,
             ]),
         );
+    });
+
+    it('imports AppDeployRequestModule, whose Build source the App runtime worker proxies', () => {
+        // APW-06 §5.1 — the controller takes `AppDeployBuildSourceAdapter` for the worker's
+        // `APP_DEPLOY_BUILD_SOURCE` proxy. Without this import the adapter is not visible here,
+        // the `@Optional()` parameter resolves `undefined`, and the worker's every Build read
+        // answers `Unknown remote target: AppDeployBuildSourceAdapter`.
+        expect(meta('imports')).toContain(AppDeployRequestModule);
     });
 
     it('declares the internal trigger controller', () => {

@@ -582,3 +582,163 @@ describe('GitHubActionsBuildPlugin — the four members T12 fills', () => {
 		expect(await plugin.getLogsUrl(ref, AUTH)).toBe('https://github.com/acme/their-app/actions/runs/9001');
 	});
 });
+
+/**
+ * APW-05 T14 remainder — `getBuild` carries the digest the build job's `Push`
+ * step logged as `image.pushLogDigest` (plan §4.8's no-token fallback). The
+ * digest is still reported `confirmed: false`: the agent decides what the log
+ * line is worth, and only when the registry itself cannot be read.
+ */
+describe('GitHubActionsBuildPlugin.getBuild — the Push-step digest (plan §4.8, T14 remainder)', () => {
+	const sha = 'a'.repeat(40);
+	const digest = `sha256:${'e'.repeat(64)}`;
+	const ref: BuildRef = {
+		repository: {
+			owner: 'acme',
+			repo: 'their-app',
+			visibility: 'private',
+			trackedBranch: 'main',
+			createdByAppWork: true
+		},
+		buildId: BUILD_ID,
+		providerRunId: '9001'
+	};
+
+	function artifactPort(overrides: Partial<ActionsRunsPort>): ActionsRunsPort {
+		return fakePort({
+			listRunJobs: async () => [job('build', 61, { id: 314 })],
+			listRunArtifacts: async () => [{ id: 77, name: APP_BUILD_RESULT_ARTIFACT_NAME, size_in_bytes: 256 }],
+			downloadArtifactZip: async () =>
+				zipSync({
+					[APP_BUILD_RESULT_ARTIFACT_FILE]: new TextEncoder().encode(
+						JSON.stringify({
+							digest,
+							imageRepository: 'ghcr.io/acme/their-app/ever-works-app',
+							tags: [`sha-${sha}`]
+						})
+					)
+				}),
+			...overrides
+		});
+	}
+
+	function pushLog(lines: readonly string[]): Uint8Array {
+		return new TextEncoder().encode(
+			[
+				'2026-09-21T10:03:00.0000000Z ##[group]Run docker push --all-tags "$EW_IMAGE"',
+				'2026-09-21T10:03:00.0000000Z ##[endgroup]',
+				'2026-09-21T10:03:01.0000000Z The push refers to repository [ghcr.io/acme/their-app/ever-works-app]',
+				...lines.map((content) => `2026-09-21T10:03:02.0000000Z ${content}`),
+				'2026-09-21T10:03:04.0000000Z ##[group]Run set -euo pipefail'
+			].join('\n')
+		);
+	}
+
+	it('a succeeded push run with an artifact carries the Push step’s digest, still unconfirmed', async () => {
+		const downloadJobLogTail = vi.fn(async () => ({
+			bytes: pushLog([`sha-${sha}: digest: ${digest} size: 1570`]),
+			partial: false
+		}));
+		const plugin = new TestPlugin(
+			artifactPort({ getWorkflowRun: async () => run({ event: 'push' }), downloadJobLogTail })
+		);
+
+		const snapshot = await plugin.getBuild(ref, AUTH, (text) => text);
+
+		expect(snapshot?.image).toEqual({
+			repository: 'ghcr.io/acme/their-app/ever-works-app',
+			digest,
+			tags: [`sha-${sha}`],
+			confirmed: false,
+			pushLogDigest: digest
+		});
+		// The BUILD job's log — the one holding the Push step — read as a bounded tail.
+		expect(downloadJobLogTail).toHaveBeenCalledTimes(1);
+		expect(downloadJobLogTail.mock.calls[0]).toEqual([
+			expect.objectContaining({ repository: REPOSITORY, jobId: 314 })
+		]);
+	});
+
+	it('reads it for a manual run too', async () => {
+		const plugin = new TestPlugin(
+			artifactPort({
+				getWorkflowRun: async () => run({ event: 'workflow_dispatch' }),
+				downloadJobLogTail: async () => ({
+					bytes: pushLog([`sha-${sha}: digest: ${digest} size: 1570`]),
+					partial: false
+				})
+			})
+		);
+
+		const snapshot = await plugin.getBuild(ref, AUTH, (text) => text);
+
+		expect(snapshot?.trigger).toBe('manual');
+		expect(snapshot?.image?.pushLogDigest).toBe(digest);
+	});
+
+	it('omits pushLogDigest when the Push step logged no digest for the Build’s sha', async () => {
+		const plugin = new TestPlugin(
+			artifactPort({
+				getWorkflowRun: async () => run({ event: 'push' }),
+				downloadJobLogTail: async () => ({ bytes: pushLog(['branch-main: digest: x size: 1']), partial: false })
+			})
+		);
+
+		const snapshot = await plugin.getBuild(ref, AUTH, (text) => text);
+
+		expect(snapshot?.image).toBeDefined();
+		expect(snapshot?.image && 'pushLogDigest' in snapshot.image).toBe(false);
+	});
+
+	it('an unreadable log costs the fallback, never the observation', async () => {
+		const plugin = new TestPlugin(
+			artifactPort({
+				getWorkflowRun: async () => run({ event: 'push' }),
+				downloadJobLogTail: async () => {
+					throw new Error('log expired');
+				}
+			})
+		);
+
+		const snapshot = await plugin.getBuild(ref, AUTH, (text) => text);
+
+		expect(snapshot?.status).toBe('succeeded');
+		expect(snapshot?.image?.digest).toBe(digest);
+		expect(snapshot?.image?.pushLogDigest).toBeUndefined();
+	});
+
+	it('does not read the log for a pull request run — it never pushes (FR-11)', async () => {
+		const downloadJobLogTail = vi.fn(async () => ({ bytes: pushLog([]), partial: false }));
+		const plugin = new TestPlugin(
+			artifactPort({ getWorkflowRun: async () => run({ event: 'pull_request' }), downloadJobLogTail })
+		);
+
+		const snapshot = await plugin.getBuild(ref, AUTH, (text) => text);
+
+		expect(snapshot?.trigger).toBe('pull_request');
+		expect(downloadJobLogTail).not.toHaveBeenCalled();
+	});
+
+	it('does not read the log for a run that is still going, or one with no artifact', async () => {
+		const downloadJobLogTail = vi.fn(async () => ({ bytes: pushLog([]), partial: false }));
+		const running = new TestPlugin(
+			artifactPort({
+				getWorkflowRun: async () => run({ status: 'in_progress', conclusion: null }),
+				listRunJobs: async () => [job('build', 0, { status: 'in_progress', conclusion: null })],
+				downloadJobLogTail
+			})
+		);
+		const noArtifact = new TestPlugin(
+			artifactPort({
+				getWorkflowRun: async () => run({ event: 'push' }),
+				listRunArtifacts: async () => [],
+				downloadJobLogTail
+			})
+		);
+
+		await running.getBuild(ref, AUTH, (text) => text);
+		await noArtifact.getBuild(ref, AUTH, (text) => text);
+
+		expect(downloadJobLogTail).not.toHaveBeenCalled();
+	});
+});

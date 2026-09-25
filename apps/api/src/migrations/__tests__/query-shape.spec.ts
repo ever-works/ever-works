@@ -423,6 +423,105 @@ describe('APW-05 repository query shape (the b5a7d6857 rule, APW05-G10)', () => 
         });
     });
 
+    /**
+     * APW-05 T21 (first slice) — the sweep's two new reads. Same rule as every
+     * read above: alias-qualified property names the builder escapes per driver,
+     * every value a parameter, every instant a plain NUMBER (the `bigint` epoch
+     * columns), and a deterministic order with the id as the tie-break.
+     */
+    describe('findUndispatchedRequested', () => {
+        it('binds the status, the triggers and both window edges as parameters', async () => {
+            const harness = queryHarness({ rows: [] });
+            const repository = new AppBuildRepository(harness.repository);
+
+            await repository.findUndispatchedRequested(1_800_000_000_000, 90_000, 450_000, 200);
+
+            const texts = harness.predicates.map((predicate) => predicate.text);
+            expect(texts).toEqual([
+                'build.status = :queued',
+                'build.trigger IN (:...triggers)',
+                'build.dispatchedAt IS NULL',
+                'build.queuedAt <= :newest',
+                'build.queuedAt > :oldest',
+            ]);
+            expect(paramsOf(harness.predicates, 'status = :queued')).toEqual({ queued: 'queued' });
+            expect(paramsOf(harness.predicates, 'IN (:...triggers)')).toEqual({
+                triggers: ['manual', 'verification'],
+            });
+            const newest = paramsOf(harness.predicates, '<= :newest').newest;
+            const oldest = paramsOf(harness.predicates, '> :oldest').oldest;
+            expect(newest).toBe(1_800_000_000_000 - 90_000);
+            expect(oldest).toBe(1_800_000_000_000 - 450_000);
+            expect(typeof newest).toBe('number');
+            expect(typeof oldest).toBe('number');
+            expect(harness.orderBys).toEqual([
+                { expression: 'build.queuedAt', direction: 'ASC' },
+                { expression: 'build.id', direction: 'ASC' },
+            ]);
+            expect(harness.takes).toEqual([200]);
+        });
+
+        it('clamps the batch and issues no query for a non-positive limit', async () => {
+            const generous = queryHarness({ rows: [] });
+            await new AppBuildRepository(generous.repository).findUndispatchedRequested(
+                1_800_000_000_000,
+                90_000,
+                450_000,
+                100_000,
+            );
+            expect(generous.takes).toEqual([APP_BUILD_SWEEP_BATCH]);
+
+            const none = queryHarness({ rows: [] });
+            expect(
+                await new AppBuildRepository(none.repository).findUndispatchedRequested(
+                    1_800_000_000_000,
+                    90_000,
+                    450_000,
+                    0,
+                ),
+            ).toEqual([]);
+            expect(none.builderCalls).toEqual([]);
+        });
+    });
+
+    describe('findNeverAdoptedQueuedBefore', () => {
+        it('binds the open statuses, the triggers and the cutoff as a number', async () => {
+            const harness = queryHarness({ rows: [] });
+            const repository = new AppBuildRepository(harness.repository);
+
+            await repository.findNeverAdoptedQueuedBefore(1_800_000_000_000 - 2_400_000, 200);
+
+            expect(harness.predicates.map((predicate) => predicate.text)).toEqual([
+                'build.status IN (:...statuses)',
+                'build.providerRunId IS NULL',
+                'build.trigger IN (:...triggers)',
+                'build.queuedAt < :cutoff',
+            ]);
+            expect(paramsOf(harness.predicates, 'IN (:...statuses)')).toEqual({
+                statuses: ['queued', 'running'],
+            });
+            expect(paramsOf(harness.predicates, 'IN (:...triggers)')).toEqual({
+                triggers: ['manual', 'verification'],
+            });
+            const cutoff = paramsOf(harness.predicates, '< :cutoff').cutoff;
+            expect(cutoff).toBe(1_800_000_000_000 - 2_400_000);
+            expect(typeof cutoff).toBe('number');
+            expect(harness.orderBys).toEqual([
+                { expression: 'build.queuedAt', direction: 'ASC' },
+                { expression: 'build.id', direction: 'ASC' },
+            ]);
+            expect(harness.takes).toEqual([200]);
+        });
+
+        it('issues no query at all for a non-positive limit', async () => {
+            const harness = queryHarness({ rows: [] });
+            const repository = new AppBuildRepository(harness.repository);
+
+            expect(await repository.findNeverAdoptedQueuedBefore(1_800_000_000_000, 0)).toEqual([]);
+            expect(harness.builderCalls).toEqual([]);
+        });
+    });
+
     describe('findPage', () => {
         it('binds the filters, orders newest first and offsets by whole pages', async () => {
             const harness = queryHarness({ rows: [], total: 61 });

@@ -53,9 +53,11 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  * `maxDuration` 300 s is the §7.2 lock's lease ("held ≤ 5 minutes"). It bounds
  * this WORKER run only, and the worker's real bound is shorter — the RPC's
  * non-retried 45 s deadline. The pass itself runs in the API behind the RPC and
- * keeps going after that deadline, its lock's 5-minute lease renewed every
- * 100 s by the heartbeat (up to a 24 h lifetime), so the API-side pass can
- * outlive this run.
+ * keeps going after that deadline, so the API-side pass can outlive this run —
+ * but not the lock: it is taken with a hard 5-minute lifetime (renewed at 100 s
+ * and 200 s, never after), and the pass starts no new provider call after about
+ * 4.5 minutes. A pass that reaches that point reports `leaseExpired` and asks for
+ * one coalesced prepare, which carries on under a fresh lock.
  *
  * `plan.md:1627` (§9.2) asks for "Job retries with the runtime's backoff 3 times
  * over 10 minutes". This job deliberately does NOT deliver that: every runner
@@ -69,9 +71,11 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  * - it cannot tell a retryable failure from a permanent one — every runner throw
  *   crosses the RPC as a detail-less 500, so a GitHub 5xx, a 401/403/404, a 422
  *   and a programming error all look the same;
- * - it can DUPLICATE a GitHub run — a database error after `startBuild`'s
+ * - it could DUPLICATE a GitHub run — a database error after `startBuild`'s
  *   `workflow_dispatch` landed but before `dispatchedAt` was stamped would, on a
- *   retry, dispatch the still-undispatched Build again;
+ *   retry, dispatch the still-undispatched Build again (closed since: the runner
+ *   now CLAIMS a Build — stamps `dispatchedAt` — before it calls `startBuild`, so
+ *   a later failure cannot make it selectable again);
  * - and it would not help: `{ maxAttempts: 3 }` with the runtime's default
  *   backoff retries after ~1–2 s and ~2–4 s (not "over 10 minutes"), far too
  *   soon for a 5xx outage or a rate-limit window. A failure that arrives as a
@@ -85,20 +89,28 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  * hold the workflow commit or pull request and some secrets, when a later step
  * throws.
  *
- * 🛑 **Routed finding — a requested Build whose prepare fails stays `queued`**
- * with `dispatchedAt` NULL until something prepares the Work again (another
- * prepare reason, or the owner's next Rebuild). Nothing re-drives it today: the
- * §7.6 listeners and the §7.4 sweep have not landed, and the planned sweep
- * dispatches watch, not prepare. And in the database-error-after-dispatch
- * window above, that next prepare dispatches the same Build AGAIN (Builds are
- * picked by `dispatchedAt IS NULL`). The fix belongs in the runner and the
- * service — classify provider failures into §9.2's `blocked` values, and claim
- * a Build before dispatching it — not in a blanket task-level retry.
+ * **A requested Build whose prepare fails stays `queued`** with `dispatchedAt`
+ * NULL, and §9.2's retry is delivered by the SWEEP rather than by this job:
+ * `app-build-sweep` (T21, `AppBuildSweepService`) re-drives such a Build with
+ * `requestPrepare(workId, 'sweep')` on each of its first three ticks after 90 s
+ * of silence (a window of 90–450 s), and a Build still never adopted past
+ * `queuedAt + 5 min + timeoutMinutes + 30` is failed as `lost`. That is the
+ * "over minutes" backoff a task-level retry could not give. A re-drive cannot
+ * start a Build twice: the runner claims a Build (stamps `dispatchedAt`) before
+ * `startBuild`, releases the claim only when `startBuild` itself threw, and the
+ * sweep selects only `dispatchedAt IS NULL`. What is left — routed — is
+ * classifying PERMANENT provider failures into §9.2's `blocked` values, so a
+ * deterministic failure ends named rather than as `lost` after three identical
+ * re-drives.
  *
  * `retry: { maxAttempts: 3 }` therefore applies only to what escapes the run
  * body's `catch`: a worker context that cannot boot or close, and a worker
- * crash, eviction or stall. A retry then re-issues the RPC — safe, except in
- * the dispatch window above.
+ * crash, eviction or stall. A retry then re-issues the RPC; the dispatch claim
+ * keeps it from starting a Build the runner already started — except after a
+ * `startBuild` that failed once the provider had accepted it (a client
+ * timeout), whose claim is released like any other throw. The runner's header
+ * names that gap and the one start the claim does not order at all:
+ * `AppBuildsService.startVerification`'s own, unclaimed `startBuild`.
  *
  * ## The payload is declared here, and T18 owns its eventual home
  *
@@ -123,7 +135,7 @@ export const APP_BUILD_PREPARE_TASK_ID = 'app-build-prepare' as const;
 export interface AppBuildPrepareTaskPayload {
     workId: string;
     buildId?: string;
-    /** §7.1's nine reasons: `specApplied` · `envChanged` · `rebuild` · `verification` · `pullTokenSaved` · `workflowMerged` · `settingsChanged` · `actionsEnabled` · `coalesced`. */
+    /** §7.1's nine reasons — `specApplied` · `envChanged` · `rebuild` · `verification` · `pullTokenSaved` · `workflowMerged` · `settingsChanged` · `actionsEnabled` · `coalesced` — and the sweep's `sweep` (T21). */
     reason: string;
 }
 

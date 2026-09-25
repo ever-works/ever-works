@@ -39,6 +39,9 @@ import { AppSpecModule } from '@ever-works/agent/app-spec';
 // the local stack only. `AppBuildsModule` imports `DatabaseModule` itself, which
 // is what its `DistributedTaskLockService` needs.
 import { AppBuildsModule } from '@ever-works/agent/app-builds';
+// APW-06 §5.1 — `AppDeployBuildSourceAdapter`, the Build source the controller
+// publishes for the isolated App runtime worker's `APP_DEPLOY_BUILD_SOURCE` proxy.
+import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
 
 @Module({
     imports: [
@@ -167,6 +170,13 @@ import { AppBuildsModule } from '@ever-works/agent/app-builds';
         // queued path would never work. Appended as its own import rather than folded
         // into AppWorksModule because the two epics' modules are separate graphs.
         AppBuildsModule,
+        // APW-06 §5.1 / plan §6.4 — exposes `AppDeployBuildSourceAdapter` through the
+        // remote-proxy controller: the isolated App runtime worker re-runs §5.1 and builds
+        // the render input locally, but owns no DataSource, so its `APP_DEPLOY_BUILD_SOURCE`
+        // proxies the two Build reads here. The module is already in the API graph through
+        // `WorksModule` and `DeployModule`; Nest caches a static module per class, so this
+        // import adds an edge, not a second adapter or a second deploy lock.
+        AppDeployRequestModule,
         // APW-06 T71 — `DistributedTaskLockService` is provided by THIS module (below) for the
         // controller's remote target of the same name, and it needs its repository: `forFeature`
         // here is the wiring `apps/api/src/data-sync/data-sync.module.ts` documents as the

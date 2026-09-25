@@ -78,6 +78,7 @@ import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService, NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { RemoteCallDto } from './dto/remote-call.dto';
 import {
+    PluginAllowlistRepository,
     PluginRepository,
     UserPluginRepository,
     WorkPluginRepository,
@@ -108,8 +109,17 @@ import { AppSpecService } from '@ever-works/agent/app-spec';
 // not the port of the same name on `./app-builds.service`: the port is T17's
 // provisional seam (`run(payload)`) and is deliberately NOT what the RPC channel
 // publishes, so a worker cannot reach the service's internals through it.
-// APW-05 T20 + C17 adds its `app-build-watch` sibling from the same barrel.
-import { AppBuildPrepareRunner, AppBuildWatchRunner } from '@ever-works/agent/app-builds';
+// APW-05 T20 + C17 adds its `app-build-watch` sibling from the same barrel, and
+// T21 the `app-build-sweep` task's service.
+import {
+    AppBuildPrepareRunner,
+    AppBuildSweepService,
+    AppBuildWatchRunner,
+} from '@ever-works/agent/app-builds';
+// APW-06 §5.1 — the Build source the isolated App runtime worker's
+// `APP_DEPLOY_BUILD_SOURCE` proxies (it owns no DataSource). The adapter CLASS, as
+// `AppDeployRequestModule` exports it, so the allow-list is its two reads.
+import { AppDeployBuildSourceAdapter } from '@ever-works/agent/app-runtime';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -461,10 +471,12 @@ export class TriggerInternalController implements OnModuleInit {
         // ⚠ These three arrived on `develop` appended LAST, and the App Works
         // block below arrived on this branch appended LAST. Both cannot be last.
         // They are ordered this way round because
-        // `app-source-initializer.service.spec.ts:1353` asserts, against the
-        // SOURCE, that `appSourceInitializerService` is the final `@Optional()`
-        // — that is APW-01 T15's own guard against a mid-list insertion, and it
-        // is the stricter of the two. `trigger-internal.controller.spec.ts`'s
+        // `app-source-initializer.service.spec.ts` asserted, against the SOURCE,
+        // that `appSourceInitializerService` was the final `@Optional()` — APW-01
+        // T15's own guard against a mid-list insertion, and the stricter of the
+        // two. Since APW-05 T21 and APW-06 §5.1 appended after the handler, that
+        // pin asserts the rule itself instead: the handler and EVERY parameter
+        // declared after it are `@Optional()`. `trigger-internal.controller.spec.ts`'s
         // arity assertion is positional (the last three indices must be
         // `@Optional()`), which holds either way. The positional construction in
         // that spec passes `undefined` for these three at exactly this offset.
@@ -563,6 +575,35 @@ export class TriggerInternalController implements OnModuleInit {
         // again, and the handler's own content compare makes that safe (plan §6).
         @Optional()
         private readonly appSourceInitializerService?: AppSourceInitializerService,
+        // APW-05 T21 (first slice) — the `app-build-sweep` task's service. Its passes
+        // write `work_builds`, take the `app-builds:sweep` lock (inside `runSweep`,
+        // because a lock callback cannot cross this hop) and finalise a lost Build
+        // through the Activity writer, so the worker proxies it by name. Appended
+        // LAST + `@Optional()` per the arity rule above: with the name absent the
+        // worker's proxy answers the loud `Unknown remote target:
+        // AppBuildSweepService` rather than pretending a tick ran.
+        @Optional()
+        private readonly appBuildSweepService?: AppBuildSweepService,
+        // APW-06 §5.1 / plan §6.4 — the Build source behind the isolated App runtime
+        // worker's `APP_DEPLOY_BUILD_SOURCE`. The worker re-runs §5.1 and assembles the
+        // render input locally but owns no DataSource, so `getBuild` /
+        // `listDeployableBuilds` land here, on the same adapter the API's own §5.1 pass
+        // uses. Its sibling `APP_DEPLOY_SPEC_SOURCE` dials the `AppSpecService` entry
+        // above. Appended LAST + `@Optional()` per the arity rule above: with the name
+        // absent the worker's proxy answers the loud `Unknown remote target:
+        // AppDeployBuildSourceAdapter` rather than pretending there is no Build.
+        @Optional()
+        private readonly appDeployBuildSourceAdapter?: AppDeployBuildSourceAdapter,
+        // EW-693 T27 (a6) — the plugin allowlist, for the Trigger.dev worker's
+        // runtime installer: it checks the allowlist BEFORE any download (FR-11)
+        // but owns no DataSource. NOT registered as a remote target itself (its
+        // other methods write); `onModuleInit` exposes a read-only
+        // `PluginAllowlistReader` over it. Appended LAST + `@Optional()` per the
+        // arity rule above: with it absent the worker's proxy answers the loud
+        // `Unknown remote target: PluginAllowlistReader`, and its installer then
+        // refuses a third-party package rather than guessing.
+        @Optional()
+        private readonly pluginAllowlistRepository?: PluginAllowlistRepository,
     ) {}
 
     onModuleInit() {
@@ -724,6 +765,25 @@ export class TriggerInternalController implements OnModuleInit {
             AppBuildPrepareRunner: this.appBuildPrepareRunner,
             // APW-05 T20 + C17 — and the worker half of `app-build-watch`, same rule.
             AppBuildWatchRunner: this.appBuildWatchRunner,
+            // APW-05 T21 — and the `app-build-sweep` schedule's `runSweep()`, same rule
+            // (allow-list auto-derived).
+            AppBuildSweepService: this.appBuildSweepService,
+            // APW-06 §5.1 — the isolated App runtime worker's Build reads (`getBuild`,
+            // `listDeployableBuilds`; allow-list auto-derived), same rule: a name that
+            // maps to `undefined` answers a loud "Unknown remote target".
+            AppDeployBuildSourceAdapter: this.appDeployBuildSourceAdapter,
+            // EW-693 T27 (a6) — the worker's allowlist reads (third-party
+            // packages may run in the worker; owner decision). A reader with ONE
+            // own-property method, so the allow-list is exactly
+            // `findByPackageName` — the repository's writes stay unreachable.
+            // Maps to `undefined` (a loud "Unknown remote target") when the
+            // repository is not bound.
+            PluginAllowlistReader: this.pluginAllowlistRepository
+                ? {
+                      findByPackageName: (packageName: string) =>
+                          this.pluginAllowlistRepository!.findByPackageName(packageName),
+                  }
+                : undefined,
             // C10 — and the worker half of `app-fork-readiness`. Registered
             // unconditionally for the same reason every App entry above is: a name that
             // maps to `undefined` answers a loud "Unknown remote target" instead of

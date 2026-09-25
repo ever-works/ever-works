@@ -27,7 +27,10 @@ import type {
 import type { ActivityLogService } from '../../activity-log/activity-log.service';
 import type { PluginUsageService, RecordPluginUsageInput } from '../../usage/plugin-usage.service';
 import type { CreateActivityLogDto } from '../../entities/activity-log.types';
+// The deploy reference APW-06 builds from a Build row — what a confirmation is FOR.
+import { imageReferenceOf } from '../../app-runtime/app-deploy-build.source';
 import {
+    APP_BUILD_DIGEST_READ_TIMEOUT_MS,
     APP_BUILD_PREPARE_DISPATCHER,
     APP_BUILD_PREPARE_RUNNER,
     APP_BUILD_PLUGIN_RESOLVER,
@@ -188,21 +191,52 @@ interface Harness {
     readonly runnerRuns: Array<{ kind: 'prepare' | 'watch'; key: string }>;
     readonly startBuildCalls: Array<Record<string, unknown>>;
     readonly cancelBuildCalls: Array<{ buildId: string; providerRunId: string | null }>;
+    /** Every `checkImageAccess` call the binding received (T14's registry read). */
+    readonly imageAccessCalls: Array<ImageAccessInput>;
     seed(row: WorkBuild): WorkBuild;
     seedPreparation(patch: Partial<WorkBuildPreparation>): void;
+    /** The Work's preparation row as the fake repository holds it now. */
+    preparation(): WorkBuildPreparation | undefined;
+    /** The fake preparation repository itself, for a case that spies on a read or a write. */
+    readonly preparationRepository: AppBuildPreparationRepository;
     row(id: string): WorkBuild;
     events(): string[];
 }
 
 interface HarnessOptions {
     readonly prepareDispatcher?: (payload: unknown) => Promise<string | null>;
-    readonly prepareRunner?: () => Promise<unknown>;
+    readonly prepareRunner?: (payload: {
+        workId: string;
+        reason: string;
+        buildId?: string;
+    }) => Promise<unknown>;
     readonly provisionEvents?: { buildUpdated(buildId: string): Promise<void> | void };
     readonly runnerRecipe?: AppBuildsServiceDeps['runnerRecipe'];
     readonly spec?: AppSpec | null;
     readonly specValid?: boolean;
     readonly fingerprints?: Record<string, string> | null;
     readonly onStartBuild?: (input: Record<string, unknown>) => void;
+    /**
+     * The binding's `checkImageAccess` (T14). Absent means the binding declares
+     * none, which is what every case written before T14 already assumed.
+     */
+    readonly checkImageAccess?: (input: ImageAccessInput) => Promise<ImageAccessAnswer>;
+    /** The binding's image repository; `undefined` keeps the platform-derived one. */
+    readonly bindingImageRepository?: string | null;
+}
+
+/** What the binding's `checkImageAccess` is asked (plan §4.8). */
+interface ImageAccessInput {
+    readonly imageRepository: string;
+    readonly tag: string;
+    readonly pullToken?: string;
+}
+
+/** What the binding's `checkImageAccess` answers (`ImageAccessResult`, plan §4.12). */
+interface ImageAccessAnswer {
+    readonly visibility: 'public' | 'private' | 'unknown';
+    readonly readable: boolean;
+    readonly digest?: string;
 }
 
 type AppBuildsServiceDeps = {
@@ -230,6 +264,7 @@ function makeHarness(options: HarnessOptions = {}): Harness {
     const runnerRuns: Harness['runnerRuns'] = [];
     const startBuildCalls: Array<Record<string, unknown>> = [];
     const cancelBuildCalls: Harness['cancelBuildCalls'] = [];
+    const imageAccessCalls: Harness['imageAccessCalls'] = [];
 
     let sequence = 100;
     const preparations = new Map<string, WorkBuildPreparation>();
@@ -472,10 +507,14 @@ function makeHarness(options: HarnessOptions = {}): Harness {
 
     const plugins: AppBuildPluginResolver = {
         async resolve() {
+            const checkImageAccess = options.checkImageAccess;
             return {
                 pluginId: 'github-actions-build',
                 buildKind: 'github-actions',
-                imageRepository: 'ghcr.io/acme/shop/ever-works-app',
+                imageRepository:
+                    options.bindingImageRepository === undefined
+                        ? 'ghcr.io/acme/shop/ever-works-app'
+                        : options.bindingImageRepository,
                 async startBuild(input) {
                     const record = input as unknown as Record<string, unknown>;
                     startBuildCalls.push(record);
@@ -485,6 +524,14 @@ function makeHarness(options: HarnessOptions = {}): Harness {
                 async cancelBuild(input) {
                     cancelBuildCalls.push(input);
                 },
+                ...(checkImageAccess
+                    ? {
+                          async checkImageAccess(input: ImageAccessInput) {
+                              imageAccessCalls.push({ ...input });
+                              return checkImageAccess(input);
+                          },
+                      }
+                    : {}),
             };
         },
     };
@@ -557,9 +604,9 @@ function makeHarness(options: HarnessOptions = {}): Harness {
         },
         options.prepareRunner
             ? {
-                  async run(payload: { workId: string }) {
+                  async run(payload: { workId: string; reason: string; buildId?: string }) {
                       runnerRuns.push({ kind: 'prepare', key: payload.workId });
-                      return options.prepareRunner?.();
+                      return options.prepareRunner?.(payload);
                   },
               }
             : undefined,
@@ -583,6 +630,7 @@ function makeHarness(options: HarnessOptions = {}): Harness {
         runnerRuns,
         startBuildCalls,
         cancelBuildCalls,
+        imageAccessCalls,
         seed(row) {
             store.set(row.id, row);
             return row;
@@ -598,6 +646,10 @@ function makeHarness(options: HarnessOptions = {}): Harness {
                 ...patch,
             } as WorkBuildPreparation);
         },
+        preparation() {
+            return preparations.get(WORK_ID);
+        },
+        preparationRepository,
         row(id) {
             const row = store.get(id);
             if (!row) throw new Error(`no row ${id}`);
@@ -703,6 +755,11 @@ describe('AppBuildsService (APW-05 T17)', () => {
             // though the dispatch behind it is still pending.
             expect(elapsed).toBeLessThan(2_000);
             // The dispatch DID happen — it is merely not awaited past the insert.
+            // It is requested through `requestPrepare` (APW-05 wave 2), whose
+            // `prepareSeq` bump comes first (§7.2), so it reaches the dispatcher a
+            // few ticks AFTER the answer instead of synchronously inside it: wait
+            // for the dispatch here — never for the dispatcher, which stays gated.
+            await waitFor(() => harness.dispatchedPrepare.length === 1);
             expect(harness.dispatchedPrepare).toHaveLength(1);
             expect(harness.dispatchedPrepare[0].reason).toBe('rebuild');
             // …and the MECHANISM, not only the clock. `elapsed < 2 s` alone cannot
@@ -723,13 +780,20 @@ describe('AppBuildsService (APW-05 T17)', () => {
 
         it('falls back in process exactly once when the prepare dispatcher returns null (APW05-G20)', async () => {
             let runs = 0;
+            let inFlight = 0;
+            let maxInFlight = 0;
+            const reasons: string[] = [];
             const harness = makeHarness({
                 prepareDispatcher: async () => null,
-                prepareRunner: async () => {
+                prepareRunner: async (payload) => {
                     runs += 1;
+                    reasons.push(payload.reason);
+                    inFlight += 1;
+                    maxInFlight = Math.max(maxInFlight, inFlight);
                     // Slow enough that a second request definitely overlaps, which is
                     // the case the in-process guard exists for.
                     await new Promise((resolve) => setTimeout(resolve, 150));
+                    inFlight -= 1;
                 },
             });
 
@@ -741,17 +805,53 @@ describe('AppBuildsService (APW-05 T17)', () => {
             expect(Date.now() - started).toBeLessThan(2_000);
 
             // A second request while the first in-process run is still in flight is
-            // refused, not queued twice — §7.1's "an in-process run and a dispatched
-            // one cannot double-fire".
+            // not run CONCURRENTLY — §7.1's "an in-process run and a dispatched one
+            // cannot double-fire" — and it is not dropped either: the run in flight
+            // is followed by exactly one `coalesced` run (§7.2: "a coalesced
+            // dispatch loses nothing").
             await harness.service.requestPrepare(WORK_ID, 'envChanged');
 
-            await waitFor(() => runs >= 1, 2_000);
+            await waitFor(() => runs >= 2, 2_000);
             await new Promise((resolve) => setTimeout(resolve, 300));
-            expect(runs).toBe(1);
-            expect(harness.runnerRuns.filter((run) => run.kind === 'prepare')).toHaveLength(1);
-            // Both requests were still dispatched to the runtime, which refused both —
-            // the requests are not lost, only coalesced.
+            // Corrected from 1 (APW-05 wave 2): the old value pinned the LOST
+            // request. The second request was dropped while the first run was in
+            // flight, and nothing ever re-read the `prepareSeq` it bumped, so its
+            // change waited for an unrelated prepare. It is now re-run once, after
+            // the first run settles — never alongside it, and never twice.
+            expect(runs).toBe(2);
+            expect(harness.runnerRuns.filter((run) => run.kind === 'prepare')).toHaveLength(2);
+            expect(maxInFlight).toBe(1);
+            expect(reasons[1]).toBe('coalesced');
+            // Both requests were still dispatched to the runtime, which refused both.
             expect(harness.dispatchedPrepare).toHaveLength(2);
+        });
+
+        it('bumps prepareSeq before it dispatches the Rebuild’s prepare (§7.2)', async () => {
+            // The bump is what lets a pass that is ALREADY running see this
+            // Rebuild: without it the holder's before/after comparison never moves,
+            // and a dispatch answered `locked` loses the Build until an unrelated
+            // prepare comes along.
+            const seqAtDispatch: Array<number | undefined> = [];
+            let harness!: Harness;
+            harness = makeHarness({
+                prepareDispatcher: async () => {
+                    seqAtDispatch.push(harness.preparation()?.prepareSeq);
+                    return 'run-1';
+                },
+            });
+            harness.seedPreparation({ prepareSeq: 4 });
+
+            const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
+            if (!result.ok) throw new Error('unreachable');
+            await waitFor(() => harness.dispatchedPrepare.length === 1);
+
+            expect(harness.preparation()?.prepareSeq).toBe(5);
+            expect(seqAtDispatch).toEqual([5]);
+            expect(harness.dispatchedPrepare[0]).toEqual({
+                workId: WORK_ID,
+                reason: 'rebuild',
+                buildId: result.build.id,
+            });
         });
 
         it('dedupes a second rebuild inside 10 seconds to the SAME Build', async () => {
@@ -1073,6 +1173,616 @@ describe('AppBuildsService (APW-05 T17)', () => {
                 checksBillableMinutes: 3,
                 payer: 'workspace',
                 costKnown: true,
+            });
+        });
+    });
+
+    /**
+     * APW-05 T14 — `finalize` confirms the artifact's digest against the registry
+     * (plan §4.8 "equal → confirmed; unequal → digestMismatch", §7.3 "On a
+     * terminal transition: confirm digest").
+     *
+     * The github-actions plugin reports every artifact digest `confirmed: false`,
+     * because the artifact is the member's own CI's claim. Before T14 nothing
+     * compared that claim with anything, so every succeeded Build settled as
+     * `digestUnconfirmed` and no Build could ever be deployed. Every case below
+     * drives a snapshot the plugin marked unconfirmed, with every OTHER verdict
+     * clause passing, so the digest is the only thing that decides the verdict.
+     */
+    describe('finalize — digest confirmation (plan §4.8, T14)', () => {
+        const REGISTRY_REPOSITORY = 'ghcr.io/acme/shop/ever-works-app';
+        const OTHER_DIGEST = `sha256:${'e'.repeat(64)}`;
+
+        /** The artifact's image, exactly as the plugin reports it: never confirmed. */
+        function unconfirmedImage(
+            overrides: Partial<NonNullable<BuildSnapshot['image']>> = {},
+        ): NonNullable<BuildSnapshot['image']> {
+            return {
+                repository: REGISTRY_REPOSITORY,
+                digest: DIGEST,
+                tags: [`sha-${SHA}`, 'branch-main'],
+                confirmed: false,
+                ...overrides,
+            };
+        }
+
+        /**
+         * One Build observed from open to a terminal snapshot, with the three
+         * stamps the `staleInputs` clause reads already on the row (§7.5:1467).
+         */
+        async function settle(
+            options: HarnessOptions,
+            snapshotOverrides: Partial<BuildSnapshot> = {},
+            rowOverrides: Partial<WorkBuild> = {},
+        ) {
+            const harness = makeHarness(options);
+            harness.seedPreparation({
+                buildInputsHash: PREPARED_HASH,
+                secretsSyncedAt: new Date('2026-09-17T09:00:00.000Z'),
+                buildSecretNames: ['APP_SECRET'],
+            });
+            const seeded = harness.seed(
+                makeRow({
+                    workId: WORK_ID,
+                    id: uuid(130),
+                    buildInputsHash: PREPARED_HASH,
+                    buildSecretNames: ['APP_SECRET'],
+                    secretsSyncedAt: new Date('2026-09-17T09:00:00.000Z'),
+                    ...rowOverrides,
+                }),
+            );
+
+            await harness.service.applySnapshot(
+                seeded.id,
+                succeededSnapshot({ image: unconfirmedImage(), ...snapshotOverrides }),
+            );
+
+            return { harness, row: harness.row(seeded.id) };
+        }
+
+        it('confirms a digest the registry reports equal, and the Build is deployable', async () => {
+            const { harness, row } = await settle({
+                checkImageAccess: async () => ({
+                    visibility: 'public',
+                    readable: true,
+                    digest: DIGEST,
+                }),
+            });
+
+            // One registry read, of the platform-derived repository and the Build's
+            // own commit tag — and no pull token: none can be stored yet (§4.12).
+            expect(harness.imageAccessCalls).toEqual([
+                { imageRepository: REGISTRY_REPOSITORY, tag: `sha-${SHA}` },
+            ]);
+            expect(row.digestConfirmed).toBe(true);
+            expect(row.deployable).toBe(true);
+            expect(row.notDeployableReason ?? null).toBeNull();
+            expect(row.failureClass ?? null).toBeNull();
+            const succeeded = harness.emitted.find((e) => e.name === 'app.build.succeeded');
+            expect(succeeded?.event.payload.deployable).toBe(true);
+        });
+
+        it('a different registry digest is digestMismatch, and never deployable', async () => {
+            const { harness, row } = await settle({
+                checkImageAccess: async () => ({
+                    visibility: 'public',
+                    readable: true,
+                    digest: OTHER_DIGEST,
+                }),
+            });
+
+            expect(harness.imageAccessCalls).toHaveLength(1);
+            expect(row.digestConfirmed).toBe(false);
+            expect(row.deployable).toBe(false);
+            expect(row.notDeployableReason).toBe('digestUnconfirmed');
+            expect(row.failureClass).toBe('digestMismatch');
+            // The Build itself still succeeded: a mismatch is a verdict, not a status.
+            expect(row.status).toBe('succeeded');
+            expect(harness.events().filter((name) => name === 'app.build.succeeded')).toHaveLength(
+                1,
+            );
+        });
+
+        it('an unreadable registry leaves the Build digestUnconfirmed, with no failure class', async () => {
+            const { harness, row } = await settle({
+                checkImageAccess: async () => ({ visibility: 'private', readable: false }),
+            });
+
+            expect(harness.imageAccessCalls).toHaveLength(1);
+            expect(row.digestConfirmed).toBe(false);
+            expect(row.notDeployableReason).toBe('digestUnconfirmed');
+            expect(row.failureClass ?? null).toBeNull();
+        });
+
+        it('never asks the registry about a repository the artifact names but the platform did not derive', async () => {
+            const { harness, row } = await settle(
+                {
+                    checkImageAccess: async () => ({
+                        visibility: 'public',
+                        readable: true,
+                        digest: DIGEST,
+                    }),
+                },
+                { image: unconfirmedImage({ repository: 'ghcr.io/other/x/ever-works-app' }) },
+            );
+
+            expect(harness.imageAccessCalls).toHaveLength(0);
+            expect(row.digestConfirmed).toBe(false);
+            expect(row.notDeployableReason).toBe('digestUnconfirmed');
+        });
+
+        it('compares the repository case-insensitively and pins the row to the derived one', async () => {
+            const { harness, row } = await settle(
+                {
+                    checkImageAccess: async () => ({
+                        visibility: 'public',
+                        readable: true,
+                        digest: DIGEST,
+                    }),
+                },
+                { image: unconfirmedImage({ repository: 'GHCR.IO/Acme/Shop/ever-works-app' }) },
+            );
+
+            expect(harness.imageAccessCalls).toHaveLength(1);
+            expect(row.digestConfirmed).toBe(true);
+            // The deploy reference is built from this column (APW-06), so it is the
+            // platform's lower-cased repository and not the artifact's spelling.
+            expect(row.imageRepository).toBe(REGISTRY_REPOSITORY);
+        });
+
+        it('a registry read that throws still settles the Build, as digestUnconfirmed', async () => {
+            const { harness, row } = await settle({
+                checkImageAccess: async () => {
+                    throw new Error('ghcr.io is unreachable');
+                },
+            });
+
+            expect(harness.imageAccessCalls).toHaveLength(1);
+            expect(row.status).toBe('succeeded');
+            expect(row.notDeployableReason).toBe('digestUnconfirmed');
+            expect(row.failureClass ?? null).toBeNull();
+            expect(harness.events()).toEqual(['app.build.started', 'app.build.succeeded']);
+            expect(harness.usage).toHaveLength(1);
+        });
+
+        it('a registry read that never answers is abandoned after APP_BUILD_DIGEST_READ_TIMEOUT_MS, and the Build still settles', async () => {
+            // `checkImageAccess` sends up to two unbounded fetches (ghcr.io's /token,
+            // then the manifest HEAD). finalize runs AFTER the terminal claim and
+            // inside the watch lease, so a hung registry must cost the confirmation,
+            // never the settlement — the same as a read that throws.
+            jest.useFakeTimers({
+                doNotFake: ['Date', 'nextTick', 'queueMicrotask', 'setImmediate', 'clearImmediate'],
+            });
+            try {
+                const harness = makeHarness({
+                    checkImageAccess: () => new Promise<ImageAccessAnswer>(() => undefined),
+                });
+                harness.seedPreparation({
+                    buildInputsHash: PREPARED_HASH,
+                    secretsSyncedAt: new Date('2026-09-17T09:00:00.000Z'),
+                    buildSecretNames: ['APP_SECRET'],
+                });
+                const seeded = harness.seed(
+                    makeRow({
+                        workId: WORK_ID,
+                        id: uuid(132),
+                        buildInputsHash: PREPARED_HASH,
+                        buildSecretNames: ['APP_SECRET'],
+                        secretsSyncedAt: new Date('2026-09-17T09:00:00.000Z'),
+                    }),
+                );
+
+                const settling = harness.service
+                    .applySnapshot(seeded.id, succeededSnapshot({ image: unconfirmedImage() }))
+                    .then(() => 'settled' as const);
+                await jest.advanceTimersByTimeAsync(APP_BUILD_DIGEST_READ_TIMEOUT_MS);
+                // One real macrotask: everything after the abandoned read is in-memory.
+                const outcome = await Promise.race([
+                    settling,
+                    new Promise<'pending'>((resolve) => setImmediate(() => resolve('pending'))),
+                ]);
+
+                expect(outcome).toBe('settled');
+                const row = harness.row(seeded.id);
+                expect(harness.imageAccessCalls).toHaveLength(1);
+                expect(row.status).toBe('succeeded');
+                expect(row.digestConfirmed).toBe(false);
+                expect(row.notDeployableReason).toBe('digestUnconfirmed');
+                expect(row.failureClass ?? null).toBeNull();
+                expect(harness.events()).toEqual(['app.build.started', 'app.build.succeeded']);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('a manual Build dispatched at a commit other than the branch head reads its OWN sha tag', async () => {
+            // The workflow checks out and tags `sha-<inputs.ew_sha>` — the commit the
+            // platform dispatched and recorded on the row. A `workflow_dispatch` run's
+            // `head_sha` is the branch head at dispatch time instead, and when that
+            // head was already built by a push Build its `sha-<head>` tag exists with a
+            // different digest: reading it recorded a false `digestMismatch`, which a
+            // Rebuild of the same commit would only repeat.
+            const DISPATCHED_SHA = 'c'.repeat(40);
+            const { harness, row } = await settle(
+                {
+                    checkImageAccess: async ({ tag }) =>
+                        tag === `sha-${DISPATCHED_SHA}`
+                            ? { visibility: 'public', readable: true, digest: DIGEST }
+                            : { visibility: 'public', readable: true, digest: OTHER_DIGEST },
+                },
+                {
+                    trigger: 'manual',
+                    // The run's head_sha: the branch head, not the dispatched commit.
+                    commitSha: SHA,
+                    image: unconfirmedImage({ tags: [`sha-${DISPATCHED_SHA}`, 'branch-main'] }),
+                },
+                { trigger: 'manual', commitSha: DISPATCHED_SHA },
+            );
+
+            expect(harness.imageAccessCalls).toEqual([
+                { imageRepository: REGISTRY_REPOSITORY, tag: `sha-${DISPATCHED_SHA}` },
+            ]);
+            expect(row.commitSha).toBe(DISPATCHED_SHA);
+            expect(row.failureClass ?? null).toBeNull();
+            expect(row.digestConfirmed).toBe(true);
+            expect(row.deployable).toBe(true);
+        });
+
+        it('asks nothing for a failed Build or a pull request Build', async () => {
+            const registry = async (): Promise<ImageAccessAnswer> => ({
+                visibility: 'public',
+                readable: true,
+                digest: DIGEST,
+            });
+
+            const failed = await settle(
+                { checkImageAccess: registry },
+                { status: 'failed', failure: { class: 'unknown', excerpt: [] } },
+            );
+            expect(failed.harness.imageAccessCalls).toHaveLength(0);
+            expect(failed.row.notDeployableReason).toBe('notSucceeded');
+
+            const pullRequest = await settle(
+                { checkImageAccess: registry },
+                { trigger: 'pull_request' },
+                { trigger: 'pull_request' },
+            );
+            expect(pullRequest.harness.imageAccessCalls).toHaveLength(0);
+            expect(pullRequest.row.notDeployableReason).toBe('pullRequest');
+        });
+
+        it('keeps a digest the plugin already confirmed, without a registry read', async () => {
+            const { harness, row } = await settle(
+                {
+                    checkImageAccess: async () => ({
+                        visibility: 'public',
+                        readable: true,
+                        digest: OTHER_DIGEST,
+                    }),
+                },
+                { image: unconfirmedImage({ confirmed: true }) },
+            );
+
+            expect(harness.imageAccessCalls).toHaveLength(0);
+            expect(row.digestConfirmed).toBe(true);
+            expect(row.deployable).toBe(true);
+        });
+
+        it('a binding with no registry read, or no image repository, confirms nothing', async () => {
+            const withoutMember = await settle({});
+            expect(withoutMember.row.notDeployableReason).toBe('digestUnconfirmed');
+
+            const withoutRepository = await settle({
+                bindingImageRepository: null,
+                checkImageAccess: async () => ({
+                    visibility: 'public',
+                    readable: true,
+                    digest: DIGEST,
+                }),
+            });
+            expect(withoutRepository.harness.imageAccessCalls).toHaveLength(0);
+            expect(withoutRepository.row.notDeployableReason).toBe('digestUnconfirmed');
+        });
+
+        /**
+         * The T14 remainder — plan §4.8's no-token fallback: "registry unreadable
+         * (private, no token yet) → confirmed only if the artifact digest equals the
+         * digest reported by `docker push` in the job log line `digest: sha256:…` of
+         * the Push step". The plugin reads that line into
+         * `BuildSnapshot.image.pushLogDigest`.
+         */
+        describe('the push-log fallback (plan §4.8, T14 remainder)', () => {
+            it('an unreadable registry and a matching Push-step digest confirm the Build', async () => {
+                const { harness, row } = await settle(
+                    { checkImageAccess: async () => ({ visibility: 'private', readable: false }) },
+                    { image: unconfirmedImage({ pushLogDigest: DIGEST }) },
+                );
+
+                // The registry is still asked first; the log only answers when it cannot.
+                expect(harness.imageAccessCalls).toHaveLength(1);
+                expect(row.digestConfirmed).toBe(true);
+                expect(row.deployable).toBe(true);
+                expect(row.imageRepository).toBe(REGISTRY_REPOSITORY);
+            });
+
+            it('a Push-step digest that differs confirms nothing, and is not a mismatch', async () => {
+                const { row } = await settle(
+                    { checkImageAccess: async () => ({ visibility: 'private', readable: false }) },
+                    { image: unconfirmedImage({ pushLogDigest: OTHER_DIGEST }) },
+                );
+
+                expect(row.digestConfirmed).toBe(false);
+                expect(row.notDeployableReason).toBe('digestUnconfirmed');
+                expect(row.failureClass ?? null).toBeNull();
+            });
+
+            it('a readable registry wins over the log: its mismatch stands', async () => {
+                const { row } = await settle(
+                    {
+                        checkImageAccess: async () => ({
+                            visibility: 'public',
+                            readable: true,
+                            digest: OTHER_DIGEST,
+                        }),
+                    },
+                    { image: unconfirmedImage({ pushLogDigest: DIGEST }) },
+                );
+
+                expect(row.digestConfirmed).toBe(false);
+                expect(row.failureClass).toBe('digestMismatch');
+            });
+
+            it('the log answers only an UNREADABLE registry — never a failed read or none at all', async () => {
+                const thrown = await settle(
+                    {
+                        checkImageAccess: async () => {
+                            throw new Error('ghcr.io is unreachable');
+                        },
+                    },
+                    { image: unconfirmedImage({ pushLogDigest: DIGEST }) },
+                );
+                expect(thrown.row.notDeployableReason).toBe('digestUnconfirmed');
+
+                const unasked = await settle(
+                    {},
+                    { image: unconfirmedImage({ pushLogDigest: DIGEST }) },
+                );
+                expect(unasked.row.notDeployableReason).toBe('digestUnconfirmed');
+            });
+        });
+
+        /**
+         * `reconfirmDigest(buildId)` — the recheck §7.4 ("re-checks
+         * `digestUnconfirmed` Builds whose App Work gained a pull token") and §4.8
+         * ("rechecked on token save") describe. `finalize` is one-shot, so without
+         * this a Build that settled as `digestUnconfirmed` stays that way forever.
+         */
+        describe('reconfirmDigest — the recheck of a digestUnconfirmed Build', () => {
+            it('re-settles a Build the registry now confirms, and publishes nothing', async () => {
+                let answer: ImageAccessAnswer = { visibility: 'private', readable: false };
+                const { harness, row } = await settle({ checkImageAccess: async () => answer });
+                expect(row.notDeployableReason).toBe('digestUnconfirmed');
+                const eventsBefore = harness.events().length;
+                const activityBefore = harness.activity.length;
+
+                answer = { visibility: 'private', readable: true, digest: DIGEST };
+                const result = await harness.service.reconfirmDigest(row.id);
+
+                expect(result).toMatchObject({
+                    reconfirmed: true,
+                    reason: 'reconfirmed',
+                    deployable: true,
+                    notDeployableReason: null,
+                });
+                const after = harness.row(row.id);
+                expect(after.digestConfirmed).toBe(true);
+                expect(after.deployable).toBe(true);
+                expect(after.notDeployableReason ?? null).toBeNull();
+                // Not a status transition, so §7.8's map names no event for it; and
+                // not a second receipt either.
+                expect(harness.events()).toHaveLength(eventsBefore);
+                expect(harness.activity).toHaveLength(activityBefore);
+                expect(harness.usage).toHaveLength(1);
+            });
+
+            it('confirms from a Push-step digest when the registry still cannot be read', async () => {
+                const { harness, row } = await settle({
+                    checkImageAccess: async () => ({ visibility: 'private', readable: false }),
+                });
+
+                const result = await harness.service.reconfirmDigest(row.id, {
+                    pushLogDigest: DIGEST,
+                });
+
+                expect(result.reconfirmed).toBe(true);
+                expect(harness.row(row.id).deployable).toBe(true);
+            });
+
+            it('leaves a Build that still cannot be confirmed as it was', async () => {
+                const { harness, row } = await settle({
+                    checkImageAccess: async () => ({ visibility: 'private', readable: false }),
+                });
+
+                const result = await harness.service.reconfirmDigest(row.id);
+
+                expect(result).toMatchObject({
+                    reconfirmed: false,
+                    reason: 'unconfirmed',
+                    deployable: false,
+                    notDeployableReason: 'digestUnconfirmed',
+                });
+                expect(harness.row(row.id).notDeployableReason).toBe('digestUnconfirmed');
+            });
+
+            it('records a registry mismatch found on recheck, and the Build stays undeployable', async () => {
+                let answer: ImageAccessAnswer = { visibility: 'private', readable: false };
+                const { harness, row } = await settle({ checkImageAccess: async () => answer });
+
+                answer = { visibility: 'private', readable: true, digest: OTHER_DIGEST };
+                const result = await harness.service.reconfirmDigest(row.id);
+
+                expect(result.reconfirmed).toBe(false);
+                expect(harness.row(row.id).failureClass).toBe('digestMismatch');
+                expect(harness.row(row.id).deployable).toBe(false);
+            });
+
+            it('clears a digestMismatch it recorded earlier once the registry confirms the digest', async () => {
+                // A mismatch keeps `notDeployableReason: 'digestUnconfirmed'`, so the
+                // recheck acts on it again. `failureClass` is exposed on the Build
+                // summary whatever its status, so a Build that became deployable must
+                // not keep saying "The pushed image could not be confirmed".
+                let answer: ImageAccessAnswer = {
+                    visibility: 'public',
+                    readable: true,
+                    digest: OTHER_DIGEST,
+                };
+                const { harness, row } = await settle({ checkImageAccess: async () => answer });
+                expect(row.failureClass).toBe('digestMismatch');
+
+                answer = { visibility: 'public', readable: true, digest: DIGEST };
+                const result = await harness.service.reconfirmDigest(row.id);
+
+                expect(result).toMatchObject({ reconfirmed: true, deployable: true });
+                const after = harness.row(row.id);
+                expect(after.deployable).toBe(true);
+                expect(after.digestConfirmed).toBe(true);
+                expect(after.failureClass ?? null).toBeNull();
+            });
+
+            it('leaves a failure class that is not its own alone', async () => {
+                const { harness, row } = await settle(
+                    { checkImageAccess: async () => ({ visibility: 'private', readable: false }) },
+                    {},
+                    // Not something a succeeded Build normally carries: it only proves
+                    // the recheck clears the class IT wrote and nothing else.
+                    { failureClass: 'unknown' },
+                );
+
+                await harness.service.reconfirmDigest(row.id, { pushLogDigest: DIGEST });
+
+                expect(harness.row(row.id).digestConfirmed).toBe(true);
+                expect(harness.row(row.id).failureClass).toBe('unknown');
+            });
+
+            it('touches only digestUnconfirmed Builds, and asks nothing about any other', async () => {
+                const { harness, row } = await settle({
+                    checkImageAccess: async () => ({
+                        visibility: 'public',
+                        readable: true,
+                        digest: DIGEST,
+                    }),
+                });
+                expect(row.deployable).toBe(true);
+                const callsBefore = harness.imageAccessCalls.length;
+
+                const settled = await harness.service.reconfirmDigest(row.id);
+                const missing = await harness.service.reconfirmDigest(uuid(404));
+
+                expect(settled).toMatchObject({
+                    reconfirmed: false,
+                    reason: 'notDigestUnconfirmed',
+                });
+                expect(missing).toMatchObject({
+                    reconfirmed: false,
+                    reason: 'notFound',
+                    build: null,
+                });
+                expect(harness.imageAccessCalls).toHaveLength(callsBefore);
+            });
+        });
+
+        /**
+         * The watch runner expects a second delivery of the same terminal snapshot
+         * (`app-build-watch.runner.ts`), and `applySnapshot` writes the observation
+         * BEFORE the terminal claim. The plugin reports every artifact digest
+         * `confirmed: false` and in the artifact's own spelling, so an observation
+         * that copied those two fields over a Build the PLATFORM had confirmed undid
+         * the confirmation: the Build stayed `deployable: true` with
+         * `digestConfirmed: false`, and APW-06 could not deploy it (no image
+         * reference). The claim then refuses the second call, so nothing re-confirms.
+         */
+        describe('a later observation never undoes the platform’s confirmation', () => {
+            const ARTIFACT_SPELLING = 'GHCR.IO/Acme/Shop/ever-works-app';
+
+            it('keeps the confirmation and the pinned repository across a second delivery of the same terminal snapshot', async () => {
+                const terminal = succeededSnapshot({
+                    image: unconfirmedImage({ repository: ARTIFACT_SPELLING }),
+                });
+                const { harness, row } = await settle(
+                    {
+                        checkImageAccess: async () => ({
+                            visibility: 'public',
+                            readable: true,
+                            digest: DIGEST,
+                        }),
+                    },
+                    { image: terminal.image },
+                );
+                expect(row.digestConfirmed).toBe(true);
+
+                await harness.service.applySnapshot(row.id, terminal);
+
+                const after = harness.row(row.id);
+                expect(after.deployable).toBe(true);
+                expect(after.digestConfirmed).toBe(true);
+                expect(after.imageRepository).toBe(REGISTRY_REPOSITORY);
+                expect(imageReferenceOf(after)).toBe(`${REGISTRY_REPOSITORY}@${DIGEST}`);
+                // The second delivery is not a second finalisation.
+                expect(harness.imageAccessCalls).toHaveLength(1);
+                expect(
+                    harness.events().filter((name) => name === 'app.build.succeeded'),
+                ).toHaveLength(1);
+            });
+
+            it('keeps a confirmation reconfirmDigest settled across a later delivery', async () => {
+                let answer: ImageAccessAnswer = { visibility: 'private', readable: false };
+                const terminal = succeededSnapshot({
+                    image: unconfirmedImage({ repository: ARTIFACT_SPELLING }),
+                });
+                const { harness, row } = await settle(
+                    { checkImageAccess: async () => answer },
+                    { image: terminal.image },
+                );
+                expect(row.notDeployableReason).toBe('digestUnconfirmed');
+                answer = { visibility: 'private', readable: true, digest: DIGEST };
+                expect((await harness.service.reconfirmDigest(row.id)).reconfirmed).toBe(true);
+
+                await harness.service.applySnapshot(row.id, terminal);
+
+                const after = harness.row(row.id);
+                expect(after.deployable).toBe(true);
+                expect(after.digestConfirmed).toBe(true);
+                expect(after.imageRepository).toBe(REGISTRY_REPOSITORY);
+                expect(imageReferenceOf(after)).toBe(`${REGISTRY_REPOSITORY}@${DIGEST}`);
+            });
+
+            it('does not carry a confirmation over to a DIFFERENT digest', async () => {
+                // The confirmation belongs to the image the registry vouched for. An
+                // observation naming another digest is a different claim, and the row
+                // takes it unconfirmed — so no deploy reference can be built from it.
+                const { harness, row } = await settle({
+                    checkImageAccess: async () => ({
+                        visibility: 'public',
+                        readable: true,
+                        digest: DIGEST,
+                    }),
+                });
+                expect(row.digestConfirmed).toBe(true);
+
+                await harness.service.applySnapshot(
+                    row.id,
+                    succeededSnapshot({
+                        image: unconfirmedImage({
+                            repository: ARTIFACT_SPELLING,
+                            digest: OTHER_DIGEST,
+                        }),
+                    }),
+                );
+
+                const after = harness.row(row.id);
+                expect(after.imageDigest).toBe(OTHER_DIGEST);
+                expect(after.digestConfirmed).toBe(false);
+                expect(imageReferenceOf(after)).toBeNull();
             });
         });
     });
@@ -1728,6 +2438,126 @@ describe('AppBuildsService (APW-05 T17)', () => {
 
             expect(result).toEqual({ prepareSeq: 0, dispatched: true });
             expect(harness.dispatchedPrepare).toHaveLength(1);
+        });
+
+        it('a Rebuild whose prepareSeq read fails is still dispatched (the bump never loses the request)', async () => {
+            // `requestRebuild` requests its prepare through `requestPrepare`, so the
+            // bump's READ of the row sits in front of the dispatch. A transient read
+            // error there must cost the coalescing marker, never the Rebuild's
+            // prepare — before, it rejected `requestPrepare`, the `.catch` logged
+            // it, and the queued Build waited for an unrelated prepare.
+            const harness = makeHarness();
+            harness.seedPreparation({ prepareSeq: 4 });
+            jest.spyOn(harness.preparationRepository, 'findByWork').mockRejectedValueOnce(
+                new Error('connection terminated unexpectedly'),
+            );
+
+            const result = await harness.service.requestRebuild(WORK_ID, USER_ID);
+            if (!result.ok) throw new Error('unreachable');
+            await waitFor(() => harness.dispatchedPrepare.length === 1);
+
+            expect(harness.dispatchedPrepare[0]).toEqual({
+                workId: WORK_ID,
+                reason: 'rebuild',
+                buildId: result.build.id,
+            });
+            // The marker was not advanced (it could not be read) — and nothing
+            // else was written in its place.
+            expect(harness.preparation()?.prepareSeq).toBe(4);
+        });
+
+        it('a requestPrepare whose prepareSeq read fails answers prepareSeq 0 (unknown) and still dispatches', async () => {
+            const harness = makeHarness();
+            harness.seedPreparation({ prepareSeq: 4 });
+            jest.spyOn(harness.preparationRepository, 'findByWork').mockRejectedValueOnce(
+                new Error('connection terminated unexpectedly'),
+            );
+
+            const result = await harness.service.requestPrepare(WORK_ID, 'envChanged');
+
+            expect(result).toEqual({ prepareSeq: 0, dispatched: true });
+            expect(harness.dispatchedPrepare).toEqual([{ workId: WORK_ID, reason: 'envChanged' }]);
+        });
+
+        it('the bump writes prepareSeq alone — never a buildPluginId a racing prepare has since changed', async () => {
+            // The bump reads the row, then merges. A prepare that lands between the
+            // two and resolves a different build plugin must keep its value: the
+            // bump names `prepareSeq` and nothing else it read.
+            const harness = makeHarness();
+            harness.seedPreparation({ prepareSeq: 4, buildPluginId: 'old-build-plugin' });
+            jest.spyOn(harness.preparationRepository, 'findByWork').mockImplementationOnce(
+                async () => {
+                    const stale = { ...harness.preparation() } as WorkBuildPreparation;
+                    // The racing prepare's write, after the bump's read.
+                    harness.preparation()!.buildPluginId = 'new-build-plugin';
+                    return stale;
+                },
+            );
+            const upsert = jest.spyOn(harness.preparationRepository, 'upsertAfterPrepare');
+
+            const result = await harness.service.requestPrepare(WORK_ID, 'envChanged');
+
+            expect(result.prepareSeq).toBe(5);
+            expect(upsert).toHaveBeenCalledTimes(1);
+            expect(upsert).toHaveBeenCalledWith(WORK_ID, { prepareSeq: 5 });
+            expect(harness.preparation()?.buildPluginId).toBe('new-build-plugin');
+            expect(harness.preparation()?.prepareSeq).toBe(5);
+        });
+
+        it('a prepare requested while an in-process prepare runs is run again once it finishes', async () => {
+            let runs = 0;
+            let release!: () => void;
+            const gate = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            const payloads: Array<{ reason: string }> = [];
+            const harness = makeHarness({
+                prepareDispatcher: async () => null,
+                prepareRunner: async (payload) => {
+                    runs += 1;
+                    payloads.push(payload);
+                    if (runs === 1) await gate;
+                },
+            });
+
+            await harness.service.requestPrepare(WORK_ID, 'specApplied');
+            await waitFor(() => runs === 1);
+            await harness.service.requestPrepare(WORK_ID, 'envChanged');
+            // Never alongside the run in flight.
+            expect(runs).toBe(1);
+
+            release();
+            await waitFor(() => runs === 2);
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            expect(runs).toBe(2);
+            expect(payloads.map((payload) => payload.reason)).toEqual(['specApplied', 'coalesced']);
+        });
+
+        it('the runner’s own coalescing dispatch from inside an in-process run is not dropped', async () => {
+            // The runner asks for its coalesced prepare while it is still running
+            // (the in-process marker is its own). In fallback mode that request
+            // used to hit the "already in flight" guard and vanish.
+            let runs = 0;
+            let harness!: Harness;
+            harness = makeHarness({
+                prepareDispatcher: async () => null,
+                prepareRunner: async () => {
+                    runs += 1;
+                    if (runs === 1) {
+                        await harness.service.dispatchPrepare({
+                            workId: WORK_ID,
+                            reason: 'coalesced',
+                        });
+                    }
+                },
+            });
+
+            await harness.service.requestPrepare(WORK_ID, 'specApplied');
+            await waitFor(() => runs === 2);
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            expect(runs).toBe(2);
         });
 
         it('reports dispatched: false and still runs the payload when the runtime refuses', async () => {

@@ -14,12 +14,14 @@
  *
  * ## Where the reason vocabulary lives
  *
- * §7.1 spells the nine reasons (`specApplied` · `envChanged` · `rebuild` · `verification` ·
- * `pullTokenSaved` · `workflowMerged` · `settingsChanged` · `actionsEnabled` · `coalesced`).
- * They are declared once as `APP_BUILD_PREPARE_REASONS` / `AppBuildPrepareReason`
- * (`packages/agent/src/app-builds/app-builds.service.ts:73-86`); this interface keeps the
- * wide `string` field so that all three declarations of this payload stay mutually
- * assignable — see the duplication note below.
+ * §7.1 spells nine reasons (`specApplied` · `envChanged` · `rebuild` · `verification` ·
+ * `pullTokenSaved` · `workflowMerged` · `settingsChanged` · `actionsEnabled` · `coalesced`),
+ * and T21's sweep adds a tenth, `sweep` — its re-drive of a requested Build nothing
+ * dispatched (§9.2). They are declared once as `APP_BUILD_PREPARE_REASONS` /
+ * `AppBuildPrepareReason` (`packages/agent/src/app-builds/app-builds.service.ts`); this
+ * interface keeps the wide `string` field so that all three declarations of this payload
+ * stay mutually assignable, and so a new reason is never a breaking wire change — see the
+ * duplication note below.
  *
  * ## 🛑 Three declarations of one payload (routed as a finding, not resolved here)
  *
@@ -56,8 +58,9 @@ export interface AppBuildPreparePayload {
      */
     buildId?: string;
     /**
-     * One of §7.1's nine reasons — `specApplied`, `envChanged`, `rebuild`, `verification`,
-     * `pullTokenSaved`, `workflowMerged`, `settingsChanged`, `actionsEnabled`, `coalesced`.
+     * One of the ten reasons — §7.1's `specApplied`, `envChanged`, `rebuild`, `verification`,
+     * `pullTokenSaved`, `workflowMerged`, `settingsChanged`, `actionsEnabled`, `coalesced`, and
+     * the sweep's `sweep`.
      */
     reason: string;
 }

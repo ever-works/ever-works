@@ -50,6 +50,12 @@
  *   §7.1's ten-run in-process cap (`APP_BUILD_WATCH_MAX_CONCURRENT_RUNS`), the
  *   lease length, the skip reasons of an unconfigured installation and
  *   `repositoryCoordinates`.
+ * - `./app-build-sweep.service` — `AppBuildSweepService` (T21, first slice), the
+ *   pass behind the `app-build-sweep` schedule: `runSweep()` under the
+ *   `app-builds:sweep` lock, the re-drive of requested Builds nothing
+ *   dispatched (§9.2) and the never-adopted half of §7.4's `lost` rule, with the
+ *   window constants its spec pins. `apps/api`'s cron fallback and the
+ *   trigger-internal controller import the class from here.
  * - `./app-builds.module` — `AppBuildsModule`, what `apps/api`'s App Builds module
  *   will import.
  */
@@ -59,6 +65,7 @@ export * from './app-builds.service';
 export * from './deployable-verdict';
 export * from './app-build-failure-copy';
 export * from './app-build-pull-token.service';
+export * from './app-build-sweep.service';
 
 // 🛑 An EXPLICIT list, not `export *`, for exactly one name.
 //

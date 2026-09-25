@@ -232,6 +232,68 @@ describe('AppBuildPreparationRepository', () => {
             expect((await stored(WORK_A)).prepareSeq).toBe(4);
         });
 
+        it('a prepare row write never reverts a prepareSeq bump that lands between its read and its write', async () => {
+            // The race of §7.2: `requestPrepare` bumps the marker while the
+            // holder's `upsertAfterPrepare` is between its read and its write.
+            // A whole-entity save writes the STALE marker it read back, and the
+            // holder's after-release re-read then sees no movement: the request
+            // is lost.
+            const preparations = dataSource.getRepository(WorkBuildPreparation);
+            const findSpy = jest
+                .spyOn(repository, 'findByWork')
+                .mockImplementationOnce(async (workId: string) => {
+                    const read = await preparations.findOne({ where: { workId } });
+                    await preparations.update({ workId }, { prepareSeq: 7 });
+                    return read;
+                });
+
+            await repository.upsertAfterPrepare(WORK_A, { workflowState: 'committed' });
+            findSpy.mockRestore();
+
+            const row = await stored(WORK_A);
+            expect(row.prepareSeq).toBe(7);
+            expect(row.workflowState).toBe('committed');
+        });
+
+        it('a prepareSeq bump never reverts a workflow state written between its read and its write', async () => {
+            // The mirror: the requester's bump is a patch of its own, and must not
+            // put back the `workflowState` a prepare stored in the meantime.
+            const preparations = dataSource.getRepository(WorkBuildPreparation);
+            const findSpy = jest
+                .spyOn(repository, 'findByWork')
+                .mockImplementationOnce(async (workId: string) => {
+                    const read = await preparations.findOne({ where: { workId } });
+                    await preparations.update({ workId }, { workflowState: 'committed' });
+                    return read;
+                });
+
+            await repository.upsertAfterPrepare(WORK_A, {
+                buildPluginId: 'github-actions',
+                prepareSeq: 5,
+            });
+            findSpy.mockRestore();
+
+            const row = await stored(WORK_A);
+            expect(row.prepareSeq).toBe(5);
+            expect(row.workflowState).toBe('committed');
+            // The columns neither writer named are untouched.
+            expect(row.workflowPullRequestNumber).toBe(5);
+            expect(row.buildSecretNames).toEqual(['EW_ONE']);
+        });
+
+        it('a patch whose every value is undefined writes nothing', async () => {
+            const before = await stored(WORK_A);
+
+            const answered = await repository.upsertAfterPrepare(WORK_A, {
+                workflowState: undefined,
+            });
+
+            const after = await stored(WORK_A);
+            expect(answered.id).toBe(before.id);
+            expect(after.workflowState).toBe('pullRequestOpen');
+            expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+        });
+
         it('clears a nullable column when the prepare says the value is gone', async () => {
             await repository.upsertAfterPrepare(WORK_A, {
                 workflowSha256: null,
