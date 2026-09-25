@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { NextIntlClientProvider } from 'next-intl';
 
 import messages from '../../../messages/en.json';
@@ -162,5 +163,30 @@ describe('TimeZoneSetting (owner 2026-09-18 — replaces the "Times shown in UTC
         expect(screen.getByTestId('profile-timezone-current')).toHaveTextContent(
             'Times are shown in Europe/Kyiv.',
         );
+    });
+
+    /**
+     * e2e run 36135997693: /settings threw React hydration error #418 because the
+     * server rendered the hint with ITS zone (UTC in production) and the browser
+     * hydrated with its own. The server render must not name any browser zone.
+     */
+    it('renders no browser zone on the server, so hydration cannot mismatch', () => {
+        const html = renderToString(
+            <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+                <TimeZoneSetting timezone="Europe/Kyiv" />
+            </NextIntlClientProvider>,
+        );
+
+        // The stored zone is server data and may appear; the local-time HINT may not.
+        expect(html).toContain('My local time');
+        expect(html).not.toMatch(/<span[^>]*>Europe\/Kyiv<\/span>/);
+    });
+
+    it('shows the browser zone as the hint once mounted on the client', () => {
+        renderSetting(null);
+
+        expect(
+            within(screen.getByTestId('profile-timezone-local')).getByText(PINNED_BROWSER_ZONE),
+        ).toBeInTheDocument();
     });
 });
