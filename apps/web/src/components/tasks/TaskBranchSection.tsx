@@ -23,6 +23,17 @@ import {
  * conflicts"), and a "Discard branch" action behind an irreversible
  * confirm.
  *
+ * Multi-repo Tasks also list the other repositories a fleet run pushed
+ * ("Also in"): each one's PR link, or its pushed / failed state. A row the
+ * agent marked `refusedByGuard` (APW-08: an App Work's change rules refused
+ * the pushed branch) gets a red "refused" pill, the guard's reason verbatim
+ * (it names the rule and the paths: ACC-NEG-04) and, when a pull request is
+ * still open, a "do not merge" line; the link is kept, as the agent keeps it,
+ * because it is the operator's route to that pull request. Any other `failed`
+ * row that kept its link (a discard survivor, a refused discard survivor) gets
+ * a "needs attention" pill with its error, so a failed entry never looks like
+ * a healthy pull request.
+ *
  * When the Task has no branch yet: a per-Task isolation override
  * select (inherit / on / off → `isolationMode` null / 'on' / 'off')
  * saved via the Task PATCH.
@@ -39,6 +50,9 @@ const STATE_TONES: Record<TaskBranchState, string> = {
 };
 
 const FALLBACK_TONE = 'bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300';
+
+/** The pill on a linked repository row that must not read as healthy. */
+const LINKED_ALERT_TONE = STATE_TONES.conflict;
 
 export function TaskBranchSection({ task }: { task: Task }) {
     if (task.branchRef) {
@@ -235,39 +249,77 @@ function BranchPanel({ task }: { task: Task }) {
                             {t('linkedPullRequests')}
                         </dt>
                         <dd className="min-w-0 space-y-1">
-                            {task.linkedPullRequests.map((linked) => (
-                                <div
-                                    key={linked.repositoryId}
-                                    className="flex items-center gap-2 text-xs min-w-0"
-                                    data-testid={`task-linked-pr-${linked.repositoryId}`}
-                                >
-                                    <span className="font-mono truncate text-text dark:text-text-dark">
-                                        {linked.repositoryId}
-                                    </span>
-                                    {linked.prUrl ? (
-                                        <a
-                                            href={linked.prUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary hover:underline shrink-0"
-                                        >
-                                            {linked.prNumber != null
-                                                ? `#${linked.prNumber}`
-                                                : t('openPr')}
-                                            <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                    ) : (
-                                        <span
-                                            className={`shrink-0 ${linked.state === 'failed' ? 'text-danger' : 'text-text-muted'}`}
-                                            title={linked.error ?? undefined}
-                                        >
-                                            {linked.state === 'failed'
-                                                ? t('linkedPrFailed')
-                                                : t('linkedPrPushed')}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
+                            {task.linkedPullRequests.map((linked) => {
+                                // Keyed on the flag alone, not on `state`: a
+                                // flagged entry must never look fine.
+                                const refused = linked.refusedByGuard === true;
+                                const alert = refused
+                                    ? t('linkedPrRefused')
+                                    : linked.state === 'failed' && linked.prUrl
+                                      ? t('linkedPrNeedsAttention')
+                                      : null;
+                                const reason = alert && linked.error ? linked.error : null;
+                                return (
+                                    <div
+                                        key={linked.repositoryId}
+                                        className="space-y-1 min-w-0"
+                                        data-testid={`task-linked-pr-${linked.repositoryId}`}
+                                    >
+                                        <div className="flex flex-wrap items-center gap-2 text-xs min-w-0">
+                                            <span className="font-mono truncate text-text dark:text-text-dark">
+                                                {linked.repositoryId}
+                                            </span>
+                                            {linked.prUrl ? (
+                                                <a
+                                                    href={linked.prUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline shrink-0"
+                                                >
+                                                    {linked.prNumber != null
+                                                        ? `#${linked.prNumber}`
+                                                        : t('openPr')}
+                                                    <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            ) : refused ? null : (
+                                                <span
+                                                    className={`shrink-0 ${linked.state === 'failed' ? 'text-danger' : 'text-text-muted'}`}
+                                                    title={linked.error ?? undefined}
+                                                >
+                                                    {linked.state === 'failed'
+                                                        ? t('linkedPrFailed')
+                                                        : t('linkedPrPushed')}
+                                                </span>
+                                            )}
+                                            {alert && (
+                                                <span
+                                                    data-testid="task-linked-pr-alert"
+                                                    title={linked.error ?? undefined}
+                                                    className={cn(
+                                                        'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0',
+                                                        LINKED_ALERT_TONE,
+                                                    )}
+                                                >
+                                                    {alert}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {refused && linked.prUrl && (
+                                            <p className="text-[11px] text-danger">
+                                                {t('linkedPrRefusedDoNotMerge')}
+                                            </p>
+                                        )}
+                                        {reason && (
+                                            <p
+                                                data-testid="task-linked-pr-reason"
+                                                className="text-[11px] whitespace-pre-line break-words text-text-secondary dark:text-text-secondary-dark"
+                                            >
+                                                {reason}
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </dd>
                     </div>
                 )}

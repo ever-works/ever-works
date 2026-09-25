@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { Task } from '@/lib/api/tasks';
 
 // Returns the key, plus the ICU values when the caller passed any — so a
@@ -211,5 +211,132 @@ describe('TaskBranchSection - the discard confirmation matches what discard does
         fireEvent.click(screen.getByTestId('task-discard-branch'));
 
         expect(discardTaskBranchAction).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * APW-08 — a linked repository whose pushed branch an App Work's change rules
+ * refused. The agent records the entry `failed` with the guard's reason and
+ * `refusedByGuard: true`, and KEEPS the pull request link when one was already
+ * open (that pull request now carries the refused change). Before this, every
+ * entry with a link rendered as the same plain `#N` link as a healthy one, so
+ * the refusal, its reason and the "do not merge" consequence were invisible —
+ * while ACC-NEG-04 requires the blocked Task's page to name the path and the
+ * rule. The same blind spot hid every other `failed` entry that kept its link
+ * (a discard survivor, a refused discard survivor).
+ */
+describe('TaskBranchSection - refused and failed linked pull requests are not shown as healthy', () => {
+    const GUARD_REASON = [
+        '`acme/app-code` is the code repository of App Work "Shop", and its change rules refused this change: This change edits a protected path.',
+        '',
+        'Paths:',
+        '- `.github/workflows/ci.yml`',
+    ].join('\n');
+
+    const entry = (overrides: Record<string, unknown>) => ({
+        repositoryId: 'acme/app-code',
+        branch: 'task/t-1-add-field-x',
+        baseRef: 'main',
+        headSha: 'e'.repeat(40),
+        prNumber: 42,
+        prUrl: 'https://github.com/acme/app-code/pull/42',
+        state: 'failed' as const,
+        error: null as string | null,
+        updatedAt: '2026-09-24T00:00:00.000Z',
+        ...overrides,
+    });
+
+    const renderWith = (linkedPullRequests: Array<Record<string, unknown>>) =>
+        render(
+            <TaskBranchSection
+                task={make({
+                    linkedPullRequests: linkedPullRequests as unknown as Task['linkedPullRequests'],
+                })}
+            />,
+        );
+
+    it('flags a refused pull request that is still open, keeps its link, says not to merge it and names the reason', () => {
+        renderWith([entry({ refusedByGuard: true, error: GUARD_REASON })]);
+
+        const row = screen.getByTestId('task-linked-pr-acme/app-code');
+        // The link is kept on purpose: it is the operator's route to the pull request.
+        expect(row.querySelector('a')).toHaveAttribute(
+            'href',
+            'https://github.com/acme/app-code/pull/42',
+        );
+
+        const alert = within(row).getByTestId('task-linked-pr-alert');
+        expect(alert).toHaveTextContent('linkedPrRefused');
+        expect(alert).toHaveAttribute('title', GUARD_REASON);
+        expect(alert.className).toContain('text-red-700');
+
+        expect(row).toHaveTextContent('linkedPrRefusedDoNotMerge');
+        // The reason (path and rule) is on the page, verbatim and whole.
+        expect(within(row).getByTestId('task-linked-pr-reason').textContent).toBe(GUARD_REASON);
+        expect(row.textContent).not.toContain('linkedPrFailed');
+    });
+
+    it('says a refused branch with no pull request was refused, not that opening one failed', () => {
+        renderWith([
+            entry({ refusedByGuard: true, prNumber: null, prUrl: null, error: GUARD_REASON }),
+        ]);
+
+        const row = screen.getByTestId('task-linked-pr-acme/app-code');
+        expect(row.querySelector('a')).toBeNull();
+        expect(within(row).getByTestId('task-linked-pr-alert')).toHaveTextContent(
+            'linkedPrRefused',
+        );
+        expect(within(row).getByTestId('task-linked-pr-reason').textContent).toBe(GUARD_REASON);
+        expect(row.textContent).not.toContain('linkedPrFailed');
+        // No pull request carries the refused change, so there is nothing not to merge.
+        expect(row.textContent).not.toContain('linkedPrRefusedDoNotMerge');
+    });
+
+    it('flags any other failed entry that kept its link as needing attention, with its error', () => {
+        const survivorError = 'branch delete failed — the branch is still on the remote: 403';
+        renderWith([
+            // A discard survivor (task-workspace.service `mountBranchSurvived`).
+            entry({ repositoryId: 'acme/survivor', error: survivorError }),
+            // A refused discard survivor: the guard's reason, but no flag — the
+            // agent keeps it unmatched on purpose.
+            entry({
+                repositoryId: 'acme/refused-survivor',
+                refusedByGuard: false,
+                error: GUARD_REASON,
+            }),
+        ]);
+
+        const cases: Array<[string, string]> = [
+            ['acme/survivor', survivorError],
+            ['acme/refused-survivor', GUARD_REASON],
+        ];
+        for (const [repositoryId, error] of cases) {
+            const row = screen.getByTestId(`task-linked-pr-${repositoryId}`);
+            expect(row.querySelector('a')).toHaveAttribute(
+                'href',
+                'https://github.com/acme/app-code/pull/42',
+            );
+            const alert = within(row).getByTestId('task-linked-pr-alert');
+            expect(alert).toHaveTextContent('linkedPrNeedsAttention');
+            expect(alert).toHaveAttribute('title', error);
+            // The refused survivor's pull request carries a refused change too;
+            // its reason names the path and the rule, so it is shown, not hidden
+            // in a tooltip.
+            expect(within(row).getByTestId('task-linked-pr-reason').textContent).toBe(error);
+            expect(row.textContent).not.toContain('linkedPrRefused');
+        }
+    });
+
+    it('adds no alert to a healthy pull request or a pushed branch', () => {
+        renderWith([
+            entry({ repositoryId: 'acme/open', state: 'pr-open' }),
+            entry({ repositoryId: 'acme/pushed', state: 'pushed', prNumber: null, prUrl: null }),
+        ]);
+
+        for (const repositoryId of ['acme/open', 'acme/pushed']) {
+            const row = screen.getByTestId(`task-linked-pr-${repositoryId}`);
+            expect(within(row).queryByTestId('task-linked-pr-alert')).toBeNull();
+            expect(within(row).queryByTestId('task-linked-pr-reason')).toBeNull();
+        }
     });
 });

@@ -1695,7 +1695,10 @@
                 "isolationSaveError": "Failed to update isolation override",
                 "linkedPullRequests": "Also in",
                 "linkedPrPushed": "branch pushed, no pull request yet",
-                "linkedPrFailed": "branch pushed; opening the pull request failed"
+                "linkedPrFailed": "branch pushed; opening the pull request failed",
+                "linkedPrRefused": "refused by an App Work's change rules",
+                "linkedPrRefusedDoNotMerge": "This pull request now carries a change those rules refuse. Do not merge it as it stands.",
+                "linkedPrNeedsAttention": "needs attention"
             },
             "gateChip": {
                 "green": "Gate passed",
