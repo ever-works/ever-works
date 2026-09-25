@@ -103,9 +103,12 @@ export class PluginBootstrapService {
      * This method:
      * 1. Discovers plugins from configured paths and registers them (as lazy
      *    proxies, unless PLUGIN_LAZY_LOAD=false)
-     * 2. Loads every builtIn plugin now, running its onLoad exactly once; the
-     *    other plugins run onLoad on first use (in eager mode, every plugin is
-     *    loaded and runs onLoad now)
+     * 2. Runs onLoad now, exactly once, for each programmatic `builtInPlugins`
+     *    instance. Every plugin discovered on disk — `builtIn: true` in its
+     *    package.json or not — is loaded, and runs onLoad, on first use.
+     *    `PLUGIN_EAGER_BUILTINS=true` loads the disk builtIns now instead; in
+     *    eager mode (PLUGIN_LAZY_LOAD=false) every plugin is loaded and runs
+     *    onLoad now.
      *
      * Once loaded, plugins are ready. Per-user/per-work enable/disable
      * is handled by the DB scope system (isPluginEnabledForScope).
@@ -135,8 +138,19 @@ export class PluginBootstrapService {
         // first-call latency on a cold path causes problems we didn't
         // anticipate in stage observation.
         const lazyLoad = process.env.PLUGIN_LAZY_LOAD !== 'false';
+        // Lazy mode only: whether the builtIns DISCOVERED ON DISK are left
+        // cold until first use like every other disk plugin (the default —
+        // it saves importing ~76 plugin modules, about 5 s, in every process,
+        // and every Trigger.dev run is a fresh process), or materialised now
+        // (`PLUGIN_EAGER_BUILTINS=true`, the boot before lazy builtIns — a
+        // runtime switch back, no redeploy).
+        const eagerBuiltIns = process.env.PLUGIN_EAGER_BUILTINS === 'true';
 
-        this.logger.log(`Bootstrapping plugin system... (${lazyLoad ? 'lazy' : 'eager'} mode)`);
+        this.logger.log(
+            `Bootstrapping plugin system... (${lazyLoad ? 'lazy' : 'eager'} mode${
+                lazyLoad ? (eagerBuiltIns ? ', builtIns at boot' : ', builtIns on first use') : ''
+            })`,
+        );
 
         // Connect the context factory to the lifecycle manager
         this.lifecycleManager.setContextFactory(this.contextFactory);
@@ -179,26 +193,32 @@ export class PluginBootstrapService {
         );
 
         // Which plugins are loaded (and run onLoad) during bootstrap:
-        // - Lazy mode, builtIn: loaded now. A disk builtIn is a proxy — it is
-        //   materialised here and its first-materialise hook runs onLoad once;
-        //   a programmatic builtIn is a real instance and gets callOnLoad.
-        // - Lazy mode, not builtIn: nothing here — onLoad runs on first use,
-        //   through the hook above.
+        // - Lazy mode, programmatic builtIn: a real instance — callOnLoad now.
+        // - Lazy mode, disk builtIn: a proxy, left cold until first use like
+        //   every other disk plugin (onLoad runs then, through the hook
+        //   above). With PLUGIN_EAGER_BUILTINS=true it is materialised here
+        //   instead, and its first-materialise hook runs onLoad once.
+        // - Lazy mode, not builtIn: nothing here — onLoad runs on first use.
         // - Eager mode: every loaded plugin is a real instance and gets
         //   callOnLoad now, matching pre-#1156 behaviour.
         //
-        // Why disk builtIns stay EAGER (loaded at boot) rather than lazy: callers
-        // read `registered.plugin.settingsSchema` / `configurationMode`
-        // SYNCHRONOUSLY, and a cold proxy answers `{}` for the schema until it
-        // is materialised (lazy-plugin-proxy.ts). Settings resolution, including
-        // `x-envVar` bindings (plugin-settings.service.ts), the operations
-        // service's schema reads, the context factory, and several facades and
-        // controllers (content-extractor, ai, search, screenshot, the generator
-        // form schema) would silently see no schema for a builtIn nobody had
-        // used yet. Making builtIns lazy (about 5 s of imports per Trigger run,
-        // one fresh process each) first needs those readers made async. That
-        // migration is approved and tracked separately; until it lands, this
-        // loop only guarantees that onLoad runs exactly once.
+        // What a cold proxy does not know until it materialises: the class's
+        // `settingsSchema` (`{}` meanwhile) and `configurationMode`
+        // (`undefined`), the manifest fields its getManifest() adds on top of
+        // package.json (openrouter's `defaultForCapabilities`, pdf-extractor's
+        // `supplementary`, the pipelines' `selectableProviderCategories`,
+        // `visibility`, `uiHints`, icons), and whether its import or onLoad
+        // fails. Every reader that decides something from those loads the
+        // plugin first — `loadPluginSchema` / `loadRegisteredPlugins` in
+        // plugin-registry.service.ts: settings resolution (its `x-envVar`
+        // bindings), the operations service, the context factory's env
+        // allow-list, the registry's scoped lookups (the search and screenshot
+        // controllers, provider-resolver), the facades' provider selection
+        // (base, code-edit, content-extractor), the generator form schema and
+        // the onboarding catalog. Still first-use only: what a builtIn
+        // registers in its onLoad (claude-managed-agent's fan-out capability,
+        // which no platform code reads) and cosmetic fields in the synchronous
+        // deploy / git provider lists (their package.json icon until loaded).
         for (const loadResult of result.results) {
             if (!loadResult.success || !loadResult.pluginId) continue;
             const registered = this.registry.get(loadResult.pluginId);
@@ -207,6 +227,9 @@ export class PluginBootstrapService {
             // a real instance and must still get callOnLoad.
             const plugin = registered?.plugin as { __materialize?: unknown } | undefined;
             if (typeof plugin?.__materialize === 'function') {
+                // Left for its first use (the hook above runs onLoad then),
+                // unless PLUGIN_EAGER_BUILTINS=true.
+                if (!eagerBuiltIns) continue;
                 // Never callOnLoad on a lazy proxy: that calls the proxy's
                 // onLoad, which materialises, runs the hook (callOnLoad =
                 // onLoad #1), then forwards the original call (onLoad #2).

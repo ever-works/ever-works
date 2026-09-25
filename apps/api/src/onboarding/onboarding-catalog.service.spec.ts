@@ -1,5 +1,7 @@
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
+    // The fakes below are plain entries, never lazy proxies: nothing to load.
+    loadRegisteredPlugins: async (entries: unknown[]) => entries,
 }));
 
 import { Test } from '@nestjs/testing';
@@ -44,7 +46,7 @@ describe('OnboardingCatalogService', () => {
 
     it('returns six AI cards with Ever Works marked default', async () => {
         const svc = await makeSvc([]);
-        const cat = svc.getCatalog();
+        const cat = await svc.getCatalog();
         expect(cat.ai).toHaveLength(6);
         const def = cat.ai.find((c) => c.default);
         expect(def?.choice).toBe('ever-works');
@@ -63,7 +65,9 @@ describe('OnboardingCatalogService', () => {
         it('flag off → Ever Works Git is Planned + unavailable', async () => {
             delete process.env.STORAGE_EVER_WORKS_GIT_ENABLED;
             const svc = await makeSvc([]);
-            const card = svc.getCatalog().storage.find((c) => c.choice === 'ever-works-git')!;
+            const card = (await svc.getCatalog()).storage.find(
+                (c) => c.choice === 'ever-works-git',
+            )!;
             expect(card.available).toBe(false);
             expect(card.badges).toContain('planned');
         });
@@ -71,7 +75,9 @@ describe('OnboardingCatalogService', () => {
         it('flag on → Ever Works Git is available with default badge only', async () => {
             process.env.STORAGE_EVER_WORKS_GIT_ENABLED = 'true';
             const svc = await makeSvc([]);
-            const card = svc.getCatalog().storage.find((c) => c.choice === 'ever-works-git')!;
+            const card = (await svc.getCatalog()).storage.find(
+                (c) => c.choice === 'ever-works-git',
+            )!;
             expect(card.available).toBe(true);
             expect(card.badges).toContain('default');
             expect(card.badges).not.toContain('planned');
@@ -79,8 +85,10 @@ describe('OnboardingCatalogService', () => {
 
         it('always exposes GitLab + generic Git as Planned cards', async () => {
             const svc = await makeSvc([]);
-            const gitlab = svc.getCatalog().storage.find((c) => c.choice === 'user-gitlab')!;
-            const git = svc.getCatalog().storage.find((c) => c.choice === 'user-git')!;
+            const gitlab = (await svc.getCatalog()).storage.find(
+                (c) => c.choice === 'user-gitlab',
+            )!;
+            const git = (await svc.getCatalog()).storage.find((c) => c.choice === 'user-git')!;
             expect(gitlab.available).toBe(false);
             expect(git.available).toBe(false);
             expect(gitlab.badges).toContain('planned');
@@ -92,7 +100,7 @@ describe('OnboardingCatalogService', () => {
         it('flag off → Ever Works DB is Planned + unavailable; Custom is always available', async () => {
             delete process.env.DB_EVER_WORKS_SHARED_ENABLED;
             const svc = await makeSvc([]);
-            const db = svc.getCatalog().db;
+            const db = (await svc.getCatalog()).db;
             const managed = db.find((c) => c.choice === 'ever-works-db')!;
             const custom = db.find((c) => c.choice === 'custom')!;
             expect(managed.default).toBe(true);
@@ -105,7 +113,7 @@ describe('OnboardingCatalogService', () => {
         it('flag on → Ever Works DB is available with default badge only', async () => {
             process.env.DB_EVER_WORKS_SHARED_ENABLED = 'true';
             const svc = await makeSvc([]);
-            const managed = svc.getCatalog().db.find((c) => c.choice === 'ever-works-db')!;
+            const managed = (await svc.getCatalog()).db.find((c) => c.choice === 'ever-works-db')!;
             expect(managed.available).toBe(true);
             expect(managed.badges).toContain('default');
             expect(managed.badges).not.toContain('planned');
@@ -116,7 +124,7 @@ describe('OnboardingCatalogService', () => {
         it('flag off → Ever Works is Planned', async () => {
             delete process.env.DEPLOY_EVER_WORKS_ENABLED;
             const svc = await makeSvc([]);
-            const card = svc.getCatalog().deploy.find((c) => c.choice === 'ever-works')!;
+            const card = (await svc.getCatalog()).deploy.find((c) => c.choice === 'ever-works')!;
             expect(card.available).toBe(false);
             expect(card.badges).toContain('planned');
         });
@@ -125,7 +133,7 @@ describe('OnboardingCatalogService', () => {
             process.env.DEPLOY_EVER_WORKS_ENABLED = 'true';
             process.env.EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER = '5';
             const svc = await makeSvc([]);
-            const card = svc.getCatalog().deploy.find((c) => c.choice === 'ever-works')!;
+            const card = (await svc.getCatalog()).deploy.find((c) => c.choice === 'ever-works')!;
             expect(card.available).toBe(true);
             expect(card.description).toMatch(/5 active works/);
         });
@@ -170,7 +178,7 @@ describe('OnboardingCatalogService', () => {
                 },
             ]);
 
-            const cat = svc.getCatalog();
+            const cat = await svc.getCatalog();
             const ids = cat.plugins.map((p) => p.pluginId);
             expect(ids).toEqual(['make', 'zapier']);
         });
@@ -206,7 +214,7 @@ describe('OnboardingCatalogService', () => {
                 },
             ]);
 
-            expect(svc.getCatalog().plugins.map((p) => p.pluginId)).toEqual(['zapier']);
+            expect((await svc.getCatalog()).plugins.map((p) => p.pluginId)).toEqual(['zapier']);
             expect(COMMUNICATION_PLUGIN_IDS).toEqual(['slack-connector', 'discord-connector']);
         });
 
@@ -229,7 +237,7 @@ describe('OnboardingCatalogService', () => {
                     },
                 },
             ]);
-            const cat = svc.getCatalog();
+            const cat = await svc.getCatalog();
             expect(cat.plugins.map((p) => p.pluginId)).toEqual(['sim-ai', 'activepieces']);
         });
     });

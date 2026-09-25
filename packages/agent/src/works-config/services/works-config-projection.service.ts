@@ -3,6 +3,11 @@ import type { ProvidersDto } from '@ever-works/contracts/api';
 import { getUIKeyFromCapability } from '@ever-works/plugin';
 import { WorkScheduleRepository } from '@src/database/repositories/work-schedule.repository';
 import { WorkPluginRepository } from '@src/plugins/repositories/work-plugin.repository';
+import type { WorkPluginEntity } from '@src/plugins/entities/work-plugin.entity';
+import {
+    PluginRegistryService,
+    loadRegisteredPlugins,
+} from '@src/plugins/services/plugin-registry.service';
 import { getActiveCapabilities } from '@src/plugins/utils/active-capabilities.util';
 import { Work } from '@src/entities/work.entity';
 import type { WorksConfigWriteRequest } from './works-config-writer.service';
@@ -13,6 +18,8 @@ export class WorksConfigProjectionService {
         private readonly scheduleRepository: WorkScheduleRepository,
         @Optional()
         private readonly workPluginRepository?: WorkPluginRepository,
+        @Optional()
+        private readonly pluginRegistry?: PluginRegistryService,
     ) {}
 
     async buildWriteRequest(work: Work): Promise<WorksConfigWriteRequest> {
@@ -46,13 +53,16 @@ export class WorksConfigProjectionService {
         const providers: ProvidersDto = {};
 
         for (const plugin of workPlugins) {
-            if (this.isSupplementaryPlugin(plugin.pluginEntity?.manifest)) {
+            const providerKeys = getActiveCapabilities(plugin)
+                .map((capability) => this.getProviderKey(capability))
+                .filter((providerKey): providerKey is keyof ProvidersDto => !!providerKey);
+            if (providerKeys.length === 0) continue;
+
+            if (await this.isSupplementaryPlugin(plugin)) {
                 continue;
             }
 
-            for (const capability of getActiveCapabilities(plugin)) {
-                const providerKey = this.getProviderKey(capability);
-                if (!providerKey) continue;
+            for (const providerKey of providerKeys) {
                 providers[providerKey] = plugin.pluginId;
             }
         }
@@ -101,7 +111,30 @@ export class WorksConfigProjectionService {
         return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
     }
 
-    private isSupplementaryPlugin(metadata: unknown): boolean {
+    /**
+     * Whether the plugin is supplementary (a URL-pattern specialist, never a
+     * Work's provider). The plugin's DB row is not enough: it holds the
+     * package.json manifest alone until the plugin's first use in some
+     * process — every boot re-registers each plugin lazily and upserts that
+     * manifest — and a plugin may declare `supplementary` only in its class's
+     * getManifest() (pdf-extractor, officecli-extractor). The registry entry
+     * carries it once the plugin has loaded, so load it (only a plugin with an
+     * active capability to project reaches here). One that cannot load is
+     * still projected: the projection mirrors the Work's configuration.
+     */
+    private async isSupplementaryPlugin(workPlugin: WorkPluginEntity): Promise<boolean> {
+        if (this.isSupplementaryManifest(workPlugin.pluginEntity?.manifest)) {
+            return true;
+        }
+        const registered = this.pluginRegistry?.get(workPlugin.pluginId);
+        if (!registered) {
+            return false;
+        }
+        await loadRegisteredPlugins([registered]);
+        return this.isSupplementaryManifest(registered.manifest);
+    }
+
+    private isSupplementaryManifest(metadata: unknown): boolean {
         return (
             !!metadata &&
             typeof metadata === 'object' &&

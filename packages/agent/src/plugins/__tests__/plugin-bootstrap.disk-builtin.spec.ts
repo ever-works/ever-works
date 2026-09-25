@@ -71,6 +71,7 @@ describe('PluginBootstrapService — plugins discovered on disk (real loader + l
     };
     let loadedEvents: string[];
     let savedLazyEnv: string | undefined;
+    let savedEagerBuiltInsEnv: string | undefined;
 
     function build(extra?: Partial<PluginsModuleOptions>): PluginBootstrapService {
         const options: PluginsModuleOptions = {
@@ -137,6 +138,11 @@ describe('PluginBootstrapService — plugins discovered on disk (real loader + l
         // flip the lazy cases into eager mode.
         savedLazyEnv = process.env.PLUGIN_LAZY_LOAD;
         delete process.env.PLUGIN_LAZY_LOAD;
+        // Disk builtIns stay cold at boot by default now (pinned by
+        // plugin-bootstrap.lazy-builtin.spec.ts); this spec pins the eager
+        // builtIn boot, which PLUGIN_EAGER_BUILTINS=true restores.
+        savedEagerBuiltInsEnv = process.env.PLUGIN_EAGER_BUILTINS;
+        process.env.PLUGIN_EAGER_BUILTINS = 'true';
     });
 
     afterEach(() => {
@@ -145,6 +151,11 @@ describe('PluginBootstrapService — plugins discovered on disk (real loader + l
             delete process.env.PLUGIN_LAZY_LOAD;
         } else {
             process.env.PLUGIN_LAZY_LOAD = savedLazyEnv;
+        }
+        if (savedEagerBuiltInsEnv === undefined) {
+            delete process.env.PLUGIN_EAGER_BUILTINS;
+        } else {
+            process.env.PLUGIN_EAGER_BUILTINS = savedEagerBuiltInsEnv;
         }
     });
 

@@ -19,9 +19,12 @@ describe('PluginBootstrapService', () => {
     let lifecycleManager: PluginLifecycleManagerService;
     let registry: PluginRegistryService;
     let registryEntries: Record<string, { builtIn: boolean; plugin?: unknown }>;
+    let savedEagerBuiltIns: string | undefined;
 
     beforeEach(async () => {
         PluginBootstrapService.resetForTesting();
+        savedEagerBuiltIns = process.env.PLUGIN_EAGER_BUILTINS;
+        delete process.env.PLUGIN_EAGER_BUILTINS;
 
         // Three registered plugins: one built-in whose entry carries no lazy
         // proxy (a programmatic `builtInPlugins` instance — gets callOnLoad at
@@ -92,6 +95,8 @@ describe('PluginBootstrapService', () => {
 
     afterEach(() => {
         PluginBootstrapService.resetForTesting();
+        if (savedEagerBuiltIns === undefined) delete process.env.PLUGIN_EAGER_BUILTINS;
+        else process.env.PLUGIN_EAGER_BUILTINS = savedEagerBuiltIns;
     });
 
     describe('bootstrap', () => {
@@ -131,7 +136,36 @@ describe('PluginBootstrapService', () => {
             expect(lifecycleManager.setContextFactory).toHaveBeenCalledTimes(1);
         });
 
+        it('should leave a disk builtIn (a lazy proxy) cold by default, and callOnLoad the real instances', async () => {
+            const materialize = jest.fn().mockResolvedValue({});
+            registryEntries['disk-builtin'] = {
+                builtIn: true,
+                plugin: { __materialize: materialize },
+            };
+            (pluginLoader.discoverAndLoadAll as jest.Mock).mockResolvedValue({
+                discovered: 3,
+                loaded: 3,
+                failed: 0,
+                results: [
+                    { success: true, pluginId: 'system-plugin' },
+                    { success: true, pluginId: 'disk-builtin' },
+                    { success: true, pluginId: 'auto-plugin' },
+                ],
+            });
+
+            await service.bootstrap();
+
+            // Its onLoad runs on first use, through the first-materialise hook.
+            expect(materialize).not.toHaveBeenCalled();
+            expect(lifecycleManager.callOnLoad).not.toHaveBeenCalledWith('disk-builtin');
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledTimes(1);
+            expect(lifecycleManager.callOnLoad).toHaveBeenCalledWith('system-plugin');
+        });
+
         it('should materialise a disk builtIn (a lazy proxy) instead of calling callOnLoad on it', async () => {
+            // Disk builtIns are left cold by default; this pins the eager
+            // boot that PLUGIN_EAGER_BUILTINS=true restores.
+            process.env.PLUGIN_EAGER_BUILTINS = 'true';
             // callOnLoad on the proxy would call the proxy's onLoad: that
             // materialises, runs the first-materialise hook (callOnLoad =
             // onLoad #1), then forwards the original call (onLoad #2).
@@ -162,6 +196,8 @@ describe('PluginBootstrapService', () => {
         });
 
         it('should keep booting when a disk builtIn fails to materialise', async () => {
+            // The eager boot (PLUGIN_EAGER_BUILTINS=true) is what materialises it.
+            process.env.PLUGIN_EAGER_BUILTINS = 'true';
             registryEntries['disk-broken'] = {
                 builtIn: true,
                 plugin: { __materialize: jest.fn().mockRejectedValue(new Error('boom')) },

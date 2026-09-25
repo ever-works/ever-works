@@ -13,6 +13,7 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
+    loadRegisteredPlugins,
 } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
@@ -300,9 +301,7 @@ export class ContentExtractorFacadeService
         userId?: string,
         workId?: string,
     ): Promise<ExtractorCandidate[]> {
-        const loadedPlugins = this.registry
-            .getByCapability(this.CAPABILITY)
-            .filter((p) => p.state === 'loaded');
+        const loadedPlugins = await this.loadEnabledExtractors(userId, workId);
         const candidates: ExtractorCandidate[] = [];
         const seen = new Set<string>();
 
@@ -399,6 +398,34 @@ export class ContentExtractorFacadeService
         return candidates;
     }
 
+    /**
+     * The `loaded` extractors, after loading every one enabled for the scope.
+     *
+     * The tiers above order extractors by manifest fields — `supplementary`,
+     * `defaultForCapabilities` — that some plugins set only in their class's
+     * getManifest() (pdf-extractor and officecli-extractor are supplementary
+     * that way), and a cold lazy proxy's registry entry does not carry them
+     * until it loads. An extractor that cannot load is now in `error` and is
+     * left out, as it would have been had it failed at boot. Disabled ones
+     * stay cold: every tier skips them anyway.
+     */
+    private async loadEnabledExtractors(
+        userId?: string,
+        workId?: string,
+    ): Promise<RegisteredPlugin[]> {
+        const loaded = this.registry
+            .getByCapability(this.CAPABILITY)
+            .filter((p) => p.state === 'loaded');
+        const enabled: RegisteredPlugin[] = [];
+        for (const registered of loaded) {
+            if (await this.isPluginEnabled(registered.plugin.id, workId, userId)) {
+                enabled.push(registered);
+            }
+        }
+        await loadRegisteredPlugins(enabled);
+        return loaded.filter((p) => p.state === 'loaded');
+    }
+
     private hasAllRequiredSettings(
         schema: JsonSchema | undefined,
         resolvedSettings: Record<string, unknown>,
@@ -424,6 +451,11 @@ export class ContentExtractorFacadeService
         workId?: string,
     ): Promise<boolean> {
         if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) return false;
+        // The required list below is the plugin class's; a cold lazy proxy
+        // answers `{}`, which would make every extractor look configured. One
+        // that cannot be loaded — or whose onLoad fails, once a first load
+        // another request started has settled — is not usable.
+        if ((await loadRegisteredPlugins([registered])).length === 0) return false;
 
         const settings = await this.getResolvedSettings(registered.plugin.id, {
             userId,

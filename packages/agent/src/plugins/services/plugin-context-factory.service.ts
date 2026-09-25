@@ -468,10 +468,24 @@ export class PluginContextFactoryService {
      * compromised/prompt-injected plugin cannot exfiltrate co-tenant secrets.
      */
     private createEnvVars(pluginId: string): EnvironmentVariables {
-        const allowedKeys = this.resolveAllowedEnvKeys(pluginId);
+        // The allowlist comes from the plugin's settings schema, so it is
+        // resolved on the first READ, not here: a context can be built while
+        // the registry still holds the plugin as a cold lazy proxy (schema
+        // `{}`), but the reads come from the plugin's own code, which only
+        // runs once it has materialised. Kept once the schema is the real one.
+        let resolvedKeys: ReadonlySet<string> | null = null;
+        const allowed = (): ReadonlySet<string> => {
+            if (resolvedKeys) return resolvedKeys;
+            const keys = this.resolveAllowedEnvKeys(pluginId);
+            const plugin = this.registry.get(pluginId)?.plugin as
+                | { __isMaterialized?: unknown }
+                | undefined;
+            if (plugin?.__isMaterialized !== false) resolvedKeys = keys;
+            return keys;
+        };
 
         const read = (key: string): string | undefined => {
-            if (!allowedKeys.has(key)) {
+            if (!allowed().has(key)) {
                 this.logger.warn(
                     `Plugin "${pluginId}" attempted to read environment variable "${key}" it did not declare via x-envVar`,
                 );
@@ -488,7 +502,7 @@ export class PluginContextFactoryService {
                 return read(key) ?? defaultValue;
             },
             has: (key: string): boolean => {
-                if (!allowedKeys.has(key)) {
+                if (!allowed().has(key)) {
                     return false;
                 }
                 return key in process.env;

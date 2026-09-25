@@ -41,6 +41,7 @@ import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
+    loadPluginSchema,
     resolvePluginEnabled,
 } from './plugin-registry.service';
 import {
@@ -193,14 +194,11 @@ export class PluginOperationsService {
      */
     async listPlugins(userId: string, category?: string): Promise<PluginListResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
-        const visiblePlugins = allPlugins.filter(
-            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
-        );
 
         // Filter by category if provided
         let filteredPlugins = category
-            ? visiblePlugins.filter((p) => p.manifest.category === category)
-            : visiblePlugins;
+            ? allPlugins.filter((p) => p.manifest.category === category)
+            : allPlugins;
 
         // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
@@ -222,6 +220,20 @@ export class PluginOperationsService {
                 });
             });
         }
+
+        // Hidden plugins are not listed. Many plugins set `visibility` only in
+        // their class's getManifest(), which a cold lazy proxy's entry does
+        // not carry yet — so load the candidates first (each listed plugin is
+        // loaded for its settings schema below anyway). A `hidden` the
+        // package.json manifest sets is final: it wins over getManifest().
+        await Promise.all(
+            filteredPlugins
+                .filter((p) => p.manifest?.visibility !== 'hidden')
+                .map((p) => loadPluginSchema(p.plugin, p)),
+        );
+        filteredPlugins = filteredPlugins.filter(
+            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
+        );
 
         // Map to response
         const plugins = await Promise.all(
@@ -265,24 +277,31 @@ export class PluginOperationsService {
         // 2. Are installed and enabled by the user
         // 3. Have user-configurable settings (configurationMode !== 'admin-only')
         // 4. Have settings schema with properties
-        const configurablePlugins = allPlugins.filter((registered) => {
+        // 3 and 4 read the plugin class's configurationMode / settingsSchema,
+        // which a cold lazy proxy answers with `undefined` / `{}` — so load
+        // them for the visible, enabled plugins first.
+        const visibleEnabled = allPlugins.filter((registered) => {
             const visibility = registered.manifest?.visibility ?? 'public';
             if (visibility === 'hidden') return false;
 
-            const hasOAuth = registered.plugin.capabilities?.includes('oauth') ?? false;
-
-            const configMode = registered.plugin.configurationMode || 'hybrid';
-            if (configMode === 'admin-only' && !hasOAuth) return false;
-
             const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
-            const isEnabled = resolvePluginEnabled({
+            return resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin,
                 workPlugin: null,
                 hasWorkContext: false,
             });
-            if (!isEnabled) return false;
+        });
+        await Promise.all(
+            visibleEnabled.map((registered) => loadPluginSchema(registered.plugin, registered)),
+        );
+
+        const configurablePlugins = visibleEnabled.filter((registered) => {
+            const hasOAuth = registered.plugin.capabilities?.includes('oauth') ?? false;
+
+            const configMode = registered.plugin.configurationMode || 'hybrid';
+            if (configMode === 'admin-only' && !hasOAuth) return false;
 
             // Check if plugin has user-configurable settings
             const schema = registered.plugin.settingsSchema;
@@ -513,6 +532,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have user settings
         if (settings || secretSettings) {
@@ -672,6 +692,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have user settings
         if (settings || secretSettings) {
@@ -1003,13 +1024,6 @@ export class PluginOperationsService {
 
         const allPlugins = this.pluginRegistryService.getAll();
 
-        // Filter: visible + applicable to work scope
-        // 'hidden' and 'user-only' plugins are not shown in work plugins list
-        const visiblePlugins = allPlugins.filter((p) => {
-            const visibility = p.manifest?.visibility ?? 'public';
-            return visibility !== 'hidden' && visibility !== 'user-only';
-        });
-
         const userPlugins = await this.userPluginRepository.find({
             where: { userId },
         });
@@ -1023,6 +1037,33 @@ export class PluginOperationsService {
 
         // Build registry map for quick supplementary lookups
         const registryMap = new Map(allPlugins.map((p) => [p.plugin.id, p]));
+
+        // `visibility` and `supplementary` are often set only by the class's
+        // getManifest(), which a cold lazy proxy's entry does not carry yet:
+        // load the plugins that could be listed (each listed one is loaded for
+        // its settings schema below anyway) and the Work's enabled ones. A
+        // visibility the package.json manifest sets is final — it wins over
+        // getManifest() — so a plugin it already excludes stays cold.
+        const toLoad = new Set(
+            allPlugins.filter((p) => {
+                const visibility = p.manifest?.visibility;
+                return visibility !== 'hidden' && visibility !== 'user-only';
+            }),
+        );
+        for (const dp of workPlugins) {
+            const registered = dp.enabled ? registryMap.get(dp.pluginId) : undefined;
+            if (registered) toLoad.add(registered);
+        }
+        await Promise.all(
+            [...toLoad].map((registered) => loadPluginSchema(registered.plugin, registered)),
+        );
+
+        // Filter: visible + applicable to work scope
+        // 'hidden' and 'user-only' plugins are not shown in work plugins list
+        const visiblePlugins = allPlugins.filter((p) => {
+            const visibility = p.manifest?.visibility ?? 'public';
+            return visibility !== 'hidden' && visibility !== 'user-only';
+        });
 
         // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
@@ -1088,6 +1129,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have work settings
         if (options?.settings) {
@@ -1262,6 +1304,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have work settings
         if (settings || secretSettings) {
@@ -1396,6 +1439,9 @@ export class PluginOperationsService {
             );
         }
 
+        // `supplementary` may come from the class's getManifest() only, which
+        // a cold lazy proxy's entry does not carry yet.
+        await loadPluginSchema(registered.plugin, registered);
         if (registered.manifest.supplementary) {
             throw new BadRequestException(
                 `Plugin "${pluginId}" is a supplementary plugin and cannot be set as an active capability provider`,
@@ -1634,6 +1680,9 @@ export class PluginOperationsService {
         userId: string,
         options: { includeConnectionStatus?: boolean } = {},
     ): Promise<UserPluginResponse> {
+        // Every projection below reads the plugin class's settingsSchema /
+        // configurationMode (a cold lazy proxy answers `{}` / `undefined`).
+        await loadPluginSchema(registered.plugin, registered);
         const response = this.toUserPluginResponse(registered, userPlugin);
 
         // Fan out the two independent reads in parallel:
@@ -1708,6 +1757,9 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         userId: string,
     ): Promise<PluginConnectionStatus | undefined> {
+        // `uiHints` may come from the class's getManifest() only, which a cold
+        // lazy proxy's entry does not carry yet.
+        await loadPluginSchema(registered.plugin, registered);
         if (!registered.manifest?.uiHints?.includeInOnboarding) {
             return undefined;
         }
@@ -1874,6 +1926,8 @@ export class PluginOperationsService {
         workPlugin?: WorkPluginEntity | null,
         options?: { userId: string; workId: string },
     ): Promise<WorkPluginResponse> {
+        // As in toUserPluginResponseWithResolvedSettings: the class's schema.
+        await loadPluginSchema(registered.plugin, registered);
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
         const rawWorkSettings = this.maskSecretSettings(
             workPlugin ? { ...workPlugin.settings, ...workPlugin.secretSettings } : undefined,

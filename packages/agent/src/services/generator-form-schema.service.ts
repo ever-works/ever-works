@@ -2,7 +2,9 @@ import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/commo
 import {
     PluginRegistryService,
     RegisteredPlugin,
+    loadRegisteredPlugins,
 } from '@src/plugins/services/plugin-registry.service';
+import { materializePlugin } from '@src/plugins/services/plugin-operation.util';
 import { WorkPluginRepository } from '@src/plugins/repositories/work-plugin.repository';
 import { PluginSettingsService } from '@src/plugins/services/plugin-settings.service';
 import type {
@@ -249,11 +251,12 @@ export class GeneratorFormSchemaService {
      * access (so `if (plugin.someOptionalMethod)` is always true) and wraps sync
      * methods in a Promise — so reliably probing/calling an OPTIONAL plugin
      * method (e.g. `transformFormValues`) requires the real instance. Mirrors
-     * `BaseFacade.materializeForUse`.
+     * `BaseFacade.materializeForUse`: it waits for the plugin's first load,
+     * onLoad included, which another request may have started (the proxy is
+     * marked materialised before its onLoad has run).
      */
     private async materialize(plugin: IPlugin): Promise<IPlugin> {
-        const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
-        return typeof stub.__materialize === 'function' ? await stub.__materialize() : plugin;
+        return (await materializePlugin(plugin)) as IPlugin;
     }
 
     /**
@@ -283,6 +286,7 @@ export class GeneratorFormSchemaService {
             if (!isEnabled) continue;
 
             const configured = await this.isPluginConfigured(registered, options);
+            if (registered.state !== 'loaded') continue;
             if (!configured) {
                 errors.push(
                     `Plugin "${registered.manifest.name}" is not configured. Visit Settings → Plugins to set it up.`,
@@ -351,6 +355,8 @@ export class GeneratorFormSchemaService {
         for (const registered of enabledPlugins) {
             // Supplementary plugins (e.g., notion-extractor, pdf-extractor) auto-activate via
             // canExtract() URL matching in the facade — they are not user-selectable providers.
+            // (Checked again below once the plugin has loaded: some declare it only in
+            // their class's getManifest().)
             if (registered.manifest.supplementary) continue;
 
             // Resilience: a single plugin whose enable-check / settings
@@ -372,7 +378,16 @@ export class GeneratorFormSchemaService {
                     }
                 }
 
+                // Load before reading what only the plugin class knows: its settings
+                // schema, and the manifest fields its getManifest() adds on top of
+                // package.json (`supplementary`, `defaultForCapabilities`, the icon),
+                // which a cold lazy proxy's registry entry does not carry yet. One
+                // that cannot load is now in `error` and is left out.
+                if ((await loadRegisteredPlugins([registered])).length === 0) continue;
+                if (registered.manifest.supplementary) continue;
+
                 const configured = await this.isPluginConfigured(registered, options);
+                if (registered.state !== 'loaded') continue;
                 result.push(
                     await this.toProviderOption(
                         registered,
@@ -458,6 +473,14 @@ export class GeneratorFormSchemaService {
             return true;
         }
 
+        // The required fields are the plugin class's; a cold lazy proxy
+        // answers `{}` for the schema, which reads as "nothing required". A
+        // plugin that cannot be loaded, or whose onLoad fails (a first load
+        // another request started is waited for), is not configured: its entry
+        // is now in `error`, which the callers skip.
+        if ((await loadRegisteredPlugins([registered])).length === 0) {
+            return false;
+        }
         const schema = registered.plugin.settingsSchema;
         if (
             !schema?.properties ||
@@ -754,11 +777,7 @@ export class GeneratorFormSchemaService {
         // 1. Explicit pipelineId — from .works/works.yml or user click in the form
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
-            if (
-                registered &&
-                registered.state === 'loaded' &&
-                (await this.isEnabledForScope(registered.plugin.id, options))
-            ) {
+            if (registered && (await this.isUsablePipeline(registered, options))) {
                 return registered;
             }
             this.logger.warn(`Pipeline plugin not found or not enabled: ${pipelineId}`);
@@ -773,11 +792,7 @@ export class GeneratorFormSchemaService {
                 );
                 if (activePlugin) {
                     const registered = this.pluginRegistry.get(activePlugin.pluginId);
-                    if (
-                        registered &&
-                        registered.state === 'loaded' &&
-                        (await this.isEnabledForScope(registered.plugin.id, options))
-                    ) {
+                    if (registered && (await this.isUsablePipeline(registered, options))) {
                         return registered;
                     }
                 }
@@ -786,30 +801,45 @@ export class GeneratorFormSchemaService {
             }
         }
 
-        // 3. Default pipeline via defaultForCapabilities
+        // 3. Default pipeline via defaultForCapabilities, else 4. the first
+        //    usable pipeline. A plugin may declare the default only in its
+        //    class's getManifest(), which a cold lazy proxy's registry entry
+        //    does not carry until it loads — so each candidate is loaded
+        //    (isUsablePipeline) before its manifest is read, in order, stopping
+        //    at the first default.
         const pipelines = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
 
+        let firstUsable: RegisteredPlugin | undefined;
         for (const registered of pipelines) {
-            if (registered.state !== 'loaded') continue;
+            if (!(await this.isUsablePipeline(registered, options))) continue;
             if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
-                if (await this.isEnabledForScope(registered.plugin.id, options)) {
-                    return registered;
-                }
-            }
-        }
-
-        // 4. Fallback: first loaded pipeline
-        for (const registered of pipelines) {
-            if (
-                registered.state === 'loaded' &&
-                (await this.isEnabledForScope(registered.plugin.id, options))
-            ) {
                 return registered;
             }
+            firstUsable ??= registered;
+        }
+        if (firstUsable) {
+            return firstUsable;
         }
 
         this.logger.warn('No pipeline plugin found');
         return undefined;
+    }
+
+    /**
+     * In the `loaded` state, enabled for the scope, and materialised: a cold
+     * lazy proxy is loaded here, so its manifest (`selectableProviderCategories`,
+     * `defaultForCapabilities`) is the class's. A pipeline whose import or
+     * onLoad fails is now in `error` and is not usable.
+     */
+    private async isUsablePipeline(
+        registered: RegisteredPlugin,
+        options?: FormSchemaOptions,
+    ): Promise<boolean> {
+        return (
+            registered.state === 'loaded' &&
+            (await this.isEnabledForScope(registered.plugin.id, options)) &&
+            (await loadRegisteredPlugins([registered])).length > 0
+        );
     }
 
     private async isEnabledForScope(

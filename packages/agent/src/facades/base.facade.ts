@@ -2,8 +2,10 @@ import { Inject, Logger, Optional } from '@nestjs/common';
 import {
     PluginRegistryService,
     RegisteredPlugin,
+    loadRegisteredPlugins,
 } from '../plugins/services/plugin-registry.service';
 import { FacadePluginAvailabilityService } from '../plugins/services/facade-plugin-availability.service';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import type { IPlugin, FacadeOptions, PluginIcon } from '@ever-works/plugin';
@@ -153,7 +155,7 @@ export abstract class BaseFacadeService {
                             workId,
                             userId,
                         );
-                        if (isEnabled) {
+                        if (isEnabled && (await this.isUsable(registered))) {
                             return {
                                 id: registered.plugin.id,
                                 name: this.getProviderName(registered.plugin),
@@ -277,7 +279,7 @@ export abstract class BaseFacadeService {
 
             if (activePlugin) {
                 const registered = await this.registeredOrInstalled(activePlugin.pluginId);
-                if (registered && registered.state === 'loaded') {
+                if (registered && (await this.isUsable(registered))) {
                     return registered;
                 }
             }
@@ -311,14 +313,23 @@ export abstract class BaseFacadeService {
             }
         }
 
+        // Load the enabled ones before reading their manifests: a plugin may
+        // declare `defaultForCapabilities`, `supplementary`,
+        // `selectableProviderCategories` or its icon only in its class's
+        // getManifest(), which a cold lazy proxy's registry entry does not
+        // carry until it loads. One that cannot load (import or onLoad
+        // failure) is now in `error` and is left out, as if it had failed at
+        // boot.
+        const usable = await loadRegisteredPlugins(result);
+
         // Sort: plugins with defaultForCapabilities matching this.CAPABILITY come first
-        result.sort((a, b) => {
+        usable.sort((a, b) => {
             const aDefault = a.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ? 0 : 1;
             const bDefault = b.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ? 0 : 1;
             return aDefault - bDefault;
         });
 
-        return result;
+        return usable;
     }
 
     // Resolve plugin:
@@ -348,7 +359,9 @@ export abstract class BaseFacadeService {
                 registered.state === 'loaded'
             ) {
                 const isEnabled = await this.isPluginEnabled(effectiveOverride, workId, userId);
-                if (isEnabled) return this.materializeForUse<T>(registered.plugin);
+                if (isEnabled && (await this.isUsable(registered))) {
+                    return this.materializeForUse<T>(registered.plugin);
+                }
             }
             throw new ProviderNotFoundError(effectiveOverride, this.CAPABILITY);
         }
@@ -367,6 +380,19 @@ export abstract class BaseFacadeService {
     }
 
     /**
+     * Still in the `loaded` state once materialised. A cold lazy proxy (a
+     * plugin nobody has used yet) is loaded here, so a failing import or
+     * onLoad puts it in `error` now — and it is not used, exactly as if it had
+     * failed at boot — and its registry entry carries the manifest fields its
+     * class's getManifest() adds. A first load another request started is
+     * waited for, onLoad included.
+     */
+    private async isUsable(registered: RegisteredPlugin): Promise<boolean> {
+        if (registered.state !== 'loaded') return false;
+        return (await loadRegisteredPlugins([registered])).length > 0;
+    }
+
+    /**
      * Materialize a (possibly lazy) plugin before an operation uses it.
      *
      * Under lazy plugin loading (PR #1156) the registry hands out a proxy whose
@@ -380,10 +406,19 @@ export abstract class BaseFacadeService {
      * materialization here is cheap — only the single plugin actually being
      * used is imported, not the whole registry, so lazy-load's memory win is
      * preserved.
+     *
+     * It waits for the plugin's first load to SETTLE, onLoad included
+     * (`materializePlugin` → `__materialize({ waitForLoad: true })`): a proxy
+     * marks itself materialised before its first-materialise hook has run
+     * onLoad, so a request arriving while another request's first load is
+     * still running would otherwise get an instance whose onLoad has not run
+     * (openrouter: "OpenRouter plugin not loaded"). Every caller here has
+     * already waited in the selection step (`isUsable` / `getEnabledPlugins`),
+     * so this is the same guarantee at the point of use.
      */
     private async materializeForUse<T extends IPlugin>(plugin: IPlugin): Promise<T> {
         const stub = plugin as unknown as {
-            __materialize?: () => Promise<IPlugin>;
+            __materialize?: unknown;
         };
         if (typeof stub.__materialize === 'function') {
             // Return the REAL instance, not the lazy proxy. The proxy forwards
@@ -396,7 +431,7 @@ export abstract class BaseFacadeService {
             // instance lets the facade call real methods directly. Settings
             // resolution is unaffected: it looks the plugin up by id in the
             // registry (still the proxy) and reads its now-materialized schema.
-            return (await stub.__materialize()) as T;
+            return (await materializePlugin(plugin)) as T;
         }
         return plugin as T;
     }

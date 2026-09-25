@@ -55,6 +55,113 @@ export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
     return ctx.autoEnable ?? false;
 }
 
+/**
+ * Make `plugin.settingsSchema` and `plugin.configurationMode` answer the plugin
+ * CLASS's values before a caller reads them synchronously.
+ *
+ * The registry holds every plugin discovered on disk as a lazy proxy
+ * (`lazy-plugin-proxy.ts`). Until the proxy materialises, it answers `{}` for
+ * the schema and `undefined` for the configuration mode — the package.json
+ * manifest carries neither — so a reader sees no fields, no `required` list,
+ * no `x-envVar` / `x-secret` / `x-scope` markers and the `hybrid` default.
+ * Await this first.
+ *
+ * A plugin that is not a lazy proxy, or one that has materialised, answers at
+ * once without importing anything. Otherwise the plugin is imported (and its
+ * first-materialise hook — `onLoad` — runs, as on any first use). A reader
+ * reached from inside the plugin's own `onLoad` (e.g. through
+ * `context.getSettings`) finds it materialised already, so this never waits
+ * on the `onLoad` that is calling it.
+ *
+ * That is also why this is for READING the schema only, never for picking a
+ * plugin to use: a caller that arrives while another caller's first load is
+ * still running (the proxy is marked materialised before the hook has run
+ * `onLoad`) gets `true` at once, before `onLoad` has settled — or failed. A
+ * caller that selects or uses the plugin takes {@link loadRegisteredPlugins},
+ * which waits for that first load.
+ *
+ * The same load brings the rest of what only the class knows onto the
+ * registry entry: the loader folds the class's `getManifest()` into the
+ * entry's manifest in the same synchronous step that marks the proxy
+ * materialised (icon, `uiHints`, `visibility`, `defaultForCapabilities`,
+ * `supplementary`, `selectableProviderCategories` — whatever package.json
+ * leaves unset), and a failing `onLoad` leaves the entry in `error`.
+ *
+ * @param entry - the plugin's registry entry, when the caller has it. An entry
+ *   already in `error` is not loaded again (answers `false`): a proxy whose
+ *   import failed resets itself, so every read would re-run the import and the
+ *   failure hook (another `error` write to the database, another state-history
+ *   entry, another STATE_CHANGED event) — and could not bring the plugin back
+ *   anyway, as `callOnLoad` refuses a plugin in `error`.
+ * @returns `false` when the plugin cannot be materialised, or `entry` is in
+ *   `error`. On a failed import the proxy's failure hook has recorded `error`
+ *   on the registry entry and the schema reads stay cold, so a caller should
+ *   treat the plugin as unusable — as the readiness filters skip any entry in
+ *   `error`.
+ */
+export async function loadPluginSchema(
+    plugin: unknown,
+    entry?: Pick<RegisteredPlugin, 'state'>,
+): Promise<boolean> {
+    if (entry?.state === 'error') return false;
+    const lazy = plugin as Partial<Pick<LazyPluginStub, '__isMaterialized' | '__materialize'>>;
+    if (!lazy || typeof lazy.__materialize !== 'function' || lazy.__isMaterialized === true) {
+        return true;
+    }
+    try {
+        await lazy.__materialize();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Load several registry entries (in parallel) for USE, answering — in their
+ * order — the ones that are still `loaded` once their first load has SETTLED.
+ *
+ * For a caller that picks among candidates by what only the plugin class knows
+ * (its schema, its configuration mode, the manifest fields its `getManifest()`
+ * adds) and must skip a candidate that cannot load, exactly as it would have
+ * skipped one whose load failed at boot. Pass only the entries the caller may
+ * actually use (e.g. those enabled for the scope): each one is imported. An
+ * entry not `loaded` beforehand is left out without being loaded (again).
+ *
+ * Unlike {@link loadPluginSchema}, this WAITS for a first load another caller
+ * started: a lazy proxy marks itself materialised before its first-materialise
+ * hook has awaited the loader's manifest DB upsert and run `onLoad`, so without
+ * the wait a second caller inside that window would be answered a plugin whose
+ * `onLoad` has not run — or is about to fail and put the entry in `error`.
+ * Never call it from inside a plugin's own `onLoad` for that same plugin: it
+ * would wait on itself (settings reads from `onLoad` go through
+ * {@link loadPluginSchema}, which does not wait).
+ */
+export async function loadRegisteredPlugins(
+    entries: readonly RegisteredPlugin[],
+): Promise<RegisteredPlugin[]> {
+    const loaded = await Promise.all(
+        entries.map((entry) => (entry.state === 'loaded' ? loadForUse(entry.plugin) : false)),
+    );
+    return entries.filter((entry, index) => loaded[index] && entry.state === 'loaded');
+}
+
+/**
+ * Materialise `plugin` and wait until its first load — `onLoad` included — has
+ * settled (`__materialize({ waitForLoad: true })`). `false` when the import
+ * fails; an `onLoad` failure resolves `true` here and shows as the entry's
+ * `error` state, which {@link loadRegisteredPlugins} checks afterwards.
+ */
+async function loadForUse(plugin: unknown): Promise<boolean> {
+    const lazy = plugin as Partial<Pick<LazyPluginStub, '__materialize'>>;
+    if (!lazy || typeof lazy.__materialize !== 'function') return true;
+    try {
+        await lazy.__materialize({ waitForLoad: true });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export interface RegisteredPlugin {
     plugin: IPlugin;
     manifest: PluginManifest;
@@ -296,7 +403,15 @@ export class PluginRegistryService {
         return this.getByCapability('notification-channel').filter((p) => p.state === 'loaded');
     }
 
-    /** Returns first ready plugin with this capability in defaultForCapabilities */
+    /**
+     * Returns first ready plugin with this capability in defaultForCapabilities.
+     *
+     * Synchronous, so it reads each entry's manifest as registered: a plugin
+     * still cold (a lazy proxy nothing has used yet) carries only its
+     * package.json manifest, without the `defaultForCapabilities` its class's
+     * `getManifest()` may add. Prefer {@link getDefaultForCapabilityScoped},
+     * which loads its candidates first.
+     */
     getDefaultForCapability(capability: string): RegisteredPlugin | undefined {
         const plugins = this.getByCapability(capability);
         const readyPlugins = plugins.filter((p) => p.state === 'loaded');
@@ -404,6 +519,12 @@ export class PluginRegistryService {
         const plugins = this.getByCapability(capability);
         const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
+        // Every candidate returned below is loaded first (loadRegisteredPlugins):
+        // a plugin nobody has used yet is a cold lazy proxy whose entry lacks
+        // the `defaultForCapabilities` its class's getManifest() may add, and
+        // whose import or onLoad may yet fail — a failure found here puts it in
+        // `error` and it is skipped, as it would have been had it failed at boot.
+        // A first load another request started is waited for, onLoad included.
         if (workId && this.workPluginRepository) {
             for (const registered of enabledPlugins) {
                 try {
@@ -411,7 +532,11 @@ export class PluginRegistryService {
                         workId,
                         registered.plugin.id,
                     );
-                    if (dp?.enabled && hasActiveCapability(dp, capability)) {
+                    if (
+                        dp?.enabled &&
+                        hasActiveCapability(dp, capability) &&
+                        (await loadRegisteredPlugins([registered])).length > 0
+                    ) {
                         return registered;
                     }
                 } catch {
@@ -420,17 +545,7 @@ export class PluginRegistryService {
             }
         }
 
-        for (const registered of enabledPlugins) {
-            const isEnabled = await this.isPluginEnabledForScope(
-                registered.plugin.id,
-                workId,
-                userId,
-            );
-            if (isEnabled && registered.manifest.defaultForCapabilities?.includes(capability)) {
-                return registered;
-            }
-        }
-
+        const enabledForScope: RegisteredPlugin[] = [];
         for (const registered of enabledPlugins) {
             const isEnabled = await this.isPluginEnabledForScope(
                 registered.plugin.id,
@@ -438,13 +553,31 @@ export class PluginRegistryService {
                 userId,
             );
             if (isEnabled) {
-                return registered;
+                enabledForScope.push(registered);
             }
         }
 
-        return undefined;
+        const usable = await loadRegisteredPlugins(enabledForScope);
+        return (
+            usable.find((registered) =>
+                registered.manifest.defaultForCapabilities?.includes(capability),
+            ) ?? usable[0]
+        );
     }
 
+    /**
+     * The `loaded` plugins (for `capability`, or all) enabled for the scope.
+     *
+     * Each returned entry has materialised and finished its first load, onLoad
+     * included — one another caller started is waited for
+     * ({@link loadRegisteredPlugins}):
+     * callers pick a provider by reading `settingsSchema` / `configurationMode`
+     * (its required settings, its `x-envVar` bindings) and manifest fields such
+     * as `defaultForCapabilities` synchronously, which a cold lazy proxy
+     * answers with `{}` / `undefined` / the package.json manifest alone. An
+     * entry that cannot be materialised, or whose onLoad fails, is left out —
+     * it is now in `error`, the state every readiness filter skips.
+     */
     async getEnabledPluginsScoped(
         capability?: string,
         workId?: string,
@@ -466,7 +599,7 @@ export class PluginRegistryService {
             }
         }
 
-        return result;
+        return loadRegisteredPlugins(result);
     }
 
     /**
