@@ -115,6 +115,17 @@ export const OIDC_CODE_VERIFIER_BYTES = 48;
 export const OIDC_DEFAULT_CLOCK_SKEW_SECONDS = 60;
 
 /**
+ * FR-2 — the widest clock-skew tolerance an administrator may configure, in
+ * seconds (`EVER_ID_LIMITS.maxClockSkewSeconds`). The schema's `clockSkewSeconds`
+ * maximum is the same number, and `src/__tests__/clock-skew-gate.spec.ts` asserts
+ * that all three agree.
+ *
+ * {@link isClockSkewInBounds} applies it at run time. The schema bound alone never
+ * reaches the value this plugin reads (see that function).
+ */
+export const OIDC_MAX_CLOCK_SKEW_SECONDS = 120;
+
+/**
  * FR-11 — an `iat` may be **no earlier than 600 seconds ago**
  * (`EVER_ID_LIMITS.idTokenMaxAgeSeconds`; plan §4.3's "ID token times" row).
  */
@@ -1029,6 +1040,19 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 			);
 			return { ok: false, missing: ['issuerUrl'] };
 		}
+
+		// FR-2's 0–120-second skew bound, re-checked here because the schema's bound
+		// never reaches the value this plugin reads ({@link isClockSkewInBounds}). Out
+		// of bounds, the skew fails OPEN: all three verifiers widen `exp`'s edge and
+		// `iat`'s future edge by it, and `NaN` or a string turns those comparisons off.
+		// The answer is the issuer gate's: `notConfigured`, with the field name logged
+		// and the value never logged (FR-4, FR-16).
+		if (!isClockSkewInBounds(raw.clockSkewSeconds)) {
+			this.context?.logger?.error?.(
+				`OpenID Connect identity (Ever ID): \`clockSkewSeconds\` is not a whole number of seconds from 0 to ${OIDC_MAX_CLOCK_SKEW_SECONDS} (FR-2). Refusing the integration — a tolerance outside that bound would widen or disable every token time check. Set EVER_ID_CLOCK_SKEW_SECONDS inside the bound, or unset it to use the default.`
+			);
+			return { ok: false, missing: ['clockSkewSeconds'] };
+		}
 		return { ok: true, settings: raw as unknown as OidcIdentitySettings };
 	}
 
@@ -1355,6 +1379,33 @@ function isInsecureIssuer(issuerUrl: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/**
+ * Is a stored `clockSkewSeconds` inside FR-2's bound — a whole number of seconds
+ * from 0 to {@link OIDC_MAX_CLOCK_SKEW_SECONDS}?
+ *
+ * This is the run-time half of the schema's `type: 'integer'`, `minimum: 0` and
+ * `maximum: 120`. The schema half does not cover the value this plugin reads:
+ *
+ *   - the key is `x-envVar` and not `x-secret`, so
+ *     `PluginSettingsService.filterEnvVarFields`
+ *     (`packages/agent/src/plugins/services/plugin-settings.service.ts`) strips it
+ *     from every settings write, and the schema validator never sees it;
+ *   - its live source is `EVER_ID_CLOCK_SKEW_SECONDS`, which `parseEnvValue` in
+ *     the same file turns into a value with `Number(value)`. That has no bound
+ *     and no integer check, and `60s` gives `NaN`;
+ *   - a row that was stored before the key became `x-envVar`, or by anything
+ *     other than the settings API, comes back exactly as stored.
+ *
+ * Absent (`undefined`) and `null` answer `true`. Both are "not configured", and
+ * the verifiers' `?? OIDC_DEFAULT_CLOCK_SKEW_SECONDS` already gives them the
+ * bounded default. Refusing them would turn a cleared key into a sign-in outage
+ * without making any token check stricter.
+ */
+function isClockSkewInBounds(value: unknown): boolean {
+	if (value === undefined || value === null) return true;
+	return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= OIDC_MAX_CLOCK_SKEW_SECONDS;
 }
 
 /** The `id_token` a token response carries, or `null` when it carries none. */

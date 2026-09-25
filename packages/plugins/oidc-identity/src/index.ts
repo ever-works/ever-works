@@ -30,6 +30,9 @@ export {
 	OIDC_ID_TOKEN_MAX_AGE_SECONDS,
 	OIDC_LOGOUT_TOKEN_MAX_AGE_SECONDS,
 	OIDC_LOGOUT_TOKEN_REPLAY_WINDOW_SECONDS,
+	// FR-2's 0–120-second skew bound, re-checked at run time by `resolveSettings`
+	// (see `isClockSkewInBounds`). It sits next to the default it bounds.
+	OIDC_MAX_CLOCK_SKEW_SECONDS,
 	OIDC_NONCE_BYTES,
 	OIDC_STATE_BYTES,
 	OIDC_SUBJECT_MAX_LENGTH

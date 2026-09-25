@@ -42,6 +42,21 @@ import type { JsonSchema } from '@ever-works/plugin';
  *     `allowInsecureRequests` call site asserted the gate as though it were in
  *     place — which is what kept it unnoticed. Do not restate a gate here without
  *     naming the function that enforces it.
+ *
+ * **A bound in this schema is a write-time check, and for an `x-envVar` key it
+ * never runs.** `PluginSettingsService.filterEnvVarFields` strips every key that
+ * is `x-envVar` and not `x-secret` from settings writes, so the validator never
+ * sees it. The value is read from its environment variable by `parseEnvValue`,
+ * which turns an `integer` key into `Number(value)` and checks nothing else. So
+ * `clockSkewSeconds`'s `minimum: 0` / `maximum: 120` (FR-2) does not reach the
+ * value the plugin reads. That bound is enforced at run time by
+ * `isClockSkewInBounds` in `oidc-identity.plugin.ts`, applied in
+ * `resolveSettings` against `OIDC_MAX_CLOCK_SKEW_SECONDS` (2026-09-25). A value
+ * outside it turns the integration off as `notConfigured`, with the field name
+ * logged and the value not logged. `src/__tests__/clock-skew-gate.spec.ts` pins
+ * that constant against this schema's `maximum` and `EVER_ID_LIMITS`. Until then
+ * the plugin applied the stored value unchecked, and an out-of-range, `NaN` or
+ * string value widened or switched off every token time check.
  */
 
 /**
