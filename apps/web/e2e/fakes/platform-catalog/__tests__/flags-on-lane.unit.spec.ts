@@ -7,7 +7,7 @@
  * backed by this directory's catalog fixture — while the 32-shard matrix keeps both switches
  * off, because `e2e/flow-deploy-capability-contract.spec.ts` asserts the switch-off behaviour
  * there. The two files skip by name on the matrix, so the second job is the only place they
- * run. That makes three facts load-bearing, and nothing but this spec checks them before a run
+ * run. That makes four facts load-bearing, and nothing but this spec checks them before a run
  * is dispatched:
  *
  *   1. the matrix still has both switches off;
@@ -15,7 +15,12 @@
  *      that quietly drifts from the matrix's env proves the files pass on a stack nobody runs;
  *   3. the API is pointed at the port this directory's server actually listens on, with the
  *      fakes switch that override is gated on, and the lane marker that turns a switch-off
- *      skip into a failure is set.
+ *      skip into a failure is set;
+ *   4. the job's apps apex is one `config.everWorks.apps.getDomain()` accepts, so the launcher
+ *      cases keep their address when APW-06 T48 binds the resolver that reads that getter.
+ *
+ * This file runs in the harness unit lane (`pnpm --filter ever-works-web test:e2e-harness`),
+ * which CI runs in `ci.yml`'s `lint-and-test` job.
  *
  * `apps/web` has no YAML parser dependency, so the reader below is a deliberately small
  * reader of the one shape GitHub Actions uses here (two-space job keys, `- name:` steps, a
@@ -55,8 +60,10 @@ const FLAGS_ON_DELTAS: Record<string, string> = {
     EVER_WORKS_APP_LAUNCHER_ENABLED: 'true',
     DEPLOY_EVER_WORKS_ENABLED: 'true',
     // The apex a launcher tile's managed address is derived under (`managed-host-root.resolver.ts`);
-    // without it a seeded App Work has no address and is `notLive`.
-    EVER_WORKS_APPS_DOMAIN: 'apps.e2e.local',
+    // without it a seeded App Work has no address and is `notLive`. It is a sibling of the
+    // platform domain, not a subdomain: `config.everWorks.apps.getDomain()` refuses the nested
+    // `apps.e2e.local` (see the last describe block below).
+    EVER_WORKS_APPS_DOMAIN: 'apps-e2e.local',
     EVER_WORKS_DOMAIN: 'e2e.local',
     // The catalog fixture this directory serves, and the environment whose addresses it reads.
     EVER_WORKS_PLATFORM_CATALOG_BASE_URL: `http://127.0.0.1:${DEFAULT_PORT}`,
@@ -190,6 +197,70 @@ function stepEnv(step: string[]): Record<string, string> {
     return env;
 }
 
+// ---------------------------------------------------------------------------
+// What `config.everWorks.apps.getDomain()` answers for an env
+// ---------------------------------------------------------------------------
+
+/**
+ * `normalizeApexDomain` in `packages/agent/src/config/index.ts`: a plain dotted DNS name,
+ * lowercased with the root dot stripped, or `null`.
+ */
+function normalizeApex(raw: string | undefined): string | null {
+    const text = (raw ?? '').trim().toLowerCase();
+    const apex = text.endsWith('.') ? text.slice(0, -1) : text;
+    if (apex.length === 0 || apex.length > 253 || !/^[a-z0-9.-]+$/.test(apex)) return null;
+    if (/^\d+(\.\d+){3}$/.test(apex)) return null;
+    const labels = apex.split('.');
+    if (labels.length < 2) return null;
+    const label = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+    return labels.every((part) => part.length <= 63 && label.test(part)) ? apex : null;
+}
+
+/** The host of a platform URL, as `platformManagedDomainHosts` reads it, or `null`. */
+function hostOf(raw: string | undefined): string | null {
+    try {
+        return normalizeApex(new URL((raw ?? '').trim()).hostname);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * What `config.everWorks.apps.getDomain()` answers for `env`, restated because `apps/web`
+ * does not depend on `@ever-works/agent`. The two branches are the agent's own: unset means
+ * the platform domain (`EVER_WORKS_DOMAIN`, default `ever.works`); an explicit apex is refused
+ * (`null`) when it is equal to, under, or a parent of the platform domain or of the host of
+ * `PLATFORM_API_URL` / `NEXT_PUBLIC_APP_URL` (`appsDomainClash`). The first case in the
+ * domain block pins this copy against the agent's own `config.spec.ts` cases.
+ */
+function getDomainWouldAnswer(env: Record<string, string | undefined>): string | null {
+    const platformRaw = (env.EVER_WORKS_DOMAIN ?? '').trim();
+    const platform = platformRaw.length === 0 ? 'ever.works' : normalizeApex(platformRaw);
+    if (platform === null) return null;
+    if ((env.EVER_WORKS_APPS_DOMAIN ?? '').trim().length === 0) return platform;
+
+    const apex = normalizeApex(env.EVER_WORKS_APPS_DOMAIN);
+    if (apex === null) return null;
+    const hosts = [platform, hostOf(env.PLATFORM_API_URL), hostOf(env.NEXT_PUBLIC_APP_URL)];
+    for (const host of hosts) {
+        if (host === null) continue;
+        if (apex === host || apex.endsWith(`.${host}`) || host.endsWith(`.${apex}`)) return null;
+    }
+    return apex;
+}
+
+/**
+ * What the launcher's bound default, `DefaultManagedHostRootResolver`, answers for a kind-`app`
+ * Work today: the raw `EVER_WORKS_APPS_DOMAIN`, else `EVER_WORKS_DOMAIN`, else `null`. It is
+ * also how `flow-app-launcher-apps.spec.ts`'s `managedRoot()` derives the tile URL it asserts.
+ */
+function defaultResolverAppRoot(env: Record<string, string | undefined>): string | null {
+    const apps = (env.EVER_WORKS_APPS_DOMAIN ?? '').trim();
+    if (apps.length > 0) return apps;
+    const domain = (env.EVER_WORKS_DOMAIN ?? '').trim();
+    return domain.length > 0 ? domain : null;
+}
+
 const source = fs.readFileSync(WORKFLOW, 'utf8');
 
 function job(name: string) {
@@ -292,5 +363,74 @@ describe('e2e.yml — the flags-on job', () => {
         // (`PlatformCatalogService.catalogBaseUrl`).
         expect(flagsOn.env.EVER_WORKS_E2E_FAKES).toBe('1');
         expect(flagsOn.env.NODE_ENV).not.toBe('production');
+    });
+});
+
+/**
+ * The launcher reads a kind-`app` Work's managed root through `MANAGED_HOST_ROOT_RESOLVER`.
+ * Today the default resolver reads the raw env. APW-06 T48 binds
+ * `AppManagedHostRootResolver`, which answers `config.everWorks.apps.getDomain()`. An apex that
+ * getter refuses works now and loses the seeded Work's address once T48 lands, which turns
+ * ACC-E2E-12 red on this job. So the job's apex must be one the getter accepts. It must also
+ * be a dedicated apex, distinct from the platform domain, so that the tile URL the launcher
+ * file asserts proves the kind-`app` branch chose the apps apex.
+ */
+describe('e2e.yml — the flags-on job’s apps apex survives config.everWorks.apps.getDomain()', () => {
+    it('restates the getter’s own cases (packages/agent/src/config/config.spec.ts)', () => {
+        expect(getDomainWouldAnswer({})).toBe('ever.works');
+        expect(getDomainWouldAnswer({ EVER_WORKS_DOMAIN: 'preview.ever.works' })).toBe(
+            'preview.ever.works',
+        );
+        expect(getDomainWouldAnswer({ EVER_WORKS_APPS_DOMAIN: 'apps.example.com' })).toBe(
+            'apps.example.com',
+        );
+        expect(getDomainWouldAnswer({ EVER_WORKS_APPS_DOMAIN: '  Apps.Example.COM.  ' })).toBe(
+            'apps.example.com',
+        );
+        // Equal to, under, and a parent of the platform domain, and a platform URL's host.
+        for (const env of [
+            { EVER_WORKS_DOMAIN: 'ever.works', EVER_WORKS_APPS_DOMAIN: 'ever.works' },
+            { EVER_WORKS_DOMAIN: 'ever.works', EVER_WORKS_APPS_DOMAIN: 'apps.ever.works' },
+            { EVER_WORKS_DOMAIN: 'apps.ever.works', EVER_WORKS_APPS_DOMAIN: 'ever.works' },
+            { PLATFORM_API_URL: 'https://api.ever.team', EVER_WORKS_APPS_DOMAIN: 'api.ever.team' },
+            {
+                NEXT_PUBLIC_APP_URL: 'https://app.ever.team',
+                EVER_WORKS_APPS_DOMAIN: 'app.ever.team',
+            },
+            // The pair this job carried until 2026-09-26.
+            { EVER_WORKS_DOMAIN: 'e2e.local', EVER_WORKS_APPS_DOMAIN: 'apps.e2e.local' },
+        ]) {
+            expect(getDomainWouldAnswer(env), JSON.stringify(env)).toBeNull();
+        }
+        for (const bad of [
+            'https://apps.example.com',
+            'apps.example.com:8443',
+            'localhost',
+            '203.0.113.7',
+        ]) {
+            expect(getDomainWouldAnswer({ EVER_WORKS_APPS_DOMAIN: bad }), bad).toBeNull();
+        }
+        expect(getDomainWouldAnswer({ EVER_WORKS_DOMAIN: 'https://ever.works' })).toBeNull();
+    });
+
+    it('is a dedicated apex the getter accepts, and the getter and today’s resolver agree on it', () => {
+        const flagsOn = job(FLAGS_ON_JOB);
+        const today = defaultResolverAppRoot(flagsOn.env);
+
+        expect(
+            today,
+            'without an apex a seeded App Work has no address and is `notLive`',
+        ).not.toBeNull();
+        expect(
+            getDomainWouldAnswer(flagsOn.env),
+            `EVER_WORKS_APPS_DOMAIN=${flagsOn.env.EVER_WORKS_APPS_DOMAIN} with ` +
+                `EVER_WORKS_DOMAIN=${flagsOn.env.EVER_WORKS_DOMAIN}: config.everWorks.apps.getDomain() ` +
+                'must answer the same root the default resolver does, or the launcher cases lose ' +
+                'their address when APW-06 T48 binds AppManagedHostRootResolver',
+        ).toBe(today);
+        expect(
+            flagsOn.env.EVER_WORKS_APPS_DOMAIN,
+            'a dedicated apex, so the asserted tile URL tells the apps apex from the platform domain',
+        ).toBeTruthy();
     });
 });

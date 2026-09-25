@@ -808,7 +808,10 @@ jobs:
   # API, prebuilt web), plus the platform-catalog fake the API reads the Ever
   # platforms from. The env is the matrix's, key for key, plus the deltas at
   # its end; `apps/web/e2e/fakes/platform-catalog/__tests__/flags-on-lane.unit.spec.ts`
-  # (harness unit lane) fails on any other difference, so edit both together.
+  # (harness unit lane) fails on any other difference, so edit both together. That
+  # lane runs in ci.yml's `lint-and-test` (pushes to stage and main, and
+  # dispatches), not in this workflow; after editing either env block run it
+  # locally first: `pnpm --filter ever-works-web test:e2e-harness flags-on-lane`.
   e2e-app-works-flags-on:
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     # One shard of ~12 tests, but the same cold `pnpm build` + dev-stack boot
@@ -1042,7 +1045,13 @@ jobs:
           # EVER_WORKS_DOMAIN). Without one the Work has no address, is
           # `notLive`, and no launcher case can list it. Playwright reads the
           # same value to assert the exact tile URL.
-          EVER_WORKS_APPS_DOMAIN: apps.e2e.local
+          # The apex is a sibling of the platform domain, NOT a subdomain of it:
+          # `config.everWorks.apps.getDomain()` refuses an explicit apex that is
+          # equal to, under or a parent of EVER_WORKS_DOMAIN (plan §8.3), so
+          # `apps.e2e.local` would answer null. Today the default resolver reads the
+          # raw variable. Once APW-06 T48 binds AppManagedHostRootResolver (which
+          # answers getDomain()), a refused apex drops the seeded Work's address.
+          EVER_WORKS_APPS_DOMAIN: apps-e2e.local
           EVER_WORKS_DOMAIN: e2e.local
           # The catalog fixture started above, and the environment whose
           # addresses the launcher shows (FR-10; unset outside production is an

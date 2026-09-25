@@ -586,6 +586,18 @@ jobs:
         if: steps.scope.outputs.code == 'true'
         run: pnpm test
 
+      # The App Works e2e harness's own unit specs (`apps/web/vitest.e2e-harness.config.ts`):
+      # the fake GitHub and its recorded-fixture contract, the platform-catalog fake, the
+      # harness helpers, and `flags-on-lane.unit.spec.ts`, which reads `e2e.yml` and fails
+      # when the flags-on job's env drifts from the 32-shard matrix's or its apps apex is one
+      # `config.everWorks.apps.getDomain()` refuses. `pnpm test` above cannot reach them:
+      # apps/web's `vitest.config.ts` includes only `src/**`, on purpose. About 10 s. It needs
+      # no stack and no network, only `git` on PATH (the fake's smart-HTTP round-trip) and the
+      # build above (`@ever-works/contracts`).
+      - name: App Works e2e harness unit specs (apps/web)
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm --filter ever-works-web test:e2e-harness
+
       # The server/client boundary guard (C22 + C27). Two React Server Components
       # crashes shipped because a server component imported a VALUE from a
       # `'use client'` module: the server render receives a client reference

@@ -926,9 +926,16 @@ test('[ACC-E2E-12 · ACC-11-16] turning Show in App Launcher off then on records
         details: hidden.details,
         metadata: hidden.metadata,
     });
-    const needles = [seeded.managedSubdomain, 'https://', 'http://', '.e2e.local'].filter(
-        (needle): needle is string => needle !== null,
-    );
+    // The apex this stack derives addresses under is a needle too. On the flags-on job it is
+    // `apps-e2e.local`, a sibling of the platform domain that `.e2e.local` does not match.
+    const root = managedRoot();
+    const needles = [
+        seeded.managedSubdomain,
+        'https://',
+        'http://',
+        '.e2e.local',
+        root === null ? null : `.${root}`,
+    ].filter((needle): needle is string => needle !== null);
     expect(
         needles.filter((needle) => ownPayload.includes(needle)),
         `the row’s own payload carries no address: ${ownPayload}`,
