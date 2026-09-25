@@ -28,6 +28,16 @@
  * The registry's `unknown` block is **never read**: its `class` is advisory
  * display metadata that "never becomes a license class" (`catalog.md` §4).
  *
+ * **`NOASSERTION` is red** — a fixed platform rule, not a registry row (owner
+ * decision 2026-09-25, ACC-NEG-01's fixture). It is the SPDX value GitHub reports
+ * for a licence FILE it found and cannot name, which is not "no licence": the
+ * provider saw terms nobody has identified, so the gate treats them as the
+ * strictest class rather than the milder `unknown`. Like R-3's fixed classes, no
+ * registry row, alias or exception can loosen it. SPDX's `NONE` ("no licence at
+ * all") is untouched and stays `unknown`. The plugin contract spells NOASSERTION
+ * `licenseSpdx: null`; {@link detectedLicenseSpdx} is the one mapping from that
+ * contract onto what this function classifies.
+ *
  * No I/O and no `process.env`: the registry is an argument, and the default is
  * the bundled seed snapshot. Choosing live / last-good / snapshot is the
  * registry loader's job (plan §2.6), not this function's.
@@ -44,6 +54,28 @@ import {
     SPDX_EXPRESSION_MAX_LENGTH,
     type SpdxExpressionNode,
 } from './spdx-expression';
+
+/**
+ * SPDX's "a licence is present and could not be determined" — what GitHub's licence
+ * API reports (`spdx_id`) for a licence file it cannot name. Always classified `red`.
+ */
+export const SPDX_NOASSERTION = 'NOASSERTION';
+
+/**
+ * The SPDX expression a provider-detected licence is classified by.
+ *
+ * `GitRepository.licenseSpdx` (packages/plugin) keeps two "no id" answers apart:
+ * `null` is "reported, and not a licence we can name" — GitHub's NOASSERTION — and
+ * `undefined` is "not reported" (no licence file at all). The first becomes
+ * {@link SPDX_NOASSERTION}, which classifies red; the second becomes `null`, which
+ * classifies `unknown`. Any string passes through unchanged.
+ */
+export function detectedLicenseSpdx(licenseSpdx: string | null | undefined): string | null {
+    if (licenseSpdx === null) {
+        return SPDX_NOASSERTION;
+    }
+    return typeof licenseSpdx === 'string' ? licenseSpdx : null;
+}
 
 /** The parts of a registry classification reads. The `unknown` block is deliberately absent. */
 export type LicenseClassifyRegistry = Pick<
@@ -135,6 +167,10 @@ function classOfNode(node: SpdxExpressionNode, index: RegistryIndex): LicenseCla
         case 'and':
             return worst(classOfNode(node.left, index), classOfNode(node.right, index));
         case 'license': {
+            // A fixed platform rule, ahead of the registry and of any exception.
+            if (node.id.toUpperCase() === SPDX_NOASSERTION) {
+                return 'red';
+            }
             const base = classOfId(node.id, index);
             if (node.exception === undefined) {
                 return base;

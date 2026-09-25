@@ -45,13 +45,20 @@
  * (2026-09-19, `node apps/api/dist/main.js` on 3999 beside the fake GitHub on 3900, an
  * account attached through `connectCustomerGitHub`):
  *
- *   1. **ACC-E2E-01's Blueprint id and licence class — APW-03.** `APP_SOURCE_CATALOG_PORT`
- *      is bound nowhere in `apps/api` (grep over `apps/api/src`: no provider for the token),
- *      so the inspector's catalog read answers `blueprint: { status: "unavailable" }` and
+ *   1. **ACC-E2E-01's Blueprint id and licence class — APW-03.** Measured 2026-09-19,
+ *      `APP_SOURCE_CATALOG_PORT` was bound nowhere, so the inspector's catalog read
+ *      answered `blueprint: { status: "unavailable" }` and
  *      `license: { class: "unknown", source: "detected" }` for **every** repository —
- *      including the ones the fake's Blueprint catalog lists. The provider-detected SPDX
- *      (`"MIT"`, `"BUSL-1.1"`) *is* asserted green below; the matched id and the class are
- *      not observable until APW-03's catalog port is bound.
+ *      including the ones the fake's Blueprint catalog lists. Since APW-03 T26
+ *      (2026-09-25) `AppWorksModule` binds the port, but the answer in this lane stays the
+ *      same (expected from the code, not re-measured): the Blueprint resolver reads the
+ *      `ever-works` catalog with a **platform** GitHub credential and the lane has none (no
+ *      installation on `ever-works`, no `EVER_WORKS_APPS_CATALOG_TOKEN` / `GITHUB_TOKEN` in
+ *      `e2e.yml`). Even with one, a Blueprint match stays held back until the apply service
+ *      (T28) is bound, and the manifest half that names `umami` for
+ *      `ever-works/umami-template` is still open (T24/T26). The provider-detected SPDX
+ *      (`"MIT"`, `"BUSL-1.1"`) *is* asserted below; the matched id and the class are not
+ *      observable here yet.
  *
  * **ACC-NEG-08's `alreadyExisted: true` (APW-01 FR-23) was the second marker until C9.**
  * Measured twice on 2026-09-19 (fork and link creates): the identical request answered
@@ -595,19 +602,24 @@ test.describe('ACC-E2E-01 — the App source preview the create form renders', (
     /**
      * The Blueprint id and the licence class ACC-E2E-01's assertion list names.
      *
-     * `APP_SOURCE_CATALOG_PORT` has no provider anywhere in `apps/api` (verified by grep
-     * over `apps/api/src`, 2026-09-19), so the inspector's catalog read answers
-     * `blueprint: { status: 'unavailable' }` — which its own contract defines as "the
-     * catalog could not be consulted at all, never 'no match'" — and
-     * `license: { class: 'unknown', source: 'detected' }` for every repository, including
-     * `ever-works/umami-template`, whose id the fake's Blueprint list carries (`umami`).
-     * Neither can be observed in this lane until APW-03's catalog port is bound; the
-     * assertions stay exactly as the case words them.
+     * Measured 2026-09-19: `APP_SOURCE_CATALOG_PORT` had no provider anywhere, so the
+     * inspector's catalog read answered `blueprint: { status: 'unavailable' }` — which its
+     * own contract defines as "the catalog could not be consulted at all, never 'no
+     * match'" — and `license: { class: 'unknown', source: 'detected' }` for every
+     * repository, including `ever-works/umami-template`, whose id the fake's Blueprint list
+     * carries (`umami`). Since APW-03 T26 the port is bound, and three things still keep
+     * this case from running here: the lane gives the platform no GitHub credential for
+     * the ever-works catalog (so the answer is still `unavailable` / `unknown`); a Blueprint
+     * match is held back until the apply service (T28) is bound; and the manifest lookup
+     * that names `umami` for this repository is not implemented yet (T24/T26 — the probe
+     * path would look for `ever-works/umami-template-template`). The assertions stay
+     * exactly as the case words them.
      */
     test.fixme(
-        'APW-03: the Blueprint preview and the licence class need the Apps catalog port, which ' +
-            'no module in apps/api provides — every inspect answers blueprint.status ' +
-            '"unavailable" and license.class "unknown" (measured 2026-09-19)',
+        'APW-03: the Blueprint preview and the licence class need a platform catalog ' +
+            'credential in this lane, the Blueprint apply service (T28) and the manifest lookup ' +
+            '(T24/T26) — the catalog port is bound since T26, and every inspect here still ' +
+            'answers blueprint.status "unavailable" and license.class "unknown" (measured 2026-09-19)',
         async ({ request }: { request: APIRequestContext }) => {
             test.skip(
                 !(await seedFakeGitHub(request)),

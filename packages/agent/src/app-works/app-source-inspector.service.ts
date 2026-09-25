@@ -7,6 +7,7 @@ import {
     ServiceUnavailableException,
 } from '@nestjs/common';
 import { type AppsTierPolicy, APPS_TIER_POLICY } from '../app-runtime/ports';
+import { detectedLicenseSpdx } from '../app-license/license-classify';
 import {
     APP_INSPECT_CACHE_TTL_MS,
     APP_INSPECT_MAX_PROVIDER_CALLS,
@@ -66,6 +67,10 @@ import {
 import { WorkRepository } from '../database/repositories/work.repository';
 import { ProviderCallBudget } from './app-upstream-sync.service';
 import { APP_SOURCE_CATALOG_PORT, type AppSourceCatalogPort } from './app-source-catalog.port';
+import {
+    APP_WORKS_TELEMETRY_EVENTS,
+    AppWorksTelemetryService,
+} from './app-works-telemetry.service';
 
 /**
  * APW-01 T12 — the App source inspector: everything the create form (and the
@@ -423,6 +428,11 @@ export class AppSourceInspectorService {
         private readonly registry?: PluginRegistryService,
         @Optional()
         private readonly deployFacade?: DeployFacadeService,
+        // APW-01 T36 — appended LAST so every positional construction keeps its
+        // slots. Absent, no event is emitted; the service's own sink being unbound is
+        // the usual way that happens, and it is the service that counts it.
+        @Optional()
+        private readonly telemetry?: AppWorksTelemetryService,
     ) {}
 
     /**
@@ -432,12 +442,28 @@ export class AppSourceInspectorService {
      * Throws only for OUR validation: the instance setting, an unparseable URL, a
      * provider mismatch. Every provider-side refusal is a `200` carrying the reason
      * codes on the modes (plan §4.1).
+     *
+     * Every answer — built, refused by the provider or served from the cache — emits
+     * one `app_source.inspected` (FR-53, plan §9.1) with codes and counters only; a
+     * throw emits nothing, because nothing was inspected.
      */
     async inspect(
         repositoryUrl: string,
         user: User,
         opts: AppSourceInspectOptions = {},
     ): Promise<AppSourceInspectResponse> {
+        const startedAt = Date.now();
+        const answer = await this.inspectUnobserved(repositoryUrl, user, opts);
+        this.trackInspected(answer.response, answer.providerCalls, startedAt, user);
+        return answer.response;
+    }
+
+    /** `inspect`'s body, answering the provider calls it made beside the response. */
+    private async inspectUnobserved(
+        repositoryUrl: string,
+        user: User,
+        opts: AppSourceInspectOptions,
+    ): Promise<{ response: AppSourceInspectResponse; providerCalls: number }> {
         // 1. The instance setting, before the parser and before any provider call
         //    (R-6: it refuses the web app, chat, the MCP server and the CLI alike).
         if (!config.everWorks.apps.worksEnabled()) {
@@ -491,7 +517,10 @@ export class AppSourceInspectorService {
         if (!opts.fresh && !opts.blueprintId) {
             const cached = this.cache.get(cacheKey);
             if (cached && cached.expiresAt > Date.now()) {
-                return applyTargetOwner(cached.response, opts.targetOwner);
+                return {
+                    response: applyTargetOwner(cached.response, opts.targetOwner),
+                    providerCalls: 0,
+                };
             }
             if (cached) {
                 this.cache.delete(cacheKey);
@@ -505,7 +534,47 @@ export class AppSourceInspectorService {
             this.remember(cacheKey, response);
         }
 
-        return applyTargetOwner(response, opts.targetOwner);
+        return {
+            response: applyTargetOwner(response, opts.targetOwner),
+            providerCalls: budget.calls,
+        };
+    }
+
+    /**
+     * `app_source.inspected` (plan §9.1): which modes were offered, why the others
+     * were not, the Blueprint status, the licence class, the time and the provider
+     * calls. Never the repository, its owner, its URL or its description.
+     */
+    private trackInspected(
+        response: AppSourceInspectResponse,
+        providerCalls: number,
+        startedAt: number,
+        user: User,
+    ): void {
+        const modes = Object.entries(response.modes ?? {}) as Array<
+            [AppRepositoryMode, AppModeAvailability]
+        >;
+        this.telemetry?.track(
+            APP_WORKS_TELEMETRY_EVENTS.sourceInspected,
+            {
+                defaultMode: response.defaultMode ?? null,
+                modesAvailable: modes
+                    .filter(([, availability]) => availability?.available === true)
+                    .map(([mode]) => mode),
+                reasons: [
+                    ...new Set(
+                        modes
+                            .map(([, availability]) => availability?.reason)
+                            .filter((reason): reason is AppSourceReasonCode => !!reason),
+                    ),
+                ].sort(),
+                blueprint: response.blueprint?.status ?? 'unavailable',
+                licenseClass: response.license?.class ?? 'unknown',
+                durationMs: Date.now() - startedAt,
+                providerCalls,
+            },
+            user?.id,
+        );
     }
 
     /* ---------------------------------------------------------------------- *
@@ -934,7 +1003,10 @@ export class AppSourceInspectorService {
         repository: GitRepository,
         blueprintId: string | undefined,
     ): Promise<{ blueprint: AppBlueprintPreview; license: AppSourceLicensePreview }> {
-        const spdx = repository.licenseSpdx ?? null;
+        // The plugin contract's `null` is GitHub's NOASSERTION ("a licence file it cannot
+        // name") and `undefined` is "no licence file": the first is carried as
+        // `NOASSERTION`, which classifies red (owner decision 2026-09-25, ACC-NEG-01).
+        const spdx = detectedLicenseSpdx(repository.licenseSpdx);
 
         if (!this.catalog) {
             return {

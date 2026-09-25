@@ -25,6 +25,10 @@ import {
 } from '../facades/git.facade';
 import { WorksConfigService } from '../works-config/services/works-config.service';
 import type { AppForkReadyHandler, AppForkReadyOutcome } from './app-fork-ready-handler.port';
+import {
+    APP_WORKS_TELEMETRY_EVENTS,
+    AppWorksTelemetryService,
+} from './app-works-telemetry.service';
 
 /**
  * APW-01 T15 — `AppSourceInitializerService`, the ready handler (Resolution R-4).
@@ -363,6 +367,8 @@ interface InitializerContext {
     blueprintMatchSource: string | null;
     /** `false` only when the member explicitly declined FR-29a's automatic start. */
     autoProvision: boolean;
+    /** The state row's `readinessStartedAt` — what `app_work.source_ready` measures from. */
+    readinessStartedAt: Date | null;
 }
 
 /** What the minimal path (plan §6 steps 3–6) decided. */
@@ -416,6 +422,10 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
         @Optional()
         @Inject(APP_PROVISIONING_SERVICE)
         private readonly provisioning?: AppProvisioningCapability,
+        // APW-01 T36 — appended LAST so every positional construction keeps its
+        // slots. Absent, no event is emitted; it never changes an outcome.
+        @Optional()
+        private readonly telemetry?: AppWorksTelemetryService,
     ) {}
 
     /**
@@ -473,6 +483,11 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
 
         // ── step 7: one Activity row per outcome ──────────────────────────────
         await this.recordActivity(context, minimal, Boolean(context.blueprintId));
+
+        // FR-53 — one `app_work.source_ready` per success row, never for a failure.
+        if (minimal.outcome !== 'failed') {
+            this.trackSourceReady(context, minimal);
+        }
 
         if (minimal.outcome === 'failed') {
             return {
@@ -562,6 +577,7 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
             // `start`. The flag is read from the Work row on EVERY invocation, so the
             // post-merge re-invocation of a link honours it too, and it is never cleared.
             autoProvision: record.autoProvision !== false,
+            readinessStartedAt: state?.readinessStartedAt ?? null,
         };
     }
 
@@ -1277,6 +1293,30 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
                     `(${errorText(error)}).`,
             );
         }
+    }
+
+    /**
+     * `app_work.source_ready` (FR-53, plan §9.1) — emitted beside each success Activity
+     * row: the relation, how long the Work was preparing (from the state row's
+     * `readinessStartedAt`, `null` when the row carries none) and whether the source
+     * went through a setup pull request. A link therefore emits twice over its life —
+     * `setupPullRequest: true` when the pull request opens, `false` on the post-merge
+     * re-invocation — exactly as it writes two Activity rows. Never the repository, the
+     * pull request URL or the file.
+     */
+    private trackSourceReady(context: InitializerContext, result: MinimalPathResult): void {
+        const started = context.readinessStartedAt
+            ? new Date(context.readinessStartedAt).getTime()
+            : Number.NaN;
+        this.telemetry?.track(
+            APP_WORKS_TELEMETRY_EVENTS.sourceReady,
+            {
+                mode: context.relation,
+                preparingMs: Number.isFinite(started) ? Math.max(0, Date.now() - started) : null,
+                setupPullRequest: result.outcome === 'waiting_for_setup_pr',
+            },
+            context.work.userId,
+        );
     }
 
     /* ---------------------------------------------------------------------- *

@@ -217,9 +217,12 @@ function harness(input: {
         { ...gitFacade, ...writes } as never,
         workRepository as never,
         // `APP_SOURCE_CATALOG_PORT`, `APPS_TIER_POLICY`, the registry and the
-        // deploy facade stay UNBOUND, exactly as the module leaves them: the
-        // Blueprint answers `unavailable` and the managed target is closed,
-        // which is the documented state of an unconfigured installation.
+        // deploy facade are left out of this hand-built inspector: the Blueprint
+        // answers `unavailable` and the managed target is closed, the documented
+        // state of an installation that has none of them. (Since APW-03 T26,
+        // `AppWorksModule` DOES bind the catalog port; with no platform GitHub
+        // credential it answers the same `unavailable` / licence `unknown`, which is
+        // why this spec's expectations do not depend on the difference.)
     );
 
     const authService = {

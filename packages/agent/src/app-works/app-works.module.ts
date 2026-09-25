@@ -16,6 +16,10 @@ import { AppSourceInspectorService } from './app-source-inspector.service';
 import { AppWorkCreateService } from './app-work-create.service';
 import { AppActionsHygieneService } from './app-actions-hygiene.service';
 import { AppSourceInitializerService } from './app-source-initializer.service';
+import { AppWorksTelemetryService } from './app-works-telemetry.service';
+import { APP_SOURCE_CATALOG_PORT } from './app-source-catalog.port';
+import { AppBlueprintResolverService } from '../apps-catalog/app-blueprint-resolver.service';
+import { AppSourceCatalogAdapter } from '../apps-catalog/app-source-catalog.adapter';
 import {
     JOB_RUNTIME_PROVIDER_REGISTRY,
     type JobRuntimeProviderRegistry,
@@ -161,6 +165,48 @@ import {
  * OWN copy, which Nest resolves ahead of this one for the `APP_FORK_READY_HANDLER`
  * binding it owns. Both halves are pinned by
  * `__tests__/app-source-initializer.service.spec.ts`.
+ *
+ * ## APW-03 T26 — the Apps-catalog port IS bound here (additive)
+ *
+ * `APP_SOURCE_CATALOG_PORT` is bound to `AppSourceCatalogAdapter`, with
+ * `AppBlueprintResolverService` (the explicit and probe halves of T26) beside it.
+ * Until then no module anywhere provided the token, so every inspect previewed
+ * Blueprint `unavailable` and licence class `unknown`, and every explicit
+ * `blueprintId` (FR-81) was refused `400 blueprint_mismatch`.
+ *
+ * 🛑 **Why here, and why not a separate `AppsCatalogModule`.** The port is
+ * injected `@Optional()` by `AppSourceInspectorService` and `AppWorkCreateService`,
+ * which this module DECLARES — the same rule the C10 section records: a provider
+ * declared in a module that imports this one never reaches them. A module of its
+ * own would have to be imported here, and `app-works-port-dormancy.spec.ts` reads
+ * the direct providers of the nine App Works modules only, so the binding would
+ * be invisible to the register. The token is NOT exported: only the two services
+ * declared here consume it.
+ *
+ * Every collaborator of the adapter and the resolver is `@Optional()`, so the
+ * bare-graph compile this module's spec performs (with `FacadesModule` shelled)
+ * still resolves: the resolver then has no git facade and answers "credential
+ * unavailable", which both consumers read as `unavailable`. The adapter also holds
+ * a Blueprint MATCH back until `APP_BLUEPRINT_APPLY_SERVICE` (T28) is bound — see
+ * its docstring for that gate and T28's obligation to bind the token in this
+ * graph.
+ *
+ * ## APW-01 T36 — the telemetry service joins them (additive)
+ *
+ * `AppWorksTelemetryService` (FR-53, plan §9.1) is provided **and exported** here:
+ * the inspector, the create service and the ready handler are declared in this
+ * module, the API-side module's own copy of the ready handler resolves it through
+ * this module's exports, and `WorkModule` (which imports this module) injects it
+ * into `WorkLifecycleService` for the delete event. One instance per graph, so its
+ * counters describe the whole process.
+ *
+ * Its sink, `APP_WORKS_TELEMETRY_SINK`, is **not** bound here and must not be: this
+ * package takes no dependency on the monitoring package. The API binds it with a
+ * `@Global()` alias to its PostHog `AnalyticsService`
+ * (`apps/api/src/telemetry/app-works-telemetry-binding.module.ts`), which a global
+ * module makes visible to this module's providers; everywhere else (the worker, the
+ * CLI, this module's bare-graph specs) the `@Optional()` sink is absent and every
+ * event is counted and dropped.
  */
 
 /**
@@ -247,6 +293,13 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // C10 — the binding that makes a readiness dispatch leave the process. See
         // the docstring above for why it lives here and what `null` means.
         buildAppForkReadinessDispatcherProvider(),
+        // APW-03 T26 — the Apps-catalog port, bound where its two consumers are
+        // declared. Deliberately not exported. See the docstring above.
+        AppBlueprintResolverService,
+        { provide: APP_SOURCE_CATALOG_PORT, useClass: AppSourceCatalogAdapter },
+        // APW-01 T36 — FR-53's five events. Its sink is the API's to bind (a global
+        // alias); unbound, events are counted and dropped. See the docstring above.
+        AppWorksTelemetryService,
     ],
     exports: [
         WorkUpstreamStateRepository,
@@ -264,6 +317,9 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // `APP_FORK_READY_HANDLER` to this class, and a class that is not exported
         // cannot be reached across the module edge.
         AppSourceInitializerService,
+        // APW-01 T36 — exported so the API-side ready handler and `WorkModule`'s
+        // `WorkLifecycleService` receive the same instance the services here do.
+        AppWorksTelemetryService,
     ],
 })
 export class AppWorksModule {}

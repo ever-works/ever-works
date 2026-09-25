@@ -57,6 +57,12 @@ import {
 import { APP_SOURCE_CATALOG_PORT, type AppSourceCatalogPort } from './app-source-catalog.port';
 import { APP_PROMPTED_VALUES_PORT, type AppPromptedValuesPort } from './app-prompted-values.port';
 import {
+    APP_WORKS_TELEMETRY_EVENTS,
+    AppWorksTelemetryService,
+    appWorkCreateOutcomeOf,
+    type AppWorkCreateOutcome,
+} from './app-works-telemetry.service';
+import {
     APP_MANAGED_TARGET_CHOICE,
     APP_MANAGED_TARGET_INPUT_ALIAS,
     APP_TIER_CAPABILITY,
@@ -211,6 +217,10 @@ export class AppWorkCreateService {
          */
         @Optional()
         private readonly registry?: PluginRegistryService,
+        // APW-01 T36 — appended LAST so every positional construction keeps its
+        // slots. Absent, no event is emitted; it never changes what `create` answers.
+        @Optional()
+        private readonly telemetry?: AppWorksTelemetryService,
     ) {}
 
     /**
@@ -220,8 +230,58 @@ export class AppWorkCreateService {
      * `isAppWorkKind(normalizedKind)` and therefore never runs
      * `resolveProviderDefaults` for this kind — onboarding defaults are never
      * applied to an App Work (plan §4.2 step 4).
+     *
+     * Every call emits exactly one `app_work.create_finished` (FR-53, plan §9.1):
+     * `created`, `already_existed`, `refused` with the reason code, or `failed` for
+     * an unexpected fault. `app_work.create_started` is emitted inside, once the
+     * request has passed validation and the fresh inspection — the first point at
+     * which its mode, deploy target and adopted fork are facts rather than guesses —
+     * so a request refused before that point finishes without having started.
      */
     async create(dto: CreateWorkDto, user: User): Promise<AppWorkCreateResult> {
+        const startedAt = Date.now();
+        const mode = (APP_REPOSITORY_MODES as readonly string[]).includes(dto?.repositoryMode)
+            ? (dto.repositoryMode as AppRepositoryMode)
+            : null;
+        try {
+            const result = await this.createUnobserved(dto, user);
+            this.trackCreateFinished(
+                mode,
+                result.alreadyExisted ? 'already_existed' : 'created',
+                undefined,
+                startedAt,
+                user,
+            );
+            return result;
+        } catch (error) {
+            const { outcome, reason } = appWorkCreateOutcomeOf(error);
+            this.trackCreateFinished(mode, outcome, reason, startedAt, user);
+            throw error;
+        }
+    }
+
+    /** `app_work.create_finished` — the mode, the outcome, its code and the time. */
+    private trackCreateFinished(
+        mode: AppRepositoryMode | null,
+        outcome: AppWorkCreateOutcome,
+        reason: string | undefined,
+        startedAt: number,
+        user: User,
+    ): void {
+        this.telemetry?.track(
+            APP_WORKS_TELEMETRY_EVENTS.createFinished,
+            {
+                mode,
+                outcome,
+                ...(reason ? { reason } : {}),
+                durationMs: Date.now() - startedAt,
+            },
+            user?.id,
+        );
+    }
+
+    /** `create`'s body — the twelve steps, unobserved. */
+    private async createUnobserved(dto: CreateWorkDto, user: User): Promise<AppWorkCreateResult> {
         // ── Step 1 — the instance setting (R-6) ──────────────────────────────
         // Checked here as well as in the inspector: a direct service call must be
         // refused identically to an HTTP one, and this is the check that refuses
@@ -376,6 +436,20 @@ export class AppWorkCreateService {
             repo: inspect.repository.repo,
         };
         const blueprint = await this.resolveBlueprint(dto.blueprintId, inspect, catalogCoordinates);
+
+        // FR-53 — the request is valid and the fresh inspection confirmed it, so the
+        // create starts acting here. `adoptedExistingFork` is the fork the inspection
+        // found in the chosen owner (the one step 9 adopts); an owner the scan budget
+        // did not reach reports `false` even if step 9's own lookup then finds one.
+        this.telemetry?.track(
+            APP_WORKS_TELEMETRY_EVENTS.createStarted,
+            {
+                mode,
+                deployTarget: deploy.target,
+                adoptedExistingFork: mode === 'fork' && !!ownerEntry?.existingFork,
+            },
+            user.id,
+        );
 
         // ── Step 7 — the lock (FR-22) ────────────────────────────────────────
         // Concurrent identical creates are serialised; the loser answers `409`

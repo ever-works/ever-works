@@ -6,6 +6,8 @@ import {
 } from '@ever-works/contracts';
 import type { User } from '../../entities/user.entity';
 import { NoGitCredentialsError } from '../../facades/git.facade';
+import { AppBlueprintResolverService } from '../../apps-catalog/app-blueprint-resolver.service';
+import { AppSourceCatalogAdapter } from '../../apps-catalog/app-source-catalog.adapter';
 import { AppSourceInspectorService } from '../app-source-inspector.service';
 
 /**
@@ -84,6 +86,8 @@ function harness(input: {
     works?: Array<{ id: string; userId: string; kind: string; relation: string }>;
     ownAppWorks?: Array<{ id: string; name: string; slug: string }>;
     catalog?: boolean;
+    /** A REAL catalog port (APW-03's adapter) in place of the jest double. */
+    catalogPort?: unknown;
     tierOpen?: boolean;
     appsCapablePlugins?: Array<{ id: string; appsTier: boolean }>;
     registry?: boolean;
@@ -153,12 +157,14 @@ function harness(input: {
     };
 
     const catalog =
-        input.catalog === false
-            ? undefined
-            : {
-                  matchBlueprint: jest.fn().mockResolvedValue(null),
-                  classifyLicense: jest.fn().mockResolvedValue('green' as const),
-              };
+        input.catalogPort !== undefined
+            ? input.catalogPort
+            : input.catalog === false
+              ? undefined
+              : {
+                    matchBlueprint: jest.fn().mockResolvedValue(null),
+                    classifyLicense: jest.fn().mockResolvedValue('green' as const),
+                };
 
     const tierPolicy =
         input.tierOpen === undefined ? undefined : { isOpen: () => input.tierOpen === true };
@@ -972,12 +978,187 @@ describe('AppSourceInspectorService', () => {
         });
 
         it('never guesses a licence class when the provider reported none', async () => {
-            const h = harness({ repository: repository({ licenseSpdx: null }) });
+            // `undefined` is the plugin contract's "not reported" — a repository with no
+            // licence file. This case used `null` until 2026-09-25, but `null` is the
+            // contract's spelling of GitHub's NOASSERTION ("reported, not nameable"),
+            // which the owner decision now classifies red: see the next case.
+            const h = harness({ repository: repository({ licenseSpdx: undefined }) });
 
             const response = await h.service.inspect(URL, USER);
 
             expect(response.license.spdx).toBeNull();
             expect(h.catalog.classifyLicense).toHaveBeenCalledWith(null);
+        });
+
+        it('carries GitHub’s NOASSERTION (licenseSpdx null) through as NOASSERTION, never as "no licence"', async () => {
+            const h = harness({ repository: repository({ licenseSpdx: null }) });
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.license.spdx).toBe('NOASSERTION');
+            expect(h.catalog.classifyLicense).toHaveBeenCalledWith('NOASSERTION');
+        });
+    });
+
+    describe('with APW-03’s real catalog adapter bound (APW-03 T26, the apply gate)', () => {
+        beforeEach(() => {
+            process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+        });
+
+        const savedCatalogToken = process.env.EVER_WORKS_APPS_CATALOG_TOKEN;
+        afterEach(() => {
+            if (savedCatalogToken === undefined) {
+                delete process.env.EVER_WORKS_APPS_CATALOG_TOKEN;
+            } else {
+                process.env.EVER_WORKS_APPS_CATALOG_TOKEN = savedCatalogToken;
+            }
+        });
+
+        /** The platform-credential facade the resolver reads `ever-works/*` through. */
+        function platformFacade(
+            input: { blueprint?: boolean; installationToken?: string | null } = {},
+        ) {
+            const name = 'widgets-template';
+            const spec = [
+                'version: 2',
+                'kind: app',
+                'spec:',
+                '  blueprint:',
+                '    id: widgets',
+                '    version: 1.0.0',
+                `    repo: ever-works/${name}`,
+                `    sha: '${'0'.repeat(40)}'`,
+                '  license:',
+                '    spdx: MIT',
+                '',
+            ].join('\n');
+            return {
+                getInstallationTokenForOwner: jest
+                    .fn()
+                    .mockResolvedValue(
+                        input.installationToken === undefined
+                            ? 'installation-token'
+                            : input.installationToken,
+                    ),
+                getRepository: jest.fn(async (_owner: string, repo: string) =>
+                    input.blueprint && repo === name
+                        ? {
+                              owner: 'ever-works',
+                              name,
+                              fullName: `ever-works/${name}`,
+                              defaultBranch: 'main',
+                              isPrivate: false,
+                              visibility: 'public',
+                              topics: ['ever-works-app-blueprint'],
+                          }
+                        : null,
+                ),
+                getFileContent: jest.fn(async (_owner: string, repo: string) =>
+                    input.blueprint && repo === name ? { content: spec, encoding: 'utf-8' } : null,
+                ),
+            };
+        }
+
+        function realAdapter(
+            platform: ReturnType<typeof platformFacade>,
+            blueprintApply?: unknown,
+        ): AppSourceCatalogAdapter {
+            return new AppSourceCatalogAdapter(
+                new AppBlueprintResolverService(platform as never),
+                blueprintApply as never,
+            );
+        }
+
+        it('previews "none" and a DETECTED licence class when the probe misses', async () => {
+            // On the unbound graph this was `unavailable` / `unknown` for every repository.
+            const platform = platformFacade();
+            const h = harness({ catalogPort: realAdapter(platform) });
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.blueprint).toEqual({ status: 'none' });
+            expect(response.license).toEqual({ spdx: 'MIT', class: 'green', source: 'detected' });
+            expect(platform.getRepository.mock.calls.map((call) => call[1])).toEqual([
+                'widgets-template',
+                'upstream-widgets-template',
+            ]);
+        });
+
+        it('previews "unavailable", never "matched", for a probe hit while nothing can apply it', async () => {
+            const h = harness({ catalogPort: realAdapter(platformFacade({ blueprint: true })) });
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.blueprint).toEqual({ status: 'unavailable' });
+            expect(response.license).toEqual({ spdx: 'MIT', class: 'unknown', source: 'detected' });
+        });
+
+        it('previews the match once an apply service is bound', async () => {
+            const h = harness({
+                catalogPort: realAdapter(platformFacade({ blueprint: true }), {
+                    request: jest.fn(),
+                }),
+            });
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.blueprint).toEqual({
+                status: 'matched',
+                id: 'widgets',
+                version: '1.0.0',
+                verified: false,
+                name: 'widgets',
+                matchSource: 'probe',
+            });
+            expect(response.license).toEqual({ spdx: 'MIT', class: 'green', source: 'blueprint' });
+        });
+
+        it('previews "unavailable" when the platform has no credential for the catalog', async () => {
+            delete process.env.EVER_WORKS_APPS_CATALOG_TOKEN;
+            const savedGithub = process.env.GITHUB_TOKEN;
+            delete process.env.GITHUB_TOKEN;
+            try {
+                const h = harness({
+                    catalogPort: realAdapter(platformFacade({ installationToken: null })),
+                });
+
+                const response = await h.service.inspect(URL, USER);
+
+                expect(response.blueprint).toEqual({ status: 'unavailable' });
+                expect(response.license).toEqual({
+                    spdx: 'MIT',
+                    class: 'unknown',
+                    source: 'detected',
+                });
+            } finally {
+                if (savedGithub !== undefined) process.env.GITHUB_TOKEN = savedGithub;
+            }
+        });
+
+        it('classifies GitHub’s NOASSERTION red (owner decision, ACC-NEG-01)', async () => {
+            const h = harness({
+                repository: repository({ licenseSpdx: null }),
+                catalogPort: realAdapter(platformFacade()),
+            });
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.license).toEqual({
+                spdx: 'NOASSERTION',
+                class: 'red',
+                source: 'detected',
+            });
+        });
+
+        it('keeps a repository with no licence file unknown', async () => {
+            const h = harness({
+                repository: repository({ licenseSpdx: undefined }),
+                catalogPort: realAdapter(platformFacade()),
+            });
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.license).toEqual({ spdx: null, class: 'unknown', source: 'detected' });
         });
     });
 

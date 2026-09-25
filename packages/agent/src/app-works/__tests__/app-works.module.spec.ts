@@ -13,6 +13,7 @@ jest.mock('../../facades/facades.module', () => ({
     FacadesModule: class FacadesModule {},
 }));
 
+import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { ENTITIES } from '../../database/_entities-inventory';
@@ -21,7 +22,16 @@ import { WorkUpstreamState } from '../../entities/work-upstream-state.entity';
 import { AppWorksModule } from '../app-works.module';
 import { AppSourceInspectorService } from '../app-source-inspector.service';
 import { AppWorkCreateService } from '../app-work-create.service';
+import { APP_SOURCE_CATALOG_PORT } from '../app-source-catalog.port';
+import { AppBlueprintResolverService } from '../../apps-catalog/app-blueprint-resolver.service';
+import { AppSourceCatalogAdapter } from '../../apps-catalog/app-source-catalog.adapter';
 import { DistributedTaskLockService } from '../../cache/distributed-task-lock.service';
+import { AppSourceInitializerService } from '../app-source-initializer.service';
+import {
+    APP_WORKS_TELEMETRY_EVENTS,
+    APP_WORKS_TELEMETRY_SINK,
+    AppWorksTelemetryService,
+} from '../app-works-telemetry.service';
 
 /**
  * APW-02 T15 — the App Works module, pinned against a REAL Nest container.
@@ -145,6 +155,115 @@ describe('AppWorksModule', () => {
         await moduleRef.close();
     });
 
+    it('binds APP_SOURCE_CATALOG_PORT to ONE adapter both APW-01 services receive (APW-03 T26)', async () => {
+        // The port is injected `@Optional()` by the inspector and the create service,
+        // which are declared HERE — so the binding must be here too (a provider declared
+        // in a module that imports this one is invisible to them; see the C10 section of
+        // the module's docstring). The bare graph shells `FacadesModule`, so the
+        // resolver's git facade is absent and it answers "credential unavailable": the
+        // adapter still resolves, which is what makes the binding boot-safe.
+        const moduleRef = await Test.createTestingModule({ imports: [AppWorksModule] })
+            .overrideProvider(getRepositoryToken(WorkUpstreamState))
+            .useValue({ findOne: jest.fn().mockResolvedValue(null) })
+            .overrideProvider(DistributedTaskLockService)
+            .useValue(lockStub())
+            .compile();
+
+        const port = moduleRef.get(APP_SOURCE_CATALOG_PORT);
+        expect(port).toBeInstanceOf(AppSourceCatalogAdapter);
+        expect(moduleRef.get(AppBlueprintResolverService)).toBeInstanceOf(
+            AppBlueprintResolverService,
+        );
+        expect(
+            (moduleRef.get(AppSourceInspectorService) as unknown as { catalog: unknown }).catalog,
+        ).toBe(port);
+        expect(
+            (moduleRef.get(AppWorkCreateService) as unknown as { catalog: unknown }).catalog,
+        ).toBe(port);
+
+        // Not exported: only the two services declared here consume it.
+        expect(metadata('exports')).not.toContain(APP_SOURCE_CATALOG_PORT);
+
+        await moduleRef.close();
+    });
+
+    it('provides and exports ONE telemetry service every App Works emitter receives (APW-01 T36)', async () => {
+        // The inspector, the create service and the ready handler are declared HERE, so
+        // the service must be provided here; it is exported so the API-side ready
+        // handler and `WorkModule`'s `WorkLifecycleService` receive the same instance.
+        expect(metadata('providers')).toContain(AppWorksTelemetryService);
+        expect(metadata('exports')).toContain(AppWorksTelemetryService);
+        // The sink is the API's to bind (a `@Global()` alias to PostHog): this package
+        // never binds it, so no module here may provide it.
+        expect(metadata('providers').map(tokenOf)).not.toContain(APP_WORKS_TELEMETRY_SINK);
+
+        const moduleRef = await Test.createTestingModule({ imports: [AppWorksModule] })
+            .overrideProvider(getRepositoryToken(WorkUpstreamState))
+            .useValue({ findOne: jest.fn().mockResolvedValue(null) })
+            .overrideProvider(DistributedTaskLockService)
+            .useValue(lockStub())
+            .compile();
+
+        const telemetry = moduleRef.get(AppWorksTelemetryService);
+        expect(telemetry).toBeInstanceOf(AppWorksTelemetryService);
+        for (const emitter of [
+            AppSourceInspectorService,
+            AppWorkCreateService,
+            AppSourceInitializerService,
+        ]) {
+            expect((moduleRef.get(emitter) as unknown as { telemetry: unknown }).telemetry).toBe(
+                telemetry,
+            );
+        }
+
+        // Unbound in this graph: an event is counted and dropped, never thrown.
+        expect(() =>
+            telemetry.track(
+                APP_WORKS_TELEMETRY_EVENTS.deleted,
+                { mode: 'link', repositoryDeleted: false },
+                'user-1',
+            ),
+        ).not.toThrow();
+        expect(telemetry.stats()).toMatchObject({ emitted: 0, dropped: 1 });
+
+        await moduleRef.close();
+    });
+
+    it('receives a sink bound by a @Global() module — the shape the API binding uses (APW-01 T36)', async () => {
+        const track = jest.fn();
+
+        @Global()
+        @Module({
+            providers: [{ provide: APP_WORKS_TELEMETRY_SINK, useValue: { track } }],
+            exports: [APP_WORKS_TELEMETRY_SINK],
+        })
+        class SinkBindingModule {}
+
+        const moduleRef = await Test.createTestingModule({
+            imports: [SinkBindingModule, AppWorksModule],
+        })
+            .overrideProvider(getRepositoryToken(WorkUpstreamState))
+            .useValue({ findOne: jest.fn().mockResolvedValue(null) })
+            .overrideProvider(DistributedTaskLockService)
+            .useValue(lockStub())
+            .compile();
+
+        moduleRef
+            .get(AppWorksTelemetryService)
+            .track(
+                APP_WORKS_TELEMETRY_EVENTS.deleted,
+                { mode: 'fork', repositoryDeleted: true },
+                'user-1',
+            );
+
+        expect(track).toHaveBeenCalledWith('user-1', 'app_work.deleted', {
+            mode: 'fork',
+            repositoryDeleted: true,
+        });
+
+        await moduleRef.close();
+    });
+
     it('resolves against a real DataSource and queries the registered table', async () => {
         const moduleRef = await Test.createTestingModule({
             imports: [
@@ -178,5 +297,12 @@ describe('app-works barrel', () => {
 
     it('re-exports the module that apps/api imports', () => {
         expect(barrel.AppWorksModule).toBe(AppWorksModule);
+    });
+
+    it('re-exports the telemetry sink token the API binds (APW-01 T36)', () => {
+        // `apps/api`'s binding imports the token from `@ever-works/agent/app-works`; a
+        // second `Symbol()` of the same name would bind nothing this package injects.
+        expect(barrel.APP_WORKS_TELEMETRY_SINK).toBe(APP_WORKS_TELEMETRY_SINK);
+        expect(barrel.AppWorksTelemetryService).toBe(AppWorksTelemetryService);
     });
 });

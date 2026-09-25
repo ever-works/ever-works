@@ -79,6 +79,10 @@
  *   APW-03 T22's `commitFiles`), each with its mandatory-swap note. The licence request
  *   **reuses** APW-03's own `APP_LICENSE_SERVICE` rather than declaring a second Symbol
  *   for the same owner (R-26).
+ * - `./app-works-telemetry.service` — `AppWorksTelemetryService`,
+ *   `APP_WORKS_TELEMETRY_SINK` and `APP_WORKS_TELEMETRY_EVENTS` (T36, FR-53, plan §9.1):
+ *   the five events, over a sink token `apps/api` binds to its PostHog client. Unbound
+ *   ⇒ every event is counted and dropped, never a refusal.
  */
 
 export * from './app-works.module';
@@ -97,6 +101,7 @@ export * from './app-source-inspector.service';
 export * from './app-work-create.service';
 export * from './app-work-deletion.port';
 export * from './app-source-initializer.service';
+export * from './app-works-telemetry.service';
 
 // APW-08 T10 — the rules one evolve run is governed by, read at the Task's BASE
 // commit and frozen. Exported here because the dispatch brief, the Fleet

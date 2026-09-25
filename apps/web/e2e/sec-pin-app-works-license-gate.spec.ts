@@ -31,14 +31,31 @@
  * checked-in seed (`fakes/github-fake/fixtures/catalog-pr-lane.seed.json`)
  * classifies `MIT`/`AGPL-3.0` **green**, `BUSL-1.1` **amber** and `NOASSERTION`
  * **red**, and seeds `apw-e2e-upstream/amber-app` / `apw-e2e-upstream/red-app` for
- * exactly those two licences. What the lane cannot reach is the **gate**: the
- * inspector's catalog read has no port bound anywhere in `apps/api`, so every
- * inspect answers `license: { class: 'unknown', source: 'detected' }` — the
- * classification (FR-57's `red`/`amber`, and the `attestationRequired` flag the
- * amber case hangs on) is *not produced*, `GET /api/apps-catalog` is **not
- * mounted**, and `POST /api/works/:id/app-license/attest` is **not mounted**
- * either. A repository the fixture's own catalog calls **red** is therefore
- * accepted as an App Work with no attestation, no refusal and no catalogue entry.
+ * exactly those two licences. What the lane cannot reach is the **gate**. Since
+ * APW-03 T26 the inspector's catalog port IS bound (`AppWorksModule` binds
+ * `AppSourceCatalogAdapter`), but its Blueprint resolver reads the `ever-works`
+ * Blueprint repositories with a **platform** GitHub credential, and this lane has
+ * none: no GitHub App installation on `ever-works` in the lane database and no
+ * `EVER_WORKS_APPS_CATALOG_TOKEN` / `GITHUB_TOKEN` in `.github/workflows/e2e.yml`'s
+ * env. The adapter therefore answers "credential unavailable", which the inspector
+ * reads as `blueprint: unavailable` and `license: { class: 'unknown', source:
+ * 'detected' }` — the classification (FR-57's `red`/`amber`, and the
+ * `attestationRequired` flag the amber case hangs on) is *not produced here*,
+ * `GET /api/apps-catalog` is **not mounted**, and
+ * `POST /api/works/:id/app-license/attest` is **not mounted** either. A repository
+ * the fixture's own catalog calls **red** is therefore accepted as an App Work with
+ * no attestation, no refusal and no catalogue entry.
+ *
+ * ⚠ If the lane ever gains a catalog credential (any of the three above), the
+ * running pins below flip on purpose: amber `BUSL-1.1` ⇒ class `amber`, green
+ * `MIT` ⇒ `green`, `NOASSERTION` ⇒ `red`, and the Blueprint preview ⇒ `none` for a
+ * repository no Blueprint names. Update them then — that is the gate starting to
+ * work, not a regression.
+ *
+ * **NOASSERTION (owner decision, 2026-09-25):** GitHub's "a licence file I cannot
+ * name" is carried through the inspector as `spdx: "NOASSERTION"` (it used to read
+ * `null`, the same as "no licence file") and the platform classifier answers `red`
+ * for it — the fixture's own classification.
  *
  * So the file is split, deliberately and visibly:
  *
@@ -61,7 +78,9 @@
  *   - inspect `https://github.com/apw-e2e-upstream/amber-app` → `200`
  *     `license: {"spdx":"BUSL-1.1","class":"unknown","source":"detected"}`
  *   - inspect `https://github.com/apw-e2e-upstream/red-app` → `200`
- *     `license: {"spdx":null,"class":"unknown","source":"detected"}`
+ *     `license: {"spdx":null,"class":"unknown","source":"detected"}` — from
+ *     2026-09-25 the `spdx` reads `"NOASSERTION"` instead (the owner decision above;
+ *     expected from the code change, not re-measured on the lane)
  *   - `POST /api/works` (`kind: app`, `repositoryMode: fork`) from a fresh
  *     NOASSERTION repository → `200` with `work.kind === "app"`
  *   - `GET /api/apps-catalog` → `404 {"message":"Cannot GET /api/apps-catalog"}`
@@ -341,8 +360,10 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
         ).toBe('BUSL-1.1');
         expect(
             amber.body.license?.class,
-            'APW-03 owes the classification: the fixture calls BUSL-1.1 amber and the inspector ' +
-                'answers "unknown" for it, because no catalog port is bound in apps/api',
+            'the fixture calls BUSL-1.1 amber and the inspector answers "unknown" for it: the ' +
+                'catalog port is bound (APW-03 T26) but this lane gives the platform no GitHub ' +
+                'credential for the ever-works catalog, so the catalog cannot be consulted. With ' +
+                'a catalog credential this becomes "amber" — update the pin then',
         ).toBe('unknown');
         expect(amber.body.license?.source, 'nothing is persisted before a create').toBe('detected');
         expect(
@@ -351,7 +372,8 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
         ).toBe(false);
         expect(
             amber.body.blueprint?.status,
-            'the same unbound port is why the Blueprint match is "unavailable", never "none"',
+            'the same missing platform credential is why the Blueprint match is "unavailable", ' +
+                'never "none" (with one, a repository no Blueprint names previews "none")',
         ).toBe('unavailable');
 
         // The red repository the fixture seeds for ACC-NEG-01.
@@ -361,11 +383,17 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
             repoUrl({ owner: UPSTREAM_OWNER, name: FIXTURE_RED_REPO }),
         );
         expect(red.status, `inspect red body=${red.text.slice(0, 300)}`).toBe(200);
+        // Pinned `null` until 2026-09-25, when a NOASSERTION licence read the same as "no
+        // licence file". The owner decision carries it through as its own value, which the
+        // platform classifier answers red for (the fixture's own class).
         expect(
             red.body.license?.spdx,
-            'a NOASSERTION licence is reported as no SPDX at all — the SPDX half is read',
-        ).toBeNull();
-        expect(red.body.license?.class, 'the class is not').toBe('unknown');
+            'a NOASSERTION licence is carried through as "NOASSERTION" — the SPDX half is read',
+        ).toBe('NOASSERTION');
+        expect(
+            red.body.license?.class,
+            'the class is not: no platform catalog credential in this lane (with one, "red")',
+        ).toBe('unknown');
 
         // The green control: the same read, on a repository the fixture calls green.
         const green = await inspect(
@@ -375,7 +403,10 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
         );
         expect(green.status, `body=${green.text.slice(0, 300)}`).toBe(200);
         expect(green.body.license?.spdx).toBe('MIT');
-        expect(green.body.license?.class, 'green is not classified either').toBe('unknown');
+        expect(
+            green.body.license?.class,
+            'green is not classified either, for the same missing credential (with one, "green")',
+        ).toBe('unknown');
     });
 
     test('a RED-licence repository is created as an App Work today: no refusal, no attestation route, no catalog entry', async ({
@@ -454,18 +485,21 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
 
 test.describe('ACC-NEG-01/02 — the gate itself (fixme until APW-03)', () => {
     /**
-     * ACC-NEG-01. Blocked on APW-03, measured on this lane: the inspector's catalog
-     * read has no bound port, so it answers `license.class: "unknown"` for the
-     * fixture's `red-app` (measured above), `GET /api/apps-catalog` answers
-     * `404 Cannot GET`, and `POST /api/works/:id/app-license/attest` answers
-     * `404 Cannot POST` — there is no classification to refuse on, no catalog to be
-     * absent from, and no attestation to write. APW-06 owns the deploy-side
-     * refusal the case also names.
+     * ACC-NEG-01. Blocked on APW-03, measured on this lane: the inspector answers
+     * `license.class: "unknown"` for the fixture's `red-app` (measured above) —
+     * since APW-03 T26 the catalog port is bound and the platform classifies
+     * NOASSERTION red, but this lane gives the platform no GitHub credential for the
+     * ever-works catalog, so the catalog is never consulted — and
+     * `GET /api/apps-catalog` answers `404 Cannot GET`, and
+     * `POST /api/works/:id/app-license/attest` answers `404 Cannot POST`: there is
+     * no classification to refuse on here, no catalog to be absent from, and no
+     * attestation to write. APW-06 owns the deploy-side refusal the case also names.
      */
     test.fixme(
-        'APW-03: the red-licence refusals need the Apps catalog port and the attestation ' +
-            'route, neither of which is mounted — inspect answers class "unknown", ' +
-            '/api/apps-catalog and /api/works/:id/app-license/attest answer 404 (measured 2026-09-19)',
+        'APW-03: the red-licence refusals need a platform catalog credential in this lane ' +
+            '(the catalog port is bound since T26, but without one inspect answers class ' +
+            '"unknown") and the attestation route — /api/apps-catalog and ' +
+            '/api/works/:id/app-license/attest answer 404 (measured 2026-09-19)',
         async ({ request }: { request: APIRequestContext }) => {
             const run = stamp();
             const redRepo = { owner: UPSTREAM_OWNER, name: `apw13-t32-neg01-${run}` };

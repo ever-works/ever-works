@@ -89,6 +89,10 @@ import {
     type AppWorkDeletionOutcome,
     type AppWorkDeletionPort,
 } from '@src/app-works/app-work-deletion.port';
+import {
+    APP_WORKS_TELEMETRY_EVENTS,
+    AppWorksTelemetryService,
+} from '@src/app-works/app-works-telemetry.service';
 
 /**
  * APW-11 (App Launcher) — the kind whose exposure default is **on**.
@@ -206,6 +210,12 @@ export class WorkLifecycleService {
         @Optional()
         @Inject(APP_WORK_DELETION_PORT)
         private readonly appWorkDeletion?: AppWorkDeletionPort,
+        // Appended LAST, and `@Optional()`, for the same positional-arity rule
+        // (APW-01 T36 — FR-53's `app_work.deleted`). `WorkModule` imports
+        // `AppWorksModule`, which exports the service; absent, no event is emitted
+        // and the delete is unchanged. Only `kind: 'app'` ever reads it.
+        @Optional()
+        private readonly appWorksTelemetry?: AppWorksTelemetryService,
     ) {}
 
     /**
@@ -1702,12 +1712,16 @@ export class WorkLifecycleService {
             // platform's to remove, and every refusal it makes is reported in
             // the response.
             const websiteRoleRemoval = this.websiteRoleRemoval(work, deleteWorkDto);
+            // For an App Work the `website` role IS the Work Repository (see above), so
+            // this is FR-53's `repositoryDeleted` for `app_work.deleted`.
+            let workRepositoryDeleted = false;
             if (hasRepositoryRole(work, 'website') && websiteRoleRemoval.remove) {
                 try {
                     await this.websiteGenerator.removeRepository(work, user);
                     deletedRepositories.push(
                         `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
                     );
+                    workRepositoryDeleted = true;
                 } catch (error) {
                     if (error instanceof HttpException) {
                         throw error;
@@ -1734,6 +1748,7 @@ export class WorkLifecycleService {
             // same two steps the `done` branch below performs. The CNAME teardown is
             // skipped for the same reason: the Work has not gone anywhere yet.
             if (appDeletionPending) {
+                this.trackAppWorkDeleted(work, workRepositoryDeleted, user);
                 return {
                     status: 'pending',
                     slug: work.slug,
@@ -1748,6 +1763,7 @@ export class WorkLifecycleService {
             }
 
             await this.workRepository.delete(work.id);
+            this.trackAppWorkDeleted(work, workRepositoryDeleted, user);
 
             // Local checkouts are keyed by `owner/repo`, not by Work. Nothing
             // was ever cloned for a Repository Work by the generators, so the
@@ -1785,6 +1801,24 @@ export class WorkLifecycleService {
                 slug: work?.slug || '',
             });
         }
+    }
+
+    /**
+     * APW-01 T36 (FR-53, plan §9.1) — `app_work.deleted`, once per accepted App Work
+     * delete: when the row goes, or when the App runtime holds it pending (the member's
+     * request is complete either way; `completeAppWorkDeletion` emits nothing, so a
+     * pending delete is never counted twice). The relation and whether the Work
+     * Repository was removed — never its name. A no-op for every other kind.
+     */
+    private trackAppWorkDeleted(work: Work, repositoryDeleted: boolean, user: User): void {
+        if (!isAppWorkKind(work.kind)) {
+            return;
+        }
+        this.appWorksTelemetry?.track(
+            APP_WORKS_TELEMETRY_EVENTS.deleted,
+            { mode: appWorkRepositoryRelation(work), repositoryDeleted },
+            user?.id,
+        );
     }
 
     /**

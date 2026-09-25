@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 import type { LicenseClass } from '@ever-works/contracts';
-import { classifyLicenseExpression } from '../license-classify';
+import {
+    classifyLicenseExpression,
+    detectedLicenseSpdx,
+    SPDX_NOASSERTION,
+} from '../license-classify';
 import {
     LICENSE_REGISTRY_SNAPSHOT,
     LICENSE_REGISTRY_SNAPSHOT_SOURCE,
@@ -55,8 +59,9 @@ describe('classifyLicenseExpression — one licence id against the bundled seed'
         [undefined, 'unknown'],
         ['', 'unknown'],
         ['  ', 'unknown'],
-        // GitHub's "a licence file I cannot name".
-        ['NOASSERTION', 'unknown'],
+        // GitHub's "a licence file I cannot name" was pinned here as `unknown` until the
+        // owner decision of 2026-09-25 made it red — see the NOASSERTION block below.
+        // SPDX's NONE ("no licence at all") is still `unknown`: detection found nothing.
         ['NONE', 'unknown'],
         // A real SPDX id the seed does not list: unknown, never a guessed class.
         ['GPL-3.0-only', 'unknown'],
@@ -176,6 +181,51 @@ describe('classifyLicenseExpression — exception effects (a registry the seed c
         expect(
             classifyLicenseExpression('LicenseRef-x WITH Classpath-exception-2.0', registry),
         ).toBe('unknown');
+    });
+});
+
+describe('classifyLicenseExpression — NOASSERTION is red (owner decision, 2026-09-25)', () => {
+    // GitHub reports `spdx_id: NOASSERTION` for a licence FILE it cannot name. ACC-NEG-01's
+    // fixture classifies that red, and the owner decided the platform does too: a licence
+    // the provider saw and could not identify is not "no licence", and the gate must not
+    // treat it as the milder `unknown`. It is a fixed platform rule, like the classes of
+    // R-3: no registry row (the seed lists none) can make it anything but red.
+    it.each<Case>([
+        ['NOASSERTION', 'red'],
+        ['noassertion', 'red'],
+        ['  NOASSERTION  ', 'red'],
+        // An operand like any other: AND takes the worst, OR the best.
+        ['MIT AND NOASSERTION', 'red'],
+        ['MIT OR NOASSERTION', 'green'],
+        ['NOASSERTION OR LicenseRef-x', 'unknown'],
+        // An exception never lifts it.
+        ['NOASSERTION WITH Classpath-exception-2.0', 'red'],
+    ])('%j ⇒ %s', (input, expected) => {
+        expect(classifyLicenseExpression(input)).toBe(expected);
+    });
+
+    it('stays red whatever a registry says about it', () => {
+        const registry: LicenseRegistryContent = {
+            ...LICENSE_REGISTRY_SNAPSHOT,
+            licenses: [
+                { spdx: 'NOASSERTION', name: 'No assertion', class: 'green', obligations: [] },
+                ...LICENSE_REGISTRY_SNAPSHOT.licenses,
+            ],
+            exceptions: [{ spdx: 'Relax-exception', effect: 'class:green' }],
+            aliases: [{ match: 'NOASSERTION', spdx: 'MIT' }],
+        };
+
+        expect(classifyLicenseExpression('NOASSERTION', registry)).toBe('red');
+        expect(classifyLicenseExpression('NOASSERTION WITH Relax-exception', registry)).toBe('red');
+    });
+
+    it('maps the plugin contract’s licenseSpdx onto what is classified', () => {
+        // `GitRepository.licenseSpdx`: `null` = "reported, and not a licence we can name"
+        // (GitHub's NOASSERTION); `undefined` = "not reported" (no licence file at all).
+        expect(detectedLicenseSpdx(null)).toBe(SPDX_NOASSERTION);
+        expect(detectedLicenseSpdx(undefined)).toBeNull();
+        expect(detectedLicenseSpdx('MIT')).toBe('MIT');
+        expect(SPDX_NOASSERTION).toBe('NOASSERTION');
     });
 });
 

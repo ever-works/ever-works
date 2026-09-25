@@ -4,6 +4,8 @@ import {
 } from '@ever-works/contracts';
 import type { User } from '../../entities/user.entity';
 import type { Work } from '../../entities/work.entity';
+import { AppBlueprintResolverService } from '../../apps-catalog/app-blueprint-resolver.service';
+import { AppSourceCatalogAdapter } from '../../apps-catalog/app-source-catalog.adapter';
 import { AppWorkCreateService } from '../app-work-create.service';
 
 /**
@@ -126,6 +128,8 @@ function harness(
         appsTierPluginId?: string | null;
         providers?: Array<{ id: string; enabled: boolean }>;
         catalog?: boolean;
+        /** A REAL catalog port (APW-03's adapter) in place of the jest double. */
+        catalogPort?: unknown;
         promptedValues?: boolean;
         appWorksEnabled?: boolean;
     } = {},
@@ -249,12 +253,14 @@ function harness(
     };
 
     const catalog =
-        input.catalog === false
-            ? undefined
-            : {
-                  matchBlueprint: jest.fn().mockResolvedValue(null),
-                  classifyLicense: jest.fn().mockResolvedValue('green' as const),
-              };
+        input.catalogPort !== undefined
+            ? input.catalogPort
+            : input.catalog === false
+              ? undefined
+              : {
+                    matchBlueprint: jest.fn().mockResolvedValue(null),
+                    classifyLicense: jest.fn().mockResolvedValue('green' as const),
+                };
 
     const tierPolicy =
         input.tierOpen === undefined ? undefined : { isOpen: () => input.tierOpen === true };
@@ -1361,6 +1367,86 @@ describe('AppWorkCreateService', () => {
             const [workData] = h.workRepository.create.mock.calls[0];
             expect(workData.sourceRepository.blueprintId).toBe('umami');
             expect(workData.sourceRepository.blueprintMatchSource).toBe('explicit');
+        });
+
+        describe('with APW-03’s real catalog adapter bound (FR-81, the apply gate)', () => {
+            /**
+             * The platform facade the resolver reads `ever-works/app-fixture-hello-template`
+             * through: a public repository with the Blueprint topic and a valid
+             * `.works/works.yml` — an explicit id the resolver WILL confirm.
+             */
+            function platformFacade() {
+                const name = 'app-fixture-hello-template';
+                const spec = [
+                    'version: 2',
+                    'kind: app',
+                    'spec:',
+                    '  blueprint:',
+                    '    id: app-fixture-hello',
+                    '    version: 0.1.0',
+                    `    repo: ever-works/${name}`,
+                    `    sha: '${'0'.repeat(40)}'`,
+                    '',
+                ].join('\n');
+                return {
+                    getInstallationTokenForOwner: jest.fn().mockResolvedValue('installation-token'),
+                    getRepository: jest.fn(async (_owner: string, repo: string) =>
+                        repo === name
+                            ? {
+                                  owner: 'ever-works',
+                                  name,
+                                  fullName: `ever-works/${name}`,
+                                  defaultBranch: 'main',
+                                  isPrivate: false,
+                                  visibility: 'public',
+                                  topics: ['ever-works-app-blueprint'],
+                              }
+                            : null,
+                    ),
+                    getFileContent: jest.fn(async (_owner: string, repo: string) =>
+                        repo === name ? { content: spec, encoding: 'utf-8' } : null,
+                    ),
+                };
+            }
+
+            it('refuses an explicit id the resolver confirms with 400 blueprint_mismatch while nothing can apply it', async () => {
+                const platform = platformFacade();
+                const h = harness({
+                    catalogPort: new AppSourceCatalogAdapter(
+                        new AppBlueprintResolverService(platform as never),
+                        undefined,
+                    ),
+                });
+
+                await expect(
+                    h.service.create(dto({ blueprintId: 'app-fixture-hello' }), USER),
+                ).rejects.toMatchObject({
+                    status: 400,
+                    response: { code: 'blueprint_mismatch' },
+                });
+                // The resolver DID confirm it — the refusal is the gate, not a miss.
+                expect(platform.getRepository).toHaveBeenCalledWith(
+                    'ever-works',
+                    'app-fixture-hello-template',
+                    { token: 'installation-token', providerId: 'github' },
+                );
+                expectNoWrites(h);
+            });
+
+            it('persists the explicit id once an apply service is bound', async () => {
+                const h = harness({
+                    catalogPort: new AppSourceCatalogAdapter(
+                        new AppBlueprintResolverService(platformFacade() as never),
+                        { request: jest.fn() } as never,
+                    ),
+                });
+
+                await h.service.create(dto({ blueprintId: 'app-fixture-hello' }), USER);
+
+                const [workData] = h.workRepository.create.mock.calls[0];
+                expect(workData.sourceRepository.blueprintId).toBe('app-fixture-hello');
+                expect(workData.sourceRepository.blueprintMatchSource).toBe('explicit');
+            });
         });
     });
 
