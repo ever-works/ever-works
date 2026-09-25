@@ -123,6 +123,9 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
      * SAME guard as {@link evaluate}, over a diff built from the paths — so the
      * two can never disagree about what a protected path or a guarded spec
      * block is. Same base-tip rules commit, same never-rejects contract.
+     *
+     * Also the cloud path's judge-before-push (`finalizeRun`): there the paths
+     * and the spec content are read from the commit about to be published.
      */
     async checkPaths(input: AppWorkChangePathsInput): Promise<AppWorkChangeGateVerdict> {
         if (input.paths.length === 0) return { allowed: true, note: null };
@@ -157,7 +160,10 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 rules,
                 diff: pathsOnlyDiff(input.paths),
                 ...specs,
-                labels: [],
+                // The cloud path's pre-push caller passes the Task's labels so
+                // its verdict equals `evaluate`'s (APW-04's `app-provision`
+                // exemption); the tool path passes none, which is no labels.
+                labels: input.taskLabels ?? [],
             });
             if (verdict.allowed) return { allowed: true, note: null };
             return {

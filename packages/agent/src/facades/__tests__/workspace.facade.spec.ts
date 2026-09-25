@@ -197,6 +197,45 @@ describe('WorkspaceFacadeService', () => {
             ).resolves.toEqual(changes);
             expect(plugin.branchChanges).toHaveBeenCalledWith(handle, opts);
         });
+
+        it('wraps a plugin failure with the operation and the provider', async () => {
+            const plugin = createMockWorkspacePlugin('local-workspace');
+            (plugin as IWorkspacePlugin & { branchChanges: jest.Mock }).branchChanges = jest
+                .fn()
+                .mockRejectedValue(new Error('fatal: no merge base'));
+            arm(plugin);
+
+            const error = await service
+                .branchChanges(
+                    handle,
+                    { headSha: 'b'.repeat(40) },
+                    { userId: 'u1', providerOverride: 'local-workspace' },
+                )
+                .catch((caught: unknown) => caught);
+
+            expect(error).toBeInstanceOf(WorkspaceFacadeError);
+            expect(error).toMatchObject({
+                message: 'fatal: no merge base',
+                operation: 'branchChanges',
+                provider: 'local-workspace',
+            });
+        });
+
+        it('passes WorkspaceNotProvisionedError through un-wrapped', async () => {
+            const plugin = createMockWorkspacePlugin('sandbox-workspace');
+            (plugin as IWorkspacePlugin & { branchChanges: jest.Mock }).branchChanges = jest
+                .fn()
+                .mockRejectedValue(new WorkspaceNotProvisionedError('git is not available'));
+            arm(plugin);
+
+            await expect(
+                service.branchChanges(
+                    handle,
+                    { headSha: 'b'.repeat(40) },
+                    { userId: 'u1', providerOverride: 'sandbox-workspace' },
+                ),
+            ).rejects.toMatchObject({ name: 'WorkspaceNotProvisionedError' });
+        });
     });
 
     it('forwards publishSha to the plugin verbatim', async () => {

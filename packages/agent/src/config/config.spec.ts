@@ -1325,6 +1325,57 @@ describe('agent/config', () => {
         });
     });
 
+    describe('everWorks.apps.cloudPushEnabled (APW-08 T17, owner decision)', () => {
+        const KEY = 'APP_WORKS_CLOUD_PUSH_ENABLED';
+        let saved: string | undefined;
+
+        beforeEach(() => {
+            saved = process.env[KEY];
+            delete process.env[KEY];
+        });
+
+        afterEach(() => {
+            if (saved === undefined) delete process.env[KEY];
+            else process.env[KEY] = saved;
+        });
+
+        it('is OFF when the variable is unset — cloud runs push no App Work branch until FR-12', () => {
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(false);
+        });
+
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['true ', false],
+            ['', false],
+        ])('reads %p as %p — only the exact string "true" is on', (value, expected) => {
+            process.env[KEY] = value;
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(expected);
+        });
+
+        it('is read at call time, not captured at import', () => {
+            process.env[KEY] = 'true';
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(true);
+            delete process.env[KEY];
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(false);
+        });
+
+        it('is independent of the App Works instance setting', () => {
+            process.env[KEY] = 'true';
+            const works = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            try {
+                expect(config.everWorks.apps.worksEnabled()).toBe(false);
+                expect(config.everWorks.apps.cloudPushEnabled()).toBe(true);
+            } finally {
+                if (works === undefined) delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+                else process.env.EVER_WORKS_APP_WORKS_ENABLED = works;
+            }
+        });
+    });
+
     describe('appLauncher (APW-11)', () => {
         const KEY = 'EVER_WORKS_APP_LAUNCHER_ENABLED';
         let saved: string | undefined;

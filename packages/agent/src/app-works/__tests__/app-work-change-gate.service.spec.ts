@@ -10,7 +10,10 @@ import {
 } from '../app-work-rules.service';
 import type { AppSpecService } from '../../app-spec/app-spec.service';
 import type { GitFacadeService } from '../../facades/git.facade';
-import type { AppWorkChangeGateInput } from '../../tasks-domain/app-work-change-gate.port';
+import {
+    APP_WORK_SPEC_PATH,
+    type AppWorkChangeGateInput,
+} from '../../tasks-domain/app-work-change-gate.port';
 
 /**
  * APW-08 T17 — the change gate: every read the guard needs, and what each read
@@ -418,5 +421,67 @@ describe('checkPaths — the pre-write question (FR-8)', () => {
             allowed: false,
         });
         expect(m.resolve).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The cloud path's judge-before-push asks THIS question about a commit it is
+     * about to publish, and `evaluate` asks the same one after the push. The two
+     * must agree on every rule they share — including APW-04's `app-provision`
+     * exemption, which reads the Task's labels.
+     */
+    describe('the Task’s labels (the judge-before-push caller)', () => {
+        const sourceMoved = () => {
+            const { gate, m } = harness();
+            m.parseDraft.mockResolvedValue({
+                status: 'valid',
+                spec: { source: { relation: 'fork', branch: 'somewhere-else' } } as AppSpec,
+            });
+            return { gate, m };
+        };
+
+        it('lets APW-04’s app-provision label past rule 4 — as `evaluate` does', async () => {
+            const { gate } = sourceMoved();
+
+            await expect(
+                gate.checkPaths({
+                    ...pathsInput([APP_SPEC_PATH]),
+                    contents: { [APP_SPEC_PATH]: 'the new spec' },
+                    taskLabels: ['app-provision'],
+                }),
+            ).resolves.toMatchObject({ allowed: true });
+        });
+
+        it('still refuses the same change without the label', async () => {
+            const { gate } = sourceMoved();
+
+            const verdict = await gate.checkPaths({
+                ...pathsInput([APP_SPEC_PATH]),
+                contents: { [APP_SPEC_PATH]: 'the new spec' },
+            });
+
+            expect(verdict.allowed).toBe(false);
+            expect(verdict.allowed === false && verdict.message).toContain('source');
+        });
+
+        it('never lets the label past a protected path — only rule 4', async () => {
+            const { gate } = harness();
+
+            const verdict = await gate.checkPaths({
+                ...pathsInput(['.github/workflows/ci.yml']),
+                taskLabels: ['app-provision'],
+            });
+
+            expect(verdict).toMatchObject({ allowed: false, paths: ['.github/workflows/ci.yml'] });
+        });
+    });
+});
+
+describe('one spec path, one literal', () => {
+    it('the guard’s APP_SPEC_PATH IS the port’s APP_WORK_SPEC_PATH', () => {
+        // The finalize path imports the port, never app-works (the §2.13 require
+        // ring); both must name the same file or the pre-push read and the
+        // guard would disagree about which file is the spec.
+        expect(APP_SPEC_PATH).toBe(APP_WORK_SPEC_PATH);
+        expect(APP_WORK_SPEC_PATH).toBe('.works/works.yml');
     });
 });

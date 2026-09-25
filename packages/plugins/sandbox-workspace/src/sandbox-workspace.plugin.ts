@@ -7,17 +7,57 @@ import type {
 	JsonSchema,
 	WorkspaceProvisionSpec,
 	WorkspaceHandle,
+	WorkspaceBranchChanges,
+	WorkspaceFinalizeOptions,
 	WorkspaceFinalizeResult,
 	WorkspaceMergeSimulation
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 /** Binding stamp kept INSIDE .git so it can never be committed. */
 const STAMP_FILE = 'ew-workspace.json';
+
+/**
+ * A full, lower-case object id — SHA-1 (40) or SHA-256 (64). Nothing symbolic,
+ * abbreviated or refspec-shaped reaches `git` as a commit to judge or publish.
+ */
+const FULL_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
+/**
+ * Global options for every git call that decides what a branch would PUBLISH
+ * (`branchChanges`, and the commit check it shares with `publishSha`). The run
+ * can write this checkout's git dir, and three things there change what git
+ * READS for an object id while `git push` still sends the real objects:
+ *
+ *  - `refs/replace/*` — `git replace <head> <decoy>` makes a diff read the
+ *    decoy's tree for `head`. `--no-replace-objects` turns replacement off.
+ *  - a forged commit-graph — it records each commit's parents and root tree, so
+ *    it could move the merge base or the tree. `core.commitGraph=false` reads
+ *    the commit objects themselves.
+ *  - grafts — `info/grafts` (or `git replace --graft`) can make an orphan
+ *    carrying a workflow an ANCESTOR of the base, which empties the three-dot
+ *    diff. `--no-replace-objects` does not cover `info/grafts`; pointing
+ *    `GIT_GRAFT_FILE` at a path that does not exist does ({@link literalHistoryEnv}).
+ *
+ * Measured with git 2.53: each plant, alone, lets a workflow file through a
+ * plain diff; with these options the diff lists it, or fails closed with "no
+ * merge base".
+ */
+const LITERAL_HISTORY_ARGS = ['--no-replace-objects', '-c', 'core.commitGraph=false'] as const;
+
+/**
+ * `GIT_GRAFT_FILE` at a fresh random path under a directory that is never
+ * created: git then reads no graft file at all, and the run cannot plant one
+ * at a path it cannot predict.
+ */
+function literalHistoryEnv(): NodeJS.ProcessEnv {
+	return { GIT_GRAFT_FILE: join(tmpdir(), `ew-no-grafts-${randomUUID()}`, 'grafts') };
+}
 
 interface GitResult {
 	code: number;
@@ -181,10 +221,17 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	async finalize(
 		handle: WorkspaceHandle,
-		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth'] }
+		opts: Pick<WorkspaceFinalizeOptions, 'commitMessage' | 'push' | 'auth' | 'publishSha'>
 	): Promise<WorkspaceFinalizeResult> {
 		await this.ensureGit();
 		const dir = handle.path;
+		// APW-08 T17 — publish an already-judged commit and nothing else. Checked
+		// BEFORE `add -A`: whatever the tree gained after the judgement must not
+		// ride along. `!== undefined`, not truthiness, so an empty value is
+		// refused rather than read as "commit the tree as usual".
+		if (opts.publishSha !== undefined) {
+			return this.publishCommit(handle, opts.publishSha, opts);
+		}
 		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed');
 
 		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed');
@@ -244,7 +291,163 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	}
 
 	/**
-	 * `git diff --name-only <baseSha>..HEAD` → distinct changed-file
+	 * The `publishSha` half of {@link finalize}: push exactly `publishSha` to
+	 * the task branch — nothing staged, nothing committed. The sha must be a
+	 * full object id that resolves to a commit in this checkout, so a symbolic
+	 * name (`HEAD`, a branch) or a refspec can never stand in for the commit a
+	 * caller judged.
+	 */
+	private async publishCommit(
+		handle: WorkspaceHandle,
+		publishSha: string,
+		opts: Pick<WorkspaceFinalizeOptions, 'push' | 'auth'>
+	): Promise<WorkspaceFinalizeResult> {
+		if (!opts.push) {
+			throw new Error(
+				'publishSha requires push: true — it publishes an already-committed commit and does nothing else'
+			);
+		}
+		const dir = handle.path;
+		const sha = await this.verifiedCommit(dir, publishSha, 'publishSha', opts.auth);
+		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth, sha);
+		const repoUrl = (
+			await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing')
+		).stdout.trim();
+		await this.gitOrThrow(
+			['push', this.authedUrl(repoUrl, opts.auth), `${sha}:refs/heads/${handle.branch}`],
+			dir,
+			opts.auth,
+			'git push failed'
+		);
+		return {
+			pushed: true,
+			headSha: sha,
+			empty: false,
+			...(changedFiles === null ? {} : { changedFiles })
+		};
+	}
+
+	/**
+	 * What the branch changes at `opts.headSha`, read from git BEFORE anything
+	 * is pushed (APW-08 T17's judge-before-push):
+	 *
+	 *  - `paths` — `git diff --name-only --no-renames --ignore-submodules=none
+	 *    -z <baseSha>...<headSha>`. Three dots, so a REUSED branch is judged by
+	 *    its own changes and not by whatever landed on the base since it was
+	 *    cut (a two-dot diff against the fresh base would name a human's
+	 *    workflow edit and refuse the run). `--no-renames`, so a rename names
+	 *    both sides — moving a protected file away is a change to it.
+	 *    `--ignore-submodules=none`, so neither a committed `.gitmodules`
+	 *    `ignore = all` nor a checkout's `diff.ignoreSubmodules` hides a
+	 *    gitlink at a protected path.
+	 *  - `contents` — each requested path's blob AT `headSha`, or `null` when
+	 *    no file is there. From git, never from disk: a gitignored or
+	 *    line-ending-converted file on disk is not what would be pushed, and
+	 *    the tree can move after the commit.
+	 *
+	 * Every read here ignores replace refs, grafts and the commit-graph
+	 * ({@link LITERAL_HISTORY_ARGS}): the run can write them, and `git push`
+	 * ignores them, so honouring them would judge something other than what is
+	 * published.
+	 *
+	 * A depth-1 checkout has no merge base once the base moved, so a failed
+	 * diff deepens the history once (`fetch --unshallow`, the same posture as
+	 * {@link simulateMerge}) and retries; a second failure throws, and the
+	 * caller refuses rather than pushing unjudged.
+	 *
+	 * NOT covered (recorded, not hidden): merge-base semantics judge a head cut
+	 * from an OLD ancestor of the base only by what it changed since that
+	 * ancestor. A workflow file the ancestor carried and the base has since
+	 * removed can therefore ride along unnamed — as it does in the pull
+	 * request's and the post-push compare's view. The contract pins these
+	 * semantics; a history-free check would need the protected globs (the
+	 * gate's) and a trusted remote tip (not on the handle).
+	 */
+	async branchChanges(
+		handle: WorkspaceHandle,
+		opts: { headSha: string; readPaths?: readonly string[] }
+	): Promise<WorkspaceBranchChanges> {
+		await this.ensureGit();
+		const dir = handle.path;
+		const readPaths = validatedReadPaths(opts.readPaths);
+		const headSha = await this.verifiedCommit(dir, opts.headSha, 'headSha', undefined);
+		if (typeof handle.baseSha !== 'string' || !FULL_OBJECT_ID.test(handle.baseSha)) {
+			throw new Error('the workspace base is not a full commit id, so the branch cannot be compared with it');
+		}
+
+		const diffArgs = [
+			'diff',
+			'--name-only',
+			'--no-renames',
+			'--ignore-submodules=none',
+			'-z',
+			`${handle.baseSha}...${headSha}`
+		];
+		let diff = await this.gitLiteral(diffArgs, dir, undefined);
+		if (diff.code !== 0) {
+			const repoUrl = (
+				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, undefined, 'origin remote missing')
+			).stdout.trim();
+			await this.git(['fetch', this.authedUrl(repoUrl, undefined), '--unshallow'], dir, undefined);
+			diff = await this.gitLiteral(diffArgs, dir, undefined);
+			if (diff.code !== 0) {
+				throw new Error(
+					`the branch's changes could not be read: ${diff.stderr.trim() || `git exited ${diff.code}`}`
+				);
+			}
+		}
+		const paths = [...new Set(diff.stdout.split('\0').filter((path) => path.length > 0))];
+
+		const contents: Record<string, string | null> = {};
+		for (const path of readPaths) {
+			contents[path] = await this.blobAt(dir, headSha, path);
+		}
+		return { paths, contents };
+	}
+
+	/**
+	 * `value` when it is a full object id naming a COMMIT in this checkout —
+	 * the real object, not a replacement ({@link LITERAL_HISTORY_ARGS}); throws
+	 * otherwise. The value is echoed only once it is known to be hex.
+	 */
+	private async verifiedCommit(
+		dir: string,
+		value: string,
+		label: 'headSha' | 'publishSha',
+		auth: WorkspaceProvisionSpec['auth']
+	): Promise<string> {
+		if (typeof value !== 'string' || !FULL_OBJECT_ID.test(value)) {
+			throw new Error(`${label} must be a full lower-case commit id (40 or 64 hex characters)`);
+		}
+		const resolved = await this.gitLiteral(['rev-parse', '--verify', '--quiet', `${value}^{commit}`], dir, auth);
+		if (resolved.code !== 0 || resolved.stdout.trim() !== value) {
+			throw new Error(`${label} ${value} is not a commit in this workspace`);
+		}
+		return value;
+	}
+
+	/**
+	 * The blob at `<sha>:<path>` in the REAL commit (no replace ref, graft or
+	 * commit-graph can swap its tree), or null when no FILE is there.
+	 */
+	private async blobAt(dir: string, sha: string, path: string): Promise<string | null> {
+		const object = `${sha}:${path}`;
+		const type = await this.gitLiteral(['cat-file', '-t', object], dir, undefined);
+		if (type.code !== 0 || type.stdout.trim() !== 'blob') return null;
+		const blob = await this.gitLiteral(['cat-file', 'blob', object], dir, undefined);
+		if (blob.code !== 0) {
+			throw new Error(`reading ${path} failed: ${blob.stderr.trim() || `git exited ${blob.code}`}`);
+		}
+		return blob.stdout;
+	}
+
+	/** {@link git} with replace refs, grafts and the commit-graph ignored — see {@link LITERAL_HISTORY_ARGS}. */
+	private gitLiteral(args: string[], cwd: string, auth: WorkspaceProvisionSpec['auth']): Promise<GitResult> {
+		return this.git([...LITERAL_HISTORY_ARGS, ...args], cwd, auth, literalHistoryEnv());
+	}
+
+	/**
+	 * `git diff --name-only <baseSha>..<head>` → distinct changed-file
 	 * count for the run-telemetry counter. Returns null when the diff
 	 * cannot be taken (unknown base after a shallow fetch, git failure),
 	 * so the caller can tell "no data" apart from "zero files".
@@ -252,10 +455,11 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	private async countChangedFiles(
 		dir: string,
 		baseSha: string,
-		auth?: WorkspaceProvisionSpec['auth']
+		auth?: WorkspaceProvisionSpec['auth'],
+		head = 'HEAD'
 	): Promise<number | null> {
 		try {
-			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth);
+			const diff = await this.git(['diff', '--name-only', `${baseSha}..${head}`], dir, auth);
 			if (diff.code !== 0) return null;
 			const files = diff.stdout
 				.split('\n')
@@ -393,14 +597,20 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return out;
 	}
 
-	private git(args: string[], cwd: string | undefined, auth: WorkspaceProvisionSpec['auth']): Promise<GitResult> {
+	private git(
+		args: string[],
+		cwd: string | undefined,
+		auth: WorkspaceProvisionSpec['auth'],
+		// Only {@link gitLiteral} passes one.
+		extraEnv?: NodeJS.ProcessEnv
+	): Promise<GitResult> {
 		return new Promise((resolve) => {
 			execFile(
 				'git',
 				args,
 				{
 					cwd,
-					env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+					env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...extraEnv },
 					maxBuffer: 16 * 1024 * 1024,
 					windowsHide: true
 				},
@@ -511,6 +721,28 @@ function isSafeCloneArgument(url: string): boolean {
 	}
 	// Same option-in-the-host-position problem, reached through a real URL.
 	return !parsed.hostname.startsWith('-');
+}
+
+/**
+ * The paths `branchChanges` may read: repository-relative, no parent segment,
+ * no NUL. They are read as `<sha>:<path>`, so an absolute or `..` path would
+ * name nothing the branch could publish.
+ */
+function validatedReadPaths(readPaths: readonly string[] | undefined): string[] {
+	if (readPaths === undefined) return [];
+	if (!Array.isArray(readPaths)) throw new Error('readPaths must be a list of repository-relative paths');
+	return readPaths.map((path) => {
+		if (
+			typeof path !== 'string' ||
+			path.length === 0 ||
+			path.includes('\0') ||
+			path.startsWith('/') ||
+			path.split('/').some((segment) => segment === '..')
+		) {
+			throw new Error('readPath must be a repository-relative path with no parent segment');
+		}
+		return path;
+	});
 }
 
 function sanitizeSegment(value: string): string {

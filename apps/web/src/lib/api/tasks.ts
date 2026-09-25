@@ -237,6 +237,14 @@ export interface Task {
     /** Multi-repo: repositories this Task spans besides its Work's (registry connections). */
     extraRepos?: TaskExtraRepo[] | null;
     conflictPaths: string[] | null;
+    /**
+     * APW-08 — why an App Work's change rules refused a change that reached
+     * the PRIMARY branch (the Task thread's refusal message, capped). The
+     * refusal leaves `branchState` as it was, so this is what tells the branch
+     * panel a `pr-open` pull request is not a healthy one. Absent or null =
+     * nothing refused; cleared by a later allowed push or a discard.
+     */
+    branchGuardRefusal?: string | null;
     // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the
     // `task-pr-status-sync` cron. All null until the Task opens a PR.
     prState?: TaskPrState | null;

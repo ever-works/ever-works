@@ -4,6 +4,8 @@ import type { AppSpec } from '@ever-works/contracts';
 import type { GitDiffFile, GitDiffResult } from '@ever-works/plugin';
 
 import { diffGuardedSpecBlocks, isProtectedPath } from '../app-spec/app-spec-guarded-blocks';
+// A value import from the ring-free port (it has no runtime imports of its own).
+import { APP_WORK_SPEC_PATH } from '../tasks-domain/app-work-change-gate.port';
 import type { AppWorkRules } from './app-work-rules.service';
 
 /**
@@ -62,8 +64,12 @@ export const MAX_FILES = 300;
 /** Always protected, whatever the spec says. See the class docstring. */
 export const ALWAYS_PROTECTED: readonly string[] = Object.freeze(['.github/workflows/**']);
 
-/** The App spec file, whose guarded blocks rule 4 reads. */
-export const APP_SPEC_PATH = '.works/works.yml';
+/**
+ * The App spec file, whose guarded blocks rule 4 reads. The port's literal, so
+ * the cloud path's pre-push read (which may not import this file) and the guard
+ * always name the same file.
+ */
+export const APP_SPEC_PATH = APP_WORK_SPEC_PATH;
 
 /** Over this multiple of the size guidance, a note becomes a refusal. */
 export const REFUSAL_MULTIPLE = 3;

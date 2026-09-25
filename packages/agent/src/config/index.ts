@@ -1066,6 +1066,32 @@ export const config = {
             },
 
             /**
+             * APW-08 T17 — may the API-side (cloud) isolated-Task path PUSH an
+             * App Work branch? (`APP_WORKS_CLOUD_PUSH_ENABLED`, owner decision
+             * 2026-09-25.)
+             *
+             * OFF by default, and on only for exactly `'true'`: APW-08 FR-12
+             * says an App Work run executes only on an enrolled Fleet node or in
+             * an isolated environment with no platform secret, and the admission
+             * that enforces it (T12) has not landed. Until it does, a cloud run
+             * on an App Work commits locally and `finalizeRun` refuses to publish
+             * — the Task is blocked with a message naming FR-12, nothing is
+             * pushed and no pull request is opened. Turned on, the cloud path
+             * judges the exact local commit with the change gate's `checkPaths`
+             * BEFORE publishing exactly that commit, then judges the pushed
+             * branch again with `evaluate`.
+             *
+             * Read per call (never captured at import), so tests can flip it; a
+             * running API reads its environment once, at process start, so a
+             * changed value takes effect when the API restarts or is redeployed.
+             * Every other Work kind, and an App Work with no change gate bound,
+             * ignores it.
+             */
+            cloudPushEnabled() {
+                return process.env.APP_WORKS_CLOUD_PUSH_ENABLED === 'true';
+            },
+
+            /**
              * APW-06 T19 — the apex an App Work's managed subdomain lives under
              * (`EVER_WORKS_APPS_DOMAIN`, plan §8.3, spec FR-40, Resolution R-16).
              *

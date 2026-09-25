@@ -340,3 +340,73 @@ describe('TaskBranchSection - refused and failed linked pull requests are not sh
         }
     });
 });
+
+/**
+ * APW-08 — a refusal on the Task's PRIMARY branch. The agent leaves
+ * `branchState` alone (the branch really is pushed) and records the reason on
+ * `branchGuardRefusal` instead. Before that marker existed, the panel showed a
+ * refused primary pull request exactly like a healthy one: a `pr-open` pill
+ * and a plain link, with nothing to say the rules refused what it now carries.
+ */
+describe('TaskBranchSection - a refused primary branch is not shown as healthy', () => {
+    const REASON = [
+        'This change edits paths this Work protects, which an agent may not change. The branch was pushed, and pull request #10 now contains this change — it must not be merged as it stands.',
+        '',
+        'Paths:',
+        '- `.github/workflows/ci.yml`',
+    ].join('\n');
+
+    it('shows the refusal banner with the reason verbatim, and keeps the pull request link', () => {
+        render(<TaskBranchSection task={make({ branchGuardRefusal: REASON })} />);
+
+        const banner = screen.getByTestId('task-guard-refusal-banner');
+        expect(banner).toHaveAttribute('role', 'alert');
+        expect(banner).toHaveTextContent('guardRefusalTitle');
+        // The reason names the rule and the paths (ACC-NEG-04), whole.
+        expect(within(banner).getByTestId('task-guard-refusal-reason').textContent).toBe(REASON);
+        // The link is the operator's route to the pull request; it stays.
+        expect(screen.getByTestId('task-branch-pr-link')).toHaveAttribute(
+            'href',
+            'https://github.com/acme/repo/pull/10',
+        );
+    });
+
+    it('shows no banner when nothing was refused', () => {
+        const { rerender } = render(<TaskBranchSection task={make({})} />);
+        expect(screen.queryByTestId('task-guard-refusal-banner')).toBeNull();
+
+        rerender(<TaskBranchSection task={make({ branchGuardRefusal: null })} />);
+        expect(screen.queryByTestId('task-guard-refusal-banner')).toBeNull();
+
+        rerender(<TaskBranchSection task={make({ branchGuardRefusal: '   ' })} />);
+        expect(screen.queryByTestId('task-guard-refusal-banner')).toBeNull();
+    });
+
+    it.each([
+        ['the branch was merged', { branchState: 'merged' }],
+        ['the branch was cleaned up', { branchState: 'cleaned' }],
+        ['the branch was discarded', { branchState: 'discarded' }],
+        ['the pull request was merged', { prState: 'merged' }],
+    ])('shows no banner once %s — nothing is left to keep unmerged', (_why, fields) => {
+        render(
+            <TaskBranchSection
+                task={make({ branchGuardRefusal: REASON, ...(fields as Partial<Task>) })}
+            />,
+        );
+        expect(screen.queryByTestId('task-guard-refusal-banner')).toBeNull();
+    });
+
+    it('shows it beside a conflict banner rather than instead of it', () => {
+        render(
+            <TaskBranchSection
+                task={make({
+                    branchState: 'conflict',
+                    conflictPaths: ['src/a.ts'],
+                    branchGuardRefusal: REASON,
+                })}
+            />,
+        );
+        expect(screen.getByTestId('task-conflict-banner')).toBeInTheDocument();
+        expect(screen.getByTestId('task-guard-refusal-banner')).toBeInTheDocument();
+    });
+});

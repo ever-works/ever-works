@@ -42,7 +42,8 @@ describe('Task branch messages', () => {
     it('resolves every branch key the component asks for in en.json', () => {
         const referenced = referencedBranchKeys();
         // Guard the guard: the scan really found the panel's keys, including
-        // the one with ICU values and the refused-pull-request states.
+        // the one with ICU values, the refused-pull-request states and the
+        // refused primary branch's banner.
         expect(referenced).toEqual(
             expect.arrayContaining([
                 'linkedPrFailed',
@@ -50,6 +51,7 @@ describe('Task branch messages', () => {
                 'linkedPrRefused',
                 'linkedPrRefusedDoNotMerge',
                 'linkedPrNeedsAttention',
+                'guardRefusalTitle',
             ]),
         );
         const missing = referenced.filter((key) => !isNonEmptyString(en[key]));

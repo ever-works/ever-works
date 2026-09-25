@@ -1698,7 +1698,8 @@
                 "linkedPrFailed": "branch pushed; opening the pull request failed",
                 "linkedPrRefused": "refused by an App Work's change rules",
                 "linkedPrRefusedDoNotMerge": "This pull request now carries a change those rules refuse. Do not merge it as it stands.",
-                "linkedPrNeedsAttention": "needs attention"
+                "linkedPrNeedsAttention": "needs attention",
+                "guardRefusalTitle": "An App Work's change rules refused a change on this branch"
             },
             "gateChip": {
                 "green": "Gate passed",

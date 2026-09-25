@@ -209,6 +209,21 @@ export class Task {
     conflictPaths?: string[] | null;
 
     /**
+     * APW-08 — why an App Work's change rules refused a change that reached
+     * this Task's PRIMARY branch: the refusal the Task thread posted, capped
+     * (`task-workspace.service.ts` `refuseChange`). A refusal does not touch
+     * `branchState` (the branch really is pushed), so without this the branch
+     * panel showed a pull request carrying a refused change exactly like a
+     * healthy one. Set only for a change that reached the remote — a refusal
+     * made before the push changes nothing on the branch — and cleared when a
+     * later judgement of the whole branch allows it, or the branch is
+     * discarded. The non-primary repositories carry the same fact per entry
+     * (`TaskLinkedPullRequest.refusedByGuard`). NULL = nothing refused.
+     */
+    @Column({ type: 'text', nullable: true })
+    branchGuardRefusal?: string | null;
+
+    /**
      * Multi-repo Task workspaces (self-build slice C): the NON-primary
      * repositories a fleet run pushed for this Task, one entry per
      * repository, keyed by `repositoryId`. The primary stays in

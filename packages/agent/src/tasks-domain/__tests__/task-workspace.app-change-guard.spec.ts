@@ -5,6 +5,7 @@ import type {
     AppWorkChangeGate,
     AppWorkChangeGateInput,
     AppWorkChangeGateVerdict,
+    AppWorkChangePathsInput,
 } from '../app-work-change-gate.port';
 
 /**
@@ -37,7 +38,35 @@ function mocks() {
         post: jest.fn(async (_userId: string, _message: { body: string }) => undefined),
         getRepository: jest.fn(async () => ({ defaultBranch: 'production' })),
         simulateMerge: jest.fn(async () => ({ clean: true, conflictPaths: [] })),
-        finalize: jest.fn(async () => ({ empty: false, changedFiles: 1 })),
+        // Echoes what a real provider answers: `pushed` follows `push`, and a
+        // publish of an already-committed sha reports that sha as the head.
+        finalize: jest.fn(
+            async (
+                _handle: unknown,
+                opts: { commitMessage: string; push: boolean; publishSha?: string },
+            ): Promise<{
+                empty: boolean;
+                changedFiles?: number;
+                pushed: boolean;
+                headSha: string | null;
+                publishWithheld?: string;
+            }> => ({
+                empty: false,
+                changedFiles: 1,
+                pushed: opts.push,
+                headSha: opts.publishSha ?? HEAD_SHA,
+            }),
+        ),
+        branchChanges: jest.fn(
+            async (
+                _handle: unknown,
+                _opts: { headSha: string; readPaths?: readonly string[] },
+                _facadeOptions: unknown,
+            ): Promise<{ paths: string[]; contents: Record<string, string | null> }> => ({
+                paths: ['src/app.ts'],
+                contents: {},
+            }),
+        ),
         createPullRequest: jest.fn(async () => ({ number: 7, url: 'https://example.test/pr/7' })),
         evaluate: jest.fn(
             async (_input: AppWorkChangeGateInput): Promise<AppWorkChangeGateVerdict> => ({
@@ -45,7 +74,37 @@ function mocks() {
                 note: null,
             }),
         ),
+        // The fleet paths never ask the pre-write question, and a double that
+        // throws makes sure they never start to. Only the cloud path's
+        // judge-before-push (`finalizeRun` with cloud pushes enabled) asks it,
+        // and those cases answer it explicitly.
+        checkPaths: jest.fn(
+            async (_input: AppWorkChangePathsInput): Promise<AppWorkChangeGateVerdict> => {
+                throw new Error('only the cloud judge-before-push may call checkPaths');
+            },
+        ),
     };
+}
+
+/** The commit the cloud run made locally — what the judge-before-push reads. */
+const HEAD_SHA = 'h'.repeat(40);
+
+/**
+ * The owner's switch for cloud App Work pushes (default OFF until APW-08 FR-12's
+ * admission, T12, lands). Set per describe and always restored.
+ */
+const CLOUD_PUSH_ENV = 'APP_WORKS_CLOUD_PUSH_ENABLED';
+function withCloudPush(value: string | undefined): void {
+    let saved: string | undefined;
+    beforeEach(() => {
+        saved = process.env[CLOUD_PUSH_ENV];
+        if (value === undefined) delete process.env[CLOUD_PUSH_ENV];
+        else process.env[CLOUD_PUSH_ENV] = value;
+    });
+    afterEach(() => {
+        if (saved === undefined) delete process.env[CLOUD_PUSH_ENV];
+        else process.env[CLOUD_PUSH_ENV] = saved;
+    });
 }
 
 function refused(paths: string[] = ['infra/main.tf']): AppWorkChangeGateVerdict {
@@ -86,18 +145,19 @@ function task(overrides: Record<string, unknown> = {}) {
 function service(m: Mocks, opts: { bound?: boolean; kind?: string } = {}) {
     const gate: AppWorkChangeGate = {
         evaluate: m.evaluate,
-        // The finalize path never asks the pre-write question; a double that
-        // throws makes sure it never starts to.
-        checkPaths: jest.fn(async () => {
-            throw new Error('finalize must not call checkPaths');
-        }),
+        // Throws by default — see `mocks()`.
+        checkPaths: m.checkPaths,
     };
 
     return new TaskWorkspaceService(
         { findById: jest.fn(async () => work(opts.kind ?? 'app')) } as never, // works
         { updateById: m.updateById, findById: m.findByIdTask } as never, // tasks
         {} as never, // runs
-        { finalize: m.finalize, simulateMerge: m.simulateMerge } as never, // workspaceFacade
+        {
+            finalize: m.finalize,
+            simulateMerge: m.simulateMerge,
+            branchChanges: m.branchChanges,
+        } as never, // workspaceFacade
         { getRepository: m.getRepository, createPullRequest: m.createPullRequest } as never, // gitFacade
         { transition: m.transition } as never, // transitions
         { post: m.post } as never, // taskChat
@@ -155,6 +215,10 @@ describe('the gate does not touch what it should not', () => {
 
         expect(outcome.outcome).toBe('pr-opened');
         expect(m.evaluate).toHaveBeenCalledTimes(1);
+        // The fleet path is judged after its push, by the provider's diff; the
+        // pre-write question belongs to the tool path and the cloud path only.
+        expect(m.checkPaths).not.toHaveBeenCalled();
+        expect(m.branchChanges).not.toHaveBeenCalled();
     });
 });
 
@@ -576,24 +640,43 @@ describe('judgeAppWorkMerge — before any merge or approval', () => {
     });
 });
 
+const RUN_BRANCH = 'ever-works/task/add-a-thing';
+const RUN_BASE_SHA = 'b'.repeat(40);
+
+function runInput(taskOverrides: Record<string, unknown> = {}) {
+    return {
+        task: task(taskOverrides),
+        userId: 'u-1',
+        agentId: 'a-1',
+        agentCanOpenPullRequests: true,
+        workspace: {
+            cwd: '/tmp/ws',
+            baseSha: RUN_BASE_SHA,
+            reused: false,
+            branch: RUN_BRANCH,
+        },
+    } as never;
+}
+
+type FinalizeOpts = { commitMessage: string; push: boolean; publishSha?: string };
+const finalizeOpts = (m: Mocks): FinalizeOpts[] =>
+    m.finalize.mock.calls.map((call) => call[1] as FinalizeOpts);
+const branchStatesWritten = (m: Mocks) =>
+    m.updateById.mock.calls.map((c) => (c[1] as { branchState?: string } | undefined)?.branchState);
+
 describe('finalizeRun — the cloud path', () => {
-    function runInput() {
-        return {
-            task: task(),
-            userId: 'u-1',
-            agentId: 'a-1',
-            agentCanOpenPullRequests: true,
-            workspace: {
-                cwd: '/tmp/ws',
-                baseSha: 'b'.repeat(40),
-                reused: false,
-                branch: 'ever-works/task/add-a-thing',
-            },
-        } as never;
-    }
+    // PINNED-ORDER CHANGE (APW-08 T17 cloud path). This case used to run with
+    // no switch and no `checkPaths` answer, because the cloud path pushed first
+    // and judged afterwards. Cloud App Work pushes are now OFF by default (owner
+    // decision, until FR-12's admission lands) and, when enabled, the pushed
+    // commit is judged by `checkPaths` BEFORE it is published. The post-push
+    // `evaluate` this case pins is unchanged — it still runs, still receives no
+    // `baseSha`, and still blocks on a refusal.
+    withCloudPush('true');
 
     it('asks the same gate, and blocks on a refusal', async () => {
         const m = mocks();
+        m.checkPaths.mockResolvedValue({ allowed: true, note: null });
         m.evaluate.mockResolvedValue(refused());
 
         const outcome = await service(m).finalizeRun(runInput());
@@ -601,5 +684,367 @@ describe('finalizeRun — the cloud path', () => {
         expect(outcome.outcome).toBe('blocked-by-guard');
         expect(m.createPullRequest).not.toHaveBeenCalled();
         expect(m.evaluate.mock.calls[0][0]).not.toHaveProperty('baseSha');
+        // The post-push judgement still says what it always said.
+        expect(bodyOf(m)).toContain('The branch was pushed');
+    });
+});
+
+/**
+ * Owner decision: the API-side (cloud) isolated-Task path does not push App Work
+ * branches until APW-08 FR-12's isolated-run admission (T12) lands. The run's
+ * commit stays local, the Task is blocked, and it says why — unless
+ * `APP_WORKS_CLOUD_PUSH_ENABLED` is exactly `true`.
+ */
+describe('finalizeRun — cloud App Work pushes are off by default (FR-12 / T12)', () => {
+    withCloudPush(undefined);
+
+    it('commits locally, pushes nothing, and blocks the Task naming FR-12 and T12', async () => {
+        const m = mocks();
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'blocked-by-guard' });
+        expect(finalizeOpts(m)).toEqual([expect.objectContaining({ push: false })]);
+        expect(finalizeOpts(m).some((opts) => opts.push)).toBe(false);
+        expect(blockedWith(m)).toBe(true);
+        expect(bodyOf(m)).toContain('FR-12');
+        expect(bodyOf(m)).toContain('T12');
+        expect(bodyOf(m)).toContain('Nothing was pushed');
+        expect(branchStatesWritten(m)).not.toContain('pushed');
+        expect(m.branchChanges).not.toHaveBeenCalled();
+        expect(m.checkPaths).not.toHaveBeenCalled();
+        expect(m.simulateMerge).not.toHaveBeenCalled();
+        expect(m.evaluate).not.toHaveBeenCalled();
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('names an open pull request as NOT containing the change', async () => {
+        const m = mocks();
+
+        const outcome = await service(m).finalizeRun(
+            runInput({ prNumber: 12, prUrl: 'https://example.test/pr/12' }),
+        );
+
+        expect(outcome).toEqual({
+            outcome: 'blocked-by-guard',
+            prNumber: 12,
+            prUrl: 'https://example.test/pr/12',
+        });
+        expect(bodyOf(m)).toContain('pull request #12 does not contain');
+        expect(finalizeOpts(m).some((opts) => opts.push)).toBe(false);
+    });
+
+    it.each([['false'], ['TRUE'], ['1'], ['yes'], ['']])(
+        'stays off for %j — only exactly `true` enables it',
+        async (value) => {
+            process.env[CLOUD_PUSH_ENV] = value;
+            const m = mocks();
+
+            const outcome = await service(m).finalizeRun(runInput());
+
+            expect(outcome.outcome).toBe('blocked-by-guard');
+            expect(finalizeOpts(m).some((opts) => opts.push)).toBe(false);
+        },
+    );
+
+    it('still reports an empty run as no-changes, and says nothing', async () => {
+        const m = mocks();
+        m.finalize.mockResolvedValueOnce({
+            empty: true,
+            changedFiles: 0,
+            pushed: false,
+            headSha: RUN_BASE_SHA,
+        });
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'no-changes' });
+        expect(finalizeOpts(m)).toEqual([expect.objectContaining({ push: false })]);
+        expect(m.post).not.toHaveBeenCalled();
+        expect(blockedWith(m)).toBe(false);
+    });
+
+    it('leaves every other Work kind exactly as it was: one finalize, pushed', async () => {
+        const m = mocks();
+
+        const outcome = await service(m, { kind: 'directory' }).finalizeRun(runInput());
+
+        expect(outcome.outcome).toBe('pr-opened');
+        expect(finalizeOpts(m)).toEqual([
+            { commitMessage: 'feat(task): add-a-thing agent run output', push: true },
+        ]);
+        expect(m.branchChanges).not.toHaveBeenCalled();
+    });
+
+    it('leaves an App Work with no gate bound exactly as it was: one finalize, pushed', async () => {
+        const m = mocks();
+
+        const outcome = await service(m, { bound: false }).finalizeRun(runInput());
+
+        expect(outcome.outcome).toBe('pr-opened');
+        expect(finalizeOpts(m)).toEqual([
+            { commitMessage: 'feat(task): add-a-thing agent run output', push: true },
+        ]);
+    });
+});
+
+describe('finalizeRun — judged before anything is pushed (cloud pushes enabled)', () => {
+    withCloudPush('true');
+
+    const SPEC = '.works/works.yml';
+    const allow = (m: Mocks) => {
+        m.checkPaths.mockResolvedValue({ allowed: true, note: null });
+        return m;
+    };
+
+    it('refuses with ONE finalize that pushes nothing, and names the refused path', async () => {
+        const m = mocks();
+        m.branchChanges.mockResolvedValue({ paths: ['.github/workflows/ci.yml'], contents: {} });
+        m.checkPaths.mockResolvedValue(refused(['.github/workflows/ci.yml']));
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'blocked-by-guard' });
+        expect(finalizeOpts(m)).toEqual([expect.objectContaining({ push: false })]);
+        expect(blockedWith(m)).toBe(true);
+        expect(bodyOf(m)).toContain('Nothing was pushed');
+        expect(bodyOf(m)).toContain('.github/workflows/ci.yml');
+        expect(bodyOf(m)).not.toContain('The branch was pushed');
+        expect(branchStatesWritten(m)).not.toContain('pushed');
+        expect(m.simulateMerge).not.toHaveBeenCalled();
+        expect(m.evaluate).not.toHaveBeenCalled();
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('publishes EXACTLY the judged commit, then judges the pushed branch and opens the PR', async () => {
+        const m = allow(mocks());
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome.outcome).toBe('pr-opened');
+        expect(finalizeOpts(m)).toEqual([
+            expect.objectContaining({ push: false }),
+            expect.objectContaining({ push: true, publishSha: HEAD_SHA }),
+        ]);
+        const order = (fn: jest.Mock, n = 0) => fn.mock.invocationCallOrder[n];
+        expect(order(m.checkPaths)).toBeLessThan(order(m.finalize, 1));
+        expect(order(m.finalize, 1)).toBeLessThan(order(m.evaluate));
+        expect(order(m.evaluate)).toBeLessThan(order(m.createPullRequest));
+        expect(branchStatesWritten(m)).toContain('pushed');
+        // `branchState: 'pushed'` is written only once the publish returned.
+        const pushedWrite = m.updateById.mock.calls.findIndex(
+            (c) => (c[1] as { branchState?: string } | undefined)?.branchState === 'pushed',
+        );
+        expect(m.updateById.mock.invocationCallOrder[pushedWrite]).toBeGreaterThan(
+            order(m.finalize, 1),
+        );
+    });
+
+    it('hands checkPaths the branch changes, resolved server-side, with the Task’s labels', async () => {
+        const m = allow(mocks());
+        m.branchChanges.mockResolvedValue({
+            paths: ['src/a.ts', 'src/b.ts'],
+            contents: {},
+        });
+
+        await service(m).finalizeRun(runInput({ labels: ['app-provision'] }));
+
+        expect(m.branchChanges).toHaveBeenCalledWith(
+            {
+                path: '/tmp/ws',
+                baseSha: RUN_BASE_SHA,
+                reused: false,
+                branch: RUN_BRANCH,
+                bindingKey: TASK_ID,
+            },
+            { headSha: HEAD_SHA, readPaths: [SPEC] },
+            { userId: 'u-1', workId: WORK_ID },
+        );
+        const handed = m.checkPaths.mock.calls[0][0];
+        expect(handed).toMatchObject({
+            owner: 'acme',
+            repo: 'their-app',
+            baseRef: 'production',
+            paths: ['src/a.ts', 'src/b.ts'],
+            taskLabels: ['app-provision'],
+            gitOptions: { userId: 'u-1', providerId: 'github', workId: WORK_ID },
+        });
+        expect(handed).not.toHaveProperty('baseSha');
+        expect(handed.contents).toBeUndefined();
+        expect(JSON.stringify(handed)).not.toContain(RUN_BASE_SHA);
+    });
+
+    it('passes the COMMITTED spec content when the change touches it', async () => {
+        const m = allow(mocks());
+        m.branchChanges.mockResolvedValue({
+            paths: [SPEC, 'src/a.ts'],
+            contents: { [SPEC]: 'spec: committed' },
+        });
+
+        await service(m).finalizeRun(runInput());
+
+        expect(m.checkPaths.mock.calls[0][0].contents).toEqual({ [SPEC]: 'spec: committed' });
+    });
+
+    it('passes a deleted or renamed-away spec as empty content — which the gate refuses', async () => {
+        const m = allow(mocks());
+        m.branchChanges.mockResolvedValue({ paths: [SPEC], contents: { [SPEC]: null } });
+
+        await service(m).finalizeRun(runInput());
+
+        expect(m.checkPaths.mock.calls[0][0].contents).toEqual({ [SPEC]: '' });
+    });
+
+    it('refuses, pushing nothing, when the branch’s changes cannot be read', async () => {
+        const m = allow(mocks());
+        m.branchChanges.mockRejectedValue(new Error('Plugin x cannot report a branch'));
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'blocked-by-guard' });
+        expect(finalizeOpts(m)).toEqual([expect.objectContaining({ push: false })]);
+        expect(bodyOf(m)).toContain('Nothing was pushed');
+        expect(m.checkPaths).not.toHaveBeenCalled();
+        expect(blockedWith(m)).toBe(true);
+    });
+
+    it('turns a gate that REJECTS into a refusal, pushing nothing', async () => {
+        const m = mocks();
+        m.checkPaths.mockRejectedValue(new Error('boom'));
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'blocked-by-guard' });
+        expect(bodyOf(m)).toContain('could not be read');
+        expect(finalizeOpts(m).some((opts) => opts.push)).toBe(false);
+    });
+
+    it('refuses when the provider reports no commit to judge', async () => {
+        const m = allow(mocks());
+        m.finalize.mockResolvedValueOnce({
+            empty: false,
+            changedFiles: 1,
+            pushed: false,
+            headSha: null,
+        });
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'blocked-by-guard' });
+        expect(m.branchChanges).not.toHaveBeenCalled();
+        expect(finalizeOpts(m)).toHaveLength(1);
+    });
+
+    it('names an open pull request as NOT containing the refused change', async () => {
+        const m = mocks();
+        m.checkPaths.mockResolvedValue(refused());
+
+        const outcome = await service(m).finalizeRun(
+            runInput({ prNumber: 12, prUrl: 'https://example.test/pr/12' }),
+        );
+
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard', prNumber: 12 });
+        expect(bodyOf(m)).toContain('pull request #12 does not contain');
+        expect(bodyOf(m)).not.toContain('now contains');
+    });
+
+    it('fails loudly — and records no push — when the judged commit was not published', async () => {
+        const m = allow(mocks());
+        m.finalize.mockImplementation(async (_handle, opts) =>
+            opts.publishSha
+                ? {
+                      empty: false,
+                      pushed: false,
+                      headSha: opts.publishSha,
+                      publishWithheld: 'the lease expired',
+                  }
+                : { empty: false, changedFiles: 1, pushed: false, headSha: HEAD_SHA },
+        );
+
+        await expect(service(m).finalizeRun(runInput())).rejects.toThrow(/the lease expired/);
+        expect(branchStatesWritten(m)).not.toContain('pushed');
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    // A provider that predates `publishSha` IGNORES it (the contract says so):
+    // it commits the tree as usual and pushes HEAD — which can carry files
+    // written after the judgement. `pushed: true` alone is not "the judged
+    // commit was published".
+    it('fails loudly — and records no push — when the publish pushed a DIFFERENT commit', async () => {
+        const m = allow(mocks());
+        const other = 'e'.repeat(40);
+        m.finalize.mockImplementation(async (_handle, opts) =>
+            opts.publishSha
+                ? { empty: false, changedFiles: 2, pushed: true, headSha: other }
+                : { empty: false, changedFiles: 1, pushed: false, headSha: HEAD_SHA },
+        );
+
+        const run = service(m).finalizeRun(runInput());
+
+        await expect(run).rejects.toThrow(HEAD_SHA);
+        await expect(run).rejects.toThrow(other);
+        expect(branchStatesWritten(m)).not.toContain('pushed');
+        expect(m.simulateMerge).not.toHaveBeenCalled();
+        expect(m.evaluate).not.toHaveBeenCalled();
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('fails loudly when the publish reports no head at all', async () => {
+        const m = allow(mocks());
+        m.finalize.mockImplementation(async (_handle, opts) =>
+            opts.publishSha
+                ? { empty: false, pushed: true, headSha: null }
+                : { empty: false, changedFiles: 1, pushed: false, headSha: HEAD_SHA },
+        );
+
+        await expect(service(m).finalizeRun(runInput())).rejects.toThrow(HEAD_SHA);
+        expect(branchStatesWritten(m)).not.toContain('pushed');
+        expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('publishes the SAME trimmed sha it judged', async () => {
+        const m = allow(mocks());
+        m.finalize.mockImplementation(async (_handle, opts) =>
+            opts.publishSha
+                ? { empty: false, pushed: true, headSha: opts.publishSha }
+                : { empty: false, changedFiles: 1, pushed: false, headSha: ` ${HEAD_SHA}\n` },
+        );
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome.outcome).toBe('pr-opened');
+        expect(m.branchChanges.mock.calls[0][1]).toMatchObject({ headSha: HEAD_SHA });
+        expect(finalizeOpts(m)[1]).toMatchObject({ push: true, publishSha: HEAD_SHA });
+    });
+
+    it('still reports an empty run as no-changes, judging nothing', async () => {
+        const m = allow(mocks());
+        m.finalize.mockResolvedValueOnce({
+            empty: true,
+            changedFiles: 0,
+            pushed: false,
+            headSha: RUN_BASE_SHA,
+        });
+
+        const outcome = await service(m).finalizeRun(runInput());
+
+        expect(outcome).toEqual({ outcome: 'no-changes' });
+        expect(m.checkPaths).not.toHaveBeenCalled();
+        expect(m.branchChanges).not.toHaveBeenCalled();
+    });
+
+    it('leaves every other Work kind, and an unbound gate, with one pushing finalize', async () => {
+        for (const opts of [{ kind: 'directory' }, { bound: false }]) {
+            const m = mocks();
+
+            const outcome = await service(m, opts).finalizeRun(runInput());
+
+            expect(outcome.outcome).toBe('pr-opened');
+            expect(finalizeOpts(m)).toEqual([
+                { commitMessage: 'feat(task): add-a-thing agent run output', push: true },
+            ]);
+            expect(m.checkPaths).not.toHaveBeenCalled();
+            expect(m.branchChanges).not.toHaveBeenCalled();
+        }
     });
 });

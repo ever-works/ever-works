@@ -35,6 +35,14 @@ import type { Work } from '../entities/work.entity';
  */
 export const APP_WORK_CHANGE_GATE = Symbol('APP_WORK_CHANGE_GATE');
 
+/**
+ * The one path an App Work's spec lives at. Declared HERE, in the ring-free
+ * port, so the finalize path can name the file it must read before a push
+ * without importing `app-works/` (the require ring above); the guard's
+ * `APP_SPEC_PATH` is this value, so the two can never name different files.
+ */
+export const APP_WORK_SPEC_PATH = '.works/works.yml';
+
 /** What the finalize path hands the gate. Every value is one it resolved itself. */
 export interface AppWorkChangeGateInput {
     readonly work: Work;
@@ -60,8 +68,18 @@ export type AppWorkChangeGateVerdict =
 /**
  * The pre-write question (FR-8): may these paths be written, with this content?
  *
- * Asked by the `commitToRepo` agent tool BEFORE it writes, so a refusal leaves
- * nothing behind. It is the same guard as {@link AppWorkChangeGate.evaluate},
+ * Two callers ask it, both BEFORE the change can leave the runtime, so a
+ * refusal leaves nothing behind on the remote:
+ *
+ *   - the `commitToRepo` agent tool, before it writes;
+ *   - `TaskWorkspaceService.finalizeRun` on the cloud path, about the commit the
+ *     run just made locally and before that commit is pushed (APW-08 T17). It
+ *     reads the paths and the committed `.works/works.yml` through the workspace
+ *     provider's `branchChanges`, and then publishes exactly the judged commit.
+ *     `evaluate` still runs after that push, for the size rule and the
+ *     provider's own diff.
+ *
+ * It is the same guard as {@link AppWorkChangeGate.evaluate},
  * over the paths the call writes instead of a provider diff: protected paths,
  * `.github/workflows/**`, the file-count cap, and — when `.works/works.yml` is
  * one of the paths — the guarded spec blocks, read from `contents`.
@@ -91,6 +109,12 @@ export interface AppWorkChangePathsInput {
      * the gate refuses rather than skipping the rule.
      */
     readonly contents?: Readonly<Record<string, string>>;
+    /**
+     * The Task's labels, for APW-04's `app-provision` exemption — so the
+     * pre-push verdict on the cloud path equals `evaluate`'s for every rule the
+     * two share. Absent (the `commitToRepo` tool) is no labels.
+     */
+    readonly taskLabels?: readonly string[];
 }
 
 export interface AppWorkChangeGate {

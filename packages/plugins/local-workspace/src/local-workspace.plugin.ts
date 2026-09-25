@@ -7,6 +7,7 @@ import type {
 	JsonSchema,
 	WorkspaceProvisionSpec,
 	WorkspaceHandle,
+	WorkspaceBranchChanges,
 	WorkspaceFinalizeOptions,
 	WorkspaceFinalizeResult,
 	WorkspaceMergeSimulation,
@@ -31,6 +32,45 @@ const INTENTS_DIR = 'ew-workspace-intents';
 /** Pool sub-directories under the base dir. */
 const REPOS_DIR = 'repos';
 const WORKTREES_DIR = 'worktrees';
+
+/**
+ * A full, lower-case object id — SHA-1 (40) or SHA-256 (64). Nothing symbolic,
+ * abbreviated or refspec-shaped reaches `git` as a commit to judge or publish.
+ */
+const FULL_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
+/**
+ * Global options for every git call that decides what a branch would PUBLISH
+ * (`branchChanges`, and the commit check it shares with `publishSha`). The run
+ * can write its worktree's git dir AND the pool's common dir, and three things
+ * there change what git READS for an object id while `git push` still sends
+ * the real objects:
+ *
+ *  - `refs/replace/*` — `git replace <head> <decoy>` makes a diff read the
+ *    decoy's tree for `head`. `--no-replace-objects` turns replacement off.
+ *  - a forged commit-graph — it records each commit's parents and root tree, so
+ *    it could move the merge base or the tree. `core.commitGraph=false` reads
+ *    the commit objects themselves.
+ *  - grafts — `info/grafts` (or `git replace --graft`) can make an orphan
+ *    carrying a workflow an ANCESTOR of the base, which empties the three-dot
+ *    diff. `--no-replace-objects` does not cover `info/grafts`; pointing
+ *    `GIT_GRAFT_FILE` at a path that does not exist does ({@link literalHistoryEnv}).
+ *
+ * A plant in the POOL outlives the run and would otherwise blind the judge for
+ * every later Task on this repository on this machine. Measured with git 2.53:
+ * each plant, alone, lets a workflow file through a plain diff; with these
+ * options the diff lists it, or fails closed with "no merge base".
+ */
+const LITERAL_HISTORY_ARGS = ['--no-replace-objects', '-c', 'core.commitGraph=false'] as const;
+
+/**
+ * `GIT_GRAFT_FILE` at a fresh random path under a directory that is never
+ * created: git then reads no graft file at all, and the run cannot plant one
+ * at a path it cannot predict.
+ */
+function literalHistoryEnv(): Record<string, string> {
+	return { GIT_GRAFT_FILE: join(tmpdir(), `ew-no-grafts-${randomUUID()}`, 'grafts') };
+}
 
 interface GitResult {
 	code: number;
@@ -413,6 +453,14 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		throwIfFinalizeAborted(signal);
 		await this.ensureGit(signal);
 		const dir = handle.path;
+		// APW-08 T17 — publish an already-judged commit and nothing else. Checked
+		// BEFORE `add -A`: this worktree persists, and processes the run started
+		// can keep writing into it after the judgement. `!== undefined`, not
+		// truthiness, so an empty value is refused rather than read as "commit
+		// the tree as usual".
+		if (opts.publishSha !== undefined) {
+			return this.publishCommit(handle, opts.publishSha, opts);
+		}
 		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal);
 
 		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed', signal);
@@ -472,87 +520,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// caller's claim like every other second does.
 		const publishWithheld = opts.push ? this.publishFenceRefusal(opts.publishFence) : null;
 		if (opts.push && publishWithheld === null) {
-			const repoUrl = (
-				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing', signal)
-			).stdout.trim();
-			const credential = this.resolvePushCredential(opts.pushCredential, repoUrl);
-			if (credential) {
-				// Fail closed BEFORE the write, twice: once because a
-				// credential already sitting in this repository's config
-				// could answer the push instead of ours, and once after,
-				// because the whole promise of an environment-carried
-				// credential is that nothing of it survives the command.
-				await this.assertNoPersistedCredential(dir, signal);
-			}
-			let pushFailure: unknown = null;
-			try {
-				await this.gitOrThrow(
-					[
-						'push',
-						// A credentialed push runs NO hooks. Git hands a
-						// `pre-push` hook the whole child environment, which
-						// is where the scoped credential rides — a hook can
-						// simply print `GIT_CONFIG_VALUE_<n>` and read the
-						// base64 basic-auth form of a live `contents: write`
-						// token, then `exit 0` so the run looks clean.
-						//
-						// The hook does not even have to be in the checkout:
-						// hooks resolve through the COMMON dir, so a file
-						// planted at `<poolDir>/hooks/pre-push` is untracked,
-						// invisible to `git add -A`, missed by
-						// `assertNoPersistedCredential`'s config probe,
-						// survives worktree teardown, and then fires on the
-						// push of EVERY later Task on that repository on that
-						// machine, harvesting each run's freshly minted token.
-						// The model holds acceptEdits over the checkout and can
-						// resolve the pool from the worktree's `.git` pointer,
-						// so writing that file is within its reach.
-						//
-						// Nothing legitimate is lost: the pool is a bare repo
-						// this plugin creates with `init --bare`, and the fleet
-						// never installs a hook into it. `core.hooksPath` is
-						// reset in `credentialEnv` as well, so neutralising the
-						// hooks does not depend on this one flag being right.
-						...(credential ? ['--no-verify'] : []),
-						this.authedUrl(repoUrl, opts.auth),
-						`HEAD:refs/heads/${handle.branch}`
-					],
-					dir,
-					opts.auth,
-					'git push failed',
-					signal,
-					credential
-				);
-			} catch (error) {
-				pushFailure = error;
-			}
-			// The proof runs whether or not the push succeeded — a REJECTED
-			// push is precisely when Git walks the helper list's `erase`
-			// path — but not after a cancellation, where the next Git call
-			// would only re-raise the abort and hide it.
-			//
-			// Its own failure NEVER replaces the push's. This probe used to
-			// run bare, so a throw here discarded `pushFailure` and an
-			// operator reading `refusing to publish: … persisted credential
-			// settings` went hunting for a config problem instead of the
-			// `remote rejected` that actually failed the run.
-			if (credential && !signal?.aborted) {
-				try {
-					await this.assertNoPersistedCredential(dir, signal, pushFailure === null);
-				} catch (probeFailure) {
-					if (pushFailure === null) throw probeFailure;
-					// The push already failed and is the more useful answer.
-					// The probe's finding is appended rather than dropped: a
-					// credential persisted into the shared pool config is a
-					// security event, not a footnote.
-					throw new Error(
-						`${pushFailure instanceof Error ? pushFailure.message : String(pushFailure)} (additionally: ${
-							probeFailure instanceof Error ? probeFailure.message : String(probeFailure)
-						})`
-					);
-				}
-			}
-			if (pushFailure) throw pushFailure;
+			await this.pushRef(dir, 'HEAD', handle.branch, opts);
 			pushed = true;
 		}
 
@@ -563,6 +531,271 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			...(changedFiles === null ? {} : { changedFiles }),
 			...(publishWithheld === null ? {} : { publishWithheld })
 		};
+	}
+
+	/**
+	 * Push `source` (`HEAD`, or a verified `publishSha`) to `refs/heads/<branch>`
+	 * — the ONE place a publish leaves this machine, shared by both finalize
+	 * paths so a judged-commit publish carries exactly the controls an ordinary
+	 * push does: the origin check against a scoped credential, the
+	 * persisted-credential probes before and after, `--no-verify` and the
+	 * environment-only credential, cancellation, and scrubbing. The caller has
+	 * already passed the publish fence.
+	 */
+	private async pushRef(
+		dir: string,
+		source: string,
+		branch: string,
+		opts: Pick<WorkspaceFinalizeOptions, 'auth' | 'signal' | 'pushCredential'>
+	): Promise<void> {
+		const signal = opts.signal;
+		const repoUrl = (
+			await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing', signal)
+		).stdout.trim();
+		const credential = this.resolvePushCredential(opts.pushCredential, repoUrl);
+		if (credential) {
+			// Fail closed BEFORE the write, twice: once because a
+			// credential already sitting in this repository's config
+			// could answer the push instead of ours, and once after,
+			// because the whole promise of an environment-carried
+			// credential is that nothing of it survives the command.
+			await this.assertNoPersistedCredential(dir, signal);
+		}
+		let pushFailure: unknown = null;
+		try {
+			await this.gitOrThrow(
+				[
+					'push',
+					// A credentialed push runs NO hooks. Git hands a
+					// `pre-push` hook the whole child environment, which
+					// is where the scoped credential rides — a hook can
+					// simply print `GIT_CONFIG_VALUE_<n>` and read the
+					// base64 basic-auth form of a live `contents: write`
+					// token, then `exit 0` so the run looks clean.
+					//
+					// The hook does not even have to be in the checkout:
+					// hooks resolve through the COMMON dir, so a file
+					// planted at `<poolDir>/hooks/pre-push` is untracked,
+					// invisible to `git add -A`, missed by
+					// `assertNoPersistedCredential`'s config probe,
+					// survives worktree teardown, and then fires on the
+					// push of EVERY later Task on that repository on that
+					// machine, harvesting each run's freshly minted token.
+					// The model holds acceptEdits over the checkout and can
+					// resolve the pool from the worktree's `.git` pointer,
+					// so writing that file is within its reach.
+					//
+					// Nothing legitimate is lost: the pool is a bare repo
+					// this plugin creates with `init --bare`, and the fleet
+					// never installs a hook into it. `core.hooksPath` is
+					// reset in `credentialEnv` as well, so neutralising the
+					// hooks does not depend on this one flag being right.
+					...(credential ? ['--no-verify'] : []),
+					this.authedUrl(repoUrl, opts.auth),
+					`${source}:refs/heads/${branch}`
+				],
+				dir,
+				opts.auth,
+				'git push failed',
+				signal,
+				credential
+			);
+		} catch (error) {
+			pushFailure = error;
+		}
+		// The proof runs whether or not the push succeeded — a REJECTED
+		// push is precisely when Git walks the helper list's `erase`
+		// path — but not after a cancellation, where the next Git call
+		// would only re-raise the abort and hide it.
+		//
+		// Its own failure NEVER replaces the push's. This probe used to
+		// run bare, so a throw here discarded `pushFailure` and an
+		// operator reading `refusing to publish: … persisted credential
+		// settings` went hunting for a config problem instead of the
+		// `remote rejected` that actually failed the run.
+		if (credential && !signal?.aborted) {
+			try {
+				await this.assertNoPersistedCredential(dir, signal, pushFailure === null);
+			} catch (probeFailure) {
+				if (pushFailure === null) throw probeFailure;
+				// The push already failed and is the more useful answer.
+				// The probe's finding is appended rather than dropped: a
+				// credential persisted into the shared pool config is a
+				// security event, not a footnote.
+				throw new Error(
+					`${pushFailure instanceof Error ? pushFailure.message : String(pushFailure)} (additionally: ${
+						probeFailure instanceof Error ? probeFailure.message : String(probeFailure)
+					})`
+				);
+			}
+		}
+		if (pushFailure) throw pushFailure;
+	}
+
+	/**
+	 * The `publishSha` half of {@link finalize}: push exactly `publishSha` to
+	 * the task branch — nothing staged, nothing committed. The sha must be a
+	 * full object id that resolves to a commit in this checkout, so a symbolic
+	 * name (`HEAD`, a branch) or a refspec can never stand in for the commit a
+	 * caller judged. The publish fence, cancellation and every push control
+	 * apply exactly as on the ordinary path.
+	 */
+	private async publishCommit(
+		handle: WorkspaceHandle,
+		publishSha: string,
+		opts: WorkspaceFinalizeOptions
+	): Promise<WorkspaceFinalizeResult> {
+		if (!opts.push) {
+			throw new Error(
+				'publishSha requires push: true — it publishes an already-committed commit and does nothing else'
+			);
+		}
+		const signal = opts.signal;
+		const dir = handle.path;
+		const sha = await this.verifiedCommit(dir, publishSha, 'publishSha', opts.auth, signal);
+		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth, signal, sha);
+		throwIfFinalizeAborted(signal);
+		const publishWithheld = this.publishFenceRefusal(opts.publishFence);
+		if (publishWithheld === null) {
+			await this.pushRef(dir, sha, handle.branch, opts);
+		}
+		return {
+			pushed: publishWithheld === null,
+			headSha: sha,
+			empty: false,
+			...(changedFiles === null ? {} : { changedFiles }),
+			...(publishWithheld === null ? {} : { publishWithheld })
+		};
+	}
+
+	/**
+	 * What the branch changes at `opts.headSha`, read from git BEFORE anything
+	 * is pushed (APW-08 T17's judge-before-push):
+	 *
+	 *  - `paths` — `git diff --name-only --no-renames --ignore-submodules=none
+	 *    -z <baseSha>...<headSha>`. Three dots, so a REUSED worktree is judged
+	 *    by its own changes and not by whatever landed on the base since it was
+	 *    cut (a two-dot diff against the fresh base would name a human's
+	 *    workflow edit and refuse the run). `--no-renames`, so a rename names
+	 *    both sides — moving a protected file away is a change to it.
+	 *    `--ignore-submodules=none`, so neither a committed `.gitmodules`
+	 *    `ignore = all` nor the pool's `diff.ignoreSubmodules` hides a gitlink
+	 *    at a protected path.
+	 *  - `contents` — each requested path's blob AT `headSha`, or `null` when
+	 *    no file is there. From git, never from disk: a gitignored or
+	 *    line-ending-converted file on disk is not what would be pushed, and
+	 *    this worktree persists and can move after the commit.
+	 *
+	 * Every read here ignores replace refs, grafts and the commit-graph
+	 * ({@link LITERAL_HISTORY_ARGS}): the run can write them — into the shared
+	 * pool, too — and `git push` ignores them, so honouring them would judge
+	 * something other than what is published.
+	 *
+	 * The pool is fetched at depth 1, so a moved base can leave no merge base; a
+	 * failed diff deepens the history once (`fetch --unshallow`, the same
+	 * posture as {@link simulateMerge}) and retries, and a second failure
+	 * throws — the caller then refuses rather than pushing unjudged.
+	 *
+	 * NOT covered (recorded, not hidden): merge-base semantics judge a head cut
+	 * from an OLD ancestor of the base only by what it changed since that
+	 * ancestor. A workflow file the ancestor carried and the base has since
+	 * removed can therefore ride along unnamed — as it does in the pull
+	 * request's and the post-push compare's view. The contract pins these
+	 * semantics; a history-free check would need the protected globs (the
+	 * gate's) and a trusted remote tip (not on the handle).
+	 */
+	async branchChanges(
+		handle: WorkspaceHandle,
+		opts: { headSha: string; readPaths?: readonly string[] }
+	): Promise<WorkspaceBranchChanges> {
+		await this.ensureGit();
+		const dir = handle.path;
+		const readPaths = validatedReadPaths(opts.readPaths);
+		const headSha = await this.verifiedCommit(dir, opts.headSha, 'headSha', undefined);
+		if (typeof handle.baseSha !== 'string' || !FULL_OBJECT_ID.test(handle.baseSha)) {
+			throw new Error('the workspace base is not a full commit id, so the branch cannot be compared with it');
+		}
+
+		const diffArgs = [
+			'diff',
+			'--name-only',
+			'--no-renames',
+			'--ignore-submodules=none',
+			'-z',
+			`${handle.baseSha}...${headSha}`
+		];
+		let diff = await this.gitLiteral(diffArgs, dir, undefined);
+		if (diff.code !== 0) {
+			const repoUrl = (
+				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, undefined, 'origin remote missing')
+			).stdout.trim();
+			await this.git(['fetch', this.authedUrl(repoUrl, undefined), '--unshallow'], dir, undefined);
+			diff = await this.gitLiteral(diffArgs, dir, undefined);
+			if (diff.code !== 0) {
+				throw new Error(
+					`the branch's changes could not be read: ${diff.stderr.trim() || `git exited ${diff.code}`}`
+				);
+			}
+		}
+		const paths = [...new Set(diff.stdout.split('\0').filter((path) => path.length > 0))];
+
+		const contents: Record<string, string | null> = {};
+		for (const path of readPaths) {
+			contents[path] = await this.blobAt(dir, headSha, path);
+		}
+		return { paths, contents };
+	}
+
+	/**
+	 * `value` when it is a full object id naming a COMMIT in this checkout —
+	 * the real object, not a replacement ({@link LITERAL_HISTORY_ARGS}); throws
+	 * otherwise. The value is echoed only once it is known to be hex.
+	 */
+	private async verifiedCommit(
+		dir: string,
+		value: string,
+		label: 'headSha' | 'publishSha',
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<string> {
+		if (typeof value !== 'string' || !FULL_OBJECT_ID.test(value)) {
+			throw new Error(`${label} must be a full lower-case commit id (40 or 64 hex characters)`);
+		}
+		const resolved = await this.gitLiteral(
+			['rev-parse', '--verify', '--quiet', `${value}^{commit}`],
+			dir,
+			auth,
+			signal
+		);
+		if (resolved.code !== 0 || resolved.stdout.trim() !== value) {
+			throw new Error(`${label} ${value} is not a commit in this workspace`);
+		}
+		return value;
+	}
+
+	/**
+	 * The blob at `<sha>:<path>` in the REAL commit (no replace ref, graft or
+	 * commit-graph can swap its tree), or null when no FILE is there.
+	 */
+	private async blobAt(dir: string, sha: string, path: string): Promise<string | null> {
+		const object = `${sha}:${path}`;
+		const type = await this.gitLiteral(['cat-file', '-t', object], dir, undefined);
+		if (type.code !== 0 || type.stdout.trim() !== 'blob') return null;
+		const blob = await this.gitLiteral(['cat-file', 'blob', object], dir, undefined);
+		if (blob.code !== 0) {
+			throw new Error(`reading ${path} failed: ${blob.stderr.trim() || `git exited ${blob.code}`}`);
+		}
+		return blob.stdout;
+	}
+
+	/** {@link git} with replace refs, grafts and the commit-graph ignored — see {@link LITERAL_HISTORY_ARGS}. */
+	private gitLiteral(
+		args: string[],
+		cwd: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<GitResult> {
+		return this.git([...LITERAL_HISTORY_ARGS, ...args], cwd, auth, signal, null, literalHistoryEnv());
 	}
 
 	/**
@@ -600,7 +833,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	}
 
 	/**
-	 * `git diff --name-only <baseSha>..HEAD` → distinct changed-file
+	 * `git diff --name-only <baseSha>..<head>` → distinct changed-file
 	 * count for the run-telemetry counter. Returns null when the diff
 	 * cannot be taken (unknown base, git failure), so the caller can
 	 * tell "no data" apart from "zero files".
@@ -609,10 +842,11 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		dir: string,
 		baseSha: string,
 		auth?: WorkspaceProvisionSpec['auth'],
-		signal?: AbortSignal
+		signal?: AbortSignal,
+		head = 'HEAD'
 	): Promise<number | null> {
 		try {
-			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth, signal);
+			const diff = await this.git(['diff', '--name-only', `${baseSha}..${head}`], dir, auth, signal);
 			if (diff.code !== 0) return null;
 			const files = diff.stdout
 				.split('\n')
@@ -1101,7 +1335,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		signal?: AbortSignal,
 		// Appended LAST and optional: every existing call site keeps its
 		// arity, and only the publish ever passes one.
-		credential?: WorkspacePushCredential | null
+		credential?: WorkspacePushCredential | null,
+		// Likewise: only {@link gitLiteral} passes one, and never together
+		// with a credential.
+		extraEnv?: Readonly<Record<string, string>>
 	): Promise<GitResult> {
 		throwIfAborted(signal);
 		const inherited: NodeJS.ProcessEnv = { ...process.env };
@@ -1117,6 +1354,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			env: {
 				...inherited,
 				GIT_TERMINAL_PROMPT: '0',
+				...extraEnv,
 				...(credential ? this.credentialEnv(credential, inherited) : {})
 			},
 			maxBuffer: 16 * 1024 * 1024,
@@ -1570,6 +1808,28 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			});
 		}
 	}
+}
+
+/**
+ * The paths `branchChanges` may read: repository-relative, no parent segment,
+ * no NUL. They are read as `<sha>:<path>`, so an absolute or `..` path would
+ * name nothing the branch could publish.
+ */
+function validatedReadPaths(readPaths: readonly string[] | undefined): string[] {
+	if (readPaths === undefined) return [];
+	if (!Array.isArray(readPaths)) throw new Error('readPaths must be a list of repository-relative paths');
+	return readPaths.map((path) => {
+		if (
+			typeof path !== 'string' ||
+			path.length === 0 ||
+			path.includes('\0') ||
+			path.startsWith('/') ||
+			path.split('/').some((segment) => segment === '..')
+		) {
+			throw new Error('readPath must be a repository-relative path with no parent segment');
+		}
+		return path;
+	});
 }
 
 function sanitizeSegment(value: string): string {
