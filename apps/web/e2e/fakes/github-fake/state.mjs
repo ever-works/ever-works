@@ -127,6 +127,18 @@ export function createState(options = {}) {
     };
 }
 
+/**
+ * C11 — the size, in KB, a repository reports when its seed names none.
+ *
+ * GitHub's repository payload carries `size` (KB), the GitHub plugin maps it to
+ * `sizeKb`, and `resolveAppRepositoryModes` fails CLOSED on an unknown size
+ * (`too_large_for_private_copy`). So the fake always reports one: at or below
+ * `APP_PRIVATE_COPY_MAX_SIZE_KB` (512000) Private copy can be offered, above it
+ * the answer is `too_large_for_private_copy`. 1024 is a small repository, well
+ * inside the cap; a spec that needs the refusal seeds `sizeKb` above it.
+ */
+export const DEFAULT_REPOSITORY_SIZE_KB = 1024;
+
 export function repoKey(owner, name) {
     return `${String(owner).toLowerCase()}/${String(name).toLowerCase()}`;
 }
@@ -153,6 +165,8 @@ export function upsertRepository(state, input, parents = {}) {
         private: input.private ?? existing?.private ?? false,
         archived: input.archived ?? existing?.archived ?? false,
         forkingAllowed: input.forkingAllowed ?? existing?.forkingAllowed ?? true,
+        /** GitHub's `size` in KB (C11) — see {@link DEFAULT_REPOSITORY_SIZE_KB}. */
+        sizeKb: input.sizeKb ?? existing?.sizeKb ?? DEFAULT_REPOSITORY_SIZE_KB,
         license: input.license ?? existing?.license ?? null,
         topics: input.topics ?? existing?.topics ?? [],
         fork: input.fork ?? existing?.fork ?? Boolean(parents.parentFullName),
@@ -632,6 +646,7 @@ export function repoPayload(repo, origin, depth = 0, identity = 'anonymous') {
         disabled: false,
         visibility: repo.private ? 'private' : 'public',
         allow_forking: repo.forkingAllowed,
+        size: repo.sizeKb,
         topics: [...repo.topics],
         license: licenseSummaryPayload(repo.license, origin),
         permissions: permissionsFor(repo, identity),
@@ -671,6 +686,7 @@ function placeholderRepo(fullName) {
         private: false,
         archived: false,
         forkingAllowed: true,
+        sizeKb: DEFAULT_REPOSITORY_SIZE_KB,
         license: null,
         topics: [],
         fork: false,

@@ -135,6 +135,29 @@ process** (`state.mjs`'s `upstreamSeedGate`). They are not fixtures of a GitHub 
 recorded shape; they are the platform's own state, seeded so the PR lane can start from an
 `awaiting_approval` row with a matching approval proposal. The runbook §4 documents them.
 
+## Added (C11) — the repository `size`
+
+Every repository payload now carries GitHub's `size` (in KB), at the top level and in each nested
+repository (`parent`, `source`, a pull request's `head.repo` / `base.repo`). The six fixtures that
+record a repository (`repo.json`, `repo-fork.json`, `repo-forks.json`, `repo-generate.json`,
+`pull.json`, `pulls.json`) record `"size": 108`, GitHub's own documented example value.
+
+The platform needs it: the GitHub plugin maps `size` to `sizeKb`, and `resolveAppRepositoryModes`
+(`packages/contracts/src/apps/app-source.ts`) fails **closed** on an unknown size, so a payload without
+`size` refused Private copy (`too_large_for_private_copy`) on every PR-lane repository.
+
+**The seed key.** A repository in the `POST /_control/seed` shape takes an optional `sizeKb` (a number,
+in KB). An unseeded size is **1024** KB (`DEFAULT_REPOSITORY_SIZE_KB` in `state.mjs`), and a re-seed
+without `sizeKb` keeps the size the repository already had. The rule a spec seeds against:
+
+| `sizeKb`                                              | Private copy                                                                                                                    |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| at or below `512000` (`APP_PRIVATE_COPY_MAX_SIZE_KB`) | can be offered — the later rules still apply: `uses_lfs`, then `forking_disabled` for a private repository that disallows forks |
+| above `512000`                                        | refused `too_large_for_private_copy`, whatever else is true (size is the first rule asked)                                      |
+
+The size never affects Link or Fork. A repository the fake creates itself — `POST …/forks` or
+`POST …/generate` — reports the default 1024 KB; neither route copies the source repository's size.
+
 ## Regenerating
 
 Do not hand-edit a fixture without re-running the contract test: it, and not

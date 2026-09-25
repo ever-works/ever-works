@@ -20,6 +20,7 @@
     "disabled": false,
     "visibility": "public",
     "allow_forking": true,
+    "size": 108,
     "topics": [],
     "license": {
         "key": "mit",
@@ -56,6 +57,7 @@
         "disabled": false,
         "visibility": "public",
         "allow_forking": true,
+        "size": 108,
         "topics": ["ever-works", "app-template"],
         "license": {
             "key": "mit",
@@ -98,6 +100,7 @@
         "disabled": false,
         "visibility": "public",
         "allow_forking": true,
+        "size": 108,
         "topics": ["ever-works", "app-template"],
         "license": {
             "key": "mit",

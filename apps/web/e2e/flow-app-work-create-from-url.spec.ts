@@ -39,9 +39,9 @@
  * error shows, **Check repository** stays disabled and no request is sent", the chip, the
  * copy) belongs to T28 and is **not driven here**; it is reported rather than implied.
  *
- * ## What is `fixme` here, and the measurement behind each marker
+ * ## What is `fixme` here, and the measurement behind the marker
  *
- * Both markers carry the number that put them there, measured on the lane's own API
+ * The marker carries the number that put it there, measured on the lane's own API
  * (2026-09-19, `node apps/api/dist/main.js` on 3999 beside the fake GitHub on 3900, an
  * account attached through `connectCustomerGitHub`):
  *
@@ -52,24 +52,25 @@
  *      including the ones the fake's Blueprint catalog lists. The provider-detected SPDX
  *      (`"MIT"`, `"BUSL-1.1"`) *is* asserted green below; the matched id and the class are
  *      not observable until APW-03's catalog port is bound.
- *   2. **ACC-NEG-08's `alreadyExisted: true` — APW-01.** The identical request answers
- *      **`409`** `A Work with the slug "…" already exists. Choose another slug.` — the slug
- *      uniqueness check (create step 5, `app-work-create.service.ts:300-304`) runs before
- *      the FR-23 idempotent lookup (step 8, `:1103-1135`), so a request identical enough to
- *      be idempotent always has the same slug and is refused first. Measured twice (fork and
- *      link creates).
  *
- * Two more lane facts are asserted as *what the case is about* rather than as the copy the
- * case quotes, because the PR lane cannot produce the quoted reason — both are reported as
- * findings beside this file:
+ * **ACC-NEG-08's `alreadyExisted: true` (APW-01 FR-23) was the second marker until C9.**
+ * Measured twice on 2026-09-19 (fork and link creates): the identical request answered
+ * **`409`** `A Work with the slug "…" already exists. Choose another slug.`, because the slug
+ * uniqueness check (create step 5) ran before the FR-23 idempotent lookup (step 8), and a
+ * request identical enough to be idempotent always has the same slug. Step 5 now defers
+ * that one refusal when the slug's holder is the caller's own App Work created inside the
+ * idempotency window (`app-work-create.service.ts`, `slugHeldByFreshOwnAppWork`), so the
+ * case runs below as a live test.
  *
- *   • **Private copy is never offered in this lane.** The fake's repository projection
- *     carries no `size` (`fakes/github-fake/state.mjs`, `repoPayload`), so
- *     `resolveAppRepositoryModes` refuses an unmeasurable size first
- *     (`contracts/src/apps/app-source.ts:516-522`) and every inspect answers
- *     `private-copy: { available: false, reason: "too_large_for_private_copy" }`. The
- *     assertions below pin "not offered" — the fact ACC-E2E-01's Fork/Private-copy
- *     contrast is about — and never the lane's own reason.
+ * Two more lane facts:
+ *
+ *   • **Private copy is observable in this lane since C11.** Until then the fake's
+ *     repository projection carried no `size`, `resolveAppRepositoryModes` refused the
+ *     unmeasurable size first (`contracts/src/apps/app-source.ts`, fail-closed) and every
+ *     inspect answered `private-copy: too_large_for_private_copy`. The fake now reports
+ *     `size` from the seed's `sizeKb` (default 1024 KB, `fakes/github-fake/fixtures/README.md`),
+ *     so the preview below pins both sides: a small repository offers Private copy, and one
+ *     seeded above the 512000 KB cap is refused `too_large_for_private_copy`.
  *   • **The rejected create is refused before any provider write**, which is what
  *     "the fake GitHub recorded no write" means; the mutating-call audit below filters on
  *     the **run-unique repository path** rather than on the whole log, because the chromium
@@ -353,8 +354,17 @@ test.describe('ACC-E2E-01 — the App source preview the create form renders', (
             private: true,
             forkingAllowed: false,
         };
+        // C11 — the two sides of the private-copy size cap (512000 KB,
+        // `APP_PRIVATE_COPY_MAX_SIZE_KB`): the fake reports the seeded `sizeKb` as GitHub's
+        // `size`, which is the value the cap is checked against.
+        const small = { owner: UPSTREAM_OWNER, name: `apw13-t30-small-${run}`, sizeKb: 2048 };
+        const tooLarge = {
+            owner: UPSTREAM_OWNER,
+            name: `apw13-t30-toolarge-${run}`,
+            sizeKb: 600000,
+        };
         test.skip(
-            !(await seedFakeGitHub(request, [forkable, own, archived, noFork])),
+            !(await seedFakeGitHub(request, [forkable, own, archived, noFork, small, tooLarge])),
             `the fake GitHub at ${FAKE_GITHUB_URL} is not answering /_control/seed, so there is ` +
                 'nothing to inspect in this run (the PR lane starts it beside the API).',
         );
@@ -424,20 +434,46 @@ test.describe('ACC-E2E-01 — the App source preview the create form renders', (
             available: false,
             reason: 'forking_disabled',
         });
-        // The copy half cannot be observed with the case's own reason in this lane: the fake
-        // reports no repository size, and the size rule is asked first
-        // (`app-source.ts:516-522` → `too_large_for_private_copy`). What the case is about —
-        // the copy is NOT offered — is what this pins; the lane's reason is reported.
+        // The copy half, with the case's own reason: since C11 the fake reports a size inside
+        // the cap, so the size rule no longer answers first and the private repository that
+        // disallows forks is refused `forking_disabled` for Private copy too.
         expect(
             noForkInspect.body.modes?.['private-copy']?.available,
             'Private copy is not offered for a repository its owner disallows copies of',
         ).toBe(false);
+        expect(noForkInspect.body.modes?.['private-copy']).toEqual({
+            available: false,
+            reason: 'forking_disabled',
+        });
         expect(
             noForkInspect.body.defaultMode,
             'nothing is pre-selected when neither Link nor Fork is available',
         ).toBeNull();
 
-        // 5. The licence preview is read from the provider, and its `spdx` is the fixture's.
+        // 5. Private copy and its size cap (C11). A small public repository the account
+        //    cannot push to offers Private copy beside Fork; one above the 512000 KB cap is
+        //    refused `too_large_for_private_copy` while Fork, which the size never affects,
+        //    stays available.
+        const smallInspect = await inspect(request, user.access_token, repoUrl(small));
+        expect(smallInspect.status, `body=${smallInspect.text.slice(0, 300)}`).toBe(200);
+        expect(
+            smallInspect.body.modes?.['private-copy'],
+            'a 2048 KB repository is inside the private-copy cap',
+        ).toEqual({ available: true });
+        expect(smallInspect.body.modes?.fork).toEqual({ available: true });
+
+        const tooLargeInspect = await inspect(request, user.access_token, repoUrl(tooLarge));
+        expect(tooLargeInspect.status, `body=${tooLargeInspect.text.slice(0, 300)}`).toBe(200);
+        expect(
+            tooLargeInspect.body.modes?.['private-copy'],
+            'a 600000 KB repository is above the 512000 KB private-copy cap',
+        ).toEqual({ available: false, reason: 'too_large_for_private_copy' });
+        expect(
+            tooLargeInspect.body.modes?.fork,
+            'the size cap is a private-copy rule only',
+        ).toEqual({ available: true });
+
+        // 6. The licence preview is read from the provider, and its `spdx` is the fixture's.
         //    The CLASS is APW-03's (see the `fixme` below); the SPDX is not.
         const licensed = await inspect(
             request,
@@ -813,42 +849,48 @@ test.describe('ACC-NEG-08 — conflicts on create', () => {
      * ACC-NEG-08's idempotent half: "an identical request within 10 minutes → `200` with
      * `alreadyExisted: true` (APW-01 FR-23–FR-26)".
      *
-     * Measured twice on the lane's own API (2026-09-19), for a fork create and a link
-     * create: the identical request answers **`409`**
-     * `A Work with the slug "<slug>" already exists. Choose another slug.` — the slug
-     * uniqueness check is create step 5 (`app-work-create.service.ts:300-304`) and the
-     * FR-23 idempotent lookup is step 8 (`:1103-1135`), so the request that FR-23 is meant
-     * to answer is refused one step earlier and `alreadyExisted` is unreachable over HTTP.
-     * The assertions below are unchanged and are the ones a fix would turn green.
+     * This was a `fixme` until C9. Measured twice on the lane's own API (2026-09-19), for a
+     * fork create and a link create, the identical request answered **`409`**
+     * `A Work with the slug "<slug>" already exists. Choose another slug.`: the slug check
+     * (create step 5) ran before the FR-23 idempotent lookup (step 8), so the request FR-23
+     * is meant to answer was refused one step earlier. Step 5 now defers that refusal when
+     * the slug's holder is the caller's own App Work created inside the window, and step 8
+     * answers it. The assertions are the ones the marker carried, unchanged.
+     *
+     * The repository grants the run account push: the case LINKS it, and Link without push
+     * is refused `no_push_access` at the FIRST create (`contracts/src/apps/app-source.ts`,
+     * `resolveAppRepositoryModes`), which the marker hid — the body as it stood could never
+     * create the Work the identical request is about.
      */
-    test.fixme(
-        'APW-01: an identical create inside ten minutes answers 200 alreadyExisted, but the slug ' +
-            'check (step 5) runs before the idempotent lookup (step 8) and answers 409 — ' +
-            'measured on this lane 2026-09-19',
-        async ({ request }: { request: APIRequestContext }) => {
-            const run = stamp();
-            const repo = { owner: UPSTREAM_OWNER, name: `apw13-t30-idem-${run}` };
-            test.skip(
-                !(await seedFakeGitHub(request, [repo])),
-                `the fake GitHub at ${FAKE_GITHUB_URL} is not answering /_control/seed.`,
-            );
-            const user = await registerUserViaAPI(request);
-            await connectCustomerGitHub(request, user.access_token);
+    test('an identical create inside ten minutes answers 200 alreadyExisted with the same App Work (FR-23)', async ({
+        request,
+    }) => {
+        const run = stamp();
+        const repo = {
+            owner: UPSTREAM_OWNER,
+            name: `apw13-t30-idem-${run}`,
+            permissions: [{ login: LANE_LOGIN, push: true }],
+        };
+        test.skip(
+            !(await seedFakeGitHub(request, [repo])),
+            `the fake GitHub at ${FAKE_GITHUB_URL} is not answering /_control/seed.`,
+        );
+        const user = await registerUserViaAPI(request);
+        await connectCustomerGitHub(request, user.access_token);
 
-            const body = appCreateBody({
-                slugBase: 'apw13-t30-idem',
-                repositoryUrl: repoUrl(repo),
-                repositoryMode: 'link',
-            });
-            const first = await createApp(request, user.access_token, body);
-            expect(first.status, `body=${first.text.slice(0, 300)}`).toBe(200);
+        const body = appCreateBody({
+            slugBase: 'apw13-t30-idem',
+            repositoryUrl: repoUrl(repo),
+            repositoryMode: 'link',
+        });
+        const first = await createApp(request, user.access_token, body);
+        expect(first.status, `body=${first.text.slice(0, 300)}`).toBe(200);
 
-            const identical = await createApp(request, user.access_token, body);
-            expect(identical.status, `identical request body=${identical.text.slice(0, 300)}`).toBe(
-                200,
-            );
-            expect(identical.body.alreadyExisted).toBe(true);
-            expect(identical.body.work?.id).toBe(first.body.work?.id);
-        },
-    );
+        const identical = await createApp(request, user.access_token, body);
+        expect(identical.status, `identical request body=${identical.text.slice(0, 300)}`).toBe(
+            200,
+        );
+        expect(identical.body.alreadyExisted).toBe(true);
+        expect(identical.body.work?.id).toBe(first.body.work?.id);
+    });
 });

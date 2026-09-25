@@ -911,3 +911,69 @@ describe('T3 — the fake matches the recorded fixtures, key for key and type fo
         });
     }
 });
+
+/**
+ * C11 — the repository projection carries GitHub's `size` (KB).
+ *
+ * The platform's mode resolver fails closed on an unmeasurable size
+ * (`resolveAppRepositoryModes` answers `too_large_for_private_copy` when
+ * `sizeKb` is unknown), and the GitHub plugin reads `sizeKb` from the payload's
+ * `size`. A projection without `size` therefore made Private copy unreachable
+ * on every PR-lane repository. The seed's `sizeKb` is what a spec sets; an
+ * unseeded size is 1024 KB, well inside the 512000 KB private-copy cap.
+ */
+describe('C11 — the repository projection reports the seeded size', () => {
+    async function getRepository(owner: string, name: string): Promise<Json> {
+        const response = await fetch(`${fake.origin}/repos/${owner}/${name}`, {
+            headers: { authorization: `Bearer ${USER_TOKEN}` },
+        });
+        expect(response.status, `GET /repos/${owner}/${name}`).toBe(200);
+        return (await response.json()) as Json;
+    }
+
+    it('projects `size` equal to a seeded `sizeKb`, and 1024 when none was seeded', async () => {
+        const seeded = await fetch(`${fake.origin}/_control/seed`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                repositories: [
+                    { owner: 'apw-e2e-upstream', name: 'c11-too-large', sizeKb: 600000 },
+                    { owner: 'apw-e2e-upstream', name: 'c11-default-size' },
+                    {
+                        owner: 'apw-e2e-user',
+                        name: 'c11-fork-of-unseeded',
+                        fork: true,
+                        parentFullName: 'apw-e2e-upstream/c11-never-seeded',
+                        sourceFullName: 'apw-e2e-upstream/c11-never-seeded',
+                    },
+                ],
+            }),
+        });
+        expect(seeded.status).toBe(200);
+
+        expect((await getRepository('apw-e2e-upstream', 'c11-too-large')).size).toBe(600000);
+        expect((await getRepository('apw-e2e-upstream', 'c11-default-size')).size).toBe(1024);
+
+        // A parent the fake only knows by name is projected from a placeholder
+        // record; it carries the same key, so the payload's shape never varies.
+        const fork = await getRepository('apw-e2e-user', 'c11-fork-of-unseeded');
+        expect(fork.size).toBe(1024);
+        expect(fork.parent?.size).toBe(1024);
+        expect(fork.source?.size).toBe(1024);
+    });
+
+    it('keeps a seeded `sizeKb` when the repository is re-seeded without one', async () => {
+        const reseed = async (repository: Json) =>
+            fetch(`${fake.origin}/_control/seed`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ repositories: [repository] }),
+            });
+        expect(
+            (await reseed({ owner: 'apw-e2e-upstream', name: 'c11-resized', sizeKb: 2048 })).status,
+        ).toBe(200);
+        expect((await reseed({ owner: 'apw-e2e-upstream', name: 'c11-resized' })).status).toBe(200);
+
+        expect((await getRepository('apw-e2e-upstream', 'c11-resized')).size).toBe(2048);
+    });
+});

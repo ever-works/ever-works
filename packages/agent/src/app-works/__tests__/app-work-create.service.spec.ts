@@ -112,6 +112,13 @@ function harness(
         ownAppWorks?: unknown[];
         lockAcquired?: boolean;
         slugTaken?: boolean;
+        /**
+         * The Work `WorkRepository.findByOwnerAndSlug` answers for the taken slug
+         * (C9 / FR-23): step 5 reads it to decide whether the collision is the one
+         * FR-23 answers idempotently. `null` (the default) is a holder that
+         * vanished between the count and the read.
+         */
+        slugHolder?: unknown;
         transactionError?: unknown;
         dispatcherResult?: string | null;
         dispatcherExplodes?: boolean;
@@ -209,6 +216,7 @@ function harness(
 
     const workRepository: Record<string, jest.Mock> = {
         existsByUserAndSlug: jest.fn().mockResolvedValue(input.slugTaken === true),
+        findByOwnerAndSlug: jest.fn().mockResolvedValue(input.slugHolder ?? null),
         findAppWorksByDataRepository: jest.fn().mockResolvedValue(input.ownAppWorks ?? []),
         withTransaction: jest.fn(async (fn: (manager: unknown) => Promise<unknown>) => {
             if (input.transactionError) {
@@ -647,6 +655,167 @@ describe('AppWorkCreateService', () => {
             // request adopts it (FR-25).
             expect(h.gitFacade.forkRepository).toHaveBeenCalledTimes(1);
             expect(h.gitFacade.deleteRepository).not.toHaveBeenCalled();
+        });
+
+        /**
+         * C9 — the slug check (step 5) must not pre-empt FR-23.
+         *
+         * A request identical enough to be idempotent ALWAYS carries the slug the
+         * first request already took, so a step-5 refusal of every taken slug made
+         * `alreadyExisted` unreachable. The harness used to model the taken slug
+         * as a flag independent of `ownAppWorks`, which is why the cases above
+         * stayed green while the real path answered 409; these cases set both,
+         * the way one row sets both on a real database.
+         */
+        describe('a taken slug and the idempotent answer (C9, FR-23)', () => {
+            function freshOwnAppWork(overrides: Record<string, unknown> = {}) {
+                return {
+                    id: 'work-9',
+                    slug: 'widgets',
+                    name: 'Widgets',
+                    owner: 'member',
+                    userId: USER.id,
+                    kind: 'app',
+                    createdAt: new Date(Date.now() - 1_000),
+                    sourceRepository: {
+                        url: 'https://github.com/member/widgets',
+                        owner: 'member',
+                        repo: 'widgets',
+                        type: 'app_fork',
+                        importedAt: new Date(),
+                        relatedRepositories: { website: { owner: 'member', repo: 'widgets' } },
+                        upstream: { owner: 'upstream', repo: 'widgets', defaultBranch: 'main' },
+                        createdByThisWork: true,
+                    },
+                    ...overrides,
+                };
+            }
+
+            const SLUG_MESSAGE =
+                'A Work with the slug "widgets" already exists. Choose another slug.';
+
+            it('answers an identical fork create with alreadyExisted even though its slug is taken', async () => {
+                const holder = freshOwnAppWork();
+                const h = harness({ slugTaken: true, slugHolder: holder, ownAppWorks: [holder] });
+                // The first request's fork now exists, so this request adopts it and
+                // the equivalent Work is known before any provider write.
+                inspectorWithAdoptedFork(h, 'member', 'widgets');
+
+                const result = await h.service.create(dto(), USER);
+
+                expect(result.alreadyExisted).toBe(true);
+                expect(result.work.id).toBe('work-9');
+                expect(result.appSource.relation).toBe('fork');
+                expect(h.workRepository.findByOwnerAndSlug).toHaveBeenCalledWith({
+                    userId: USER.id,
+                    owner: '',
+                    slug: 'widgets',
+                });
+                expectNoWrites(h);
+                expect(h.gitFacade.forkRepository).not.toHaveBeenCalled();
+            });
+
+            it('answers an identical link create with alreadyExisted even though its slug is taken', async () => {
+                const holder = freshOwnAppWork({
+                    sourceRepository: {
+                        url: UPSTREAM_URL,
+                        owner: 'upstream',
+                        repo: 'widgets',
+                        type: 'app_link',
+                        importedAt: new Date(),
+                        relatedRepositories: { website: { owner: 'upstream', repo: 'widgets' } },
+                        createdByThisWork: false,
+                    },
+                });
+                const h = harness({
+                    slugTaken: true,
+                    slugHolder: holder,
+                    ownAppWorks: [holder],
+                    inspect: inspectResponse({
+                        modes: {
+                            link: { available: true },
+                            fork: { available: true },
+                            'private-copy': { available: true },
+                        },
+                        access: { canPush: true, canAdmin: true },
+                    }),
+                });
+
+                const result = await h.service.create(
+                    dto({ repositoryMode: 'link', targetOwner: undefined }),
+                    USER,
+                );
+
+                expect(result.alreadyExisted).toBe(true);
+                expect(result.work.id).toBe('work-9');
+                expect(result.appSource.relation).toBe('link');
+                expectNoWrites(h);
+            });
+
+            it.each([
+                ['a new fork', { repositoryMode: 'fork' }],
+                ['a private copy', { repositoryMode: 'private-copy' }],
+                ['a link', { repositoryMode: 'link', targetOwner: undefined }],
+            ])(
+                'refuses %s with the slug 409 and zero writes when the fresh own App Work is on another repository',
+                async (_label, overrides) => {
+                    const h = harness({
+                        slugTaken: true,
+                        slugHolder: freshOwnAppWork(),
+                        // No App Work on THIS request's repository: nothing FR-23 can
+                        // return, so the deferred slug refusal is the answer.
+                        ownAppWorks: [],
+                        inspect: inspectResponse({
+                            modes: {
+                                link: { available: true },
+                                fork: { available: true },
+                                'private-copy': { available: true },
+                            },
+                        }),
+                    });
+
+                    const attempt = h.service.create(dto(overrides), USER);
+
+                    await expect(attempt).rejects.toMatchObject({ status: 409 });
+                    await expect(attempt).rejects.toThrow(SLUG_MESSAGE);
+                    // Deferred, not skipped: the inspector ran, and the refusal still
+                    // came before the provider write.
+                    expect(h.inspector.inspect).toHaveBeenCalledTimes(1);
+                    expect(h.gitFacade.forkRepository).not.toHaveBeenCalled();
+                    expect(h.gitFacade.createRepository).not.toHaveBeenCalled();
+                    expectNoWrites(h);
+                },
+            );
+
+            it.each([
+                ['a Repository Work', freshOwnAppWork({ kind: 'repo' })],
+                ['a Work with no kind', freshOwnAppWork({ kind: undefined })],
+                [
+                    'an App Work older than the window',
+                    freshOwnAppWork({
+                        createdAt: new Date(Date.now() - APP_CREATE_IDEMPOTENCY_WINDOW_MS - 1),
+                    }),
+                ],
+                ['an App Work with no createdAt', freshOwnAppWork({ createdAt: undefined })],
+            ])(
+                'refuses a slug held by %s with 409 before the inspector is consulted',
+                async (_label, holder) => {
+                    const h = harness({
+                        slugTaken: true,
+                        slugHolder: holder,
+                        ownAppWorks: [holder],
+                    });
+                    inspectorWithAdoptedFork(h, 'member', 'widgets');
+
+                    const attempt = h.service.create(dto(), USER);
+
+                    await expect(attempt).rejects.toMatchObject({ status: 409 });
+                    await expect(attempt).rejects.toThrow(SLUG_MESSAGE);
+                    expect(h.inspector.inspect).not.toHaveBeenCalled();
+                    expect(h.locks.runExclusive).not.toHaveBeenCalled();
+                    expectNoWrites(h);
+                },
+            );
         });
     });
 

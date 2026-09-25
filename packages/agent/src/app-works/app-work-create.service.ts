@@ -16,6 +16,7 @@ import {
     APP_PRIVATE_COPY_NAME_ATTEMPTS,
     APP_REPOSITORY_MODES,
     APP_SOURCE_REPOSITORY_TYPE_BY_MODE,
+    isAppWorkKind,
     type AppDeployTargetChoice,
     type AppRepositoryMode,
     type AppSourceBlueprintMatchSource,
@@ -297,10 +298,21 @@ export class AppWorkCreateService {
         // The same per-user uniqueness rule `WorkQueryService.checkSlugAvailability`
         // applies, read through `WorkRepository` so no `WorkModule` provider is
         // injected (T11's no-cycle condition).
+        //
+        // One collision is NOT refused here: a request identical enough for FR-23's
+        // idempotent answer always carries the slug the first request took, so
+        // refusing every taken slug at this step made `alreadyExisted` unreachable
+        // (C9). When the slug's holder is the caller's own App Work created inside
+        // the idempotency window, the refusal is DEFERRED to step 8, which either
+        // finds that Work on this request's repository and returns it, or throws
+        // this same `409` — still before any provider write. Every other collision
+        // is refused here, before the inspector, exactly as before.
+        let slugConflictDeferred = false;
         if (await this.workRepository.existsByUserAndSlug(user.id, dto.slug)) {
-            throw new ConflictException(
-                `A Work with the slug "${dto.slug}" already exists. Choose another slug.`,
-            );
+            if (!(await this.slugHeldByFreshOwnAppWork(user.id, dto.slug))) {
+                throw slugTakenConflict(dto.slug);
+            }
+            slugConflictDeferred = true;
         }
 
         // ── Step 6 — the fresh inspection ────────────────────────────────────
@@ -390,6 +402,7 @@ export class AppWorkCreateService {
                     autoProvision,
                     requestedOwner,
                     upstreamCoordinates,
+                    slugConflictDeferred,
                 }),
             { ttlMs: APP_CREATE_LOCK_TTL_MS },
         );
@@ -420,6 +433,8 @@ export class AppWorkCreateService {
         autoProvision: boolean;
         requestedOwner: string | null;
         upstreamCoordinates: AppUpstreamRef | null;
+        /** Step 5 found the slug taken by a fresh own App Work (see step 5). */
+        slugConflictDeferred: boolean;
     }): Promise<AppWorkCreateResult> {
         const {
             dto,
@@ -468,6 +483,16 @@ export class AppWorkCreateService {
             if (existing) {
                 return existing;
             }
+        }
+
+        // The deferred half of step 5: the taken slug was not this request's own
+        // idempotent answer, so it is refused exactly as step 5 refuses it — and,
+        // like every refusal, before the provider write. A deferred request that
+        // would create a brand-new fork or private copy always lands here: it has
+        // no coordinates yet, so it cannot be the equivalent of a Work that already
+        // exists (a private-copy double-submit therefore still answers this 409).
+        if (input.slugConflictDeferred) {
+            throw slugTakenConflict(dto.slug);
         }
 
         // ── Step 9 — the provider write ──────────────────────────────────────
@@ -1088,6 +1113,27 @@ export class AppWorkCreateService {
      * ---------------------------------------------------------------------- */
 
     /**
+     * Whether a taken slug may be FR-23's idempotent answer (step 5, C9): its
+     * holder is the caller's own **App** Work, created inside
+     * {@link APP_CREATE_IDEMPOTENCY_WINDOW_MS}. Only then is the slug refusal
+     * deferred to step 8; any other holder — a Repository Work, an App Work older
+     * than the window, or a row that vanished between the count and this read — is
+     * refused at step 5, before the inspector, exactly as before.
+     *
+     * `owner: ''` makes the repository look the slug up by `{ userId, slug }`, the
+     * same key `existsByUserAndSlug` counted.
+     */
+    private async slugHeldByFreshOwnAppWork(userId: string, slug: string): Promise<boolean> {
+        const holder = await this.workRepository!.findByOwnerAndSlug({ userId, owner: '', slug });
+        return (
+            !!holder &&
+            holder.userId === userId &&
+            isAppWorkKind(holder.kind) &&
+            withinIdempotencyWindow(holder.createdAt)
+        );
+    }
+
+    /**
      * The own-Work lookup (step 8).
      *
      * `idempotent: true` (the up-front half) answers FR-23: the SAME slug created
@@ -1498,6 +1544,17 @@ export function appCreateLockKey(input: {
     return (
         `${APP_CREATE_LOCK_PREFIX}${input.userId}:${input.providerId}:` +
         `${input.upstream.toLowerCase()}:${input.mode}:${input.owner.toLowerCase()}`
+    );
+}
+
+/**
+ * The per-user slug refusal. One helper, because step 5 throws it directly and
+ * step 8 throws it when step 5 deferred it — a member must not be able to tell
+ * the two apart.
+ */
+function slugTakenConflict(slug: string): ConflictException {
+    return new ConflictException(
+        `A Work with the slug "${slug}" already exists. Choose another slug.`,
     );
 }
 
