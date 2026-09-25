@@ -655,7 +655,7 @@ export function DashboardLayoutClient({
                                 />
 
                                 <main
-                                    className="flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
+                                    className="relative flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
                                     id="main-content"
                                 >
                                     {/* Help links (AW-25) anywhere in the page open the
