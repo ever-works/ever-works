@@ -278,7 +278,7 @@ interface PluginManifest {
 	icon?: PluginIcon; // SVG, URL, base64, Lucide icon name, or emoji
 	author?: { name: string };
 	license?: string;
-	builtIn?: boolean; // Ships with the platform
+	builtIn?: boolean; // Ships with the platform; loaded during bootstrap, not on first use
 	systemPlugin?: boolean; // Core functionality, always enabled
 	autoEnable?: boolean; // Enabled by default for new users
 	defaultForCapabilities?: readonly string[]; // Default provider for these capabilities
@@ -329,17 +329,29 @@ On application startup, the API calls `PluginBootstrapService.bootstrap()`:
    c. Validate manifests
    d. Topological sort (respect plugin dependencies)
    e. For each plugin (in order):
-      - Dynamically import the module
-      - Instantiate the plugin class
-      - Validate the class structure
-      - Register in PluginRegistryService
+      - Register a lazy proxy in PluginRegistryService from the manifest
+        alone (the module is NOT imported yet)
       - Persist to database (PluginEntity)
-4. PluginLifecycleManagerService.callOnLoad()
-   - Create PluginContext for each plugin
-   - Call plugin.onLoad(context)
-   - Update state to 'loaded'
+4. Load the plugins marked builtIn: true
+   - Materialise each proxy: import the module, instantiate the class
+   - The first-materialise hook calls PluginLifecycleManagerService.callOnLoad(),
+     which creates the PluginContext and calls plugin.onLoad(context) ONCE
+   - A plugin whose import or onLoad fails is set to 'error' (in the registry
+     and the database); the boot continues
 5. Bootstrap complete
+   - Every other plugin is materialised on first use, and its onLoad runs
+     then, once, through the same hook
 ```
+
+With `PLUGIN_LAZY_LOAD=false` (the eager kill switch), step 3e instead imports every
+discovered plugin, validates its class and registers the real instance, and step 4 calls
+`callOnLoad()` once for every loaded plugin. Plugins passed programmatically as
+`builtInPlugins` are always registered as real instances and get `callOnLoad()` once
+during bootstrap.
+
+Bootstrap never calls `callOnLoad()` on a lazy proxy: the proxy forwards `onLoad` by
+materialising first, the materialisation hook runs `onLoad`, and the forwarded call would
+then run it a second time.
 
 ### Discovery Paths
 
