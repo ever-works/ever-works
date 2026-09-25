@@ -68,7 +68,7 @@
  *   | route (another account, real id)            | real id | random id | owner |
  *   |---------------------------------------------|---------|-----------|-------|
  *   | `GET /api/works/:id`                        | **403** | 404       | 200   |
- *   | `POST /api/deploy/works/:id`                | **403** | 404       | 400   |
+ *   | `POST /api/deploy/works/:id`                | **403** | 404       | 422   |
  *   | `GET /api/works/:id/upstream`               | 404     | 404       | 200   |
  *   | `POST /api/works/:id/upstream/sync`         | 404     | 404       | 409   |
  *   | `GET /api/works/:id/app-env` (unmounted)    | 404     | 404       | 404   |
@@ -412,6 +412,8 @@ test.describe('ACC-NEG-13 — MEASURED DEVIATION: the Work read and the deploy r
             method: 'GET' | 'POST';
             /** The owner's own answer, as the control that the route exists. */
             ownerStatus: number;
+            /** Fragments the owner's body must carry, so the status is the expected refusal. */
+            ownerBodyIncludes?: string[];
         }> = [
             {
                 label: 'GET /api/works/:id',
@@ -423,7 +425,12 @@ test.describe('ACC-NEG-13 — MEASURED DEVIATION: the Work read and the deploy r
                 label: 'POST /api/deploy/works/:id',
                 route: `/api/deploy/works/${workId}`,
                 method: 'POST',
-                ownerStatus: 400,
+                // Since 1076e17d9 (APW-06 T34) an App Work's deploy goes to the App
+                // request path, which refuses a Work with no deploy target with 422
+                // APP_DEPLOY_PRECONDITIONS (target_none). It used to hit the website
+                // provider's 400 first. The 403/404 existence oracle is unchanged.
+                ownerStatus: 422,
+                ownerBodyIncludes: ['APP_DEPLOY_PRECONDITIONS', 'target_none'],
             },
         ];
 
@@ -436,6 +443,9 @@ test.describe('ACC-NEG-13 — MEASURED DEVIATION: the Work read and the deploy r
                 mine.status,
                 `${probe.label} (owner) body=${mine.text.slice(0, 200)} — the route resolves the Work`,
             ).toBe(probe.ownerStatus);
+            for (const fragment of probe.ownerBodyIncludes ?? []) {
+                expect(mine.text, `${probe.label} (owner) names ${fragment}`).toContain(fragment);
+            }
 
             const theirs = await rawApi(request, probe.method, probe.route, {
                 token: stranger.access_token,
