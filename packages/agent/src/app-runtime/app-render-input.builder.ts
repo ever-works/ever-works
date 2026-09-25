@@ -129,6 +129,7 @@ import {
     APP_DEPLOY_BUILD_SOURCE,
     APP_DEPLOY_HOST_SOURCE,
     APP_DEPLOY_SPEC_SOURCE,
+    isDeployableAppSpecStatus,
     type AppDeployBuildSnapshot,
     type AppDeployBuildSource,
     type AppDeployHostSource,
@@ -793,7 +794,7 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
         }
     }
 
-    /** The App spec at one commit. `status` is APW-03's own string, compared and never narrowed. */
+    /** The App spec at one commit. `status` is APW-03's own string, never narrowed: T21's `isDeployableAppSpecStatus` decides. */
     private async readSpec(workId: string, commitSha: string | null): Promise<AppRenderSpecRead> {
         if (!this.specs?.getEffectiveSpec) {
             return {
@@ -826,7 +827,7 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
             };
         }
 
-        if (String(snapshot.status ?? '') !== 'valid') {
+        if (!isDeployableAppSpecStatus(snapshot.status)) {
             return {
                 status: 'unavailable',
                 code: 'spec_invalid',

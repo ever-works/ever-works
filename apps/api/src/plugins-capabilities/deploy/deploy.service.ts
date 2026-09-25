@@ -134,9 +134,10 @@ export class DeployService {
         // fixtures that construct DeployService directly keep working (a
         // missing provider means "don't auto-provision", same as feature-off).
         private readonly dbProvisionService?: EverWorksDbProvisionService,
-        // APW-06 §2.2's SECOND caller. `deploy()` is reached by the batch route,
-        // the scheduler and `POST /api/deploy/works/:id`; an App Work arriving
-        // through any of them must take the App path, not the website one.
+        // APW-06 §2.2's SECOND caller. `deploy()` is reached by the batch route
+        // and `POST /api/deploy/works/:id` (the legacy rollback route refuses an
+        // App Work first); an App Work arriving through either must take the App
+        // path, not the website one.
         // Optional in DI for the same reason as the two above — fixtures
         // construct this service directly — and an absent service is a named
         // refusal rather than a silent fall-through to the website path, which
@@ -288,8 +289,9 @@ export class DeployService {
         //
         // The member-facing route is `POST /api/works/:id/deploy`
         // (`work-app-deploy.controller.ts`). This branch is what catches the
-        // OTHER callers — `deployBatch`, the schedule dispatcher, and the legacy
-        // `POST /api/deploy/works/:id` — so one deploy lock serves all of them.
+        // OTHER callers — `deployBatch` and the legacy `POST /api/deploy/works/:id`
+        // — so one deploy lock serves all of them. (The legacy rollback route
+        // refuses an App Work before it gets here: APW-06 T34.)
         if (candidate && isAppWorkKind(candidate.kind)) {
             return this.deployAppWork(candidate.id, userId, options);
         }
@@ -557,12 +559,22 @@ export class DeployService {
 
             const { dispatched, deploymentId } = await this.deploy(workId, userId, { teamScope });
 
+            // APW-06 T34: for an App Work a RESOLVED result is always a success —
+            // `deployAppWork` throws every refusal, which lands in the catch below —
+            // and `dispatched: false` means QUEUED behind the Deployment holding the
+            // lock, not "failed to initiate".
+            const started = dispatched || isAppWorkKind(work.kind);
+
             return {
                 workId,
                 deploymentId,
                 slug: work.slug,
-                status: dispatched ? 'pending' : 'error',
-                message: dispatched ? 'Deployment started' : 'Failed to initiate deployment',
+                status: started ? 'pending' : 'error',
+                message: dispatched
+                    ? 'Deployment started'
+                    : started
+                      ? 'Deployment queued'
+                      : 'Failed to initiate deployment',
                 owner: work.getRepoOwner('website'),
                 repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             };

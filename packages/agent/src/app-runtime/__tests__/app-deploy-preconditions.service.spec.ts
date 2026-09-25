@@ -15,8 +15,13 @@
 
 import { Logger } from '@nestjs/common';
 
-import type { AppSpec, HostingEligibility } from '@ever-works/contracts';
+import {
+    APP_SPEC_VALIDATION_STATUSES,
+    type AppSpec,
+    type HostingEligibility,
+} from '@ever-works/contracts';
 
+import { APP_SPEC_USABLE_STATUSES } from '../../app-spec/app-spec.service';
 import { AppLicenseGate, type AppLicenseService } from '../app-license-gate';
 import {
     APP_DEPLOY_WARNING_DEPENDENCIES_UNAVAILABLE,
@@ -640,6 +645,58 @@ describe('AppDeployPreconditionsService — spec_invalid', () => {
         specs.snapshot = null;
 
         expect(codes(await service.evaluate(request()))).toEqual(['spec_invalid']);
+    });
+
+    // `AppSpecService.getEffectiveSpec` answers `valid_with_warnings` for a commit that is
+    // neither the stored effective one nor a usable head — an earlier Build, a Build a newer
+    // push superseded, a rollback commit. APW-03 calls that usable and APW-05 builds it, so a
+    // green Build of it must not come back as `spec_invalid` here.
+    it('accepts valid_with_warnings: warnings never stop a deploy (APP_SPEC_USABLE_STATUSES)', async () => {
+        const { service, specs, env } = makeHarness();
+        specs.snapshot = {
+            status: 'valid_with_warnings',
+            spec: appSpec(),
+            commitSha: 'sha-head',
+            issues: [{ code: 'unknown_key', path: 'extra' }],
+        };
+
+        const result = await service.evaluate(request());
+
+        expect(codes(result)).toEqual([]);
+        expect(result.ready).toBe(true);
+        expect(result.context.specCommitSha).toBe('sha-head');
+        expect(result.context.strategy).toBe('dockerfile');
+        expect(env.calls).toHaveLength(1);
+    });
+
+    it.each(['invalid', 'missing', 'unreadable', 'no_state'])(
+        'still refuses a spec whose status is %s',
+        async (status) => {
+            const { service, specs } = makeHarness();
+            specs.snapshot = { status, spec: appSpec(), commitSha: 'sha-head' };
+
+            const result = await service.evaluate(request());
+
+            expect(codes(result)).toEqual(['spec_invalid']);
+            expect(entryFor(result, 'spec_invalid').message).toContain(`(status: ${status})`);
+        },
+    );
+
+    it('accepts exactly APW-03’s usable statuses, of all six getEffectiveSpec can answer', async () => {
+        const answered = [...APP_SPEC_VALIDATION_STATUSES, 'no_state'];
+        const accepted: string[] = [];
+
+        for (const status of answered) {
+            const { service, specs } = makeHarness();
+            specs.snapshot = { status, spec: appSpec(), commitSha: 'sha-head' };
+
+            const result = await service.evaluate(request());
+
+            if (!codes(result).includes('spec_invalid')) accepted.push(status);
+        }
+
+        expect(answered).toHaveLength(6);
+        expect(accepted).toEqual([...APP_SPEC_USABLE_STATUSES]);
     });
 
     it('reads the App spec at the BUILD’s commit, not the latest applied one (ACC-06-20)', async () => {

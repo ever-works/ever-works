@@ -31,9 +31,10 @@ import { isIP } from 'node:net';
 import * as path from 'node:path';
 
 import { Logger } from '@nestjs/common';
-import type { AppSpec } from '@ever-works/contracts';
+import { APP_SPEC_VALIDATION_STATUSES, type AppSpec } from '@ever-works/contracts';
 import type { AppRenderInput, AppTargetRef } from '@ever-works/plugin';
 
+import { APP_SPEC_USABLE_STATUSES } from '../../app-spec/app-spec.service';
 import {
     APP_RENDER_WARNING_EGRESS_UNRESOLVED,
     APP_RENDER_WARNING_HOSTS_INCOMPLETE,
@@ -1208,6 +1209,56 @@ describe('refusals — a named code, never an exception', () => {
 
         expect(result.code).toBe('spec_invalid');
         expect(result.reason).toContain('sha-b1');
+    });
+
+    // The same read the preconditions make: `getEffectiveSpec` answers `valid_with_warnings`
+    // for a Build of an earlier or superseded commit, and APW-03 calls that usable. A Build
+    // the preconditions let through must not be refused here as `spec_invalid`.
+    it('builds from a valid_with_warnings spec at the Build’s commit (APP_SPEC_USABLE_STATUSES)', async () => {
+        const harness = makeHarness();
+        harness.specs.snapshot = {
+            status: 'valid_with_warnings',
+            spec: appSpec(),
+            commitSha: 'sha-b1',
+            issues: [{ code: 'unknown_key', path: 'extra' }],
+        };
+
+        const input = inputOf(await harness.builder.build(request()));
+
+        expect(input.specCommitSha).toBe('sha-b1');
+        expect(harness.specs.reads).toEqual([{ workId: WORK_ID, commitSha: 'sha-b1' }]);
+    });
+
+    it.each(['invalid', 'missing', 'unreadable', 'no_state'])(
+        'still refuses a spec whose status is %s',
+        async (status) => {
+            const harness = makeHarness();
+            harness.specs.snapshot = { status, spec: appSpec(), commitSha: 'sha-b1' };
+
+            const result = await harness.builder.build(request());
+
+            expect(result.status).toBe('unavailable');
+            expect(result.code).toBe('spec_invalid');
+            expect(result.reason).toContain(status);
+            expect(result.input).toBeNull();
+        },
+    );
+
+    it('accepts exactly APW-03’s usable statuses, of all six getEffectiveSpec can answer', async () => {
+        const answered = [...APP_SPEC_VALIDATION_STATUSES, 'no_state'];
+        const accepted: string[] = [];
+
+        for (const status of answered) {
+            const harness = makeHarness();
+            harness.specs.snapshot = { status, spec: appSpec(), commitSha: 'sha-b1' };
+
+            const result = await harness.builder.build(request());
+
+            if (result.code !== 'spec_invalid') accepted.push(status);
+        }
+
+        expect(answered).toHaveLength(6);
+        expect(accepted).toEqual([...APP_SPEC_USABLE_STATUSES]);
     });
 
     it('refuses when the spec cannot be read at all', async () => {

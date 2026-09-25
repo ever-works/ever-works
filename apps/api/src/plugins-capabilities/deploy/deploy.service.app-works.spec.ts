@@ -47,9 +47,9 @@ import { DeployService } from './deploy.service';
  * APW-06 §2.2's SECOND caller — `DeployService.deploy()` for a Work of kind `app`.
  *
  * `POST /api/works/:id/deploy` is the member-facing route. This branch is what
- * catches every OTHER way a deploy reaches the platform — `deployBatch`, the
- * schedule dispatcher, and the legacy `POST /api/deploy/works/:id` — so all of
- * them go through one request service and therefore one deploy lock.
+ * catches every OTHER way a deploy reaches the platform — `deployBatch` and the
+ * legacy `POST /api/deploy/works/:id` — so all of them go through one request
+ * service and therefore one deploy lock.
  *
  * Four properties, and each of them is a way this could silently do the wrong
  * thing rather than fail loudly:
@@ -240,6 +240,71 @@ describe('DeployService.deploy — kind `app` (APW-06 §2.2)', () => {
             status: HttpStatus.BAD_REQUEST,
         });
         expect(deployFacade.getPluginAndTokenAndSettings).not.toHaveBeenCalled();
+    });
+
+    it('deployBatch counts a QUEUED App Deployment as started, not as an error (T34)', async () => {
+        // A resolved `DeployResult` for an App Work is always a success — every
+        // refusal throws above — and `queued` is one with `dispatched: false`.
+        // Reporting it as `error` told the member a Deployment failed that is
+        // waiting in the latest-wins queue.
+        const request: RequestMock = {
+            request: jest.fn(async () =>
+                appResult({ status: 'queued', dispatched: false, deploymentId: 'd-queued' }),
+            ),
+        };
+        const { service, findById } = makeService('app', request);
+        // A Work entity carries these; for an App Work the `website` role IS its
+        // Work Repository (`app-work-create.service.ts`), so they are reported as-is.
+        findById.mockResolvedValue({
+            id: WORK_ID,
+            slug: 'demo',
+            kind: 'app',
+            getRepoOwner: () => 'acme',
+            getWebsiteRepo: () => 'demo-app',
+        });
+
+        const result = await service.deployBatch([{ workId: WORK_ID }] as never, USER_ID);
+
+        expect(result.results[0]).toMatchObject({
+            workId: WORK_ID,
+            deploymentId: 'd-queued',
+            status: 'pending',
+            message: 'Deployment queued',
+        });
+        expect(result.successfullyStarted).toBe(1);
+        expect(result.failed).toBe(0);
+    });
+
+    it('deployBatch still reports a refused App Deployment as an error', async () => {
+        const request: RequestMock = {
+            request: jest.fn(async () =>
+                appResult({
+                    status: 'refused',
+                    httpStatus: 422,
+                    code: 'worker_not_isolated',
+                    deploymentId: null,
+                    dispatched: false,
+                    unmet: [{ code: 'worker_not_isolated', message: 'No isolated worker.' }],
+                }),
+            ),
+        };
+        const { service, findById } = makeService('app', request);
+        findById.mockResolvedValue({
+            id: WORK_ID,
+            slug: 'demo',
+            kind: 'app',
+            getRepoOwner: () => 'acme',
+            getWebsiteRepo: () => 'demo-app',
+        });
+
+        const result = await service.deployBatch([{ workId: WORK_ID }] as never, USER_ID);
+
+        expect(result.results[0]).toMatchObject({
+            status: 'error',
+            message: 'No isolated worker.',
+        });
+        expect(result.successfullyStarted).toBe(0);
+        expect(result.failed).toBe(1);
     });
 
     it('leaves every other kind on the website path', async () => {

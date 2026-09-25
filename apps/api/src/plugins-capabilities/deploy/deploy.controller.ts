@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
+import { isAppWorkKind } from '@ever-works/contracts';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 import { WorkOwnershipService, WorkRuntimeEnvService } from '@ever-works/agent/services';
 import { UserRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
@@ -31,6 +32,7 @@ import {
     ActivityStatus,
     DeploymentEnvironment,
     DeploymentTriggerSource,
+    type Work,
 } from '@ever-works/agent/entities';
 import { DeployWorkDto, RollbackDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
@@ -238,6 +240,10 @@ export class DeployController {
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
+        if (isAppWorkKind(work.kind)) {
+            return this.deployAppWork(work, auth.userId);
+        }
+
         // Check if user has configured deployment credentials
         const isConfigured = await this.deployFacade.isConfigured({
             userId: isCreator ? auth.userId : work.user.id,
@@ -306,6 +312,43 @@ export class DeployController {
             owner: work.getRepoOwner('website'),
             repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             message: 'Deployment started',
+        };
+    }
+
+    /**
+     * APW-06 T34 (`plan.md:1220-1223`) — `POST /api/deploy/works/:id` for an App Work.
+     *
+     * `DeployService.deploy()` already sends kind `app` to the App request path, which
+     * owns every precondition, the deploy lock and the dispatch, and THROWS every
+     * refusal with its own status and code. What this route must not add is the
+     * website wrapper around it:
+     *
+     * - no provider `isConfigured` / `validateToken`: an App Work's `deployProvider`
+     *   names its cluster target, not a website provider token, and the request
+     *   path checks the target itself;
+     * - no `DeploymentVerifierService.startVerification`: it reads the cluster from
+     *   this process (`lookupExistingDeployment` → the k8s plugin — FR-5, §6.2's
+     *   `APP_CLUSTER_IO_IN_API`) and writes the Work's deployment state and the
+     *   Deployment row's `state` while the App orchestrator owns both;
+     * - a QUEUED answer (`dispatched: false`) is `pending`, not a 400: the row is in
+     *   the latest-wins queue and runs when the holder releases the lock;
+     * - no website activity row, matching `POST /api/works/:id/deploy`, which writes none.
+     *
+     * The caller's id is sent, never the owner's — the rule
+     * `work-app-deploy.controller.ts` applies to the same request.
+     */
+    private async deployAppWork(work: Work, callerId: string) {
+        const { dispatched, deploymentId } = await this.deployService.deploy(work.id, callerId, {});
+
+        return {
+            status: 'pending',
+            deploymentId,
+            dispatched,
+            slug: work.slug,
+            // An App Work's `website` role IS its Work Repository.
+            owner: work.getRepoOwner('website'),
+            repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
+            message: dispatched ? 'Deployment started' : 'Deployment queued',
         };
     }
 
@@ -745,6 +788,10 @@ export class DeployController {
                     deployResult.workId,
                     auth.userId,
                 );
+                // APW-06 T34: the website verifier never runs for an App Work — it
+                // reads the cluster from the API and overwrites what the App
+                // orchestrator owns (see `deployAppWork`).
+                if (isAppWorkKind(work.kind)) continue;
                 this.deploymentVerifier.startVerification(
                     work,
                     auth.userId,
@@ -1046,6 +1093,22 @@ export class DeployController {
         @Body() dto: RollbackDto,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        // APW-06 T34: this route redeploys a website's commit as a `manual` request
+        // and starts the website verifier. For an App Work that would be neither an
+        // FR-34 rollback (trigger `rollback` plus the rollback facts the App request
+        // path validates) nor safe (the verifier reads the cluster from the API).
+        // Refused before anything is read or queued until the App rollback route
+        // (T33/T39) lands and this delegates to it.
+        if (isAppWorkKind(work.kind)) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'app_rollback_unavailable',
+                message:
+                    'An App Work is rolled back from its App Deployment history; this route rolls ' +
+                    'back websites only. Nothing was queued.',
+            });
+        }
 
         const target = await this.deploymentRepository.findById(dto.deploymentId);
         if (!target || target.workId !== id) {

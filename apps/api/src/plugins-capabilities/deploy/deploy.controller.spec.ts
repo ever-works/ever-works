@@ -1714,4 +1714,193 @@ describe('DeployController', () => {
             });
         });
     });
+
+    /**
+     * APW-06 T34 (`tasks.md:609-627`, `plan.md:1220-1223`) — the legacy routes on an App Work.
+     *
+     * `DeployService.deploy()` already routes an App Work to the App request path, but these
+     * routes wrapped it in website logic: provider credential checks, a 400 for a QUEUED
+     * Deployment, and `DeploymentVerifierService.startVerification`, which reads the member's
+     * cluster from the API process (`lookupExistingDeployment` → the k8s plugin) and writes the
+     * App Deployment row behind the orchestrator's back. Rollback re-deployed the target's commit
+     * as a `manual` request, which is not an FR-34 rollback.
+     */
+    describe('kind `app` (APW-06 T34)', () => {
+        const appWork = (overrides: Record<string, unknown> = {}) =>
+            buildWork({
+                kind: 'app',
+                deployProvider: 'k8s',
+                user: { id: 'owner-1' },
+                ...overrides,
+            });
+
+        it('deploy: no provider checks, no verifier, no website activity row; the CALLER’s id reaches the App path', async () => {
+            const work = appWork();
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: false });
+            // Configured and valid, so the only way these are skipped is the kind check.
+            deployFacade.getAvailableProviders.mockReturnValue([]);
+            deployFacade.isConfigured.mockResolvedValue(true);
+            deployFacade.validateToken.mockResolvedValue(true);
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: 'dep-app' });
+
+            const result = await controller.deploy(auth, { teamScope: 'team-x' } as any, 'work-1');
+
+            expect(deployFacade.isConfigured).not.toHaveBeenCalled();
+            expect(deployFacade.validateToken).not.toHaveBeenCalled();
+            expect(deployService.deploy).toHaveBeenCalledTimes(1);
+            expect(deployService.deploy).toHaveBeenCalledWith('work-1', 'caller-1', {});
+            expect(deploymentVerifier.startVerification).not.toHaveBeenCalled();
+            expect(activityLogService.log).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                status: 'pending',
+                deploymentId: 'dep-app',
+                dispatched: true,
+                slug: 'my-site',
+                owner: 'acme',
+                repository: 'acme/acme-site',
+                message: 'Deployment started',
+            });
+        });
+
+        it('deploy: a QUEUED Deployment is pending, not a 400', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: appWork(), isCreator: true });
+            deployFacade.getAvailableProviders.mockReturnValue([]);
+            deployFacade.isConfigured.mockResolvedValue(true);
+            deployFacade.validateToken.mockResolvedValue(true);
+            deployService.deploy.mockResolvedValue({
+                dispatched: false,
+                deploymentId: 'dep-queued',
+            });
+
+            const result = await controller.deploy(auth, {} as any, 'work-1');
+
+            expect(result).toMatchObject({
+                status: 'pending',
+                deploymentId: 'dep-queued',
+                dispatched: false,
+                message: 'Deployment queued',
+            });
+            expect(deploymentVerifier.startVerification).not.toHaveBeenCalled();
+        });
+
+        it('deploy: a refusal from the App request path propagates unchanged', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: appWork(), isCreator: true });
+            deployFacade.getAvailableProviders.mockReturnValue([]);
+            deployFacade.isConfigured.mockResolvedValue(true);
+            deployFacade.validateToken.mockResolvedValue(true);
+            const refusal = new BadRequestException({
+                status: 'error',
+                code: 'worker_not_isolated',
+                message: 'No attested isolated worker.',
+            });
+            deployService.deploy.mockRejectedValue(refusal);
+
+            await expect(controller.deploy(auth, {} as any, 'work-1')).rejects.toBe(refusal);
+            expect(deploymentVerifier.startVerification).not.toHaveBeenCalled();
+        });
+
+        it('rollback: refused by name before anything is read or queued', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: appWork(), isCreator: true });
+            deploymentRepository.findById.mockResolvedValue({
+                id: 'dep-old',
+                workId: 'work-1',
+                environment: 'production',
+                branch: 'main',
+                commitSha: 'a'.repeat(40),
+            });
+            // Would succeed if reached — so a rejection below can only be the kind check.
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: 'dep-x' });
+
+            const attempt = controller.rollback(auth, 'work-1', { deploymentId: 'dep-old' } as any);
+
+            await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+            await expect(attempt).rejects.toMatchObject({
+                response: { status: 'error', code: 'app_rollback_unavailable' },
+            });
+            expect(deploymentRepository.findById).not.toHaveBeenCalled();
+            expect(deployService.deploy).not.toHaveBeenCalled();
+            expect(deploymentVerifier.startVerification).not.toHaveBeenCalled();
+            expect(activityLogService.log).not.toHaveBeenCalled();
+        });
+
+        it('rollback: a website Work still redeploys the target and starts the verifier', async () => {
+            const work = buildWork({ user: { id: 'caller-1' } });
+            ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+            deploymentRepository.findById.mockResolvedValue({
+                id: 'dep-old',
+                workId: 'work-1',
+                environment: 'production',
+                branch: 'main',
+                commitSha: 'b'.repeat(40),
+            });
+            deployService.deploy.mockResolvedValue({ dispatched: true, deploymentId: 'dep-new' });
+
+            const result = await controller.rollback(auth, 'work-1', {
+                deploymentId: 'dep-old',
+            } as any);
+
+            expect(deployService.deploy).toHaveBeenCalledWith('work-1', 'caller-1', {
+                environment: 'production',
+                branch: 'main',
+                commitSha: 'b'.repeat(40),
+                triggerSource: 'manual',
+            });
+            expect(deploymentVerifier.startVerification).toHaveBeenCalledWith(
+                work,
+                'caller-1',
+                undefined,
+                'dep-new',
+            );
+            expect(result).toEqual({
+                status: 'pending',
+                deploymentId: 'dep-new',
+                message: 'Rollback started',
+            });
+        });
+
+        it('batchDeploy: the verifier starts for the website Work only', async () => {
+            const website = buildWork({ id: 'a' });
+            const app = appWork({ id: 'b' });
+            ownershipService.ensureCanEdit.mockImplementation(async (id: string) => ({
+                work: id === 'b' ? app : website,
+                isCreator: true,
+            }));
+            deployService.deployBatch.mockResolvedValue({
+                totalRequested: 2,
+                successfullyStarted: 2,
+                failed: 0,
+                results: [
+                    {
+                        workId: 'a',
+                        slug: 'a',
+                        status: 'pending',
+                        message: 'ok',
+                        deploymentId: 'd-a',
+                    },
+                    {
+                        workId: 'b',
+                        slug: 'b',
+                        status: 'pending',
+                        message: 'ok',
+                        deploymentId: 'd-b',
+                    },
+                ],
+            });
+
+            const result = await controller.batchDeploy(auth, {
+                works: [{ workId: 'a' }, { workId: 'b' }],
+                teamScope: 'team-x',
+            } as any);
+
+            expect(deploymentVerifier.startVerification).toHaveBeenCalledTimes(1);
+            expect(deploymentVerifier.startVerification).toHaveBeenCalledWith(
+                website,
+                'caller-1',
+                'team-x',
+                'd-a',
+            );
+            expect(result.status).toBe('success');
+            expect(result.successfullyStarted).toBe(2);
+        });
+    });
 });

@@ -89,6 +89,7 @@ import {
 } from '@ever-works/contracts';
 
 import { WORK_APP_RUNTIME_STATES } from '../app-launcher/app-launcher.service';
+import { isUsableAppSpecStatus } from '../app-spec/app-spec.service';
 import { APP_DEPENDENCIES_SERVICE } from './app-runtime-deletion.service';
 import { AppLicenseGate } from './app-license-gate';
 import {
@@ -152,14 +153,13 @@ export interface AppDeployRuntimeStateReader {
     getOrCreate(workId: string): Promise<AppDeployRuntimeState>;
 }
 
-// ── provisional — APW-03 T12 `AppSpecService` ────────────────────────────────
+// ── APW-03 T12 `AppSpecService` — bound in `app-deploy-request.module.ts` ────
 //
-// `AppSpecService.getEffectiveSpec(workId, commitSha?)` (`APW-03/tasks.md:274`,
-// plan §2.3:195-198) does not exist in this tree. Its statuses are `valid`,
-// `invalid` and `unreadable` — "returns `{ status: 'invalid', issues }` for a commit
-// whose spec has errors" — so `status` is compared as a string and never narrowed
+// `AppSpecService.getEffectiveSpec(workId, commitSha?)` (plan §2.3:195-198) answers
+// one of six status strings, so `status` is compared as a string and never narrowed
 // (this package sets `strictNullChecks: false`, under which a boolean discriminant
-// does not narrow a union anyway). The swap is one adapter:
+// does not narrow a union anyway). `isDeployableAppSpecStatus` alone decides which pass —
+// `valid_with_warnings` too, which an earlier or superseded Build's commit reads. Bound as:
 // `{ provide: APP_DEPLOY_SPEC_SOURCE, useExisting: AppSpecService }`.
 //
 // `getEffectiveSpec` is the read §5.1 names — "APW-03 validator over
@@ -169,7 +169,7 @@ export interface AppDeployRuntimeStateReader {
 
 /** The effective App spec at one commit, plus the two facts §5.1 needs from it. */
 export interface AppDeploySpecSnapshot {
-    /** `valid` ⇔ zero validation errors (warnings allowed). Any other status refuses. */
+    /** Deployable ⇔ in APW-03's `APP_SPEC_USABLE_STATUSES` (`valid`, `valid_with_warnings`); see {@link isDeployableAppSpecStatus}. */
     status: string;
     spec?: AppSpec | null;
     commitSha?: string | null;
@@ -724,7 +724,7 @@ export class AppDeployPreconditionsService {
         const snapshot = await this.readEffectiveSpec(workId, commitSha, unmet);
         if (!snapshot) return null;
 
-        if (String(snapshot.status ?? '') !== 'valid') {
+        if (!isDeployableAppSpecStatus(snapshot.status)) {
             const issues = (snapshot.issues ?? [])
                 .map((issue) => String(issue?.code ?? issue?.path ?? '').trim())
                 .filter((name) => name.length > 0)
@@ -745,7 +745,7 @@ export class AppDeployPreconditionsService {
         if (!spec) {
             warnings.push({
                 code: APP_DEPLOY_WARNING_RUNTIME_STATE_UNAVAILABLE,
-                message: 'The App spec read reported a valid status but carried no spec document.',
+                message: 'The App spec read reported a usable status but carried no spec document.',
             });
         }
 
@@ -1564,4 +1564,21 @@ function primaryDomainRefs(spec: AppSpec | null | undefined): string[] {
     }
 
     return names;
+}
+
+/**
+ * §5.1 row 3's status rule: may a Deployment use the App spec `getEffectiveSpec` answered?
+ *
+ * Exactly APW-03's usable statuses — `APP_SPEC_USABLE_STATUSES`, `valid` and
+ * `valid_with_warnings` — because warnings never stop anything (the rule that constant's own
+ * doc records) and APW-05 already builds a `valid_with_warnings` commit. `getEffectiveSpec`
+ * answers that status for a commit that is neither the stored effective one nor a usable
+ * head: an earlier Build, a Build a newer push superseded, a rollback commit. A literal
+ * `=== 'valid'` refused all three as `spec_invalid`.
+ *
+ * It lives here, and T22's `AppRenderInputBuilder` imports it from here, so this pass and the
+ * builder that re-reads the same spec (§5.6 step 2) apply one rule and cannot drift apart.
+ */
+export function isDeployableAppSpecStatus(status: unknown): boolean {
+    return isUsableAppSpecStatus(status);
 }
