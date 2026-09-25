@@ -424,6 +424,51 @@ describe('APW-05 repository query shape (the b5a7d6857 rule, APW05-G10)', () => 
     });
 
     /**
+     * The sweep's never-adopted write: the same UPDATE as `markLost`, plus the two
+     * predicates the read saw — no run id, and the very `dispatchedAt` it read, bound
+     * as a NUMBER (the `bigint` epoch column), or `IS NULL` when it read none.
+     */
+    describe('markNeverAdoptedLost', () => {
+        it('re-checks the read dispatch stamp as a bound number, beside the open statuses', async () => {
+            const harness = queryHarness({ affected: 1 });
+            const repository = new AppBuildRepository(harness.repository);
+            const completedAt = new Date('2026-03-01T06:00:00.000Z');
+            const readDispatchedAt = Date.parse('2026-03-01T04:00:00.000Z');
+
+            expect(await repository.markNeverAdoptedLost('b1', readDispatchedAt, completedAt)).toBe(
+                true,
+            );
+
+            expect(paramsOf(harness.predicates, 'id = :id')).toEqual({ id: 'b1' });
+            expect(paramsOf(harness.predicates, 'IN (:...statuses)')).toEqual({
+                statuses: ['queued', 'running'],
+            });
+            expect(harness.predicates.map((predicate) => predicate.text)).toContain(
+                'providerRunId IS NULL',
+            );
+            const stamp = paramsOf(harness.predicates, 'dispatchedAt = :readDispatchedAt');
+            expect(stamp).toEqual({ readDispatchedAt });
+            expect(typeof stamp.readDispatchedAt).toBe('number');
+            expect(harness.sets[0]).toEqual({
+                status: 'failed',
+                failureClass: 'lost',
+                completedAt,
+            });
+        });
+
+        it('asks for dispatchedAt IS NULL when the read saw no stamp, and answers false for no row', async () => {
+            const harness = queryHarness({ affected: 0 });
+            const repository = new AppBuildRepository(harness.repository);
+
+            expect(await repository.markNeverAdoptedLost('b1', null)).toBe(false);
+
+            const texts = harness.predicates.map((predicate) => predicate.text);
+            expect(texts).toContain('dispatchedAt IS NULL');
+            expect(texts.some((text) => text.includes(':readDispatchedAt'))).toBe(false);
+        });
+    });
+
+    /**
      * APW-05 T21 (first slice) — the sweep's two new reads. Same rule as every
      * read above: alias-qualified property names the builder escapes per driver,
      * every value a parameter, every instant a plain NUMBER (the `bigint` epoch

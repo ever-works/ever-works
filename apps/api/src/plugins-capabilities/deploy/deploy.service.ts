@@ -90,6 +90,14 @@ export interface DeployOptions {
 export interface DeployResult {
     dispatched: boolean;
     deploymentId: string;
+    /**
+     * App Works only (APW-06 §2.2): `true` when the request was put in the
+     * latest-wins queue behind the Deployment holding the lock (or matched the
+     * entry already there). Absent otherwise — in particular for an ACCEPTED
+     * request whose dispatch was still in flight when FR-23's 2 s budget ran out,
+     * which is `dispatched: false` too but is not queued behind anything.
+     */
+    queued?: boolean;
 }
 
 /**
@@ -245,9 +253,20 @@ export class DeployService {
             );
         }
 
-        // `queued` is a success: the row exists in the latest-wins queue of one
-        // and will run when the Deployment holding the lock releases it. It is
-        // reported as NOT dispatched, which is exactly what `dispatched` means.
+        // Two successes answer `dispatched: false`, and they are not the same:
+        //  - `queued`: the row is in the latest-wins queue of one and runs when the
+        //    Deployment holding the lock releases it — reported with `queued: true`;
+        //  - `accepted` with the dispatch still in flight when FR-23's 2 s budget
+        //    ran out (`app-deploy-request.service.ts`, `dispatch`): nothing is
+        //    queued, the dispatch is simply not confirmed yet.
+        // `dispatched` means "the dispatcher answered inside the budget", nothing more.
+        if (result.status === 'queued') {
+            return {
+                dispatched: result.dispatched,
+                deploymentId: result.deploymentId,
+                queued: true,
+            };
+        }
         return { dispatched: result.dispatched, deploymentId: result.deploymentId };
     }
 
@@ -557,12 +576,16 @@ export class DeployService {
                 };
             }
 
-            const { dispatched, deploymentId } = await this.deploy(workId, userId, { teamScope });
+            const { dispatched, deploymentId, queued } = await this.deploy(workId, userId, {
+                teamScope,
+            });
 
             // APW-06 T34: for an App Work a RESOLVED result is always a success —
             // `deployAppWork` throws every refusal, which lands in the catch below —
-            // and `dispatched: false` means QUEUED behind the Deployment holding the
-            // lock, not "failed to initiate".
+            // so `dispatched: false` is never "failed to initiate" there. It is
+            // either QUEUED behind the Deployment holding the lock (`queued: true`)
+            // or a dispatch still in flight past FR-23's 2 s budget, which is
+            // pending but queued behind nothing.
             const started = dispatched || isAppWorkKind(work.kind);
 
             return {
@@ -572,9 +595,11 @@ export class DeployService {
                 status: started ? 'pending' : 'error',
                 message: dispatched
                     ? 'Deployment started'
-                    : started
-                      ? 'Deployment queued'
-                      : 'Failed to initiate deployment',
+                    : !started
+                      ? 'Failed to initiate deployment'
+                      : queued
+                        ? 'Deployment queued'
+                        : 'Deployment pending',
                 owner: work.getRepoOwner('website'),
                 repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             };

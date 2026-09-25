@@ -779,11 +779,129 @@ describe('AppBuildRepository', () => {
     });
 
     /**
+     * §7.4's never-adopted `lost`, re-checked in the UPDATE. `markLost` re-checks only
+     * the status; the never-adopted rule is about what has NOT happened yet, and it can
+     * happen between the sweep's read and this write — the watch adopts the run
+     * (`providerRunId`), or a prepare pass claims and starts the Build (`dispatchedAt`).
+     */
+    describe('markNeverAdoptedLost (§7.4, never adopted)', () => {
+        beforeEach(async () => {
+            await seedWork(WORK_A);
+        });
+
+        const rows = () => dataSource.getRepository(WorkBuild);
+
+        it('fails a Build that is still exactly as read — open, no run, dispatchedAt NULL', async () => {
+            const build = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+            });
+
+            expect(await repository.markNeverAdoptedLost(build.id, null, new Date(NOW))).toBe(true);
+
+            const row = await stored(build.id);
+            expect(row.status).toBe('failed');
+            expect(row.failureClass).toBe('lost');
+            expect(row.completedAt?.getTime()).toBe(NOW);
+        });
+
+        it('fails a Build whose dispatch stamp is the one that was read', async () => {
+            const dispatchedAt = NOW - 2 * 60 * MINUTE;
+            const build = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'verification',
+                status: 'running',
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+                dispatchedAt: new Date(dispatchedAt),
+            });
+
+            expect(
+                await repository.markNeverAdoptedLost(build.id, dispatchedAt, new Date(NOW)),
+            ).toBe(true);
+            expect((await stored(build.id)).failureClass).toBe('lost');
+        });
+
+        it('leaves a Build the watch adopted after the read — a run that just started is never orphaned', async () => {
+            const build = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+            });
+            // The adoption, landing between the sweep's read and its write.
+            await rows().update(build.id, { providerRunId: 'run-42' });
+
+            expect(await repository.markNeverAdoptedLost(build.id, null, new Date(NOW))).toBe(
+                false,
+            );
+
+            const row = await stored(build.id);
+            expect(row.status).toBe('queued');
+            expect(row.failureClass).toBeNull();
+            expect(row.providerRunId).toBe('run-42');
+        });
+
+        it('leaves a Build a prepare claimed after the read (dispatchedAt NULL → stamped)', async () => {
+            const build = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+            });
+            // The runner's dispatch claim, landing between the read and the write.
+            await rows().update(build.id, { dispatchedAt: new Date(NOW - SECOND) });
+
+            expect(await repository.markNeverAdoptedLost(build.id, null, new Date(NOW))).toBe(
+                false,
+            );
+            expect((await stored(build.id)).status).toBe('queued');
+        });
+
+        it('leaves a Build whose dispatch stamp changed after the read', async () => {
+            const read = NOW - 2 * 60 * MINUTE;
+            const build = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+                dispatchedAt: new Date(read),
+            });
+            await rows().update(build.id, { dispatchedAt: new Date(NOW - SECOND) });
+
+            expect(await repository.markNeverAdoptedLost(build.id, read, new Date(NOW))).toBe(
+                false,
+            );
+            expect((await stored(build.id)).status).toBe('queued');
+        });
+
+        it('leaves a terminal Build exactly as it was', async () => {
+            const finished = await seedBuild({
+                workId: WORK_A,
+                number: 1,
+                trigger: 'manual',
+                status: 'succeeded',
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+            });
+
+            expect(await repository.markNeverAdoptedLost(finished.id, null, new Date(NOW))).toBe(
+                false,
+            );
+            const row = await stored(finished.id);
+            expect(row.status).toBe('succeeded');
+            expect(row.failureClass).toBeNull();
+        });
+    });
+
+    /**
      * T21's first slice — the sweep's re-drive read (§9.2 "a requested Build stays
      * queued … the job retries 3 times"). The window is half-open, `[min, max)` by
      * AGE: `queuedAt <= now - min` and `queuedAt > now - max`. The sweep passes
      * 90 s and 90 s + 3 × 120 s = 450 s, so exactly three two-minute ticks fall
-     * inside it.
+     * inside it when the ticks are exactly periodic (three ±1 under real tick
+     * jitter — see `app-build-sweep.service.ts`).
      */
     describe('findUndispatchedRequested (§9.2, the sweep re-drive)', () => {
         const MIN_AGE = APP_BUILD_POLL_AFTER_SILENCE_MS;

@@ -68,9 +68,14 @@ import { AppRuntimeStateModule } from '../app-runtime-state.module';
  * A token moving from UNBOUND to BOUND is the point — update {@link BOUND} and
  * say in the commit what now works that did not. A token moving the other way
  * means a binding was lost; find it before changing the list. And a NEW token
- * that is neither in {@link BOUND} nor in {@link UNBOUND} fails the last case
- * in this file on purpose: a port added without a decision about who provides
- * it is exactly the thing this register exists to stop.
+ * declared under any `app-*` directory that is neither in {@link BOUND} nor in
+ * {@link UNBOUND} fails the case "classifies every token the App Works
+ * directories declare" on purpose: a port added without a decision about who
+ * provides it is exactly the thing this register exists to stop. (That case was
+ * promised here from the start and only written on 2026-09-26; five tokens had
+ * slipped through in the meantime — see the headline case.) A token an App Works
+ * module provides and {@link BOUND} does not name fails "names in BOUND every
+ * declared …", the other half of "binds exactly".
  */
 
 /** Every Nest module this programme declares, by the name its file gives it. */
@@ -203,6 +208,11 @@ const BOUND: readonly string[] = [
     // `missingRequired` found nothing missing and `ensureGenerated` had
     // nothing to generate, for every App Work.
     'APP_ENV_SPEC_SOURCE',
+    // C10 — `buildAppForkReadinessDispatcherProvider()`, provided by `AppWorksModule`
+    // over the active job runtime's dispatchers view. It had been provided since C10
+    // and listed nowhere: the register only checked BOUND ⊆ provided until the
+    // "names in BOUND every declared …" case (2026-09-26) checked the other half.
+    'APP_FORK_READINESS_DISPATCHER',
     'APP_RUNTIME_ENV_SOURCE',
     // APW-03 T26 (explicit + probe halves) — `AppSourceCatalogAdapter`, bound
     // 2026-09-25 by `AppWorksModule`, beside the inspector and the create service
@@ -216,10 +226,14 @@ const BOUND: readonly string[] = [
     'APP_SOURCE_CATALOG_PORT',
     // APW-05 T16's two credential/fact ports, provided by `AppBuildsModule`
     // (2026-09-22). Declared by `build-facade.service.ts`, so they belong in this
-    // register like any other port — a new token in NEITHER list fails the last
-    // case in this file, which is how they got here.
+    // register like any other port — a new token in NEITHER list fails the
+    // "classifies every token …" case below.
     'BUILD_REPOSITORY_FACTS_SOURCE',
     'BUILD_TOKEN_SOURCE',
+    // APW-06 — `DefaultManagedHostRootResolver`, provided by `AppLauncherModule`
+    // (`useClass`). Provided and unlisted until 2026-09-26, like the readiness
+    // dispatcher above.
+    'MANAGED_HOST_ROOT_RESOLVER',
     // APW-06 T17 — provided by `AppRuntimeStateModule` (2026-09-21).
     'WORK_APP_RUNTIME_STATES',
 ];
@@ -298,6 +312,10 @@ const UNBOUND: readonly string[] = [
     'APP_ENV_ACTOR_NAMES',
     'APP_ENV_BUILD_FINGERPRINTS',
     'APP_ENV_DEPLOY_FINGERPRINTS',
+    // APW-01 T15 — bound OUTSIDE this package, twice: `apps/api`'s App Works module
+    // (`useExisting: AppSourceInitializerService`) and the Trigger worker module. No
+    // module in `packages/agent` provides it, which is all this list claims.
+    'APP_FORK_READY_HANDLER',
     'APP_HEALTH_EGRESS_SOURCE',
     'APP_HOSTS_APPS_DOMAIN',
     'APP_HOSTS_DEPLOYMENT_STORE',
@@ -328,13 +346,59 @@ const UNBOUND: readonly string[] = [
     'APP_UPSTREAM_LICENSE_SERVICE',
     'APP_UPSTREAM_PRIVATE_COPY_PORT',
     'APP_UPSTREAM_STATE_READER',
+    // APW-02 T31's — `app-works.module.ts` records that its binding is not that
+    // file's to add; nothing provides it anywhere yet.
+    'APP_UPSTREAM_SYNC_DISPATCHER',
     'APP_UPSTREAM_SYNC_SPEC_SOURCE',
     'APP_VERIFICATION_SINK',
     'APP_VERIFICATION_SPEC_SOURCE',
+    // APW-01 T36 — bound in `apps/api` by the `@Global()`
+    // `AppWorksTelemetryBindingModule` (`useExisting: AnalyticsService`), whose global
+    // export reaches `AppWorksTelemetryService` without an import. Unbound in THIS
+    // package on purpose: the agent never depends on `@ever-works/monitoring`.
+    'APP_WORKS_TELEMETRY_SINK',
     'APP_WORK_AGENT_RESOLVER',
     'APP_WORK_DELETION_COMPLETION',
     'APP_WORK_DELETION_PORT',
 ];
+
+/**
+ * `Symbol()`s under the App Works directories that are NOT injection tokens, each with
+ * its reason — the only names the classification case below lets through unlisted.
+ */
+const NOT_A_PORT: readonly string[] = [
+    // `app-deploy-request.service.ts` — the sentinel FR-23's 2 s dispatch budget rejects
+    // with, so a dispatch failure is never mistaken for the budget running out. It is
+    // compared by identity inside one method and never `@Inject()`ed.
+    'APP_DEPLOY_REQUEST_BUDGET_EXCEEDED',
+];
+
+/**
+ * Every `Symbol('…')` the App Works programme declares, by description → where: the
+ * production sources of every `app-*` directory under `packages/agent/src`, read through
+ * the same TypeScript-parser scan the duplicate-name case below uses (so a token quoted in
+ * a comment is not a declaration).
+ *
+ * The job-runtime dispatchers under `tasks/` (`APP_BUILD_PREPARE_DISPATCHER` and the
+ * rest) are deliberately out of scope: `buildJobRuntimeProviders()` binds every one of
+ * them in `packages/tasks`' `@Global()` `TriggerModule`, and `job-runtime.providers.spec.ts`
+ * is their register.
+ */
+function appWorksDeclaredTokens(): Map<string, string> {
+    const declared = new Map<string, string>();
+    const appDirectories = readdirSync(AGENT_SRC, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name.startsWith('app-'))
+        .map((entry) => join(AGENT_SRC, entry.name));
+    for (const directory of appDirectories) {
+        for (const file of productionSourceFiles(directory)) {
+            const at = relative(AGENT_SRC, file).split('\\').join('/');
+            for (const { description } of symbolDeclarationsIn(at, readFileSync(file, 'utf8'))) {
+                if (!declared.has(description)) declared.set(description, at);
+            }
+        }
+    }
+    return declared;
+}
 
 describe('App Works port dormancy register (§5.10)', () => {
     it('reads real provider metadata — a zero here would make every case below vacuous', () => {
@@ -352,6 +416,18 @@ describe('App Works port dormancy register (§5.10)', () => {
         const actuallyBound = [...BOUND].filter((name) => bound.has(name)).sort();
 
         expect(actuallyBound).toEqual([...BOUND].sort());
+    });
+
+    it('names in BOUND every declared App Works token an App Works module provides', () => {
+        // The other half of "exactly": the case above proves every BOUND name is
+        // provided, and this one that nothing provided is missing from BOUND — a
+        // binding added without a line here would otherwise go uncounted.
+        const bound = boundTokenNames();
+        const providedButUnlisted = [...appWorksDeclaredTokens().keys()]
+            .filter((name) => bound.has(name) && !BOUND.includes(name))
+            .sort();
+
+        expect(providedButUnlisted).toEqual([]);
     });
 
     it('WORK_APP_RUNTIME_STATES is bound — APW-06 T17, and the reason the list is not empty', () => {
@@ -374,12 +450,21 @@ describe('App Works port dormancy register (§5.10)', () => {
         // The register's headline, and it is about THIS PACKAGE — see the
         // scope note in the header and `WORKER_BOUND`. It is an assertion
         // and not a log line so
-        // that it cannot drift: **46 of the 68 tokens in these two lists are
-        // dormant**, and the 22 that are not are named in `BOUND`. It was 62 of
+        // that it cannot drift: **49 of the 73 tokens in these two lists are
+        // dormant**, and the 24 that are not are named in `BOUND`. It was 62 of
         // 68 on 2026-09-21; APW-07's seven, APW-06's five and APW-05's three
         // moved across on 2026-09-22, and APW-03's catalog port on 2026-09-25.
-        expect(UNBOUND).toHaveLength(46);
-        expect(BOUND).toHaveLength(22);
+        //
+        // 46/22 → 49/24 on 2026-09-26 was not a binding change: the header had
+        // promised a case that fails on a token in neither list, and no such
+        // case existed, so five declared tokens were counted nowhere. The
+        // "classifies every token …" case now exists and placed them — two
+        // provided here (`APP_FORK_READINESS_DISPATCHER`,
+        // `MANAGED_HOST_ROOT_RESOLVER`) and three that no module in this package
+        // provides (`APP_FORK_READY_HANDLER`, `APP_UPSTREAM_SYNC_DISPATCHER`,
+        // `APP_WORKS_TELEMETRY_SINK`).
+        expect(UNBOUND).toHaveLength(49);
+        expect(BOUND).toHaveLength(24);
     });
 
     it('names where the worker binds what this package does not', () => {
@@ -421,6 +506,28 @@ describe('App Works port dormancy register (§5.10)', () => {
         expect([...UNBOUND]).toEqual([...UNBOUND].sort());
         expect([...BOUND]).toEqual([...BOUND].sort());
         expect(UNBOUND.filter((name) => BOUND.includes(name))).toEqual([]);
+    });
+
+    it('classifies every token the App Works directories declare — a new port needs a decision', () => {
+        // The case the header promises. A `Symbol()` added under an `app-*` directory
+        // that is in neither list fails HERE, by name, until someone decides who
+        // provides it; a list entry whose declaration was deleted fails here too.
+        const declared = appWorksDeclaredTokens();
+        const ports = [...declared.keys()].filter((name) => !NOT_A_PORT.includes(name));
+
+        // Vacuity guard: the programme declares seventy-odd tokens. An empty scan would
+        // pass both assertions below by accident.
+        expect(ports.length).toBeGreaterThan(50);
+        expect(NOT_A_PORT.filter((name) => !declared.has(name))).toEqual([]);
+
+        const unclassified = ports
+            .filter((name) => !BOUND.includes(name) && !UNBOUND.includes(name))
+            .map((name) => `${name} (${declared.get(name)})`)
+            .sort();
+        const stale = [...BOUND, ...UNBOUND].filter((name) => !declared.has(name)).sort();
+
+        expect(unclassified).toEqual([]);
+        expect(stale).toEqual([]);
     });
 });
 

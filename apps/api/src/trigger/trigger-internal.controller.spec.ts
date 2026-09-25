@@ -484,10 +484,14 @@ describe('TriggerInternalController', () => {
 
         // APW-05 T21 — the real method the RPC hop must reach (`runSweep`, the one
         // member the task's seam declares). The API reads its own clock, so the
-        // worker sends no argument.
+        // worker sends no argument. `sweep` (the lock-free body) and `lostPass` stand
+        // for the rest of the real class's prototype — public or TS-private, all of it
+        // function-valued — which a prototype-derived allow-list would publish.
         appBuildSweepService = {
             name: 'AppBuildSweepService',
             runSweep: jest.fn(() => ({ skipped: null, redriveRequested: 1, lostMarked: 0 })),
+            sweep: jest.fn(),
+            lostPass: jest.fn(),
         };
 
         // APW-06 §5.1 — the two reads `AppDeployBuildSource` declares, and nothing else:
@@ -1139,18 +1143,6 @@ describe('TriggerInternalController', () => {
     });
 
     /**
-     * APW-01 T15 — the ready handler, the RPC target the `app-fork-readiness` run calls
-     * once the Work Repository has content.
-     *
-     * Two claims, and both have to hold together: the name is in `remoteMap` (so the
-     * worker's proxy does not answer `Unknown remote target: AppSourceInitializerService`)
-     * and `onDataRepositoryReady` — the one member `AppForkReadyHandler` declares — is in
-     * the auto-derived allow-list (so the call is not refused before it reaches the
-     * method). This is the same pair the C10 block above asserts for the runner, and the
-     * reason is the same: before the entry existed there was nothing to call, so the App
-     * spec state row could never be created (C32).
-     */
-    /**
      * APW-05 T21 (first slice) — `packages/tasks/src/tasks/trigger/app-build-sweep.task.ts`
      * proxies exactly this name, because a Trigger worker owns no `DataSource` and the
      * sweep's passes write `work_builds`, take the `app-builds:sweep` lock (a callback,
@@ -1160,8 +1152,15 @@ describe('TriggerInternalController', () => {
      * `failed` — visible, but no stuck Build would ever be re-driven on a Trigger install.
      */
     describe('the APW-05 T21 app-build-sweep remote target', () => {
-        it('registers AppBuildSweepService so the scheduled sweep can run at all', () => {
-            expect((controller as any).remoteMap.AppBuildSweepService).toBe(appBuildSweepService);
+        it('registers an AppBuildSweepService entry so the scheduled sweep can run at all', () => {
+            // Until the entry became a narrow facade (the `PluginAllowlistReader`
+            // precedent) this pinned `toBe(appBuildSweepService)`: the whole instance
+            // was published, and with it the lock-free `sweep(nowMs)` and every
+            // TS-private pass. The entry is now a one-member object over the service.
+            const entry = (controller as any).remoteMap.AppBuildSweepService;
+            expect(entry).toBeDefined();
+            expect(entry).not.toBe(appBuildSweepService);
+            expect(Object.keys(entry)).toEqual(['runSweep']);
         });
 
         it('reaches `runSweep` — the one member the task’s seam declares — over the RPC hop', async () => {
@@ -1179,21 +1178,66 @@ describe('TriggerInternalController', () => {
             });
         });
 
-        it('derives an allow-list that contains `runSweep` and refuses an unknown method', async () => {
-            expect(
-                (controller as any).allowedMethods.AppBuildSweepService as Set<string>,
-            ).toContain('runSweep');
+        it('never forwards a caller-supplied clock — the API reads its own', async () => {
+            // `runSweep(nowMs)` keeps its clock seam for the specs. Over the RPC hop a
+            // far-future `nowMs` would fail every open never-adopted requested Build as
+            // `lost`, so the entry calls `runSweep()` whatever arguments arrive.
+            const farFuture = Date.parse('2099-01-01T00:00:00.000Z');
+
+            await controller.callRemote(VALID_SECRET, {
+                name: 'AppBuildSweepService',
+                method: 'runSweep',
+                args: superjson.serialize([farFuture]) as any,
+            });
+
+            expect(appBuildSweepService.runSweep).toHaveBeenCalledTimes(1);
+            expect(appBuildSweepService.runSweep).toHaveBeenCalledWith();
+        });
+
+        it('derives an allow-list of exactly `runSweep`, refusing `sweep`, the passes and an unknown method', async () => {
+            expect([
+                ...((controller as any).allowedMethods.AppBuildSweepService as Set<string>),
+            ]).toEqual(['runSweep']);
+
+            for (const method of ['sweep', 'lostPass', 'doesNotExist']) {
+                await expect(
+                    controller.callRemote(VALID_SECRET, {
+                        name: 'AppBuildSweepService',
+                        method,
+                        args: superjson.serialize([Date.now()]) as any,
+                    }),
+                ).rejects.toThrow(`Method not in allow-list for AppBuildSweepService: ${method}`);
+            }
+            expect(appBuildSweepService.sweep).not.toHaveBeenCalled();
+            expect(appBuildSweepService.lostPass).not.toHaveBeenCalled();
+        });
+
+        it('answers the loud `Unknown remote target` when the service is not bound', async () => {
+            appBuildSweepService = undefined;
+            const bare = buildController();
 
             await expect(
-                controller.callRemote(VALID_SECRET, {
+                bare.callRemote(VALID_SECRET, {
                     name: 'AppBuildSweepService',
-                    method: 'doesNotExist',
+                    method: 'runSweep',
                     args: superjson.serialize([]) as any,
                 }),
-            ).rejects.toThrow('Method not in allow-list for AppBuildSweepService: doesNotExist');
+            ).rejects.toThrow('Unknown remote target: AppBuildSweepService');
         });
     });
 
+    /**
+     * APW-01 T15 — the ready handler, the RPC target the `app-fork-readiness` run calls
+     * once the Work Repository has content.
+     *
+     * Two claims, and both have to hold together: the name is in `remoteMap` (so the
+     * worker's proxy does not answer `Unknown remote target: AppSourceInitializerService`)
+     * and `onDataRepositoryReady` — the one member `AppForkReadyHandler` declares — is in
+     * the auto-derived allow-list (so the call is not refused before it reaches the
+     * method). This is the same pair the C10 block above asserts for the runner, and the
+     * reason is the same: before the entry existed there was nothing to call, so the App
+     * spec state row could never be created (C32).
+     */
     describe('the APW-01 T15 app-source-initializer remote target', () => {
         it('registers AppSourceInitializerService so the ready hand-off can happen at all', () => {
             expect((controller as any).remoteMap.AppSourceInitializerService).toBe(

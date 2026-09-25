@@ -191,9 +191,31 @@ describe('DeployService.deploy — kind `app` (APW-06 §2.2)', () => {
         };
         const { service } = makeService('app', request);
 
+        // `queued: true` was added when `dispatched: false` stopped being read as
+        // "queued" on its own: an ACCEPTED request whose dispatch outlived the 2 s
+        // budget is also `dispatched: false`, and nothing is queued there.
         expect(await service.deploy(WORK_ID, USER_ID)).toEqual({
             dispatched: false,
             deploymentId: 'd-queued',
+            queued: true,
+        });
+    });
+
+    it('reports an ACCEPTED request whose dispatch outlived the budget as neither started nor queued', async () => {
+        // `AppDeployRequestService` answers `accepted` with `dispatched: false`
+        // when the 2 s dispatch budget runs out while the dispatch is still in
+        // flight. The row is not in the latest-wins queue, so `queued` must not
+        // be claimed for it.
+        const request: RequestMock = {
+            request: jest.fn(async () =>
+                appResult({ status: 'accepted', dispatched: false, deploymentId: 'd-slow' }),
+            ),
+        };
+        const { service } = makeService('app', request);
+
+        expect(await service.deploy(WORK_ID, USER_ID)).toEqual({
+            dispatched: false,
+            deploymentId: 'd-slow',
         });
     });
 
@@ -270,6 +292,36 @@ describe('DeployService.deploy — kind `app` (APW-06 §2.2)', () => {
             deploymentId: 'd-queued',
             status: 'pending',
             message: 'Deployment queued',
+        });
+        expect(result.successfullyStarted).toBe(1);
+        expect(result.failed).toBe(0);
+    });
+
+    it('deployBatch reports a dispatch still in flight past the budget as pending, never as queued', async () => {
+        // `accepted` + `dispatched: false`: the request answered inside FR-23's
+        // 2 s budget while the dispatch was still running. It is a success, and
+        // it is not queued behind anything, so "Deployment queued" would be false.
+        const request: RequestMock = {
+            request: jest.fn(async () =>
+                appResult({ status: 'accepted', dispatched: false, deploymentId: 'd-slow' }),
+            ),
+        };
+        const { service, findById } = makeService('app', request);
+        findById.mockResolvedValue({
+            id: WORK_ID,
+            slug: 'demo',
+            kind: 'app',
+            getRepoOwner: () => 'acme',
+            getWebsiteRepo: () => 'demo-app',
+        });
+
+        const result = await service.deployBatch([{ workId: WORK_ID }] as never, USER_ID);
+
+        expect(result.results[0]).toMatchObject({
+            workId: WORK_ID,
+            deploymentId: 'd-slow',
+            status: 'pending',
+            message: 'Deployment pending',
         });
         expect(result.successfullyStarted).toBe(1);
         expect(result.failed).toBe(0);

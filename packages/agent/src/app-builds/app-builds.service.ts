@@ -1053,9 +1053,9 @@ export function toAppBuildSummary(build: WorkBuild): AppBuildSummary {
  *
  * - a Build the owner cancelled (`cancel` leaves `completedAt` NULL on purpose)
  *   still finalises on the next observation — that is ACC-05-09's sequence;
- * - a Build the sweep failed as `lost` (`markLost` writes `status` +
- *   `completedAt` and no verdict) still finalises, because the guard is the
- *   verdict and not the status.
+ * - a Build the sweep failed as `lost` (`markLost` / `markNeverAdoptedLost`
+ *   write `status` + `completedAt` and no verdict) still finalises, because the
+ *   guard is the verdict and not the status.
  *
  * ## Additive by design: unlanded collaborators are optional ports
  *

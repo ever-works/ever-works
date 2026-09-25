@@ -44,8 +44,9 @@ import {
  *
  * The Builds live in a REAL in-memory better-sqlite3 table read through the real
  * `AppBuildRepository`, because the two properties that matter most are window
- * arithmetic — "exactly three re-drives" and "lost one millisecond after the
- * deadline, never at it" — and they are only honest when the SQL that bounds the
+ * arithmetic — "exactly three re-drives" at exactly periodic ticks (three ±1
+ * under real tick jitter) and "lost one millisecond after the deadline, never at
+ * it" — and they are only honest when the SQL that bounds the
  * window is the SQL production runs. `AppBuildsService` is a recording double in
  * the unit cases (the sweep's contract with it is two calls: `requestPrepare` and
  * `finalize`); the last block wires the REAL service, the REAL prepare runner and
@@ -274,8 +275,11 @@ describe('AppBuildSweepService', () => {
 
         it('re-drives a stuck Build on exactly three two-minute ticks, then leaves it', async () => {
             // Pins §9.2's "3 times": a half-open window three intervals long holds
-            // exactly three ticks, whatever their phase. Widening the window by one
-            // millisecond (451 s) gives this Build a fourth request.
+            // exactly three ticks, whatever their phase, when the ticks are exactly
+            // 120 s apart — as they are here. Widening the window by one millisecond
+            // (451 s) gives this Build a fourth request. Real ticks drift by a few
+            // seconds, so production sees three ±1; that bound is the window's, and
+            // a re-drive is idempotent.
             const h = unit();
             const queuedAt = NOW - 10 * MINUTE;
             await seedBuild({ workId: WORK_A, queuedAt: new Date(queuedAt) });
@@ -453,13 +457,19 @@ describe('AppBuildSweepService', () => {
 
         it('never finalizes a Build this pass did not move (a racing terminal write)', async () => {
             // `finalize` is not claim-guarded against a concurrent finalize, so the
-            // pass may only finalize the rows ITS `markLost` moved: a Build that
+            // pass may only finalize the rows ITS write moved: a Build that
             // finished between the read and the UPDATE is finalized by whoever
             // finished it, and a second call would publish a second terminal event.
+            //
+            // The spy moved from `markLost` to `markNeverAdoptedLost` when the pass
+            // started re-checking the never-adopted predicate in its UPDATE; the
+            // property is unchanged — a write that moved nothing finalizes nothing.
             const h = unit();
             const queuedAt = NOW - 3 * 60 * MINUTE;
             await seedBuild({ workId: WORK_A, queuedAt: new Date(queuedAt) });
-            const markLost = jest.spyOn(repository, 'markLost').mockResolvedValueOnce(0);
+            const markLost = jest
+                .spyOn(repository, 'markNeverAdoptedLost')
+                .mockResolvedValueOnce(false);
 
             try {
                 const summary = await h.sweeps.sweep(NOW);
@@ -473,6 +483,66 @@ describe('AppBuildSweepService', () => {
                 });
             } finally {
                 markLost.mockRestore();
+            }
+        });
+
+        /**
+         * The pass reads its candidates, then — before its write — the Build stops being
+         * never-adopted: a prepare pass claims it (stamps `dispatchedAt`) and starts it, or
+         * the watch adopts its run (`providerRunId`). Failing it as `lost` then would orphan
+         * a run that just started: the runner's record patch finds a row that is no longer
+         * `queued` and records nothing. The write re-checks what the read saw.
+         */
+        function raceAfterRead(buildId: string, change: Partial<WorkBuild>) {
+            const realRead = repository.findNeverAdoptedQueuedBefore.bind(repository);
+            return jest
+                .spyOn(repository, 'findNeverAdoptedQueuedBefore')
+                .mockImplementationOnce(async (cutoffMs: number, limit: number) => {
+                    const candidates = await realRead(cutoffMs, limit);
+                    await dataSource.getRepository(WorkBuild).update(buildId, change);
+                    return candidates;
+                });
+        }
+
+        it('never fails a Build a prepare claimed between the read and the write', async () => {
+            const h = unit();
+            const build = await seedBuild({
+                workId: WORK_A,
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+            });
+            const read = raceAfterRead(build.id, { dispatchedAt: new Date(NOW - SECOND) });
+
+            try {
+                const summary = await h.sweeps.sweep(NOW);
+
+                const row = await stored(build.id);
+                expect(row.status).toBe('queued');
+                expect(row.failureClass).toBeNull();
+                expect(h.service.finalize).not.toHaveBeenCalled();
+                expect(summary).toMatchObject({ lostCandidates: 1, lostMarked: 0, lostFailed: 0 });
+            } finally {
+                read.mockRestore();
+            }
+        });
+
+        it('never fails a Build the watch adopted between the read and the write', async () => {
+            const h = unit();
+            const build = await seedBuild({
+                workId: WORK_A,
+                queuedAt: new Date(NOW - 3 * 60 * MINUTE),
+            });
+            const read = raceAfterRead(build.id, { providerRunId: 'run-7', status: 'running' });
+
+            try {
+                const summary = await h.sweeps.sweep(NOW);
+
+                const row = await stored(build.id);
+                expect(row.status).toBe('running');
+                expect(row.failureClass).toBeNull();
+                expect(h.service.finalize).not.toHaveBeenCalled();
+                expect(summary).toMatchObject({ lostCandidates: 1, lostMarked: 0 });
+            } finally {
+                read.mockRestore();
             }
         });
 

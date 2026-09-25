@@ -93,7 +93,10 @@
  *    `packages/agent/src/app-works/app-work-deletion.port.ts`, and the four names are now imported
  *    from it and re-exported — no local declaration remains.
  * 2. **APW-01 T39** — `completeAppWorkDeletion(workId)` (`APW-01/plan.md:980-982`), reached here
- *    through the {@link APP_WORK_DELETION_COMPLETION} seam.
+ *    through the {@link APP_WORK_DELETION_COMPLETION} seam. ⏳ **Half swapped**: the method has
+ *    landed on `WorkLifecycleService`, and the seam's token is declared once, here; what is still
+ *    owed is the API binding `{ provide: APP_WORK_DELETION_COMPLETION, useExisting:
+ *    WorkLifecycleService }` (APW-06 T33/T58), not a change to this file.
  * 3. **APW-07 T16** — `AppDependenciesService.onAppWorkDeleting(workId, { deleteStoredData })` and
  *    `onAppRemoved(workId, { deleteData })` (`APW-07/plan.md:749-758`, `:561`).
  *
@@ -313,13 +316,18 @@ export interface AppWorkDeletionOpResult {
 export { APP_WORK_DELETION_PORT };
 export type { AppWorkDeletionOutcome, AppWorkDeletionPort, AppWorkDeletionRequest };
 
-// ── provisional — APW-01 T39, the completion edge ────────────────────────────
+// ── APW-01 T39, the completion edge — the method exists, the BINDING does not ──
 //
 // `WorkLifecycleService.completeAppWorkDeletion(workId)` is APW-01's (`APW-01/plan.md:980-982`) and
-// does not exist yet. §9.8:1537-1541 reaches it through `ModuleRef` (`finishDeletion` resolves
-// `WorkLifecycleService` in the API), so this narrow seam is what that resolution binds: the swap is
-// `{ provide: APP_WORK_DELETION_COMPLETION, useExisting: WorkLifecycleService }` in the API's
-// module graph, and nothing else in this file changes.
+// has landed (`packages/agent/src/services/work-lifecycle.service.ts`, `completeAppWorkDeletion`):
+// it deletes the row and the local checkouts, idempotently, and answers `false` for a Work that is
+// already gone. §9.8:1537-1541 reaches it through `ModuleRef` (`finishDeletion` resolves
+// `WorkLifecycleService` in the API), so this narrow seam is what that resolution binds. The one
+// thing still missing is the API-side binding
+// `{ provide: APP_WORK_DELETION_COMPLETION, useExisting: WorkLifecycleService }` (APW-06 T33/T58,
+// beside `APP_WORK_DELETION_PORT_PROVIDER`); nothing else in this file changes when it lands. Until
+// then the token is unbound (`app-works-port-dormancy.spec.ts` lists it) and a finished removal
+// keeps the Work row — the fail-closed answer the table in this file's header gives.
 
 /** APW-01 T39: the completion that deletes the Work row and its local checkout, idempotently. */
 export interface AppWorkDeletionCompletion {

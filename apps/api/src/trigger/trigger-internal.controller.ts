@@ -765,9 +765,18 @@ export class TriggerInternalController implements OnModuleInit {
             AppBuildPrepareRunner: this.appBuildPrepareRunner,
             // APW-05 T20 + C17 — and the worker half of `app-build-watch`, same rule.
             AppBuildWatchRunner: this.appBuildWatchRunner,
-            // APW-05 T21 — and the `app-build-sweep` schedule's `runSweep()`, same rule
-            // (allow-list auto-derived).
-            AppBuildSweepService: this.appBuildSweepService,
+            // APW-05 T21 — and the `app-build-sweep` schedule's `runSweep()`, and ONLY
+            // that: a one-member facade (the `PluginAllowlistReader` precedent below),
+            // so the derived allow-list is exactly `runSweep`. The service's prototype
+            // also carries the lock-free `sweep(nowMs)` and its TS-private passes, and
+            // `runSweep(nowMs)` keeps a clock seam for the specs — over this hop a
+            // far-future `nowMs` would fail every open never-adopted requested Build as
+            // `lost`. The facade calls `runSweep()` with no argument whatever arrives,
+            // so the API reads its own clock. Maps to `undefined` (a loud "Unknown
+            // remote target") when the service is not bound, same rule as above.
+            AppBuildSweepService: this.appBuildSweepService
+                ? { runSweep: () => this.appBuildSweepService!.runSweep() }
+                : undefined,
             // APW-06 §5.1 — the isolated App runtime worker's Build reads (`getBuild`,
             // `listDeployableBuilds`; allow-list auto-derived), same rule: a name that
             // maps to `undefined` answers a loud "Unknown remote target".

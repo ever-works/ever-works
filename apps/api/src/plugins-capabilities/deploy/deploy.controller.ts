@@ -330,15 +330,22 @@ export class DeployController {
      *   this process (`lookupExistingDeployment` → the k8s plugin — FR-5, §6.2's
      *   `APP_CLUSTER_IO_IN_API`) and writes the Work's deployment state and the
      *   Deployment row's `state` while the App orchestrator owns both;
-     * - a QUEUED answer (`dispatched: false`) is `pending`, not a 400: the row is in
-     *   the latest-wins queue and runs when the holder releases the lock;
+     * - `dispatched: false` is `pending`, not a 400, and it has two causes: a
+     *   QUEUED answer (`queued: true` — the row is in the latest-wins queue and runs
+     *   when the holder releases the lock), or an accepted request whose dispatch
+     *   was still in flight when FR-23's 2 s budget ran out, which is queued behind
+     *   nothing — so only the first is called "queued";
      * - no website activity row, matching `POST /api/works/:id/deploy`, which writes none.
      *
      * The caller's id is sent, never the owner's — the rule
      * `work-app-deploy.controller.ts` applies to the same request.
      */
     private async deployAppWork(work: Work, callerId: string) {
-        const { dispatched, deploymentId } = await this.deployService.deploy(work.id, callerId, {});
+        const { dispatched, deploymentId, queued } = await this.deployService.deploy(
+            work.id,
+            callerId,
+            {},
+        );
 
         return {
             status: 'pending',
@@ -348,7 +355,11 @@ export class DeployController {
             // An App Work's `website` role IS its Work Repository.
             owner: work.getRepoOwner('website'),
             repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
-            message: dispatched ? 'Deployment started' : 'Deployment queued',
+            message: dispatched
+                ? 'Deployment started'
+                : queued
+                  ? 'Deployment queued'
+                  : 'Deployment pending',
         };
     }
 

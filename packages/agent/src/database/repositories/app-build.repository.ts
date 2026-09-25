@@ -413,7 +413,9 @@ export class AppBuildRepository {
      * The window is half-open by age, `[minAgeMs, maxAgeMs)`:
      * `queuedAt <= now - minAgeMs AND queuedAt > now - maxAgeMs`. A window three
      * sweep intervals long therefore holds exactly three ticks whatever their
-     * phase, which is what bounds the re-drives of one Build.
+     * phase WHEN the ticks are exactly one interval apart — and three ±1 when they
+     * drift, as real scheduled ticks do. Either way the window is what bounds the
+     * re-drives of one Build.
      *
      * `dispatchedAt IS NULL` is the runner's own selection rule
      * (`readRequestedBuilds`) and its dispatch claim: a Build the runner claimed
@@ -534,6 +536,50 @@ export class AppBuildRepository {
             .execute();
 
         return result.affected ?? 0;
+    }
+
+    /**
+     * §7.4's never-adopted `lost` for ONE Build, applied only while the row is still
+     * exactly what the sweep read: open (`queued`/`running`), with no provider run
+     * adopted (`providerRunId IS NULL`) and the same `dispatchedAt` — NULL still NULL,
+     * or the very stamp that was read. `true` when the row was moved.
+     *
+     * {@link markLost} re-checks the status alone, which suffices for a Build the
+     * provider stopped reporting. The never-adopted rule is about something that has
+     * NOT happened yet, and it can happen between the sweep's read and this write: the
+     * watch adopts the run (`providerRunId`), or a prepare pass claims and starts the
+     * Build (its dispatch claim stamps `dispatchedAt`). Failing the Build then would
+     * orphan a run that just started — the runner's record patch finds a row that is
+     * no longer `queued` and records nothing. With the predicate re-checked here the
+     * write simply misses, and the next tick measures the Build again from what it
+     * then reads.
+     *
+     * `readDispatchedAtMs` is epoch milliseconds, like every instant in this file.
+     */
+    async markNeverAdoptedLost(
+        id: string,
+        readDispatchedAtMs: number | null,
+        completedAt: Date = new Date(),
+    ): Promise<boolean> {
+        const update = this.repository
+            .createQueryBuilder()
+            .update(WorkBuild)
+            .set({ status: 'failed', failureClass: 'lost', completedAt })
+            .where('id = :id', { id })
+            .andWhere('status IN (:...statuses)', { statuses: [...APP_BUILD_OPEN_STATUSES] })
+            .andWhere('providerRunId IS NULL');
+
+        if (readDispatchedAtMs === null) {
+            update.andWhere('dispatchedAt IS NULL');
+        } else {
+            update.andWhere('dispatchedAt = :readDispatchedAt', {
+                readDispatchedAt: readDispatchedAtMs,
+            });
+        }
+
+        const result = await update.execute();
+
+        return (result.affected ?? 0) === 1;
     }
 
     /** The one row of a run identity, or `null` — the read {@link upsertByProviderRun} decides on. */

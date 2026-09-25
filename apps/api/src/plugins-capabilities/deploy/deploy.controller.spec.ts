@@ -1767,9 +1767,13 @@ describe('DeployController', () => {
             deployFacade.getAvailableProviders.mockReturnValue([]);
             deployFacade.isConfigured.mockResolvedValue(true);
             deployFacade.validateToken.mockResolvedValue(true);
+            // `queued: true` is what `DeployService.deployAppWork` sets for a request
+            // the App path answered `queued`; `dispatched: false` alone no longer
+            // implies it (see the in-flight case below).
             deployService.deploy.mockResolvedValue({
                 dispatched: false,
                 deploymentId: 'dep-queued',
+                queued: true,
             });
 
             const result = await controller.deploy(auth, {} as any, 'work-1');
@@ -1779,6 +1783,30 @@ describe('DeployController', () => {
                 deploymentId: 'dep-queued',
                 dispatched: false,
                 message: 'Deployment queued',
+            });
+            expect(deploymentVerifier.startVerification).not.toHaveBeenCalled();
+        });
+
+        it('deploy: a dispatch still in flight past the budget is pending, and never called queued', async () => {
+            // `AppDeployRequestService` answers `accepted` + `dispatched: false` when
+            // FR-23's 2 s budget ran out with the dispatch still running. Nothing
+            // is queued, so the message must not say it is.
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: appWork(), isCreator: true });
+            deployFacade.getAvailableProviders.mockReturnValue([]);
+            deployFacade.isConfigured.mockResolvedValue(true);
+            deployFacade.validateToken.mockResolvedValue(true);
+            deployService.deploy.mockResolvedValue({
+                dispatched: false,
+                deploymentId: 'dep-slow',
+            });
+
+            const result = await controller.deploy(auth, {} as any, 'work-1');
+
+            expect(result).toMatchObject({
+                status: 'pending',
+                deploymentId: 'dep-slow',
+                dispatched: false,
+                message: 'Deployment pending',
             });
             expect(deploymentVerifier.startVerification).not.toHaveBeenCalled();
         });

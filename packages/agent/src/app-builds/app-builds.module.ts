@@ -71,23 +71,39 @@ import { GitFacadeService } from '../facades/git.facade';
  * the entity in `forFeature` is what makes `@InjectRepository(WorkBuild)` resolvable
  * in the service.
  *
- * ## What is deliberately NOT bound here
+ * ## What is bound here, what is bound elsewhere, and what stays unbound
  *
- * `APP_BUILD_PLUGIN_RESOLVER` (T16), `APP_BUILD_PREPARE_DISPATCHER` /
- * `APP_BUILD_WATCH_DISPATCHER` (T18), `APP_BUILD_WATCH_RUNNER` (T20),
- * `APP_BUILD_WORK_SOURCE`, `APP_BUILD_SPEC_SOURCE` (APW-03),
- * `APP_BUILD_RUNNER_RECIPE_SOURCE` (APW-07), `APP_BUILD_PLATFORM_SETTINGS_WRITER`
- * (§4.12), `APP_BUILD_EDIT_ACCESS` and `APP_PROVISION_EVENTS_PORT` (APW-04) all
- * stay **unbound**: binding a placeholder would make an unconfigured installation
- * look configured, which is the failure mode `AppWorksModule`'s docstring names
- * for exactly this reason. Each absence has a documented, fail-closed behaviour —
- * `null` plugin ⇒ `pullTokenUnavailable` / no provider call; unbound dispatcher ⇒
+ * T17 first shipped this module with every collaborator unbound. Since then:
+ *
+ * - **bound HERE** (see `providers` below): `APP_BUILD_PLUGIN_RESOLVER` (T16, the
+ *   facade), `APP_BUILD_WORK_SOURCE`, `APP_BUILD_SPEC_SOURCE` (APW-03),
+ *   `APP_BUILD_RUNNER_RECIPE_SOURCE` (APW-07), `APP_BUILD_PREPARE_RUNNER` (T19) and
+ *   `APP_BUILD_WATCH_RUNNER` (T20);
+ * - **provided ELSEWHERE, never here**: `APP_BUILD_PREPARE_DISPATCHER` /
+ *   `APP_BUILD_WATCH_DISPATCHER` (T18) by `buildJobRuntimeProviders()` in
+ *   `packages/tasks`' `@Global()` `TriggerModule`, which is what lets them reach
+ *   this module's `@Optional()` injections; and `APP_ENV_RESOLVER_FINGERPRINTS` by
+ *   `AppEnvModule` — which is neither `@Global()` nor imported here, so from THIS
+ *   module's injector that token is absent and `AppBuildsService` takes the
+ *   "unbound fingerprints" answer below (routed as a finding, not changed here);
+ * - **unbound everywhere**: `APP_BUILD_PLATFORM_SETTINGS_WRITER` (§4.12),
+ *   `APP_BUILD_EDIT_ACCESS` and `APP_PROVISION_EVENTS_PORT` (APW-04). Binding a
+ *   placeholder for any of them would make an unconfigured installation look
+ *   configured, which is the failure mode `AppWorksModule`'s docstring names for
+ *   exactly this reason (`app-works-port-dormancy.spec.ts` counts them).
+ *
+ * Each absence has a documented, fail-closed behaviour — `null` plugin ⇒
+ * `pullTokenUnavailable` / no provider call; unbound settings writer ⇒
+ * `503 pullTokenUnavailable` from `AppBuildPullTokenService.save` BEFORE the
+ * Build read and the registry call, so no token is checked that could not be
+ * stored and no save is ever claimed that did not happen; unbound dispatcher ⇒
  * §7.1's in-process fallback; unbound fingerprints ⇒ `staleInputs`; unbound edit
- * port ⇒ `canEdit: false`. T19's prepare runner answers three of the same
- * absences in its own vocabulary, so the two lists agree: `null` plugin ⇒
- * `pluginUnavailable` and no provider call; unbound APW-07 resolver ⇒
- * `buildValuesUnavailable`, never a zero-secret sync; unbound work or spec source
- * ⇒ `workUnavailable` / `specUnavailable`.
+ * port ⇒ `canEdit: false`; unbound provision-events port ⇒ APW-04 is not told
+ * about a verification Build (the Build itself is unaffected). T19's prepare
+ * runner answers three of the same absences in its own vocabulary, so the two
+ * lists agree: `null` plugin ⇒ `pluginUnavailable` and no provider call; unbound
+ * APW-07 resolver ⇒ `buildValuesUnavailable`, never a zero-secret sync; unbound
+ * work or spec source ⇒ `workUnavailable` / `specUnavailable`.
  *
  * ## T19 — the prepare runner joins them, and its token is bound
  *

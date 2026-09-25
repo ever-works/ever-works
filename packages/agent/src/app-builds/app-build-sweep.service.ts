@@ -38,21 +38,42 @@ import {
  *    between {@link APP_BUILD_REDRIVE_MIN_AGE_MS} and
  *    {@link APP_BUILD_REDRIVE_MAX_AGE_MS} old and asks
  *    `AppBuildsService.requestPrepare(workId, 'sweep')` once per Work. The
- *    window is three sweep intervals long and half-open, so it holds exactly
- *    three ticks whatever their phase — §9.2's "3 times", at the sweep's own
- *    two-minute spacing. `requestPrepare` bumps `prepareSeq` before it
- *    dispatches, so a prepare that is already running loops once more and picks
- *    the Build up instead of being answered `locked` and forgotten.
+ *    window is three sweep intervals long and half-open, so ticks that are
+ *    exactly two minutes apart land in it three times whatever their phase —
+ *    §9.2's "3 times". Real ticks are not exactly periodic (Trigger's schedule
+ *    start latency, worker boot, the RPC hop; `runSweep` reads its clock
+ *    API-side, and a tick that finds the lock held runs no pass), so in
+ *    production a Build whose window edge falls near a tick is re-driven three
+ *    times ±1 — two or four. That is harmless: a re-drive is idempotent (one
+ *    `requestPrepare` per Work, and the runner's dispatch claim starts a Build at
+ *    most once) and still bounded by the window. `requestPrepare` bumps
+ *    `prepareSeq` before it dispatches, so a prepare that is already running
+ *    loops once more and picks the Build up instead of being answered `locked`
+ *    and forgotten.
+ *
+ *    ⚠ A **verification** Build is in this read too (`APP_BUILD_REQUESTED_TRIGGERS`,
+ *    as the plan has it), and the runner cannot plan one. Only
+ *    `AppBuildsService.startVerification` creates them, and it stamps
+ *    `dispatchedAt` after its own `startBuild` even when that throws — so one is
+ *    still undispatched at 90 s only when that persist failed or `startBuild` took
+ *    longer than 90 s. The re-drive then has the runner claim it and start it in
+ *    `verify` mode WITHOUT the verification plan: the plan-less duplicate verify
+ *    run the prepare runner's header already routes. The sweep brings that
+ *    forward (90–450 s instead of the Work's next prepare); it does not create
+ *    it. Routed, not changed here.
  * 2. **Never-adopted `lost` (§7.4).** An open manual or verification Build with
  *    no provider run id that is past `queuedAt + 5 min + timeoutMinutes + 30`
- *    is failed as `lost` with `AppBuildRepository.markLost`, and ONLY a row that
- *    call actually moved is finalised — `finalize` publishes `app.build.failed`
- *    and writes the Activity row, and it is not claim-guarded against a
- *    concurrent finalise, so finalising a row this pass did not move could
- *    publish a second terminal event. `timeoutMinutes` is read from the App spec
- *    at the Build's commit (default 60, clamped to the schema's 5–180), once
- *    per Work and commit per tick. A Build dispatched LATER than it was queued
- *    is measured from its dispatch, which is when its run could first exist.
+ *    is failed as `lost` with `AppBuildRepository.markNeverAdoptedLost`, whose
+ *    UPDATE re-checks what the read saw (still open, still no run id, the same
+ *    `dispatchedAt`), so a Build the watch adopted or a prepare claimed in between
+ *    is left alone. ONLY a row that call actually moved is finalised — `finalize`
+ *    publishes `app.build.failed` and writes the Activity row, and it is not
+ *    claim-guarded against a concurrent finalise, so finalising a row this pass
+ *    did not move could publish a second terminal event. `timeoutMinutes` is
+ *    read from the App spec at the Build's commit (default 60, clamped to the
+ *    schema's 5–180), once per Work and commit per tick. A Build dispatched
+ *    LATER than it was queued is measured from its dispatch, which is when its
+ *    run could first exist.
  *
  * The remaining T21 passes — the silent-Build watch dispatch, the adopted half of
  * the `lost` rule (`startedAt + timeoutMinutes + 30`), the `digestUnconfirmed`
@@ -93,7 +114,10 @@ export const APP_BUILD_SWEEP_LOCK_MAX_LIFETIME_MS = 5 * 60 * 1000;
 /** The period of `APP_BUILD_SWEEP_CRON` — the sweep runs every two minutes. */
 export const APP_BUILD_SWEEP_INTERVAL_MS = 120_000;
 
-/** §9.2 — how many times a requested Build nothing dispatched is re-driven. */
+/**
+ * §9.2 — how many times a requested Build nothing dispatched is re-driven, at
+ * exactly periodic ticks; tick jitter makes it three ±1 (see the file header).
+ */
 export const APP_BUILD_REDRIVE_ATTEMPTS = 3;
 
 /**
@@ -106,8 +130,9 @@ export const APP_BUILD_REDRIVE_MIN_AGE_MS = APP_BUILD_POLL_AFTER_SILENCE_MS;
 /**
  * …and is no longer re-driven once it is this old: three sweep intervals past
  * the minimum. The window `[min, max)` holds exactly
- * {@link APP_BUILD_REDRIVE_ATTEMPTS} ticks. After it the Build waits for the
- * next prepare of its Work, or for the `lost` rule.
+ * {@link APP_BUILD_REDRIVE_ATTEMPTS} ticks when they are exactly one interval
+ * apart, and one more or one fewer when they drift (see the file header). After
+ * it the Build waits for the next prepare of its Work, or for the `lost` rule.
  */
 export const APP_BUILD_REDRIVE_MAX_AGE_MS =
     APP_BUILD_REDRIVE_MIN_AGE_MS + APP_BUILD_REDRIVE_ATTEMPTS * APP_BUILD_SWEEP_INTERVAL_MS;
@@ -142,11 +167,11 @@ export interface AppBuildSweepSummary {
     readonly redriveFailed: number;
     /** Lost: never-adopted candidates read (before each Build's own deadline). */
     readonly lostCandidates: number;
-    /** Lost: Builds this tick's `markLost` moved. */
+    /** Lost: Builds this tick's `markNeverAdoptedLost` moved. */
     readonly lostMarked: number;
     /** Lost: of those, Builds `finalize` settled. */
     readonly lostFinalized: number;
-    /** Lost: Builds whose `markLost` or `finalize` threw (an unreadable spec is the default). */
+    /** Lost: Builds whose `markNeverAdoptedLost` or `finalize` threw (an unreadable spec is the default). */
     readonly lostFailed: number;
 }
 
@@ -206,6 +231,12 @@ export class AppBuildSweepService {
      * One tick, under `app-builds:sweep`. What the Trigger task calls over the
      * RPC channel (with no argument) and what the API's cron fallback calls.
      *
+     * `nowMs` is a clock seam for the specs only. The RPC entry
+     * (`TriggerInternalController`'s `AppBuildSweepService`) is a one-member facade
+     * that calls `runSweep()` with NO argument whatever the caller sends — a
+     * far-future clock would fail every open never-adopted requested Build as
+     * `lost` — and it publishes neither {@link sweep} nor the private passes.
+     *
      * A tick that cannot take the lock runs nothing and says why: `locked` when
      * another tick holds it, `lockUnavailable` when no lock service is bound —
      * two overlapping passes would re-drive the same Work twice in one tick.
@@ -243,7 +274,8 @@ export class AppBuildSweepService {
     /**
      * Both passes, WITHOUT the lock — {@link runSweep} is the entry point; this
      * is its body, public for the specs and for a caller that already holds
-     * `app-builds:sweep`.
+     * `app-builds:sweep`. It is never reachable over the internal RPC channel
+     * (see {@link runSweep}).
      */
     async sweep(nowMs: number = Date.now()): Promise<AppBuildSweepSummary> {
         let passesFailed = 0;
@@ -346,10 +378,17 @@ export class AppBuildSweepService {
                     continue;
                 }
 
-                // Moves the row only while it is still open, so a Build that
-                // finished between the read and here keeps the status it earned.
-                const moved = await this.builds.markLost([build.id], new Date(nowMs));
-                if (moved !== 1) {
+                // Moves the row only while it is still exactly what this pass read —
+                // open, never adopted, the same `dispatchedAt` — so a Build that
+                // finished, was adopted by the watch, or was claimed and started by a
+                // prepare between the read and here keeps what it has, and a run that
+                // just started is never orphaned.
+                const moved = await this.builds.markNeverAdoptedLost(
+                    build.id,
+                    build.dispatchedAt ? new Date(build.dispatchedAt).getTime() : null,
+                    new Date(nowMs),
+                );
+                if (!moved) {
                     continue;
                 }
                 marked += 1;
