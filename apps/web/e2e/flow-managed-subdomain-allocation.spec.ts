@@ -38,8 +38,21 @@
  * and records the unenforced one as a routed item rather than asserting it.
  * Reaching it needs `DEPLOY_EVER_WORKS_ENABLED=true` in the API's environment:
  * without that switch `resolveProviderDefaults` silently rewrites
- * `deployProvider: 'ever-works'` to `'vercel'` and the cap can never be reached,
- * so the first assertion here fails loudly instead of passing vacuously.
+ * `deployProvider: 'ever-works'` to `'vercel'` and the cap can never be reached.
+ *
+ * ── Where the two switch-dependent cases run (owner decision 2026-09-25):
+ *
+ * The cap case and the allocation-boundary case read the switch from the API
+ * first (the onboarding catalog's `ever-works` deploy card is `available`
+ * exactly when `config.everWorks.deploy.isEnabled()`, the reading
+ * `resolveProviderDefaults` makes). On the 32-shard matrix the switch is off
+ * on purpose — `flow-deploy-capability-contract.spec.ts` asserts the rewrite —
+ * so there both cases are SKIPPED BY NAME. They run on the
+ * `e2e-app-works-flags-on` job of `.github/workflows/e2e.yml`, which turns the
+ * switch on and sets `APW_E2E_FLAGS_ON_LANE=1`; on that job a switch reading
+ * off FAILS instead, so they can never pass vacuously. With the switch on,
+ * every `deployProvider` assertion below stays a hard expect. The other cases
+ * need no switch and run everywhere.
  *
  * ── Why the allocation half is fixme'd (and not faked):
  *
@@ -81,6 +94,12 @@ const subdomainUrl = (workId: string): string => `${API_BASE}/api/deploy/works/$
  */
 const DEPLOY_CAP =
     Number.parseInt(process.env.EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER ?? '3', 10) || 3;
+
+/**
+ * `APW_E2E_FLAGS_ON_LANE=1` marks the one job that exists to run the
+ * switch-dependent cases (`e2e-app-works-flags-on` in `.github/workflows/e2e.yml`).
+ */
+const FLAGS_ON_LANE = process.env.APW_E2E_FLAGS_ON_LANE === '1';
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -152,11 +171,59 @@ async function listWorks(
     return { status: res.status(), works };
 }
 
+/**
+ * Read `DEPLOY_EVER_WORKS_ENABLED` from the API — never from this process's env,
+ * which need not match the API's — and skip the calling case by name when it
+ * is off, unless this is the flags-on job, where off is a failure.
+ *
+ * The onboarding catalog's `ever-works` deploy card carries
+ * `available: config.everWorks.deploy.isEnabled()`
+ * (`apps/api/src/onboarding/onboarding-catalog.service.ts`), the same reading
+ * `resolveProviderDefaults` makes before it rewrites `'ever-works'` to
+ * `'vercel'`. Keyed on that reading alone, so a create that persists `'vercel'`
+ * while the switch reads ON still fails the case's own hard expect.
+ */
+async function skipUnlessEverWorksDeployEnabled(
+    request: APIRequestContext,
+    token: string,
+): Promise<void> {
+    const res = await request.get(`${API_BASE}/api/onboarding/catalog`, {
+        headers: authedHeaders(token),
+    });
+    const text = await res.text();
+    expect(res.status(), `GET /api/onboarding/catalog body=${text.slice(0, 300)}`).toBe(200);
+    const deploy = (
+        JSON.parse(text) as { deploy?: Array<{ choice?: string; available?: unknown }> }
+    ).deploy;
+    const card = deploy?.find((entry) => entry.choice === 'ever-works');
+    expect(
+        typeof card?.available,
+        'the onboarding catalog always carries the ever-works deploy card with a boolean ' +
+            '`available` (onboarding-catalog.service.ts) — the switch reading this case keys on',
+    ).toBe('boolean');
+    const enabled = card?.available === true;
+    if (FLAGS_ON_LANE) {
+        expect(
+            enabled,
+            'STACK: this is the flags-on job (APW_E2E_FLAGS_ON_LANE=1), which exists to run this ' +
+                'case, but the ever-works deploy card is unavailable — the API must run with ' +
+                'DEPLOY_EVER_WORKS_ENABLED=true here.',
+        ).toBe(true);
+    }
+    test.skip(
+        !enabled,
+        "DEPLOY_EVER_WORKS_ENABLED is off on this stack — 'ever-works' creates persist 'vercel' " +
+            '(resolveProviderDefaults), so ACC-REG-05’s cap and allocation boundary are ' +
+            'unreachable here; they run on the flags-on lane (e2e.yml job e2e-app-works-flags-on)',
+    );
+}
+
 test.describe('Managed subdomain — the per-user cap', () => {
     test(`a user may hold ${DEPLOY_CAP} active ever-works deployments and the next create is refused`, async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
+        await skipUnlessEverWorksDeployEnabled(request, user.access_token);
 
         const accepted: WorkRow[] = [];
         for (let index = 1; index <= DEPLOY_CAP; index += 1) {
@@ -286,6 +353,7 @@ test.describe('Managed subdomain — the allocation boundary the fake would have
         request,
     }) => {
         const user = await registerUserViaAPI(request);
+        await skipUnlessEverWorksDeployEnabled(request, user.access_token);
         const { result, work } = await createWork(request, user.access_token, {
             deployProvider: 'ever-works',
         });

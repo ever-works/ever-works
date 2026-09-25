@@ -12,6 +12,7 @@ operations repository and in the lane's own environment block, never here. Every
 | Lane                       | Config / workflow                                                                             | What it proves                                                                                                                                                                                                                                           | Needs                                                                                                         |
 | -------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **PR lane**                | `.github/workflows/e2e.yml` (sharded Playwright matrix) + the fake GitHub the workflow starts | the platform's existing behaviour, plus APW-13's five regression specs (`flow-repo-work-kind-regression`, `flow-template-fork-success`, `flow-activity-deploy-and-pr-events`, `flow-github-intake-signed-delivery`, `flow-managed-subdomain-allocation`) | a stack the workflow builds itself: fake GitHub, in-memory SQLite API, prod-built web, the App runtime worker |
+| **PR lane — flags-on job** | `e2e.yml` job `e2e-app-works-flags-on` (one shard) + the fake GitHub + the catalog fake       | ACC-E2E-12 (`flow-app-launcher-apps`) and ACC-REG-05's cap and allocation boundary (`flow-managed-subdomain-allocation`) — the cases that skip by name on the matrix, where both switches are off on purpose                                             | the matrix's stack plus the launcher and ever-works-deploy switches, the apps apex and the catalog fixture    |
 | **Acceptance (live) lane** | `apps/web/playwright.app-works.config.ts` (`workers: 1`, its own setup project)               | the golden paths end to end against the run account                                                                                                                                                                                                      | everything above, plus the interlocks and a GitHub connection surface (T63)                                   |
 | **Nightly lane**           | `app-works-nightly.yml` / `app-works-golden-path.yml` (APW-13 T36/T45)                        | the Blueprints, the fixture variants and the live sandbox checks                                                                                                                                                                                         | operator switches and an estate                                                                               |
 | **Harness unit lane**      | `apps/web/vitest.e2e-harness.config.ts` (`pnpm exec vitest run -c …`)                         | the harness's own specs — fake GitHub, helpers, evidence                                                                                                                                                                                                 | nothing but the repo                                                                                          |
@@ -38,6 +39,12 @@ git ls-tree -r --name-only <sha> -- packages/tasks/src/tasks/trigger/   # e.g. i
 That check is not academic: a run dispatched before the App runtime worker landed legitimately took the
 worker step's "no script yet" branch, and its logs show a `::warning title=App runtime worker absent`
 that reads like a defect and is not one.
+
+**The same dispatch runs the flags-on job** (`e2e-app-works-flags-on`, added 2026-09-25) beside the
+32-shard matrix. It is a new gate, so the programme's rule for new gates applies: its first dispatched
+run is the proof that the job itself runs, and until one run of it is green nothing it has not yet shown
+is trusted. On that run the matrix should report the two flags-on files' switch-dependent cases as
+**skipped** (with the reasons in §5), and the flags-on job should report them as **passed**.
 
 ---
 
@@ -118,6 +125,53 @@ of the live project, a runner that exports the interlocks only for step 4 gets a
 `Error: APW_E2E_RUN_ID is not set` with no scenario having run. Export them once for the whole shell
 (the workflow's env block is the source of truth for the values) and both steps work. This is worth stating
 because it reads like a broken lane and is in fact the interlock doing its job.
+
+### The flags-on recipe — ACC-E2E-12 and ACC-REG-05's cap (added 2026-09-25)
+
+`flow-app-launcher-apps` and the cap and allocation-boundary cases of `flow-managed-subdomain-allocation`
+need two switches the matrix keeps **off** on purpose: the launcher's flag-off lane needs
+`EVER_WORKS_APP_LAUNCHER_ENABLED` unset, and `flow-deploy-capability-contract` asserts that an
+`ever-works` create becomes `vercel` while `DEPLOY_EVER_WORKS_ENABLED` is off. So those cases read both
+switches from the API and **skip by name** where they are off, and they run on the `e2e-app-works-flags-on`
+job. Locally that is the stack above plus a fourth process and five variables:
+
+```bash
+# 1b. The platform-catalog fake — the launcher's "versioned catalog". Port 4084, from its OWN variable
+#     APW_E2E_PLATFORM_CATALOG_PORT (never PORT, so the PORT trap below cannot move it). It serves
+#     apps/web/e2e/fakes/platform-catalog/{platforms.json,icons/} at exactly the coordinates the API
+#     reads (EVER_WORKS_PLATFORM_CATALOG_REPO / _REF, default ever-works/platforms @ main).
+node apps/web/e2e/fakes/platform-catalog/server.mjs &
+curl -s http://127.0.0.1:4084/_control/health     # { status: 'ok', catalogVersion, platforms, … }
+
+# 2. The API exactly as in step 2 above (it already carries DEPLOY_EVER_WORKS_ENABLED=true and the
+#    fakes switch the catalog override is gated on), plus:
+EVER_WORKS_APP_LAUNCHER_ENABLED=true E2E_APP_LAUNCHER_SEED=true \
+EVER_WORKS_APPS_DOMAIN=apps.e2e.local EVER_WORKS_DOMAIN=e2e.local \
+EVER_WORKS_PLATFORM_CATALOG_BASE_URL=http://127.0.0.1:4084 EVER_WORKS_PLATFORM_CATALOG_ENV=develop \
+  … node apps/api/dist/main.js &
+
+# 4. The two files. Playwright needs the apex (it asserts the exact tile URL) and the base URL (it then
+#    requires the catalog to have been READ). APW_E2E_FLAGS_ON_LANE=1 makes a switch that reads off a
+#    failure instead of a skip — without it a mis-set stack reports named skips, not failures.
+APW_E2E_FLAGS_ON_LANE=1 EVER_WORKS_APPS_DOMAIN=apps.e2e.local \
+EVER_WORKS_PLATFORM_CATALOG_BASE_URL=http://127.0.0.1:4084 \
+pnpm --filter ever-works-web exec playwright test --project=chromium \
+  e2e/flow-app-launcher-apps.spec.ts e2e/flow-managed-subdomain-allocation.spec.ts
+```
+
+- **The job's env is the matrix's, key for key, plus exactly those deltas.**
+  `apps/web/e2e/fakes/platform-catalog/__tests__/flags-on-lane.unit.spec.ts` (harness unit lane) reads
+  `e2e.yml` and fails if the two drift, if either switch appears on the matrix, or if the job stops running
+  exactly the two files. Change a matrix variable and the flags-on job's copy together.
+- **The fixture is the reader's to accept, not the fake's.** `…/__tests__/server.unit.spec.ts` feeds the
+  served `platforms.json` and every icon to the API reader's own parser
+  (`apps/api/src/app-launcher/platform-catalog.schema.ts`) and requires them accepted whole, so an edit that
+  the reader would silently drop is a red harness run rather than a tile that quietly goes missing from both
+  sides of ACC-E2E-12's catalog-versus-launcher comparison.
+- **A catalog that was never read** shows up as `GET /api/app-launcher/platforms` answering
+  `catalogVersion: null`. `curl http://127.0.0.1:4084/_control/calls` lists every read the fake answered,
+  hit or miss; a `404` there names the path the API asked for. The flags-on job prints the same list when
+  it fails.
 
 ### The fake's `_control` API — what a spec author may call
 
@@ -220,8 +274,9 @@ deterministic green run and green status `routes/commits.mjs` derives.
     - `REQUIRE_EMAIL_VERIFICATION=false`, or `POST /api/auth/login` answers **403 "Email not verified"** and
       the Playwright global setup dies before a single spec runs.
     - `DEPLOY_EVER_WORKS_ENABLED=true`, or the managed-subdomain lane's cap and allocation-boundary cases
-      fail — without it the platform rewrites `deployProvider: 'ever-works'` to `'vercel'` and the cap is
-      unreachable.
+      cannot run — without it the platform rewrites `deployProvider: 'ever-works'` to `'vercel'` and the cap
+      is unreachable. Since 2026-09-25 they read the switch from the API and skip by name when it is off
+      (and fail instead under `APW_E2E_FLAGS_ON_LANE=1`, the flags-on recipe above).
     - `GITHUB_APP_WEBHOOK_SECRET` must reach the **Playwright** process as well as the API, or the four
       intake specs self-skip instead of signing their own deliveries.
 - **The fake GitHub reads `PORT` too, and defaults to 3900 — so a script that has already exported
@@ -251,6 +306,9 @@ deterministic green run and green status `routes/commits.mjs` derives.
 | `waiting: 'budget'` / the member sees a reset time                                                      | the Work's own budget refused the run (FR-44)                                                                                                                                                                                   | wait for the reset, or raise the Work's budget. The row keeps its state and nothing was opened                                                                                                        |
 | `dispatch_unavailable` on fork readiness                                                                | no App runtime worker is reachable                                                                                                                                                                                              | check the worker's `boot.ok` (§4); in CI, that the step is enabled and the secret is set                                                                                                              |
 | A shard fails with API timeouts under load                                                              | fleet contention, not a defect                                                                                                                                                                                                  | reproduce locally (§4) before opening anything                                                                                                                                                        |
+| skipped: `EVER_WORKS_APP_LAUNCHER_ENABLED is off …` or `DEPLOY_EVER_WORKS_ENABLED is off …`             | the 32-shard matrix, where both switches are off on purpose: the two flags-on files read the switch from the API and skip by name there                                                                                         | nothing on the matrix — the cases run on the flags-on job; locally, use the flags-on recipe (§4)                                                                                                      |
+| `STACK: this is the flags-on job (APW_E2E_FLAGS_ON_LANE=1) … but …`                                     | the flags-on job's API is missing the switch the message names, so the case fails rather than skip                                                                                                                              | restore the variable in the job's env; `flags-on-lane.unit.spec.ts` (harness lane) pins that env against the matrix's                                                                                 |
+| `STACK: EVER_WORKS_PLATFORM_CATALOG_BASE_URL is set, but the API served no catalog`                     | the catalog fake was unreachable, the API runs without `EVER_WORKS_E2E_FAKES` (the override is gated on it), or it asked for other coordinates                                                                                  | read the job log's "platform-catalog fake log and catalog reads" group — a `404` there names the path the API asked for                                                                               |
 
 ---
 

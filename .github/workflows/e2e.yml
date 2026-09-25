@@ -785,3 +785,307 @@ jobs:
             apps/web/e2e/test-results
           retention-days: 14
           if-no-files-found: ignore
+
+  # Flags-on sub-job — the PR lane's stack with the two App Works switches ON,
+  # running ONLY the two files that need them (owner decision 2026-09-25):
+  #
+  #   - `e2e/flow-app-launcher-apps.spec.ts` — ACC-E2E-12, "with the launcher
+  #     enabled" (`EVER_WORKS_APP_LAUNCHER_ENABLED=true`), against the
+  #     checked-in platform-catalog fixture;
+  #   - `e2e/flow-managed-subdomain-allocation.spec.ts` — ACC-REG-05's cap and
+  #     allocation boundary, which need `DEPLOY_EVER_WORKS_ENABLED=true` (with
+  #     it off, `resolveProviderDefaults` rewrites 'ever-works' to 'vercel').
+  #
+  # The 32-shard matrix above keeps both switches OFF on purpose: the launcher's
+  # flag-off lane needs `EVER_WORKS_APP_LAUNCHER_ENABLED` unset (see its
+  # E2E_APP_LAUNCHER_SEED note), and `flow-deploy-capability-contract.spec.ts`
+  # asserts the switch-off rewrite. On the matrix the two files therefore SKIP
+  # BY NAME (they read the switches from the API); here they must run, so
+  # `APW_E2E_FLAGS_ON_LANE=1` turns a switch that reads off into a failure
+  # instead of a skip — this job can never go green by skipping.
+  #
+  # Same boot as a matrix shard (fake GitHub, gated App runtime worker, prebuilt
+  # API, prebuilt web), plus the platform-catalog fake the API reads the Ever
+  # platforms from. The env is the matrix's, key for key, plus the deltas at
+  # its end; `apps/web/e2e/fakes/platform-catalog/__tests__/flags-on-lane.unit.spec.ts`
+  # (harness unit lane) fails on any other difference, so edit both together.
+  e2e-app-works-flags-on:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
+    # One shard of ~12 tests, but the same cold `pnpm build` + dev-stack boot
+    # as every matrix shard and the prod-build job — the same 90-minute cap.
+    timeout-minutes: 90
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22.x]
+
+    # The matrix's service containers: the env below points SMTP_HOST and
+    # REDIS_URL / THROTTLER_REDIS_URL at them.
+    services:
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_8 != '' }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages (excluding docs)
+        run: pnpm build --filter=!./apps/docs
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start the flags-on stack, run the two flag-on files
+        # One step for the same reason as the matrix: background processes die
+        # when the step that started them ends. Each boot below is the matrix's,
+        # and the comments there say why it is done that way.
+        working-directory: apps/web
+        run: |
+          set -e
+
+          echo "::group::Starting the fake GitHub on :3900 (APW-13 P0, plan §9.1)"
+          nohup node e2e/fakes/github-fake/server.mjs > /tmp/github-fake.log 2>&1 &
+          FAKE_PID=$!
+          disown $FAKE_PID
+          echo "fake GitHub pid=$FAKE_PID"
+          timeout 30 bash -c 'until curl -sSf http://127.0.0.1:3900/_control/state > /dev/null; do sleep 1; done' \
+            || { echo "fake GitHub never came up — last 80 lines:"; tail -n 80 /tmp/github-fake.log || true; exit 1; }
+          echo "fake GitHub ready."
+          echo "::endgroup::"
+
+          echo "::group::Starting the platform-catalog fake on :4084 (ACC-E2E-12's versioned catalog)"
+          # The launcher's Ever apps are read by the API process from the
+          # versioned catalog repository, so the fixture must be served before
+          # the API's first catalog read. The API reaches it through
+          # EVER_WORKS_PLATFORM_CATALOG_BASE_URL (env below), which it honours
+          # only outside production and with EVER_WORKS_E2E_FAKES on. The fake
+          # listens on APW_E2E_PLATFORM_CATALOG_PORT (default 4084) — never
+          # PORT — and serves exactly the coordinates the API reads.
+          nohup node e2e/fakes/platform-catalog/server.mjs > /tmp/platform-catalog-fake.log 2>&1 &
+          CATALOG_PID=$!
+          disown $CATALOG_PID
+          echo "platform-catalog fake pid=$CATALOG_PID"
+          timeout 30 bash -c 'until curl -sSf http://127.0.0.1:4084/_control/health > /dev/null; do sleep 1; done' \
+            || { echo "platform-catalog fake never came up — last 80 lines:"; tail -n 80 /tmp/platform-catalog-fake.log || true; exit 1; }
+          curl -sS http://127.0.0.1:4084/_control/health
+          echo
+          echo "platform-catalog fake ready."
+          echo "::endgroup::"
+
+          echo "::group::Starting the App runtime worker (APW-13 FR-55, plan §9.1)"
+          if node -e "process.exit(require('../../packages/tasks/package.json').scripts['app-runtime:local-worker'] ? 0 : 1)"; then
+            EVER_WORKS_APPS_LOCAL_WORKER=true nohup pnpm --filter @ever-works/trigger-tasks app-runtime:local-worker \
+              > /tmp/local-worker.log 2>&1 &
+            WORKER_PID=$!
+            disown $WORKER_PID
+            echo "App runtime worker pid=$WORKER_PID"
+            timeout 60 bash -c 'until curl -sSf http://127.0.0.1:3101/health > /dev/null; do sleep 2; done' \
+              || { echo "App runtime worker never came up — last 80 lines:"; tail -n 80 /tmp/local-worker.log || true; exit 1; }
+            echo "App runtime worker ready."
+          else
+            echo "::warning title=App runtime worker absent::packages/tasks has no 'app-runtime:local-worker' script yet (APW-06 owns it, CONTRACTS §7 EVER_WORKS_APPS_LOCAL_WORKER). The worker step is skipped."
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Starting API on :3100 (prebuilt dist — no watch/typecheck)"
+          nohup pnpm --filter ever-works-api start:prod > /tmp/api.log 2>&1 &
+          API_PID=$!
+          disown $API_PID
+          echo "API pid=$API_PID"
+          echo "::endgroup::"
+
+          echo "::group::Starting Web on :3000 (prebuilt next start — no dev compiler)"
+          NODE_ENV=production nohup pnpm --filter ever-works-web start > /tmp/web.log 2>&1 &
+          WEB_PID=$!
+          disown $WEB_PID
+          echo "Web pid=$WEB_PID"
+          echo "::endgroup::"
+
+          echo "Waiting for API on :3100 ..."
+          timeout 180 bash -c 'until curl -sSf http://127.0.0.1:3100/api/health > /dev/null; do sleep 3; done' \
+            || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
+          echo "API ready."
+
+          echo "Waiting for Web on :3000 ..."
+          timeout 240 bash -c 'until curl -sSf http://127.0.0.1:3000/en/login > /dev/null; do sleep 3; done' \
+            || { echo "Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
+          echo "Web ready."
+
+          echo "::group::Running the two flag-on files"
+          # The same log dump as the matrix, plus the catalog fake's own log and
+          # every catalog read it answered — a launcher case that fails because
+          # the API asked for other coordinates shows up there as a named 404.
+          trap '{
+            echo "::group::API log (last 200 lines)"
+            tail -n 200 /tmp/api.log || true
+            echo "::endgroup::"
+            echo "::group::Web log (last 200 lines)"
+            tail -n 200 /tmp/web.log || true
+            echo "::endgroup::"
+            echo "::group::fake GitHub log (last 200 lines)"
+            tail -n 200 /tmp/github-fake.log 2>/dev/null || true
+            echo "::endgroup::"
+            echo "::group::platform-catalog fake log and catalog reads"
+            tail -n 200 /tmp/platform-catalog-fake.log 2>/dev/null || true
+            curl -sS http://127.0.0.1:4084/_control/calls 2>/dev/null || true
+            echo "::endgroup::"
+            echo "::group::App runtime worker log (last 200 lines)"
+            tail -n 200 /tmp/local-worker.log 2>/dev/null || true
+            echo "::endgroup::"
+          }' EXIT
+          pnpm exec playwright test e2e/flow-app-launcher-apps.spec.ts e2e/flow-managed-subdomain-allocation.spec.ts
+          echo "::endgroup::"
+        env:
+          # The matrix's env, key for key and value for value — see the `e2e`
+          # job for why each one is set. Only the block at the end differs.
+          NODE_OPTIONS: --max-old-space-size=16384
+          DATABASE_TYPE: sqlite
+          DATABASE_IN_MEMORY: 'true'
+          AUTH_SECRET: ever-works-e2e-ci-secret-padding-to-meet-32min-fake
+          NODE_ENV: development
+          DATABASE_AUTOMIGRATE: 'true'
+          REQUIRE_EMAIL_VERIFICATION: 'false'
+          MAILER_PROVIDER: smtp
+          SMTP_HOST: 127.0.0.1
+          SMTP_PORT: '1025'
+          SMTP_IGNORE_TLS: 'true'
+          SMTP_SECURE: 'false'
+          EMAIL_FROM_EMAIL: e2e-noreply@ever.works
+          MAILHOG_URL: http://127.0.0.1:8025
+          UPLOADS_MAX_BYTES: '209715200'
+          REDIS_URL: redis://127.0.0.1:6379
+          THROTTLER_REDIS_URL: redis://127.0.0.1:6379
+          REGISTER_THROTTLE_LIMIT: '100000'
+          LOGIN_THROTTLE_LIMIT: '100000'
+          E2E_DISABLE_AUTH_THROTTLE: 'true'
+          SUBSCRIPTIONS_ENABLED: 'true'
+          E2E_BYPASS_SEAT_LIMITS: 'true'
+          E2E_APP_LAUNCHER_SEED: 'true'
+          EVER_WORKS_E2E_FAKES: '1'
+          APW_E2E_GITHUB_FAKE_URL: http://127.0.0.1:3900
+          EVER_WORKS_APP_WORKS_ENABLED: 'true'
+          EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS: '15000'
+          TRIGGER_INTERNAL_API_URL: http://127.0.0.1:3100/internal/trigger
+          TRIGGER_INTERNAL_SECRET: ever-works-e2e-trigger-internal-secret-not-a-real-credential
+          SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID: 'true'
+          MAGIC_LINK_ENABLED: 'true'
+          EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS: 'e2e-admin-*@test.local'
+          GH_CLIENT_ID: e2e-fake-github-client-id
+          GH_CLIENT_SECRET: e2e-fake-github-client-secret-padding-to-32+
+          GOOGLE_CLIENT_ID: e2e-fake-google-client-id
+          GOOGLE_CLIENT_SECRET: e2e-fake-google-client-secret-padding-to-32+
+          PLATFORM_API_SECRET_TOKEN: e2e-platform-secret-token-deterministic-32+chars
+          PLATFORM_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          GITHUB_APP_ID: '999999'
+          GITHUB_APP_CLIENT_ID: e2e-fake-github-app-client-id
+          GITHUB_APP_CLIENT_SECRET: e2e-fake-github-app-client-secret-padding+
+          GITHUB_APP_WEBHOOK_SECRET: e2e-fake-github-app-webhook-secret-32chars+
+          GITHUB_APP_PRIVATE_KEY: |-
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu
+            KUpRKfFLfRYC9AIKjbJTWit+CqvjWYzvQwECAwEAAQJAIJLixBy2qpFoS4DSmoEm
+            o3qGy0t6z09AIJtH+5OeRV1be+N4cDYJKffGzDa88vQENZiRm0GRq6a+HPGQMd2k
+            TQIhAKMSvzIBnni7ot/OSie2TmJLY4SwTQAevXysE2RbFDYdAiEBCUEaRQnMnbp7
+            9mxDXDf6AU0cN/RPBjb9qSHDcWZHGzUCIG2Es59z8ugGrDY+pxLQnwfotadxd+Uy
+            v/Ow5T0q5gIJAiEAyS4RaI9YG8EWx/2w0T67ZUVAw8eOMB6BIUg0Xcu+3okCIBOs
+            /5OiPgoTdSy7bcF9IGpSE8ZgGKzgYQVZeN97YE00
+            -----END RSA PRIVATE KEY-----
+          API_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3100/api
+          WEB_URL: http://127.0.0.1:3000
+          ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+          ALLOWED_CALLBACK_HOSTS: 127.0.0.1:3000,localhost:3000
+          CI: 'true'
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+          # ── The flags-on deltas: the ONLY differences from the matrix ──────
+          # The two switches the owner decision turns on.
+          EVER_WORKS_APP_LAUNCHER_ENABLED: 'true'
+          DEPLOY_EVER_WORKS_ENABLED: 'true'
+          # The apex a seeded App Work's managed address is derived under
+          # (`managed-host-root.resolver.ts`: EVER_WORKS_APPS_DOMAIN, else
+          # EVER_WORKS_DOMAIN). Without one the Work has no address, is
+          # `notLive`, and no launcher case can list it. Playwright reads the
+          # same value to assert the exact tile URL.
+          EVER_WORKS_APPS_DOMAIN: apps.e2e.local
+          EVER_WORKS_DOMAIN: e2e.local
+          # The catalog fixture started above, and the environment whose
+          # addresses the launcher shows (FR-10; unset outside production is an
+          # error event on every catalog refresh, APW11-G19).
+          EVER_WORKS_PLATFORM_CATALOG_BASE_URL: http://127.0.0.1:4084
+          EVER_WORKS_PLATFORM_CATALOG_ENV: develop
+          # Read by the two files: on this job a switch that reads off FAILS
+          # the case instead of skipping it.
+          APW_E2E_FLAGS_ON_LANE: '1'
+
+      - name: Sanitize branch tag for artifact names
+        if: always()
+        id: tag
+        run: |
+          RAW="${HEAD_REF:-$REF_NAME}"
+          SAFE="${RAW//[^A-Za-z0-9._-]/-}"
+          echo "tag=${SAFE}" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+
+      - name: Upload Playwright report
+        if: always()
+        # A diagnostic never decides the job's verdict — see the matrix's note.
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ steps.tag.outputs.tag }}-app-works-flags-on-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report
+            apps/web/e2e/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload server logs on failure
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-logs-${{ steps.tag.outputs.tag }}-app-works-flags-on-${{ github.run_attempt }}
+          path: |
+            /tmp/api.log
+            /tmp/web.log
+            /tmp/platform-catalog-fake.log
+          retention-days: 7
+          if-no-files-found: ignore

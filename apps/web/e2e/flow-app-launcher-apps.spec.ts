@@ -108,6 +108,15 @@
  *   - **Nothing here deploys anything.** The "successful production deployment" is T33's
  *     fixture row written through the non-production seed route (APW11-G07): no cluster, no
  *     build, no DNS, no network.
+ *
+ * ## Where this file runs (owner decision 2026-09-25)
+ *
+ * On the `e2e-app-works-flags-on` job of `.github/workflows/e2e.yml`: one shard, the matrix's
+ * stack plus `EVER_WORKS_APP_LAUNCHER_ENABLED=true`, the apps apex and the checked-in catalog
+ * fixture (`e2e/fakes/platform-catalog/`). The 32-shard matrix keeps the launcher switch off on
+ * purpose, so there every case below is **skipped by name** by the `beforeAll` that reads the
+ * switch — and on the flags-on job (`APW_E2E_FLAGS_ON_LANE=1`) the same reading off is a
+ * failure, never a skip.
  */
 import { test, expect, type APIRequestContext, type Browser, type Request } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from './helpers/api';
@@ -146,6 +155,13 @@ const FILTER_PARAM = 'q';
 
 /** The route's documented maximum window (`APP_LAUNCHER_MAX_ITEMS_RESPONSE`). */
 const MAX_WINDOW = 200;
+
+/**
+ * `APW_E2E_FLAGS_ON_LANE=1` marks the one job that exists to run this file
+ * (`e2e-app-works-flags-on` in `.github/workflows/e2e.yml`). There a launcher switch that reads
+ * off is a broken lane and fails; everywhere else it skips the file by name.
+ */
+const FLAGS_ON_LANE = process.env.APW_E2E_FLAGS_ON_LANE === '1';
 
 /** A unique, lower-case, DNS-shaped label component for this run. */
 function stamp(): string {
@@ -515,6 +531,44 @@ function credentialInUrl(raw: string): string | null {
 // ACC-E2E-12 — the stack the case needs, checked before any case asserts anything
 // ---------------------------------------------------------------------------
 
+/**
+ * The launcher's installation switch decides whether this file can run at all, so it is read
+ * once, before any case, from the route the web reads it from (`GET /api/config` →
+ * `features.appLauncherEnabled`, `apps/web/src/lib/feature-flags/app-launcher.ts`).
+ *
+ *   - **Off** is ACC-11-28's off state, in which every launcher route answers `404`. The sharded
+ *     PR matrix runs that way on purpose (`e2e.yml` keeps the switch out of its env for the
+ *     flag-off lane), so there every case is skipped **by name**: ACC-E2E-12 runs on the
+ *     flags-on job.
+ *   - **Off on the flags-on job** fails instead: that job exists to run this file, and a skip
+ *     there would be a green job that proved nothing.
+ *   - **On** changes nothing: the preflight below still asserts the switch as a hard `expect`.
+ *
+ * The skip keys on the switch reading alone. A launcher route that answers `404` with the switch
+ * on still fails the case that called it.
+ */
+test.beforeAll(async ({ request }) => {
+    const config = await request.get(`${API_BASE}/api/config`);
+    expect(config.status(), 'GET /api/config').toBe(200);
+    const features = ((await config.json()) as { features?: { appLauncherEnabled?: unknown } })
+        .features;
+    const enabled = features?.appLauncherEnabled === true;
+    if (FLAGS_ON_LANE) {
+        expect(
+            enabled,
+            'STACK: this is the flags-on job (APW_E2E_FLAGS_ON_LANE=1), which exists to run this ' +
+                'file, but GET /api/config reports features.appLauncherEnabled ' +
+                `${JSON.stringify(features?.appLauncherEnabled)} — the API must run with ` +
+                'EVER_WORKS_APP_LAUNCHER_ENABLED=true here.',
+        ).toBe(true);
+    }
+    test.skip(
+        !enabled,
+        'EVER_WORKS_APP_LAUNCHER_ENABLED is off on this stack (ACC-11-28 off state); ' +
+            'ACC-E2E-12 runs on the launcher-on lane (e2e.yml job e2e-app-works-flags-on)',
+    );
+});
+
 test('the lane carries the launcher and the non-production seed route (APW-11 T20/T33)', async ({
     request,
 }) => {
@@ -567,6 +621,27 @@ test('the lane carries the launcher and the non-production seed route (APW-11 T2
         platforms.status,
         `GET /api/app-launcher/platforms answered ${platforms.status} (FR-37)`,
     ).toBe(200);
+
+    // 5. A lane that points the API at a fixture catalog must actually have READ it, and this is
+    //    where that is said by name. Otherwise the first sign is the read case below failing on
+    //    a symptom — the synthesised self tile (plan §4.1 step 1) in the launcher with no catalog
+    //    entry behind it — that points at the launcher rather than at the stack. Keyed on the
+    //    variable the lane sets for the API (`e2e.yml`, flags-on job); a stack that reads the
+    //    real catalog is not asserted on here.
+    if ((process.env.EVER_WORKS_PLATFORM_CATALOG_BASE_URL ?? '').trim().length > 0) {
+        const catalog = platforms.json as PlatformsList;
+        expect(
+            catalog.catalogVersion,
+            'STACK: EVER_WORKS_PLATFORM_CATALOG_BASE_URL is set, but the API served no catalog ' +
+                '(catalogVersion null) — the fixture server was unreachable, the API runs without ' +
+                'EVER_WORKS_E2E_FAKES (the override is gated on it), or it asked for other ' +
+                'coordinates (the fake’s /_control/calls names the 404).',
+        ).not.toBeNull();
+        expect(
+            catalog.platforms.length,
+            `the fixture catalog lists platforms for ${catalog.environment}`,
+        ).toBeGreaterThan(0);
+    }
 });
 
 // ---------------------------------------------------------------------------
