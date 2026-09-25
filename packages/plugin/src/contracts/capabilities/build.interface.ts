@@ -351,7 +351,19 @@ export interface BuildSnapshot {
 	readonly checksBillableMinutes?: number;
 	readonly runnerLabel?: string;
 	readonly logsUrl?: string;
-	readonly image?: { repository: string; digest: string; tags: string[]; confirmed: boolean };
+	readonly image?: {
+		repository: string;
+		digest: string;
+		tags: string[];
+		confirmed: boolean;
+		/**
+		 * The digest the build job's own `Push` step logged for the image
+		 * (plan §4.8's no-token fallback), when the provider could read it.
+		 * Lets the platform confirm a digest the registry cannot be asked
+		 * about (a private image with no pull token). Optional and additive.
+		 */
+		pushLogDigest?: string;
+	};
 	readonly secretCheck?: 'passed' | 'failed' | 'not_needed';
 	readonly failure?: { class: string; detail?: Record<string, unknown>; excerpt: string[] };
 	readonly verification?: AppBuildVerificationResult;

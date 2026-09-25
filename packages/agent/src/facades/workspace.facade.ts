@@ -7,6 +7,7 @@ import type {
     WorkspaceHandle,
     WorkspaceFinalizeResult,
     WorkspaceMergeSimulation,
+    WorkspaceBranchChanges,
     FacadeOptions,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isWorkspacePlugin } from '@ever-works/plugin';
@@ -58,7 +59,7 @@ export class WorkspaceFacadeService extends BaseFacadeService implements IWorksp
 
     async finalize(
         handle: WorkspaceHandle,
-        opts: { commitMessage: string; push: boolean },
+        opts: { commitMessage: string; push: boolean; publishSha?: string },
         facadeOptions: FacadeOptions,
     ): Promise<WorkspaceFinalizeResult> {
         const plugin = await this.resolveTypedPlugin(facadeOptions);
@@ -79,6 +80,31 @@ export class WorkspaceFacadeService extends BaseFacadeService implements IWorksp
             return await plugin.simulateMerge(handle, targetRef);
         } catch (error) {
             throw this.passOrWrap(error, 'simulateMerge', plugin.id);
+        }
+    }
+
+    /**
+     * What the branch changes at `opts.headSha`, read BEFORE it is pushed
+     * (APW-08 T17's judge-before-push). A provider that cannot report it is
+     * refused with a named error rather than letting a caller push unjudged.
+     */
+    async branchChanges(
+        handle: WorkspaceHandle,
+        opts: { headSha: string; readPaths?: readonly string[] },
+        facadeOptions: FacadeOptions,
+    ): Promise<WorkspaceBranchChanges> {
+        const plugin = await this.resolveTypedPlugin(facadeOptions);
+        if (typeof plugin.branchChanges !== 'function') {
+            throw new WorkspaceFacadeError(
+                `Plugin ${plugin.id} cannot report a branch's changes before it is pushed.`,
+                'branchChanges',
+                plugin.id,
+            );
+        }
+        try {
+            return await plugin.branchChanges(handle, opts);
+        } catch (error) {
+            throw this.passOrWrap(error, 'branchChanges', plugin.id);
         }
     }
 

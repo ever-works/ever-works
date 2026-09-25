@@ -180,6 +180,39 @@ export interface WorkspaceFinalizeOptions {
 	pushCredential?: WorkspacePushCredential;
 	/** Author / committer identity for this commit; see {@link WorkspaceCommitIdentity}. */
 	identity?: WorkspaceCommitIdentity;
+	/**
+	 * Publish THIS already-committed commit instead of committing the tree:
+	 * nothing is staged or committed, and `<publishSha>:refs/heads/<branch>` is
+	 * pushed with the same fence, credential and cancellation handling as a
+	 * normal push. Requires `push: true`. Only a full lowercase hex object id
+	 * (40 or 64 characters) that resolves to a commit is accepted.
+	 *
+	 * Lets a caller judge the exact commit it is about to publish (see
+	 * {@link IWorkspacePlugin.branchChanges}) before anything leaves the
+	 * runtime — the App Work change gate on the cloud path (APW-08 T17).
+	 * Optional and additive: a provider that predates it ignores it.
+	 */
+	publishSha?: string;
+}
+
+/**
+ * What a branch changes relative to the base it was cut from, read from git
+ * BEFORE the branch is pushed (see {@link IWorkspacePlugin.branchChanges}).
+ */
+export interface WorkspaceBranchChanges {
+	/**
+	 * `git diff --name-only --no-renames -z <handle.baseSha>...<headSha>`:
+	 * merge-base semantics, the same set a pull request or compare view shows,
+	 * with BOTH sides of every rename. Deduplicated.
+	 */
+	paths: string[];
+	/**
+	 * The blob at `headSha` for each requested path, or `null` when the path
+	 * does not exist at `headSha`. Read from git, never from disk: a
+	 * gitignored or line-ending-converted file on disk can differ from what
+	 * would be pushed.
+	 */
+	contents: Record<string, string | null>;
 }
 
 export interface WorkspaceFinalizeResult {
@@ -260,6 +293,18 @@ export interface IWorkspacePlugin extends IPlugin {
 		auth?: WorkspaceProvisionSpec['auth']
 	): Promise<WorkspaceMergeSimulation>;
 
+	/**
+	 * The paths the branch changes at `headSha` relative to `handle.baseSha`,
+	 * and the content of `readPaths` at `headSha` — read before the branch is
+	 * pushed, so a caller can judge exactly what it would publish. OPTIONAL: a
+	 * provider without it cannot serve a judge-before-push caller, which then
+	 * refuses rather than pushing unjudged.
+	 */
+	branchChanges?(
+		handle: WorkspaceHandle,
+		opts: { headSha: string; readPaths?: readonly string[] }
+	): Promise<WorkspaceBranchChanges>;
+
 	/** Route EVERY delete through here (kill processes → remove). */
 	teardown(handle: WorkspaceHandle): Promise<void>;
 
@@ -272,9 +317,15 @@ export interface IWorkspaceFacade {
 	provision(spec: Omit<WorkspaceProvisionSpec, 'settings'>, facadeOptions: FacadeOptions): Promise<WorkspaceHandle>;
 	finalize(
 		handle: WorkspaceHandle,
-		opts: { commitMessage: string; push: boolean },
+		opts: { commitMessage: string; push: boolean; publishSha?: string },
 		facadeOptions: FacadeOptions
 	): Promise<WorkspaceFinalizeResult>;
+	/** See {@link IWorkspacePlugin.branchChanges}; refuses when the provider cannot report them. */
+	branchChanges(
+		handle: WorkspaceHandle,
+		opts: { headSha: string; readPaths?: readonly string[] },
+		facadeOptions: FacadeOptions
+	): Promise<WorkspaceBranchChanges>;
 	simulateMerge(
 		handle: WorkspaceHandle,
 		targetRef: string,
