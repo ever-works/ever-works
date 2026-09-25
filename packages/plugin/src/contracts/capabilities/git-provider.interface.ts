@@ -92,6 +92,12 @@ export interface GitRepository {
 	 * ones; this field is what lets a caller notice the redirect at all.
 	 */
 	readonly movedFrom?: string;
+	/**
+	 * The repository's topics, as the provider reports them (APW-03 T22 — the
+	 * Blueprint probe checks for `ever-works-app-blueprint`). `undefined` means
+	 * "not reported", never "no topics". Optional and additive (R-26).
+	 */
+	readonly topics?: readonly string[];
 }
 
 export interface GitBranch {

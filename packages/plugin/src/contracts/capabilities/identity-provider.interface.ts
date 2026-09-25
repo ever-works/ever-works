@@ -195,6 +195,7 @@ export type IdentityTokenRejectionCode = (typeof IDENTITY_TOKEN_REJECTION_CODES)
 export class IdentityTokenRejectedError extends Error {
 	constructor(readonly code: IdentityTokenRejectionCode) {
 		super(code);
+		this.name = 'IdentityTokenRejectedError';
 	}
 }
 

@@ -175,7 +175,7 @@ export interface BuildValue {
  * (T9's `workflow-writer.ts`) agree on the same two strings; when APW-03 lands a
  * typed vocabulary, re-point this alias at it rather than adding a third name.
  */
-export type RepositoryWriteErrorCode = 'nonFastForward' | 'refRejectedByRule';
+export type RepositoryWriteErrorCode = 'nonFastForward' | 'refRejectedByRule' | 'pullRequestExists';
 
 /** One file in a {@link RepositoryWriter.commitFiles} call (APW-03 plan §7:717–719). */
 export interface RepositoryCommitFile {
@@ -230,7 +230,14 @@ export interface RepositoryWriter {
 	/** Create `name` from `fromRef`; an existing branch is returned rather than recreated. */
 	createBranch(name: string, fromRef: string): Promise<GitBranch>;
 
-	/** Open a pull request in the bound repository. `owner`/`repo` are omitted: the writer already holds them. */
+	/**
+	 * Open a pull request in the bound repository. `owner`/`repo` are omitted: the writer already holds them.
+	 *
+	 * An OPEN pull request for the same head branch already existing is refused with the code
+	 * `pullRequestExists` (GitHub answers 422 "A pull request already exists"). The caller reuses the
+	 * open one (plan §4.6 step 3, ACC-05-02) — only the provider can say whether a recorded pull
+	 * request is still open, so a stored number is never trusted on its own.
+	 */
 	createPullRequest(options: Omit<CreatePROptions, 'owner' | 'repo'>): Promise<GitPullRequest>;
 }
 
@@ -246,6 +253,13 @@ export interface PrepareRepositoryInput {
 	readonly previouslyWrittenSecretNames: readonly string[];
 	/** The workflow sha256 the platform last wrote, or `null`; a file that differs is a hand edit (FR-9). */
 	readonly lastWrittenWorkflowSha256: string | null;
+	/**
+	 * The workflow pull request the platform recorded (§3.1b), echoed back when the provider reports
+	 * that the same head already has an OPEN pull request (`pullRequestExists`), so the reused one
+	 * keeps its link. Never used to decide that a pull request is still open. Optional and additive.
+	 */
+	readonly workflowPullRequestNumber?: number | null;
+	readonly workflowPullRequestUrl?: string | null;
 	readonly settings: Record<string, unknown>;
 	/** `spec.checks[]` (APW-03 schema §17), already validated; empty → no checks job (R-9). */
 	readonly checks: ReadonlyArray<{ name: string; command: string; required: boolean; timeoutSeconds: number }>;

@@ -364,7 +364,9 @@ describe('the closed IdentityTokenRejectedError code set (APW-12 T4)', () => {
 	it('is an Error, so a caller that catches it degrades to a refusal', () => {
 		const error = new IdentityTokenRejectedError('badSignature');
 		expect(error).toBeInstanceOf(Error);
-		expect(error.name).toBe('Error');
+		// C28: it used to keep the default name 'Error', so a log could not name the type
+		// (unlike this package's other errors). The pin now asserts the fix.
+		expect(error.name).toBe('IdentityTokenRejectedError');
 		expect(error.code).toBe('badSignature');
 		// The union is derived from the tuple, so both spell the same member set.
 		const everyCode: readonly IdentityTokenRejectionCode[] = [...IDENTITY_TOKEN_REJECTION_CODES];
