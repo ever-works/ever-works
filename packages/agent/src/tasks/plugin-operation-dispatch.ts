@@ -46,6 +46,22 @@ export interface PluginOperationPayload {
      */
     readonly operation: string;
     readonly args?: Record<string, unknown>;
+    /**
+     * T26 / EW-742 P3: the tenant the router dispatched for, present only on a
+     * tenant call. The run itself was started through that tenant's view of the
+     * job runtime (`TenantAwareRuntimeResolver`).
+     */
+    readonly tenantId?: string;
+    /**
+     * FR-5 (tenant-job-runtime-overlay spec) enqueue-time capture, from
+     * `RuntimeBindingStamperService.stamp(tenantId)`: present on a tenant call
+     * when the stamper is bound, `null` when no overlay is active for the
+     * tenant (or the lookup failed). The Trigger.dev worker does not read them:
+     * it is push-model, and the run already executes in the project it was
+     * dispatched to. They are recorded for the credential-rotation drain.
+     */
+    readonly providerId?: string | null;
+    readonly credentialVersion?: number | null;
 }
 
 /**

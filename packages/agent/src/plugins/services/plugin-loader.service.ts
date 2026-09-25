@@ -182,6 +182,64 @@ export class PluginLoaderService {
     }
 
     /**
+     * EW-693 T27 — register a plugin package the installer placed at runtime.
+     *
+     * `discover()` cannot find one: it keeps only entries one level deep whose
+     * Dirent is a directory, and the installer's `node_modules/<pkg>` entry is
+     * a link, with the package itself under `.versions/<pkg>/<version>`. Pass
+     * the `installPath` `PluginInstallerService` answered.
+     *
+     * - Not a plugin package (no valid `everworks.plugin` manifest), or one
+     *   whose manifest declares another id than `expectedId`: nothing is
+     *   registered, and the answer says why.
+     * - A plugin already registered in this process is kept as it is (the
+     *   answer succeeds, with a warning): the image's copy wins over a
+     *   runtime-installed one.
+     * - Otherwise it is registered as NOT built-in (whatever its manifest
+     *   says: it is not part of this image) — lazily by default, so `onLoad`
+     *   runs at first materialisation through the hook `PluginBootstrapService`
+     *   wires in lazy mode; `lazy: false` loads it now.
+     */
+    async registerFromPath(
+        packagePath: string,
+        options: { expectedId: string; lazy?: boolean },
+    ): Promise<LoadResult> {
+        const { expectedId, lazy = true } = options;
+        const discovered = await this.tryLoadPluginManifest(packagePath);
+        if (!discovered) {
+            return {
+                success: false,
+                pluginId: expectedId,
+                error: `The package at ${packagePath} is not a plugin package (no valid everworks.plugin manifest).`,
+            };
+        }
+        if (discovered.manifest.id !== expectedId) {
+            return {
+                success: false,
+                pluginId: expectedId,
+                error: `The package at ${packagePath} declares plugin "${discovered.manifest.id}", not "${expectedId}"; nothing was registered.`,
+            };
+        }
+        if (this.registry.has(expectedId)) {
+            return {
+                success: true,
+                pluginId: expectedId,
+                warnings: [
+                    `Plugin "${expectedId}" is already registered in this process; the existing registration is kept.`,
+                ],
+            };
+        }
+        if (lazy && !this.onFirstMaterialize) {
+            this.logger.warn(
+                `Registering "${expectedId}" lazily with no first-materialise hook wired ` +
+                    `(PLUGIN_LAZY_LOAD=false?): its onLoad will not run when it materialises.`,
+            );
+        }
+        const runtimeInstalled: DiscoveredPlugin = { ...discovered, builtIn: false };
+        return lazy ? this.registerLazy(runtimeInstalled) : this.load(runtimeInstalled);
+    }
+
+    /**
      * Try to load a plugin manifest from a package work
      */
     private async tryLoadPluginManifest(packagePath: string): Promise<DiscoveredPlugin | null> {

@@ -1035,3 +1035,195 @@ describe('PluginLoaderService', () => {
         });
     });
 });
+
+/**
+ * EW-693 T27 — registering a plugin the installer placed at runtime.
+ *
+ * The installer puts a package at `<installDir>/.versions/<pkg>/<version>` and
+ * links it at `<installDir>/node_modules/<pkg>`. Nothing registered it: the
+ * loader's `discover()` keeps only entries one level deep whose Dirent is a
+ * DIRECTORY, and the link is not one. `registerFromPath` registers the
+ * directory the installer answers, and only when it IS the plugin asked for.
+ *
+ * Real registry, real manifest validator, real fixture on disk — only the
+ * repository is a double.
+ */
+describe('PluginLoaderService — registering a runtime-installed plugin (T27)', () => {
+    /* eslint-disable @typescript-eslint/no-var-requires */
+    const fsSync = require('fs') as typeof import('fs');
+    const os = require('os') as typeof import('os');
+    const nodePath = require('path') as typeof import('path');
+    const { EventEmitter2 } = require('@nestjs/event-emitter');
+    /* eslint-enable @typescript-eslint/no-var-requires */
+
+    let storeDir: string;
+    let loader: PluginLoaderService;
+    let registry: PluginRegistryService;
+    let repository: { upsert: jest.Mock; updateState: jest.Mock; findByPluginId: jest.Mock };
+
+    /** A plugin package as the installer leaves it in the versioned store. */
+    function writePluginPackage(dir: string, id: string, extra: Record<string, unknown> = {}) {
+        fsSync.mkdirSync(dir, { recursive: true });
+        fsSync.writeFileSync(
+            nodePath.join(dir, 'package.json'),
+            JSON.stringify({
+                name: `@ever-works/${id}-plugin`,
+                version: '1.2.0',
+                main: './index.js',
+                everworks: {
+                    plugin: {
+                        id,
+                        name: `Plugin ${id}`,
+                        version: '1.2.0',
+                        category: 'utility',
+                        capabilities: [],
+                        description: 'A runtime-installed fixture.',
+                        builtIn: true,
+                        ...extra,
+                    },
+                },
+            }),
+        );
+        fsSync.writeFileSync(
+            nodePath.join(dir, 'index.js'),
+            `module.exports = class P {\n` +
+                `  constructor() { this.id = ${JSON.stringify(id)}; }\n` +
+                `  async onLoad() {}\n` +
+                `  async onUnload() {}\n` +
+                `};\n`,
+        );
+    }
+
+    const versioned = (id: string) =>
+        nodePath.join(storeDir, '.versions', `@ever-works__${id}-plugin`, '1.2.0');
+
+    async function makeLoader(pluginPaths: string[] = []) {
+        repository = {
+            upsert: jest.fn().mockResolvedValue({}),
+            updateState: jest.fn().mockResolvedValue({}),
+            findByPluginId: jest.fn().mockResolvedValue(null),
+        };
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                PluginLoaderService,
+                PluginRegistryService,
+                PluginManifestValidatorService,
+                PluginVersionCheckerService,
+                PluginClassValidatorService,
+                { provide: EventEmitter2, useValue: new EventEmitter2() },
+                {
+                    provide: PLUGINS_MODULE_OPTIONS,
+                    useValue: { pluginPaths, builtInPlugins: [], platformVersion: '1.0.0' },
+                },
+                { provide: PluginRepository, useValue: repository },
+            ],
+        }).compile();
+        loader = moduleRef.get(PluginLoaderService);
+        registry = moduleRef.get(PluginRegistryService);
+    }
+
+    beforeEach(() => {
+        storeDir = fsSync.mkdtempSync(nodePath.join(os.tmpdir(), 'ew693-loader-store-'));
+    });
+
+    afterEach(() => {
+        fsSync.rmSync(storeDir, { recursive: true, force: true });
+    });
+
+    it('registers the directory the installer answers — lazily, as not built-in, at that path', async () => {
+        writePluginPackage(versioned('notion-extractor'), 'notion-extractor');
+        await makeLoader();
+
+        const result = await loader.registerFromPath(versioned('notion-extractor'), {
+            expectedId: 'notion-extractor',
+        });
+
+        expect(result).toMatchObject({ success: true, pluginId: 'notion-extractor' });
+        const entry = registry.get('notion-extractor');
+        expect(entry).toBeDefined();
+        // A lazy proxy: nothing was imported yet.
+        expect(typeof (entry!.plugin as { __materialize?: unknown }).__materialize).toBe(
+            'function',
+        );
+        // Runtime-installed, so never treated as a built-in of this image —
+        // even though its manifest says `builtIn: true`.
+        expect(entry!.builtIn).toBe(false);
+        expect(entry!.installPath).toBe(versioned('notion-extractor'));
+        expect(repository.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                pluginId: 'notion-extractor',
+                builtIn: false,
+                installPath: versioned('notion-extractor'),
+            }),
+        );
+    });
+
+    it('registers NOTHING when the package declares a different plugin id', async () => {
+        writePluginPackage(versioned('notion-extractor'), 'someone-else');
+        await makeLoader();
+
+        const result = await loader.registerFromPath(versioned('notion-extractor'), {
+            expectedId: 'notion-extractor',
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('someone-else');
+        expect(registry.get('notion-extractor')).toBeUndefined();
+        expect(registry.get('someone-else')).toBeUndefined();
+        expect(repository.upsert).not.toHaveBeenCalled();
+    });
+
+    it('registers nothing for a directory that is not a plugin package', async () => {
+        fsSync.mkdirSync(versioned('notion-extractor'), { recursive: true });
+        fsSync.writeFileSync(
+            nodePath.join(versioned('notion-extractor'), 'package.json'),
+            JSON.stringify({ name: 'just-a-library', version: '1.0.0' }),
+        );
+        await makeLoader();
+
+        const result = await loader.registerFromPath(versioned('notion-extractor'), {
+            expectedId: 'notion-extractor',
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/not a plugin package/);
+        expect(registry.get('notion-extractor')).toBeUndefined();
+    });
+
+    it('keeps an existing registration — the plugin already in this process wins', async () => {
+        writePluginPackage(versioned('notion-extractor'), 'notion-extractor');
+        await makeLoader();
+        await loader.registerFromPath(versioned('notion-extractor'), {
+            expectedId: 'notion-extractor',
+        });
+        const first = registry.get('notion-extractor');
+
+        const again = await loader.registerFromPath(versioned('notion-extractor'), {
+            expectedId: 'notion-extractor',
+        });
+
+        expect(again).toMatchObject({ success: true, pluginId: 'notion-extractor' });
+        expect(again.warnings?.[0]).toContain('already registered');
+        expect(registry.get('notion-extractor')).toBe(first);
+        expect(repository.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * CHARACTERIZATION (passes before and after T27) — why `registerFromPath`
+     * is needed at all: discovery over the store the installer builds finds
+     * nothing, neither at its root nor under its `node_modules` scope.
+     */
+    it('discover() over an installer-shaped store finds no plugin', async () => {
+        writePluginPackage(versioned('notion-extractor'), 'notion-extractor');
+        const scope = nodePath.join(storeDir, 'node_modules', '@ever-works');
+        fsSync.mkdirSync(scope, { recursive: true });
+        fsSync.symlinkSync(
+            versioned('notion-extractor'),
+            nodePath.join(scope, 'notion-extractor-plugin'),
+            'junction',
+        );
+        await makeLoader([storeDir, scope]);
+
+        await expect(loader.discover()).resolves.toEqual([]);
+    });
+});

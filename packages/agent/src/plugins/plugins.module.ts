@@ -33,6 +33,9 @@ import { PluginBootstrapService } from './services/plugin-bootstrap.service';
 import { PluginInstallerService } from './services/plugin-installer.service';
 // EW-693 — sync vs long-running execution router.
 import { PluginExecutionRouterService } from './services/plugin-execution-router.service';
+// EW-693 T26 — the router's first long-running caller, and facade install-on-use.
+import { ManagedAgentSandboxRunnerService } from './services/managed-agent-sandbox-runner.service';
+import { FacadePluginAvailabilityService } from './services/facade-plugin-availability.service';
 
 // Constants and interfaces
 import { PLUGINS_MODULE_OPTIONS, DEFAULT_PLATFORM_VERSION } from './plugins.constants';
@@ -96,6 +99,16 @@ const PROVIDERS = [
     // active job runtime (an explicit or manifest long-running profile is
     // honoured in bundled mode too).
     PluginExecutionRouterService,
+    // EW-693 T26 — sandbox sessions (`runSandboxSession`) on the pipeline
+    // plugin the caller selected, through the router: in-process by default,
+    // the job runtime when `sandboxSessionsViaJobRuntime` is on.
+    ManagedAgentSandboxRunnerService,
+    // EW-693 T26 / FR-15 — facade install-on-use. Inert unless
+    // `distributionMode: 'dynamic'` AND `facadeInstallOnUse: true`; then it
+    // places the pinned version on this replica (`ensureLocalInstall`, no
+    // shared-row write), registers it (`registerFromPath`) and loads it
+    // (EW-693 T27; see the service's docstring).
+    FacadePluginAvailabilityService,
 ];
 
 /**
@@ -133,6 +146,12 @@ const EXPORTS = [
     // nothing outside this module could inject it (T26 "facade adoption" was
     // never reachable).
     PluginExecutionRouterService,
+    // EW-693 T26 — for the APW-04 session runner (sandbox sessions, on the
+    // pipeline it selects by capability) and for
+    // every facade (`BaseFacadeService` property-injects the availability
+    // service, @Optional, so graphs without this module are unaffected).
+    ManagedAgentSandboxRunnerService,
+    FacadePluginAvailabilityService,
 ];
 
 /**

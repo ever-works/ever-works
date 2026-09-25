@@ -409,6 +409,87 @@ describe('dispatchersFromTenantClient', () => {
         expect(triggerB.mock.calls[0][1]).toEqual({ workId: 'b', documentId: 'b' });
     });
 
+    // T26 / EW-742 P3 — the plugin execution router looks
+    // `dispatchPluginOperation` up by name on a BYO tenant's view; without it
+    // every long-running plugin call for that tenant answered
+    // JOB_RUNTIME_UNAVAILABLE.
+    it('dispatchPluginOperation triggers run-plugin-operation on the tenant client, with the tags and queue ttl', async () => {
+        const fakeTrigger = vi.fn().mockResolvedValue({ id: 'tenant-plugin-run' });
+        const fakeClient = {
+            tasks: { trigger: fakeTrigger },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchPluginOperation: (p: unknown) => Promise<string | null>;
+        };
+
+        await expect(
+            dispatchers.dispatchPluginOperation({
+                pluginId: 'acme',
+                operation: 'runSandboxSession',
+                args: { n: 1 },
+                tenantId: 't-1',
+                providerId: 'trigger',
+                credentialVersion: 3,
+            }),
+        ).resolves.toBe('tenant-plugin-run');
+        expect(fakeTrigger).toHaveBeenCalledTimes(1);
+        expect(fakeTrigger).toHaveBeenCalledWith(
+            'run-plugin-operation',
+            {
+                pluginId: 'acme',
+                operation: 'runSandboxSession',
+                args: { n: 1 },
+                tenantId: 't-1',
+                providerId: 'trigger',
+                credentialVersion: 3,
+            },
+            // No tenant tag here: the bound view's Proxy owns stamping.
+            { tags: ['plugin-operation', 'plugin:acme'], ttl: '15m' },
+        );
+        expect(tasksTriggerMock).not.toHaveBeenCalled();
+    });
+
+    it('dispatchPluginOperation sends only the fields the payload has', async () => {
+        const fakeTrigger = vi.fn().mockResolvedValue({ id: 'r' });
+        const fakeClient = {
+            tasks: { trigger: fakeTrigger },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchPluginOperation: (p: unknown) => Promise<string | null>;
+        };
+
+        await dispatchers.dispatchPluginOperation({ pluginId: 'acme', operation: 'op' });
+
+        expect(Object.keys(fakeTrigger.mock.calls[0][1] as object)).toEqual([
+            'pluginId',
+            'operation',
+            'args',
+        ]);
+    });
+
+    it('dispatchPluginOperation answers null when the SDK throws or returns no run id (the router reads null as not accepted)', async () => {
+        const fakeTrigger = vi
+            .fn()
+            .mockRejectedValueOnce(new Error('SDK down'))
+            .mockResolvedValueOnce(undefined);
+        const fakeClient = {
+            tasks: { trigger: fakeTrigger },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchPluginOperation: (p: unknown) => Promise<string | null>;
+        };
+
+        await expect(
+            dispatchers.dispatchPluginOperation({ pluginId: 'acme', operation: 'op' }),
+        ).resolves.toBeNull();
+        await expect(
+            dispatchers.dispatchPluginOperation({ pluginId: 'acme', operation: 'op' }),
+        ).resolves.toBeNull();
+    });
+
     it('the dispatchers map is frozen', () => {
         const fakeClient = {
             tasks: { trigger: vi.fn() },

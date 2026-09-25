@@ -1,8 +1,9 @@
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, Optional } from '@nestjs/common';
 import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
+import { FacadePluginAvailabilityService } from '../plugins/services/facade-plugin-availability.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import type { IPlugin, FacadeOptions, PluginIcon } from '@ever-works/plugin';
@@ -60,6 +61,25 @@ export interface UserProviderInfo {
 export abstract class BaseFacadeService {
     protected abstract readonly CAPABILITY: string;
     protected abstract readonly logger: Logger;
+
+    /**
+     * EW-693 T26 / FR-15 — install-on-use for a plugin this process has not
+     * registered (dynamic distribution + `facadeInstallOnUse` only; see
+     * `FacadePluginAvailabilityService`). Asked by the two lookups that name a
+     * plugin by id: an explicit provider override and the Work's active
+     * plugin. When on, the service places the pinned version on THIS replica
+     * (`installer.ensureLocalInstall` — no write to the shared install row),
+     * registers it (`loader.registerFromPath`) and loads it (EW-693 T27; see
+     * the service). Off unless the mode is `dynamic` and `facadeInstallOnUse`
+     * is `true`.
+     *
+     * PROPERTY-injected so no facade constructor changes. Absent — a facade
+     * built with `new`, or a graph without `PluginsModule` such as the Trigger
+     * worker — means exactly the behaviour before it existed.
+     */
+    @Optional()
+    @Inject(FacadePluginAvailabilityService)
+    protected readonly pluginAvailability?: FacadePluginAvailabilityService;
 
     constructor(
         protected readonly registry: PluginRegistryService,
@@ -256,7 +276,7 @@ export abstract class BaseFacadeService {
             );
 
             if (activePlugin) {
-                const registered = this.registry.get(activePlugin.pluginId);
+                const registered = await this.registeredOrInstalled(activePlugin.pluginId);
                 if (registered && registered.state === 'loaded') {
                     return registered;
                 }
@@ -266,6 +286,16 @@ export abstract class BaseFacadeService {
         }
 
         return null;
+    }
+
+    /**
+     * The registry's entry for `pluginId` — or, when this process has none,
+     * what install-on-use answers (FR-15; `undefined` when it is off).
+     */
+    private async registeredOrInstalled(pluginId: string): Promise<RegisteredPlugin | undefined> {
+        const registered = this.registry.get(pluginId);
+        if (registered || !this.pluginAvailability) return registered;
+        return this.pluginAvailability.ensureRegistered(pluginId);
     }
 
     protected async getEnabledPlugins(workId: string, userId: string): Promise<RegisteredPlugin[]> {
@@ -311,7 +341,7 @@ export abstract class BaseFacadeService {
     ): Promise<T> {
         const effectiveOverride = agentProviderOverride ?? providerOverride;
         if (effectiveOverride) {
-            const registered = this.registry.get(effectiveOverride);
+            const registered = await this.registeredOrInstalled(effectiveOverride);
             if (
                 registered &&
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 
 /**
  * EW-693 / T27 — **`run-plugin-operation`**, the long-running plugin call, until
@@ -49,6 +49,10 @@ vi.mock('@ever-works/agent/plugins', async () => {
     return {
         PluginInstallerService: class PluginInstallerService {},
         PluginRegistryService: class PluginRegistryService {},
+        PluginLoaderService: class PluginLoaderService {},
+        // The REAL refusal class: the task tells a refusal (FR-10/FR-11) from
+        // a failed fetch by it.
+        PluginInstallRefusedError: actual.PluginInstallRefusedError,
         materializePlugin: actual.materializePlugin,
         resolvePluginOperation: actual.resolvePluginOperation,
         describeMissingOperation: actual.describeMissingOperation,
@@ -73,7 +77,13 @@ vi.mock('../trigger/worker/trigger-logger', () => ({
 }));
 
 import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
-import { PluginInstallerService, PluginRegistryService } from '@ever-works/agent/plugins';
+import { Logger } from '@nestjs/common';
+import {
+    PluginInstallerService,
+    PluginInstallRefusedError,
+    PluginLoaderService,
+    PluginRegistryService,
+} from '@ever-works/agent/plugins';
 import {
     PLUGIN_OPERATION_MAX_DURATION_SECONDS,
     PLUGIN_OPERATION_TASK_ID,
@@ -95,35 +105,70 @@ const PLUGIN_ID = 'acme-generator';
  */
 const DECLARES_GENERATE = { id: PLUGIN_ID, operations: [{ name: 'generate' }] };
 
+interface InstallerDouble {
+    getDistributionMode: ReturnType<typeof vi.fn>;
+    ensureLocalInstall: ReturnType<typeof vi.fn>;
+    /** The API-side method that trusts — and writes — the shared row. Never called here. */
+    ensurePluginAvailable: ReturnType<typeof vi.fn>;
+}
+
 interface Harness {
-    installer: { ensurePluginAvailable: ReturnType<typeof vi.fn> } | 'absent';
+    installer: InstallerDouble | 'absent';
     registry: { get: ReturnType<typeof vi.fn> } | 'absent';
+    loader: { registerFromPath: ReturnType<typeof vi.fn> } | 'absent';
     close: ReturnType<typeof vi.fn>;
     generate: ReturnType<typeof vi.fn>;
 }
 
+/** Where the double installer "places" a runtime-installed plugin. */
+const INSTALL_PATH = '/worker/.plugin-store/.versions/@ever-works__acme-generator-plugin/1.2.0';
+
 /**
  * A worker context whose `get` behaves the way Nest's does: it answers the
  * bound service, and THROWS `UnknownElementException` for one that is absent.
+ *
+ * `plugin: 'unregistered'` — the plugin is not in the image; with
+ * `mode: 'dynamic'` the double loader registers it (`registerFromPath`), after
+ * which the registry answers it.
  */
 function harness(
     over: {
         installer?: 'absent';
         registry?: 'absent';
+        loader?: 'absent';
         plugin?: 'unregistered';
+        mode?: 'bundled' | 'dynamic';
         hydrator?: { initialize: ReturnType<typeof vi.fn> };
         entry?: unknown;
     } = {},
 ): Harness {
     const generate = vi.fn(async (args?: Record<string, unknown>) => ({ generated: true, args }));
+    let registeredAtRuntime = false;
     const h: Harness = {
-        installer: over.installer ?? { ensurePluginAvailable: vi.fn(async () => undefined) },
+        installer: over.installer ?? {
+            getDistributionMode: vi.fn(() => over.mode ?? 'bundled'),
+            ensureLocalInstall: vi.fn(async (id: string) => ({
+                pluginId: id,
+                packageName: '@ever-works/acme-generator-plugin',
+                version: '1.2.0',
+                integrity: 'sha512-pinned',
+                installPath: INSTALL_PATH,
+                registrySpec: '@ever-works/acme-generator-plugin@1.2.0',
+            })),
+            ensurePluginAvailable: vi.fn(async () => undefined),
+        },
         registry: over.registry ?? {
             get: vi.fn((id: string) =>
-                over.plugin === 'unregistered' || id !== PLUGIN_ID
+                id !== PLUGIN_ID || (over.plugin === 'unregistered' && !registeredAtRuntime)
                     ? undefined
                     : (over.entry ?? { manifest: DECLARES_GENERATE, plugin: { generate } }),
             ),
+        },
+        loader: over.loader ?? {
+            registerFromPath: vi.fn(async (_path: string, opts: { expectedId: string }) => {
+                registeredAtRuntime = true;
+                return { success: true, pluginId: opts.expectedId };
+            }),
         },
         close: vi.fn(async () => undefined),
         generate,
@@ -137,9 +182,11 @@ function harness(
                     ? h.installer
                     : token === PluginRegistryService
                       ? h.registry
-                      : token === TriggerPluginHydratorService && over.hydrator
-                        ? over.hydrator
-                        : 'absent';
+                      : token === PluginLoaderService
+                        ? h.loader
+                        : token === TriggerPluginHydratorService && over.hydrator
+                          ? over.hydrator
+                          : 'absent';
             if (bound === 'absent') {
                 throw new UnknownElementException(
                     String((token as { name?: string })?.name ?? token),
@@ -171,8 +218,13 @@ describe('run-plugin-operation (EW-693 T27)', () => {
     });
 
     describe('with both services bound', () => {
-        it('installs the plugin, then runs the operation with the payload’s args', async () => {
-            const h = harness();
+        // T27 — was "installs the plugin, then runs the operation", which
+        // pinned the old order: `ensurePluginAvailable` BEFORE hydrating, for
+        // every plugin — a method that trusts, and writes, the API's shared
+        // install row. A plugin in the image is now run without asking the
+        // installer at all ("bundled wins").
+        it('runs the operation of a plugin in the image with the payload’s args — the installer is not asked', async () => {
+            const h = harness({ mode: 'dynamic' });
 
             const outcome = await run({
                 pluginId: PLUGIN_ID,
@@ -181,18 +233,20 @@ describe('run-plugin-operation (EW-693 T27)', () => {
             });
 
             expect(outcome).toEqual({ ok: true, result: { generated: true, args: { n: 1 } } });
-            expect(
-                (h.installer as { ensurePluginAvailable: ReturnType<typeof vi.fn> })
-                    .ensurePluginAvailable,
-            ).toHaveBeenCalledWith(PLUGIN_ID);
+            const installer = h.installer as InstallerDouble;
+            expect(installer.ensureLocalInstall).not.toHaveBeenCalled();
+            expect(installer.ensurePluginAvailable).not.toHaveBeenCalled();
             expect(h.close).toHaveBeenCalledTimes(1);
         });
 
+        // T27 — was driven by `ensurePluginAvailable` rejecting for a plugin
+        // that was already registered. The install step is now
+        // `ensureLocalInstall`, reached only for a plugin not in the image.
         it('answers WORKER_INSTALL_FAILED when the install throws, and runs nothing', async () => {
-            const h = harness();
-            (
-                h.installer as { ensurePluginAvailable: ReturnType<typeof vi.fn> }
-            ).ensurePluginAvailable.mockRejectedValue(new Error('integrity mismatch'));
+            const h = harness({ mode: 'dynamic', plugin: 'unregistered' });
+            (h.installer as InstallerDouble).ensureLocalInstall.mockRejectedValue(
+                new Error('integrity mismatch'),
+            );
 
             await expect(run({ pluginId: PLUGIN_ID, operation: 'generate' })).resolves.toEqual({
                 ok: false,
@@ -202,8 +256,10 @@ describe('run-plugin-operation (EW-693 T27)', () => {
             expect(h.close).toHaveBeenCalledTimes(1);
         });
 
+        // T27 — was 'after ensurePluginAvailable': in bundled mode (the
+        // default) nothing is installed, and the answer names the image.
         it('answers PLUGIN_NOT_REGISTERED when the registry does not know the plugin', async () => {
-            harness({ plugin: 'unregistered' });
+            const h = harness({ plugin: 'unregistered' });
 
             await expect(
                 run({ pluginId: PLUGIN_ID, operation: 'generate' }),
@@ -211,9 +267,10 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 ok: false,
                 error: {
                     code: 'PLUGIN_NOT_REGISTERED',
-                    message: expect.stringContaining('after ensurePluginAvailable'),
+                    message: expect.stringContaining('not bundled in the worker image'),
                 },
             });
+            expect((h.installer as InstallerDouble).ensureLocalInstall).not.toHaveBeenCalled();
         });
 
         it('answers OPERATION_NOT_FOUND for an operation the plugin does not implement', async () => {
@@ -235,6 +292,238 @@ describe('run-plugin-operation (EW-693 T27)', () => {
                 ok: false,
                 error: { message: 'upstream 500', code: 'WORKER_PLUGIN_THREW' },
             });
+        });
+    });
+
+    /**
+     * T27's runtime-installed half. A plugin that is not in the worker image,
+     * in dynamic mode: hydrate first, then install the version the API PINNED
+     * into this worker's own store (`ensureLocalInstall` — never the method
+     * that writes the shared row), register the extracted directory, and look
+     * it up again.
+     */
+    describe('a plugin that is not in the image (T27 — runtime-installed)', () => {
+        it('hydrates, installs the pinned version, registers the extracted directory, then runs', async () => {
+            const order: string[] = [];
+            const initialize = vi.fn(async () => {
+                order.push('hydrate');
+            });
+            const h = harness({
+                mode: 'dynamic',
+                plugin: 'unregistered',
+                hydrator: { initialize },
+            });
+            const installer = h.installer as InstallerDouble;
+            const registry = h.registry as { get: ReturnType<typeof vi.fn> };
+            const loader = h.loader as { registerFromPath: ReturnType<typeof vi.fn> };
+            const lookup = registry.get.getMockImplementation()!;
+            registry.get.mockImplementation((id: string) => {
+                order.push('lookup');
+                return lookup(id);
+            });
+            const install = installer.ensureLocalInstall.getMockImplementation()!;
+            installer.ensureLocalInstall.mockImplementation(async (id: string) => {
+                order.push('install');
+                return install(id);
+            });
+            const register = loader.registerFromPath.getMockImplementation()!;
+            loader.registerFromPath.mockImplementation(async (p: string, o: unknown) => {
+                order.push('register');
+                return register(p, o);
+            });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate', args: { n: 4 } }),
+            ).resolves.toEqual({ ok: true, result: { generated: true, args: { n: 4 } } });
+
+            expect(order).toEqual(['hydrate', 'lookup', 'install', 'register', 'lookup']);
+            expect(installer.ensureLocalInstall).toHaveBeenCalledWith(PLUGIN_ID);
+            expect(loader.registerFromPath).toHaveBeenCalledWith(INSTALL_PATH, {
+                expectedId: PLUGIN_ID,
+            });
+            expect(installer.ensurePluginAvailable).not.toHaveBeenCalled();
+            expect(h.close).toHaveBeenCalledTimes(1);
+        });
+
+        it('answers WORKER_INSTALL_REFUSED — and runs nothing — when the installer refuses (FR-10/FR-11)', async () => {
+            const h = harness({ mode: 'dynamic', plugin: 'unregistered' });
+            (h.installer as InstallerDouble).ensureLocalInstall.mockRejectedValue(
+                new PluginInstallRefusedError(
+                    PLUGIN_ID,
+                    'Package "@acme/generator" is not on the admin allowlist.',
+                ),
+            );
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: {
+                    code: 'WORKER_INSTALL_REFUSED',
+                    message: expect.stringContaining('not on the admin allowlist'),
+                },
+            });
+            expect(
+                (h.loader as { registerFromPath: ReturnType<typeof vi.fn> }).registerFromPath,
+            ).not.toHaveBeenCalled();
+            expect(h.generate).not.toHaveBeenCalled();
+        });
+
+        it('answers WORKER_INSTALL_FAILED, carrying the loader’s reason, when the extracted directory cannot be registered', async () => {
+            const h = harness({ mode: 'dynamic', plugin: 'unregistered' });
+            (
+                h.loader as { registerFromPath: ReturnType<typeof vi.fn> }
+            ).registerFromPath.mockResolvedValue({
+                success: false,
+                pluginId: PLUGIN_ID,
+                error: 'The package declares plugin "someone-else", not "acme-generator"',
+            });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: {
+                    code: 'WORKER_INSTALL_FAILED',
+                    message: expect.stringContaining('declares plugin "someone-else"'),
+                },
+            });
+            expect(h.generate).not.toHaveBeenCalled();
+        });
+
+        it('answers WORKER_INSTALL_FAILED when no plugin loader is bound to register it', async () => {
+            const h = harness({ mode: 'dynamic', plugin: 'unregistered', loader: 'absent' });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: {
+                    code: 'WORKER_INSTALL_FAILED',
+                    message: expect.stringContaining('no plugin loader'),
+                },
+            });
+            expect(h.generate).not.toHaveBeenCalled();
+        });
+
+        it('answers PLUGIN_NOT_REGISTERED when the plugin is still absent after it was installed and registered', async () => {
+            const h = harness({ mode: 'dynamic', plugin: 'unregistered' });
+            (h.registry as { get: ReturnType<typeof vi.fn> }).get.mockReturnValue(undefined);
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: {
+                    code: 'PLUGIN_NOT_REGISTERED',
+                    message: expect.stringContaining('after installing it'),
+                },
+            });
+            expect(h.generate).not.toHaveBeenCalled();
+        });
+
+        it('never installs in bundled mode — a plugin not in the image is PLUGIN_NOT_REGISTERED', async () => {
+            const h = harness({ mode: 'bundled', plugin: 'unregistered' });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({
+                ok: false,
+                error: { code: 'PLUGIN_NOT_REGISTERED' },
+            });
+            const installer = h.installer as InstallerDouble;
+            expect(installer.ensureLocalInstall).not.toHaveBeenCalled();
+            expect(installer.ensurePluginAvailable).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * "The image wins" — and the image is chosen at BUILD time
+     * (`prepare-plugins.js` reads PLUGIN_DISTRIBUTION_MODE when the worker is
+     * deployed), while runtime installs follow the RUN-time mode. A worker run
+     * in dynamic mode on an image built in bundled mode (the default) carries
+     * distributable plugins, and runs its own copy, not the version the API
+     * pinned. That is allowed, but it must not be silent. No API call is needed
+     * to notice: the manifest says whether the plugin is distributable.
+     *
+     * Each case uses its own manifest version: the warning is once per plugin
+     * version per process, and the process outlives a test.
+     */
+    describe('a distributable plugin the image carries, in dynamic mode (T27 — image/pin skew)', () => {
+        let warn: MockInstance;
+
+        beforeEach(() => {
+            warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        });
+
+        afterEach(() => {
+            warn.mockRestore();
+        });
+
+        const inImage = (manifest: Record<string, unknown>) => ({
+            manifest: { ...DECLARES_GENERATE, ...manifest },
+            plugin: { generate: vi.fn(async () => ({ generated: true })) },
+        });
+
+        const skewWarnings = () =>
+            warn.mock.calls
+                .map(([message]) => String(message))
+                .filter((message) => message.includes('PLUGIN_DISTRIBUTION_MODE=dynamic'));
+
+        it('runs the image’s copy, and warns — once per process — that it is not the pinned version', async () => {
+            const h = harness({ mode: 'dynamic', entry: inImage({ version: '9.0.1' }) });
+
+            await expect(run({ pluginId: PLUGIN_ID, operation: 'generate' })).resolves.toEqual({
+                ok: true,
+                result: { generated: true },
+            });
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({ ok: true });
+
+            const warnings = skewWarnings();
+            expect(warnings).toHaveLength(1);
+            expect(warnings[0]).toContain(`"${PLUGIN_ID}"`);
+            expect(warnings[0]).toContain('9.0.1');
+            expect(warnings[0]).toContain('pinned');
+            expect((h.installer as InstallerDouble).ensureLocalInstall).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['declared core', { version: '9.0.2', distribution: 'core' }],
+            ['a system plugin with no distribution', { version: '9.0.3', systemPlugin: true }],
+        ])('does not warn for %s — core plugins belong in every image', async (_l, manifest) => {
+            harness({ mode: 'dynamic', entry: inImage(manifest) });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({ ok: true });
+
+            expect(skewWarnings()).toEqual([]);
+        });
+
+        it('does not warn in bundled mode — there the image is the distribution', async () => {
+            harness({ mode: 'bundled', entry: inImage({ version: '9.0.4' }) });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({ ok: true });
+
+            expect(skewWarnings()).toEqual([]);
+        });
+
+        it('does not warn for a plugin it installed at runtime — that IS the pinned version', async () => {
+            harness({
+                mode: 'dynamic',
+                plugin: 'unregistered',
+                entry: inImage({ version: '9.0.5' }),
+            });
+
+            await expect(
+                run({ pluginId: PLUGIN_ID, operation: 'generate' }),
+            ).resolves.toMatchObject({ ok: true });
+
+            expect(skewWarnings()).toEqual([]);
         });
     });
 

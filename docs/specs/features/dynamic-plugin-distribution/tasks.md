@@ -5,8 +5,8 @@
 
 **Feature ID**: `dynamic-plugin-distribution`
 **Plan**: `./plan.md`
-**Status**: `In progress` — Phase 7 (T26, T27) is not complete; see the Phase 7 status note.
-**Last updated**: 2026-09-24
+**Status**: `In progress` — Phase 7 (T26, T27) is not complete. T26's first long-running caller ships behind a configuration switch that is off by default; its FR-15 facade path is wired behind a second switch but has no effect until the local-install and registration follow-up. See the Phase 7 status note.
+**Last updated**: 2026-09-25
 
 ---
 
@@ -192,8 +192,64 @@
 >   TTL + `maxDuration` + boot) is derived from them, and an unmocked spec pins
 >   the wiring.
 >
-> **Still open:** T26 — no facade calls the router yet (the first real caller
-> is a product decision); T27's _runtime-installed_ half — the worker binds no
+> **T26 (owner decision 2026-09-25: all three, each behind configuration,
+> nothing removed):**
+>
+> - **The first long-running caller.** `claude-managed-agent` declares
+>   `runSandboxSession` in `everworks.plugin.operations` with
+>   `executionProfile: 'long-running'`. `ManagedAgentSandboxRunnerService`
+>   (`packages/agent/src/plugins/services/managed-agent-sandbox-runner.service.ts`,
+>   provided and exported by `PluginsModule`) runs one sandbox session through
+>   the router: it starts, polls, waits for and cancels the session, with the
+>   Work's tenant. The switch is `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`
+>   (`PluginsModuleOptions.sandboxSessionsViaJobRuntime`). It is off by
+>   default, and then the session runs in the API process through the plugin
+>   and stops on the caller's `AbortSignal`.
+>     - The runner names no plugin id (Constitution Principle II). Its caller
+>       passes the plugin id on every `run` / `start`. APW-04 T48's session
+>       runner selects that plugin by `enforcesRuntimeNetworking` plus
+>       `runSandboxSession` (the first enabled such pipeline with resolvable
+>       settings); only specs name `claude-managed-agent`.
+>     - On the job-runtime path, a signal that is already aborted starts
+>       nothing, on `run` and `start` alike. On `start`, a signal aborted
+>       while the run is being started cancels that run.
+>     - The router gained `cancelLongRunning(runId, { tenantId })`. It calls
+>       `provider.cancel` through the tenant's view, answers within 20 s and
+>       never throws.
+>     - It also gained `dispatchSync(…, { signal })`, which hands the signal to
+>       the operation as its second argument.
+>     - The APW-04 App Provisioner does not exist yet. Its session runner (T48)
+>       is meant to select the pipeline and then open the session through this
+>       runner.
+> - **FR-15 facade install-on-use.** `BaseFacadeService.resolvePlugin` asks
+>   `FacadePluginAvailabilityService` for a plugin this process has not
+>   registered. Two lookups ask: an explicit provider override and the Work's
+>   active plugin. The service calls `ensurePluginAvailable`, then reads the
+>   registry again.
+>     - It is active only in dynamic mode, and only with
+>       `PLUGIN_FACADE_INSTALL_ON_USE` (`PluginsModuleOptions.facadeInstallOnUse`,
+>       off by default) turned on.
+>     - Only a plugin the platform already installed and pinned qualifies: a
+>       `registry`-sourced row in state `installed` with its `registrySpec`
+>       and `installedVersion`. A miss is not retried for 60 s, and at most
+>       1,000 misses are remembered (oldest forgotten first).
+>     - **It has no effect on the current build, for two reasons.** (1)
+>       `ensurePluginAvailable` trusts the shared row: every row the service
+>       lets through takes its fast path, which returns the `node_modules` link
+>       path without checking or writing this replica's disk. Each pod has its
+>       own install directory (`emptyDir`), so a replica that did not run the
+>       install gets no files. (2) Nothing registers what is installed.
+>     - **Follow-up:** replace the `ensurePluginAvailable` call with the
+>       disk-aware `installer.ensureLocalInstall(pluginId)` (pinned version,
+>       this replica's store, never writes the shared row), then
+>       `loader.registerFromPath(result.installPath, { expectedId })` on the
+>       versioned directory it answers. Adding `registerFromPath` after
+>       `ensurePluginAvailable` is not enough: its `installPath` does not exist
+>       on exactly the replicas this targets.
+> - **T27's acceptance proof** stays the real-module fixture test
+>   `packages/tasks/src/trigger/worker/modules/__tests__/trigger-run-plugin-operation.module.spec.ts`.
+>
+> **Still open:** T27's _runtime-installed_ half — the worker binds no
 > installer, because today's `PluginInstallerService` would trust and write
 > the API's shared install row and never register the plugin, so a plugin not
 > bundled in the worker image answers `PLUGIN_NOT_REGISTERED`; and tenant-aware
@@ -207,6 +263,13 @@
 - [ ] **T26**. In-process path: facades (`packages/agent/src/facades/*`) call the
       dynamically-loaded plugin directly for `sync` operations (FR-15). No change
       for bundled/core. **Test**: short call stays in-process (no job dispatch).
+    - **Status (2026-09-25)**: the long-running caller is done
+      (`ManagedAgentSandboxRunnerService`, behind
+      `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`, off by default). The FR-15
+      facade path (`FacadePluginAvailabilityService`, behind
+      `PLUGIN_FACADE_INSTALL_ON_USE`, off by default) is wired but has no
+      effect until the local-install and registration follow-up
+      (`ensureLocalInstall` + `registerFromPath`; see the Phase 7 note).
 - [ ] **T27**. Long-running path: route `long-running` plugin calls through the
       job runtime (Trigger.dev task in `packages/tasks/src/tasks/trigger/`). The
       task MUST call `ensurePluginAvailable` (T19) **first** — the worker is a
@@ -215,6 +278,8 @@
       result channel (FR-16). Coordinate with [EW-683] for provider abstraction.
     - **Test**: long call for a runtime-installed plugin succeeds in the worker
       (worker installs into its own store first), not just the API.
+    - **Acceptance proof**: the real-module fixture test
+      `packages/tasks/src/trigger/worker/modules/__tests__/trigger-run-plugin-operation.module.spec.ts`.
 - [x] **T28**. Result/error propagation + timeout/retry parity between paths.
       (Both paths answer one `PluginExecutionResult`; the job-runtime path adds the
       run id and named `JOB_RUNTIME_*` codes; the worker task runs one attempt.)

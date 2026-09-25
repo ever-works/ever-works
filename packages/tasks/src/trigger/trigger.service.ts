@@ -101,6 +101,7 @@ import {
     type appForkReadinessTask,
 } from '../tasks/trigger/app-fork-readiness.task';
 import type { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
+import { pluginOperationRunPayload } from './plugin-operation-run-payload';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 // C10 — the readiness payload and dispatcher contract T23 declared (provisionally) in
 // `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
@@ -1404,6 +1405,12 @@ export class TriggerService
      * run no worker picks up within `PLUGIN_OPERATION_QUEUE_TTL_SECONDS` (15
      * minutes) expires, and the router reads it as failed instead of waiting on
      * it. The router's default wait is derived from the same constant.
+     *
+     * A tenant call's payload also carries `tenantId`, `providerId` and
+     * `credentialVersion` (T26 / EW-742 P3 FR-5), forwarded as they are; the
+     * worker does not read them. Reached through a tenant's bound view, the
+     * call runs under the tenant stamp, so `stampTenantOptions` adds the
+     * `tenant:<id>` tag and the tenant's concurrency key.
      */
     async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
@@ -1413,7 +1420,7 @@ export class TriggerService
         try {
             const handle = await tasks.trigger<typeof runPluginOperationTask>(
                 PLUGIN_OPERATION_TASK_ID,
-                { pluginId: payload.pluginId, operation: payload.operation, args: payload.args },
+                pluginOperationRunPayload(payload),
                 this.stampTenantOptions({
                     tags: ['plugin-operation', `plugin:${payload.pluginId}`],
                     machine: this.machine() as any,

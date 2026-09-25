@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { IJobRuntimeProvider, JobRunResult, PluginExecutionProfile } from '@ever-works/plugin';
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginInstallerService } from './plugin-installer.service';
@@ -19,7 +20,14 @@ import {
     PLUGIN_OPERATION_DEFAULT_WAIT_MS,
     PLUGIN_OPERATION_DISPATCH_METHOD,
     type PluginOperationDispatch,
+    type PluginOperationPayload,
 } from '../../tasks/plugin-operation-dispatch';
+// Direct file imports, not the `tasks` barrel: the plugins module must not pull
+// the whole dispatcher graph in. Both are looked up at call time through
+// `ModuleRef` (see `providerFor` / `payloadFor`), never injected.
+import { TenantAwareRuntimeResolver } from '../../tasks/tenant-aware-runtime.resolver';
+import { RuntimeBindingStamperService } from '../../tasks/runtime-binding-stamper.service';
+import { getOptionalProvider } from '../../utils/optional-provider.util';
 
 /** Default upper bound between result reads (reads back off from 1 s). */
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
@@ -91,7 +99,36 @@ const FINAL_READ_MIN_MS = 1_000;
  *   not block behind the 60 s ingress limit: start, answer with the run id,
  *   read the outcome once per poll.
  *
+ * `cancelLongRunning()` (T26) cancels a run through the job runtime — the
+ * only way to stop one, since an `AbortSignal` cannot cross into the worker.
+ * In-process, `dispatchSync(…, { signal })` hands the operation the signal.
+ *
  * Result/error shape is unified across both paths (`PluginExecutionResult`).
+ *
+ * ## Tenants (T26 / EW-742 P3)
+ *
+ * A caller that knows the Work's tenant passes `tenantId` (in the options of
+ * `dispatch`, `dispatchLongRunning`, `startLongRunning`, `pollLongRunning` and
+ * `cancelLongRunning`).
+ * The long-running path then runs through
+ * `TenantAwareRuntimeResolver.resolve(tenantId)`: the tenant's bound view of
+ * the active runtime (a BYO tenant's own Trigger.dev project, the tenant's
+ * tag and concurrency key), or the platform provider for a tenant with no
+ * overlay. The wait reads back through the SAME view it dispatched through.
+ * `pollLongRunning` and `cancelLongRunning` resolve again from the caller's
+ * `tenantId`, so a caller keeps the tenant next to the run id. The resolver lives in a non-global API
+ * module, so it is looked up through `ModuleRef` (`getOptionalProvider`);
+ * where it is absent (a worker, a narrower graph) or throws, the call uses the
+ * platform provider, as the resolver itself does on any failure. A resolver
+ * answering `null` means no runtime at all: JOB_RUNTIME_UNAVAILABLE. Without
+ * `tenantId` nothing is looked up.
+ *
+ * FR-5 (tenant-job-runtime-overlay spec): the payload of a tenant call carries
+ * `tenantId` and, when `RuntimeBindingStamperService` is bound, the
+ * `(providerId, credentialVersion)` it reports at enqueue time (null/null
+ * when the tenant has no active overlay or the lookup fails). The Trigger.dev
+ * worker ignores them today: it is push-model, and the run already executes in
+ * the project it was dispatched to.
  */
 @Injectable()
 export class PluginExecutionRouterService {
@@ -113,6 +150,10 @@ export class PluginExecutionRouterService {
         @Optional()
         @Inject(JOB_RUNTIME_PROVIDER_REGISTRY)
         private readonly jobRuntimes?: JobRuntimeProviderRegistry | null,
+        // Appended last so positional construction keeps working. Used only to
+        // look up the tenant resolver and the stamper when a call names a tenant.
+        @Optional()
+        private readonly moduleRef?: ModuleRef,
     ) {
         this.distributionMode = options.distributionMode ?? 'bundled';
     }
@@ -197,11 +238,18 @@ export class PluginExecutionRouterService {
      * function for ANY name. A plugin in `error` state — before loading, or
      * after its `onLoad` failed while loading — answers PLUGIN_LOAD_FAILED and
      * runs nothing.
+     *
+     * The operation receives `args` as its ONE argument, as in the worker
+     * task. Only when the caller passes `options.signal` (T26) is it handed
+     * the signal as a second argument — for operations shaped
+     * `(input, signal?)`, such as `runSandboxSession`. The job-runtime path
+     * cannot carry a signal; there, {@link cancelLongRunning} stops the run.
      */
     async dispatchSync<TResult = unknown>(
         pluginId: string,
         operation: string,
         args?: Record<string, unknown>,
+        options: InProcessOptions = {},
     ): Promise<PluginExecutionResult<TResult>> {
         try {
             if (this.installer) {
@@ -248,7 +296,9 @@ export class PluginExecutionRouterService {
                     },
                 };
             }
-            const result = (await method.call(plugin, args)) as TResult;
+            const result = (await (options.signal
+                ? method.call(plugin, args, options.signal)
+                : method.call(plugin, args))) as TResult;
             return { ok: true, location: 'in-process', result };
         } catch (err) {
             return {
@@ -284,9 +334,13 @@ export class PluginExecutionRouterService {
     ): Promise<PluginExecutionResult<TResult>> {
         let runId: string | undefined;
         try {
-            const dispatcher = this.triggerDispatcher ?? this.jobRuntimeDispatcher(options);
+            const dispatcher =
+                this.triggerDispatcher ??
+                this.jobRuntimeDispatcher(await this.providerFor(options.tenantId), options);
             if (!dispatcher) return jobRuntimeUnavailable();
-            const handle = await dispatcher.trigger({ pluginId, operation, args });
+            const handle = await dispatcher.trigger(
+                await this.payloadFor(pluginId, operation, args, options.tenantId),
+            );
             runId = typeof handle?.id === 'string' && handle.id ? handle.id : undefined;
             if (!runId) {
                 return {
@@ -318,20 +372,23 @@ export class PluginExecutionRouterService {
     /**
      * Start a long-running operation WITHOUT waiting — for HTTP callers. Answers
      * `{ ok: true, runId }`, or the failure that prevented the start. Read the
-     * outcome with {@link pollLongRunning}.
+     * outcome with {@link pollLongRunning}, passing the same `tenantId`.
      */
     async startLongRunning(
         pluginId: string,
         operation: string,
         args?: Record<string, unknown>,
+        options: LongRunningTenantOptions = {},
     ): Promise<
         { ok: true; location: 'job-runtime'; runId: string } | PluginExecutionResult<never>
     > {
-        const provider = this.activeProvider();
+        const provider = await this.providerFor(options.tenantId);
         const dispatch = provider ? dispatchMethodOf(provider) : null;
         if (!provider || !dispatch) return jobRuntimeUnavailable();
         try {
-            const runId = await dispatch({ pluginId, operation, args });
+            const runId = await dispatch(
+                await this.payloadFor(pluginId, operation, args, options.tenantId),
+            );
             if (!runId) {
                 return {
                     ok: false,
@@ -363,13 +420,28 @@ export class PluginExecutionRouterService {
      * not be read this time is `done`, with JOB_RUNTIME_OUTPUT_UNREADABLE: its
      * work is over and it must not be dispatched again (a later poll may still
      * return the output).
+     *
+     * Pass the `tenantId` the run was started with: a BYO tenant's run lives in
+     * the tenant's project and reads as `'unknown'` anywhere else. Resolving the
+     * tenant counts against the same `POLL_READ_TIMEOUT_MS`, so a stalled
+     * lookup is also answered as not-done in time.
      */
-    async pollLongRunning<TResult = unknown>(runId: string): Promise<LongRunningPoll<TResult>> {
-        const provider = this.activeProvider();
+    async pollLongRunning<TResult = unknown>(
+        runId: string,
+        options: LongRunningTenantOptions = {},
+    ): Promise<LongRunningPoll<TResult>> {
+        const deadline = Date.now() + POLL_READ_TIMEOUT_MS;
+        const resolved = await withinTime(this.providerFor(options.tenantId), POLL_READ_TIMEOUT_MS);
+        if (!resolved.settled) return { done: false, runId, status: 'unknown' };
+        const provider = resolved.value;
         if (!provider || typeof provider.getRunResult !== 'function') {
             return { done: true, runId, result: { ...jobRuntimeUnavailable(), runId } };
         }
-        const read = await readRunResult(provider, runId, POLL_READ_TIMEOUT_MS);
+        const read = await readRunResult(
+            provider,
+            runId,
+            Math.max(deadline - Date.now(), FINAL_READ_MIN_MS),
+        );
         if (read.status === 'queued' || read.status === 'running' || read.status === 'unknown') {
             return { done: false, runId, status: read.status };
         }
@@ -378,6 +450,64 @@ export class PluginExecutionRouterService {
             runId,
             result: fromTaskOutcome(outcomeOf<TResult>(read, runId), runId),
         };
+    }
+
+    /**
+     * T26 — ask the job runtime to CANCEL a long-running run started earlier
+     * (`provider.cancel`). The job runtime cannot carry an `AbortSignal`, so
+     * this is how a caller stops an operation it no longer wants. Pass the
+     * `tenantId` the run was started with: a BYO tenant's run lives in the
+     * tenant's project, and the tenant's view cancels it there.
+     *
+     * Answers `{ ok: true, cancelled }` — `cancelled: false` when the runtime
+     * does not know the run or it already ended — or JOB_RUNTIME_UNAVAILABLE /
+     * JOB_RUNTIME_CANCEL_FAILED. Never throws, and answers within
+     * `POLL_READ_TIMEOUT_MS` (tenant lookup included), like
+     * {@link pollLongRunning}: a cancel that did not answer in time may still
+     * take effect, so read the run again to learn its fate.
+     */
+    async cancelLongRunning(
+        runId: string,
+        options: LongRunningTenantOptions = {},
+    ): Promise<LongRunningCancel> {
+        if (typeof runId !== 'string' || runId.length === 0) {
+            return cancelFailed(runId, 'A run id is required to cancel a run.');
+        }
+        const deadline = Date.now() + POLL_READ_TIMEOUT_MS;
+        try {
+            const resolved = await withinTime(
+                this.providerFor(options.tenantId),
+                POLL_READ_TIMEOUT_MS,
+            );
+            if (!resolved.settled) {
+                return cancelFailed(
+                    runId,
+                    `The job runtime for run ${runId} could not be resolved within ${POLL_READ_TIMEOUT_MS} ms; nothing was cancelled.`,
+                );
+            }
+            const provider = resolved.value;
+            if (!provider || typeof provider.cancel !== 'function') {
+                const unavailable = jobRuntimeUnavailable();
+                return { ok: false, runId, error: unavailable.error! };
+            }
+            const answer = await withinTime(
+                Promise.resolve().then(() => provider.cancel(runId)),
+                Math.max(deadline - Date.now(), FINAL_READ_MIN_MS),
+            );
+            if (!answer.settled) {
+                return cancelFailed(
+                    runId,
+                    `The job runtime did not answer the cancel of run ${runId} within ${POLL_READ_TIMEOUT_MS} ms. ` +
+                        'It may still be cancelled; read the run again.',
+                );
+            }
+            return { ok: true, runId, cancelled: answer.value === true };
+        } catch (err) {
+            return cancelFailed(
+                runId,
+                `Cancelling run ${runId} failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
     }
 
     /**
@@ -400,12 +530,89 @@ export class PluginExecutionRouterService {
     }
 
     /**
-     * The default long-running dispatcher: the active job runtime's
-     * `dispatchPluginOperation` to start the run, its `getRunResult` to wait.
-     * `null` when no runtime is active or it cannot do request/response work.
+     * The runtime a call runs through: the platform's active provider without a
+     * tenant (no lookup at all), else what `TenantAwareRuntimeResolver` answers
+     * for the tenant, which may be `null` (no runtime). No resolver in this
+     * graph, or one that throws, means the platform provider (the resolver's
+     * own fail-open semantics).
      */
-    private jobRuntimeDispatcher(options: LongRunningOptions): TriggerDispatcher | null {
-        const provider = this.activeProvider();
+    private async providerFor(
+        tenantId: string | null | undefined,
+    ): Promise<IJobRuntimeProvider | null> {
+        if (!tenantId) return this.activeProvider();
+        try {
+            const resolver = this.moduleRef
+                ? getOptionalProvider<TenantAwareRuntimeResolver>(
+                      this.moduleRef,
+                      TenantAwareRuntimeResolver,
+                  )
+                : undefined;
+            if (!resolver) return this.activeProvider();
+            return await resolver.resolve(tenantId);
+        } catch (err) {
+            this.logger.warn(
+                `Tenant runtime lookup failed for tenant ${tenantId} ` +
+                    `(${err instanceof Error ? err.message : String(err)}); using the platform job runtime.`,
+            );
+            return this.activeProvider();
+        }
+    }
+
+    /**
+     * The run's payload. Without a tenant it is exactly `{ pluginId, operation,
+     * args }`. With one it adds `tenantId` and, when the stamper is bound, the
+     * `(providerId, credentialVersion)` FR-5 captures at enqueue time: null/null
+     * when the lookup fails, because an enqueue never fails on stamping.
+     */
+    private async payloadFor(
+        pluginId: string,
+        operation: string,
+        args: Record<string, unknown> | undefined,
+        tenantId: string | null | undefined,
+    ): Promise<PluginOperationPayload> {
+        if (!tenantId) return { pluginId, operation, args };
+        let stamper: RuntimeBindingStamperService | undefined;
+        try {
+            stamper = this.moduleRef
+                ? getOptionalProvider<RuntimeBindingStamperService>(
+                      this.moduleRef,
+                      RuntimeBindingStamperService,
+                  )
+                : undefined;
+        } catch {
+            stamper = undefined;
+        }
+        if (!stamper) return { pluginId, operation, args, tenantId };
+        let binding: { providerId: string | null; credentialVersion: number | null };
+        try {
+            binding = await stamper.stamp(tenantId);
+        } catch (err) {
+            this.logger.warn(
+                `Runtime binding stamp failed for tenant ${tenantId} ` +
+                    `(${err instanceof Error ? err.message : String(err)}); dispatching unstamped.`,
+            );
+            binding = { providerId: null, credentialVersion: null };
+        }
+        return {
+            pluginId,
+            operation,
+            args,
+            tenantId,
+            providerId: binding.providerId,
+            credentialVersion: binding.credentialVersion,
+        };
+    }
+
+    /**
+     * The default long-running dispatcher: `provider`'s (the platform's, or a
+     * tenant's view) `dispatchPluginOperation` to start the run, its
+     * `getRunResult` to wait, the same provider for both. `null` when there is
+     * no runtime or it cannot do request/response work.
+     */
+    private jobRuntimeDispatcher(
+        provider: IJobRuntimeProvider | null,
+        options: LongRunningOptions,
+    ): TriggerDispatcher | null {
         const dispatch = provider ? dispatchMethodOf(provider) : null;
         if (!provider || !dispatch || typeof provider.getRunResult !== 'function') return null;
         return {
@@ -551,6 +758,28 @@ async function readRunResult(
     }
 }
 
+/**
+ * `promise`'s value, or `{ settled: false }` once `ms` pass first. A promise
+ * that loses the race is left to settle on its own; its rejection is handled.
+ * A rejection that wins the race is rethrown.
+ */
+async function withinTime<T>(
+    promise: Promise<T>,
+    ms: number,
+): Promise<{ settled: true; value: T } | { settled: false }> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<{ settled: false }>((resolve) => {
+        timer = setTimeout(() => resolve({ settled: false }), ms);
+    });
+    const settled = promise.then((value) => ({ settled: true as const, value }));
+    settled.catch(() => undefined);
+    try {
+        return await Promise.race([settled, late]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 /** `value` when it is a finite number, else `fallback` (NaN, ±Infinity, absent). */
 function finiteOr(value: number | undefined, fallback: number): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -620,6 +849,10 @@ function fromTaskOutcome<TResult>(
             code: outcome?.error?.code ?? 'JOB_RUNTIME_FAILED',
         },
     };
+}
+
+function cancelFailed(runId: string, message: string): LongRunningCancel {
+    return { ok: false, runId, error: { code: 'JOB_RUNTIME_CANCEL_FAILED', message } };
 }
 
 function jobRuntimeUnavailable(): PluginExecutionResult<never> {
@@ -695,7 +928,17 @@ export interface RouteOptions {
     readonly profile?: PluginExecutionProfile;
 }
 
-export interface LongRunningOptions {
+/** Which tenant a long-running call is for (T26 / EW-742 P3). */
+export interface LongRunningTenantOptions {
+    /**
+     * The Work's tenant. Routes the run through the tenant's view of the job
+     * runtime (`TenantAwareRuntimeResolver`) and stamps it (FR-5). Absent or
+     * `null` = the platform runtime, with no lookup.
+     */
+    readonly tenantId?: string | null;
+}
+
+export interface LongRunningOptions extends LongRunningTenantOptions {
     /**
      * Wall-clock budget for waiting on the run; default
      * `PLUGIN_OPERATION_DEFAULT_WAIT_MS` (80 minutes). Not a finite number =
@@ -712,6 +955,30 @@ export interface LongRunningOptions {
 }
 
 export interface DispatchOptions extends RouteOptions, LongRunningOptions {}
+
+/** Options for {@link PluginExecutionRouterService.dispatchSync} (T26). */
+export interface InProcessOptions {
+    /**
+     * Handed to the operation as its SECOND argument, for operations shaped
+     * `(input, signal?)` (e.g. `runSandboxSession`). Absent = the operation
+     * receives exactly one argument, as in the worker task.
+     */
+    readonly signal?: AbortSignal;
+}
+
+/** One {@link PluginExecutionRouterService.cancelLongRunning} answer (T26). */
+export type LongRunningCancel =
+    | {
+          readonly ok: true;
+          readonly runId: string;
+          /** `false`: the runtime does not know the run, or it already ended. */
+          readonly cancelled: boolean;
+      }
+    | {
+          readonly ok: false;
+          readonly runId: string;
+          readonly error: { readonly message: string; readonly code: string };
+      };
 
 export interface RouteDecision {
     readonly location: 'in-process' | 'job-runtime';
@@ -754,11 +1021,8 @@ export interface PluginExecutionTaskOutcome<TResult = unknown> {
     readonly error?: { readonly message: string; readonly code: string };
 }
 
-export interface TriggerDispatchPayload {
-    readonly pluginId: string;
-    readonly operation: string;
-    readonly args?: Record<string, unknown>;
-}
+/** The run's payload, as the long-running dispatcher seam receives it. */
+export type TriggerDispatchPayload = PluginOperationPayload;
 
 /** The long-running dispatcher seam: start a run, then wait for its outcome. */
 export interface TriggerDispatcher {

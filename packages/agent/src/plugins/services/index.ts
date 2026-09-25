@@ -17,3 +17,6 @@ export * from './plugin-installer.service';
 // EW-693 — sync vs long-running execution router (Phase 7).
 export * from './plugin-execution-router.service';
 export * from './plugin-operation.util';
+// EW-693 T26 — the router's first long-running caller, and facade install-on-use.
+export * from './managed-agent-sandbox-runner.service';
+export * from './facade-plugin-availability.service';

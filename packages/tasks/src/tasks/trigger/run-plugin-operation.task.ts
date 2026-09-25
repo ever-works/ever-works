@@ -1,13 +1,17 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import type { INestApplicationContext } from '@nestjs/common';
+import { Logger, type INestApplicationContext } from '@nestjs/common';
+import { resolvePluginDistribution, type PluginManifest } from '@ever-works/plugin';
 import {
     describeMissingOperation,
     materializePlugin,
     PluginInstallerService,
+    PluginInstallRefusedError,
+    PluginLoaderService,
     pluginLoadFailure,
     PluginRegistryService,
     resolvePluginOperation,
+    type LoadResult,
 } from '@ever-works/agent/plugins';
 import {
     PLUGIN_OPERATION_MAX_DURATION_SECONDS,
@@ -45,9 +49,10 @@ export interface RunPluginOperationOutcome {
  * |-------------------------------|---------------------------------------------------------------|
  * | `INVALID_PAYLOAD`             | no plugin id or operation name                                |
  * | `WORKER_CONTEXT_BOOT_FAILED`  | the worker context cannot boot (e.g. an env var missing)      |
- * | `WORKER_INSTALL_FAILED`       | a bound installer threw (none is bound — see the module)      |
- * | `WORKER_PLUGIN_HYDRATE_FAILED`| loading the bundled plugins threw                             |
- * | `PLUGIN_NOT_REGISTERED`       | the plugin is not in this worker (not bundled in the image)  |
+ * | `WORKER_PLUGIN_HYDRATE_FAILED`| loading the plugins in the worker image threw                 |
+ * | `WORKER_INSTALL_REFUSED`      | dynamic mode, plugin not in the image: the installer refused before any download — the platform's record pins no exact version and integrity (FR-10) or pins something other than a plain package name and exact semver version, or the allowlist does not admit the package (FR-11) |
+ * | `WORKER_INSTALL_FAILED`       | dynamic mode, plugin not in the image: fetching the pinned version failed, or the fetched package could not be registered |
+ * | `PLUGIN_NOT_REGISTERED`       | the plugin is not in this worker: not in the image, and (bundled mode) nothing is installed at runtime |
  * | `WORKER_PLUGIN_LOAD_FAILED`   | the plugin is in `error` state, will not load, or its `onLoad` failed while loading |
  * | `OPERATION_NOT_FOUND`         | the manifest does not declare the operation, or the class lacks it |
  * | `WORKER_PLUGIN_THREW`         | the operation itself threw                                    |
@@ -56,11 +61,34 @@ export interface RunPluginOperationOutcome {
  *
  * It used to boot `TriggerInternalModule`, which binds neither the plugin
  * registry nor the installer, so every run answered PLUGIN_NOT_REGISTERED
- * (runtime probe). The new module binds the registry and the hydrator, and
- * "install" in the worker is HYDRATION: every first-party plugin is bundled
- * into the worker image, and `hydrator.initialize()` registers them. The boot
- * passes `abortOnError: false` inside a `try`: Nest's default turns a boot
- * failure into `process.exit(1)`, which no envelope survives.
+ * (runtime probe). The module binds the registry, the hydrator and (T27) the
+ * installer. The boot passes `abortOnError: false` inside a `try`: Nest's
+ * default turns a boot failure into `process.exit(1)`, which no envelope
+ * survives.
+ *
+ * ## Where the plugin comes from
+ *
+ * 1. **Hydrate** — `hydrator.initialize()` registers the plugins in the worker
+ *    image (`prepare-plugins.js`: every first-party plugin in bundled mode,
+ *    the core ones only when the image is built for dynamic mode).
+ * 2. **The image wins.** A plugin the image carries is run as it is; the
+ *    installer is not asked. The image's content is fixed when the worker is
+ *    DEPLOYED (`prepare-plugins.js` reads PLUGIN_DISTRIBUTION_MODE then), the
+ *    runtime installs follow the mode the worker RUNS with. So in dynamic mode
+ *    a distributable plugin found in the image means the image was built
+ *    without PLUGIN_DISTRIBUTION_MODE=dynamic, and its copy runs instead of
+ *    the version the API pinned: that is logged once per plugin version per
+ *    process (read from the manifest — no API call).
+ * 3. **Dynamic mode, plugin not in the image (T27's runtime-installed
+ *    half).** `installer.ensureLocalInstall` installs the version the API
+ *    PINNED (exact version + integrity, allowlist first) into THIS worker's
+ *    own store — a local copy answers without a download — and never writes
+ *    the API's shared install row. `loader.registerFromPath` registers the
+ *    extracted directory, and the registry is read again. The API-side
+ *    `ensurePluginAvailable` is deliberately not used: it can run a full
+ *    install, which writes that row over the internal API.
+ *
+ * In bundled mode (the default) step 3 never runs.
  *
  * ## Which operations can be called
  *
@@ -94,14 +122,81 @@ function fail(code: string, message: string): RunPluginOperationOutcome {
     return { ok: false, error: { code, message } };
 }
 
+const logger = new Logger('RunPluginOperation');
+
+/** `pluginId@version` pairs already warned about in this process. */
+const imageSkewWarned = new Set<string>();
+
+/**
+ * Dynamic mode, and the image carries a DISTRIBUTABLE plugin: the image was
+ * built without PLUGIN_DISTRIBUTION_MODE=dynamic (build time), so its copy
+ * runs, not the version the API pinned. Warn once per plugin version per
+ * process — the image does not change while the process lives.
+ */
+function warnImageVersionSkew(pluginId: string, manifest: PluginManifest | undefined): void {
+    if (!manifest || resolvePluginDistribution(manifest) !== 'registry') return;
+    const version = typeof manifest.version === 'string' ? manifest.version : 'unknown';
+    const key = `${pluginId}@${version}`;
+    if (imageSkewWarned.has(key)) return;
+    imageSkewWarned.add(key);
+    logger.warn(
+        `Plugin "${pluginId}" is distributable, but this worker image carries it (version ${version}): ` +
+            'the image was built without PLUGIN_DISTRIBUTION_MODE=dynamic, so the image’s copy runs ' +
+            'instead of the version the platform pinned. Redeploy the worker with ' +
+            'PLUGIN_DISTRIBUTION_MODE=dynamic set for `pnpm deploy:trigger` to run the pinned version.',
+    );
+}
+
 function errorText(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
 /**
- * Everything after the boot, against an already-built context: install (only if
- * an installer is bound), hydrate, look up, load, resolve the operation, call it.
- * Exported so the boot spec can drive it against the REAL module.
+ * T27 — install a plugin the worker image does not carry (dynamic mode) and
+ * register it. Answers a failure envelope, or `null` once the plugin is
+ * registered (the caller reads the registry again).
+ */
+async function installAtRuntime(
+    pluginId: string,
+    installer: PluginInstallerService,
+    loader: PluginLoaderService | undefined,
+): Promise<RunPluginOperationOutcome | null> {
+    let installPath: string;
+    try {
+        installPath = (await installer.ensureLocalInstall(pluginId)).installPath;
+    } catch (err) {
+        return err instanceof PluginInstallRefusedError
+            ? fail('WORKER_INSTALL_REFUSED', errorText(err))
+            : fail('WORKER_INSTALL_FAILED', errorText(err));
+    }
+    if (!loader) {
+        return fail(
+            'WORKER_INSTALL_FAILED',
+            `Plugin "${pluginId}" was installed at ${installPath}, but no plugin loader is bound in this worker context to register it.`,
+        );
+    }
+    let loaded: LoadResult;
+    try {
+        loaded = await loader.registerFromPath(installPath, { expectedId: pluginId });
+    } catch (err) {
+        loaded = { success: false, pluginId, error: errorText(err) };
+    }
+    if (!loaded.success) {
+        return fail(
+            'WORKER_INSTALL_FAILED',
+            `Plugin "${pluginId}" was installed at ${installPath} but could not be registered: ${
+                loaded.error ?? 'unknown error'
+            }`,
+        );
+    }
+    return null;
+}
+
+/**
+ * Everything after the boot, against an already-built context: hydrate, look
+ * up, install at runtime (dynamic mode, a plugin not in the image), load,
+ * resolve the operation, call it. Exported so the boot spec can drive it
+ * against the REAL module.
  */
 export async function executePluginOperation(
     appContext: Pick<INestApplicationContext, 'get'>,
@@ -115,19 +210,13 @@ export async function executePluginOperation(
         appContext,
         PluginInstallerService,
     );
+    const loader = getOptionalProvider<PluginLoaderService>(appContext, PluginLoaderService);
     const hydrator = getOptionalProvider<TriggerPluginHydratorService>(
         appContext,
         TriggerPluginHydratorService,
     );
     const registry = getOptionalProvider<PluginRegistryService>(appContext, PluginRegistryService);
 
-    if (installer) {
-        try {
-            await installer.ensurePluginAvailable(pluginId);
-        } catch (err) {
-            return fail('WORKER_INSTALL_FAILED', errorText(err));
-        }
-    }
     if (hydrator) {
         try {
             await hydrator.initialize();
@@ -139,14 +228,25 @@ export async function executePluginOperation(
         }
     }
 
-    const registered = registry?.get(pluginId);
+    let registered = registry?.get(pluginId);
+    const installsAtRuntime = installer?.getDistributionMode() === 'dynamic';
+    if (registered && installsAtRuntime) {
+        warnImageVersionSkew(pluginId, registered.manifest);
+    }
+    if (!registered && registry && installer && installsAtRuntime) {
+        const failure = await installAtRuntime(pluginId, installer, loader);
+        if (failure) return failure;
+        registered = registry.get(pluginId);
+    }
     if (!registered) {
         // The code stays PLUGIN_NOT_REGISTERED; the message names the cause.
         const message = !registry
             ? `Plugin "${pluginId}" cannot be resolved: no plugin registry is bound in this worker context.`
-            : installer
-              ? `Plugin "${pluginId}" not registered in worker after ensurePluginAvailable.`
-              : `Plugin "${pluginId}" is not registered in this worker: it is not bundled in the worker image (no plugin installer is bound, so no install was attempted).`;
+            : installsAtRuntime
+              ? `Plugin "${pluginId}" is not registered in this worker after installing it.`
+              : installer
+                ? `Plugin "${pluginId}" is not registered in this worker: it is not bundled in the worker image (PLUGIN_DISTRIBUTION_MODE is "bundled", so no runtime install was attempted).`
+                : `Plugin "${pluginId}" is not registered in this worker: it is not bundled in the worker image (no plugin installer is bound, so no install was attempted).`;
         return fail('PLUGIN_NOT_REGISTERED', message);
     }
     if (registered.state === 'error') {

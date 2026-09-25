@@ -90,7 +90,16 @@ import type {
     AppDependencyProvisionPayload,
     // APW-03 T13 — the payload of the job APW-02 T28 wires below.
     AppSpecEvaluatePayload,
+    PluginOperationPayload,
 } from '@ever-works/agent/tasks';
+// T26 / EW-742 P3 — read inside `dispatchPluginOperation`, never at module
+// scope: several specs replace `@ever-works/agent/tasks` with a partial mock
+// that does not carry them, and a top-level read would fail the whole file.
+import {
+    PLUGIN_OPERATION_QUEUE_TTL_SECONDS,
+    PLUGIN_OPERATION_TASK_ID,
+} from '@ever-works/agent/tasks';
+import { pluginOperationRunPayload } from './plugin-operation-run-payload';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -123,6 +132,9 @@ const TASK_IDS = {
     // APW-03 T13 — must match the `app-spec-evaluate` task's own `id`. Wired by
     // APW-02 T28 so the same dispatch works for a BYO Trigger.dev tenant.
     appSpecEvaluate: 'app-spec-evaluate',
+    // `run-plugin-operation` is not listed: its id is the shared
+    // `PLUGIN_OPERATION_TASK_ID` constant (the router, the dispatchers and the
+    // task registration all import it), read in `dispatchPluginOperation`.
 } as const;
 
 /**
@@ -461,6 +473,26 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                 );
             }
             return handle.id;
+        },
+
+        /**
+         * T26 / EW-742 P3 — the long-running plugin operation, for a BYO
+         * Trigger.dev tenant: the mirror of the singleton
+         * `TriggerService.dispatchPluginOperation`, which the plugin execution
+         * router looks up by name on the tenant's bound view. Same payload,
+         * tags and queue `ttl`; no `machine` (like the other BYO dispatchers).
+         * Soft like the singleton: `null` when the SDK throws or answers no run
+         * id, which the router reports as JOB_RUNTIME_DISPATCH_FAILED. The
+         * tenant's project must have the `run-plugin-operation` task deployed,
+         * like every other BYO task.
+         */
+        async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(PLUGIN_OPERATION_TASK_ID, pluginOperationRunPayload(payload), {
+                    tags: ['plugin-operation', `plugin:${payload.pluginId}`],
+                    ttl: `${PLUGIN_OPERATION_QUEUE_TTL_SECONDS / 60}m`,
+                }),
+            );
         },
     };
 

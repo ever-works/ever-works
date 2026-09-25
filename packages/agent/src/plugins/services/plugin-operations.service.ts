@@ -5,6 +5,7 @@ import {
     ForbiddenException,
     Logger,
     Optional,
+    UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -59,6 +60,9 @@ import { buildProviderModelSummaries } from '../utils/plugin-model-settings.util
 // EW-693 — install-on-enable hook (T18). Optional so bundled-mode
 // deployments don't structurally depend on the installer.
 import { PluginInstallerService } from './plugin-installer.service';
+// EW-693 T27 — registers what the installer placed on this node.
+import { PluginLoaderService } from './plugin-loader.service';
+import { materializePlugin } from './plugin-operation.util';
 import { WorkOwnershipService } from '../../services/work-ownership.service';
 
 @Injectable()
@@ -96,6 +100,11 @@ export class PluginOperationsService {
         // paths before any repository access so a foreign workId cannot
         // be probed or mutated.
         private readonly workOwnershipService?: WorkOwnershipService,
+        // EW-693 T27 — registers a plugin the installer placed on this node.
+        // Appended LAST and @Optional() for the same positional reason as
+        // the gate above; graphs without the plugins module skip registration.
+        @Optional()
+        private readonly pluginLoader?: PluginLoaderService,
     ) {}
 
     /**
@@ -103,23 +112,76 @@ export class PluginOperationsService {
      *
      * Called at the top of every enable path. In bundled mode this is
      * a no-op (the installer is undefined or returns immediately). In
-     * dynamic mode, if the plugin isn't already registered, this calls
-     * `installer.ensurePluginAvailable(pluginId)` so the package is
-     * downloaded + verified + placed under the install dir's
-     * `node_modules/`, then prompts a re-discover via the loader (the
-     * existing path scan picks up the new symlink). If install fails,
-     * the original NotFoundException-with-context is thrown so the
-     * caller surfaces the registry/install error.
+     * dynamic mode, if the plugin isn't registered in this process:
      *
-     * Failure here MUST NOT register a half-loaded plugin (FR-14).
-     * `ensurePluginAvailable` writes installState='error' on its own;
-     * this method only forwards the error.
+     * 1. `installer.ensurePluginAvailable(pluginId)` places the package on
+     *    THIS node — from the local store when it is there, the pinned
+     *    version fetched without touching the shared row when another
+     *    replica installed it (FR-13), or a full install for a plugin no
+     *    node has installed yet;
+     * 2. {@link registerInstalledPlugin} registers the directory it
+     *    answers. (This docstring used to promise "a re-discover via the
+     *    loader"; nothing did, so the lookup right after this threw
+     *    NotFound for every runtime-installed plugin — T27.)
+     *
+     * An install failure is forwarded (`install()` records
+     * installState='error' itself); a package that cannot be registered is
+     * a 422. Neither registers a half-loaded plugin (FR-14).
      */
     private async ensurePluginInstalledOrThrow(pluginId: string): Promise<void> {
         if (!this.pluginInstaller) return;
         if (this.pluginInstaller.getDistributionMode() !== 'dynamic') return;
         if (this.pluginRegistryService.get(pluginId)) return;
-        await this.pluginInstaller.ensurePluginAvailable(pluginId);
+        const installed = await this.pluginInstaller.ensurePluginAvailable(pluginId);
+        if (installed) await this.registerInstalledPlugin(pluginId, installed.installPath);
+    }
+
+    /**
+     * EW-693 T27 — register, in this process, a plugin the installer placed
+     * at `installPath` on this node (`POST /plugins/:id/install` calls it
+     * after an install; the enable path through
+     * {@link ensurePluginInstalledOrThrow}). A plugin already registered is
+     * left as it is.
+     *
+     * The plugin is registered lazily, then materialised at once: the
+     * settings paths read `registered.plugin.settingsSchema` synchronously,
+     * and a cold lazy proxy answers `{}` for it. A materialisation failure is
+     * recorded on the registry entry (`error` state) by the loader's hook and
+     * logged here; it is not thrown.
+     *
+     * @throws UnprocessableEntityException when the directory is not the
+     *   plugin asked for (not a plugin package, or another plugin id) — the
+     *   loader then registered nothing.
+     */
+    async registerInstalledPlugin(pluginId: string, installPath: string): Promise<void> {
+        if (this.pluginRegistryService.get(pluginId)) return;
+        if (!this.pluginLoader) {
+            this.logger.warn(
+                `Plugin "${pluginId}" is installed at ${installPath}, but no plugin loader is bound ` +
+                    `to register it in this process.`,
+            );
+            return;
+        }
+        const result = await this.pluginLoader.registerFromPath(installPath, {
+            expectedId: pluginId,
+        });
+        if (!result.success) {
+            throw new UnprocessableEntityException(
+                `Plugin "${pluginId}" is installed on this node, but its package could not be ` +
+                    `registered: ${result.error ?? 'unknown error'}`,
+            );
+        }
+        const registered = this.pluginRegistryService.get(pluginId);
+        if (!registered) return;
+        try {
+            await materializePlugin(registered.plugin);
+        } catch (err) {
+            this.logger.warn(
+                `Plugin "${pluginId}" was registered but could not be loaded: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
     }
 
     // ============================================

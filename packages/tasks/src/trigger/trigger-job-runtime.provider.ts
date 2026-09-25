@@ -353,8 +353,21 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             const dispatchersSource: Record<string, unknown> = tenantClient
                 ? (base.dispatchersFromClient(tenantClient) as Record<string, unknown>)
                 : (base.dispatchers as Record<string, unknown>);
-            stampedDispatchersCache = new Proxy(dispatchersSource, {
-                get(t, prop, receiver) {
+            // A Proxy may not answer a different value for a read-only,
+            // non-configurable own property of its TARGET, and the production
+            // BYO map is frozen (`dispatchersFromTenantClient`): with that map
+            // as the target, every wrapped `dispatchXxx` read threw a
+            // TypeError, so no BYO dispatch ever reached the tenant's project.
+            // A BYO target is therefore an empty object inheriting from the
+            // map (no own properties, no invariant); reads and `this` still go
+            // to the map itself. The singleton path keeps the service as its
+            // target, unchanged.
+            const proxyTarget: Record<string, unknown> = tenantClient
+                ? (Object.create(dispatchersSource) as Record<string, unknown>)
+                : dispatchersSource;
+            stampedDispatchersCache = new Proxy(proxyTarget, {
+                get(_target, prop, receiver) {
+                    const t = dispatchersSource;
                     const value = Reflect.get(t, prop, receiver);
                     if (typeof value !== 'function') {
                         return value;

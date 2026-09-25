@@ -5,6 +5,14 @@ import { collectPluginDependencies } from './src/build/collect-plugin-deps';
 
 const canRetry = process.env.TRIGGER_DEV_ENABLE_RETRIES === 'true';
 
+/**
+ * EW-693 T27 — `pacote`, the registry client `PluginInstallerService` imports
+ * lazily in dynamic mode. It is a dependency of `@ever-works/agent` only, so the
+ * worker image needs it installed explicitly. Keep the range in step with
+ * `packages/agent/package.json`.
+ */
+const PACOTE_PACKAGE = 'pacote@^21.5.1';
+
 export default defineConfig({
     // Project ref is read from the environment so the same task bundle can be
     // deployed to either the Trigger.dev CLOUD project or our self-hosted
@@ -46,6 +54,10 @@ export default defineConfig({
             'amqplib',
             'amqp-connection-manager',
             'class-transformer',
+            // EW-693 T27 — the plugin installer's registry client. Imported
+            // lazily, only in dynamic mode; kept out of the bundle and
+            // installed as a real package (below) like the plugins' own deps.
+            'pacote',
         ],
         extensions: [
             // Enable TypeScript decorator metadata for TypeORM
@@ -54,9 +66,13 @@ export default defineConfig({
             additionalFiles({
                 files: ['./plugins/**'],
             }),
-            // Install plugin dependencies without modifying package.json
+            // Install plugin dependencies without modifying package.json.
+            // Every first-party plugin's dependencies are collected — also
+            // those a dynamic-mode image does not carry — so a plugin the
+            // worker installs at runtime (EW-693 T27; `pacote` extracts the
+            // package only, never its dependencies) finds them here.
             additionalPackages({
-                packages: collectPluginDependencies(),
+                packages: [...collectPluginDependencies(), PACOTE_PACKAGE],
             }),
         ],
     },

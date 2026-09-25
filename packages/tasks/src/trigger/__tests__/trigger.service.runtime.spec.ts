@@ -114,6 +114,7 @@ vi.mock('../../tasks/trigger/notification-channel-delivery.task', () => ({
 }));
 
 import { TriggerService } from '../trigger.service';
+import { TriggerJobRuntimeProvider } from '../trigger-job-runtime.provider';
 
 describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 P1)', () => {
     let service: TriggerService;
@@ -322,6 +323,84 @@ describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 
         it('answers null when the enqueue fails', async () => {
             tasksTriggerMock.mockRejectedValue(new Error('rate limited'));
             await expect(service.dispatchPluginOperation(payload)).resolves.toBeNull();
+        });
+
+        // T26 / EW-742 P3 FR-5 — the router puts the tenant and the stamper's
+        // (providerId, credentialVersion) on a tenant call's payload; this
+        // method rebuilds the payload object, so it must carry them over.
+        it('forwards the tenant stamp fields the router put on the payload', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_43' });
+
+            await service.dispatchPluginOperation({
+                ...payload,
+                tenantId: 't-1',
+                providerId: 'trigger',
+                credentialVersion: 2,
+            });
+
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'run-plugin-operation',
+                {
+                    pluginId: 'acme-gen',
+                    operation: 'generate',
+                    args: { n: 1 },
+                    tenantId: 't-1',
+                    providerId: 'trigger',
+                    credentialVersion: 2,
+                },
+                expect.anything(),
+            );
+        });
+
+        it('forwards a null stamp (no active overlay) as null, and adds no key a payload lacks', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_44' });
+
+            await service.dispatchPluginOperation({
+                ...payload,
+                tenantId: 't-1',
+                providerId: null,
+                credentialVersion: null,
+            });
+            await service.dispatchPluginOperation(payload);
+
+            expect(tasksTriggerMock.mock.calls[0][1]).toEqual({
+                ...payload,
+                tenantId: 't-1',
+                providerId: null,
+                credentialVersion: null,
+            });
+            expect(Object.keys(tasksTriggerMock.mock.calls[1][1] as object)).toEqual([
+                'pluginId',
+                'operation',
+                'args',
+            ]);
+        });
+
+        it('through an inherit tenant view, the run carries the tenant tag and concurrency key', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_45' });
+            const view = new TriggerJobRuntimeProvider(service).bindToTenant({
+                tenantId: 't-inherit',
+                providerId: 'trigger',
+                credentialVersion: 1,
+                credentials: {},
+            });
+
+            await expect(
+                (
+                    view.dispatchers as unknown as {
+                        dispatchPluginOperation: (p: unknown) => Promise<string | null>;
+                    }
+                ).dispatchPluginOperation(payload),
+            ).resolves.toBe('run_45');
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'run-plugin-operation',
+                payload,
+                expect.objectContaining({
+                    tags: ['tenant:t-inherit', 'plugin-operation', 'plugin:acme-gen'],
+                    concurrencyKey: 't-inherit',
+                    ttl: '15m',
+                }),
+            );
         });
 
         it('is reachable through the dispatchers bag, by the name the router looks up', () => {

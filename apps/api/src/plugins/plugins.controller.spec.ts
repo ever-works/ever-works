@@ -638,4 +638,76 @@ describe('PluginsController', () => {
             expect(pluginsService.setActiveCapability).not.toHaveBeenCalled();
         });
     });
+
+    // ============================================
+    // EW-693 — Install (T27 / FR-13: registers what it installed)
+    // ============================================
+
+    /**
+     * `POST /plugins/:id/install` installed the package and answered
+     * `installed` — but nothing registered it, so the plugin stayed invisible
+     * to this replica's registry (routing, enable) until a restart. It now
+     * registers the directory the installer answers, through
+     * `PluginOperationsService.registerInstalledPlugin`.
+     */
+    describe('installPlugin', () => {
+        const INSTALL_PATH = '/app/plugins/node_modules/@ever-works/notion-extractor-plugin';
+        let installer: { install: jest.Mock };
+        let catalogService: { getInstallState: jest.Mock };
+        let registerInstalledPlugin: jest.Mock;
+
+        beforeEach(() => {
+            installer = {
+                install: jest.fn().mockResolvedValue({
+                    pluginId: 'notion-extractor',
+                    packageName: '@ever-works/notion-extractor-plugin',
+                    version: '1.2.0',
+                    integrity: 'sha512-x',
+                    installPath: INSTALL_PATH,
+                    registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
+                }),
+            };
+            catalogService = {
+                getInstallState: jest.fn().mockResolvedValue({ installState: 'installed' }),
+            };
+            registerInstalledPlugin = jest.fn().mockResolvedValue(undefined);
+            (pluginsService as unknown as Record<string, jest.Mock>).registerInstalledPlugin =
+                registerInstalledPlugin;
+            controller = new PluginsController(
+                pluginsService as unknown as PluginOperationsService,
+                ownershipService as unknown as WorkOwnershipService,
+                pluginValidationService as unknown as PluginValidationService,
+                activityLogService as unknown as ActivityLogService,
+                catalogService as any,
+                installer as any,
+            );
+        });
+
+        it('registers the directory it installed, then answers the install state', async () => {
+            await expect(
+                controller.installPlugin('notion-extractor', { version: '1.2.0' } as any),
+            ).resolves.toEqual({
+                pluginId: 'notion-extractor',
+                install: { installState: 'installed' },
+            });
+
+            expect(installer.install).toHaveBeenCalledWith(
+                expect.objectContaining({ pluginId: 'notion-extractor', version: '1.2.0' }),
+            );
+            expect(registerInstalledPlugin).toHaveBeenCalledWith('notion-extractor', INSTALL_PATH);
+            expect(registerInstalledPlugin.mock.invocationCallOrder[0]).toBeGreaterThan(
+                installer.install.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('surfaces a package that cannot be registered instead of answering installed', async () => {
+            registerInstalledPlugin.mockRejectedValue(
+                new Error('its package could not be registered: declares plugin "someone-else"'),
+            );
+
+            await expect(controller.installPlugin('notion-extractor', {} as any)).rejects.toThrow(
+                'declares plugin "someone-else"',
+            );
+        });
+    });
 });

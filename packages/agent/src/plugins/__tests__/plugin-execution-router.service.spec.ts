@@ -7,11 +7,14 @@ import {
 import { getEventListeners } from 'events';
 import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
 import { PluginRegistryService, type RegisteredPlugin } from '../services/plugin-registry.service';
 import type { PluginInstallerService } from '../services/plugin-installer.service';
 import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.interface';
 import { PLUGINS_MODULE_OPTIONS } from '../plugins.constants';
 import { JOB_RUNTIME_PROVIDER_REGISTRY } from '../../tasks/job-runtime.providers';
+import { TenantAwareRuntimeResolver } from '../../tasks/tenant-aware-runtime.resolver';
+import { RuntimeBindingStamperService } from '../../tasks/runtime-binding-stamper.service';
 import { PLUGIN_OPERATION_DEFAULT_WAIT_MS } from '../../tasks/plugin-operation-dispatch';
 import { createLazyPluginProxy } from '../services/lazy-plugin-proxy';
 
@@ -1206,6 +1209,567 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                     moduleRef.get(PluginExecutionRouterService).startLongRunning('p', 'op'),
                 ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_UNAVAILABLE' } });
                 await moduleRef.close();
+            });
+        });
+
+        /**
+         * T26 / EW-742 P3 — a caller that knows the Work's tenant passes
+         * `tenantId`, and the long-running path then goes through
+         * `TenantAwareRuntimeResolver.resolve(tenantId)`: the tenant's bound view
+         * of the runtime (BYO project, tenant stamp), or the platform provider
+         * when the tenant has no overlay. The resolver lives in a NON-global API
+         * module (`TenantJobRuntimeModule`), so the router looks it up through
+         * `ModuleRef` (`getOptionalProvider`) — a constructor injection would
+         * always be `undefined` from the @Global plugins module. FR-5: the
+         * payload carries the `(providerId, credentialVersion)` the stamper
+         * reports at enqueue time.
+         */
+        describe('tenant-aware routing (TenantAwareRuntimeResolver)', () => {
+            function tenantView(reads: Read[] = [], runId: string | null = 'run_t1') {
+                const queue = [...reads];
+                return {
+                    runtimeId: 'trigger',
+                    dispatchers: { dispatchPluginOperation: jest.fn(async () => runId) },
+                    getRunResult: jest.fn(async () => queue.shift() ?? { status: 'running' }),
+                    cancel: jest.fn(async () => true),
+                };
+            }
+
+            /** A ModuleRef double that behaves like Nest's: an absent token THROWS. */
+            function fakeModuleRef(bound: Map<unknown, unknown>) {
+                return {
+                    get: jest.fn((token: unknown) => {
+                        if (bound.has(token)) return bound.get(token);
+                        throw new UnknownElementException(String(token));
+                    }),
+                };
+            }
+
+            function tenantRouter(
+                runtime: ReturnType<typeof makeRuntime> | null,
+                bound: { resolver?: unknown; stamper?: unknown } = {},
+            ) {
+                const map = new Map<unknown, unknown>();
+                if (bound.resolver) map.set(TenantAwareRuntimeResolver, bound.resolver);
+                if (bound.stamper) map.set(RuntimeBindingStamperService, bound.stamper);
+                return new PluginExecutionRouterService(
+                    { distributionMode: 'bundled' },
+                    makeRegistry({}),
+                    undefined,
+                    (runtime?.registry ?? null) as never,
+                    fakeModuleRef(map) as never,
+                );
+            }
+
+            it('without a tenantId, uses the platform registry and never looks the tenant up', async () => {
+                const runtime = makeRuntime();
+                const resolver = { resolve: jest.fn(async () => tenantView()) };
+                const stamper = {
+                    stamp: jest.fn(async () => ({ providerId: 'trigger', credentialVersion: 3 })),
+                };
+                const router = tenantRouter(runtime, { resolver, stamper });
+
+                await expect(router.startLongRunning('p', 'op', { a: 1 })).resolves.toEqual({
+                    ok: true,
+                    location: 'job-runtime',
+                    runId: 'run_7',
+                });
+                // Byte-identical to the pre-tenancy payload: no tenant keys at all.
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith({
+                    pluginId: 'p',
+                    operation: 'op',
+                    args: { a: 1 },
+                });
+                expect(
+                    Object.keys(
+                        (
+                            runtime.provider.dispatchers.dispatchPluginOperation.mock
+                                .calls[0] as unknown[]
+                        )[0] as object,
+                    ),
+                ).toEqual(['pluginId', 'operation', 'args']);
+                expect(resolver.resolve).not.toHaveBeenCalled();
+                expect(stamper.stamp).not.toHaveBeenCalled();
+            });
+
+            it('startLongRunning with a tenantId dispatches through the tenant’s view, not the platform provider', async () => {
+                const runtime = makeRuntime();
+                const view = tenantView();
+                const resolver = { resolve: jest.fn(async () => view) };
+                const router = tenantRouter(runtime, { resolver });
+
+                await expect(
+                    router.startLongRunning('p', 'op', { a: 1 }, { tenantId: 't1' }),
+                ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_t1' });
+                expect(resolver.resolve).toHaveBeenCalledWith('t1');
+                expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith({
+                    pluginId: 'p',
+                    operation: 'op',
+                    args: { a: 1 },
+                    tenantId: 't1',
+                });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+            });
+
+            it('dispatchLongRunning with a tenantId waits on the SAME tenant view it dispatched through', async () => {
+                const runtime = makeRuntime();
+                const view = tenantView([
+                    { status: 'running' },
+                    { status: 'completed', output: { ok: true, result: 'tenant' } },
+                ]);
+                const router = tenantRouter(runtime, {
+                    resolver: { resolve: jest.fn(async () => view) },
+                });
+
+                await expect(
+                    router.dispatchLongRunning('p', 'op', undefined, { ...fast, tenantId: 't1' }),
+                ).resolves.toEqual({
+                    ok: true,
+                    location: 'job-runtime',
+                    runId: 'run_t1',
+                    result: 'tenant',
+                });
+                expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledTimes(1);
+                expect(view.getRunResult).toHaveBeenCalledWith('run_t1');
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+                expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+            });
+
+            it('dispatch() with a long-running profile carries the tenantId through', async () => {
+                const runtime = makeRuntime();
+                const view = tenantView([{ status: 'completed', output: { ok: true, result: 1 } }]);
+                const router = tenantRouter(runtime, {
+                    resolver: { resolve: jest.fn(async () => view) },
+                });
+
+                await expect(
+                    router.dispatch(
+                        'p',
+                        'op',
+                        {},
+                        { profile: 'long-running', ...fast, tenantId: 't1' },
+                    ),
+                ).resolves.toMatchObject({ ok: true, runId: 'run_t1', result: 1 });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+            });
+
+            it('pollLongRunning with a tenantId reads the tenant’s view', async () => {
+                const runtime = makeRuntime();
+                const view = tenantView([{ status: 'completed', output: { ok: true, result: 5 } }]);
+                const resolver = { resolve: jest.fn(async () => view) };
+                const router = tenantRouter(runtime, { resolver });
+
+                await expect(router.pollLongRunning('run_t1', { tenantId: 't1' })).resolves.toEqual(
+                    {
+                        done: true,
+                        runId: 'run_t1',
+                        result: { ok: true, location: 'job-runtime', runId: 'run_t1', result: 5 },
+                    },
+                );
+                expect(resolver.resolve).toHaveBeenCalledWith('t1');
+                expect(view.getRunResult).toHaveBeenCalledWith('run_t1');
+                expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+            });
+
+            it('cancelLongRunning with a tenantId cancels through the tenant’s view, not the platform provider (T26)', async () => {
+                const runtime = makeRuntime();
+                const view = tenantView();
+                const resolver = { resolve: jest.fn(async () => view) };
+                const router = tenantRouter(runtime, { resolver });
+
+                await expect(
+                    router.cancelLongRunning('run_t1', { tenantId: 't1' }),
+                ).resolves.toEqual({ ok: true, runId: 'run_t1', cancelled: true });
+                expect(resolver.resolve).toHaveBeenCalledWith('t1');
+                expect(view.cancel).toHaveBeenCalledWith('run_t1');
+                expect(runtime.provider.cancel).not.toHaveBeenCalled();
+            });
+
+            it('a resolver that throws falls back to the platform provider', async () => {
+                const runtime = makeRuntime([{ status: 'running' }]);
+                const router = tenantRouter(runtime, {
+                    resolver: {
+                        resolve: jest.fn(async () => {
+                            throw new Error('overlay table missing');
+                        }),
+                    },
+                });
+
+                await expect(
+                    router.startLongRunning('p', 'op', undefined, { tenantId: 't1' }),
+                ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_7' });
+                await expect(router.pollLongRunning('run_7', { tenantId: 't1' })).resolves.toEqual({
+                    done: false,
+                    runId: 'run_7',
+                    status: 'running',
+                });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).toHaveBeenCalledTimes(
+                    1,
+                );
+                expect(runtime.provider.getRunResult).toHaveBeenCalledWith('run_7');
+            });
+
+            it('a resolver that answers null means no runtime — JOB_RUNTIME_UNAVAILABLE, never the platform provider', async () => {
+                const runtime = makeRuntime();
+                const router = tenantRouter(runtime, {
+                    resolver: { resolve: jest.fn(async () => null) },
+                });
+
+                await expect(
+                    router.startLongRunning('p', 'op', undefined, { tenantId: 't1' }),
+                ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_UNAVAILABLE' } });
+                await expect(
+                    router.dispatchLongRunning('p', 'op', undefined, { ...fast, tenantId: 't1' }),
+                ).resolves.toMatchObject({ ok: false, error: { code: 'JOB_RUNTIME_UNAVAILABLE' } });
+                await expect(
+                    router.pollLongRunning('run_7', { tenantId: 't1' }),
+                ).resolves.toMatchObject({
+                    done: true,
+                    result: { ok: false, error: { code: 'JOB_RUNTIME_UNAVAILABLE' } },
+                });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+                expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+            });
+
+            it('with no resolver bound (a narrower graph), a tenant call uses the platform provider', async () => {
+                const runtime = makeRuntime();
+                const router = tenantRouter(runtime);
+
+                await expect(
+                    router.startLongRunning('p', 'op', undefined, { tenantId: 't1' }),
+                ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_7' });
+            });
+
+            it('stamps the tenant’s (providerId, credentialVersion) onto the payload when the stamper is bound (FR-5)', async () => {
+                const view = tenantView();
+                const stamper = {
+                    stamp: jest.fn(async () => ({ providerId: 'trigger', credentialVersion: 4 })),
+                };
+                const router = tenantRouter(makeRuntime(), {
+                    resolver: { resolve: jest.fn(async () => view) },
+                    stamper,
+                });
+
+                await router.startLongRunning('p', 'op', { a: 1 }, { tenantId: 't1' });
+
+                expect(stamper.stamp).toHaveBeenCalledWith('t1');
+                expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith({
+                    pluginId: 'p',
+                    operation: 'op',
+                    args: { a: 1 },
+                    tenantId: 't1',
+                    providerId: 'trigger',
+                    credentialVersion: 4,
+                });
+            });
+
+            it('without a stamper, the payload carries the tenantId but no stamp fields', async () => {
+                const view = tenantView();
+                const router = tenantRouter(makeRuntime(), {
+                    resolver: { resolve: jest.fn(async () => view) },
+                });
+
+                await router.startLongRunning('p', 'op', undefined, { tenantId: 't1' });
+
+                const payload = (
+                    view.dispatchers.dispatchPluginOperation.mock.calls[0] as unknown[]
+                )[0];
+                expect(payload).toEqual({
+                    pluginId: 'p',
+                    operation: 'op',
+                    args: undefined,
+                    tenantId: 't1',
+                });
+                expect(payload).not.toHaveProperty('providerId');
+                expect(payload).not.toHaveProperty('credentialVersion');
+            });
+
+            it('a stamper that throws fails open to null/null — the enqueue still happens', async () => {
+                const view = tenantView();
+                const router = tenantRouter(makeRuntime(), {
+                    resolver: { resolve: jest.fn(async () => view) },
+                    stamper: {
+                        stamp: jest.fn(async () => {
+                            throw new Error('db down');
+                        }),
+                    },
+                });
+
+                await expect(
+                    router.startLongRunning('p', 'op', undefined, { tenantId: 't1' }),
+                ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_t1' });
+                expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        tenantId: 't1',
+                        providerId: null,
+                        credentialVersion: null,
+                    }),
+                );
+            });
+
+            describe('with fake timers', () => {
+                beforeEach(() => jest.useFakeTimers());
+                afterEach(() => jest.useRealTimers());
+
+                it('a tenant lookup that stalls still answers the poll as not-done within 20 s', async () => {
+                    const runtime = makeRuntime();
+                    const router = tenantRouter(runtime, {
+                        resolver: { resolve: jest.fn(() => new Promise(() => {})) },
+                    });
+                    let settled: unknown;
+                    void router
+                        .pollLongRunning('run_7', { tenantId: 't1' })
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(20_000);
+                    expect(settled).toEqual({ done: false, runId: 'run_7', status: 'unknown' });
+                    expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+                });
+            });
+
+            /**
+             * The real API shape: the router's module does not import the
+             * resolver's module, and the resolver's module is NOT global.
+             */
+            describe('Nest wiring', () => {
+                function hosts(resolver: unknown, stamper?: unknown) {
+                    const runtime = makeRuntime();
+                    class RuntimeHost {}
+                    Module({
+                        providers: [
+                            { provide: JOB_RUNTIME_PROVIDER_REGISTRY, useValue: runtime.registry },
+                        ],
+                        exports: [JOB_RUNTIME_PROVIDER_REGISTRY],
+                    })(RuntimeHost);
+                    Global()(RuntimeHost);
+
+                    class TenantHost {}
+                    Module({
+                        providers: [
+                            { provide: TenantAwareRuntimeResolver, useValue: resolver },
+                            ...(stamper
+                                ? [{ provide: RuntimeBindingStamperService, useValue: stamper }]
+                                : []),
+                        ],
+                        exports: [TenantAwareRuntimeResolver],
+                    })(TenantHost);
+
+                    class RouterHost {}
+                    Module({
+                        providers: [
+                            PluginExecutionRouterService,
+                            {
+                                provide: PLUGINS_MODULE_OPTIONS,
+                                useValue: { distributionMode: 'bundled' },
+                            },
+                            { provide: PluginRegistryService, useValue: makeRegistry({}) },
+                        ],
+                        exports: [PluginExecutionRouterService],
+                    })(RouterHost);
+                    return { runtime, modules: [RuntimeHost, TenantHost, RouterHost] };
+                }
+
+                it('finds the resolver in a sibling, non-global module and routes the tenant through it', async () => {
+                    const view = tenantView();
+                    const stamper = {
+                        stamp: jest.fn(async () => ({
+                            providerId: 'trigger',
+                            credentialVersion: 2,
+                        })),
+                    };
+                    const { runtime, modules } = hosts(
+                        { resolve: jest.fn(async () => view) },
+                        stamper,
+                    );
+                    const moduleRef = await Test.createTestingModule({
+                        imports: modules,
+                    }).compile();
+
+                    await expect(
+                        moduleRef
+                            .get(PluginExecutionRouterService)
+                            .startLongRunning('p', 'op', undefined, { tenantId: 't1' }),
+                    ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_t1' });
+                    expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith({
+                        pluginId: 'p',
+                        operation: 'op',
+                        args: undefined,
+                        tenantId: 't1',
+                        providerId: 'trigger',
+                        credentialVersion: 2,
+                    });
+                    expect(
+                        runtime.provider.dispatchers.dispatchPluginOperation,
+                    ).not.toHaveBeenCalled();
+                    await moduleRef.close();
+                });
+
+                it('boots without the tenant module, and a tenant call uses the platform provider', async () => {
+                    const { runtime, modules } = hosts({ resolve: jest.fn() });
+                    const moduleRef = await Test.createTestingModule({
+                        imports: [modules[0], modules[2]],
+                    }).compile();
+
+                    await expect(
+                        moduleRef
+                            .get(PluginExecutionRouterService)
+                            .startLongRunning('p', 'op', undefined, { tenantId: 't1' }),
+                    ).resolves.toEqual({ ok: true, location: 'job-runtime', runId: 'run_7' });
+                    expect(
+                        runtime.provider.dispatchers.dispatchPluginOperation,
+                    ).toHaveBeenCalledWith({
+                        pluginId: 'p',
+                        operation: 'op',
+                        args: undefined,
+                        tenantId: 't1',
+                    });
+                    await moduleRef.close();
+                });
+            });
+        });
+
+        /**
+         * T26 — the first long-running caller (the managed-agent sandbox runner)
+         * must be able to stop a session it started. The job runtime cannot
+         * carry an `AbortSignal`, so the router cancels the RUN, through the
+         * same provider view the run was started through.
+         */
+        describe('cancelLongRunning (T26)', () => {
+            it('asks the active runtime to cancel the run, and says it was accepted', async () => {
+                const runtime = makeRuntime();
+
+                await expect(routerWith(runtime).cancelLongRunning('run_7')).resolves.toEqual({
+                    ok: true,
+                    runId: 'run_7',
+                    cancelled: true,
+                });
+                expect(runtime.provider.cancel).toHaveBeenCalledTimes(1);
+                expect(runtime.provider.cancel).toHaveBeenCalledWith('run_7');
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+            });
+
+            it('answers cancelled: false when the runtime does not know the run or it already ended', async () => {
+                const runtime = makeRuntime();
+                runtime.provider.cancel.mockResolvedValueOnce(false);
+
+                await expect(routerWith(runtime).cancelLongRunning('run_7')).resolves.toEqual({
+                    ok: true,
+                    runId: 'run_7',
+                    cancelled: false,
+                });
+            });
+
+            it('answers JOB_RUNTIME_UNAVAILABLE with no active runtime', async () => {
+                await expect(routerWith(null).cancelLongRunning('run_7')).resolves.toMatchObject({
+                    ok: false,
+                    runId: 'run_7',
+                    error: { code: 'JOB_RUNTIME_UNAVAILABLE' },
+                });
+            });
+
+            it('answers JOB_RUNTIME_CANCEL_FAILED — and never throws — when the runtime’s cancel throws', async () => {
+                const runtime = makeRuntime();
+                runtime.provider.cancel.mockRejectedValueOnce(new Error('503 from the runtime'));
+
+                await expect(routerWith(runtime).cancelLongRunning('run_7')).resolves.toEqual({
+                    ok: false,
+                    runId: 'run_7',
+                    error: {
+                        code: 'JOB_RUNTIME_CANCEL_FAILED',
+                        message: expect.stringContaining('503 from the runtime'),
+                    },
+                });
+            });
+
+            it('refuses an empty run id without calling the runtime', async () => {
+                const runtime = makeRuntime();
+
+                await expect(routerWith(runtime).cancelLongRunning('')).resolves.toMatchObject({
+                    ok: false,
+                    error: { code: 'JOB_RUNTIME_CANCEL_FAILED' },
+                });
+                expect(runtime.provider.cancel).not.toHaveBeenCalled();
+            });
+
+            describe('with fake timers', () => {
+                beforeEach(() => jest.useFakeTimers());
+                afterEach(() => jest.useRealTimers());
+
+                it('a cancel that stalls is answered within 20 s — under the 60 s ingress limit', async () => {
+                    const runtime = makeRuntime();
+                    runtime.provider.cancel.mockImplementationOnce(() => new Promise(() => {}));
+                    let settled: unknown;
+                    void routerWith(runtime)
+                        .cancelLongRunning('run_7')
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(19_999);
+                    expect(settled).toBeUndefined();
+                    await jest.advanceTimersByTimeAsync(1);
+                    expect(settled).toMatchObject({
+                        ok: false,
+                        runId: 'run_7',
+                        error: { code: 'JOB_RUNTIME_CANCEL_FAILED' },
+                    });
+                });
+            });
+        });
+
+        /**
+         * T26 — in-process, a caller can hand the operation an `AbortSignal`
+         * (`runSandboxSession(input, signal?)` stops its session on it). Without
+         * the option the operation still receives exactly ONE argument, as the
+         * worker task gives it.
+         */
+        describe('dispatchSync — an AbortSignal for the operation (T26)', () => {
+            const DECLARES_RUN = { id: 'p', operations: [{ name: 'run' }] } as never;
+
+            it('passes the caller’s signal as the operation’s second argument', async () => {
+                const run = jest.fn(async (...received: unknown[]) => received.length);
+                const router = routerWith(
+                    null,
+                    {},
+                    { p: { manifest: DECLARES_RUN, exec: { run } } },
+                );
+                const controller = new AbortController();
+
+                await expect(
+                    router.dispatchSync('p', 'run', { a: 1 }, { signal: controller.signal }),
+                ).resolves.toEqual({ ok: true, location: 'in-process', result: 2 });
+                expect(run).toHaveBeenCalledWith({ a: 1 }, controller.signal);
+            });
+
+            it('without a signal, the operation receives exactly one argument', async () => {
+                const run = jest.fn(async (...received: unknown[]) => received.length);
+                const router = routerWith(
+                    null,
+                    {},
+                    { p: { manifest: DECLARES_RUN, exec: { run } } },
+                );
+
+                await expect(router.dispatchSync('p', 'run', { a: 1 })).resolves.toEqual({
+                    ok: true,
+                    location: 'in-process',
+                    result: 1,
+                });
+                await expect(router.dispatchSync('p', 'run', { a: 1 }, {})).resolves.toEqual({
+                    ok: true,
+                    location: 'in-process',
+                    result: 1,
+                });
+            });
+
+            it('dispatch() does not hand its wait signal to an in-process operation', async () => {
+                const run = jest.fn(async (...received: unknown[]) => received.length);
+                const router = routerWith(
+                    null,
+                    {},
+                    { p: { manifest: DECLARES_RUN, exec: { run } } },
+                );
+
+                await expect(
+                    router.dispatch('p', 'run', { a: 1 }, { signal: new AbortController().signal }),
+                ).resolves.toEqual({ ok: true, location: 'in-process', result: 1 });
             });
         });
 

@@ -49,7 +49,7 @@ const { triggerServiceMock, dispatchersSentinel } = vi.hoisted(() => {
 });
 
 import { TriggerJobRuntimeProvider } from '../trigger-job-runtime.provider';
-import { TriggerService } from '../trigger.service';
+import { TriggerService, triggerTenantStampStorage } from '../trigger.service';
 
 describe('TriggerJobRuntimeProvider', () => {
     let provider: TriggerJobRuntimeProvider;
@@ -277,6 +277,69 @@ describe('TriggerJobRuntimeProvider', () => {
                 });
                 expect(retrieve).toHaveBeenCalledWith('run_t');
                 expect(triggerServiceMock.getRunResult).not.toHaveBeenCalled();
+            });
+
+            // T26 / EW-742 P3 — what the plugin execution router dispatches
+            // through for a BYO tenant: the view's `dispatchers` (the tenant
+            // client's map, wrapped in the tenant-stamp Proxy).
+            it('exposes dispatchPluginOperation, which runs on the tenant’s client under the tenant stamp', async () => {
+                const seenStamps: unknown[] = [];
+                const trigger = vi.fn(async () => {
+                    seenStamps.push(triggerTenantStampStorage.getStore());
+                    return { id: 'run_byo_plugin' };
+                });
+                const client = {
+                    tasks: { trigger },
+                    runs: { cancel: vi.fn(), retrieve: vi.fn() },
+                };
+                // Default `dispatchersFromClient` — the production BYO map.
+                const byo = new TriggerJobRuntimeProvider(
+                    triggerServiceMock as unknown as TriggerService,
+                    { clientFactory: vi.fn(() => client) as never },
+                );
+                const view = byo.bindToTenant(byoSnapshot);
+                const dispatch = (view.dispatchers as Record<string, unknown>)
+                    .dispatchPluginOperation as
+                    | ((p: unknown) => Promise<string | null>)
+                    | undefined;
+
+                expect(typeof dispatch).toBe('function');
+                await expect(dispatch!({ pluginId: 'acme', operation: 'op' })).resolves.toBe(
+                    'run_byo_plugin',
+                );
+                expect(trigger).toHaveBeenCalledWith(
+                    'run-plugin-operation',
+                    { pluginId: 'acme', operation: 'op', args: undefined },
+                    expect.objectContaining({ tags: ['plugin-operation', 'plugin:acme'] }),
+                );
+                expect(seenStamps).toEqual([{ tenantId: byoSnapshot.tenantId }]);
+            });
+
+            // The production BYO map is FROZEN (`dispatchersFromTenantClient`),
+            // and a Proxy may not answer a different value for a read-only,
+            // non-configurable own property of its target. The stamping Proxy
+            // used to take that map as its target, so EVERY dispatch through a
+            // BYO view threw a TypeError instead of reaching the tenant's
+            // project — this pins an existing dispatcher, not only the new one.
+            it('dispatches through the frozen production BYO map without a Proxy invariant TypeError', async () => {
+                const trigger = vi.fn(async () => ({ id: 'run_byo_embed' }));
+                const client = { tasks: { trigger }, runs: { cancel: vi.fn(), retrieve: vi.fn() } };
+                const byo = new TriggerJobRuntimeProvider(
+                    triggerServiceMock as unknown as TriggerService,
+                    { clientFactory: vi.fn(() => client) as never },
+                );
+                const dispatchers = byo.bindToTenant(byoSnapshot).dispatchers as unknown as {
+                    dispatchKbEmbedDocument: (p: unknown) => Promise<string | null>;
+                };
+
+                await expect(
+                    dispatchers.dispatchKbEmbedDocument({ workId: 'w', documentId: 'd' }),
+                ).resolves.toBe('run_byo_embed');
+                expect(trigger).toHaveBeenCalledWith(
+                    'kb-embed-document',
+                    { workId: 'w', documentId: 'd' },
+                    expect.objectContaining({ concurrencyKey: 'kb-embed:w' }),
+                );
             });
 
             it("answers { status: 'unknown' } when the tenant's read throws", async () => {

@@ -199,14 +199,16 @@ Anything other than the exact string `dynamic` — empty, unset, `BUNDLED`, a ty
 
 ### What an operator sets
 
-| Variable                     | Default                      | What it controls                                                                                                                                                                                                                                   |
-| ---------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PLUGIN_DISTRIBUTION_MODE`   | `bundled`                    | The mode above.                                                                                                                                                                                                                                    |
-| `FEATURE_DYNAMIC_PLUGINS`    | `false`                      | The independent master switch for the dynamic surface — the catalog, the install / uninstall API and the admin allowlist. Set it to `true` together with the mode; what it does on today's build is spelled out below.                             |
-| `PLUGIN_REGISTRY_URL`        | `https://registry.npmjs.org` | The primary registry the installer resolves packages from. Point it at your own mirror to install without reaching public npm. **The default applies to resolution only** — the boot guard below reads the raw variable, so unset counts as empty. |
-| `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | The GitHub Packages fallback — used when an allowlist row's source is `github-packages`, or when the primary registry answers 404 for a first-party package. Its default is resolution-only too, on the same terms as the row above.               |
-| `PLUGIN_REGISTRY_TOKEN`      | unset                        | Bearer token for the registry. Read lazily, so a missing token surfaces on the first install rather than at boot. Never logged.                                                                                                                    |
-| `PLUGIN_INSTALL_DIR`         | `/app/plugins`               | Where installed packages are placed so Node can import them. In dynamic mode it **must** be writable — the boot reconciler refuses to start on a read-only directory.                                                                              |
+| Variable                                  | Default                      | What it controls                                                                                                                                                                                                                                   |
+| ----------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DISTRIBUTION_MODE`                | `bundled`                    | The mode above.                                                                                                                                                                                                                                    |
+| `FEATURE_DYNAMIC_PLUGINS`                 | `false`                      | The independent master switch for the dynamic surface — the catalog, the install / uninstall API and the admin allowlist. Set it to `true` together with the mode; what it does on today's build is spelled out below.                             |
+| `PLUGIN_REGISTRY_URL`                     | `https://registry.npmjs.org` | The primary registry the installer resolves packages from. Point it at your own mirror to install without reaching public npm. **The default applies to resolution only** — the boot guard below reads the raw variable, so unset counts as empty. |
+| `PLUGIN_REGISTRY_GITHUB_URL`              | `https://npm.pkg.github.com` | The GitHub Packages fallback — used when an allowlist row's source is `github-packages`, or when the primary registry answers 404 for a first-party package. Its default is resolution-only too, on the same terms as the row above.               |
+| `PLUGIN_REGISTRY_TOKEN`                   | unset                        | Bearer token for the registry. Read lazily, so a missing token surfaces on the first install rather than at boot. Never logged.                                                                                                                    |
+| `PLUGIN_INSTALL_DIR`                      | `/app/plugins`               | Where installed packages are placed so Node can import them. In dynamic mode it **must** be writable — the boot reconciler refuses to start on a read-only directory.                                                                              |
+| `PLUGIN_FACADE_INSTALL_ON_USE`            | `false`                      | Dynamic mode only. Meant to let an API replica pick up a plugin another replica installed, the first time a feature asks for it by id. **It has no effect on the current build.** See [Install-on-use](#install-on-use) below.                     |
+| `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME` | `false`                      | Where sandbox sessions run (today only the Claude Managed Agent plugin offers them): inside the API process (`false`), or as a background job on the job runtime (`true`). Applies in both modes. See [Sandbox sessions](#sandbox-sessions) below. |
 
 :::caution Set a registry URL explicitly — the defaults do not satisfy the boot guard
 In dynamic mode **at least one of `PLUGIN_REGISTRY_URL` or `PLUGIN_REGISTRY_GITHUB_URL` must be set explicitly.** The guard runs on the raw environment rather than on the resolved value, so leaving both unset — relying on the defaults in the table above — fails at boot exactly as clearing them does: _"PLUGIN_DISTRIBUTION_MODE=dynamic requires at least one of PLUGIN_REGISTRY_URL or PLUGIN_REGISTRY_GITHUB_URL to be set. Set PLUGIN_REGISTRY_URL=https://registry.npmjs.org (or your mirror) and re-deploy. Bundled-mode deployments are unaffected."_
@@ -219,6 +221,42 @@ The flag is defined in the API configuration with a default of `false`, and [Sel
 :::
 
 Building the image is a separate switch, covered in [Self-host with Docker or Kubernetes](../guides/self-host-docker-kubernetes.md).
+
+Both switches below are read when the API starts. `true` in any letter case turns one on; anything else, including leaving it unset, leaves it off — and off is exactly how the API behaved before the switch existed.
+
+### Install-on-use
+
+In dynamic mode a plugin is installed on the replica that handled the enable, and each replica keeps its own install directory, so another replica may not have the plugin's files. `PLUGIN_FACADE_INSTALL_ON_USE=true` is meant to close that gap. When a feature asks for a plugin **by id** and this replica does not have it, the API is to fetch the version the platform recorded into this replica's own install directory, load it, and then use it. Two lookups name a plugin by id: a provider you picked explicitly, and the plugin that is active on the Work.
+
+- **Only plugins the platform already installed qualify.** The plugin must be a registry plugin that some replica installed, at a recorded version. An unknown id, or a plugin nobody enabled, is never fetched. Enabling a plugin is still what installs it for the first time.
+- **A failure is not fatal.** If the plugin cannot be made available, the feature answers as it would have without the switch: it uses another enabled provider, or reports that the provider was not found. That plugin is not tried again on this replica for 60 seconds.
+- **Bundled mode ignores the switch.**
+
+:::note Current build — the switch has no effect yet
+Turning the switch on changes nothing on the current build, for two reasons:
+
+1. **The installer trusts the platform's install record.** When the record says a plugin is installed, the installer takes that as proof that this replica has the files. So it fetches nothing onto a replica that lacks them.
+2. **Nothing loads what was installed.** Even where the files are present, the install step does not load the plugin into the API process.
+
+So a plugin missing from a replica stays missing, and the API logs a warning. The switch takes effect once the install step fetches the recorded version onto the replica that needs it and loads it there.
+:::
+
+### Sandbox sessions
+
+A pipeline plugin that enforces a restricted network can open a sandbox session: one agent session under a network policy the platform sets. Today the Claude Managed Agent plugin is the only one that does. The App Provisioner will use these sessions, and it picks the pipeline by that ability, not by name. `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME` decides where they run:
+
+| Value                 | Where the session runs                                                                                                                                                      | Stopping it                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `false` **(default)** | Inside the API process that asked for it.                                                                                                                                   | The caller stops the session, and the plugin removes the temporary agent and environment it created.        |
+| `true`                | As a background job on the job runtime (Trigger.dev), in the Work's tenant: a tenant with its own Trigger.dev project runs it there. The API reads its result from the job. | The caller cancels the job. Waiting that times out does **not** cancel it; the job can be read again later. |
+
+The session request holds no credentials. The plugin reads its own settings for the user and the Work, so the job runtime's run record holds no secret.
+
+:::caution Cancelling a job
+When a job is cancelled, the job runtime stops the worker. The worker does not pass the cancellation on to the plugin, so the temporary agent and environment the session created may be left behind. A session that ends on its own always cleans up.
+:::
+
+No shipped feature opens sandbox sessions yet. The switch takes effect once the App Provisioner lands.
 
 ### The admin allowlist
 
