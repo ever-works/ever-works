@@ -3,27 +3,25 @@
  *
  * ACC-REG-07's recorded verdict is *Partial — no e2e asserts deploy, domain, PR,
  * merge or template-fork events*. Those events are emitted by the fork, deploy
- * and pull-request paths, so the event rows themselves need three things: the
- * GitHub connection surface — **landed by T63** as surface (b) of plan §8.8,
- * `connectCustomerGitHub` in `helpers/github-connection.ts` — a create route that
- * accepts the fork fields (**landed by APW-01 T5**), and a service layer that
- * acts on them (still missing; T24/T25 own it).
+ * and pull-request paths, so the event rows themselves need a forked Work, a
+ * finished readiness run, a deploy and an upstream estate. The first of those
+ * exists now; the others are either not driven by this lane or not yet measured
+ * on it.
  *
- * ── Why the fixme'd half is still fixme'd, re-measured 2026-09-18 after T5:
+ * ── Why the fixme'd half is still fixme'd (refreshed 2026-09-25):
  *
- * The DTO half is done: `POST /api/works` with `kind: "app"`,
- * `repositoryMode: "fork"` and `targetOwner` now answers **`200`** and creates a
- * Work with `kind: "app"` — probed on the lane's own API, so the
- * `400 property repositoryMode should not exist` this file used to record is
- * gone. What has not changed is that nothing *acts* on the mode:
- * `packages/agent/src/services/work-lifecycle.service.ts:311-364` branches only
- * on `isRepositoryWorkKind`, so an `app` create takes the generated-site path and
- * no fork request is ever made — the fake GitHub's call log stays **empty**
- * (measured: 0 calls, 0 of them forks). No fork means no `app.fork.*` row, which
- * is why the marker moves to the service layer rather than being removed. When
- * T24/T25 wire it, each acting account must be attached with
- * `connectCustomerGitHub(request, token)` before its first create, as T14's
- * connected half now does.
+ * The fork is no longer what it waits for. The GitHub connection surface landed
+ * with T63 (`connectCustomerGitHub`, surface (b) of plan §8.8), the create
+ * contract with APW-01 T5, and the service that acts on it with APW-01 T12 + T13
+ * (`5b838cb97`): an `app` create goes to `AppWorkCreateService`, which forks with
+ * the caller's connection (asserted on the fake by
+ * `flow-template-fork-success.spec.ts`). The record this header used to carry —
+ * "nothing acts on the mode, the fake's call log stays empty" — described the
+ * tree before that commit. What the case reads is three Activity rows the fork
+ * alone does not produce: `app.fork.ready` (APW-02's readiness run must finish
+ * on the lane — not measured), `app.deploy.succeeded` (a completed App deploy)
+ * and `app.upstream_pr.opened` (an upstream pull request). The marker below
+ * names them, and says what its body must change when it is lifted.
  *
  * ── The half that runs, and why it is the load-bearing half:
  *
@@ -174,18 +172,32 @@ test.describe('Activity — the read surface every App Works step lands on', () 
 test.describe('Activity — template fork and PR events (T16)', () => {
     // The events ACC-REG-07 names — a template fork, a deploy, a domain, a PR, a
     // merge — are emitted by paths that need a forked Work and, for the PR half,
-    // an upstream estate. Two of the three blockers have landed: T63's GitHub
-    // connection surface (surface (b) of plan §8.8), and the create contract,
-    // which APW-01 T5 completed — the same `POST /api/works` body now answers
-    // `200` and creates the Work instead of the ValidationPipe's
-    // `400 property repositoryMode should not exist` this file used to record.
-    // What is left is the service layer: `work-lifecycle.service.ts:311-364`
-    // branches only on `isRepositoryWorkKind`, so nothing forks and no
-    // `app.fork.*` row can appear. The assertions below are unchanged and the
-    // marker now names the blocker that is actually left (T24/T25).
+    // an upstream estate. The fork itself is no longer the blocker: since APW-01
+    // T12 + T13 (`5b838cb97`) an `app` create goes to `AppWorkCreateService`,
+    // which forks with the caller's connection — `flow-template-fork-success`
+    // asserts the fork request on the fake, and `flow-app-work-fork-lifecycle`
+    // the create's `preparing` answer. What this case still cannot see are the
+    // three rows it reads:
+    //   - `app.fork.ready` is written when APW-02's readiness run marks the fork
+    //     ready (`app-upstream-state.service.ts`). The dispatcher is bound since
+    //     C10 (`cf24c9e56`), but it hands the run only to a registered job
+    //     runtime, and this lane has not been measured reaching `ready`;
+    //   - `app.deploy.succeeded` needs a completed App deploy, and
+    //     `app.upstream_pr.opened` an upstream pull request — neither of which
+    //     this lane drives.
+    // When the case is lifted, its body must follow the fork spec's post-T13
+    // shape as well: attach the caller with `connectCustomerGitHub`, fork a
+    // seeded upstream (the fixture's `ever-works/templates` already has an
+    // `apw-e2e-user` fork, so it would be adopted, not forked), and use the
+    // fixture's login `apw-e2e-user` — `apw13-e2e-user` below is not an account
+    // the fake knows, and the create now refuses it with
+    // `400 target_owner_unavailable`. The body is left as it was on purpose: the
+    // marker is what changed.
     test.fixme(
-        'APW-13 T16: the fork event needs a service that acts on repositoryMode — the create ' +
-            'is accepted since APW-01 T5 but nothing forks yet (T24/T25 own that wiring)',
+        'APW-13 T16: forks happen since APW-01 T13, but the rows this case reads do not — ' +
+            'app.fork.ready needs the readiness run to finish on the lane (unmeasured), and ' +
+            'app.deploy.succeeded / app.upstream_pr.opened need a deploy and an upstream PR the ' +
+            'lane does not drive',
         async ({ request }: { request: APIRequestContext }) => {
             const user = await registerUserViaAPI(request);
 

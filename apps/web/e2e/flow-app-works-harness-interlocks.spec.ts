@@ -56,14 +56,18 @@
  *     the spend line "against budget" the case asks for.
  *
  * Nothing here starts a lane, opens a browser or writes to GitHub. The only network calls are
- * the two App Launcher reads of the E2E-12 reference case — the surface APW-11 T20's spec
- * drives — and that case carries a `fixme` naming T20, because this file must **reference**
- * `flow-app-launcher-apps.spec.ts` and never create it (Resolution R-22).
+ * the E2E-12 reference case's — the surface APW-11 T20's spec drives: the public
+ * `GET /api/config` read that says whether the launcher switch is on, one throwaway
+ * registration, and the App Launcher reads, whose expected answers are paired on that switch
+ * so the case holds on a stack with the launcher on and on one with it off. This file must
+ * **reference** `flow-app-launcher-apps.spec.ts` and never create it (Resolution R-22); the
+ * case that checks the file exists is below.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
 import { expect, test } from '@playwright/test';
+import { API_BASE, registerUserViaAPI } from './helpers/api';
 import { getAppLauncherPlatforms, getMyApps } from './helpers/app-works';
 import * as appWorksLive from './helpers/app-works-live';
 import {
@@ -842,23 +846,63 @@ test.describe('ACC-E2E-12 — the App Launcher lane APW-13 references', () => {
     test('the launcher read surface E2E-12 drives is mounted, or refused as documented', async ({
         request,
     }) => {
-        // The public platform list is E2E-12's first read (APW-11 FR-37) and needs no session.
+        // 0. Which state is this stack in? The installation switch
+        //    (`EVER_WORKS_APP_LAUNCHER_ENABLED`) is published as `features.appLauncherEnabled`,
+        //    read through the SAME accessor as the launcher's own guard
+        //    (`api.controller.ts` → `config.appLauncher.isEnabled()`, APW11-G12), so the two
+        //    cannot disagree. Both states are legitimate stacks: `e2e.yml` leaves the switch
+        //    unset on purpose (its env block says so — T20's flag-off lane), while
+        //    `flow-app-launcher-apps.spec.ts` needs a stack that sets it. Asserting ONE fixed
+        //    answer, as this case used to (`200` for the platforms read), made it red on
+        //    every stack of the other kind — e2e run 35455975352, job 105940305798:
+        //    `404 {"message":"Cannot find route"}` with the switch unset — while its own
+        //    session half already allowed that `404`.
+        const config = await request.get(`${API_BASE}/api/config`);
+        expect(config.status(), 'GET /api/config').toBe(200);
+        const launcherOn = (
+            (await config.json()) as { features?: { appLauncherEnabled?: unknown } }
+        ).features?.appLauncherEnabled;
+        expect(
+            typeof launcherOn,
+            'features.appLauncherEnabled is a real boolean — the state this case pairs on',
+        ).toBe('boolean');
+        const state = launcherOn === true ? 'on' : 'off';
+
+        // 1. The public platform list is E2E-12's first read (APW-11 FR-37) and needs no
+        //    session: `200` with the launcher on, the opaque `404` of a route that was never
+        //    mounted with it off (`AppLauncherEnabledGuard`, ACC-11-28).
         const platforms = await getAppLauncherPlatforms(request);
         expect(
             platforms.status,
-            `GET /api/app-launcher/platforms body=${platforms.text.slice(0, 200)}`,
-        ).toBe(200);
+            `GET /api/app-launcher/platforms with the launcher ${state} ` +
+                `body=${platforms.text.slice(0, 200)}`,
+        ).toBe(launcherOn === true ? 200 : 404);
 
-        // The session list is the read E2E-12 asserts item by item. Without a session it is
-        // `401` when the launcher is on and `404` when it is off — ACC-E2E-12 documents the
-        // 404 as the flag-off state, and the runbook's §4 recipe does not set
-        // `EVER_WORKS_APP_LAUNCHER_ENABLED`.
-        const session = await getMyApps(request);
+        // 2. The session list is the read E2E-12 asserts item by item — asked WITH a session,
+        //    so the answer is the switch's and not the sign-in wall's: `200` with the launcher
+        //    on, `404` with it off. Paired with 1, this proves the one switch governs both
+        //    launcher routes the same way, which neither read shows on its own.
+        const person = await registerUserViaAPI(request);
+        const signedIn = await getMyApps(request, { token: person.access_token });
         expect(
-            [401, 404],
-            `GET /api/me/apps answered ${session.status} — expected 401 (launcher on, no ` +
-                'session) or 404 (launcher off, ACC-E2E-12’s documented off state)',
-        ).toContain(session.status);
+            signedIn.status,
+            `GET /api/me/apps (signed in) with the launcher ${state} ` +
+                `body=${signedIn.text.slice(0, 200)}`,
+        ).toBe(launcherOn === true ? 200 : 404);
+
+        // 3. Without a session the same route answers `401` in BOTH states, and that is why
+        //    step 2 signs in: the platform's `AuthSessionGuard` is a global `APP_GUARD`, and
+        //    Nest runs global guards before a controller's own (`@nestjs/core`
+        //    `ContextCreator.createContext`: global, then class, then method), so the
+        //    sign-in wall answers before `AppLauncherEnabledGuard` is consulted. An anonymous
+        //    read therefore cannot tell the two states apart, which is what the `401 or 404`
+        //    this case used to accept was papering over.
+        const anonymous = await getMyApps(request);
+        expect(
+            anonymous.status,
+            `GET /api/me/apps (no session) with the launcher ${state} — the sign-in wall ` +
+                `answers first body=${anonymous.text.slice(0, 200)}`,
+        ).toBe(401);
     });
 
     /**
