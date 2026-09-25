@@ -370,6 +370,25 @@ describe('AppBuildPullTokenService (plan §4.12, APW05-G07)', () => {
                 code: 'pullTokenUnavailable',
             });
         });
+
+        it('answers `pullTokenUnavailable` before any registry call when no settings writer is bound', async () => {
+            // `APP_BUILD_PLATFORM_SETTINGS_WRITER` is optional and bound nowhere yet
+            // (app-builds.module.ts). Without it the token cannot be stored, so an
+            // `ok: true, tokenSet: true` answer would claim a save that never happened,
+            // and the token would still have been sent to the registry for nothing.
+            const { service, accessCalls, pageCalls } = makeService({
+                rows: [buildWithDigest()],
+                writer: null,
+            });
+
+            expect(await service.save(WORK_ID, USER_ID, 'ghp_x')).toEqual({
+                ok: false,
+                status: 503,
+                code: 'pullTokenUnavailable',
+            });
+            expect(accessCalls).toHaveLength(0);
+            expect(pageCalls).toHaveLength(0);
+        });
     });
 
     describe('the expiry warning (FR-51)', () => {

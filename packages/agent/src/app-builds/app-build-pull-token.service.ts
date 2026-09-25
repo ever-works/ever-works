@@ -195,7 +195,10 @@ export class AppBuildPullTokenService {
         token: string,
     ): Promise<AppBuildPullTokenSaveResult> {
         const binding = await this.resolve(userId, workId);
-        if (!binding || !binding.imageRepository || !binding.checkImageAccess) {
+        // No settings writer means step 5 cannot store the token, so answering
+        // `ok: true, tokenSet: true` would claim a save that never happened. Refuse
+        // up front, before the token is sent to the registry for nothing.
+        if (!binding || !binding.imageRepository || !binding.checkImageAccess || !this.settings) {
             return { ok: false, status: 503, code: 'pullTokenUnavailable' };
         }
 
@@ -232,20 +235,18 @@ export class AppBuildPullTokenService {
 
         const expiresAt = result.tokenExpiresAt ?? null;
 
-        if (this.settings) {
-            try {
-                await this.settings.writePlatformManagedWorkSettings(binding.pluginId, workId, {
-                    pullToken: token,
-                    pullTokenExpiresAt: expiresAt,
-                });
-            } catch (error) {
-                this.logger.warn(
-                    `App builds: storing the pull token of work ${workId} failed (${
-                        error instanceof Error ? error.message : String(error)
-                    }).`,
-                );
-                return { ok: false, status: 503, code: 'pullTokenUnavailable' };
-            }
+        try {
+            await this.settings.writePlatformManagedWorkSettings(binding.pluginId, workId, {
+                pullToken: token,
+                pullTokenExpiresAt: expiresAt,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `App builds: storing the pull token of work ${workId} failed (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return { ok: false, status: 503, code: 'pullTokenUnavailable' };
         }
 
         return {
