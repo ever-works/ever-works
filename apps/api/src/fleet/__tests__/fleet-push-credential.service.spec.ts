@@ -184,6 +184,14 @@ describe('FleetPushCredentialService', () => {
             // repository in the installation with every permission the App
             // holds — fine for the read-shaped callers, exactly wrong for a
             // write credential handed to an unattended machine.
+            //
+            // The EXACT pin is also what keeps `workflows` out. Never add
+            // `workflows` to this token: APW-08 T17 (the AppChangeGuard, whose
+            // ALWAYS_PROTECTED list is `.github/workflows/**`) relies on
+            // GitHub refusing workflow-file pushes from this token, because a
+            // fleet node pushes before the platform's change gate judges the
+            // branch. A test that loosens this to `toMatchObject` or adds a
+            // permission here is removing that protection.
             expect(JSON.parse(String(init.body))).toEqual({
                 repository_ids: [556677],
                 permissions: { contents: 'write' },
