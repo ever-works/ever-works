@@ -57,11 +57,15 @@
  *     (`app-launcher-enabled.guard.ts:77`, ACC-E2E-12's documented off state), so that
  *     case self-skips with the measured reason when the lane runs the runbook's §4 recipe
  *     verbatim (which does not set the switch).
- *   - **Nothing records the deletion in Activity.** 1.5 s after a `200` delete, both
- *     `/api/activity-log?workId=<id>` and the unfiltered read return no `work.deleted` row
- *     for the account (the two rows that do exist are `work.created` and `user.signup`) —
- *     `works.controller.ts:1692-1701` logs `work.deleted` *after* the Work row is gone and
- *     swallows the failure with `.catch(() => {})`. Reported as a `fixme`, not hidden.
+ *   - **Activity records the deletion, and names what was kept.** Measured 2026-09-19:
+ *     1.5 s after a `200` delete, neither `/api/activity-log?workId=<id>` nor the
+ *     unfiltered read held a `work.deleted` row — the controller logged it *after* the
+ *     Work row was gone, with `workId` set, so the `activity_log.workId → works` foreign
+ *     key refused the insert and `.catch(() => {})` swallowed the refusal. Fixed in
+ *     `works.controller.ts` (ACC-NEG-07): a completed delete logs without `workId` and
+ *     names the Work (`details.workId`, `details.slug`) and the service's `Kept: …`
+ *     message in `details`. The unfiltered read is the one asserted — a row that no longer
+ *     references a Work cannot appear in the per-Work filter.
  *
  * One further lane fact is asserted as *what the case is about* rather than as the copy it
  * quotes: this PR lane has no cluster, so the Kubernetes clauses are out of reach by the
@@ -275,8 +279,20 @@ interface DeleteView {
     deleted_repositories?: string[];
 }
 
+interface ActivityRowView {
+    action?: string;
+    summary?: string;
+    workId?: string | null;
+    details?: {
+        workId?: string;
+        slug?: string;
+        deletedRepositories?: string[];
+        message?: string;
+    } | null;
+}
+
 interface ActivityView {
-    activities?: Array<{ action?: string; summary?: string }>;
+    activities?: ActivityRowView[];
     total?: number;
 }
 
@@ -324,13 +340,13 @@ async function createForkWork(
 }
 
 /** The Activity rows of one account, unfiltered — the only read that survives a delete. */
-async function activityActions(request: APIRequestContext, token: string): Promise<string[]> {
+async function activityRows(request: APIRequestContext, token: string): Promise<ActivityRowView[]> {
     const res = await request.get(`${API_BASE}/api/activity-log?limit=100`, {
         headers: authedHeaders(token),
     });
     expect(res.status(), `GET /api/activity-log answered ${res.status()}`).toBe(200);
     const body = (await res.json()) as ActivityView;
-    return (body.activities ?? []).map((row) => row.action ?? '');
+    return body.activities ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -774,30 +790,63 @@ test.describe('ACC-NEG-07 — the halves that need APW-06 / APW-07, and T39’s 
     /**
      * NEG-07's last clause: "Activity records the deletion and names what was kept".
      *
-     * Measured on this lane (2026-09-19), twice (a link create and a fork create): 1.5 s
-     * after a `200` delete, `/api/activity-log?workId=<id>` returns
-     * `{activities: [], total: 0}` and the unfiltered read returns only `work.created` and
-     * `user.signup` — no `work.deleted` row at all. The controller logs it *after*
-     * `deleteWork` has removed the row and discards a failure with `.catch(() => {})`
-     * (`apps/api/src/works/works.controller.ts:1692-1701`), so the insert is either
-     * rejected by the Work foreign key or silently dropped; either way the record the case
-     * asks for is not observable. Reported, not fixed (not this lane's file).
+     * **Un-fixme'd with the ACC-NEG-07 controller fix.** Measured on this lane
+     * (2026-09-19), twice (a link create and a fork create): 1.5 s after a `200` delete,
+     * `/api/activity-log?workId=<id>` returned `{activities: [], total: 0}` and the
+     * unfiltered read only `work.created` and `user.signup`. The controller logged
+     * `work.deleted` *after* `deleteWork` had removed the row, naming it as `workId`, so the
+     * `activity_log.workId → works` foreign key refused the insert and `.catch(() => {})`
+     * hid it. A completed delete now logs without `workId` and carries the Work's identity
+     * and the service's own `Kept: …` sentence in `details`.
+     *
+     * The write stays fire-and-forget (a failed Activity insert must not fail a delete that
+     * already happened), so the read polls rather than racing the insert.
      */
-    test.fixme(
-        'APW-01: Activity records the deletion and names what was kept — no work.deleted row ' +
-            'appears in /api/activity-log after a 200 delete (measured twice, 2026-09-19)',
-        async ({ request }: { request: APIRequestContext }) => {
-            const user = await registerUserViaAPI(request);
-            await connectCustomerGitHub(request, user.access_token);
-            const work = await createForkWork(request, user.access_token, 'activity');
+    test('APW-01: Activity records the deletion and names what was kept', async ({
+        request,
+    }: {
+        request: APIRequestContext;
+    }) => {
+        const user = await registerUserViaAPI(request);
+        await connectCustomerGitHub(request, user.access_token);
+        const work = await createForkWork(request, user.access_token, 'activity');
 
-            const deleted = await deleteWorkViaAPI(request, {
-                token: user.access_token,
-                workId: work.workId,
-                body: {},
-            });
-            expect(deleted.status).toBe(200);
-            expect(await activityActions(request, user.access_token)).toContain('work.deleted');
-        },
-    );
+        const deleted = await deleteWorkViaAPI(request, {
+            token: user.access_token,
+            workId: work.workId,
+            body: {},
+        });
+        expect(deleted.status, `body=${deleted.text.slice(0, 300)}`).toBe(200);
+
+        let row: ActivityRowView | undefined;
+        await expect
+            .poll(
+                async () => {
+                    const rows = await activityRows(request, user.access_token);
+                    row = rows.find(
+                        (candidate) =>
+                            candidate.action === 'work.deleted' &&
+                            candidate.details?.workId === work.workId,
+                    );
+                    return row !== undefined;
+                },
+                {
+                    message:
+                        'a work.deleted row naming this Work appears in /api/activity-log after ' +
+                        'the 200 delete',
+                    timeout: 15_000,
+                },
+            )
+            .toBe(true);
+
+        // The Work row is gone, so the record cannot reference it; it names it instead.
+        expect(row?.workId ?? null, 'the record no longer references the deleted row').toBeNull();
+        expect(row?.details?.slug).toBe(work.slug);
+        // "… and names what was kept": the fork stays, and the record says so.
+        expect(row?.details?.message ?? '', 'the record names what was kept').toContain('Kept:');
+        expect(row?.details?.message ?? '').toContain(work.forkName);
+        expect(row?.details?.deletedRepositories ?? []).not.toContain(
+            `${LANE_LOGIN}/${work.forkName}`,
+        );
+    });
 });

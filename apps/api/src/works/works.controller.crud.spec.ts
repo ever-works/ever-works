@@ -60,6 +60,7 @@ jest.mock('../auth', () => {
 
 import { ValidationPipe } from '@nestjs/common';
 import { ROUTE_ARGS_METADATA, CUSTOM_ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { DataSource, EntitySchema } from 'typeorm';
 import { WorksController } from './works.controller';
 // APW-01 T18 — the REAL `AppWorkCreateService`, imported by path rather than through
 // `@ever-works/agent/app-works`: that barrel is not what this route's module loads for
@@ -672,9 +673,45 @@ describe('WorksController — core CRUD endpoints', () => {
     // deleteWork
     // -----------------------------------------------------------------------
     describe('deleteWork', () => {
+        /**
+         * What `WorkLifecycleService.deleteWork` answers once the row is gone
+         * (`DeleteWorkResponseDto`): the message is where `withDeleteNotes` names every
+         * repository that stayed and why.
+         */
+        const completedDelete = {
+            status: 'success',
+            slug: 'my-work',
+            message:
+                "Work 'my-work' and associated repositories have been deleted. " +
+                'Kept: acme/my-work (a repository this Work did not create).',
+            deleted_repositories: ['acme/my-work-data'],
+        };
+
+        /**
+         * What it answers while the App runtime tears the workloads down (APW-01 T39,
+         * FR-40a): the row stays and reads **Deleting…** until
+         * `completeAppWorkDeletion(workId)` removes it.
+         */
+        const pendingAppDelete = {
+            status: 'pending',
+            slug: 'my-app',
+            deleting: true,
+            message:
+                "Work 'my-app' is being deleted and keeps its row until the App runtime has " +
+                'removed its workloads. Kept: acme/my-app (the fork stays on GitHub).',
+            deleted_repositories: [],
+        };
+
         it('forwards the dto, resolves the user, and logs WORK_DELETED', async () => {
+            // ACC-NEG-07 — this case used to pin `workId: 'w-1'` on the log of a
+            // COMPLETED delete, and no `details`. That call can never land: by the time
+            // it runs `deleteWork` has removed the row, `activity_log.workId` is a
+            // foreign key to `works`, and the insert is refused — then swallowed by the
+            // handler's `.catch(() => {})`. The pinned shape encoded the defect, so it is
+            // corrected here rather than kept: the identity of the deleted Work and what
+            // was kept move into `details`.
             const dto: any = { deleteRepositories: true };
-            s.workLifecycleService.deleteWork.mockResolvedValue({ status: 'deleted' });
+            s.workLifecycleService.deleteWork.mockResolvedValue(completedDelete);
 
             const result = await controller.deleteWork(auth, 'w-1', dto);
 
@@ -683,13 +720,73 @@ describe('WorksController — core CRUD endpoints', () => {
             });
             expect(s.activityLogService.log).toHaveBeenCalledWith({
                 userId: 'auth-1',
-                workId: 'w-1',
                 actionType: 'WORK_DELETED',
                 action: 'work.deleted',
                 status: 'COMPLETED',
                 summary: 'Deleted work',
+                details: {
+                    workId: 'w-1',
+                    slug: 'my-work',
+                    deletedRepositories: ['acme/my-work-data'],
+                    message: completedDelete.message,
+                },
             });
-            expect(result).toEqual({ status: 'deleted' });
+            expect(result).toEqual(completedDelete);
+        });
+
+        it('logs a completed delete without the foreign key, naming the Work and what was kept in details (ACC-NEG-07)', async () => {
+            s.workLifecycleService.deleteWork.mockResolvedValue(completedDelete);
+
+            await controller.deleteWork(auth, 'w-1', {} as any);
+
+            expect(s.activityLogService.log).toHaveBeenCalledTimes(1);
+            const [entry] = s.activityLogService.log.mock.calls[0];
+            // Absent, not merely `undefined`-valued: the row this would reference is gone.
+            expect(entry).not.toHaveProperty('workId');
+            expect(entry.details).toEqual(
+                expect.objectContaining({
+                    workId: 'w-1',
+                    slug: 'my-work',
+                    deletedRepositories: ['acme/my-work-data'],
+                }),
+            );
+            expect(entry.details.message).toContain('Kept: acme/my-work');
+        });
+
+        it('keeps workId for a pending App Work delete, whose row remains and reads Deleting…', async () => {
+            s.workLifecycleService.deleteWork.mockResolvedValue(pendingAppDelete);
+
+            const result = await controller.deleteWork(auth, 'w-1', {} as any);
+
+            expect(s.activityLogService.log).toHaveBeenCalledWith({
+                userId: 'auth-1',
+                workId: 'w-1',
+                actionType: 'WORK_DELETED',
+                action: 'work.deleted',
+                status: 'COMPLETED',
+                summary: 'Deleting work',
+                details: {
+                    workId: 'w-1',
+                    slug: 'my-app',
+                    deletedRepositories: [],
+                    message: pendingAppDelete.message,
+                },
+            });
+            expect(result).toEqual(pendingAppDelete);
+        });
+
+        it('defaults deletedRepositories to an empty list when the answer carries none', async () => {
+            s.workLifecycleService.deleteWork.mockResolvedValue({
+                status: 'success',
+                slug: 'bare',
+                message: "Work 'bare' and associated repositories have been deleted",
+            });
+
+            await controller.deleteWork(auth, 'w-1', {} as any);
+
+            const [entry] = s.activityLogService.log.mock.calls[0];
+            expect(entry).not.toHaveProperty('workId');
+            expect(entry.details.deletedRepositories).toEqual([]);
         });
 
         it('does not log when delete rejects', async () => {
@@ -705,6 +802,126 @@ describe('WorksController — core CRUD endpoints', () => {
 
             await expect(controller.deleteWork(auth, 'w-1', {} as any)).resolves.toEqual({
                 status: 'deleted',
+            });
+        });
+
+        /**
+         * ACC-NEG-07 through a REAL foreign key. The mocked log above only pins the
+         * call's shape, and a mock cannot refuse anything: the defect was that the
+         * database did. These cases write through `activity_log.workId → works.id`
+         * (`ON DELETE SET NULL`, as `activity-log.entity.ts` declares it) on
+         * better-sqlite3 — the driver the PR lane runs, which TypeORM opens with
+         * `PRAGMA foreign_keys = ON` — and the lifecycle mock removes the Work row
+         * before it answers, in the order `WorkLifecycleService.deleteWork` does.
+         */
+        describe('against the activity_log → works foreign key (better-sqlite3)', () => {
+            interface WorkRow {
+                id: string;
+            }
+            interface ActivityRow {
+                id: string;
+                userId: string;
+                workId: string | null;
+                actionType: string;
+                action: string;
+                status: string;
+                summary: string;
+                details: Record<string, any> | null;
+            }
+
+            const workSchema = new EntitySchema<WorkRow>({
+                name: 'Work',
+                tableName: 'works',
+                columns: { id: { type: String, primary: true } },
+            });
+            const activitySchema = new EntitySchema<ActivityRow>({
+                name: 'ActivityLog',
+                tableName: 'activity_log',
+                columns: {
+                    id: { type: String, primary: true, generated: 'uuid' },
+                    userId: { type: String },
+                    workId: { type: String, nullable: true },
+                    actionType: { type: String },
+                    action: { type: String },
+                    status: { type: String },
+                    summary: { type: String },
+                    details: { type: 'simple-json', nullable: true },
+                },
+                relations: {
+                    work: {
+                        type: 'many-to-one',
+                        target: 'Work',
+                        nullable: true,
+                        onDelete: 'SET NULL',
+                        joinColumn: { name: 'workId' },
+                    },
+                } as any,
+            });
+
+            let dataSource: DataSource;
+
+            beforeEach(async () => {
+                dataSource = await new DataSource({
+                    type: 'better-sqlite3',
+                    database: ':memory:',
+                    entities: [workSchema, activitySchema],
+                    synchronize: true,
+                }).initialize();
+                await dataSource.getRepository(workSchema).insert({ id: 'w-1' });
+                s.activityLogService.log.mockImplementation((entry: Partial<ActivityRow>) =>
+                    dataSource.getRepository(activitySchema).save({ ...entry }),
+                );
+            });
+
+            afterEach(async () => {
+                if (dataSource?.isInitialized) {
+                    await dataSource.destroy();
+                }
+            });
+
+            /** The handler does not await its log; the test does, so a refusal fails it. */
+            async function theLogWrite(): Promise<void> {
+                expect(s.activityLogService.log).toHaveBeenCalledTimes(1);
+                await s.activityLogService.log.mock.results[0].value;
+            }
+
+            it('a completed delete lands its work.deleted row, naming the Work and what was kept', async () => {
+                s.workLifecycleService.deleteWork.mockImplementation(async (id: string) => {
+                    await dataSource.getRepository(workSchema).delete(id);
+                    return completedDelete;
+                });
+
+                await controller.deleteWork(auth, 'w-1', {} as any);
+                await theLogWrite();
+
+                const rows = await dataSource
+                    .getRepository(activitySchema)
+                    .findBy({ action: 'work.deleted' });
+                expect(rows).toHaveLength(1);
+                expect(rows[0].workId).toBeNull();
+                expect(rows[0].details).toEqual(
+                    expect.objectContaining({ workId: 'w-1', slug: 'my-work' }),
+                );
+                expect(rows[0].details?.message).toContain('Kept: acme/my-work');
+            });
+
+            it('a pending App Work delete lands referencing its row, which the foreign key clears once the row goes', async () => {
+                s.workLifecycleService.deleteWork.mockResolvedValue(pendingAppDelete);
+
+                await controller.deleteWork(auth, 'w-1', {} as any);
+                await theLogWrite();
+
+                const activities = dataSource.getRepository(activitySchema);
+                const logged = await activities.findOneByOrFail({ action: 'work.deleted' });
+                expect(logged.workId).toBe('w-1');
+                expect(logged.summary).toBe('Deleting work');
+
+                // `completeAppWorkDeletion` removes the row later (APW-06); the record
+                // stays, and still names the Work in `details`.
+                await dataSource.getRepository(workSchema).delete('w-1');
+                const kept = await activities.findOneByOrFail({ id: logged.id });
+                expect(kept.workId).toBeNull();
+                expect(kept.details?.workId).toBe('w-1');
             });
         });
     });
