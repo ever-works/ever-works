@@ -820,6 +820,14 @@ export class GitHubApiService {
 				data.visibility === 'public' || data.visibility === 'private' || data.visibility === 'internal'
 					? data.visibility
 					: undefined;
+			// APW-03 T22 — the Blueprint probe reads `ever-works-app-blueprint` off
+			// these. A payload without a list leaves `topics` unreported: `[]` is
+			// GitHub saying "no topics", which an absent key is not. Non-string
+			// entries are dropped rather than cast into the contract.
+			const rawTopics: unknown = data.topics;
+			const topics = Array.isArray(rawTopics)
+				? rawTopics.filter((topic): topic is string => typeof topic === 'string')
+				: undefined;
 
 			return {
 				owner: data.owner.login,
@@ -863,6 +871,7 @@ export class GitHubApiService {
 				...(typeof data.size === 'number' ? { sizeKb: data.size } : {}),
 				...(licenseSpdx === undefined ? {} : { licenseSpdx }),
 				...(empty === undefined ? {} : { empty }),
+				...(topics === undefined ? {} : { topics }),
 				// Octokit follows GitHub's 301 for a renamed repository, so the
 				// payload's `full_name` is the RESOLVED name and the requested
 				// coordinates are the only trace of the redirect. Case-insensitive

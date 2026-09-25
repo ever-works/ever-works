@@ -273,6 +273,53 @@ describe('APW-02 T16 — getRepository maps the repository facts (plan §4.3)', 
 	});
 });
 
+describe('APW-03 T22 — getRepository maps the repository topics', () => {
+	it('maps the topics GitHub reports, exactly', async () => {
+		reposGetMock.mockResolvedValue({
+			data: repositoryPayload({ topics: ['ever-works-app-blueprint', 'x'] })
+		});
+
+		const result = await svc.getRepository(OWNER, REPO, 'ghp_secret');
+
+		expect(result!.topics).toEqual(['ever-works-app-blueprint', 'x']);
+	});
+
+	it('reports an empty topic list as a fact — GitHub said "no topics"', async () => {
+		reposGetMock.mockResolvedValue({ data: repositoryPayload({ topics: [] }) });
+
+		const result = await svc.getRepository(OWNER, REPO, 'ghp_secret');
+
+		expect(result!.topics).toEqual([]);
+	});
+
+	it('leaves topics ABSENT when the payload does not carry the key — not reported is not []', async () => {
+		reposGetMock.mockResolvedValue({ data: repositoryPayload() });
+
+		const result = await svc.getRepository(OWNER, REPO, 'ghp_secret');
+
+		// `[]` would claim "this repository has no topics", which nobody reported.
+		expect('topics' in result!).toBe(false);
+	});
+
+	it('leaves topics absent when GitHub sends something that is not a list', async () => {
+		reposGetMock.mockResolvedValue({ data: repositoryPayload({ topics: null }) });
+
+		const result = await svc.getRepository(OWNER, REPO, 'ghp_secret');
+
+		expect('topics' in result!).toBe(false);
+	});
+
+	it('drops non-string entries rather than casting them into the contract', async () => {
+		reposGetMock.mockResolvedValue({
+			data: repositoryPayload({ topics: ['ever-works-app-blueprint', 42, null, 'y'] })
+		});
+
+		const result = await svc.getRepository(OWNER, REPO, 'ghp_secret');
+
+		expect(result!.topics).toEqual(['ever-works-app-blueprint', 'y']);
+	});
+});
+
 describe('APW-02 T16 — `empty` is computed ONLY from a zero size', () => {
 	it('probes the default branch when size is 0 and reports empty: true on a 404', async () => {
 		reposGetMock.mockResolvedValue({ data: repositoryPayload({ size: 0, default_branch: 'main' }) });
