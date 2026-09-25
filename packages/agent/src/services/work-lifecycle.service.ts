@@ -1533,6 +1533,20 @@ export class WorkLifecycleService {
         // clone of somebody's code repository into the shared checkout, for
         // content that cannot be there.
         assertNotRepositoryWork(work, 'syncing from the data repository');
+        // A kind that provisions no data repository (`repos.data: false` in
+        // the capability registry — today the App Work) has nothing to sync
+        // FROM. Without this the snapshot below cloned the derived
+        // `<slug>-data` name, failed, and logged "Error syncing work from data
+        // repository" on every Work page mount. Answer the same shape as the
+        // "already up to date" case below so the controller's activity log
+        // and the web action need no new branch.
+        if (!hasRepositoryRole(work, 'data')) {
+            return {
+                status: 'success',
+                updated: [] as string[],
+                message: `Nothing to sync: a "${work.kind}" Work has no data repository.`,
+            };
+        }
         const updates: Record<string, any> = {};
 
         try {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { GitProviderConnectionInfo, Work, WorkConfig } from '@/lib/api/types-only';
 import type { Agent } from '@/lib/api/agents';
-import type { AppRepositoryMode } from '@ever-works/contracts';
+import { getWorkCapabilities, type AppRepositoryMode } from '@ever-works/contracts';
 import { WorkHeader } from './WorkHeader';
 import { WorkTabs } from './WorkTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -56,6 +56,12 @@ export function WorkLayoutClient({
     const lastGenerateStatus = useRef(work.generateStatus?.status);
     const hasSyncedOnMount = useRef(false);
     const { markGenerating, clearGenerating } = useBackgroundActivity();
+    // `POST /api/works/:id/sync-data` clones the Work's data repository. A kind
+    // that provisions none (`repos.data: false` — today the App Work) has
+    // nothing to sync, and calling anyway cost a failed clone and an API error
+    // log on every page mount. The API answers a no-op for such a kind too;
+    // this keeps the request from being made at all.
+    const syncsFromDataRepository = getWorkCapabilities(syncedWork.kind).repos.data;
 
     useEffect(() => {
         setSyncedWork(work);
@@ -116,7 +122,7 @@ export function WorkLayoutClient({
         }
 
         if (lastStatus === GenerateStatusType.GENERATING && currentStatus !== lastStatus) {
-            if (currentStatus === GenerateStatusType.GENERATED) {
+            if (currentStatus === GenerateStatusType.GENERATED && syncsFromDataRepository) {
                 syncWorkData(syncedWork.id).catch(() => {
                     // Silent fail; best effort
                 });
@@ -126,7 +132,7 @@ export function WorkLayoutClient({
         }
 
         lastGenerateStatus.current = currentStatus;
-    }, [router, syncedWork.generateStatus?.status, syncedWork.id, t]);
+    }, [router, syncedWork.generateStatus?.status, syncedWork.id, syncsFromDataRepository, t]);
 
     useEffect(() => {
         if (!isGenerating) {
@@ -167,10 +173,13 @@ export function WorkLayoutClient({
         }
 
         hasSyncedOnMount.current = true;
+        if (!syncsFromDataRepository) {
+            return;
+        }
         syncWorkData(syncedWork.id).catch(() => {
             // Silent fail; best effort
         });
-    }, [syncedWork.id]);
+    }, [syncedWork.id, syncsFromDataRepository]);
 
     return (
         <WorkDetailProvider

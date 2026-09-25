@@ -2,6 +2,24 @@ import { workAppSpecAPI } from '@/lib/api/work-app-spec';
 import { getAuthFromCookie } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponseError } from '@/lib/api/server-api';
+import { BROWSER_WORKSPACE_SCOPE_HEADER, parseWorkspaceSelector } from '@/lib/workspace-scope';
+
+/**
+ * Whether the browser's per-tab selector is missing or does not parse — the
+ * exact condition under which `serverFetch` (inside `getAuthFromCookie()`)
+ * fails closed with `Invalid workspace scope`, because it runs the same
+ * `parseWorkspaceSelector` on the same header (`lib/api/server-api.ts`, the
+ * `selectedScope` resolution). `/auth/profile` does not opt out with
+ * `publicRouteScope`, so no other throw from that call is a scope failure.
+ */
+function hasInvalidWorkspaceSelector(request: NextRequest): boolean {
+    try {
+        parseWorkspaceSelector(request.headers.get(BROWSER_WORKSPACE_SCOPE_HEADER));
+        return false;
+    } catch {
+        return true;
+    }
+}
 
 /**
  * APW-03 T17 — the browser's read door to `GET /api/works/:id/app-spec`.
@@ -15,8 +33,8 @@ import { ApiResponseError } from '@/lib/api/server-api';
  * queued — the same reason `ComparisonGenerationProgress` records for its own
  * poller and the reason APW-02 T30 built
  * `apps/web/src/app/api/works/[id]/upstream/route.ts` for its 5-second poll
- * (`route.ts:9-19`). `workAppSpecAPI` is `server-only` and cannot be called from
- * the browser, and T15 exposed no client-callable read.
+ * (its "Why this route exists" section). `workAppSpecAPI` is `server-only` and
+ * cannot be called from the browser, and T15 exposed no client-callable read.
  *
  * So the read the poll needs is **this route handler**, not a second server
  * action: it is the shape the sibling App Work surface already uses for the same
@@ -29,31 +47,43 @@ import { ApiResponseError } from '@/lib/api/server-api';
  * already answers `404 { status: 'error', code: 'not_found' }` for a Work the
  * caller cannot see — the same answer for missing, invisible and another
  * account's (ACC-03-41) — and `422 notAnAppWork` for the wrong kind
- * (`apps/api/src/works/work-app-spec.controller.ts:408-441`). This handler
+ * (`WorkAppSpecController.authorize` in
+ * `apps/api/src/works/work-app-spec.controller.ts`). This handler
  * forwards that status and body unchanged, so the page has one vocabulary.
  * An unauthenticated call is answered `401` before any upstream work, exactly as
- * `api/works/[id]/upstream/route.ts:33-36` does.
+ * `api/works/[id]/upstream/route.ts`'s `GET` does.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     // Security: require an authenticated session before proxying to the App spec
     // API, rather than relying on the API's own tenant isolation alone.
     //
-    // The workspace-scope resolution happens INSIDE `getAuthFromCookie()`, and it
-    // fails closed when the browser's per-tab selector is absent or does not
-    // parse (`applyBffWorkspaceScope` throw → `Invalid workspace scope`). That
-    // throw used to escape this function entirely, because the call sits BEFORE
-    // the try below — so a caller without the selector got an EMPTY 500 where
-    // every `bffProxy`-built route answers the documented
-    // `400 { error: 'Invalid workspace scope' }` (`lib/api/bff-proxy.ts:147-152`).
+    // The workspace-scope resolution happens INSIDE `getAuthFromCookie()`
+    // (`serverFetch` → `parseWorkspaceSelector`), and it fails closed when the
+    // browser's per-tab selector is absent or does not parse (the throw is
+    // `Invalid workspace scope`). That throw used to escape this function
+    // entirely, because the call sits BEFORE the try below — so a caller without
+    // the selector got an EMPTY 500 where every `bffProxy`-built route answers the
+    // documented `400 { error: 'Invalid workspace scope' }` (`bffProxy`'s catch
+    // around `applyBffWorkspaceScope` in `lib/api/bff-proxy.ts`).
     // Measured on a lane: no selector → 500, `x-ever-workspace: personal` → 404
     // from the API, anonymous → 401. Catching it here keeps this hand-written
     // route on the house convention instead of a second vocabulary for the same
     // condition.
+    //
+    // ONLY that failure is a 400. `bffProxy` keeps its `try` around the scope
+    // resolution alone; here the resolution is buried in `getAuthFromCookie()`,
+    // which also rethrows an `/auth/profile` 5xx, so the catch re-checks the
+    // selector and lets anything else escape exactly as it did before the catch
+    // existed (Next answers 500). An anonymous caller still gets 401 whatever
+    // the selector: no session means no profile read, so nothing is resolved.
     let user;
     try {
         user = await getAuthFromCookie();
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    } catch (error) {
+        if (hasInvalidWorkspaceSelector(request)) {
+            return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+        }
+        throw error;
     }
 
     if (!user) {
