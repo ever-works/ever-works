@@ -81,6 +81,13 @@ describe('TaskPrPill', () => {
         expect(screen.getByTestId('task-pr-pill').textContent).toContain('merged');
     });
 
+    it('marks a closed PR in its body, not only by tone and tooltip', () => {
+        render(<TaskPrPill task={make({ prState: 'closed' })} />);
+        const pill = screen.getByTestId('task-pr-pill');
+        expect(pill.getAttribute('data-pr-state')).toBe('closed');
+        expect(pill.textContent).toContain('closed');
+    });
+
     it('links out with noopener/noreferrer for a valid https URL', () => {
         render(<TaskPrPill task={make()} />);
         const pill = screen.getByTestId('task-pr-pill');
@@ -115,6 +122,70 @@ describe('TaskPrPill', () => {
         expect(pill.getAttribute('title')).toContain('Failing: e2e <img>');
         // Provider-authored text never becomes markup on the board.
         expect(pill.querySelector('img')).toBeNull();
+    });
+});
+
+/**
+ * APW-08 — a primary pull request the change guard blocked. The refusal leaves
+ * `branchState` / `prState` as they were (the branch really is pushed), and the
+ * agent records why on `branchGuardRefusal`. The branch panel shows that as a
+ * banner; the board pill used to show the same pull request as an ordinary
+ * open one, so the board was the one place it still read as mergeable.
+ */
+describe('TaskPrPill — a pull request the change guard blocked', () => {
+    const REASON =
+        'This change edits paths this Work protects, which an agent may not change. ' +
+        'The branch was pushed, and pull request #241 now contains this change.\n\nPaths:\n- `<img src=x>`';
+
+    it('does not read as a healthy open pull request', () => {
+        render(<TaskPrPill task={make({ branchGuardRefusal: REASON, branchState: 'pr-open' })} />);
+        const pill = screen.getByTestId('task-pr-pill');
+        expect(pill.getAttribute('data-guard-refused')).toBe('true');
+        expect(pill.textContent).toContain('refused');
+        expect(pill.className).toContain('bg-red-100');
+        expect(pill.className).not.toContain('bg-blue-100');
+        expect(pill.getAttribute('title')).toContain('do not merge');
+    });
+
+    it('keeps a closed (unmerged) refused pull request refused — and still legible as closed', () => {
+        // Same rule as the branch panel banner (`activeGuardRefusal`): only a
+        // MERGED pull request or a settled branch retires the refusal; a closed
+        // one can be reopened as it stands, so the warning stays. The red tone
+        // replaces the slate "closed" tone, so the body carries the word.
+        render(<TaskPrPill task={make({ branchGuardRefusal: REASON, prState: 'closed' })} />);
+        const pill = screen.getByTestId('task-pr-pill');
+        expect(pill.getAttribute('data-pr-state')).toBe('closed');
+        expect(pill.getAttribute('data-guard-refused')).toBe('true');
+        expect(pill.className).toContain('bg-red-100');
+        expect(pill.textContent).toContain('closed');
+        expect(pill.textContent).toContain('refused');
+    });
+
+    it('keeps the link — the operator’s route to that pull request', () => {
+        render(<TaskPrPill task={make({ branchGuardRefusal: REASON })} />);
+        expect(screen.getByTestId('task-pr-pill').tagName).toBe('A');
+    });
+
+    it('never renders the stored reason, as markup or text — the Task page carries it', () => {
+        render(<TaskPrPill task={make({ branchGuardRefusal: REASON })} />);
+        const pill = screen.getByTestId('task-pr-pill');
+        expect(pill.querySelector('img')).toBeNull();
+        expect(pill.textContent).not.toContain('protects');
+        expect(pill.getAttribute('title')).not.toContain('protects');
+    });
+
+    it.each([
+        ['no marker', { branchGuardRefusal: null }],
+        ['a blank marker', { branchGuardRefusal: '   ' }],
+        ['a merged pull request', { branchGuardRefusal: REASON, prState: 'merged' }],
+        ['a merged branch', { branchGuardRefusal: REASON, branchState: 'merged' }],
+        ['a cleaned branch', { branchGuardRefusal: REASON, branchState: 'cleaned' }],
+        ['a discarded branch', { branchGuardRefusal: REASON, branchState: 'discarded' }],
+    ])('shows nothing refused for %s', (_why, fields) => {
+        render(<TaskPrPill task={make(fields as Partial<Task>)} />);
+        const pill = screen.getByTestId('task-pr-pill');
+        expect(pill.getAttribute('data-guard-refused')).toBeNull();
+        expect(pill.textContent).not.toContain('refused');
     });
 });
 

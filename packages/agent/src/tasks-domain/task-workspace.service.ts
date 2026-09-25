@@ -535,6 +535,15 @@ export class TaskWorkspaceService {
      * a mirror on another host grants nothing to the primary. Without a
      * described workspace the primary contributes no grants (LESS access,
      * never more); the Work is not re-read for a second, looser match.
+     *
+     * That match is the only thing scoped to a host. A mirror row that is also
+     * ATTACHED to the run's Agent or listed as a Task extra is skipped as a
+     * mount (`resolveFleetMounts` skips both by `owner/repo` only, host
+     * ignored, and logs each as the primary), yet its grants still join the
+     * union above like every attachment's and Task extra's — mounted or not.
+     * Recorded, not a regression: closing it needs a host-scoped primary skip
+     * there and in `normalizeFleetTaskWorkspaceMounts`, or dropping the grants
+     * of attachments and Task extras that were not mounted.
      */
     async resolveFleetRunEnvGrants(input: {
         task: Task;
@@ -1733,6 +1742,12 @@ export class TaskWorkspaceService {
         if (!simulation.clean) {
             // Refuse the PR and NAME the paths — the single
             // highest-value UX detail of the whole feature.
+            //
+            // An App Work's `branchGuardRefusal` from an earlier push is left
+            // as it is: the post-push `guardAppChange` below never runs on this
+            // path, and an allowed `judgeBeforePush` does not clear the marker
+            // (`checkPaths` has no size rule). Only that full judgement clears
+            // it, so until the next one the banner errs toward warning.
             await this.tasks.updateById(task.id, {
                 branchState: 'conflict',
                 conflictPaths: simulation.conflictPaths,
@@ -3233,8 +3248,10 @@ export class TaskWorkspaceService {
      * So: when the Task has an open pull request, its head is judged — the head
      * the PLATFORM recorded (`branchRef`), never a name the node reports.
      * Without one, the reported branch is judged if the node says it pushed, so a
-     * refused change is at least named and the Task blocked. Otherwise there is
-     * nothing to judge. Every other Work kind returns at once.
+     * refused change is at least named and the Task blocked — unless it is not
+     * the Task's recorded branch: that is refused as a mismatch first, naming
+     * both, and never judged in the Task's name. Otherwise there is nothing to
+     * judge. Every other Work kind returns at once.
      *
      * Never throws, like everything this service calls at finalize time.
      */
@@ -3261,6 +3278,23 @@ export class TaskWorkspaceService {
             if (!branch) return null;
 
             const judged = { task, userId, agentId: input.agentId };
+            // The same rule as `finalizeRemotePush`: a reported branch that is
+            // not the Task's recorded branch blocks, BEFORE the caller records
+            // the push — on the question path `recordRemotePush` would
+            // otherwise overwrite `branchRef` with the node's name, and every
+            // later judgement would follow it.
+            const mismatch = reported ? this.branchMismatch(task, reported) : null;
+            // With no open pull request the branch judged below IS the reported
+            // one, so a mismatch is refused first, as `finalizeRemotePush` does:
+            // judging a branch that is not the Task's would make its verdict —
+            // which names neither branch — the refusal the Task's OWN branch
+            // panel shows. With an open pull request its recorded head is judged
+            // first instead: that is the branch a refused change would reach.
+            if (mismatch && !existingPullRequest) {
+                return this.refuseChange(judged, task, mismatch, undefined, {
+                    reachedRemote: true,
+                });
+            }
             const { owner, repo } = resolveTaskRepository(work);
             const guarded = await this.guardAppChange({
                 input: judged,
@@ -3273,12 +3307,6 @@ export class TaskWorkspaceService {
             });
             if (guarded) return guarded;
 
-            // The same rule as `finalizeRemotePush`: a reported branch that is
-            // not the Task's recorded branch blocks, BEFORE the caller records
-            // the push — on the question path `recordRemotePush` would
-            // otherwise overwrite `branchRef` with the node's name, and every
-            // later judgement would follow it.
-            const mismatch = reported ? this.branchMismatch(task, reported) : null;
             if (mismatch) {
                 return this.refuseChange(judged, task, mismatch, existingPullRequest, {
                     reachedRemote: true,

@@ -454,6 +454,32 @@ describe('a node cannot move the judgement off an open pull request', () => {
 
         expect(outcome).toMatchObject({ outcome: 'blocked-by-guard' });
     });
+
+    /**
+     * Wave-2 review (primary-pr-marker): with no open pull request these paths
+     * judged the REPORTED branch first. When that branch was not the Task's and
+     * the gate refused it, the refusal (which names neither branch) came back
+     * before the mismatch check, and became the refusal the Task's OWN branch
+     * panel shows. `finalizeRemotePush` has always refused the mismatch first;
+     * so do these paths when there is no pull request head to judge instead.
+     */
+    it('refuses a mismatched report as a mismatch — without judging the other branch — when no pull request is open', async () => {
+        const m = mocks();
+        m.evaluate.mockResolvedValue(refused());
+
+        const outcome = await service(m).judgeAppWorkBranch({
+            task: task({ branchRef: 'ever-works/task/add-a-thing' }) as never,
+            userId: 'u-1',
+            agentId: 'a-1',
+            reportedBranch: 'innocuous',
+        });
+
+        expect(outcome).toMatchObject({ outcome: 'blocked-by-guard' });
+        expect(m.evaluate).not.toHaveBeenCalled();
+        expect(bodyOf(m)).toContain('`innocuous`');
+        expect(bodyOf(m)).toContain('`ever-works/task/add-a-thing`');
+        expect(blockedWith(m)).toBe(true);
+    });
 });
 
 describe('a merged or closed pull request is not an open one', () => {

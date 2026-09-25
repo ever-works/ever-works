@@ -236,6 +236,26 @@ describe('a refused change that reached the remote is recorded on the Task', () 
         expect(markerWrites(m)[0]).toContain('`innocuous`');
     });
 
+    it('records the mismatch — not a judgement of the other branch — on those paths with no pull request open', async () => {
+        const m = mocks();
+        // Would refuse whatever it were asked about: the reported branch must
+        // not be judged in the Task's name at all.
+        m.evaluate.mockResolvedValue(refused());
+
+        const outcome = await service(m).judgeAppWorkBranch({
+            task: task() as never,
+            userId: 'u-1',
+            agentId: 'a-1',
+            reportedBranch: 'innocuous',
+        });
+
+        expect(outcome).toEqual({ outcome: 'blocked-by-guard' });
+        expect(m.evaluate).not.toHaveBeenCalled();
+        expect(markerWrites(m)).toEqual([bodyOf(m)]);
+        expect(markerWrites(m)[0]).toContain('`innocuous`');
+        expect(markerWrites(m)[0]).toContain('`ever-works/task/add-a-thing`');
+    });
+
     it('records a refused head on the question and failure paths', async () => {
         const m = mocks();
         m.evaluate.mockResolvedValue(refused());

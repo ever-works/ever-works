@@ -238,11 +238,14 @@ export interface Task {
     extraRepos?: TaskExtraRepo[] | null;
     conflictPaths: string[] | null;
     /**
-     * APW-08 — why an App Work's change rules refused a change that reached
-     * the PRIMARY branch (the Task thread's refusal message, capped). The
-     * refusal leaves `branchState` as it was, so this is what tells the branch
-     * panel a `pr-open` pull request is not a healthy one. Absent or null =
-     * nothing refused; cleared by a later allowed push or a discard.
+     * APW-08 — why an App Work's change guard blocked the PRIMARY branch: its
+     * rules refused a change that reached it, or a run reported pushing a
+     * branch that is not the Task's (the Task thread's refusal message,
+     * capped). The refusal leaves `branchState` as it was, so this is what
+     * tells the branch panel and the board's pull-request pill that a
+     * `pr-open` pull request is not a healthy one (`activeGuardRefusal`).
+     * Absent or null = nothing refused; cleared by a later allowed push or a
+     * discard.
      */
     branchGuardRefusal?: string | null;
     // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the

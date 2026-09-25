@@ -21,6 +21,7 @@ import {
     resolveTaskConflictsAction,
     updateTaskAction,
 } from '@/app/actions/tasks';
+import { activeGuardRefusal } from './task-guard-refusal';
 
 /**
  * Wave 2 M7 — Task detail "Branch" cockpit.
@@ -31,14 +32,17 @@ import {
  * conflicts"), and a "Discard branch" action behind an irreversible
  * confirm.
  *
- * APW-08: when an App Work's change rules refused a change that reached the
- * PRIMARY branch, the agent leaves `branchState` alone (the branch really is
- * pushed) and records the reason on `branchGuardRefusal`. The panel then shows
- * a refusal banner with that reason verbatim (it names the rule and the paths:
- * ACC-NEG-04, and says whether the open pull request carries the change), so
- * the `pr-open` pill and link beside it no longer read as a healthy pull
- * request. Once the branch is merged, cleaned or discarded there is nothing
- * left to keep unmerged, and the banner is not shown.
+ * APW-08: when an App Work's change guard blocked a change that reached the
+ * PRIMARY branch — its rules refused the change, or a run reported pushing a
+ * branch that is not the Task's — the agent leaves `branchState` alone (the
+ * branch really is pushed) and records the reason on `branchGuardRefusal`. The
+ * panel then shows a banner with that reason verbatim (a rule refusal names
+ * the rule and the paths: ACC-NEG-04, and says whether the open pull request
+ * carries the change; a mismatch names both branches), under a title that
+ * holds for either, so the `pr-open` pill and link beside it no longer read
+ * as a healthy pull request. Once the branch is merged, cleaned or discarded
+ * there is nothing left to keep unmerged, and the banner is not shown
+ * (`activeGuardRefusal`, which the board's pull-request pill reads too).
  *
  * Multi-repo Tasks also list the other repositories a fleet run pushed
  * ("Also in"): each one's PR link, or its pushed / failed state. A row the
@@ -70,21 +74,6 @@ const FALLBACK_TONE = 'bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:tex
 
 /** The pill on a linked repository row that must not read as healthy. */
 const LINKED_ALERT_TONE = STATE_TONES.conflict;
-
-/** Branch states after which a refused change has nothing left to be merged into. */
-const SETTLED_BRANCH_STATES: ReadonlySet<string> = new Set(['merged', 'cleaned', 'discarded']);
-
-/**
- * The primary branch's change-guard refusal to show, or null. Blank text is
- * nothing refused; a merged pull request or a settled branch is history.
- */
-function activeGuardRefusal(task: Task): string | null {
-    const reason = task.branchGuardRefusal;
-    if (typeof reason !== 'string' || reason.trim().length === 0) return null;
-    if (task.prState === 'merged') return null;
-    if (task.branchState && SETTLED_BRANCH_STATES.has(task.branchState)) return null;
-    return reason;
-}
 
 export function TaskBranchSection({ task }: { task: Task }) {
     if (task.branchRef) {
