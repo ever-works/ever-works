@@ -112,6 +112,32 @@ export interface WorkspaceBackupRunOptions {
     readonly instance?: string;
     readonly retentionDays?: number;
     readonly formatReferenceUrl?: string;
+    /**
+     * The latest moment this run may still be producing, when the caller has
+     * a harder limit than the hour of spec FR-6 — the job runtime's own
+     * ceiling for the task, less the time the task needs to report the
+     * outcome. The run stops at whichever comes first.
+     */
+    readonly deadline?: Date;
+}
+
+/**
+ * The run reached its ceiling (spec FR-6). Raised into the writer so every
+ * pending append and the upload stop at once; never escapes the runner.
+ */
+class WorkspaceBackupTimeoutError extends Error {
+    constructor(readonly minutes: number) {
+        super(`The backup did not finish within ${minutes} minutes and was stopped`);
+        this.name = 'WorkspaceBackupTimeoutError';
+    }
+}
+
+/** Shared between a run and the timer that bounds it. */
+interface RunCeiling {
+    /** Set by the timer; read at every stop probe. */
+    reached: WorkspaceBackupTimeoutError | null;
+    /** The run's writer, once it has one, so the timer can abort it. */
+    writer: BackupArchiveWriter | null;
 }
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
@@ -170,12 +196,19 @@ export class WorkspaceBackupRunner {
      * real workspace, which is why the archive task calls
      * {@link startFromPayload} instead.
      */
-    async runFromPayload(payload: {
-        backupId: string;
-        userId: string;
-        organizationId?: string | null;
-    }): Promise<WorkspaceBackupRunResult> {
-        return this.run(payload.backupId, await this.optionsFromPayload(payload));
+    async runFromPayload(
+        payload: {
+            backupId: string;
+            userId: string;
+            organizationId?: string | null;
+        },
+        control: { readonly deadline?: Date } = {},
+    ): Promise<WorkspaceBackupRunResult> {
+        const options = await this.optionsFromPayload(payload);
+        return this.run(
+            payload.backupId,
+            control.deadline ? { ...options, deadline: control.deadline } : options,
+        );
     }
 
     /**
@@ -279,7 +312,31 @@ export class WorkspaceBackupRunner {
         return { row, startedAt, storage: this.storage };
     }
 
-    /** Produce a claimed row's archive, settling the row on every failure it can name. */
+    /**
+     * Produce a claimed row's archive, settling the row on every failure it
+     * can name — including running out of time.
+     *
+     * ## The ceiling is the runner's own
+     *
+     * Spec FR-6 says a backup that has not finished within the hour is stopped
+     * and marked `timeout`. That used to rest on something OUTSIDE the run: the
+     * job runtime's `maxDuration`, which kills the process without settling
+     * anything, and later a watcher polling the row, which enforced nothing
+     * once it was gone. Either way a run could outlive its ceiling with the row
+     * still `running`, or be killed and left for the stall sweep with no
+     * notification.
+     *
+     * So the run carries its ceiling itself: the earlier of `startedAt` plus
+     * `timeoutMinutes` and the caller's `deadline`. A timer at that moment
+     * aborts the writer — which rejects every pending append and the upload —
+     * and every stop probe reads it. And because a hung await that is not the
+     * writer's (a clone, a storage read, an upload that never answers) would
+     * not notice either, the production RACES the timer: at the ceiling the
+     * row is settled `timeout` and this method returns, whatever the
+     * production is still waiting on. What it later wakes up to is an aborted
+     * writer and a row that is no longer `running`, so it cannot settle
+     * anything or leave an object behind.
+     */
     private async execute(
         row: WorkspaceBackup,
         startedAt: Date,
@@ -287,9 +344,38 @@ export class WorkspaceBackupRunner {
         storage: BackupStorage,
     ): Promise<WorkspaceBackupRunResult> {
         const backupId = row.id;
+        const limitMinutes = BACKUP_DEFAULT_LIMITS.timeoutMinutes;
+        const ceiling = Math.min(
+            startedAt.getTime() + limitMinutes * 60 * 1000,
+            options.deadline?.getTime() ?? Number.POSITIVE_INFINITY,
+        );
+
+        const run: RunCeiling = { reached: null, writer: null };
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const ceilingReached = new Promise<'timeout'>((resolve) => {
+            timer = setTimeout(
+                () => {
+                    run.reached = new WorkspaceBackupTimeoutError(limitMinutes);
+                    run.writer?.abort(run.reached);
+                    resolve('timeout');
+                },
+                Math.max(0, ceiling - Date.now()),
+            );
+            timer.unref?.();
+        });
+
+        const production = this.produce(row, startedAt, options, storage, run);
+        // Whichever loses the race below still settles on its own; its
+        // rejection must never surface as an unhandled one.
+        production.catch(() => undefined);
+
         try {
-            return await this.produce(row, startedAt, options, storage);
+            const outcome = await Promise.race([production, ceilingReached]);
+            return outcome === 'timeout' ? await this.settleTimeout(backupId) : outcome;
         } catch (error) {
+            if (run.reached) {
+                return this.settleTimeout(backupId);
+            }
             if (error instanceof BackupArchiveTooLargeError) {
                 await this.fail(backupId, 'too_large', error.message);
                 return { status: 'failed', reason: 'too_large', backupId };
@@ -298,7 +384,36 @@ export class WorkspaceBackupRunner {
             this.logger.error(`Workspace backup ${backupId} failed: ${detail}`);
             await this.fail(backupId, 'internal', detail);
             return { status: 'failed', reason: 'internal', backupId };
+        } finally {
+            clearTimeout(timer);
         }
+    }
+
+    /**
+     * Settle a run that reached its ceiling as `timeout` (spec FR-6).
+     *
+     * A compare-and-set out of `running`: an outcome that landed a moment
+     * earlier — the archive finishing, the owner cancelling — keeps its own
+     * result, and is what this reports.
+     */
+    private async settleTimeout(backupId: string): Promise<WorkspaceBackupRunResult> {
+        const limitMinutes = BACKUP_DEFAULT_LIMITS.timeoutMinutes;
+        const moved = await this.backups.markTerminal(
+            backupId,
+            {
+                status: 'failed',
+                failureReason: 'timeout',
+                failureDetail: new WorkspaceBackupTimeoutError(limitMinutes).message,
+                finishedAt: new Date(),
+                currentDomain: null,
+            },
+            ['running'],
+        );
+        if (moved) {
+            this.logger.warn(`Workspace backup ${backupId} reached its ceiling and was stopped`);
+            return { status: 'failed', reason: 'timeout', backupId };
+        }
+        return this.outcomeOfStoppedRun(backupId);
     }
 
     /** The manifest identity for a payload, read fresh (spec FR-11). */
@@ -351,6 +466,7 @@ export class WorkspaceBackupRunner {
         startedAt: Date,
         options: WorkspaceBackupRunOptions,
         storage: BackupStorage,
+        run: RunCeiling,
     ): Promise<WorkspaceBackupRunResult> {
         await storage.warmUp?.();
 
@@ -364,6 +480,13 @@ export class WorkspaceBackupRunner {
             maxAttachmentBytes: limits.maxAttachmentBytes,
             maxFileBytes: limits.maxFileBytes,
         });
+        // Handed to the ceiling's timer. If the ceiling already passed while
+        // the backend warmed up, the writer is aborted before a byte is read.
+        run.writer = writer;
+        if (run.reached) {
+            writer.abort(run.reached);
+            throw run.reached;
+        }
 
         const scope: BackupScope = {
             userId: row.userId,
@@ -420,18 +543,38 @@ export class WorkspaceBackupRunner {
             idsFor: (name) => registeredIds.get(name)?.ids ?? [],
             // An unregistered name is the "no rows" case, which is honest.
             idsComplete: (name) => registeredIds.get(name)?.complete ?? true,
-            shouldStop: () => cancelled.value,
+            shouldStop: () => cancelled.value || run.reached !== null,
             heartbeat,
         };
 
         const outcomes: BackupDomainOutcome[] = [];
         const total = BACKUP_DOMAINS.length;
 
+        /**
+         * Stop here if the row is no longer `running`, discarding everything
+         * written so far. Asked at every domain boundary and once more after
+         * the attachment copy, so the two phases that can run for a long time
+         * both end at the first probe after a cancel rather than at the end of
+         * the archive.
+         */
+        const stopIfNotRunning = async (): Promise<WorkspaceBackupRunResult | null> => {
+            if (run.reached) {
+                // The ceiling's own settle already ran; this production only
+                // has to stop.
+                throw run.reached;
+            }
+            if (!cancelled.value && !(await this.isCancelled(row.id))) {
+                return null;
+            }
+            cancelled.value = true;
+            writer.abort('the backup is no longer running');
+            return this.outcomeOfStoppedRun(row.id);
+        };
+
         for (const [index, descriptor] of BACKUP_DOMAINS.entries()) {
-            if (await this.isCancelled(row.id)) {
-                cancelled.value = true;
-                writer.abort('cancelled by the owner');
-                return { status: 'cancelled', backupId: row.id };
+            const stopped = await stopIfNotRunning();
+            if (stopped) {
+                return stopped;
             }
 
             await this.backups.heartbeat(row.id, {
@@ -452,7 +595,23 @@ export class WorkspaceBackupRunner {
             );
         }
 
-        const omissions = await this.copyFiles(queuedFiles, writer, storage, heartbeat);
+        const omissions = await this.copyFiles(
+            queuedFiles,
+            writer,
+            storage,
+            heartbeat,
+            context.shouldStop,
+        );
+
+        // The copy phase is the longest one on a workspace with files — up to
+        // the whole attachment budget read from storage — and nothing after it
+        // looks at the row until the final compare-and-set. Without this probe
+        // a backup cancelled while its last attachments copied still finished
+        // the zip and the whole upload, and only then threw the object away.
+        const stoppedAfterCopy = await stopIfNotRunning();
+        if (stoppedAfterCopy) {
+            return stoppedAfterCopy;
+        }
 
         const manifest = buildManifest({
             producedAt: startedAt,
@@ -532,20 +691,39 @@ export class WorkspaceBackupRunner {
             // permanent, billable orphan on an object store, so the object
             // goes with the outcome that won.
             await this.discardOrphan(stored.key, storage);
-            const current = await this.dataSource
-                .getRepository<WorkspaceBackup>('WorkspaceBackup')
-                .findOne({ where: { id: row.id }, select: { id: true, status: true } });
+            const outcome = await this.outcomeOfStoppedRun(row.id);
             this.logger.warn(
-                `Workspace backup ${row.id} settled elsewhere as ${current?.status ?? 'unknown'}; discarded the archive it had already produced`,
+                `Workspace backup ${row.id} settled elsewhere as ${outcome.reason}; discarded the archive it had already produced`,
             );
-            return {
-                status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
-                reason: current?.status ?? 'settled-elsewhere',
-                backupId: row.id,
-            };
+            return outcome;
         }
 
         return { status: gaps ? 'ready_with_gaps' : 'ready', backupId: row.id };
+    }
+
+    /**
+     * What a run that stopped because its row left `running` reports.
+     *
+     * The row says who stopped it. The owner's cancel is `cancelled`, and the
+     * task stays silent about it because the owner already knows. Anything
+     * else that settled the row — the sweeper's stall or timeout rule — is a
+     * `failed` backup the owner is still owed a notification for, which is why
+     * this reads the row instead of assuming a cancel.
+     */
+    private async outcomeOfStoppedRun(backupId: string): Promise<WorkspaceBackupRunResult> {
+        const current = await this.dataSource
+            .getRepository<WorkspaceBackup>('WorkspaceBackup')
+            .findOne({ where: { id: backupId }, select: { id: true, status: true } });
+        if (current?.status === 'ready' || current?.status === 'ready_with_gaps') {
+            // Only reachable from the ceiling's settle, racing an archive that
+            // finished in the same moment: the archive won.
+            return { status: current.status, backupId };
+        }
+        return {
+            status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
+            reason: current?.status ?? 'settled-elsewhere',
+            backupId,
+        };
     }
 
     /** Remove an archive no row will ever reference. Best effort by design. */
@@ -638,6 +816,26 @@ export class WorkspaceBackupRunner {
             }
 
             if (failure === undefined && planCode !== undefined) {
+                // The trims were applied to every file that was read, the
+                // shortfall of one file notwithstanding. The format promises
+                // each applied trim is recorded with its cutoff and what it
+                // left out, and a `partial` domain can carry trims like any
+                // other — so a file planned off an unfinished parent must not
+                // erase the reports of its siblings.
+                // `collector.trims` issues its own COUNT queries. This branch
+                // runs precisely because the database already failed one query
+                // for this domain, so treat a second failure as "no reports
+                // available" rather than letting it reach the outer catch —
+                // that would return `failed` with no files at all and hide
+                // data the writer has already streamed into the archive.
+                let trims: BackupTrimReport[] = [];
+                try {
+                    trims = await collector.trims(context, plans);
+                } catch (error) {
+                    this.logger.warn(
+                        `[backup] ${key}: trim reports unavailable after a partial read (${String(error)})`,
+                    );
+                }
                 return {
                     outcome: {
                         key,
@@ -645,6 +843,7 @@ export class WorkspaceBackupRunner {
                         records,
                         files,
                         errorCode: planCode,
+                        ...(trims.length > 0 ? { trims } : {}),
                     },
                     plans: planned,
                 };
@@ -860,6 +1059,7 @@ export class WorkspaceBackupRunner {
         writer: BackupArchiveWriter,
         storage: BackupStorage,
         heartbeat: () => Promise<void>,
+        shouldStop: () => boolean,
     ): Promise<BackupOmission[]> {
         const omissions: BackupOmission[] = [];
 
@@ -871,6 +1071,15 @@ export class WorkspaceBackupRunner {
             // archive they went on to produce became an orphan nothing could
             // reach or delete. `heartbeat` throttles itself to 25 s.
             await heartbeat();
+
+            // The heartbeat is also the live stop signal: it matches no row
+            // once the backup has left `running`. It used to be written here
+            // and never read, so a cancelled backup went on reading every
+            // remaining attachment out of storage before anything noticed.
+            // The caller decides what the stop means; this only stops reading.
+            if (shouldStop()) {
+                break;
+            }
 
             const verdict = writer.canAcceptFile(file.sizeBytes);
             if (!verdict.accepted) {
