@@ -87,6 +87,18 @@ const SETTINGS: Record<
     },
 };
 
+/**
+ * A failed signature check: 401 with a generic answer; the plugin's own
+ * `reason` is kept as the cause, never answered.
+ */
+function signatureRefused(reason: string) {
+    return {
+        status: 401,
+        message: 'Invalid webhook signature',
+        cause: expect.objectContaining({ message: reason }),
+    };
+}
+
 function row(id: string, userId: string, address: string, pluginId: string, order: number) {
     return {
         id,
@@ -311,7 +323,7 @@ describe('EmailFacadeService + DefaultInboundEmailDispatcher — a webhook reach
                 'mailgun',
                 mailgunWebhook({ recipient: 'victim@v.test, attacker@a.test' }, 'mg-attacker'),
             ),
-        ).rejects.toThrow('Mailgun inbound: signature mismatch.');
+        ).rejects.toMatchObject(signatureRefused('Mailgun inbound: signature mismatch.'));
         expect(settingsScopes).toEqual(['mailgun:victim']);
         expect(spawned).toEqual([]);
     });
@@ -321,7 +333,7 @@ describe('EmailFacadeService + DefaultInboundEmailDispatcher — a webhook reach
 
         await expect(
             deliver('mailgun', mailgunWebhook({ recipient: 'victim@v.test' }, 'mg-attacker')),
-        ).rejects.toThrow('Mailgun inbound: signature mismatch.');
+        ).rejects.toMatchObject(signatureRefused('Mailgun inbound: signature mismatch.'));
         expect(spawned).toEqual([]);
     });
 

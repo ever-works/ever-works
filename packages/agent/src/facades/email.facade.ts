@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
+import {
+    Inject,
+    Injectable,
+    Logger,
+    Optional,
+    ServiceUnavailableException,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { PLUGIN_CAPABILITIES, type FacadeOptions, type IPlugin } from '@ever-works/plugin';
 import {
     isEmailOutboundPlugin,
@@ -39,6 +46,14 @@ import { BaseFacadeService, FacadeError, NoProviderError } from './base.facade';
  * sends, or by the address's provider when the send fails first.
  */
 export const EMAIL_SEND_RESERVATION_PENDING_PLUGIN_ID = 'pending';
+
+/**
+ * The whole answer (401) to a webhook whose signature check failed. The
+ * plugin's own reason can say WHICH check failed (a missing header, a stale
+ * timestamp, a mismatch against the configured secret): it is logged, never
+ * answered to the unauthenticated caller.
+ */
+const WEBHOOK_SIGNATURE_REJECTED = 'Invalid webhook signature';
 
 export class EmailFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -365,8 +380,9 @@ export class EmailFacadeService extends BaseFacadeService {
      * theirs, so a destination must never be re-derived from `to`.
      *
      * Fails closed: every plugin method below is called on the plugin's REAL,
-     * loaded instance ({@link getUsableInboundPlugin}), and the verification is
-     * awaited ({@link verifyWebhookSignature}). Note that a plugin with NO
+     * loaded instance ({@link getUsableInboundPlugin} — 503 when it cannot
+     * load), and the verification is awaited ({@link verifyWebhookSignature} —
+     * 401 with a generic body when it fails). Note that a plugin with NO
      * secret at the resolved scope accepts unsigned webhooks (an operator
      * opt-in in the shipped postmark and mailgun plugins).
      */
@@ -644,6 +660,13 @@ export class EmailFacadeService extends BaseFacadeService {
      * rejection) — so a thenable is awaited. A plugin with no
      * `verifyWebhookSignature` at all cannot authenticate anything and is
      * refused.
+     *
+     * A failed check — a throw, or a rejection of that thenable — is answered
+     * 401 with a generic body (email-providers spec §7). The plugin throws a
+     * plain `Error`, which the API would otherwise answer 500: the provider
+     * would retry a forged delivery as if we had failed, and the plugin's
+     * reason could say which check failed. That reason is logged instead, and
+     * kept as the exception's `cause`.
      */
     private async verifyWebhookSignature(
         plugin: IEmailInboundPlugin,
@@ -659,13 +682,22 @@ export class EmailFacadeService extends BaseFacadeService {
                 pluginId,
             );
         }
-        const outcome: unknown = plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
-        if (isThenable(outcome)) {
-            this.logger.error(
-                `verifyWebhookSignature of ${pluginId} returned a Promise; the contract is ` +
-                    'synchronous (throw on mismatch). Awaiting it so the check still gates the webhook.',
+        try {
+            const outcome: unknown = plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+            if (isThenable(outcome)) {
+                this.logger.error(
+                    `verifyWebhookSignature of ${pluginId} returned a Promise; the contract is ` +
+                        'synchronous (throw on mismatch). Awaiting it so the check still gates the webhook.',
+                );
+                await outcome;
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Refusing a ${pluginId} webhook (401): signature verification failed — ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
             );
-            await outcome;
+            throw new UnauthorizedException(WEBHOOK_SIGNATURE_REJECTED, { cause: error });
         }
     }
 

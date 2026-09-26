@@ -115,6 +115,25 @@ function settingsStub(
     return { service: { getSettings } as unknown as PluginSettingsService, scopes };
 }
 
+/**
+ * How a refused webhook reads: its HTTP status, the generic answer, and the
+ * plugin's own reason (kept as the `cause`, never answered).
+ */
+function refusal(error: unknown): string {
+    const refused = error as { status?: number; message?: string; cause?: unknown };
+    const reason = refused.cause instanceof Error ? ` (${refused.cause.message})` : '';
+    return `${refused.status ?? 'no status'} ${refused.message}${reason}`;
+}
+
+/** A failed signature check: 401, a generic answer, the plugin's `reason` as cause. */
+function signatureRefused(reason: string) {
+    return {
+        status: 401,
+        message: 'Invalid webhook signature',
+        cause: expect.objectContaining({ message: reason }),
+    };
+}
+
 function addressesStub(): TenantEmailAddressRepository {
     return {
         findByAddress: jest.fn(async (address: string) =>
@@ -177,14 +196,14 @@ describe('EmailFacadeService — inbound webhooks over a lazy (cold) email plugi
             // Request A starts the first load and is held inside its hook.
             legit = facade.parseInbound(PLUGIN_ID, body(), { authorization: basic('admin') }).then(
                 () => outcomes.push('legit: accepted'),
-                (error: Error) => outcomes.push(`legit: rejected: ${error.message}`),
+                (error: unknown) => outcomes.push(`legit: rejected: ${refusal(error)}`),
             );
             await settle();
             // Request B arrives once the module is imported but the first load
             // has not settled — with a bad signature.
             forged = facade.parseInbound(PLUGIN_ID, body(), { authorization: basic('wrong') }).then(
                 () => outcomes.push('forged: accepted'),
-                (error: Error) => outcomes.push(`forged: rejected: ${error.message}`),
+                (error: unknown) => outcomes.push(`forged: rejected: ${refusal(error)}`),
             );
             await settle();
             firstLoad.release();
@@ -192,7 +211,9 @@ describe('EmailFacadeService — inbound webhooks over a lazy (cold) email plugi
         });
 
         expect(outcomes).toContain('legit: accepted');
-        expect(outcomes).toContain('forged: rejected: Postmark inbound: signature mismatch.');
+        expect(outcomes).toContain(
+            'forged: rejected: 401 Invalid webhook signature (Postmark inbound: signature mismatch.)',
+        );
         expect(parsed).toHaveBeenCalledTimes(1);
         expect(unhandled).toEqual([]);
     });
@@ -216,7 +237,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy (cold) email plugi
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseInbound(PLUGIN_ID, body(), { authorization: basic('forged') }),
-            ).rejects.toThrow('Postmark inbound: signature mismatch.');
+            ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
         });
 
         expect(scopes).toEqual([OWNER_ID]);
@@ -267,14 +288,14 @@ describe('EmailFacadeService — inbound webhooks over a lazy (cold) email plugi
                 .parseEventWebhook(PLUGIN_ID, body(), { authorization: basic('admin') })
                 .then(
                     () => outcomes.push('legit: accepted'),
-                    (error: Error) => outcomes.push(`legit: rejected: ${error.message}`),
+                    (error: unknown) => outcomes.push(`legit: rejected: ${refusal(error)}`),
                 );
             await settle();
             const forged = facade
                 .parseEventWebhook(PLUGIN_ID, body(), { authorization: basic('wrong') })
                 .then(
                     () => outcomes.push('forged: accepted'),
-                    (error: Error) => outcomes.push(`forged: rejected: ${error.message}`),
+                    (error: unknown) => outcomes.push(`forged: rejected: ${refusal(error)}`),
                 );
             await settle();
             firstLoad.release();
@@ -282,7 +303,9 @@ describe('EmailFacadeService — inbound webhooks over a lazy (cold) email plugi
         });
 
         expect(outcomes).toContain('legit: accepted');
-        expect(outcomes).toContain('forged: rejected: Postmark inbound: signature mismatch.');
+        expect(outcomes).toContain(
+            'forged: rejected: 401 Invalid webhook signature (Postmark inbound: signature mismatch.)',
+        );
         expect(events).toHaveBeenCalledTimes(1);
         expect(unhandled).toEqual([]);
     });
@@ -375,7 +398,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy (cold) email plugi
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseInbound(PLUGIN_ID, body(), { authorization: basic('x') }),
-            ).rejects.toThrow('async signature mismatch');
+            ).rejects.toMatchObject(signatureRefused('async signature mismatch'));
         });
 
         expect(parsed).not.toHaveBeenCalled();

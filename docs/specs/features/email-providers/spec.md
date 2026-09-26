@@ -319,7 +319,7 @@ POST /api/email/events/:pluginId       -- provider delivery events (bounces, ope
 GET  /api/email/verify/:tokenId        -- tenant address verification click-through
 ```
 
-Each `POST` route dispatches to the plugin's `verifyWebhookSignature` + `parseInboundWebhook` / `parseEventWebhook`. Auth: webhook secret stored per plugin instance; rejection on signature mismatch returns 401 with no body (don't leak which secrets are wrong).
+Each `POST` route dispatches to the plugin's `verifyWebhookSignature` + `parseInboundWebhook` / `parseEventWebhook`. Auth: webhook secret stored per plugin instance; rejection on signature mismatch returns 401 with a generic body (`Invalid webhook signature`) — don't leak which secrets are wrong: the plugin's own reason is only logged (`EmailFacadeService.verifyWebhookSignature`). A plugin that cannot load answers 503, so the provider retries; the webhook is never accepted unverified.
 
 Rate-limited per plugin id (default 600/min — reduces blast radius if a provider mis-routes traffic).
 

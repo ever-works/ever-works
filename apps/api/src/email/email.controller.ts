@@ -395,8 +395,8 @@ export class EmailController {
         // Verify + decode the provider delivery-event payload, then fold
         // each event's outcome onto the matching email_messages row
         // (latest-status-wins). Always 202s so the provider stops
-        // retrying; a signature failure throws (mapped to 401 by the
-        // plugin's verifyWebhookSignature).
+        // retrying; a signature failure throws — the facade answers it 401
+        // with a generic body, and a plugin that cannot load 503.
         const events = await this.emailFacade.parseEventWebhook(pluginId, rawBody, headers);
         const recorded = await this.emailFacade.recordDeliveryEvents(pluginId, events);
         return { received: true, pluginId, events: events.length, recorded };
