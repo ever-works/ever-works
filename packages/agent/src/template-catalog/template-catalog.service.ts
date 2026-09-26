@@ -533,11 +533,11 @@ export class TemplateCatalogService implements OnModuleInit {
                     fullName: `${existingTemplate.repositoryOwner}/${existingTemplate.repositoryName}`,
                     url:
                         existingTemplate.repositoryUrl ||
-                        this.gitFacade.getWebUrl(
+                        (await this.gitFacade.getWebUrl(
                             providerId,
                             existingTemplate.repositoryOwner,
                             existingTemplate.repositoryName,
-                        ),
+                        )),
                 },
                 created: false,
             };
@@ -577,7 +577,11 @@ export class TemplateCatalogService implements OnModuleInit {
             previewImageUrl: template.previewImageUrl || null,
             repositoryUrl:
                 forkedRepository.url ||
-                this.gitFacade.getWebUrl(providerId, forkedRepository.owner, forkedRepository.name),
+                (await this.gitFacade.getWebUrl(
+                    providerId,
+                    forkedRepository.owner,
+                    forkedRepository.name,
+                )),
             repositoryOwner: forkedRepository.owner,
             repositoryName: forkedRepository.name,
             branch: forkedRepository.defaultBranch || template.branch,
@@ -611,11 +615,11 @@ export class TemplateCatalogService implements OnModuleInit {
                 fullName: forkedRepository.fullName,
                 url:
                     forkedRepository.url ||
-                    this.gitFacade.getWebUrl(
+                    (await this.gitFacade.getWebUrl(
                         providerId,
                         forkedRepository.owner,
                         forkedRepository.name,
-                    ),
+                    )),
             },
             created: true,
             forkReadiness: forkedRepository.forkReadiness,

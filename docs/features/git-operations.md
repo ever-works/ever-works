@@ -72,11 +72,11 @@ GitFacadeService
 
 ### URL Utilities
 
-| Method                                                 | Description                            |
-| ------------------------------------------------------ | -------------------------------------- |
-| `getWebUrl(providerId, owner, repo)`                   | Get the web URL for a repository       |
-| `getRawFileUrl(providerId, owner, repo, branch, path)` | Get raw file URL                       |
-| `isConfigured()`                                       | Check if any Git provider is available |
+| Method                                                 | Description                              |
+| ------------------------------------------------------ | ---------------------------------------- |
+| `getWebUrl(providerId, owner, repo)`                   | Get the web URL for a repository (async) |
+| `getRawFileUrl(providerId, owner, repo, branch, path)` | Get raw file URL (async)                 |
+| `isConfigured()`                                       | Check if any Git provider is available   |
 
 ## Credential Resolution
 

@@ -130,12 +130,14 @@ describe('WebsiteGeneratorService', () => {
             cloneUrlRequested = resolve;
         });
 
+        // No `as unknown as string` cast any more: `getCloneUrl` is async on the
+        // facade (it loads a possibly-cold provider first).
         gitFacade.getCloneUrl.mockImplementation(
             () =>
                 new Promise<string>((resolve) => {
                     cloneUrlRequested();
                     resolveCloneUrl = resolve;
-                }) as unknown as string,
+                }),
         );
 
         const initialization = service.initialize(
@@ -188,6 +190,29 @@ describe('WebsiteGeneratorService', () => {
             expect(gitFacade.updateRepository).not.toHaveBeenCalled();
         },
     );
+
+    // `getLocalDir` is async on the facade (the git provider may be a cold lazy
+    // proxy, loaded first). `cleanup` handed its result straight to `fs.rm`, so
+    // it removed `<Promise>` — never the checkout.
+    it('cleanup removes the directory the facade resolves, not a Promise', async () => {
+        const fs = jest.requireMock('node:fs/promises') as { rm: jest.Mock };
+        fs.rm.mockClear();
+        const gitFacade = createGitFacadeMock();
+        gitFacade.getLocalDir.mockResolvedValue('/tmp/git/acme/test-work-web');
+        const service = new WebsiteGeneratorService(
+            gitFacade,
+            createBranchSyncMock(),
+            createTemplateResolverMock(),
+        );
+
+        await service.cleanup(createWork());
+
+        expect(gitFacade.getLocalDir).toHaveBeenCalledWith('github', 'acme', 'test-work-web');
+        expect(fs.rm).toHaveBeenCalledWith('/tmp/git/acme/test-work-web', {
+            recursive: true,
+            force: true,
+        });
+    });
 });
 
 describe('WebsiteUpdateService', () => {

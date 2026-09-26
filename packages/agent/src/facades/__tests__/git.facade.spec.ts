@@ -1894,56 +1894,60 @@ describe('GitFacadeService', () => {
     });
 
     describe('getCloneUrl', () => {
-        it('should return clone URL from plugin', () => {
+        it('should return clone URL from plugin', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getCloneUrl('github', 'owner', 'repo');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getCloneUrl('github', 'owner', 'repo');
 
             expect(result).toBe('https://github.com/owner/repo.git');
         });
     });
 
     describe('getWebUrl', () => {
-        it('should return web URL from plugin', () => {
+        it('should return web URL from plugin', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getWebUrl('github', 'owner', 'repo');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getWebUrl('github', 'owner', 'repo');
 
             expect(result).toBe('https://github.com/owner/repo');
         });
     });
 
     describe('getLocalDir', () => {
-        it('should return local work path', () => {
+        it('should return local work path', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getLocalDir('github', 'owner', 'repo');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getLocalDir('github', 'owner', 'repo');
 
             expect(result).toBe('/tmp/owner/repo');
         });
 
         // APW-02 P0 — per-caller checkout keys must reach the provider, otherwise two
         // callers of one repository silently share a working copy again.
-        it('should forward the optional checkout key to the plugin', () => {
+        it('should forward the optional checkout key to the plugin', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            service.getLocalDir('github', 'owner', 'repo', 'work:work-1:data');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            await service.getLocalDir('github', 'owner', 'repo', 'work:work-1:data');
 
             expect(gitPlugin.getLocalDir).toHaveBeenCalledWith('owner', 'repo', 'work:work-1:data');
         });
@@ -1980,19 +1984,26 @@ describe('GitFacadeService', () => {
     });
 
     describe('getRawFileUrl', () => {
-        it('should return raw file URL when supported', () => {
+        it('should return raw file URL when supported', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getRawFileUrl('github', 'owner', 'repo', 'main', 'file.txt');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getRawFileUrl(
+                'github',
+                'owner',
+                'repo',
+                'main',
+                'file.txt',
+            );
 
             expect(result).toBe('https://raw.githubusercontent.com/owner/repo/main/file.txt');
         });
 
-        it('should throw when not supported', () => {
+        it('should throw when not supported', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             gitPlugin.getRawFileUrl = undefined as any;
             const registered = createRegisteredPlugin(gitPlugin, {
@@ -2000,9 +2011,10 @@ describe('GitFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            expect(() =>
+            // Rejects rather than throws: async since the provider is loaded first.
+            await expect(
                 service.getRawFileUrl('github', 'owner', 'repo', 'main', 'file.txt'),
-            ).toThrow(GitFacadeError);
+            ).rejects.toThrow(GitFacadeError);
         });
     });
 

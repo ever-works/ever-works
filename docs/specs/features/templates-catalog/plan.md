@@ -195,7 +195,7 @@ forkTemplateForUser({ kind, templateId, targetOwner }, userId):
         description: template.description || null,
         framework: template.framework || null,
         previewImageUrl: template.previewImageUrl || null,
-        repositoryUrl: forked.url || gitFacade.getWebUrl('github', forked.owner, forked.name),
+        repositoryUrl: forked.url || await gitFacade.getWebUrl('github', forked.owner, forked.name),
         repositoryOwner: forked.owner,
         repositoryName: forked.name,
         branch: forked.defaultBranch || template.branch,

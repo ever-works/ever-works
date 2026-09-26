@@ -181,7 +181,7 @@ Implements `IOAuthFacade` and provides OAuth authentication flows through plugin
 
 - **`isConfigured()`** -- check if any OAuth provider is available
 - **`getAvailableProviders()`** -- list registered OAuth providers with enabled status
-- **`getAuthorizationUrl(providerId, state, config?)`** -- generate the OAuth authorization URL for redirect
+- **`getAuthorizationUrl(providerId, state, config?)`** -- generate the OAuth authorization URL for redirect (async: the facade loads the provider plugin first)
 - **`exchangeCodeForToken(providerId, code, config?)`** -- exchange an authorization code for an access token
 - **`getAuthenticatedUser(providerId, token)`** -- get the authenticated user's profile
 - **`hasValidCredentials(userId, providerId)`** -- check if a user has a valid (non-expired) OAuth token
@@ -246,7 +246,7 @@ processWork(work: Work, state?: CommunityPrState, autoClose?: boolean): Promise<
 ```typescript
 isConfigured(): boolean
 getAvailableProviders(): OAuthProviderInfo[]
-getAuthorizationUrl(providerId: string, state: string, config?: Partial<OAuthConfig>): string
+getAuthorizationUrl(providerId: string, state: string, config?: Partial<OAuthConfig>): Promise<string>
 exchangeCodeForToken(providerId: string, code: string, config?: Partial<OAuthConfig>): Promise<OAuthToken>
 getAuthenticatedUser(providerId: string, token: string): Promise<OAuthUser>
 hasValidCredentials(userId: string, providerId: string): Promise<boolean>
@@ -376,7 +376,7 @@ result.errors.forEach((e) => {
 import { OAuthFacadeService } from '@ever-works/agent/facades';
 
 // Step 1: Generate authorization URL
-const authUrl = oauthFacade.getAuthorizationUrl('github', stateToken);
+const authUrl = await oauthFacade.getAuthorizationUrl('github', stateToken);
 // Redirect user to authUrl...
 
 // Step 2: Exchange code for token (after redirect callback)

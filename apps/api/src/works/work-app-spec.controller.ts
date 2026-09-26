@@ -494,7 +494,11 @@ export class WorkAppSpecController {
                 | Promise<{ url?: string; lineAnchor?: string } | null>
                 | { url?: string; lineAnchor?: string }
                 | null;
-            getWebUrl?: (providerId: string, owner: string, repo: string) => string;
+            getWebUrl?: (
+                providerId: string,
+                owner: string,
+                repo: string,
+            ) => Promise<string> | string;
         };
 
         let base = '';
@@ -511,7 +515,7 @@ export class WorkAppSpecController {
                 base = file?.url ?? '';
                 lineAnchor = file?.lineAnchor ?? null;
             } else if (typeof facade.getWebUrl === 'function') {
-                base = facade.getWebUrl(providerId, owner, repo) ?? '';
+                base = (await facade.getWebUrl(providerId, owner, repo)) ?? '';
             }
         } catch {
             // Deliberately swallowed — see the docstring. The block keeps an

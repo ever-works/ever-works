@@ -57,7 +57,12 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    loadRegisteredPlugins,
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import {
     AuthAccountRepository,
@@ -671,7 +676,7 @@ export class GitFacadeService implements IGitFacade {
         perPage?: number,
         listOptions?: ListRepositoriesOptions,
     ): Promise<GitRepositoryWithPermissions[]> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         if (plugin.listRepositories) {
             return plugin.listRepositories('', page, perPage, listOptions);
         }
@@ -908,14 +913,14 @@ export class GitFacadeService implements IGitFacade {
         return null;
     }
 
-    getRawFileUrl(
+    async getRawFileUrl(
         providerId: string,
         owner: string,
         repo: string,
         branch: string,
         path: string,
-    ): string {
-        const plugin = this.getPluginSync(providerId);
+    ): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         if (plugin.getRawFileUrl) {
             return plugin.getRawFileUrl(owner, repo, branch, path);
         }
@@ -1901,12 +1906,12 @@ export class GitFacadeService implements IGitFacade {
     }
 
     async add(providerId: string, dir: string, paths: string | string[]): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.add(dir, paths);
     }
 
     async addAll(providerId: string, dir: string): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.addAll(dir);
     }
 
@@ -1916,7 +1921,7 @@ export class GitFacadeService implements IGitFacade {
         message: string,
         committer?: GitCommitter,
     ): Promise<string | null> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.commit(dir, message, committer);
     }
 
@@ -1996,12 +2001,12 @@ export class GitFacadeService implements IGitFacade {
     }
 
     async getCurrentBranch(providerId: string, dir: string): Promise<string | null> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getCurrentBranch(dir);
     }
 
     async getMainBranch(providerId: string, dir: string): Promise<string | null> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getMainBranch(dir);
     }
 
@@ -2011,45 +2016,72 @@ export class GitFacadeService implements IGitFacade {
         branch: string,
         create?: boolean,
     ): Promise<string> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.switchBranch(dir, branch, create);
     }
 
     async getStatus(providerId: string, dir: string): Promise<GitFileChange[]> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getStatus(dir);
     }
 
-    getCloneUrl(providerId: string, owner: string, repo: string): string {
-        const plugin = this.getPluginSync(providerId);
+    // `getCloneUrl` / `getWebUrl` / `getLocalDir` (and `getRawFileUrl`) are
+    // SYNC on the provider but async here: the provider may be a COLD lazy
+    // proxy (disk builtIns such as `github` stay cold until first use), on
+    // which a sync member reads as the async forwarding wrapper — so a sync
+    // facade answered a Promise where its callers expect a string. The
+    // provider is loaded first (`getPlugin`), and the call made on the real
+    // instance.
+    async getCloneUrl(providerId: string, owner: string, repo: string): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         return plugin.getCloneUrl(owner, repo);
     }
 
-    getWebUrl(providerId: string, owner: string, repo: string): string {
-        const plugin = this.getPluginSync(providerId);
+    async getWebUrl(providerId: string, owner: string, repo: string): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         return plugin.getWebUrl(owner, repo);
     }
 
-    getLocalDir(providerId: string, owner: string, repo: string, checkoutKey?: string): string {
-        const plugin = this.getPluginSync(providerId);
+    async getLocalDir(
+        providerId: string,
+        owner: string,
+        repo: string,
+        checkoutKey?: string,
+    ): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         return plugin.getLocalDir(owner, repo, checkoutKey);
     }
 
-    private getPluginSync(providerId: string): IGitProviderPlugin {
+    /**
+     * The git provider `providerId` names — or, when that one is not usable,
+     * the first usable git provider, as before — LOADED: its first load
+     * (import and `onLoad`) has settled, including one another caller started
+     * (`loadRegisteredPlugins` waits for it), and the REAL instance is
+     * returned, so its sync members answer values and its optional-method
+     * probes are truthful. A provider that cannot be imported or whose
+     * `onLoad` fails is now in `error` and is passed over, exactly as one that
+     * failed at boot was.
+     */
+    private async getPlugin(providerId: string): Promise<IGitProviderPlugin> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
+        const requested = providerId ? plugins.find((p) => p.plugin.id === providerId) : undefined;
+        const candidates = requested
+            ? [requested, ...plugins.filter((p) => p !== requested)]
+            : plugins;
 
-        if (providerId) {
-            const registered = plugins.find((p) => p.plugin.id === providerId);
-            if (registered?.state === 'loaded') {
-                return registered.plugin as IGitProviderPlugin;
-            }
+        for (const registered of candidates) {
+            const plugin = await this.loadForUse(registered);
+            if (plugin) return plugin;
         }
+        throw new NoGitProviderError();
+    }
 
-        const enabled = plugins.find((p) => p.state === 'loaded');
-        if (!enabled) {
-            throw new NoGitProviderError();
-        }
-        return enabled.plugin as IGitProviderPlugin;
+    /** `registered`'s real instance once loaded, or `null` when it cannot load. */
+    private async loadForUse(registered: RegisteredPlugin): Promise<IGitProviderPlugin | null> {
+        if (registered.state !== 'loaded') return null;
+        const [usable] = await loadRegisteredPlugins([registered]);
+        if (!usable) return null;
+        return (await materializePlugin(usable.plugin)) as IGitProviderPlugin;
     }
 
     async replaceRemote(
@@ -2058,7 +2090,7 @@ export class GitFacadeService implements IGitFacade {
         remote: string,
         url: string,
     ): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.replaceRemote(dir, remote, url);
     }
 
@@ -2068,7 +2100,7 @@ export class GitFacadeService implements IGitFacade {
         repo: string,
         checkoutKey?: string,
     ): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.removeLocalDir(owner, repo, checkoutKey);
     }
 
@@ -2078,7 +2110,7 @@ export class GitFacadeService implements IGitFacade {
         oldName: string,
         newName: string,
     ): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.renameBranch(dir, oldName, newName);
     }
 
@@ -2205,7 +2237,13 @@ export class GitFacadeService implements IGitFacade {
                 userId,
             );
             if (isEnabled) {
-                return registered.plugin as IGitProviderPlugin;
+                // Loaded before use (see `getPlugin`): a cold provider's
+                // optional-method probes (`if (plugin.getReadme)`) would
+                // otherwise all read truthy, and its methods could run before
+                // its `onLoad` has settled. One that cannot load is `error`
+                // now — not found, as when it failed at boot.
+                const plugin = await this.loadForUse(registered);
+                if (plugin) return plugin;
             }
         }
         throw new GitProviderNotFoundError(providerId);

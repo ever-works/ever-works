@@ -113,8 +113,8 @@ Implements `IGitFacade` and provides comprehensive Git operations (~813 lines):
 - `getFileContent(owner, repo, path, options)` -- read a file from a remote repository
 - `getWorkContents(owner, repo, path, options)` -- list work contents remotely
 - `getReadme(owner, repo, options)` -- fetch README content
-- `getRawFileUrl(providerId, owner, repo, branch, path)` -- construct raw file URL
-- `getWebUrl(providerId, owner, repo)` -- construct repository web URL
+- `getRawFileUrl(providerId, owner, repo, branch, path)` -- construct raw file URL (async)
+- `getWebUrl(providerId, owner, repo)` -- construct repository web URL (async)
 
 **Token resolution:**
 

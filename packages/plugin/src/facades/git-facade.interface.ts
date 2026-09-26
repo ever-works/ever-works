@@ -144,8 +144,12 @@ export interface IGitFacade extends IBaseFacade {
 	 * @param providerId - Git provider ID
 	 * @param owner - Repository owner
 	 * @param repo - Repository name
+	 *
+	 * Async although the provider's own method is sync: the facade loads the
+	 * provider first (the host registers it as a lazy proxy that stays cold
+	 * until first use), so the answer is always the string itself.
 	 */
-	getCloneUrl(providerId: string, owner: string, repo: string): string;
+	getCloneUrl(providerId: string, owner: string, repo: string): Promise<string>;
 
 	/**
 	 * Get the web URL for a repository.
@@ -153,8 +157,12 @@ export interface IGitFacade extends IBaseFacade {
 	 * @param providerId - Git provider ID
 	 * @param owner - Repository owner
 	 * @param repo - Repository name
+	 *
+	 * Async although the provider's own method is sync: the facade loads the
+	 * provider first (the host registers it as a lazy proxy that stays cold
+	 * until first use), so the answer is always the string itself.
 	 */
-	getWebUrl(providerId: string, owner: string, repo: string): string;
+	getWebUrl(providerId: string, owner: string, repo: string): Promise<string>;
 
 	/**
 	 * Get the local work path for a repository.
@@ -164,8 +172,12 @@ export interface IGitFacade extends IBaseFacade {
 	 * @param repo - Repository name
 	 * @param checkoutKey - Optional per-caller working copy key (`work:<workId>:<role>`);
 	 *   omitted means the directory shared by every caller of this repository
+	 *
+	 * Async although the provider's own method is sync: the facade loads the
+	 * provider first (the host registers it as a lazy proxy that stays cold
+	 * until first use), so the answer is always the string itself.
 	 */
-	getLocalDir(providerId: string, owner: string, repo: string, checkoutKey?: string): string;
+	getLocalDir(providerId: string, owner: string, repo: string, checkoutKey?: string): Promise<string>;
 
 	/**
 	 * Remove the local work for a repository.
@@ -186,8 +198,12 @@ export interface IGitFacade extends IBaseFacade {
 	 * @param repo - Repository name
 	 * @param branch - Branch name
 	 * @param path - File path within the repository
+	 *
+	 * Async although the provider's own method is sync: the facade loads the
+	 * provider first (the host registers it as a lazy proxy that stays cold
+	 * until first use), so the answer is always the string itself.
 	 */
-	getRawFileUrl(providerId: string, owner: string, repo: string, branch: string, path: string): string;
+	getRawFileUrl(providerId: string, owner: string, repo: string, branch: string, path: string): Promise<string>;
 
 	// ==========================================
 	// Utility Methods

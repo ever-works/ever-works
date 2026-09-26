@@ -110,7 +110,11 @@ export class DeploySubCommand extends CommandRunner {
                 console.log(chalk.gray('2. Push to your repository to trigger CI/CD deployment'));
 
                 const gitProvider = work.gitProvider || 'github';
-                const cloneUrl = this.gitFacade.getCloneUrl(gitProvider, websiteOwner, websiteRepo);
+                const cloneUrl = await this.gitFacade.getCloneUrl(
+                    gitProvider,
+                    websiteOwner,
+                    websiteRepo,
+                );
 
                 console.log(chalk.cyan('\n--- Repository Information ---'));
                 console.log(

@@ -275,8 +275,8 @@ export class WebsiteGeneratorService {
         });
     }
 
-    public cleanup(work: Work) {
-        const dataDir = this.gitFacade.getLocalDir(
+    public async cleanup(work: Work) {
+        const dataDir = await this.gitFacade.getLocalDir(
             work.gitProvider,
             work.getRepoOwner('website'),
             work.getWebsiteRepo(),

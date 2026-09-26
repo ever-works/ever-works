@@ -866,7 +866,7 @@ export class WorkImportService {
             const worksConfig = await this.loadAndApplySourceWorksConfig(work, user, {
                 owner: source.owner,
                 repo: source.repo,
-                url: this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
+                url: await this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
                 type: ImportSourceTypeEnum.DATA_REPO as ImportSourceType,
                 role: 'data',
             });
@@ -978,7 +978,7 @@ export class WorkImportService {
         const previousSourceRepository =
             work.sourceRepository ||
             ({
-                url: this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
+                url: await this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
                 owner: source.owner,
                 repo: source.repo,
                 type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,

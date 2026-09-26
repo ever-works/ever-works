@@ -592,7 +592,7 @@ export class MarkdownGeneratorService {
                 workId: work.id,
             });
 
-            const dataDir = this.gitFacade.getLocalDir(
+            const dataDir = await this.gitFacade.getLocalDir(
                 work.gitProvider,
                 work.getRepoOwner(),
                 work.getMainRepo(),
@@ -613,7 +613,7 @@ export class MarkdownGeneratorService {
     }
 
     async cleanup(work: Work) {
-        const dataDir = this.gitFacade.getLocalDir(
+        const dataDir = await this.gitFacade.getLocalDir(
             work.gitProvider,
             work.getRepoOwner(),
             work.getMainRepo(),
