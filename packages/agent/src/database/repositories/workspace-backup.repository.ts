@@ -399,19 +399,21 @@ export class WorkspaceBackupRepository {
      * owned it could not — and without this nothing else would ever end it.
      */
     async findOverdue(startedBefore: Date, limit: number): Promise<WorkspaceBackup[]> {
-        return this.repository
-            .createQueryBuilder('backup')
-            .where('backup.status = :running', { running: 'running' })
-            .andWhere('backup.startedAt IS NOT NULL')
-            // Inclusive, to match the timeout rule `observeRun` applies
-            // (workspace-backup.service.ts: `startedAt <= minutesAgo(timeoutMinutes)`).
-            // A row sitting exactly on the cutoff is overdue to the watcher, and
-            // the backstop must not be the stricter of the two or that row waits
-            // another hour for the next pass.
-            .andWhere('backup.startedAt <= :cutoff', { cutoff: startedBefore })
-            .orderBy('backup.startedAt', 'ASC')
-            .take(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('backup')
+                .where('backup.status = :running', { running: 'running' })
+                .andWhere('backup.startedAt IS NOT NULL')
+                // Inclusive, to match the timeout rule `observeRun` applies
+                // (workspace-backup.service.ts: `startedAt <= minutesAgo(timeoutMinutes)`).
+                // A row sitting exactly on the cutoff is overdue to the watcher, and
+                // the backstop must not be the stricter of the two or that row waits
+                // another hour for the next pass.
+                .andWhere('backup.startedAt <= :cutoff', { cutoff: startedBefore })
+                .orderBy('backup.startedAt', 'ASC')
+                .take(limit)
+                .getMany()
+        );
     }
 
     /**

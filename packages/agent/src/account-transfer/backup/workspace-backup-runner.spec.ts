@@ -796,7 +796,11 @@ describe('WorkspaceBackupRunner', () => {
                         await new Promise((resolve) => setImmediate(resolve));
                     }
                 };
-                for (let i = 0; i < 2_000 && !(h.storage.readObject as jest.Mock).mock.calls.length; i += 1) {
+                for (
+                    let i = 0;
+                    i < 2_000 && !(h.storage.readObject as jest.Mock).mock.calls.length;
+                    i += 1
+                ) {
                     await turns(1);
                 }
                 expect(h.storage.readObject).toHaveBeenCalled();

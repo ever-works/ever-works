@@ -584,7 +584,11 @@ describe('WorkspaceBackupService — the sweeper passes', () => {
         );
         expect(repository.markTerminal).toHaveBeenCalledWith(
             'long-1',
-            expect.objectContaining({ status: 'failed', failureReason: 'timeout', finishedAt: now }),
+            expect.objectContaining({
+                status: 'failed',
+                failureReason: 'timeout',
+                finishedAt: now,
+            }),
             // A compare-and-set out of `running`: an archive that settled a
             // moment earlier keeps its own outcome.
             ['running'],

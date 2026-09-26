@@ -86,8 +86,14 @@ describe('WorkspaceBackupRepository.findOverdue (better-sqlite3)', () => {
 
     it('returns the longest-running first and honours the limit', async () => {
         await seed('11111111-0000-4000-8000-000000000007', new Date(CUTOFF.getTime() - MINUTE));
-        await seed('11111111-0000-4000-8000-000000000008', new Date(CUTOFF.getTime() - 30 * MINUTE));
-        await seed('11111111-0000-4000-8000-000000000009', new Date(CUTOFF.getTime() - 10 * MINUTE));
+        await seed(
+            '11111111-0000-4000-8000-000000000008',
+            new Date(CUTOFF.getTime() - 30 * MINUTE),
+        );
+        await seed(
+            '11111111-0000-4000-8000-000000000009',
+            new Date(CUTOFF.getTime() - 10 * MINUTE),
+        );
 
         const overdue = await backups.findOverdue(CUTOFF, 2);
 
