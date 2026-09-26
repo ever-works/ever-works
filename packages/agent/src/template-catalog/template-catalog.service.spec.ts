@@ -576,6 +576,198 @@ describe('TemplateCatalogService', () => {
         );
     });
 
+    describe('App Blueprint repositories are not website templates', () => {
+        // ever-works/cal-template and ever-works/umami-template are App Blueprints
+        // (topic `ever-works-app-blueprint`, `.works/works.yml` with `kind: app`)
+        // whose names end in "template". Name matching alone saved them as
+        // built-in WEBSITE templates ("Cal Template", "Umami Template") in the
+        // Create-Work picker; the topic is what tells them apart.
+        const websiteTemplateRepository = {
+            name: 'astro-blog-template',
+            owner: 'ever-works',
+            url: 'https://github.com/ever-works/astro-blog-template',
+            fullName: 'ever-works/astro-blog-template',
+            defaultBranch: 'main',
+            description: 'Astro blog template',
+            topics: ['astro', 'website-template'],
+        };
+        // The Blueprint repository as a provider that does not report topics sees it.
+        const blueprintRepositoryWithoutTopics = {
+            name: 'cal-template',
+            owner: 'ever-works',
+            url: 'https://github.com/ever-works/cal-template',
+            fullName: 'ever-works/cal-template',
+            defaultBranch: 'main',
+            description: 'Cal.com App Blueprint',
+        };
+        const appBlueprintRepository = {
+            ...blueprintRepositoryWithoutTopics,
+            topics: ['ever-works-app-blueprint', 'ever-works'],
+        };
+        const discoveredBlueprintRow = {
+            id: 'cal-template',
+            kind: 'website',
+            sourceType: 'built_in',
+            repositoryOwner: 'ever-works',
+            repositoryName: 'cal-template',
+            isActive: true,
+            metadata: {
+                discoveredFromOrganization: 'ever-works',
+                fullName: 'ever-works/cal-template',
+            },
+        };
+
+        beforeEach(() => {
+            templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
+            gitFacade.getAccessToken.mockResolvedValue(null);
+            templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue(null);
+            templateRepository.findById.mockResolvedValue(null);
+            templateRepository.findVisibleByKind.mockResolvedValue([]);
+            userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+        });
+
+        it('saves only the website template when the listing also carries an App Blueprint', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                websiteTemplateRepository,
+                appBlueprintRepository,
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.upsert).toHaveBeenCalledTimes(1);
+            expect(templateRepository.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 'astro-blog-template',
+                    kind: 'website',
+                    sourceType: 'built_in',
+                    repositoryName: 'astro-blog-template',
+                }),
+            );
+            expect(templateRepository.upsert).not.toHaveBeenCalledWith(
+                expect.objectContaining({ repositoryName: 'cal-template' }),
+            );
+        });
+
+        it('saves only the website template on the authenticated listing path too', async () => {
+            gitFacade.getAccessToken.mockResolvedValue('gho_user_token');
+            gitFacade.listRepositories.mockResolvedValueOnce([
+                appBlueprintRepository,
+                websiteTemplateRepository,
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(gitFacade.listPublicRepositories).not.toHaveBeenCalled();
+            expect(templateRepository.upsert).toHaveBeenCalledTimes(1);
+            expect(templateRepository.upsert).not.toHaveBeenCalledWith(
+                expect.objectContaining({ repositoryName: 'cal-template' }),
+            );
+        });
+
+        it('deactivates a row an earlier discovery saved for a repository that is now an App Blueprint', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                websiteTemplateRepository,
+                appBlueprintRepository,
+            ]);
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
+                async (kind: string, owner: string, repo: string) =>
+                    kind === 'website' && owner === 'ever-works' && repo === 'cal-template'
+                        ? [discoveredBlueprintRow]
+                        : [],
+            );
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.findAllBuiltInByRepositoryCoordinates).toHaveBeenCalledWith(
+                'website',
+                'ever-works',
+                'cal-template',
+            );
+            // The existing deactivate path (the one archive and the duplicate
+            // clean-up use): the row stays, it just stops being offered.
+            expect(templateRepository.updateById).toHaveBeenCalledWith('cal-template', {
+                isActive: false,
+            });
+            expect(templateRepository.updateById).toHaveBeenCalledTimes(1);
+        });
+
+        it('leaves an already-inactive discovered Blueprint row alone', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([appBlueprintRepository]);
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockResolvedValue([
+                { ...discoveredBlueprintRow, isActive: false },
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.updateById).not.toHaveBeenCalled();
+        });
+
+        it('never deactivates a curated WEBSITE_TEMPLATES row, even if its repository carries the topic', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                {
+                    name: 'directory-web-minimal-template',
+                    owner: 'ever-works',
+                    url: 'https://github.com/ever-works/directory-web-minimal-template',
+                    fullName: 'ever-works/directory-web-minimal-template',
+                    defaultBranch: 'develop',
+                    description: 'Minimal template',
+                    topics: ['ever-works-app-blueprint'],
+                },
+            ]);
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockResolvedValue([
+                {
+                    id: 'minimal',
+                    kind: 'website',
+                    sourceType: 'built_in',
+                    repositoryOwner: 'ever-works',
+                    repositoryName: 'directory-web-minimal-template',
+                    isActive: true,
+                    metadata: {},
+                },
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.updateById).not.toHaveBeenCalled();
+            expect(templateRepository.upsert).not.toHaveBeenCalled();
+        });
+
+        it('treats a repository whose provider reported no topics exactly as before', async () => {
+            // `topics` undefined = "not reported" (git-provider contract), never
+            // "not a Blueprint" and never "a Blueprint": today's name rule applies.
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                blueprintRepositoryWithoutTopics,
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 'cal-template',
+                    kind: 'website',
+                    sourceType: 'built_in',
+                    repositoryName: 'cal-template',
+                    isActive: true,
+                }),
+            );
+            expect(templateRepository.findAllBuiltInByRepositoryCoordinates).not.toHaveBeenCalled();
+            expect(templateRepository.updateById).not.toHaveBeenCalled();
+        });
+
+        it('treats a repository with an empty topic list exactly as before', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                { ...appBlueprintRepository, topics: [] },
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'cal-template', repositoryName: 'cal-template' }),
+            );
+            expect(templateRepository.updateById).not.toHaveBeenCalled();
+        });
+    });
+
     it('rejects updates for custom templates the user does not own', async () => {
         templateRepository.findOwnedCustomById.mockResolvedValue(null);
 
