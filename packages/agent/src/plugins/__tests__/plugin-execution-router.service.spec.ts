@@ -521,7 +521,13 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                 expect(runtime.provider.cancel).not.toHaveBeenCalled();
             });
 
-            it('stops waiting when the caller aborts', async () => {
+            // Retitled (wave-2 re-review): was "stops waiting when the caller
+            // aborts". Its signal is aborted BEFORE the call, so since the
+            // pre-dispatch check it never dispatches or waits; the assertion
+            // is unchanged. An abort that lands once the run exists is pinned
+            // by "an abort during the dispatch keeps the run id…" below, and
+            // by "an abort during a stalled read / between reads".
+            it('answers JOB_RUNTIME_WAIT_ABORTED for a signal aborted before the call', async () => {
                 const runtime = makeRuntime([]);
                 const controller = new AbortController();
                 controller.abort();
@@ -535,6 +541,67 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                     ok: false,
                     error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
                 });
+            });
+
+            // Wave-2 review (tenant-routing, LOW): the signal was first read
+            // AFTER the dispatch, so an already-aborted call still started a
+            // run — with side effects — and then walked away from it.
+            it('dispatches nothing when the signal is already aborted — no run is left behind', async () => {
+                const runtime = makeRuntime([]);
+                const controller = new AbortController();
+                controller.abort();
+
+                const result = await routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                    ...fast,
+                    signal: controller.signal,
+                });
+
+                expect(result).toMatchObject({
+                    ok: false,
+                    location: 'job-runtime',
+                    error: {
+                        code: 'JOB_RUNTIME_WAIT_ABORTED',
+                        message: expect.stringContaining('nothing was dispatched'),
+                    },
+                });
+                expect(result).not.toHaveProperty('runId');
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+                expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+            });
+
+            // Wave-2 re-review (plugins-lows, LOW): no spec covered an abort
+            // that lands WHILE the runtime is starting the run. The run then
+            // exists, so the answer must carry its id — a caller that owns
+            // the signal (the sandbox runner) cancels by that id; without it
+            // the run is left running with nobody able to stop it.
+            it('an abort during the dispatch keeps the run id — the run exists, and the router does not cancel it', async () => {
+                const runtime = makeRuntime([]);
+                const controller = new AbortController();
+                runtime.provider.dispatchers.dispatchPluginOperation.mockImplementation(
+                    async () => {
+                        controller.abort();
+                        return 'run_7';
+                    },
+                );
+
+                await expect(
+                    routerWith(runtime).dispatchLongRunning('p', 'op', undefined, {
+                        ...fast,
+                        signal: controller.signal,
+                    }),
+                ).resolves.toEqual({
+                    ok: false,
+                    location: 'job-runtime',
+                    runId: 'run_7',
+                    error: {
+                        code: 'JOB_RUNTIME_WAIT_ABORTED',
+                        message: expect.stringContaining('not cancelled'),
+                    },
+                });
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).toHaveBeenCalledTimes(
+                    1,
+                );
+                expect(runtime.provider.cancel).not.toHaveBeenCalled();
             });
 
             it('answers JOB_RUNTIME_UNAVAILABLE with no active runtime — and never falls back in-process', async () => {
@@ -1507,6 +1574,34 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                 );
             });
 
+            it('dispatchLongRunning dispatches nothing when the signal aborts during the tenant lookup', async () => {
+                const runtime = makeRuntime();
+                const view = tenantView();
+                const controller = new AbortController();
+                const router = tenantRouter(runtime, {
+                    resolver: {
+                        resolve: jest.fn(async () => {
+                            controller.abort();
+                            return view;
+                        }),
+                    },
+                });
+
+                const result = await router.dispatchLongRunning('p', 'op', undefined, {
+                    ...fast,
+                    tenantId: 't1',
+                    signal: controller.signal,
+                });
+
+                expect(result).toMatchObject({
+                    ok: false,
+                    error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
+                });
+                expect(result).not.toHaveProperty('runId');
+                expect(view.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+                expect(runtime.provider.dispatchers.dispatchPluginOperation).not.toHaveBeenCalled();
+            });
+
             describe('with fake timers', () => {
                 beforeEach(() => jest.useFakeTimers());
                 afterEach(() => jest.useRealTimers());
@@ -1524,6 +1619,58 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                     await jest.advanceTimersByTimeAsync(20_000);
                     expect(settled).toEqual({ done: false, runId: 'run_7', status: 'unknown' });
                     expect(runtime.provider.getRunResult).not.toHaveBeenCalled();
+                });
+
+                // Wave-2 review (tenant-routing, LOW): only the poll bounded the
+                // tenant lookup; startLongRunning — the HTTP caller's half —
+                // waited on the resolver and the stamper with no limit.
+                it('a tenant lookup that stalls fails the start within 20 s — and dispatches nothing', async () => {
+                    const runtime = makeRuntime();
+                    const router = tenantRouter(runtime, {
+                        resolver: { resolve: jest.fn(() => new Promise(() => {})) },
+                    });
+                    let settled: unknown;
+                    void router
+                        .startLongRunning('p', 'op', undefined, { tenantId: 't1' })
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(20_000);
+                    expect(settled).toEqual({
+                        ok: false,
+                        location: 'job-runtime',
+                        error: {
+                            code: 'JOB_RUNTIME_DISPATCH_FAILED',
+                            message: expect.stringContaining('nothing was dispatched'),
+                        },
+                    });
+                    // Not the platform provider either: a BYO tenant's run would
+                    // land in the wrong project and read 'unknown' on every poll.
+                    expect(
+                        runtime.provider.dispatchers.dispatchPluginOperation,
+                    ).not.toHaveBeenCalled();
+                });
+
+                it('a stamp that stalls still starts the run within 20 s — unstamped, like a stamp that throws', async () => {
+                    const runtime = makeRuntime();
+                    const view = tenantView();
+                    const router = tenantRouter(runtime, {
+                        resolver: { resolve: jest.fn(async () => view) },
+                        stamper: { stamp: jest.fn(() => new Promise(() => {})) },
+                    });
+                    let settled: unknown;
+                    void router
+                        .startLongRunning('p', 'op', undefined, { tenantId: 't1' })
+                        .then((result) => (settled = result));
+
+                    await jest.advanceTimersByTimeAsync(20_000);
+                    expect(settled).toEqual({ ok: true, location: 'job-runtime', runId: 'run_t1' });
+                    expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            tenantId: 't1',
+                            providerId: null,
+                            credentialVersion: null,
+                        }),
+                    );
                 });
             });
 

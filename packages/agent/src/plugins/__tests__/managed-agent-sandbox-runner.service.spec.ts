@@ -412,6 +412,36 @@ describe('ManagedAgentSandboxRunnerService (T26)', () => {
             expect(view.cancel).not.toHaveBeenCalled();
         });
 
+        // Wave-2 re-review (plugins-lows, LOW): the run() counterpart of
+        // "start(): a signal aborted while the run is being started cancels
+        // that run". The router keeps the run id when the abort lands during
+        // the dispatch, and run() cancels by it.
+        it('run(): a signal aborted while the run is being started cancels that run', async () => {
+            const view = makeRuntime().provider;
+            const { runner } = setup(ON, { tenantView: view });
+            const controller = new AbortController();
+            view.dispatchers.dispatchPluginOperation.mockImplementation(async () => {
+                controller.abort();
+                return 'run_s1';
+            });
+
+            await expect(
+                runner.run(PLUGIN_ID, INPUT, {
+                    tenantId: 'tenant-1',
+                    signal: controller.signal,
+                    ...fast,
+                }),
+            ).resolves.toMatchObject({
+                ok: false,
+                location: 'job-runtime',
+                runId: 'run_s1',
+                error: { code: 'JOB_RUNTIME_WAIT_ABORTED' },
+            });
+            expect(view.dispatchers.dispatchPluginOperation).toHaveBeenCalledTimes(1);
+            expect(view.cancel).toHaveBeenCalledTimes(1);
+            expect(view.cancel).toHaveBeenCalledWith('run_s1');
+        });
+
         it('start(): a signal that is already aborted starts nothing — the same answer as run()', async () => {
             const view = makeRuntime().provider;
             const { runner } = setup(ON, { tenantView: view });

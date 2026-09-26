@@ -203,12 +203,17 @@ export function createTenantTriggerClient(credentials: TriggerTenantCredentials)
  * client differs.
  *
  * Tenant stamping (`tenant:<id>` tag, `tenantId`-prefixed
- * `concurrencyKey`) is NOT applied here — the plugin's per-tenant view
- * carries the stamp at the binding layer (see
- * `TriggerJobRuntimeProvider.bindToTenant`'s Proxy in
- * `trigger-job-runtime.provider.ts`) and stamping at BOTH layers would
- * double-prefix the tag. This dispatcher map is the structural BYO
- * routing only; stamping stays the binding layer's job.
+ * `concurrencyKey`) is NOT applied here, and nothing else applies it to
+ * a BYO run either. The per-tenant view's Proxy
+ * (`TriggerJobRuntimeProvider.bindToTenant` in
+ * `trigger-job-runtime.provider.ts`) only puts the stamp on the stack
+ * (`triggerTenantStampStorage`); the one reader of that stamp is
+ * `TriggerService.stampTenantOptions`, which these dispatchers never
+ * call. So a BYO run carries NO `tenant:<id>` tag and no tenant
+ * concurrency key — a known gap (wave-2 review, T26). The Proxy adds no
+ * options of its own, so closing it here (reading the stamp in these
+ * dispatchers) would not double-prefix anything. This dispatcher map
+ * is the structural BYO routing only.
  *
  * Catches per-dispatcher SDK errors and returns `null` (matches the
  * `TriggerService` shared-singleton behaviour — callers fall through

@@ -112,23 +112,49 @@ const FINAL_READ_MIN_MS = 1_000;
  * `cancelLongRunning`).
  * The long-running path then runs through
  * `TenantAwareRuntimeResolver.resolve(tenantId)`: the tenant's bound view of
- * the active runtime (a BYO tenant's own Trigger.dev project, the tenant's
- * tag and concurrency key), or the platform provider for a tenant with no
- * overlay. The wait reads back through the SAME view it dispatched through.
+ * the active runtime, or the platform provider for a tenant with no overlay.
+ * What the view adds depends on its shape. A BYO view (the tenant's own
+ * credentials) dispatches into the tenant's own Trigger.dev project, but its
+ * dispatcher map does not read the tenant stamp, so the run carries NO
+ * `tenant:<id>` tag and no tenant concurrency key. Only a view over the
+ * platform's own dispatchers (the singleton path) adds that tag and key
+ * (`TriggerService.stampTenantOptions`).
+ * The wait reads back through the SAME view it dispatched through.
  * `pollLongRunning` and `cancelLongRunning` resolve again from the caller's
  * `tenantId`, so a caller keeps the tenant next to the run id. The resolver lives in a non-global API
  * module, so it is looked up through `ModuleRef` (`getOptionalProvider`);
  * where it is absent (a worker, a narrower graph) or throws, the call uses the
  * platform provider, as the resolver itself does on any failure. A resolver
  * answering `null` means no runtime at all: JOB_RUNTIME_UNAVAILABLE. Without
- * `tenantId` nothing is looked up.
+ * `tenantId` nothing is looked up. The lookup is time-limited in
+ * `startLongRunning`, `pollLongRunning` and `cancelLongRunning` (the HTTP
+ * callers' methods), not in `dispatchLongRunning`.
+ *
+ * Known limit: the start and each later poll or cancel resolve the tenant
+ * separately, and nothing makes them agree. One lookup can land on the
+ * platform provider while another reaches the tenant's BYO view, or the other
+ * way round, when:
+ * - the resolver threw (e.g. a database error) and this router failed open;
+ * - the resolver fell back on its own, WITHOUT throwing — the secret store
+ *   threw or answered nothing for the overlay's credentials, or the provider's
+ *   `bindToTenant` threw or refused the snapshot. None of these fallbacks is
+ *   cached (only a successful bind is), so a transient secret-store miss at
+ *   the start and a good bind at the next poll is the likelier path;
+ * - the tenant's overlay row changed in between (enabled, disabled, or its
+ *   mode switched).
+ * The run is then looked for in the wrong project. It reads `'unknown'` on
+ * every poll, and a wait ends with JOB_RUNTIME_RUN_UNREADABLE. Nothing is
+ * dispatched twice, but the outcome cannot be read through the router.
+ * Answering which view served the start next to the run id would close this.
  *
  * FR-5 (tenant-job-runtime-overlay spec): the payload of a tenant call carries
  * `tenantId` and, when `RuntimeBindingStamperService` is bound, the
  * `(providerId, credentialVersion)` it reports at enqueue time (null/null
- * when the tenant has no active overlay or the lookup fails). The Trigger.dev
- * worker ignores them today: it is push-model, and the run already executes in
- * the project it was dispatched to.
+ * when the tenant has no active overlay or the lookup fails). Those are the
+ * overlay ROW's values, never checked against the provider the run actually
+ * went through (see `payloadFor`). The Trigger.dev worker ignores them today:
+ * it is push-model, and the run already executes in the project it was
+ * dispatched to.
  */
 @Injectable()
 export class PluginExecutionRouterService {
@@ -325,6 +351,13 @@ export class PluginExecutionRouterService {
      * JOB_RUNTIME_RUN_UNREADABLE — none of them says the run failed.
      * JOB_RUNTIME_OUTPUT_UNREADABLE says it COMPLETED (do not dispatch it again)
      * but its output could not be read.
+     *
+     * The signal is read once more right before the dispatch: a signal that is
+     * already aborted, or aborts during the tenant lookup, dispatches NOTHING
+     * (JOB_RUNTIME_WAIT_ABORTED with no `runId`). Once dispatched, an abort
+     * only stops the wait. The tenant lookup and the stamp themselves are not
+     * time-limited on this path (background callers); see
+     * {@link startLongRunning} for the bounded one.
      */
     async dispatchLongRunning<TResult = unknown>(
         pluginId: string,
@@ -338,9 +371,9 @@ export class PluginExecutionRouterService {
                 this.triggerDispatcher ??
                 this.jobRuntimeDispatcher(await this.providerFor(options.tenantId), options);
             if (!dispatcher) return jobRuntimeUnavailable();
-            const handle = await dispatcher.trigger(
-                await this.payloadFor(pluginId, operation, args, options.tenantId),
-            );
+            const payload = await this.payloadFor(pluginId, operation, args, options.tenantId);
+            if (options.signal?.aborted) return abortedBeforeDispatch();
+            const handle = await dispatcher.trigger(payload);
             runId = typeof handle?.id === 'string' && handle.id ? handle.id : undefined;
             if (!runId) {
                 return {
@@ -373,6 +406,20 @@ export class PluginExecutionRouterService {
      * Start a long-running operation WITHOUT waiting — for HTTP callers. Answers
      * `{ ok: true, runId }`, or the failure that prevented the start. Read the
      * outcome with {@link pollLongRunning}, passing the same `tenantId`.
+     *
+     * The tenant lookup and the FR-5 stamp share a `POLL_READ_TIMEOUT_MS`
+     * budget, as in {@link pollLongRunning}, so a stalled database cannot hold
+     * an HTTP caller past its 60 s ingress limit before the dispatch. The
+     * bound is about 20 s, not exactly: the stamp always gets at least
+     * `FINAL_READ_MIN_MS` (1 s) even when the lookup used the whole budget. A
+     * lookup that does not answer in time is JOB_RUNTIME_DISPATCH_FAILED with
+     * nothing dispatched — deliberately NOT the platform provider, where a BYO
+     * tenant's run would land in the wrong project. That does not remove the
+     * wrong-project risk (the resolver's own fallbacks still produce it, see
+     * "Known limit" on the class); it only avoids adding one more path to it.
+     * A stamp that does not answer in time dispatches unstamped (null/null),
+     * as a stamp that throws does. The dispatch call itself is not
+     * time-limited: giving up on it could leave a run nobody knows the id of.
      */
     async startLongRunning(
         pluginId: string,
@@ -382,12 +429,32 @@ export class PluginExecutionRouterService {
     ): Promise<
         { ok: true; location: 'job-runtime'; runId: string } | PluginExecutionResult<never>
     > {
-        const provider = await this.providerFor(options.tenantId);
+        const deadline = Date.now() + POLL_READ_TIMEOUT_MS;
+        const resolved = await withinTime(this.providerFor(options.tenantId), POLL_READ_TIMEOUT_MS);
+        if (!resolved.settled) {
+            return {
+                ok: false,
+                location: 'job-runtime',
+                error: {
+                    message:
+                        `The job runtime for tenant ${options.tenantId} could not be resolved within ` +
+                        `${POLL_READ_TIMEOUT_MS} ms; nothing was dispatched.`,
+                    code: 'JOB_RUNTIME_DISPATCH_FAILED',
+                },
+            };
+        }
+        const provider = resolved.value;
         const dispatch = provider ? dispatchMethodOf(provider) : null;
         if (!provider || !dispatch) return jobRuntimeUnavailable();
         try {
             const runId = await dispatch(
-                await this.payloadFor(pluginId, operation, args, options.tenantId),
+                await this.payloadFor(
+                    pluginId,
+                    operation,
+                    args,
+                    options.tenantId,
+                    Math.max(deadline - Date.now(), FINAL_READ_MIN_MS),
+                ),
             );
             if (!runId) {
                 return {
@@ -562,13 +629,23 @@ export class PluginExecutionRouterService {
      * The run's payload. Without a tenant it is exactly `{ pluginId, operation,
      * args }`. With one it adds `tenantId` and, when the stamper is bound, the
      * `(providerId, credentialVersion)` FR-5 captures at enqueue time: null/null
-     * when the lookup fails, because an enqueue never fails on stamping.
+     * when the lookup fails — or, given `stampWithinMs`, does not answer within
+     * it — because an enqueue never fails on stamping.
+     *
+     * The stamp is the overlay ROW's `(providerId, credentialVersion)`; it is
+     * not checked against the provider the run actually went through. After a
+     * fail-open to the platform provider (see {@link providerFor}), or with an
+     * overlay naming a provider other than the active one, the payload still
+     * carries the row's values. No consumer reads them today (the worker
+     * ignores them); a future credential-rotation drain must not trust them
+     * without checking.
      */
     private async payloadFor(
         pluginId: string,
         operation: string,
         args: Record<string, unknown> | undefined,
         tenantId: string | null | undefined,
+        stampWithinMs?: number,
     ): Promise<PluginOperationPayload> {
         if (!tenantId) return { pluginId, operation, args };
         let stamper: RuntimeBindingStamperService | undefined;
@@ -583,9 +660,24 @@ export class PluginExecutionRouterService {
             stamper = undefined;
         }
         if (!stamper) return { pluginId, operation, args, tenantId };
+        const boundStamper = stamper;
         let binding: { providerId: string | null; credentialVersion: number | null };
         try {
-            binding = await stamper.stamp(tenantId);
+            const stamping = Promise.resolve().then(() => boundStamper.stamp(tenantId));
+            if (stampWithinMs === undefined) {
+                binding = await stamping;
+            } else {
+                const stamped = await withinTime(stamping, stampWithinMs);
+                if (stamped.settled) {
+                    binding = stamped.value;
+                } else {
+                    this.logger.warn(
+                        `Runtime binding stamp for tenant ${tenantId} did not answer within ` +
+                            `${stampWithinMs} ms; dispatching unstamped.`,
+                    );
+                    binding = { providerId: null, credentialVersion: null };
+                }
+            }
         } catch (err) {
             this.logger.warn(
                 `Runtime binding stamp failed for tenant ${tenantId} ` +
@@ -851,6 +943,18 @@ function fromTaskOutcome<TResult>(
     };
 }
 
+/** The caller's signal was aborted before the run was dispatched: nothing started. */
+function abortedBeforeDispatch(): PluginExecutionResult<never> {
+    return {
+        ok: false,
+        location: 'job-runtime',
+        error: {
+            message: 'Aborted before the run was dispatched; nothing was dispatched.',
+            code: 'JOB_RUNTIME_WAIT_ABORTED',
+        },
+    };
+}
+
 function cancelFailed(runId: string, message: string): LongRunningCancel {
     return { ok: false, runId, error: { code: 'JOB_RUNTIME_CANCEL_FAILED', message } };
 }
@@ -950,7 +1054,10 @@ export interface LongRunningOptions extends LongRunningTenantOptions {
      * 1 s). Never below 250 ms; not a finite number = the default.
      */
     readonly pollIntervalMs?: number;
-    /** Stop waiting early (the run is NOT cancelled). */
+    /**
+     * Stop waiting early (the run is NOT cancelled). Aborted before the
+     * dispatch — already, or during the tenant lookup — nothing is dispatched.
+     */
     readonly signal?: AbortSignal;
 }
 
