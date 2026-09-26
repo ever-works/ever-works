@@ -13,7 +13,12 @@ import type { PluginRepository } from '../repositories/plugin.repository';
 import type { UserPluginRepository } from '../repositories/user-plugin.repository';
 import type { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import type { WorkOwnershipService } from '../../services/work-ownership.service';
-import { createRegistry, registerColdPlugin, requiredSecretSchema } from './cold-plugin.fixture';
+import {
+    createRegistry,
+    loadTracker,
+    registerColdPlugin,
+    requiredSecretSchema,
+} from './cold-plugin.fixture';
 
 // Same isolation as plugin-operations.service.spec.ts: the facades barrel
 // pulls in the whole agent graph.
@@ -49,6 +54,12 @@ describe('PluginOperationsService — cold lazy plugins', () => {
         create: jest.Mock;
         save: jest.Mock;
     };
+    let workPluginRepository: {
+        find: jest.Mock;
+        findOne: jest.Mock;
+        create: jest.Mock;
+        save: jest.Mock;
+    };
 
     beforeEach(() => {
         registry = createRegistry();
@@ -64,7 +75,7 @@ describe('PluginOperationsService — cold lazy plugins', () => {
             create: jest.fn((row: Record<string, unknown>) => row),
             save: jest.fn(async (row: Record<string, unknown>) => row),
         };
-        const workPluginRepository = {
+        workPluginRepository = {
             find: jest.fn().mockResolvedValue([]),
             findOne: jest.fn().mockResolvedValue(null),
             create: jest.fn((row: Record<string, unknown>) => row),
@@ -140,14 +151,23 @@ describe('PluginOperationsService — cold lazy plugins', () => {
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    // The list / menu cases below register their plugins as builtIns (pin
+    // changed, F7 of the second review of 60916d328: they were non-builtIn).
+    // A list loads only the builtIns — the plugins the boot before lazy
+    // builtIns loaded — and every real plugin these cases model (settings,
+    // visibility or uiHints set in the class only) is one. A non-builtIn stays
+    // cold on a list: see "lists never load" below.
+
     it('lists a cold plugin with user settings in the settings menu, flagged as needing setup', async () => {
         registerColdPlugin(registry, {
             id: 'cold-menu',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
             manifest: { autoEnable: true },
         });
         registerColdPlugin(registry, {
             id: 'cold-menu-admin-only',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
             configurationMode: 'admin-only',
             manifest: { autoEnable: true },
@@ -166,10 +186,12 @@ describe('PluginOperationsService — cold lazy plugins', () => {
     it('leaves a cold plugin whose getManifest() declares it hidden out of the plugin list', async () => {
         registerColdPlugin(registry, {
             id: 'cold-visible',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
         });
         registerColdPlugin(registry, {
             id: 'cold-hidden',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
             runtimeManifest: { visibility: 'hidden' },
         });
@@ -182,10 +204,12 @@ describe('PluginOperationsService — cold lazy plugins', () => {
     it("leaves a cold user-only plugin out of a Work's plugin list", async () => {
         registerColdPlugin(registry, {
             id: 'cold-work-visible',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
         });
         registerColdPlugin(registry, {
             id: 'cold-user-only',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
             runtimeManifest: { visibility: 'user-only' },
         });
@@ -232,10 +256,12 @@ describe('PluginOperationsService — cold lazy plugins', () => {
     it('does not import a plugin whose import already failed again on each plugin list', async () => {
         registerColdPlugin(registry, {
             id: 'cold-listed-ok',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
         });
         const broken = registerColdPlugin(registry, {
             id: 'cold-listed-broken',
+            builtIn: true,
             settingsSchema: requiredSecretSchema(),
             failing: true,
         });
@@ -246,5 +272,238 @@ describe('PluginOperationsService — cold lazy plugins', () => {
         await service.listWorkPlugins('work-1', 'user-1');
 
         expect(broken.loads()).toBe(1);
+    });
+
+    it('refuses as voice default a cold AI provider whose onLoad fails on this first use (F6)', async () => {
+        const cold = registerColdPlugin(registry, {
+            id: 'cold-voice-onload-fails',
+            capabilities: ['ai-provider'],
+            settingsSchema: requiredSecretSchema(),
+            onLoadFails: true,
+            members: { transcribe: async () => ({ text: '' }) },
+        });
+
+        await expect(
+            service.setGlobalVoiceDefault('user-1', 'cold-voice-onload-fails'),
+        ).rejects.toThrow(/cannot be used for voice transcription.*error state/);
+        expect(cold.registered.state).toBe('error');
+        expect(userPluginRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('leaves a builtIn out of the settings menu when its getManifest() hides it (F5)', async () => {
+        registerColdPlugin(registry, {
+            id: 'cold-menu-shown',
+            builtIn: true,
+            settingsSchema: requiredSecretSchema(),
+            manifest: { autoEnable: true },
+        });
+        registerColdPlugin(registry, {
+            id: 'cold-menu-hidden-at-runtime',
+            builtIn: true,
+            settingsSchema: requiredSecretSchema(),
+            manifest: { autoEnable: true },
+            runtimeManifest: { visibility: 'hidden' },
+        });
+
+        const menu = await service.getPluginsForSettingsMenu('user-1');
+
+        const listed = menu.categories.flatMap((category) => category.plugins);
+        expect(listed.map((plugin) => plugin.pluginId)).toEqual(['cold-menu-shown']);
+    });
+
+    /**
+     * F7 — the lists and the settings menu load plugins only to show what their
+     * class adds; before lazy builtIns (60916d328) they loaded nothing, and
+     * every builtIn was loaded at boot. So they load the builtIns, a bounded
+     * number at a time, and never a non-builtIn nobody uses: that one keeps
+     * its package.json manifest and the cold proxy's `{}` schema, as then.
+     */
+    describe('lists never load a cold plugin that is not builtIn', () => {
+        // Pin changed (review of the F7 fix): this plugin was `autoEnable`,
+        // i.e. enabled for the user, and the menu assertion read "its cold
+        // schema has no user settings, so the menu leaves it out" — the menu
+        // dropping a plugin the user has enabled, which is the defect. A list
+        // loads the plugins its viewer has enabled whatever their builtIn flag
+        // (see "lists load a non-builtIn the user or the Work has enabled"
+        // below); a non-builtIn nobody has enabled stays cold, as here.
+        it('lists a cold non-builtIn nobody has enabled by its package.json manifest without importing it', async () => {
+            const cold = registerColdPlugin(registry, {
+                id: 'cold-third-party',
+                capabilities: ['ai-provider'],
+                settingsSchema: requiredSecretSchema(),
+                runtimeManifest: { uiHints: { includeInOnboarding: true } },
+            });
+
+            const list = await service.listPlugins('user-1');
+            const menu = await service.getPluginsForSettingsMenu('user-1');
+            const workList = await service.listWorkPlugins('work-1', 'user-1');
+
+            expect(cold.loads()).toBe(0);
+            expect(cold.proxy.__isMaterialized).toBe(false);
+            expect(list.plugins.map((plugin) => plugin.pluginId)).toEqual(['cold-third-party']);
+            expect(workList.plugins.map((plugin) => plugin.pluginId)).toEqual(['cold-third-party']);
+            // Not enabled for the user, so the menu leaves it out.
+            expect(menu.categories.flatMap((category) => category.plugins)).toEqual([]);
+        });
+
+        it('still loads a cold non-builtIn for its own detail page', async () => {
+            const cold = registerColdPlugin(registry, {
+                id: 'cold-third-party-detail',
+                settingsSchema: requiredSecretSchema(),
+            });
+
+            const response = await service.getPlugin('cold-third-party-detail', 'user-1');
+
+            expect(cold.loads()).toBe(1);
+            expect(response.settingsSchema?.required).toEqual(['apiKey']);
+        });
+    });
+
+    /**
+     * Review of the F7 fix: loading only the builtIns is right for a CATALOG
+     * (every visible plugin), not for the plugins its viewer USES. The settings
+     * menu and the settings page list the plugins the user has enabled, and a
+     * Work's list decides its capability providers from the plugins the Work
+     * has enabled: a non-builtIn among those (notion-extractor, apify,
+     * screenshotone) is loaded, as the detail page loads it.
+     */
+    describe('lists load a non-builtIn the user or the Work has enabled', () => {
+        function enabledForUser(...pluginIds: string[]) {
+            userPluginRepository.find.mockResolvedValue(
+                pluginIds.map((pluginId) => ({
+                    id: `user-plugin-${pluginId}`,
+                    userId: 'user-1',
+                    pluginId,
+                    enabled: true,
+                    settings: {},
+                    secretSettings: {},
+                })),
+            );
+        }
+
+        it('shows an enabled non-builtIn with user settings in the settings menu, needing setup', async () => {
+            const cold = registerColdPlugin(registry, {
+                id: 'enabled-third-party-menu',
+                settingsSchema: requiredSecretSchema(),
+            });
+            enabledForUser('enabled-third-party-menu');
+
+            const menu = await service.getPluginsForSettingsMenu('user-1');
+
+            const listed = menu.categories.flatMap((category) => category.plugins);
+            expect(listed.map((plugin) => plugin.pluginId)).toEqual(['enabled-third-party-menu']);
+            expect(listed[0].hasRequiredSettings).toBe(true);
+            expect(cold.loads()).toBe(1);
+        });
+
+        it("answers an enabled non-builtIn's real schema on the settings page and the plugin list", async () => {
+            registerColdPlugin(registry, {
+                id: 'enabled-third-party-page',
+                settingsSchema: requiredSecretSchema(),
+            });
+            const untouched = registerColdPlugin(registry, {
+                id: 'not-enabled-third-party',
+                settingsSchema: requiredSecretSchema(),
+            });
+            enabledForUser('enabled-third-party-page');
+
+            // The settings page: the plugins of one category the user has enabled.
+            const page = await service.listPlugins('user-1', 'utility');
+            const list = await service.listPlugins('user-1');
+
+            expect(page.plugins.map((plugin) => plugin.pluginId)).toEqual([
+                'enabled-third-party-page',
+            ]);
+            expect(page.plugins[0].settingsSchema?.required).toEqual(['apiKey']);
+            const row = list.plugins.find(
+                (plugin) => plugin.pluginId === 'enabled-third-party-page',
+            );
+            expect(row?.settingsSchema?.required).toEqual(['apiKey']);
+            // The catalog still leaves a non-builtIn nobody enabled cold.
+            expect(untouched.loads()).toBe(0);
+        });
+
+        it("keeps a Work-enabled non-builtIn that getManifest() marks supplementary out of the Work's providers", async () => {
+            registerColdPlugin(registry, {
+                id: 'work-extractor',
+                capabilities: ['content-extractor'],
+                settingsSchema: requiredSecretSchema(),
+            });
+            const specialist = registerColdPlugin(registry, {
+                id: 'work-extractor-specialist',
+                capabilities: ['content-extractor'],
+                settingsSchema: requiredSecretSchema(),
+                // notion-extractor: `supplementary` only in its class.
+                runtimeManifest: { supplementary: true },
+            });
+            // The specialist's row comes last: without its class's manifest it
+            // would be recorded as the Work's content extractor.
+            workPluginRepository.find.mockResolvedValue(
+                ['work-extractor', 'work-extractor-specialist'].map((pluginId) => ({
+                    id: `work-plugin-${pluginId}`,
+                    workId: 'work-1',
+                    pluginId,
+                    enabled: true,
+                    activeCapabilities: ['content-extractor'],
+                    settings: {},
+                    secretSettings: {},
+                })),
+            );
+
+            const workList = await service.listWorkPlugins('work-1', 'user-1');
+
+            expect(specialist.loads()).toBe(1);
+            expect(workList.capabilityProviders).toEqual({ 'content-extractor': 'work-extractor' });
+        });
+    });
+
+    describe('lists load a bounded number of plugins at a time', () => {
+        const saved = process.env.PLUGIN_LOAD_CONCURRENCY;
+        afterEach(() => {
+            if (saved === undefined) delete process.env.PLUGIN_LOAD_CONCURRENCY;
+            else process.env.PLUGIN_LOAD_CONCURRENCY = saved;
+        });
+
+        function registerBuiltIns(count: number) {
+            const tracker = loadTracker();
+            const plugins = Array.from({ length: count }, (_, index) =>
+                registerColdPlugin(registry, {
+                    id: `cold-builtin-${String(index).padStart(2, '0')}`,
+                    builtIn: true,
+                    settingsSchema: requiredSecretSchema(),
+                    manifest: { autoEnable: true },
+                    loadTracker: tracker,
+                }),
+            );
+            return { tracker, plugins };
+        }
+
+        it('never has more than 6 first loads in flight for one plugin list', async () => {
+            delete process.env.PLUGIN_LOAD_CONCURRENCY;
+            const { tracker, plugins } = registerBuiltIns(14);
+
+            const list = await service.listPlugins('user-1');
+
+            expect(list.plugins).toHaveLength(14);
+            expect(plugins.every((plugin) => plugin.loads() === 1)).toBe(true);
+            expect(tracker.peak).toBeGreaterThan(1);
+            expect(tracker.peak).toBeLessThanOrEqual(6);
+        });
+
+        it('takes its bound from PLUGIN_LOAD_CONCURRENCY (the settings menu)', async () => {
+            process.env.PLUGIN_LOAD_CONCURRENCY = '2';
+            const { tracker } = registerBuiltIns(9);
+
+            await service.getPluginsForSettingsMenu('user-1');
+            expect(tracker.peak).toBe(2);
+        });
+
+        it('bounds the Work plugin list the same way', async () => {
+            process.env.PLUGIN_LOAD_CONCURRENCY = '3';
+            const { tracker } = registerBuiltIns(10);
+
+            await service.listWorkPlugins('work-1', 'user-1');
+            expect(tracker.peak).toBe(3);
+        });
     });
 });

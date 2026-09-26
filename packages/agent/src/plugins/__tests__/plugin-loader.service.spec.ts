@@ -1059,7 +1059,12 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
     let storeDir: string;
     let loader: PluginLoaderService;
     let registry: PluginRegistryService;
-    let repository: { upsert: jest.Mock; updateState: jest.Mock; findByPluginId: jest.Mock };
+    let repository: {
+        upsert: jest.Mock;
+        updateState: jest.Mock;
+        findByPluginId: jest.Mock;
+        mergeLazyRegistration: jest.Mock;
+    };
 
     /** A plugin package as the installer leaves it in the versioned store. */
     function writePluginPackage(dir: string, id: string, extra: Record<string, unknown> = {}) {
@@ -1102,6 +1107,7 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
             upsert: jest.fn().mockResolvedValue({}),
             updateState: jest.fn().mockResolvedValue({}),
             findByPluginId: jest.fn().mockResolvedValue(null),
+            mergeLazyRegistration: jest.fn().mockResolvedValue({}),
         };
         const moduleRef = await Test.createTestingModule({
             providers: [
@@ -1149,12 +1155,16 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
         // even though its manifest says `builtIn: true`.
         expect(entry!.builtIn).toBe(false);
         expect(entry!.installPath).toBe(versioned('notion-extractor'));
-        expect(repository.upsert).toHaveBeenCalledWith(
+        // Pin changed (a worker read per registration): was `repository.upsert`.
+        // A lazy registration's row is written by ONE repository call, which the
+        // Trigger worker answers in memory (see the lazy-registration block below).
+        expect(repository.mergeLazyRegistration).toHaveBeenCalledWith(
             expect.objectContaining({
                 pluginId: 'notion-extractor',
                 builtIn: false,
                 installPath: versioned('notion-extractor'),
             }),
+            expect.objectContaining({ id: 'notion-extractor' }),
         );
     });
 
@@ -1171,6 +1181,7 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
         expect(registry.get('notion-extractor')).toBeUndefined();
         expect(registry.get('someone-else')).toBeUndefined();
         expect(repository.upsert).not.toHaveBeenCalled();
+        expect(repository.mergeLazyRegistration).not.toHaveBeenCalled();
     });
 
     it('registers nothing for a directory that is not a plugin package', async () => {
@@ -1205,7 +1216,9 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
         expect(again).toMatchObject({ success: true, pluginId: 'notion-extractor' });
         expect(again.warnings?.[0]).toContain('already registered');
         expect(registry.get('notion-extractor')).toBe(first);
-        expect(repository.upsert).toHaveBeenCalledTimes(1);
+        // Pin changed (a worker read per registration): was `repository.upsert`
+        // once — the row write is `mergeLazyRegistration` now; still once.
+        expect(repository.mergeLazyRegistration).toHaveBeenCalledTimes(1);
     });
 
     /**
@@ -1225,5 +1238,183 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
         await makeLoader([storeDir, scope]);
 
         await expect(loader.discover()).resolves.toEqual([]);
+    });
+});
+
+/**
+ * The DB row a lazy registration writes (`registerLazy`), and the one its first
+ * materialisation writes (the runtime manifest fold). Real loader, real
+ * registry, real lazy proxy, a plugin package on disk — only the repository is
+ * a double.
+ */
+describe('PluginLoaderService — the plugin row a lazy registration and first load write', () => {
+    /* eslint-disable @typescript-eslint/no-var-requires */
+    const fsSync = require('fs') as typeof import('fs');
+    const os = require('os') as typeof import('os');
+    const nodePath = require('path') as typeof import('path');
+    const { EventEmitter2 } = require('@nestjs/event-emitter');
+    /* eslint-enable @typescript-eslint/no-var-requires */
+
+    let dir: string;
+    let repository: {
+        upsert: jest.Mock;
+        updateState: jest.Mock;
+        findByPluginId: jest.Mock;
+        updateByPluginId: jest.Mock;
+        mergeLazyRegistration: jest.Mock;
+    };
+    let loader: PluginLoaderService;
+    let registry: PluginRegistryService;
+
+    function writePlugin() {
+        fsSync.mkdirSync(dir, { recursive: true });
+        fsSync.writeFileSync(
+            nodePath.join(dir, 'package.json'),
+            JSON.stringify({
+                name: '@ever-works/lean-row-plugin',
+                version: '2.0.0',
+                main: './index.js',
+                everworks: {
+                    plugin: {
+                        id: 'lean-row',
+                        name: 'Lean Row',
+                        version: '2.0.0',
+                        category: 'utility',
+                        capabilities: ['test'],
+                        description: 'package.json description',
+                    },
+                },
+            }),
+        );
+        fsSync.writeFileSync(
+            nodePath.join(dir, 'index.js'),
+            `module.exports = class P {\n` +
+                `  constructor() { this.id = 'lean-row'; }\n` +
+                `  getManifest() { return { id: 'lean-row', name: 'Lean Row', version: '2.0.0',` +
+                ` category: 'utility', capabilities: ['test'], description: 'runtime',` +
+                ` icon: 'runtime-icon', homepage: 'https://runtime.example' }; }\n` +
+                `  async onLoad() {}\n` +
+                `  async onUnload() {}\n` +
+                `};\n`,
+        );
+    }
+
+    async function makeLoader() {
+        repository = {
+            upsert: jest.fn().mockResolvedValue({}),
+            updateState: jest.fn().mockResolvedValue({}),
+            findByPluginId: jest.fn().mockResolvedValue(null),
+            updateByPluginId: jest.fn().mockResolvedValue({}),
+            mergeLazyRegistration: jest.fn().mockResolvedValue({}),
+        };
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                PluginLoaderService,
+                PluginRegistryService,
+                PluginManifestValidatorService,
+                PluginVersionCheckerService,
+                PluginClassValidatorService,
+                { provide: EventEmitter2, useValue: new EventEmitter2() },
+                {
+                    provide: PLUGINS_MODULE_OPTIONS,
+                    useValue: { pluginPaths: [], builtInPlugins: [], platformVersion: '1.0.0' },
+                },
+                { provide: PluginRepository, useValue: repository },
+            ],
+        }).compile();
+        loader = moduleRef.get(PluginLoaderService);
+        registry = moduleRef.get(PluginRegistryService);
+    }
+
+    beforeEach(() => {
+        dir = nodePath.join(
+            fsSync.mkdtempSync(nodePath.join(os.tmpdir(), 'lean-row-')),
+            'lean-row-plugin',
+        );
+    });
+
+    afterEach(() => {
+        fsSync.rmSync(nodePath.dirname(dir), { recursive: true, force: true });
+    });
+
+    /**
+     * Every process boot registers each disk plugin lazily and writes its row.
+     * With builtIns lazy that is every API boot and every Trigger run.
+     *
+     * Pins changed (a worker read per registration): the three cases here
+     * pinned the merge as the LOADER's — `findByPluginId`, then
+     * `updateByPluginId` or `upsert` — and that read was the defect. In a
+     * Trigger worker `PluginRepository` is a remote proxy whose reads go to the
+     * API, so every plugin a run registered cost one round trip
+     * (`trigger-run-plugin-operation.module.spec.ts` › "still dialled nothing
+     * after running operations"). The read-merge-write is now ONE repository
+     * method, `mergeLazyRegistration`, which the worker's `LocalPluginStore`
+     * answers in memory; its rules (same version keeps the row's keys with
+     * package.json on top, another version or no row writes package.json as it
+     * is) moved with it, to `plugin.repository.lazy-registration.spec.ts` (real
+     * sqlite) and the tasks package's `local-plugin-store.spec.ts`.
+     */
+    it('writes its row through one mergeLazyRegistration call, reading nothing', async () => {
+        writePlugin();
+        await makeLoader();
+
+        await expect(
+            loader.registerFromPath(dir, { expectedId: 'lean-row' }),
+        ).resolves.toMatchObject({ success: true });
+
+        expect(repository.mergeLazyRegistration).toHaveBeenCalledTimes(1);
+        const [row, manifest] = repository.mergeLazyRegistration.mock.calls[0];
+        expect(row).toEqual({
+            pluginId: 'lean-row',
+            name: 'Lean Row',
+            version: '2.0.0',
+            description: 'package.json description',
+            category: 'utility',
+            capabilities: ['test'],
+            builtIn: false,
+            installPath: dir,
+            state: 'loaded',
+        });
+        // The package.json manifest, not the class's (nothing is imported yet).
+        expect(manifest).toMatchObject({
+            id: 'lean-row',
+            version: '2.0.0',
+            description: 'package.json description',
+        });
+        expect((manifest as Record<string, unknown>).icon).toBeUndefined();
+        expect(repository.findByPluginId).not.toHaveBeenCalled();
+        expect(repository.updateByPluginId).not.toHaveBeenCalled();
+        expect(repository.upsert).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The first materialisation runs `onLoad` right after the import, before
+     * the manifest DB upsert (which used to come first), and a failing
+     * `onLoad` is not overwritten back to `loaded` by that upsert.
+     */
+    it('runs onLoad before the runtime manifest upsert, which then keeps an onLoad failure', async () => {
+        writePlugin();
+        await makeLoader();
+        const order: string[] = [];
+        // What PluginBootstrapService wires: callOnLoad, here failing.
+        loader.setOnFirstMaterialize(async (pluginId) => {
+            order.push('onLoad');
+            registry.updateState(pluginId, 'error', new Error('onLoad refused'));
+        });
+        await loader.registerFromPath(dir, { expectedId: 'lean-row' });
+        repository.upsert.mockClear();
+        repository.upsert.mockImplementation(async () => {
+            order.push('upsert');
+            return {};
+        });
+
+        await (
+            registry.get('lean-row')!.plugin as unknown as { __materialize(): Promise<unknown> }
+        ).__materialize();
+
+        expect(order).toEqual(['onLoad', 'upsert']);
+        const row = repository.upsert.mock.calls[0][0] as Record<string, unknown>;
+        expect((row.manifest as Record<string, unknown>).icon).toBe('runtime-icon');
+        expect(row.state).toBeUndefined();
     });
 });

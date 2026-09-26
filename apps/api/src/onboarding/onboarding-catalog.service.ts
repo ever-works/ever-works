@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
-import { PluginRegistryService, loadRegisteredPlugins } from '@ever-works/agent/plugins';
+import { PluginRegistryService, loadPluginsForListing } from '@ever-works/agent/plugins';
 import type {
     OnboardingCatalogResponse,
     OnboardingCard,
@@ -259,9 +259,12 @@ export class OnboardingCatalogService {
         // Plugins declare `uiHints` in their class's getManifest() (none does
         // in package.json), which the registry entry of a plugin nobody has
         // used yet — a cold lazy proxy — does not carry until it loads. Load
-        // the candidates first; one that cannot load keeps its package.json
-        // manifest and is not offered.
-        await loadRegisteredPlugins(candidates);
+        // the candidates first — a bounded number at a time, and only the
+        // builtIns (loadPluginsForListing): a cold plugin that is not builtIn
+        // stays cold and keeps its package.json manifest, as when builtIns
+        // loaded at boot, so it is not offered. One that cannot load keeps its
+        // package.json manifest and is not offered either.
+        await loadPluginsForListing(candidates);
         return candidates
             .filter((entry) => entry.manifest.uiHints?.includeInOnboarding === true)
             .map(

@@ -454,10 +454,11 @@ describe('lazy-plugin-proxy', () => {
     });
 
     /**
-     * EW-693 — the first-materialise hook (onLoad) runs while `materialized` is
-     * already set, because the hook calls the plugin THROUGH the proxy. So a
-     * second caller's plain `__materialize()` answers before onLoad settles; a
-     * caller that must not run anything before then passes `waitForLoad`.
+     * EW-693 — the first-materialise hook (onLoad) runs while the instance is
+     * already imported, because the hook calls the plugin THROUGH the proxy.
+     * A caller from inside the hook is answered at once (an AsyncLocalStorage
+     * marker says where it is called from); every other caller — plain
+     * `__materialize()` or `waitForLoad` — waits for the hook to settle.
      */
     describe('__materialize({ waitForLoad: true })', () => {
         function deferred() {
@@ -467,7 +468,7 @@ describe('lazy-plugin-proxy', () => {
         }
         const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-        it('waits for the first-materialise hook that a plain __materialize() does not wait for', async () => {
+        it('waits for the first-materialise hook, as a plain __materialize() from outside it now does too', async () => {
             const hookGate = deferred();
             const loader = jest.fn().mockResolvedValue(makeRealPlugin('w1', jest.fn()));
             const stub = createLazyPluginProxy(makeManifest('w1'), loader, () => hookGate.promise);
@@ -479,10 +480,15 @@ describe('lazy-plugin-proxy', () => {
             void stub.__materialize({ waitForLoad: true }).then(() => order.push('waitForLoad'));
             await flush();
 
-            expect(order).toEqual(['plain']);
+            // Pin changed (F6, second review of 60916d328): this used to be
+            // `['plain']` — a plain __materialize() from OUTSIDE the hook was
+            // answered before onLoad had settled, the first-use race. Only a
+            // call from inside the hook is answered at once now (see the next
+            // case and lazy-plugin-proxy.first-load.spec.ts).
+            expect(order).toEqual([]);
             hookGate.resolve();
             await flush();
-            // All three now; which of the two hook-waiters resolves first is incidental.
+            // All three now; which of the hook-waiters resolves first is incidental.
             expect(order).toHaveLength(3);
             expect(order).toEqual(expect.arrayContaining(['plain', 'first caller', 'waitForLoad']));
         });

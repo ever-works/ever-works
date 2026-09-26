@@ -1,7 +1,9 @@
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
     // The fakes below are plain entries, never lazy proxies: nothing to load.
-    loadRegisteredPlugins: async (entries: unknown[]) => entries,
+    // (The catalog loads its candidates through loadPluginsForListing now —
+    // bounded, builtIns only; it used loadRegisteredPlugins.)
+    loadPluginsForListing: async () => undefined,
 }));
 
 import { Test } from '@nestjs/testing';

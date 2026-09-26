@@ -915,6 +915,38 @@ describe('B · resolution is by capability, never by plugin id (R-5)', () => {
         });
     });
 
+    it('refuses a lazy plugin whose onLoad fails on this first use', async () => {
+        // F6: the first load resolves, but a failing onLoad leaves the entry in `error` (as the
+        // lifecycle manager's callOnLoad records it). The eager boot skipped such a plugin; the
+        // facade must not hand it out either.
+        const real = fakePlugin({ id: 'k8s', supportsApps: true });
+        const registry = new PluginRegistryService(new EventEmitter2());
+        registry.registerLazy(
+            manifestFor('k8s', ['deployment']),
+            async () => real as unknown as IDeploymentPlugin,
+            {
+                onFirstMaterialize: async (pluginId) => {
+                    registry.updateState(pluginId, 'error', new Error('onLoad failed'));
+                },
+            },
+        );
+
+        // The runtime-state row names the target, so the plugin's FIRST load is the one this
+        // resolution makes (no earlier target derivation loads it and re-reads the state).
+        const service = new AppRuntimeFacadeService(
+            registry,
+            workRepositoryFor([appWork({})]),
+            new FakeDeployFacade() as unknown as DeployFacadeService,
+            new FakeTierPolicy(true),
+            runtimeStateRow({ target: 'your-cluster' }),
+        );
+
+        expect(await service.resolveDeletionTarget(WORK_ID)).toEqual({
+            unavailable: 'target_unavailable',
+        });
+        expect(registry.get('k8s')?.state).toBe('error');
+    });
+
     it('omits a member the real plugin behind a lazy loader does not implement', async () => {
         // The discriminating half of the materialisation rule: against the COLD proxy,
         // `typeof plugin.destroyApp === 'function'` is TRUE for a member the real plugin never

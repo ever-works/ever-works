@@ -739,6 +739,33 @@ describe('TriggerInternalController', () => {
             ).rejects.toThrow('Method not in allow-list for PluginRepository: doesNotExist');
         });
 
+        // The worker's `LocalPluginStore` answers `mergeLazyRegistration` (every lazy
+        // plugin registration's row write) in memory; a worker that dialled it would
+        // pay a round trip per discovered plugin per run. So it is refused here even
+        // though the derived allow-list would otherwise hold every repository method.
+        it('refuses PluginRepository.mergeLazyRegistration — the worker writes that row locally', async () => {
+            const merge = jest.fn();
+            (pluginRepository as any).mergeLazyRegistration = merge;
+            controller = buildController();
+
+            await expect(
+                controller.callRemote(
+                    VALID_SECRET,
+                    buildBody({
+                        name: 'PluginRepository',
+                        method: 'mergeLazyRegistration',
+                        args: [{ pluginId: 'p', version: '1.0.0' }, {}],
+                    }),
+                ),
+            ).rejects.toThrow(
+                'Method not in allow-list for PluginRepository: mergeLazyRegistration',
+            );
+            expect(merge).not.toHaveBeenCalled();
+            // The target's other methods stay callable.
+            const out = await controller.callRemote(VALID_SECRET, buildBody({ args: ['still'] }));
+            expect(superjson.deserialize(out.result as any)).toBe('echo:still');
+        });
+
         it('throws ForbiddenException with wrong secret (and never invokes the remote)', async () => {
             const echoSpy = jest.spyOn(pluginRepository, 'echo');
 

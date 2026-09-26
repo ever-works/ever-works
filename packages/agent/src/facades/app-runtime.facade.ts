@@ -155,6 +155,7 @@ import {
     PluginRegistryService,
     type RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
+import { pluginLoadFailure } from '../plugins/services/plugin-operation.util';
 import { DeployFacadeService, PLATFORM_MANAGED_KUBECONFIG_SENTINEL } from './deploy.facade';
 import { validateClusterSourceForOwner, type ClusterSource } from './deployment-context.resolver';
 
@@ -958,7 +959,9 @@ export class AppRuntimeFacadeService
     }
 
     /**
-     * The real plugin behind a possibly-lazy registry entry, or `null` when materialisation failed.
+     * The real plugin behind a possibly-lazy registry entry, or `null` when materialisation failed
+     * — its import failed, or its first load left the entry in `error` (an `onLoad` that fails on
+     * this first use does not reject the materialise; the eager boot skipped such a plugin).
      *
      * This is the only way to see a plugin's true shape: while cold, the lazy proxy answers a
      * forwarding function for every property it does not define, so `isAppDeploymentPlugin` or a
@@ -974,14 +977,21 @@ export class AppRuntimeFacadeService
         if (typeof plugin.__materialize !== 'function') {
             return plugin;
         }
+        let real: IDeploymentPlugin;
         try {
-            return (await plugin.__materialize()) ?? plugin;
+            real = (await plugin.__materialize()) ?? plugin;
         } catch (error) {
             this.logger.warn(
                 `Plugin '${registered.plugin.id}' could not be materialised: ${errorText(error)}`,
             );
             return null;
         }
+        const failure = pluginLoadFailure(registered, registered.plugin.id);
+        if (failure) {
+            this.logger.warn(`Plugin '${registered.plugin.id}' is not usable: ${failure}`);
+            return null;
+        }
+        return real;
     }
 
     /**

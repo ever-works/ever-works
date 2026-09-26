@@ -1,6 +1,11 @@
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
     PluginSettingsService: class {},
+    // The real helper (plugin-operation.util.ts) — light, but the barrel that
+    // exports it pulls in the whole agent graph, hence the mock.
+    pluginLoadFailure: jest.requireActual(
+        '../../../../packages/agent/src/plugins/services/plugin-operation.util',
+    ).pluginLoadFailure,
 }));
 jest.mock('@ever-works/agent/facades', () => ({
     GitFacadeService: class {},
@@ -297,6 +302,31 @@ describe('PluginValidationService', () => {
             expect(validateConnection).toHaveBeenCalledWith({ apiKey: 'k' });
         });
 
+        // F6: the first load resolves, but an onLoad that failed there leaves the
+        // entry in `error` (the eager boot skipped such a plugin at boot).
+        it('returns null for a lazy plugin whose onLoad fails on this first use', async () => {
+            const validateConnection = jest
+                .fn()
+                .mockResolvedValue({ success: true, message: 'ok' });
+            const entry = { state: 'loaded', error: undefined as unknown, plugin: {} as unknown };
+            entry.plugin = {
+                id: 'plug-1',
+                name: 'Plug 1',
+                capabilities: ['ai-provider'],
+                __materialize: jest.fn(async () => {
+                    entry.state = 'error';
+                    entry.error = 'onLoad failed';
+                    return { id: 'plug-1', capabilities: ['ai-provider'], validateConnection };
+                }),
+            };
+            pluginRegistry.get.mockReturnValue(entry);
+
+            const result = await service.tryValidateConnection('plug-1', 'u-1');
+
+            expect(result).toBeNull();
+            expect(validateConnection).not.toHaveBeenCalled();
+        });
+
         it('returns null and warns when the lazy plugin fails to materialize', async () => {
             const warn = jest.spyOn(service['logger'], 'warn').mockImplementation();
             const lazyStub = {
@@ -430,6 +460,30 @@ describe('PluginValidationService', () => {
             const result = await service.validateUserPluginConnection('plug-1', 'u-1');
 
             expect(result).toEqual({ success: true, message: 'Plain settings saved.' });
+        });
+
+        it('throws NotFoundException for a lazy plugin whose onLoad fails on this first use', async () => {
+            const validateConnection = jest
+                .fn()
+                .mockResolvedValue({ success: true, message: 'ok' });
+            const entry = { state: 'loaded', error: undefined as unknown, plugin: {} as unknown };
+            entry.plugin = {
+                id: 'plug-1',
+                name: 'Plug 1',
+                capabilities: ['ai-provider'],
+                __materialize: jest.fn(async () => {
+                    entry.state = 'error';
+                    entry.error = 'onLoad failed';
+                    return { id: 'plug-1', capabilities: ['ai-provider'], validateConnection };
+                }),
+            };
+            pluginRegistry.get.mockReturnValue(entry);
+            pluginSettings.getSettings.mockResolvedValue({ apiKey: 'k' });
+
+            await expect(
+                service.validateUserPluginConnection('plug-1', 'u-1'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(validateConnection).not.toHaveBeenCalled();
         });
 
         // Regression: the throwing endpoint 500'd for lazy plugins whose real

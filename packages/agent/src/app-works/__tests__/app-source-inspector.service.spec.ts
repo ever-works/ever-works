@@ -1257,6 +1257,45 @@ describe('AppSourceInspectorService', () => {
             expect(response.deployTargets['your-cluster'].available).toBe(false);
             assertNoContradictions(response);
         });
+
+        it('ignores a lazy plugin whose onLoad fails on this first use', async () => {
+            // F6: the first load resolves, but a failing onLoad leaves the entry in `error`; the
+            // eager boot skipped such a plugin, so it offers no target here either.
+            const h = harness({ tierOpen: true });
+            const entry = {
+                state: 'loaded' as string,
+                error: undefined as unknown,
+                manifest: { capabilities: ['deployment'] },
+                plugin: {} as Record<string, unknown>,
+            };
+            entry.plugin = {
+                id: 'k8s',
+                capabilities: ['deployment'],
+                __materialize: jest.fn(async () => {
+                    entry.state = 'error';
+                    entry.error = 'onLoad failed';
+                    return {
+                        id: 'k8s',
+                        capabilities: ['deployment'],
+                        supportsApps: true,
+                        deployApp: () => undefined,
+                    };
+                }),
+            };
+            (h.service as unknown as { registry: unknown }).registry = {
+                getEnabledPluginsScoped: jest.fn().mockResolvedValue([entry]),
+            };
+            (h.service as unknown as { deployFacade: unknown }).deployFacade = {
+                getAvailableProvidersForUser: jest
+                    .fn()
+                    .mockResolvedValue([{ id: 'k8s', enabled: true }]),
+            };
+
+            const response = await h.service.inspect(URL, USER);
+
+            expect(response.deployTargets['your-cluster'].available).toBe(false);
+            assertNoContradictions(response);
+        });
     });
 
     describe('inspect writes nothing (FR-5, ACC-01-06)', () => {

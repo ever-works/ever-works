@@ -151,6 +151,20 @@ const DANGEROUS_METHOD_NAMES = new Set<string>([
 const METHOD_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 
 /**
+ * Methods of a registered target that the Trigger.dev worker answers LOCALLY and
+ * must never call over this hop, left out of the target's derived allow-list.
+ *
+ * `PluginRepository.mergeLazyRegistration` is every lazy plugin registration's
+ * row write, and a worker run registers every plugin it discovers: the worker's
+ * `LocalPluginStore` (`trigger-plugins.module.ts`) answers it in memory. A worker
+ * that dialled it instead would pay a round trip per plugin per run; refusing it
+ * here makes that a loud failure rather than a quiet cost.
+ */
+const WORKER_LOCAL_METHODS: Readonly<Record<string, readonly string[]>> = {
+    PluginRepository: ['mergeLazyRegistration'],
+};
+
+/**
  * Security (deserialization): the legitimate Trigger.dev worker always sends
  * `args` as a SuperJSON envelope — a plain object with exactly a `json` field
  * and an optional `meta` field (see `TriggerInternalApiClient.callRemote`).
@@ -853,11 +867,13 @@ export class TriggerInternalController implements OnModuleInit {
         // Only methods declared directly on the service class (or one of its
         // parents in the chain, excluding Object.prototype) are callable
         // via /internal/trigger/remote/call.
+        // Minus the methods the worker must answer locally (WORKER_LOCAL_METHODS).
         this.allowedMethods = Object.fromEntries(
-            Object.entries(this.remoteMap).map(([name, instance]) => [
-                name,
-                buildMethodAllowList(instance),
-            ]),
+            Object.entries(this.remoteMap).map(([name, instance]) => {
+                const allowed = buildMethodAllowList(instance);
+                for (const method of WORKER_LOCAL_METHODS[name] ?? []) allowed.delete(method);
+                return [name, allowed];
+            }),
         );
     }
 

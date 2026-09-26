@@ -68,6 +68,7 @@ describe('PluginBootstrapService — plugins discovered on disk (real loader + l
         upsert: jest.Mock;
         updateState: jest.Mock;
         findByPluginId: jest.Mock;
+        mergeLazyRegistration: jest.Mock;
     };
     let loadedEvents: string[];
     let savedLazyEnv: string | undefined;
@@ -133,6 +134,8 @@ describe('PluginBootstrapService — plugins discovered on disk (real loader + l
             upsert: jest.fn().mockResolvedValue(undefined),
             updateState: jest.fn().mockResolvedValue(undefined),
             findByPluginId: jest.fn().mockResolvedValue(null),
+            // The lazy registration's row write (`registerLazy`).
+            mergeLazyRegistration: jest.fn().mockResolvedValue(undefined),
         };
         // Lazy mode is the default; make sure an ambient kill switch cannot
         // flip the lazy cases into eager mode.

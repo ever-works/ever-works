@@ -697,46 +697,117 @@ export class PluginLoaderService {
     /**
      * Merge the runtime manifest from the plugin class with the package.json
      * manifest stored in the registry + DB. Mirrors the eager `load()` path's
-     * inline merge at lines 237–246; runs at first materialization for lazy
-     * plugins so fields like icon, homepage, readme don't go missing in the
-     * admin UI for the lifetime of the install.
+     * inline merge; runs at first materialization for lazy plugins so fields
+     * like icon, homepage, readme don't go missing in the admin UI for the
+     * lifetime of the install.
+     *
+     * The registry entry is updated at once (synchronously, before anything
+     * is awaited), then `runHook` — the lifecycle manager's `callOnLoad` — runs,
+     * and only then is the merged manifest written to the DB. `onLoad` used to
+     * wait for that three-query upsert, which queues behind every other query
+     * of a list that loads many plugins; the proxy makes other callers wait
+     * for this whole first load either way. The upsert leaves `state` alone
+     * when the hook has put the entry in `error` (a failing `onLoad`), so it
+     * never writes that failure back to `loaded`.
      */
     private async enrichManifestAfterMaterialize(
         pluginId: string,
         real: IPlugin,
         discovered: DiscoveredPlugin,
+        runHook?: () => Promise<void>,
     ): Promise<void> {
-        if (typeof real.getManifest !== 'function') return;
-        try {
-            // Routing declarations come from package.json only: the plugin was
-            // routed with that manifest before it loaded.
-            const runtimeManifest = withoutRoutingDeclarations(real.getManifest());
-            const definedManifest = pickBy(
-                discovered.manifest as unknown as Record<string, unknown>,
-                (v) => v !== undefined,
-            );
-            const merged = { ...runtimeManifest, ...definedManifest } as typeof discovered.manifest;
-
-            this.registry.updateRegisteredManifest(pluginId, merged);
-            await this.pluginRepository.upsert({
-                pluginId: merged.id,
-                name: merged.name,
-                version: merged.version,
-                description: merged.description,
-                category: merged.category,
-                capabilities: [...merged.capabilities],
-                manifest: merged as unknown as Record<string, unknown>,
-                builtIn: discovered.builtIn,
-                installPath: discovered.path,
-                state: 'loaded',
-            });
-        } catch (error) {
-            this.logger.warn(
-                `Failed to enrich manifest for plugin ${pluginId}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
+        let merged: PluginManifest | null = null;
+        if (typeof real.getManifest === 'function') {
+            try {
+                // Routing declarations come from package.json only: the plugin
+                // was routed with that manifest before it loaded.
+                const runtimeManifest = withoutRoutingDeclarations(real.getManifest());
+                const definedManifest = pickBy(
+                    discovered.manifest as unknown as Record<string, unknown>,
+                    (v) => v !== undefined,
+                );
+                merged = { ...runtimeManifest, ...definedManifest } as PluginManifest;
+                this.registry.updateRegisteredManifest(pluginId, merged);
+            } catch (error) {
+                merged = null;
+                this.warnEnrichFailed(pluginId, error);
+            }
         }
+
+        let hookError: unknown;
+        let hookFailed = false;
+        if (runHook) {
+            try {
+                await runHook();
+            } catch (error) {
+                hookFailed = true;
+                hookError = error;
+            }
+        }
+
+        if (merged) {
+            try {
+                const row: Parameters<PluginRepository['upsert']>[0] = {
+                    pluginId: merged.id,
+                    name: merged.name,
+                    version: merged.version,
+                    description: merged.description,
+                    category: merged.category,
+                    capabilities: [...merged.capabilities],
+                    manifest: merged as unknown as Record<string, unknown>,
+                    builtIn: discovered.builtIn,
+                    installPath: discovered.path,
+                };
+                if (this.registry.get(pluginId)?.state !== 'error') {
+                    row.state = 'loaded';
+                }
+                await this.pluginRepository.upsert(row);
+            } catch (error) {
+                this.warnEnrichFailed(pluginId, error);
+            }
+        }
+
+        if (hookFailed) throw hookError;
+    }
+
+    private warnEnrichFailed(pluginId: string, error: unknown): void {
+        this.logger.warn(
+            `Failed to enrich manifest for plugin ${pluginId}: ${
+                error instanceof Error ? error.message : String(error)
+            }`,
+        );
+    }
+
+    /**
+     * Write the plugin row for a lazy registration: package.json's manifest,
+     * merged into a richer one the row already carries for the same version
+     * (the rules are `PluginRepository.mergeLazyRegistration`'s).
+     *
+     * ONE repository call, never a read here: in a Trigger worker
+     * `PluginRepository` is a remote proxy whose reads go to the API and whose
+     * writes stay in its in-memory `LocalPluginStore`, and a run registers every
+     * plugin it discovers — a read per plugin was a round trip per plugin per
+     * run.
+     */
+    private async persistLazyRegistration(
+        manifest: PluginManifest,
+        builtIn: boolean,
+        installPath: string,
+    ): Promise<void> {
+        await this.pluginRepository.mergeLazyRegistration(
+            {
+                pluginId: manifest.id,
+                name: manifest.name,
+                version: manifest.version,
+                description: manifest.description,
+                category: manifest.category,
+                capabilities: [...manifest.capabilities],
+                builtIn,
+                installPath,
+                state: 'loaded',
+            },
+            manifest as unknown as Record<string, unknown>,
+        );
     }
 
     /**
@@ -784,11 +855,15 @@ export class PluginLoaderService {
             // load() path used to do this inline before the upsert; for lazy
             // loading we have to defer it to first materialization so we don't
             // lose those fields for the lifetime of the install.
+            // The registry entry is enriched first (synchronously), then the
+            // lifecycle hook runs onLoad, then the DB row is written.
             const onFirstMaterialize = async (id: string, real: IPlugin) => {
-                await this.enrichManifestAfterMaterialize(id, real, discovered);
-                if (userOnFirstMaterialize) {
-                    await userOnFirstMaterialize(id, real);
-                }
+                await this.enrichManifestAfterMaterialize(
+                    id,
+                    real,
+                    discovered,
+                    userOnFirstMaterialize ? () => userOnFirstMaterialize(id, real) : undefined,
+                );
             };
 
             this.registry.registerLazy(manifest, loader, {
@@ -798,18 +873,8 @@ export class PluginLoaderService {
                 onMaterializeError: userOnMaterializeError,
             });
 
-            await this.pluginRepository.upsert({
-                pluginId: manifest.id,
-                name: manifest.name,
-                version: manifest.version,
-                description: manifest.description,
-                category: manifest.category,
-                capabilities: [...manifest.capabilities],
-                manifest: manifest as unknown as Record<string, unknown>,
-                builtIn: discovered.builtIn,
-                installPath: pluginPath,
-                state: 'loaded',
-            });
+            // Keeps the richer manifest an existing row carries: see there.
+            await this.persistLazyRegistration(manifest, discovered.builtIn, pluginPath);
 
             this.logger.debug(`Registered lazy plugin: ${manifest.id} v${manifest.version}`);
 

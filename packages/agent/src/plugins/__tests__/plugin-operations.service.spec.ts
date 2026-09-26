@@ -3081,6 +3081,7 @@ describe('PluginOperationsService — enabling a runtime-installed plugin (dynam
         updateInstallState: jest.Mock;
         upsert: jest.Mock;
         updateState: jest.Mock;
+        mergeLazyRegistration: jest.Mock;
     };
     let extractCalls: string[];
 
@@ -3143,6 +3144,8 @@ describe('PluginOperationsService — enabling a runtime-installed plugin (dynam
             updateInstallState: jest.fn(async () => undefined),
             upsert: jest.fn(async () => ({})),
             updateState: jest.fn(async () => ({})),
+            // The lazy registration's row write (`registerLazy`).
+            mergeLazyRegistration: jest.fn(async () => ({})),
         };
         userPluginRepository = {
             findOne: jest.fn().mockResolvedValue(null),

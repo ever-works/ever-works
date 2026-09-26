@@ -1,9 +1,13 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
-import type { IAiProviderPlugin, IPlugin, JsonSchema } from '@ever-works/plugin';
+import type { IAiProviderPlugin, JsonSchema } from '@ever-works/plugin';
 import type { ModelCredentialField } from '@ever-works/contracts';
 import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializeUsablePlugin } from '../plugins/services/plugin-operation.util';
 
 /** An installed AI-provider plugin, as the model-accounts surface needs it. */
 export interface ModelProviderDescriptor {
@@ -44,13 +48,11 @@ export class ModelProviderCatalogService {
         if (!this.registry) return [];
         const descriptors: ModelProviderDescriptor[] = [];
         for (const registered of this.registry.getByCapability(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
+            // A package.json `supplementary` is final: no need to load it.
             if (registered.state !== 'loaded' || registered.manifest.supplementary) continue;
-            const descriptor = await this.describe(
-                registered.plugin,
-                registered.manifest.name,
-                false,
-            );
-            if (descriptor) descriptors.push(descriptor);
+            const descriptor = await this.describe(registered);
+            // `supplementary` read after the load: getManifest() may set it.
+            if (descriptor && !descriptor.supplementary) descriptors.push(descriptor);
         }
         return descriptors;
     }
@@ -65,11 +67,7 @@ export class ModelProviderCatalogService {
         ) {
             return null;
         }
-        return this.describe(
-            registered.plugin,
-            registered.manifest.name,
-            registered.manifest.supplementary === true,
-        );
+        return this.describe(registered);
     }
 
     /** Display name for a provider id; the id itself when the plugin is gone. */
@@ -85,40 +83,36 @@ export class ModelProviderCatalogService {
         );
     }
 
-    private async describe(
-        candidate: IPlugin,
-        manifestName: string | undefined,
-        supplementary: boolean,
-    ): Promise<ModelProviderDescriptor | null> {
-        try {
-            const plugin = (await materialize(candidate)) as IAiProviderPlugin;
-            const descriptor: ModelProviderDescriptor = {
-                providerPluginId: plugin.id,
-                providerName: plugin.providerName || manifestName || plugin.id,
-                credentialFields: secretFieldsOf(plugin.settingsSchema),
-                plugin,
-            };
-            if (supplementary) descriptor.supplementary = true;
-            return descriptor;
-        } catch (error) {
-            this.logger.warn(
-                `Could not load AI provider ${candidate.id} for model accounts: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
-            return null;
-        }
+    /**
+     * The descriptor of a registered AI provider, read once it has LOADED:
+     * under lazy plugin loading the registry hands out a proxy whose
+     * `settingsSchema` is only real after materialization (the same reason the
+     * facades materialize before use), and whose entry carries the manifest
+     * fields the class's getManifest() adds — `supplementary` among them —
+     * only then. `null` when the provider cannot be used: its import fails, or
+     * its onLoad fails on this first use (the entry turns `error`; the eager
+     * boot skipped such a plugin).
+     */
+    private async describe(registered: RegisteredPlugin): Promise<ModelProviderDescriptor | null> {
+        const pluginId = registered.plugin.id;
+        const plugin = await materializeUsablePlugin<IAiProviderPlugin>(
+            registered,
+            pluginId,
+            (reason) =>
+                this.logger.warn(
+                    `Could not load AI provider ${pluginId} for model accounts: ${reason}`,
+                ),
+        );
+        if (!plugin) return null;
+        const descriptor: ModelProviderDescriptor = {
+            providerPluginId: plugin.id,
+            providerName: plugin.providerName || registered.manifest.name || plugin.id,
+            credentialFields: secretFieldsOf(plugin.settingsSchema),
+            plugin,
+        };
+        if (registered.manifest.supplementary === true) descriptor.supplementary = true;
+        return descriptor;
     }
-}
-
-/**
- * Under lazy plugin loading the registry hands out a proxy whose
- * `settingsSchema` is only real after materialization — the same reason the
- * facades materialize before use.
- */
-async function materialize(plugin: IPlugin): Promise<IPlugin> {
-    const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
-    return typeof stub.__materialize === 'function' ? stub.__materialize() : plugin;
 }
 
 /** The `x-secret` properties of a settings schema, as credential fields. */

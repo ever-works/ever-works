@@ -66,12 +66,35 @@ export interface ColdPluginSpec {
     /**
      * Holds the first-materialise hook AFTER the proxy has marked itself
      * materialised (and the runtime manifest is folded in) but BEFORE `onLoad`
-     * runs, until this promise settles — the window in which the real loader
-     * awaits its manifest DB upsert (`enrichManifestAfterMaterialize`) before
-     * `callOnLoad`. A second caller arriving then finds `__isMaterialized`
-     * already true and the entry still `loaded`.
+     * has completed, until this promise settles — the window of a slow
+     * `onLoad` (the real loader used to await its manifest DB upsert here too,
+     * before `callOnLoad`). A second caller arriving then finds
+     * `__isMaterialized` already true and the entry still `loaded`.
      */
     firstLoadGate?: Promise<unknown>;
+    /**
+     * Register it as a `builtIn` (package.json `builtIn: true`), as every real
+     * plugin whose `getManifest()` adds list fields (visibility, uiHints,
+     * supplementary) is. Default `false`: a plugin a list leaves cold unless
+     * the list's viewer (the user, or the Work) has enabled it.
+     */
+    builtIn?: boolean;
+    /**
+     * Counts this plugin's first load while it is in flight (import started,
+     * first-materialise hook not finished) on a tracker several plugins share.
+     * The import then yields a macrotask, so loads started together overlap.
+     */
+    loadTracker?: LoadTracker;
+}
+
+/** How many fixture first loads are in flight now, and at most so far. */
+export interface LoadTracker {
+    active: number;
+    peak: number;
+}
+
+export function loadTracker(): LoadTracker {
+    return { active: 0, peak: 0 };
 }
 
 export interface ColdPlugin {
@@ -137,9 +160,16 @@ export function registerColdPlugin(
 
     let loads = 0;
     let onLoadDone = false;
+    const tracker = spec.loadTracker;
     const loader = async (): Promise<IPlugin | null> => {
         loads += 1;
+        if (tracker) {
+            tracker.active += 1;
+            tracker.peak = Math.max(tracker.peak, tracker.active);
+            await settle();
+        }
         if (spec.failing) {
+            if (tracker) tracker.active -= 1;
             throw new Error(`fixture: cannot import ${spec.id}`);
         }
         const instance: Record<string, unknown> = {
@@ -169,23 +199,28 @@ export function registerColdPlugin(
     };
 
     const registered = registry.registerLazy(manifest, loader, {
+        builtIn: spec.builtIn ?? false,
         // The loader's hook, then the lifecycle manager's (callOnLoad).
         onFirstMaterialize: async (pluginId, real) => {
-            if (spec.runtimeManifest) {
-                const defined = Object.fromEntries(
-                    Object.entries(manifest).filter(([, value]) => value !== undefined),
-                );
-                registry.updateRegisteredManifest(pluginId, {
-                    ...spec.runtimeManifest,
-                    ...defined,
-                } as PluginManifest);
-            }
-            // The loader's manifest DB upsert, awaited before callOnLoad.
-            if (spec.firstLoadGate) await spec.firstLoadGate;
             try {
-                await real.onLoad({} as never);
-            } catch (error) {
-                registry.updateState(pluginId, 'error', error as Error);
+                if (spec.runtimeManifest) {
+                    const defined = Object.fromEntries(
+                        Object.entries(manifest).filter(([, value]) => value !== undefined),
+                    );
+                    registry.updateRegisteredManifest(pluginId, {
+                        ...spec.runtimeManifest,
+                        ...defined,
+                    } as PluginManifest);
+                }
+                // Held here: whatever the hook awaits before onLoad has run.
+                if (spec.firstLoadGate) await spec.firstLoadGate;
+                try {
+                    await real.onLoad({} as never);
+                } catch (error) {
+                    registry.updateState(pluginId, 'error', error as Error);
+                }
+            } finally {
+                if (tracker) tracker.active -= 1;
             }
         },
         onMaterializeError: async (pluginId, error) => {

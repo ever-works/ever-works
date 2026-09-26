@@ -41,6 +41,7 @@ import {
 } from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { pluginLoadFailure } from '../plugins/services/plugin-operation.util';
 import { redactSecrets } from '../utils/secret-scan';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { FleetAuditService } from './fleet-audit.service';
@@ -1485,6 +1486,14 @@ export class FleetService {
             const kubeContext = settings.kubeContext?.value as string | undefined;
 
             const plugin = await this.materialize(registered.plugin);
+            // A k8s plugin whose onLoad failed on this first use is left
+            // alone (the load resolves; the entry turns `error`), as the eager
+            // boot left it: enrolled rows only.
+            const failure = pluginLoadFailure(registered, 'k8s');
+            if (failure) {
+                this.logger.debug(`Cluster node listing skipped: ${failure}`);
+                return [];
+            }
             const listClusterNodes = (
                 plugin as unknown as {
                     listClusterNodes?: (
@@ -1508,7 +1517,10 @@ export class FleetService {
         }
     }
 
-    /** Under lazy plugin loading the registry hands out a proxy stub. */
+    /**
+     * Under lazy plugin loading the registry hands out a proxy stub. Resolves
+     * once its first load has settled; the caller re-checks the entry's state.
+     */
     private async materialize(plugin: IPlugin): Promise<IPlugin> {
         const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
         if (typeof stub.__materialize === 'function') {

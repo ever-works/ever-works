@@ -70,7 +70,12 @@ class ProgrammaticBuiltinPlugin {
 
 describe('PluginBootstrapService — PLUGIN_EAGER_BUILTINS (disk builtIns, real loader + lazy proxy)', () => {
     let registry: PluginRegistryService;
-    let repo: { upsert: jest.Mock; updateState: jest.Mock; findByPluginId: jest.Mock };
+    let repo: {
+        upsert: jest.Mock;
+        updateState: jest.Mock;
+        findByPluginId: jest.Mock;
+        mergeLazyRegistration: jest.Mock;
+    };
     let loadedEvents: string[];
     const savedEnv: Record<string, string | undefined> = {};
 
@@ -134,6 +139,8 @@ describe('PluginBootstrapService — PLUGIN_EAGER_BUILTINS (disk builtIns, real 
             upsert: jest.fn().mockResolvedValue(undefined),
             updateState: jest.fn().mockResolvedValue(undefined),
             findByPluginId: jest.fn().mockResolvedValue(null),
+            // The lazy registration's row write (`registerLazy`).
+            mergeLazyRegistration: jest.fn().mockResolvedValue(undefined),
         };
         for (const key of ['PLUGIN_LAZY_LOAD', 'PLUGIN_EAGER_BUILTINS', ENV_KEY]) {
             savedEnv[key] = process.env[key];

@@ -196,10 +196,13 @@ export function validateOperationDeclarations(operations: unknown): ValidationEr
 /**
  * The real plugin behind a registry entry, once it has LOADED: a lazy proxy is
  * materialised with `{ waitForLoad: true }`, so its first-materialise hook
- * (onLoad) has settled — by default `__materialize` answers a caller that
- * arrives while another caller's onLoad is still running before that onLoad
- * settles, and the registry state read afterwards would still say `loaded`.
- * Anything else is returned as it is. Rejects when the plugin will not load.
+ * (onLoad) has settled before this resolves. A plain `__materialize()` waits
+ * for that too — except from inside the plugin's own first load, where it
+ * answers at once; `waitForLoad` REJECTS there instead, so a use path reached
+ * from a plugin's own onLoad fails loudly rather than run on a half-loaded
+ * plugin (or hang). Anything else is returned as it is. Rejects when the
+ * plugin will not load. Follow it with {@link pluginLoadFailure}: an onLoad
+ * that failed leaves the entry in `error` but still resolves here.
  */
 export async function materializePlugin(plugin: unknown): Promise<object> {
     const lazy = plugin as { __materialize?: unknown };
@@ -232,4 +235,50 @@ export function pluginLoadFailure(
     if (!entry || entry.state !== 'error') return null;
     const cause = entry.error instanceof Error ? entry.error.message : entry.error;
     return `Plugin "${pluginId}" is in an error state${cause ? `: ${String(cause)}` : '.'}`;
+}
+
+/**
+ * The real plugin behind `entry` for a caller about to USE it, or `null` when
+ * it cannot be used: its import fails, or its first load leaves the entry in
+ * `error` ({@link pluginLoadFailure} — a failing `onLoad` does not reject the
+ * materialise, it records `error` on the entry). The eager boot skipped such a
+ * plugin; a caller that materialises on first use must skip it too, not run
+ * it. `onUnusable` hears why, for a log line.
+ *
+ * Waits for the first load to settle (a plain `__materialize()` does, outside
+ * the plugin's own onLoad). Pass the entry `PluginRegistryService.get`
+ * returned — the registry mutates it in place, so it carries the state as it
+ * is after the load.
+ */
+export async function materializeUsablePlugin<T = object>(
+    entry: { plugin: unknown; state?: string; error?: unknown },
+    pluginId: string,
+    onUnusable?: (reason: string) => void,
+): Promise<T | null> {
+    const before = pluginLoadFailure(entry, pluginId);
+    if (before) {
+        onUnusable?.(before);
+        return null;
+    }
+    let real: object;
+    try {
+        const lazy = entry.plugin as { __materialize?: () => Promise<object> };
+        real =
+            typeof lazy?.__materialize === 'function'
+                ? await lazy.__materialize()
+                : (entry.plugin as object);
+    } catch (error) {
+        onUnusable?.(
+            `Plugin "${pluginId}" could not be loaded: ${
+                error instanceof Error ? error.message : String(error)
+            }`,
+        );
+        return null;
+    }
+    const after = pluginLoadFailure(entry, pluginId);
+    if (after) {
+        onUnusable?.(after);
+        return null;
+    }
+    return (real ?? entry.plugin) as T;
 }

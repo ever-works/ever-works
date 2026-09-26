@@ -113,14 +113,16 @@ export class WorksConfigProjectionService {
 
     /**
      * Whether the plugin is supplementary (a URL-pattern specialist, never a
-     * Work's provider). The plugin's DB row is not enough: it holds the
-     * package.json manifest alone until the plugin's first use in some
-     * process — every boot re-registers each plugin lazily and upserts that
-     * manifest — and a plugin may declare `supplementary` only in its class's
-     * getManifest() (pdf-extractor, officecli-extractor). The registry entry
-     * carries it once the plugin has loaded, so load it (only a plugin with an
-     * active capability to project reaches here). One that cannot load is
-     * still projected: the projection mirrors the Work's configuration.
+     * Work's provider). The plugin's DB row is not enough: each lazy
+     * registration writes package.json's manifest into it, keeping only the
+     * keys a first load of the SAME version wrote (a version change resets the
+     * row to package.json's manifest, so a flag an older version declared does
+     * not outlive the upgrade), and a plugin may declare `supplementary` only
+     * in its class's getManifest() (pdf-extractor, officecli-extractor,
+     * notion-extractor). The registry entry carries it once the plugin has
+     * loaded, so load it (only a plugin with an active capability to project
+     * reaches here). One that cannot load is still projected: the projection
+     * mirrors the Work's configuration.
      */
     private async isSupplementaryPlugin(workPlugin: WorkPluginEntity): Promise<boolean> {
         if (this.isSupplementaryManifest(workPlugin.pluginEntity?.manifest)) {

@@ -317,6 +317,8 @@ describe('FacadePluginAvailabilityService (FR-15 / T26)', () => {
                 updateInstallState: jest.fn(async () => undefined),
                 upsert: jest.fn(async () => ({})),
                 updateState: jest.fn(async () => ({})),
+                // The lazy registration's row write (`registerLazy`).
+                mergeLazyRegistration: jest.fn(async () => ({})),
             };
             const options: PluginsModuleOptions = {
                 ...ON,

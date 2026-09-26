@@ -60,6 +60,7 @@ import {
     PluginRegistryService,
     type RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
+import { pluginLoadFailure } from '../plugins/services/plugin-operation.util';
 import {
     parseRepositoryWorkSource,
     type RepositoryWorkSource,
@@ -1351,9 +1352,12 @@ function declaresCapability(
 
 /**
  * The real plugin behind a possibly-lazy registry entry, or `null` when
- * materialisation failed. A lazy proxy answers a forwarding function for every
- * property it does not define, so `isAppDeploymentPlugin` against the stub would
- * tell us about the proxy rather than about the plugin.
+ * materialisation failed — its import failed, or its first load left the entry
+ * in `error` (an `onLoad` that fails on this first use does not reject the
+ * materialise; the eager boot skipped such a plugin). A lazy proxy answers a
+ * forwarding function for every property it does not define, so
+ * `isAppDeploymentPlugin` against the stub would tell us about the proxy rather
+ * than about the plugin.
  */
 async function materialiseDeploymentPlugin(
     registered: RegisteredPlugin,
@@ -1368,8 +1372,9 @@ async function materialiseDeploymentPlugin(
     if (typeof plugin.__materialize !== 'function') {
         return plugin;
     }
+    let real: IDeploymentPlugin;
     try {
-        return (await plugin.__materialize()) ?? plugin;
+        real = (await plugin.__materialize()) ?? plugin;
     } catch (error) {
         logger?.warn(
             `App source inspect: plugin '${registered.plugin.id}' could not be materialised ` +
@@ -1377,6 +1382,12 @@ async function materialiseDeploymentPlugin(
         );
         return null;
     }
+    const failure = pluginLoadFailure(registered, registered.plugin.id);
+    if (failure) {
+        logger?.warn(`App source inspect: ${failure}`);
+        return null;
+    }
+    return real;
 }
 
 /** Base64 → utf-8, and the raw value when the provider sent something else. */
