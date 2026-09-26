@@ -3,7 +3,7 @@
  *
  * ## What the acceptance case asks for, in its own words
  *
- * **ACC-E2E-11 — "Not deployed, still evolved (step 6)"** (`ACCEPTANCE.md:573-590`; its
+ * **ACC-E2E-11 — "Not deployed, still evolved (step 6)"** (`ACCEPTANCE.md:577-594`; its
  * own row names this file as the PR-lane spec):
  *
  * > - **Given** a fixture App Work created with Deploy target **None** (label **None —

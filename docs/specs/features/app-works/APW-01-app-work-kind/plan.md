@@ -1059,17 +1059,23 @@ No repository name, URL, owner, token or file content in any payload.
 **`app_work.create_finished` (amended 2026-09-25, T36).** `reason` is the closed-set reason code; `http_<status>` for
 a refusal with no code (Nest validation 400, the per-user slug 409). `failed` is an unexpected fault: reason
 `unexpected`, or `http_<status>` for a 5xx without a code (`appWorkCreateOutcomeOf` in
-`packages/agent/src/app-works/app-works-telemetry.service.ts`).
+`packages/agent/src/app-works/app-works-telemetry.service.ts`). A `failed` outcome is a platform fault and is never
+counted as the member's refusal.
 
 **Emission points (T36).** `app_source.inspected` once per inspect answer, including a cache hit (`providerCalls` 0),
 and never for a validation refusal. `app_work.create_started` once the request has passed validation and the fresh
 inspection (after step 6a), so a request refused earlier has a `create_finished` without a `create_started`.
 `adoptedExistingFork` is the fork the inspection found in the chosen owner. `app_work.create_finished` exactly once per
-create call. `app_work.source_ready` beside each success Activity row (`initialized` / `unchanged` /
-`waiting_for_setup_pr`), so a link emits it at least twice, first with `setupPullRequest` true and then false after the
-merge (it counts hand-offs, not Works); `preparingMs` is measured from `work_upstream_states.readinessStartedAt` and is
-null when that is absent. `app_work.deleted` when the row goes or the App runtime holds the delete pending, never again
-from `completeAppWorkDeletion` (a repeated delete request while the row is still pending does emit again);
+create call. `app_work.source_ready` once per non-failed minimal-path invocation (plan §6 steps 3–6: `initialized` /
+`unchanged` / `waiting_for_setup_pr`), never for a failure (corrected 2026-09-26). It is not once per Work, and not once
+per `app.source.*` success row: a Blueprint request (step 2a) writes its `app.source.<relation>` row but emits nothing,
+and a Blueprint Work's event comes from the re-invocation after the Blueprint lands. A link emits at least twice, first
+with `setupPullRequest` true and then false after the merge. Any re-dispatched run that answers `unchanged`, or finds
+its setup pull request still open, emits again. `setupPullRequest` describes that invocation, and `preparingMs` (from
+`work_upstream_states.readinessStartedAt`, null when absent) includes the wait for the merge. `app_work.deleted` once per
+accepted App Work delete request, when the row goes or the App runtime holds the delete pending; never again from
+`completeAppWorkDeletion`, and a repeated delete request for a Work still held pending is counted again, just as it
+writes a second `work.deleted` Activity row;
 `repositoryDeleted` = the Work Repository (website role) was removed. Unbound sink, or
 PostHog not configured ⇒ counted and dropped, with only a count logged. Events flow only in the API process; the
 worker and CLI graphs count and drop them by design.

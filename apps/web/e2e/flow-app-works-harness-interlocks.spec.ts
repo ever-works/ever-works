@@ -906,7 +906,7 @@ test.describe('ACC-E2E-12 — the App Launcher lane APW-13 references', () => {
     });
 
     /**
-     * E2E-12's spec file is **APW-11 T20's** (`ACCEPTANCE.md:596`: "created by APW-11 T20;
+     * E2E-12's spec file is **APW-11 T20's** (`ACCEPTANCE.md:600`: "created by APW-11 T20;
      * APW-13 references it"; Resolution R-22), and T33's Done-when says "this epic's diff
      * adds no `flow-app-launcher-apps.spec.ts`".
      *

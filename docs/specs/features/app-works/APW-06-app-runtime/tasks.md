@@ -367,7 +367,7 @@ kind, namespace, labelSelector)`, `deleteObject(…, propagationPolicy)`, `readP
       **Done when**: `pnpm --filter @ever-works/agent test -- app-runtime.facade` is green and no `'k8s'` string literal
       is added outside `packages/plugins/k8s/`.
 
-- [ ] **T21. Preconditions and license gate.**
+- [ ] **T21. Preconditions and license gate.** _Status 2026-09-26: [Status notes](#status-notes)._
       **Create** `packages/agent/src/app-runtime/app-deploy-preconditions.service.ts` and
       `packages/agent/src/app-runtime/app-license-gate.ts` _(new)_ per plan §5.1–§5.2 — the license gate reads
       `AppLicenseService.getHostingEligibility(workId)` (APW-03; typed fake until it lands) and stores nothing (R-3).
@@ -1231,7 +1231,7 @@ unblock APW-07 P1. Numbers continue from T68._
       treats the dispatcher gate inside the isolated worker (for example, skip it when the request carries the
       lock-holding `deploymentId`); (b) `WORK_APP_RUNTIME_STATES` is unbound in the worker (runtime-state warning);
       (c) `APP_RUNTIME_ENV_SOURCE`, `APP_IMAGE_PULL_CREDENTIAL_SOURCE`, `APP_RUNTIME_TARGET` and `APPS_TIER_POLICY` are
-      still default-ports fail-closed stubs (T73/T44).
+      still default-ports fail-closed stubs (T73/T44). _Later status: [Status notes](#status-notes)._
       **Create** `packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts` _(new)_ exactly as plan §6.4,
       modelled on `trigger-workflow-run.module.ts` but importing **no** `DatabaseModule`, **no** TypeORM `DataSource` and
       no Redis client. It provides the local services of plan §6.4's table, proxies the rest through
@@ -1295,3 +1295,29 @@ unblock APW-07 P1. Numbers continue from T68._
 - No new string literal `'k8s'` outside `packages/plugins/k8s/`; no read of `EVER_WORKS_APPS_MANAGED_ENABLED` in this
   epic; no kubeconfig, env value, token or log text in Activity, telemetry, API responses or `work_deployments`.
 - `docs/plugin-system/built-in-plugins.md` untouched (no plugin added — Constitution VIII).
+
+## Status notes
+
+Dated status for the tasks above. It is kept here, not in the task bodies, so the task text keeps the line numbers that
+code comments and specs cite.
+
+- **T21 (2026-09-26, `3a956180e`):** the preconditions are wired in the API graph. `AppDeployRequestModule` now imports
+  APW-07's `AppRuntimeEnvModule` (`APP_RUNTIME_ENV_SOURCE`) and `AppDependenciesModule` (`APP_DEPENDENCIES_SERVICE`),
+  which were in no API graph, so every Deploy past the dispatcher gate had been refused `env_source_unavailable`. It
+  also provides `AppLicenseGate`, so the licence preconditions run on the API request path; with APW-03's
+  `APP_LICENSE_SERVICE` unwritten the gate answers its documented unreadable verdict (`license_blocks_target` on the
+  managed target, a `license_eligibility_unavailable` warning on your cluster). The dependency step reuses the readiness
+  the env step already fetched (one `ensureReadyForDeploy` call per evaluation), and while APW-07's
+  `APP_DEPENDENCY_SPEC_SOURCE` is unbound it refuses (`dependency_not_ready`) only a spec that declares a dependency; a
+  spec that declares none gets the `dependencies_unavailable` warning. Pinned by
+  `packages/agent/src/app-runtime/__tests__/app-deploy-request.graph.spec.ts` and
+  `app-deploy-preconditions.service.spec.ts`; guarded by `apps/api/src/app-works-di-reachability.spec.ts`.
+- **T71 (2026-09-26, `3a956180e`):** `apps/api/src/app-works-di-reachability.spec.ts` walks the worker contexts the
+  `app-*` tasks boot. Its `EXPECTED_WORKER_UNBOUND` list cites T71's 2026-09-25 status line for items (a) and (b).
+  Besides those gaps it measured 13 more unbound worker bindings, kept in its `OPEN_WORKER_GAPS` list rather than
+  called intended: six in `AppDependencyProvisionWorkerModule` (`WorkAppDependencyRepository` twice, by class and by
+  name, `APP_DEPENDENCY_CLUSTER_ACCESS`, `APP_DEPENDENCY_CONFIG_CIPHER`, `APP_DEPENDENCY_PROVISION_DISPATCHER`,
+  `AppDependencyFacadeService`) and seven in `TriggerAppRuntimeModule` (`APP_CUSTOM_DOMAIN_STORE`,
+  `APP_DEPENDENCIES_SERVICE`, `APP_DEPLOY_DEPLOYMENT_STORE`, `APP_HOSTS_APPS_DOMAIN`, `APP_HOSTS_DEPLOYMENT_STORE`,
+  `APP_HOSTS_DEPLOY_REQUESTER`, `APP_HOSTS_WORK_STORE`). **Owner decision:** add them to T71's status line (they then
+  move to `EXPECTED_WORKER_UNBOUND`, citing it) or cut a T71 slice (with APW-07 T17) that binds them.

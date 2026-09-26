@@ -65,10 +65,12 @@
  *   steps of an `app`-kind create, the `WorkUpstreamState` row written in the same
  *   transaction, and the readiness dispatch.
  * - `./app-work-deletion.port` — `AppWorkDeletionPort` and `APP_WORK_DELETION_PORT`
- *   (T39, plan §7): the App runtime's deletion seam. APW-06's
- *   `AppRuntimeDeletionService` binds it; `WorkLifecycleService` injects it
- *   `@Optional()`, and unbound means "no App runtime exists yet", so an App Work's
- *   delete keeps today's behaviour (the row goes now) until APW-06 merges.
+ *   (T39, plan §7): the App runtime's deletion seam. The binding is APW-06's
+ *   `APP_WORK_DELETION_PORT_PROVIDER` (`app-runtime-deletion.service.ts`), which
+ *   provides this exact token; no API module provides it yet (APW-06 T33).
+ *   `WorkLifecycleService` injects it `@Optional()`, and unbound means "no App
+ *   runtime exists yet", so an App Work's delete keeps today's behaviour (the row
+ *   goes now) until T33 registers that provider.
  * - `./app-source-initializer.service` — `AppSourceInitializerService` (T15, plan §6),
  *   the implementation of `APP_FORK_READY_HANDLER`: it creates the App spec state row
  *   (**the call C32 measured as missing everywhere**), applies or requests a Blueprint,

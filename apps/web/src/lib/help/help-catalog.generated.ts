@@ -1015,6 +1015,11 @@ export const HELP_ARTICLES = [
             { id: 'what-an-operator-sets', text: 'What an operator sets', level: 3 },
             { id: 'install-on-use', text: 'Install-on-use', level: 3 },
             { id: 'sandbox-sessions', text: 'Sandbox sessions', level: 3 },
+            {
+                id: 'background-jobs-the-worker',
+                text: 'Background jobs (the worker)',
+                level: 3,
+            },
             { id: 'the-admin-allowlist', text: 'The admin allowlist', level: 3 },
             {
                 id: 'installing-and-what-refuses',

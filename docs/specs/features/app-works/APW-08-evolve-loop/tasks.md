@@ -406,8 +406,10 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       **Status (2026-09-25, wave 2, `86e1a3ddf`):**
       _Cloud path:_ judged before the push (`checkPaths` over `IWorkspacePlugin.branchChanges`, then publish by
       `publishSha`). Default-off behind `APP_WORKS_CLOUD_PUSH_ENABLED` until T12 lands (owner decision 2026-09-25);
-      when T12 lands, revisit the default. The switch holds `finalizeRun` only: the agent tool `commitToRepo` still
-      pushes an App Work feature branch after a pre-push `checkPaths` of the call's own files (plan §2.5). The residual that the post-push compare still names the branch, not the sha,
+      when T12 lands, revisit the default. The switch holds `finalizeRun` and the agent git tools through one gate
+      (`appWorkCloudPushAllowed`, 2026-09-26, `cab3419e5`): off, `commitToRepo` / `openPullRequest` refuse an App Work
+      with the FR-12 message and publish nothing; on, `commitToRepo` pushes after a pre-push `checkPaths` of the call's
+      own files and `openPullRequest` runs `evaluate` first (plan §2.5, including the switch-on residual). The residual that the post-push compare still names the branch, not the sha,
       is recorded in `guardAppChange`'s docstring.
       _Residual (plan §2.5):_ both judgements (pre-push `branchChanges` and the post-push compare) use merge-base
       semantics, the pull request's view. A head cut from an old ancestor of the base is judged only by what it changed

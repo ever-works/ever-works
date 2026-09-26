@@ -33,6 +33,18 @@ a task text marks it **new**, so a slice can ship ten files and register none of
 which is why an epic's `named` count can _fall_ while its `landed` rises). And it decides "exists" from `git ls-files`,
 so nothing counts until it is **committed**.
 
+⚠️ **Landed is not wired, and bound is not reachable (2026-09-26).** Every App Works collaborator is `@Optional()`,
+so a token the declaring module cannot reach does not crash anything: the feature behind it silently answers
+"unavailable". The dormancy register (`packages/agent/src/app-runtime/__tests__/app-works-port-dormancy.spec.ts`)
+counts a token BOUND when some module's metadata provides it, which is not the same question, and `e23c2f844` found
+`AppEnvModule` imported by no API module while its tokens read BOUND (no App Build could ever be deployable). The
+question "can Nest actually resolve it in the graph that ships" is asked by
+[`apps/api/src/app-works-di-reachability.spec.ts`](../../../../apps/api/src/app-works-di-reachability.spec.ts)
+(`3a956180e`): it walks the API root and the App Works worker contexts with SWC-compiled metadata, and keeps its
+allow-lists exact in both directions. Its `OPEN_API_GAPS` (`DeployFacadeService`'s `AppDomainsService`) and
+`OPEN_WORKER_GAPS` (13 APW-06 T71 worker bindings, an owner decision) are the known gaps; read its "What the walker
+does not see" before treating a green run as "all wired".
+
 **APW-13's P0 is complete**, which is what the other epics' PR lanes were waiting for (R-38): the fake GitHub
 (43 recorded fixtures), the helpers and their specs, `vitest.e2e-harness.config.ts` (T4), the acceptance config
 and its setup (T12), the five regression lanes (T14–T18), the harness unit lane and the operator runbook (T56).

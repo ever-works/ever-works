@@ -134,7 +134,11 @@ import {
  * the failure instead of rethrowing it (decided 2026-09-24, see
  * `packages/tasks/src/tasks/trigger/app-build-prepare.task.ts`, "Budget"), and
  * the in-process fallback runs once. Nothing in this file re-drives a failed
- * prepare: a requested Build stays `queued` until the Work is prepared again.
+ * prepare; the scheduled sweep does (`AppBuildSweepService`, §9.2's "3 times",
+ * since `6e57ed005`): a requested Build still `queued` with `dispatchedAt` NULL
+ * gets `requestPrepare(workId, 'sweep')` while its queue age is in
+ * [90 s, 450 s), and past that window it stays `queued` until the Work is
+ * prepared again.
  * Nor is "nothing written" true at that point — the provider may already hold
  * the workflow commit or pull request and some secrets.
  *
@@ -1373,7 +1377,7 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             this.logger.warn(
                 `App builds: prepareRepository failed for work ${workId} (${
                     error instanceof Error ? error.message : String(error)
-                }); nothing retries it — requested Builds stay queued until the Work is prepared again.`,
+                }); the sweep re-drives a requested Build still queued 90-450 s after it was requested, and after that it stays queued until the Work is prepared again.`,
             );
             throw error;
         }

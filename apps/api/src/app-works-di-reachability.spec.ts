@@ -321,7 +321,7 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
     {
         key: 'AppWorksModule[agent] | AppUpstreamStateService | APP_WORK_AGENT_RESOLVER',
         reason: "APW-08's agent-resolution rule is unwritten in this tree.",
-        source: 'packages/agent/src/app-works/app-upstream-state.service.ts:392; APW-08 T25 (tasks.md:578-586)',
+        source: 'packages/agent/src/app-works/app-upstream-state.service.ts:392; APW-08 T25 (tasks.md:580-588)',
     },
     {
         key: 'AppWorksModule[agent] | AppUpstreamSyncDispatcherService | APP_UPSTREAM_SYNC_DISPATCHER',
@@ -371,7 +371,7 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
     {
         key: 'WorkModule | WorkLifecycleService | APP_WORK_DELETION_PORT',
         reason: "APW-06 T33 binds `AppRuntimeDeletionService` to it in the API's ports module; unbound, `deleteWork` reads 'no App runtime exists' and deletes the row as before.",
-        source: 'packages/agent/src/services/work-lifecycle.service.ts:204-209; packages/agent/src/app-runtime/app-runtime-deletion.service.ts:24-27 (APW-06 T33, APW-06/tasks.md:577)',
+        source: 'packages/agent/src/services/work-lifecycle.service.ts:204-211; packages/agent/src/app-runtime/app-runtime-deletion.service.ts:24-27 (APW-06 T33, APW-06/tasks.md:577)',
     },
 ];
 

@@ -1097,7 +1097,7 @@ dependency is nothing.
   E2E-12 asserts those events "recorded" after hiding and pinning; its test must toggle the Work setting to
   produce them — flagged to the ACCEPTANCE owner rather than changed there.
   **Update (audit round, 2026-09-17 — APW11-G25):** ACCEPTANCE.md's E2E-12 row now says hide and pin write
-  **no** Activity entry and the events come from toggling the Work setting (`ACCEPTANCE.md:573-576`), so this
+  **no** Activity entry and the events come from toggling the Work setting (`ACCEPTANCE.md:577-580`), so this
   epic and that file agree and no change is needed there. The note above is kept as the record of why.
 - If `EVER_WORKS_APPS_DOMAIN` (APW-06) is unset, managed App Works fall back to the deployment-reported
   address — correct but possibly a load-balancer host until APW-06 P2 binds `ManagedHostRootResolver`.

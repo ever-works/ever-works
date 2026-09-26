@@ -5,8 +5,8 @@
 
 **Feature ID**: `dynamic-plugin-distribution`
 **Plan**: `./plan.md`
-**Status**: `In progress` — Phase 7 (T26, T27) is not complete. T26's first long-running caller ships behind a configuration switch that is off by default; its FR-15 facade path is wired behind a second switch but has no effect until the local-install and registration follow-up. See the Phase 7 status note.
-**Last updated**: 2026-09-25
+**Status**: `In progress` — Phase 7: T27 is complete (bundled plugins hydrate; a plugin the worker image does not carry is installed into the worker's own store and registered, in dynamic mode). T26's first long-running caller ships behind a switch that is off by default; its FR-15 facade path (a second switch, off by default) takes effect since T27's runtime-installed half. See the Phase 7 status note.
+**Last updated**: 2026-09-26
 
 ---
 
@@ -224,8 +224,11 @@
 > - **FR-15 facade install-on-use.** `BaseFacadeService.resolvePlugin` asks
 >   `FacadePluginAvailabilityService` for a plugin this process has not
 >   registered. Two lookups ask: an explicit provider override and the Work's
->   active plugin. The service calls `ensurePluginAvailable`, then reads the
->   registry again.
+>   active plugin. The service calls `installer.ensureLocalInstall(pluginId)`
+>   (the pinned version and integrity, allowlist first, into THIS replica's
+>   store, never writing the shared row), then
+>   `loader.registerFromPath(installPath, { expectedId })`, loads the plugin and
+>   reads the registry again.
 >     - It is active only in dynamic mode, and only with
 >       `PLUGIN_FACADE_INSTALL_ON_USE` (`PluginsModuleOptions.facadeInstallOnUse`,
 >       off by default) turned on.
@@ -233,27 +236,104 @@
 >       `registry`-sourced row in state `installed` with its `registrySpec`
 >       and `installedVersion`. A miss is not retried for 60 s, and at most
 >       1,000 misses are remembered (oldest forgotten first).
->     - **It has no effect on the current build, for two reasons.** (1)
->       `ensurePluginAvailable` trusts the shared row: every row the service
->       lets through takes its fast path, which returns the `node_modules` link
->       path without checking or writing this replica's disk. Each pod has its
->       own install directory (`emptyDir`), so a replica that did not run the
->       install gets no files. (2) Nothing registers what is installed.
->     - **Follow-up:** replace the `ensurePluginAvailable` call with the
->       disk-aware `installer.ensureLocalInstall(pluginId)` (pinned version,
->       this replica's store, never writes the shared row), then
->       `loader.registerFromPath(result.installPath, { expectedId })` on the
->       versioned directory it answers. Adding `registerFromPath` after
->       `ensurePluginAvailable` is not enough: its `installPath` does not exist
->       on exactly the replicas this targets.
+>     - **In effect since T27's runtime-installed half.** A row with no
+>       integrity pin is refused before any fetch and answered as absent.
 > - **T27's acceptance proof** stays the real-module fixture test
 >   `packages/tasks/src/trigger/worker/modules/__tests__/trigger-run-plugin-operation.module.spec.ts`.
 >
-> **Still open:** T27's _runtime-installed_ half — the worker binds no
-> installer, because today's `PluginInstallerService` would trust and write
-> the API's shared install row and never register the plugin, so a plugin not
-> bundled in the worker image answers `PLUGIN_NOT_REGISTERED`; and tenant-aware
-> routing (the router uses the platform's active runtime).
+> **T27 runtime-installed half (2026-09-25, `05e4b0236`):**
+>
+> - `run-plugin-operation` hydrates first. Then, in dynamic mode and for a
+>   plugin the worker image does not carry, it calls
+>   `PluginInstallerService.ensureLocalInstall`: the version the API pinned
+>   (exact version + integrity), allowlist first (FR-11), into the worker's own
+>   store (`PLUGIN_INSTALL_DIR`, default `<cwd>/.plugin-store`). It never writes
+>   the shared install row: the worker only reads
+>   `PluginRepository.findByPluginId`.
+> - `PluginLoaderService.registerFromPath` then registers the extracted
+>   directory.
+> - New codes: `WORKER_INSTALL_REFUSED` (refused before any download) and
+>   `WORKER_INSTALL_FAILED` (the fetch or the registration failed).
+> - The worker reads `PLUGIN_DISTRIBUTION_MODE`, `PLUGIN_REGISTRY_*` and
+>   `PLUGIN_INSTALL_DIR` exactly as the API does.
+> - Allowlisted third-party packages may run in the worker, through the
+>   read-only `PluginAllowlistReader` remote target (owner decision).
+> - With `PLUGIN_DISTRIBUTION_MODE=dynamic` set for `pnpm deploy:trigger`,
+>   `prepare-plugins.js` copies core plugins only (mirrors T29). Bundled stays
+>   the default. `pacote` is external and installed via `additionalPackages`.
+> - A worker run in dynamic mode on an image built without
+>   `PLUGIN_DISTRIBUTION_MODE=dynamic` runs the image's copy of a distributable
+>   plugin, and logs a warning once per plugin version per process.
+> - The store marks a complete copy with `.ew-install.json` (name, version, and
+>   the integrity it was verified against), written before the extract is
+>   renamed into place. A tree without it (for example an interrupted pre-T27
+>   in-place extract) or marked for another integrity (a re-published version)
+>   is fetched again, once. This includes an explicit re-install.
+> - A pin that is not a plain npm package name and an exact semver version is
+>   refused before anything on disk is touched: 409 on the API,
+>   `WORKER_INSTALL_REFUSED` in the worker. The store path and the
+>   `node_modules` link are built from row data.
+> - API side: `ensurePluginAvailable` no longer takes the shared row as proof
+>   of local files. It answers from this replica's store, or fetches the pinned
+>   version there without writing the row. The enable path and
+>   `POST /plugins/:id/install` register what was installed
+>   (`PluginOperationsService.registerInstalledPlugin`).
+> - The boot warmup gives each plugin at most `PLUGIN_WARMUP_TIMEOUT_MS`
+>   (default 60000; `0` = no bound). A slower plugin keeps fetching in the
+>   background.
+> - Acceptance: the dynamic-mode describe in
+>   `trigger-run-plugin-operation.module.spec.ts` (real module, stub registry,
+>   stub API).
+>
+> **Tenant-aware routing (2026-09-25, `05e4b0236`; bounds 2026-09-26,
+> `68ffb9a97`).** `dispatch`, `dispatchLongRunning`,
+> `startLongRunning(pluginId, op, args, { tenantId })`,
+> `pollLongRunning(runId, { tenantId })` and `cancelLongRunning` take the
+> Work's tenant. With one, the run goes through
+> `TenantAwareRuntimeResolver.resolve(tenantId)`, looked up through `ModuleRef`
+> (`getOptionalProvider`) because the resolver lives in the non-global
+> `TenantJobRuntimeModule`. A BYO tenant's run starts and is read in the
+> tenant's own Trigger.dev project, and the wait reads through the same view it
+> dispatched through; the caller keeps the tenant next to the run id for
+> polling. With no resolver, or a resolver that throws, the call uses the
+> platform runtime; a resolver answering `null` gives
+> `JOB_RUNTIME_UNAVAILABLE`. Without `tenantId` nothing is looked up and the
+> payload is unchanged.
+>
+> - The lookup is time-limited in `startLongRunning`, `pollLongRunning` and
+>   `cancelLongRunning` (the HTTP callers' methods), not in
+>   `dispatchLongRunning`. In `startLongRunning` the lookup and the FR-5 stamp
+>   share a budget of about 20 s (the stamp always gets at least 1 s): a lookup
+>   that does not answer in time is `JOB_RUNTIME_DISPATCH_FAILED` with nothing
+>   dispatched (deliberately not the platform provider), and a stamp that does
+>   not answer in time dispatches unstamped. In `dispatchLongRunning`, an abort
+>   before or during the lookup dispatches nothing (`JOB_RUNTIME_WAIT_ABORTED`,
+>   no `runId`); an abort during or after the dispatch keeps the `runId`, and
+>   `ManagedAgentSandboxRunnerService.run()` cancels by it.
+> - FR-5: a tenant call's `run-plugin-operation` payload carries `tenantId` and,
+>   when `RuntimeBindingStamperService` is bound, its `providerId` /
+>   `credentialVersion`; the worker ignores them. The BYO dispatcher map
+>   (`dispatchersFromTenantClient`) gained `dispatchPluginOperation`, so a BYO
+>   tenant's Trigger.dev project must deploy `run-plugin-operation`.
+> - Two latent defects were fixed along the way. `TenantJobRuntimeModule` bound
+>   its own, never-registered `JOB_RUNTIME_PROVIDER_REGISTRY`, so the resolver
+>   answered `null` for every tenant. And a BYO view's stamping Proxy used the
+>   frozen BYO dispatcher map as its target, so every BYO dispatch threw a
+>   Proxy-invariant `TypeError`.
+> - Known limits are recorded with the router consumer in
+>   [`tenant-job-runtime-overlay/tasks.md`](../tenant-job-runtime-overlay/tasks.md)
+>   (Phase 3).
+>
+> **Still open:**
+>
+> - `PluginExecutionRouterService.dispatchSync` and the boot warmup place a
+>   runtime-installed plugin on the replica but do not register it (the warmup
+>   is bounded by `PLUGIN_WARMUP_TIMEOUT_MS`).
+> - Worker tasks other than `run-plugin-operation` do not install at runtime,
+>   so do not build a core-only worker image while they need a distributable
+>   plugin.
+> - `onLoad` does not run for a runtime-registered plugin when
+>   `PLUGIN_LAZY_LOAD=false`.
 
 - [x] **T25**. Implement `PluginExecutionRouterService` at
       `packages/agent/src/plugins/services/plugin-execution-router.service.ts`:
@@ -267,10 +347,10 @@
       (`ManagedAgentSandboxRunnerService`, behind
       `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`, off by default). The FR-15
       facade path (`FacadePluginAvailabilityService`, behind
-      `PLUGIN_FACADE_INSTALL_ON_USE`, off by default) is wired but has no
-      effect until the local-install and registration follow-up
-      (`ensureLocalInstall` + `registerFromPath`; see the Phase 7 note).
-- [ ] **T27**. Long-running path: route `long-running` plugin calls through the
+      `PLUGIN_FACADE_INSTALL_ON_USE`, off by default) is wired, and takes
+      effect since T27's runtime-installed half (`ensureLocalInstall` +
+      `registerFromPath`; see the Phase 7 note).
+- [x] **T27**. Long-running path: route `long-running` plugin calls through the
       job runtime (Trigger.dev task in `packages/tasks/src/tasks/trigger/`). The
       task MUST call `ensurePluginAvailable` (T19) **first** — the worker is a
       separate runtime with its own store, so a runtime-installed plugin is absent
@@ -280,6 +360,9 @@
       (worker installs into its own store first), not just the API.
     - **Acceptance proof**: the real-module fixture test
       `packages/tasks/src/trigger/worker/modules/__tests__/trigger-run-plugin-operation.module.spec.ts`.
+    - **Status (2026-09-25)**: done. The task installs via `ensureLocalInstall`
+      (not `ensurePluginAvailable`, which can write the shared row); acceptance
+      proof as above.
 - [x] **T28**. Result/error propagation + timeout/retry parity between paths.
       (Both paths answer one `PluginExecutionResult`; the job-runtime path adds the
       run id and named `JOB_RUNTIME_*` codes; the worker task runs one attempt.)

@@ -196,7 +196,7 @@ CASCADE`, indexes; no `ALTER TABLE "works"`; the partial unique index is the Pos
       redactor replaces every stored value ≥ 6 chars with `***`.
       **Done when**: `pnpm --filter @ever-works/agent test -- app-env.service` is green.
 
-- [ ] **T14. `AppEnvResolver` and the `AppRuntimeEnvSource` port.**
+- [ ] **T14. `AppEnvResolver` and the `AppRuntimeEnvSource` port.** _Status 2026-09-26: [Status notes](#status-notes)._
       **Create** `packages/agent/src/app-env/app-env.resolver.ts` ([plan §2.2 and §4.6](./plan.md)) and
       `packages/agent/src/app-env/app-env-runtime.source.ts` implementing APW-06's `AppRuntimeEnvSource`
       (`packages/agent/src/app-runtime/ports.ts`, typed copy until APW-06 lands) bound to `APP_RUNTIME_ENV_SOURCE`, with
@@ -223,7 +223,7 @@ CASCADE`, indexes; no `ALTER TABLE "works"`; the partial unique index is the Pos
       derived reference from `ctx.dependencyOutputs` and stores nothing (ACC-07-31).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-env.resolver app-env-runtime.source` is green.
 
-- [ ] **T15. Listener.**
+- [ ] **T15. Listener.** _Status 2026-09-26: [Status notes](#status-notes)._
       **Create** `packages/agent/src/app-env/app-env.listener.ts` — `app.spec.applied` → `ensureGenerated` then
       `AppDependenciesService.reconcile` (T16).
       **Test**: `packages/agent/src/app-env/__tests__/app-env.listener.spec.ts` — generated rows exist when the handler
@@ -726,3 +726,19 @@ cnpg]` installing a pinned operator release on the `cnpg` leg, plus the S3-compa
   and each ACC-07 id appears in at least one **Test** line above.
 - No read of `EVER_WORKS_APPS_MANAGED_ENABLED` in this epic's code (R-5).
 - Every gate in [plan §12](./plan.md) is confirmed, and its known gaps are still recorded there rather than silently closed.
+
+## Status notes
+
+Dated status for the tasks above. It is kept here, not in the task bodies, so the task text keeps the line numbers that
+code comments and specs cite.
+
+- **T14 (2026-09-26):** both halves now reach the API. `AppEnvModule` (with `AppEnvResolver` and
+  `APP_ENV_RESOLVER_FINGERPRINTS`) is imported by APW-05's `AppBuildsModule` (`e23c2f844`), and `read(workId, 'build')`
+  resolves against the effective spec's `build.services`, as the prepare runner does. `AppRuntimeEnvModule`
+  (`APP_RUNTIME_ENV_SOURCE`) is imported by APW-06's `AppDeployRequestModule` (`3a956180e`), which also makes
+  `AppBuildsModule`'s lazy runner-recipe lookup of `AppEnvRuntimeSource` resolve. `APP_DEPENDENCY_SPEC_SOURCE` (T25)
+  is still unbound, so `ensureReadyForDeploy` answers `specUnavailable`.
+- **T15 (2026-09-26, `3a956180e`):** `AppEnvListener` is provided only by `AppRuntimeEnvModule`, which is now in the
+  API graph through `AppDeployRequestModule`'s import, so `app.spec.applied` runs `ensureGenerated` (idempotent) and
+  `reconcile` in the API. A class module is one instance however many modules import it, so the listener is subscribed
+  once; do not provide it anywhere else.

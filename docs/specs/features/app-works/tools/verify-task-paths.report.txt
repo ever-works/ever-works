@@ -5,9 +5,9 @@ not been built yet; this tree is not consistent about marking which task creates
 "absent" cannot be read as "the task text is wrong". The crisp signal is the last section:
 a path a task marks as new that already exists means that surface has landed.
 
-epics: 13 · tasks: 699 · root-anchored paths: 2673 · package-relative skipped: 215
+epics: 13 · tasks: 699 · root-anchored paths: 2679 · package-relative skipped: 217
 
-present: 1684 · absent: 989 · of the absent, another task says it creates them: 679
+present: 1690 · absent: 989 · of the absent, another task says it creates them: 679
 
 ## LANDED SURFACE — marked "new", already in the repository (266)
 

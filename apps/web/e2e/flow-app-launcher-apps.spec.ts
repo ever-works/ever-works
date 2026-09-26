@@ -4,7 +4,7 @@
  * ## What the acceptance case asks for, in its own words
  *
  * **ACC-E2E-12 — "App Launcher shows the App Work and the Ever platforms (step 7)"**
- * (`docs/specs/features/app-works/ACCEPTANCE.md:592-614`; its own row names this file:
+ * (`docs/specs/features/app-works/ACCEPTANCE.md:596-618`; its own row names this file:
  * "`apps/web/e2e/flow-app-launcher-apps.spec.ts` (created by APW-11 T20; APW-13 references
  * it)"):
  *

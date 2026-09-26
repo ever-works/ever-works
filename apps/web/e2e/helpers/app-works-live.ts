@@ -759,7 +759,7 @@ export const REDACTED = '[redacted]';
  * Variable names whose **value** is a secret, beyond the `APW_E2E_*` shape rules
  * below. `APW_E2E_HONEYTOKEN` is credential-shaped by construction (plan §5.3) and
  * `EVER_ID_CLIENT_SECRET` is named a secret by ACCEPTANCE §0.4
- * (`ACCEPTANCE.md:139`) even though it does not carry the `APW_E2E_` prefix.
+ * (`ACCEPTANCE.md:143`) even though it does not carry the `APW_E2E_` prefix.
  */
 export const KNOWN_SECRET_VARIABLES: readonly string[] = [
     APW_E2E.honeyToken,

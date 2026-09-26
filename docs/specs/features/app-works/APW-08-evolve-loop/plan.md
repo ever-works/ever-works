@@ -247,8 +247,8 @@ cross-process serialization is unnecessary because the working copy is per proce
       rung for that category is refused or held before the adapter runs. The P0 fix still ships for their other
       callers; on an App Work the adapter cannot bypass the change guard — `commitToRepo` refuses protected paths and
       `.github/workflows/**` (`AppWorkChangeGate.checkPaths` over the call's own files and content; as built,
-      2026-09-26) and `openPullRequest` runs `AppWorkChangeGate.evaluate` before `createPullRequest` (T17). Neither
-      tool reads `APP_WORKS_CLOUD_PUSH_ENABLED` (§2.5).
+      2026-09-26) and `openPullRequest` runs `AppWorkChangeGate.evaluate` before `createPullRequest` (T17). Both
+      tools answer to `APP_WORKS_CLOUD_PUSH_ENABLED` through the same gate as `finalizeRun` (§2.5).
 - **Checks on a Fleet node.** `readFleetRepoDeclaredCommands` learns `kind: 'app'`: it parses `spec.checks`
   (mapped to `TaskAcceptanceCheck`: **the id the existing parser already mints — `repo/` + the declaration's
   position** — `kind: 'custom'`, `required`, `timeoutSec = timeoutSeconds` from APW-03's schema range 60–7,200,
@@ -470,20 +470,53 @@ Work with the gate bound, the cloud (API-side) run is committed locally (`push: 
   finalize rather than pushing unjudged.
 - Fleet paths are unchanged: a node still pushes before the platform judges the branch, with a `contents: write`-only
   push credential, and the merge gate re-judges the head.
-- The switch covers `finalizeRun` only; it is its sole reader
-  (`packages/agent/src/tasks-domain/task-workspace.service.ts:1693`). The agent tool `commitToRepo` still commits and
-  pushes an App Work **feature** branch from the API whatever the switch says, after refusing the base branch and
-  judging the call's own files and content with `checkPaths` (`apps/api/src/agents/agents.module.ts:1183-1223`, push
-  at `:1353`); `openPullRequest` pushes nothing and runs `evaluate` before it opens a pull request (`:1492-1523`). The
-  evolve loop does not use either tool (§2.3, "Finalize, not tools"). Whether the switch should also hold the tools is
-  open for the owner.
+- **One gate for every cloud publisher (2026-09-26, `cab3419e5`).** The switch has one reader
+  (`config.everWorks.apps.cloudPushEnabled()`, `packages/agent/src/config/index.ts:1097`) and one gate,
+  `appWorkCloudPushAllowed(kind)`, with its refusal text `appWorkCloudPushRefusal(consequence)`
+  (`packages/agent/src/tasks-domain/app-work-cloud-push.ts`). Its only callers are the two API-side publishers:
+  `TaskWorkspaceService.finalizeRun` (`task-workspace.service.ts:1698`, refusal at `:3229`) and the agent git tools in
+  the `AGENT_GIT_FACADE` adapter (`apps/api/src/agents/agents.module.ts`, `assertAppWorkCloudPushAllowed`: `:1165` in
+  `commitToRepo`, `:1443` in `openPullRequest`). With the switch off, both tools refuse an App Work before any
+  provider, policy or git call and before the change gate, with `finalizeRun`'s FR-12 / T12 text. `commitToRepo`
+  writes, commits and pushes nothing. `openPullRequest` opens no pull request: opening one runs the repository's
+  `pull_request` workflows, so it is held like `finalizeRun`'s. With the switch on, the tools keep their judgement.
+  `commitToRepo` refuses the base branch and judges the call's own files and content with `checkPaths` before it
+  writes and pushes `refs/heads/<branch>` (`:1395`). `openPullRequest` runs `evaluate` on the verified head (`:1549`)
+  before `createPullRequest` (`:1568`). The Fleet path never asks the gate: `AGENT_GIT_FACADE` is bound only in the API
+  process (`:839`), and a node pushes with its own credential and is judged by `finalizeRemotePush` /
+  `judgeAppWorkBranch` / the merge gate. Other Work kinds pass without the switch being read. The evolve loop does not
+  use either tool (§2.3, "Finalize, not tools").
+- **Residual (switch on).** `commitToRepo` judges each call's own delta (`checkPaths` over the paths and content it
+  writes), not the branch. It pushes the local ref `refs/heads/<branch>` of the shared per-Work checkout
+  (`agents.module.ts:1395`) after `switchBranch` checks out an existing local branch as it is (`:1304`), so commits
+  already on that local branch are pushed without being judged again. Platform code only ever puts judged commits
+  there. A cloud run whose model has a shell on the API host (the local-workspace plugin keeps its worktrees on that
+  host, by default under `tmpdir()/ew-local-workspaces`) can plant commits in that checkout; that is T12 containment.
+  The whole branch is judged only at `openPullRequest`'s `evaluate` and at the merge gate. Closing it in code needs a
+  local-commit read in the git facade, so that the tool refuses a push whose new commit is not a direct child of the
+  remote tip (or of the base, for a new branch).
+- **Website-template sync never targets an App Work (2026-09-26, `08c05ee78`), whatever the switch says.** An App
+  Work's `website` role is its Work Repository, so the template pipelines used to reach it with the platform
+  credential: `WebsiteUpdateService.updateRepository` force-pushes (`website-update.service.ts:308`, `:377`), syncs
+  every template branch (`:150`) and re-points the default branch (`:151`); `WebsiteGeneratorService.initialize`
+  force-pushes (`website-generator.service.ts:161`) and then syncs branches with `cleanupExtraBranches`. Callers:
+  `POST /api/works/:id/update-website` (MCP `update_website`, including a Fleet node's run token on `/api/works`),
+  `switch-website-template`, the hourly `WebsiteTemplateSchedulerService`, `DeployService`'s dispatch fallback
+  (`deploy.service.ts:2043`; App Works take `deployAppWork` first, `:315`), generation and import. None of it is an
+  agent push, so the switch does not apply; instead both funnels refuse the kind through
+  `assertNotAppWorkTemplateTarget` (`packages/agent/src/works/repository-work-guard.ts`) before any provider or git
+  call (`website-update.service.ts:84`, `website-generator.service.ts:231`, entry
+  `work-generation.service.ts:1038`), and the scheduler skips App Works (`website-template-scheduler.service.ts:70`).
 - **Residual (recorded, not closed).** Both judgements — pre-push `branchChanges` and the post-push compare — use
   merge-base semantics, the pull request's view. A head cut from an **old** ancestor of the base is judged only by
   what it changed since that ancestor, so a workflow file that the ancestor carried and the base later removed can be
   published unnamed, and an `on: push` trigger in it runs on the push. Closing it needs a history-free comparison of
   the protected paths against a trusted remote task-branch tip, which neither the workspace contract nor the handle
   carries today (candidate: the tip sha on `WorkspaceHandle` at provision time, plus a protected-path tree check in the
-  gate). The post-push compare also still names the branch, not the sha (`guardAppChange`'s docstring).
+  gate; or a history-free comparison of the protected globs only, `--no-replace-objects diff-tree -r --name-only`
+  from the base sha to the head sha, limited to paths whose head content also differs from the remote Task branch, so
+  a reused branch is not falsely refused). The post-push compare also still names the branch, not the sha
+  (`guardAppChange`'s docstring).
 
 **`maxPullRequestChangedFiles` is honoured, not dropped (APW08-G22).** APW-03's schema §18 declares
 `agents.maxPullRequestChangedFiles` (default 50, 1–500) and no epic enforces it, while FR-21 uses 300 files.

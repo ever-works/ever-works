@@ -262,10 +262,12 @@ describe('AppBlueprintResolverService', () => {
         });
 
         it('(d) reads ONLY .works/works.yml — a root app-spec.yml is not a Blueprint', async () => {
-            // Today's three live repositories keep their spec at `app-spec.yml` behind
-            // `.works/template.yml`'s `specPath`; the normative contract (FR-43, CONTRACTS §8,
-            // catalog.md §5) is `.works/works.yml`, and the owner decided to fix the
-            // repositories rather than the contract.
+            // The live Blueprint repositories (`ever-works/cal-template`,
+            // `ever-works/umami-template`) no longer keep a root `app-spec.yml`: since their
+            // PRs #2 (2026-09-25) the spec lives only at `.works/works.yml`, the normative
+            // contract (FR-43, CONTRACTS §8, catalog.md §5); the owner decided to fix the
+            // repositories rather than the contract. This case keeps a stray root
+            // `app-spec.yml` from ever being read as a Blueprint.
             const double = facade({
                 repositories: { 'cal-diy-template': blueprintRepository('cal-diy-template') },
             });

@@ -134,7 +134,7 @@ run in that position** — see §6.
 | T-03 | T      | The agent writes outside its remit or weakens the spec (approval off, checks removed, licence misreported) | Only `.works/works.yml` and `.works/overlay/**` are writable (`APW-04-app-provisioner/spec.md:262`); a proposal is capped at 12 files / 3,000 lines / 128 KB each (`:265`); platform-owned spec fields are preserved (`:266`) and re-checked by a pure guard (`APW-04-app-provisioner/plan.md:667-676`); on the evolve side, protected paths, `.github/workflows/**` and `source`/`license`/`blueprint` changes open **no** pull request (`APW-08-evolve-loop/spec.md:263-269`) | `ACC-04-07`, `ACC-04-09`, `ACC-08-11`, `ACC-08-12`, `ACC-NEG-05` | Accepted in Wave 1. Residual: a _human_ owner may of course weaken their own spec — the control constrains agents, and says so.                                                            |
 | T-04 | S/R    | A change is attributed to the member that the member never approved                                        | The agent may not merge its own pull request (`APW-04-app-provisioner/spec.md:208`); commits and PRs go through Task finalize with the Task's actor (`APW-04-app-provisioner/plan.md:677-683`); every App Works agent run passes the run-admission chain (`CONTRACTS.md:60`, R-17)                                                                                                                                                                                              | `ACC-04-37`, `ACC-04-35`, `ACC-04-36`, `ACC-08-31`               | Accepted in Wave 1. Residual: an approval the owner gives while a hostile repository is open in chat is still the owner's decision; prompt fencing reduces, never eliminates, that.        |
 
-**T-03, where the evolve-side control runs (updated 2026-09-25, APW-08 T17, `86e1a3ddf`).**
+**T-03, where the evolve-side control runs (updated 2026-09-25, APW-08 T17, `86e1a3ddf`; 2026-09-26, `cab3419e5`, `08c05ee78`).**
 
 - **The cloud Task finalize is judged before the push, and is off by default.** The isolated-Task finalize
   (`TaskWorkspaceService.finalizeRun`) of a cloud (API-side) run on an App Work commits locally and pushes nothing
@@ -142,17 +142,29 @@ run in that position** — see §6.
   `APP_WORKS_CLOUD_PUSH_ENABLED=true` the exact local commit is judged (`AppWorkChangeGate.checkPaths` over
   `IWorkspacePlugin.branchChanges`, objects read literally — no replace refs, grafts, commit-graph or submodule ignore
   settings) and only that sha is published (`publishSha`) ([`APW-08/plan.md`](./APW-08-evolve-loop/plan.md) §2.5).
-  `finalizeRun` is the switch's only reader (`packages/agent/src/tasks-domain/task-workspace.service.ts:1693`).
-- **The agent git tools are not behind that switch.** `commitToRepo` still commits and pushes an App Work **feature**
-  branch from the API process whatever `APP_WORKS_CLOUD_PUSH_ENABLED` says: it refuses the Work's base branch, then
-  judges only the call's own files and their new content with `AppWorkChangeGate.checkPaths` before it writes, and
-  pushes `refs/heads/<branch>` (`apps/api/src/agents/agents.module.ts:1183-1223`, push at `:1353`). `openPullRequest`
-  pushes nothing; it runs `AppWorkChangeGate.evaluate` on the head branch before it opens a pull request
-  (`:1492-1523`). Both are offered to an Agent holding `canCommitToRepo` / `canOpenPullRequests`
-  (`packages/agent/src/agents/agent-tool.service.ts:355`, `:364`), refuse at invoke time unless the Agent is
-  Work-scoped, and pass the safety gate as `publish.external`
-  (`packages/agent/src/safety/action-category.ts:105`). The evolve loop itself never depends on them (Resolution
-  R-17).
+  `finalizeRun` and the agent git tools are its only callers, through one gate (`appWorkCloudPushAllowed`,
+  `packages/agent/src/tasks-domain/app-work-cloud-push.ts`).
+- **The agent git tools are behind the same switch (2026-09-26, `cab3419e5`).** `commitToRepo` / `openPullRequest`
+  run only in the API process (`AGENT_GIT_FACADE`, `apps/api/src/agents/agents.module.ts:839`) and ask
+  `finalizeRun`'s gate first. Off (the default until T12), an App Work call is refused with the FR-12 / T12 message,
+  and nothing is written, committed, pushed or opened. On, `commitToRepo` refuses the Work's base branch, judges the
+  call's own files and new content with `AppWorkChangeGate.checkPaths` before it writes, and pushes
+  `refs/heads/<branch>` (`:1395`), which carries any commit already on the local branch; commits planted there by a
+  shell on the API host are not judged again (T12). `openPullRequest` pushes nothing and runs
+  `AppWorkChangeGate.evaluate` on the verified head before it opens (`:1549`). Both are offered to an Agent holding
+  `canCommitToRepo` / `canOpenPullRequests` (`packages/agent/src/agents/agent-tool.service.ts:355`, `:364`), refuse at
+  invoke time unless the Agent is Work-scoped, and pass the safety gate as `publish.external`
+  (`packages/agent/src/safety/action-category.ts:105`). The evolve loop never depends on them (R-17). A model with a
+  shell in a cloud workspace whose host carries an ambient git credential could still push outside every platform
+  path; that is T12 containment, not this switch.
+- **Website-template sync never targets an App Work (2026-09-26, `08c05ee78`).** An App Work's `website` role is its
+  Work Repository. With the platform credential, the template pipelines force-push a template into it, force-sync
+  every template branch and re-point the default branch; `initialize` also deletes the other branches. None of this
+  passes through the change gate, the protected-branch floor or the switch. Both funnels,
+  `WebsiteUpdateService.updateRepository` and `WebsiteGeneratorService.initialize`, now refuse the kind through
+  `assertNotAppWorkTemplateTarget` (`packages/agent/src/works/repository-work-guard.ts`) before any provider or git
+  call, and the hourly auto-update poller skips App Works. Before this, `update_website` (MCP, including a Fleet
+  node's run token) and `switch-website-template` reached it.
 - **Fleet runs still push before the platform judges.** The platform's `finalizeRemotePush` and the merge gate judge
   the pushed branch afterwards, so protected non-workflow paths and guarded spec blocks can reach the Task branch
   before judgement; they execute nothing, and the merge gate re-judges the head. Workflow files are kept out by the
@@ -361,6 +373,8 @@ known-bad control that must reach an unlisted host, run nightly
 | 2026-09-17 | App Works program (SK-06/XC-03) | Alignment pass: R-30…R-37 controls wired into the existing rows; **B-12** (non-human callers on human-only routes, T-35) and T-34 (Fleet containment, R-33) added; §6 gains the containment requirement. |
 | 2026-09-26 | App Works specs lane            | T-03 note under B-1: the cloud evolve path is judged before the push and is off by default; the Fleet path, the unverified credential check and the merge-base residual (APW-08 T17).                    |
 | 2026-09-26 | App Works specs lane            | T-03 note narrowed: `APP_WORKS_CLOUD_PUSH_ENABLED` holds only `finalizeRun`; `commitToRepo` still pushes App Work feature branches after a pre-push `checkPaths` of its own files.                       |
+| 2026-09-26 | APW-08 T17                      | T-03: the agent git tools answer to `APP_WORKS_CLOUD_PUSH_ENABLED` through `finalizeRun`'s gate; off, an App Work `commitToRepo` / `openPullRequest` refuses naming FR-12 / T12 and publishes nothing.   |
+| 2026-09-26 | APW-08 T17                      | T-03: website-template sync refuses App Works in both funnels, whatever the switch says; the `commitToRepo` switch-on residual now says local-branch commits are not judged again.                       |
 
 ---
 

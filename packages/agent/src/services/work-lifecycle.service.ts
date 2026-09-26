@@ -202,11 +202,13 @@ export class WorkLifecycleService {
         @Optional()
         private readonly appWorkCreate?: AppWorkCreateService,
         // Appended LAST, and `@Optional()`, for the same positional-arity rule
-        // (APW-01 T39 — deleting an App Work). APW-06's `AppRuntimeDeletionService`
-        // binds `APP_WORK_DELETION_PORT`; until it does, the token is unbound and
-        // `deleteWork` treats that as "no App runtime exists, so nothing can be
-        // running" and keeps today's behaviour (the row goes now). Only
-        // `kind: 'app'` ever reads it.
+        // (APW-01 T39 — deleting an App Work). The binding is APW-06's
+        // `APP_WORK_DELETION_PORT_PROVIDER` (`app-runtime-deletion.service.ts`),
+        // which provides this exact token, imported from
+        // `app-works/app-work-deletion.port.ts`. No API module provides it yet
+        // (APW-06 T33), so the token is unbound and `deleteWork` treats that as
+        // "no App runtime exists, so nothing can be running" and keeps today's
+        // behaviour (the row goes now). Only `kind: 'app'` ever reads it.
         @Optional()
         @Inject(APP_WORK_DELETION_PORT)
         private readonly appWorkDeletion?: AppWorkDeletionPort,

@@ -299,6 +299,13 @@ export interface IWorkspacePlugin extends IPlugin {
 	 * pushed, so a caller can judge exactly what it would publish. OPTIONAL: a
 	 * provider without it cannot serve a judge-before-push caller, which then
 	 * refuses rather than pushing unjudged.
+	 *
+	 * An implementation must read git objects literally (no replace refs,
+	 * grafts or commit-graph) and must not honour submodule ignore settings
+	 * (`--ignore-submodules=none`), because `git push` ignores them all: a
+	 * judge that honoured them could be shown something other than what is
+	 * published. The paths use merge-base (three-dot) semantics, the pull
+	 * request's view.
 	 */
 	branchChanges?(
 		handle: WorkspaceHandle,

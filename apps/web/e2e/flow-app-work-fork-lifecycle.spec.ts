@@ -3,7 +3,7 @@
  *
  * ## What the acceptance cases ask for, in their own words
  *
- * **ACC-E2E-02** (`ACCEPTANCE.md:258-293`, the PR twin named on its row:
+ * **ACC-E2E-02** (`ACCEPTANCE.md:262-297`, the PR twin named on its row:
  * `apps/web/e2e/flow-app-work-fork-lifecycle.spec.ts`):
  *
  * > Given the user cannot push to that upstream, when they create an App Work choosing

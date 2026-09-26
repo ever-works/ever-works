@@ -1378,7 +1378,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
  * 🛑 **Where this provider belongs.** `apps/api/src/app-runtime/app-runtime-ports.module.ts` — the
  * `@Global()` module of §9.8:1524-1533 — does **not** exist in this tree, and it is not this task's
  * file to create: T33 owns it (`tasks.md:583-587`) and T73 replaces bindings inside it
- * (`tasks.md:1258-1267`). Until it lands, **this export is where the port is provided**: the module
+ * (`tasks.md:1271-1278`). Until it lands, **this export is where the port is provided**: the module
  * that lands adds `APP_WORK_DELETION_PORT_PROVIDER` to its `providers` array and nothing else. T33's
  * own spec pins exactly this shape — "the deletion-port provider has `useExisting` and `useClass`
  * undefined and `inject` equal to `[ModuleRef]`" — so the one-line addition satisfies it.

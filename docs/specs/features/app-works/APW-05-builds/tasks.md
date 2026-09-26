@@ -334,7 +334,7 @@ page, pageSize)`, `findByIdForWork`, `findRecentForCommit(workId, sha, sinceMs)`
 
 ## P1.4 — Facade, services, jobs
 
-- [ ] **T16. `BuildFacadeService`.**
+- [ ] **T16. `BuildFacadeService`.** _Status 2026-09-26: [Status notes](#status-notes)._
       **Create** `packages/agent/src/facades/build.facade.ts` extending `BaseFacadeService` with `CAPABILITY =
 PLUGIN_CAPABILITIES.BUILD`: `resolve(workId, userId)` → `{ plugin, auth, settings, repository }` (token through
       `GitFacadeService.getAccessToken`), `getPullCredential(workId)` (public → `null`; private → `{ server: 'ghcr.io',
@@ -350,7 +350,7 @@ username: 'x-access-token', password }` from the Work-scoped `pullToken`; never 
       never returns the git token when `pullToken` is unset (ACC-05-21); the port returns the same object as the facade.
       **Done when**: `pnpm --filter @ever-works/agent test -- build.facade` is green.
 
-- [ ] **T17. `AppBuildsService` and the deployable verdict.**
+- [ ] **T17. `AppBuildsService` and the deployable verdict.** _Status 2026-09-26: [Status notes](#status-notes)._
       **Status (2026-09-25, wave 2):** `finalize`'s digest confirmation (T14's confirming half) and
       `reconfirmDigest(buildId, { pushLogDigest? })`, which re-settles a `digestUnconfirmed` Build without publishing an
       event, are implemented; nothing calls `reconfirmDigest` yet (the §7.4 sweep recheck and the pull-token-save
@@ -946,3 +946,26 @@ suggestion }` templates with `{param}` placeholders equal to plan §8's `failure
 - No file in the repository outside `packages/plugins/github-actions-build/` and `packages/plugins/apps-builder/` contains
   either plugin id as a string literal (grep in CI).
 - Every gate in [plan §12](./plan.md) is confirmed, and its known gaps are still recorded there rather than silently closed.
+
+## Status notes
+
+Dated status for the tasks above. It is kept here, not in the task bodies, so the task text keeps the line numbers that
+code comments and specs cite.
+
+- **T16 (2026-09-26, `3a956180e`):** the shipped facade (`packages/agent/src/app-builds/build-facade.service.ts`) now
+  receives the plugin registry by token (`@Inject(PluginRegistryService)`): SWC, which builds what ships, emitted
+  `Object` for the `PluginRegistryService | undefined` parameter, so the running API constructed it with no registry
+  and every Build plugin resolution failed, while every ts-jest spec saw one. It also loads its candidates
+  (`loadRegisteredPlugins`) before reading `buildKind`, which a cold lazy proxy answers with a forwarding function.
+  Pinned by `__tests__/build-facade.registry-token.spec.ts` and `__tests__/build-facade.cold-plugin.spec.ts`, and
+  guarded by `apps/api/src/app-works-di-reachability.spec.ts`. Still open (D19): the binding forwards no
+  `prepareRepository` and no writer, so every production prepare still answers `pluginUnavailable`.
+- **T17 (2026-09-26, `e23c2f844`):** `AppBuildsModule` (packages/agent) imports APW-07's `AppEnvModule`, which no API
+  or `packages/tasks` module imported and which is not `@Global()`. Before, `APP_ENV_RESOLVER_FINGERPRINTS`
+  (`AppBuildsService`), `AppEnvResolver` (the prepare runner) and `AppEnvService` (the watch runner) were `undefined`
+  in the API, so every finalized Build's verdict was `staleInputs` and none was ever deployable, every secret-syncing
+  prepare answered `buildValuesUnavailable`, and every watch without a plugin redactor was skipped
+  `redactorUnavailable`.
+  `AppEnvResolver.read(workId, 'build')` now resolves against the effective spec's own `build.services`, so the verdict
+  hashes build-service values the way the prepare does. Pinned by `apps/api/src/app-builds/app-builds.module.spec.ts`,
+  which composes the API's own `AppBuildsModule` in a real container (4 of 5 red before the fix, 5 of 5 green after).

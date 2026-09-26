@@ -1426,9 +1426,13 @@ checksBillableMinutes } })`), publish the terminal event (§7.8 — the explicit
 Selects up to 200 Builds with `status IN (queued, running)` and `lastObservedAt < now() − 90 s` (or NULL and
 `dispatchedAt < now() − 90 s`), oldest first, and dispatches `app-build-watch` for each. Builds past `startedAt +
 timeoutMinutes + 30` (or `max(queuedAt, dispatchedAt) + 5 min + timeoutMinutes + 30` when never adopted — the
-never-adopted clock starts at the later of the two, clarified 2026-09-25) are failed as `lost`. A queued manual or
-verification Build with `dispatchedAt` NULL and a queue age in [90 s, 450 s) gets `requestPrepare(workId, 'sweep')`,
-once per Work per tick; that is §9.2's "3 times" (added 2026-09-25). Also
+never-adopted clock starts at the later of the two, clarified 2026-09-25) are failed as `lost`; the never-adopted
+`lost` write re-checks `providerRunId IS NULL` and the `dispatchedAt` it read
+(`AppBuildRepository.markNeverAdoptedLost`), so a Build adopted or claimed between the read and the write is left
+alone (2026-09-26). A queued manual or verification Build with `dispatchedAt` NULL and a queue age in [90 s, 450 s)
+gets `requestPrepare(workId, 'sweep')`, once per Work per tick; that is §9.2's "3 times" (added 2026-09-25): three
+re-drives at exactly periodic ticks, three ±1 under schedule jitter, and fewer when a hung pass holds the lock. The
+window always bounds them from above, and a re-drive is idempotent (clarified 2026-09-26). Also
 re-checks `digestUnconfirmed` Builds whose App Work gained a pull token, and deletes a verification Build's per-run
 prompted-value secret still present `30 + 10` minutes after `startedAt` (§4.10). Task file
 `packages/tasks/src/tasks/trigger/app-build-sweep.task.ts`, same shape as `deploy-ready-poller.task.ts`.

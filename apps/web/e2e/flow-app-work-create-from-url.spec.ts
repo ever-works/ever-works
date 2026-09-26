@@ -3,7 +3,7 @@
  *
  * ## What the acceptance cases ask for, in their own words
  *
- * **ACC-E2E-01** (`ACCEPTANCE.md:224-256`, `apps/web/e2e/flow-app-work-create-from-url.spec.ts`):
+ * **ACC-E2E-01** (`ACCEPTANCE.md:228-260`, `apps/web/e2e/flow-app-work-create-from-url.spec.ts`):
  *
  * > Given a signed-in user with a connected GitHub account, when they open `/works/new`,
  * > choose the **App** chip and paste each URL in turn, then the form shows, for each:

@@ -1,7 +1,8 @@
 # `manifests/cal-diy/` — golden rendered output, index
 
-**App spec:** [`APW-13-golden-paths/blueprints/cal-diy/.works/works.yml`](../../../../APW-13-golden-paths/blueprints/cal-diy/.works/works.yml)
-(`sha256` of its LF-normalised bytes: `6977cfdf9b4ae12e83e6c0710ebef2b27d36f46e1fc875dd376bd0d1bcb0ecea`)
+**App spec:** [`ever-works/cal-template` `.works/works.yml`](https://github.com/ever-works/cal-template/blob/main/.works/works.yml)
+(`sha256` of the LF-normalised bytes this index was rendered from: `6977cfdf9b4ae12e83e6c0710ebef2b27d36f46e1fc875dd376bd0d1bcb0ecea`)
+_Note (2026-09-26): this is a generated expected-output index, not an evidence transcript; it was rendered from the retired in-tree draft `APW-13-golden-paths/blueprints/cal-diy/.works/works.yml`, whose content now lives in the Blueprint repository above, so its `works.yml:` line citations may drift from the live file._
 **Renderer:** `packages/plugins/k8s/src/app/` — `app-manifest.renderer.ts` (APW-06 **T6**), `app-names.ts` (T4),
 `app-security.ts` (T5), `app-jobs.renderer.ts` + `app-runner.script.ts` (T8), `app-network-policy.renderer.ts` (T7)
 **Target rendered here:** `your-cluster` (the second flavour is `managed-overlay.yaml`)

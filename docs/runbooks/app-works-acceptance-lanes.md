@@ -114,6 +114,7 @@ REQUIRE_EMAIL_VERIFICATION=false \
 EVER_WORKS_E2E_FAKES=1 APW_E2E_GITHUB_FAKE_URL=<the fake's origin> \
 EVER_WORKS_APP_WORKS_ENABLED=true DEPLOY_EVER_WORKS_ENABLED=true \
 EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER=3 \
+REGISTER_THROTTLE_LIMIT=100000 LOGIN_THROTTLE_LIMIT=100000 E2E_DISABLE_AUTH_THROTTLE=true \
 GITHUB_APP_WEBHOOK_SECRET=<any CI-only value> node apps/api/dist/main.js &
 
 # 3. The web — a PROD build (`next build` first), and the port must be set for the web process only.
@@ -135,6 +136,15 @@ of the live project, a runner that exports the interlocks only for step 4 gets a
 `Error: APW_E2E_RUN_ID is not set` with no scenario having run. Export them once for the whole shell
 (the workflow's env block is the source of truth for the values) and both steps work. This is worth stating
 because it reads like a broken lane and is in fact the interlock doing its job.
+
+**`APP_WORKS_CLOUD_PUSH_ENABLED` stays unset (off, the default) on every lane**: neither `e2e.yml` nor
+the recipes here set it. Off, a cloud run on an App Work commits locally, pushes nothing, opens no pull
+request and blocks the Task with a message naming APW-08 FR-12 / T12, and the agent git tools
+`commitToRepo` / `openPullRequest` refuse an App Work with the same message
+(`packages/agent/src/tasks-domain/app-work-cloud-push.ts`). Leave it off on any stack whose API runtime
+does not meet FR-12's isolation, because cloud runs have no admission yet (T12). Only the exact value
+`true` turns it on. It is read per call from the API process's environment (never captured at import), so
+a changed value takes effect when the API restarts or is redeployed.
 
 ### The flags-on recipe — ACC-E2E-12 and ACC-REG-05's cap (added 2026-09-25)
 
@@ -303,6 +313,22 @@ deterministic green run and green status `routes/commits.mjs` derives.
   Set `PORT=3900` for the fake's own process (step 1), then `PORT=3100` for the API, and assert the fake
   answers on **3900** and that **3100 has no owner** before starting the API. Cost: one full battery run
   that reported a healthy API and then failed four specs on a 404 health check.
+- **Running ONE spec file on its own (`--no-deps`, or a single file) skips what the lane does for it**
+  (recorded while proving ACC-NEG-07's delete Activity row, 2026-09-25):
+    - `--no-deps` skips the `setup` project, but the `chromium` project still reads its `storageState`
+      from `apps/web/e2e/.auth/user.json`, so that file must already exist. `{"cookies":[],"origins":[]}`
+      is enough for request-only specs.
+    - A spec that calls `connectCustomerGitHub` before it seeds the fake (for example
+      `flow-app-work-delete-retains.spec.ts`, which connects and only then seeds inside its create
+      helper) needs a manual `POST /_control/seed` with
+      `apps/web/e2e/fakes/github-fake/fixtures/catalog-pr-lane.seed.json` first. On a fresh fake the
+      connection otherwise reads "unknown" and S10 throws; in a full shard an earlier spec has already
+      seeded it.
+    - `EVER_WORKS_E2E_FAKES=1` must be set in the **Playwright** process as well
+      (`helpers/github-estate.ts` resolves the fake's origin only while it is `1`).
+    - The three auth-throttle variables `e2e.yml` sets (`REGISTER_THROTTLE_LIMIT`, `LOGIN_THROTTLE_LIMIT`,
+      `E2E_DISABLE_AUTH_THROTTLE`, now in §4 step 2) are needed on the API, or repeated local runs hit
+      `registerUserViaAPI failed (429)`.
 - **A concurrent build of a workspace package can wipe `apps/api/dist` mid-build.** Rebuilding
   `packages/plugin` or `packages/agent` in another process while the API is building produces phantom type
   errors and an empty `dist`; if the API stops starting, rebuild it **after** the package builds finish

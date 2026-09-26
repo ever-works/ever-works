@@ -69,8 +69,8 @@ judgement; they execute nothing. **Not yet verified live:** that GitHub refuses 
 organization, push a commit touching `.github/workflows/x.yml`, and expect "refusing to allow a GitHub App to create
 or update workflow". The Task finalize of a cloud (API-side) run (`finalizeRun`) no longer pushes unjudged: its push is
 off by default and, when enabled, judged before the push ([APW-08 plan](./APW-08-evolve-loop/plan.md) §2.5). The agent
-tool `commitToRepo` is not behind that switch: it pushes an App Work feature branch from the API after a pre-push check
-of the call's own files ([THREAT-MODEL.md](./THREAT-MODEL.md) T-03).
+tool `commitToRepo` is behind the same switch (off: refused naming FR-12; on: a pre-push check of the call's own files)
+([THREAT-MODEL.md](./THREAT-MODEL.md) T-03).
 
 ---
 

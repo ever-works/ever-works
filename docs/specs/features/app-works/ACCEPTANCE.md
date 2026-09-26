@@ -135,6 +135,10 @@ traces and attachments. Values are never committed.
 | `APW_E2E_MANAGED_AGENT_API_KEY`                                   | yes      | nightly              | managed-agent credential for APW-04's sandbox isolation live spec (T4); used only to open the probe session                                                |
 | `APW_E2E_TOKEN_BUDGET`, `APW_E2E_ACTIONS_MINUTES_BUDGET`          | no       | nightly, golden path | hard spend caps per run                                                                                                                                    |
 | `EVER_WORKS_E2E_FAKES`, `APW_E2E_GITHUB_FAKE_URL`                 | no       | PR, PR — cluster     | point the platform's Git provider calls at the fake GitHub (non-production builds only)                                                                    |
+| `APW_E2E_FLAGS_ON_LANE`                                           | no       | PR — flags-on job    | `1` turns a switch that reads off into a failure instead of a named skip (`flow-app-launcher-apps`, `flow-managed-subdomain-allocation`)                   |
+| `APW_E2E_PLATFORM_CATALOG_PORT`                                   | no       | PR — flags-on job    | port of the platform-catalog fake (`apps/web/e2e/fakes/platform-catalog/server.mjs`), default `4084`, deliberately not `PORT`                              |
+| `EVER_WORKS_PLATFORM_CATALOG_BASE_URL`                            | no       | PR — flags-on job    | point the launcher's catalog read at that fake (honoured only with `EVER_WORKS_E2E_FAKES=1`, never in production)                                          |
+| `EVER_WORKS_PLATFORM_CATALOG_ENV`                                 | no       | PR — flags-on job    | `develop` on that job, so the catalog answers dev addresses                                                                                                |
 | `EVER_ID_ISSUER_URL`, `EVER_ID_CLIENT_ID`                         | no       | PR (ever-id suite)   | the **fake** Ever ID issuer and the `ever-works-web` client, set by the lane helper (APW-12 T48); must be the in-lane fake, never a real provider          |
 | `EVER_ID_CLIENT_SECRET`                                           | yes      | PR (ever-id suite)   | the fake client's secret; never a real provider secret, and redacted from traces like every other secret                                                   |
 | `EVER_ID_API_AUDIENCE`                                            | no       | PR (ever-id suite)   | `ever-works` — the audience the delegated-read and exchange specs mint tokens for (APW-12 §4.3)                                                            |
@@ -736,11 +740,17 @@ update (first Build, the agent PR's **PR #n** Build, the merge Build; ≤ 150 Ac
 
 **Implementation status (2026-09-25).** ACC-NEG-04: the primary branch panel now names the refusal (reason, rule and
 paths, in full) in a banner beside the `pr-open` pill, from `tasks.branchGuardRefusal` (APW-08 T17, `86e1a3ddf`);
-linked repositories already did so per row (`refusedByGuard`). The Task finalize (`finalizeRun`) of a cloud (API-side)
+linked repositories already did so per row (`refusedByGuard`). Since `a1bbf17a8` (2026-09-26) the banner's title reads
+"An App Work's change guard blocked this branch" (it used to claim a rule refusal even for a branch mismatch), and the
+board's pull-request pill (`TaskPrPill`) shows a blocked primary pull request in red with a "refused" label, a
+do-not-merge tooltip and `data-guard-refused="true"`, keeping the link and never showing the stored reason. The pill
+labels `draft`, `merged` and `closed` (an open pull request carries no label) and adds `refused` on top while the
+refusal is still in force by the banner's rule (`activeGuardRefusal`), so a closed pull request the guard refused reads
+"#N closed refused". The Task finalize (`finalizeRun`) of a cloud (API-side)
 App Work run is refused before anything is pushed while `APP_WORKS_CLOUD_PUSH_ENABLED` is off (the default until
-APW-08 T12), so the refused commit stays in the run's workspace rather than on the Task branch. The switch does not
-cover the agent tool `commitToRepo`, which still pushes a feature branch after judging the call's own files
-([THREAT-MODEL.md](./THREAT-MODEL.md) T-03).
+APW-08 T12), so the refused commit stays in the run's workspace rather than on the Task branch. The agent tools
+`commitToRepo` / `openPullRequest` are refused the same way while it is off (`apps/api/src/agents/agents.module.spec.ts`,
+'cloud App Work pushes are OFF by default') ([THREAT-MODEL.md](./THREAT-MODEL.md) T-03).
 
 ---
 

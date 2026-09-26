@@ -250,6 +250,8 @@ regression gaps of ACCEPTANCE §5 that need no App Works code._
       **Modify** `apps/web/e2e/COVERAGE.md` — rows for the new specs. **Modify** `docs/specs/features/app-works/ACCEPTANCE.md`
       §5 verdicts for REG-01, 02, 05, 07, 12.
       **Test**: `pnpm --filter ever-works-web test:e2e-harness`; a dispatched `e2e.yml` run; root `pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build`.
+      Since `1be4770c9` (2026-09-26) CI runs the first of these itself: `ci.yml`'s `lint-and-test` has an "App Works
+      e2e harness unit specs (apps/web)" step after `pnpm test`, behind the same code-scope gate.
       **Done when**: all three are green.
 
 ---
@@ -879,7 +881,8 @@ one._
 ## Definition of Done
 
 - Every checkbox above is ticked, or carries a `fixme` naming an unmerged epic that the TRACKER shows as not merged.
-- `pnpm format:check`, `pnpm lint`, `pnpm type-check`, `pnpm test`, `pnpm build` and `test:e2e-harness` are green.
+- `pnpm format:check`, `pnpm lint`, `pnpm type-check`, `pnpm test`, `pnpm build` and `test:e2e-harness` are green
+  (`ci.yml`'s `lint-and-test` runs `test:e2e-harness` since `1be4770c9`).
 - The existing `e2e.yml`, `k8s-e2e.yml` and `smoke-deployed.yml` runs pass with no change to any pre-existing spec.
 - No file under `apps/web/e2e/` can delete a GitHub repository (T9), and no live spec can target production (T8).
 - The nightly lane has five consecutive green runs on dev and the golden-path lane three on stage.
