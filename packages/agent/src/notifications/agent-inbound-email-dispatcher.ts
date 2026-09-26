@@ -10,7 +10,8 @@
  *
  * Flow (spec §5.2):
  *   inbound webhook → EmailFacade.parseInbound → AgentInboundEmailDispatcher.dispatch
- *     1. resolve recipient address → tenant address row
+ *     1. load the tenant address the webhook was authenticated for
+ *        (`payload.recipient`) — never one re-derived from `to`
  *     2. resolve the inbound agent assignment (lowest priority) + its mode
  *     3. persist the inbound email_messages row
  *     4a. task-spawn mode → delegate to INBOUND_EMAIL_TASK_SPAWNER (creates a
@@ -19,11 +20,37 @@
  *         message, touch lastMessageAt (the chat-reply path picks it up).
  */
 
+/**
+ * The tenant address an inbound webhook was AUTHENTICATED for: the recipient
+ * whose owner's secret (their own, or the admin/env one they inherit) verified
+ * the webhook's signature. `EmailFacadeService.parseInbound` answers it as
+ * `authenticatedRecipient`.
+ */
+export interface AgentInboundEmailRecipient {
+    /** `tenant_email_addresses.id`. */
+    readonly emailAddressId: string;
+    /** The address's owner — the scope the signature was verified at. */
+    readonly userId: string;
+}
+
 export interface AgentInboundEmailDispatchPayload {
     /** Plugin that received the mail (e.g. 'postmark'). */
     pluginId: string;
+    /**
+     * Where the message may go: the address the webhook was authenticated for
+     * (`EmailFacadeService.parseInbound` → `authenticatedRecipient`). The
+     * dispatcher routes ONLY here. `null` (no recipient is a registered
+     * address of this plugin) means the message is not dispatched.
+     *
+     * Security: never derive the destination from `to` instead. That list is
+     * the sender's to write — a tenant signing with their own per-user key
+     * could otherwise name their own address where verification looks and a
+     * victim's where routing looks.
+     */
+    recipient: AgentInboundEmailRecipient | null;
     providerMessageId: string;
     from: string;
+    /** Every recipient the message names — recorded, never used for routing. */
     to: string[];
     subject: string;
     bodyText: string;

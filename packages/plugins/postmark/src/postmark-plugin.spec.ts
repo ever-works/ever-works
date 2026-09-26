@@ -121,6 +121,23 @@ describe('PostmarkPlugin', () => {
 			expect(result.bodyText).toBe('plain body');
 			expect(result.bodyHtml).toBe('<p>html body</p>');
 		});
+
+		// The owner lookup (extractInboundRecipients) and the parsed `to` must
+		// name the same mailboxes, on the raw `To` fallback too.
+		it('reports the same bare recipient as extractInboundRecipients on the To fallback', async () => {
+			const raw = Buffer.from(
+				JSON.stringify({
+					MessageID: 'pm-inbound-2',
+					From: 'sender@example.com',
+					To: '"Acme Inbox" <inbox@acme.com>',
+					Subject: 's',
+					Date: '2026-05-28T10:00:00Z'
+				})
+			);
+			const result = await plugin.parseInboundWebhook(raw, {}, {});
+			expect(result.to).toEqual(['inbox@acme.com']);
+			expect(result.to).toEqual(plugin.extractInboundRecipients(raw, {}));
+		});
 	});
 
 	describe('extractInboundRecipients', () => {
