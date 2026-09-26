@@ -173,12 +173,20 @@ is already used by <owner>/<name>.`).
   says `Template "<id>" (<owner>/<repo>) is an App Blueprint, not a
 website template. …`; re-sending the id a Work already has (a settings
   save, a no-op switch) still succeeds.
+- **Given** my saved website default is a retired row (saved while it
+  was still listed), **when** I create a Work WITHOUT naming a template
+  — the Create-Work forms' "use my default" choice, a draft, or an
+  import — **then** the Work is pinned to the template a user with no
+  saved default gets (its kind's default, else the system default) and
+  never inherits the retired row (FR-5 f); the template listing reports
+  that system default as my default, never the unlisted row.
 - **Given** my saved website default is a retired row, **when** I
-  create a Work WITHOUT naming a template, **then** that Work inherits
-  the retired row like any inheriting Work (inheritance, not a
-  selection); the pickers never preselect it, because it is not listed
-  and `GET /api/works/website-templates` flags the system default when
-  no listed row is my default.
+  switch a Work that uses another template to "use my default", or save
+  its settings with no website template, **then** the call fails with a
+  400 whose message says `Your default website template "<id>"
+(<owner>/<repo>) is an App Blueprint, …` before anything is reset or
+  saved (FR-5 f); a Work that already inherits the row, or names it,
+  may still do so.
 - **Given** the user has no `user_template_preferences` row for a
   given kind, **when** `getDefaultTemplateIdForUser('website',
 userId)` runs, **then** it falls back to
@@ -210,7 +218,10 @@ userId)` runs, **then** it falls back to
   returning `{ status: 'success', kind, defaultTemplateId, templates }`
   with `templates` as `findVisibleByKind(kind, userId)` minus retired
   rows (FR-5 e) mapped to `TemplateCatalogItem`s and ordered
-  `sourceType DESC, name ASC`.
+  `sourceType DESC, name ASC`, and `defaultTemplateId` as the default a
+  NEW selection gets: the user's saved default unless it is retired,
+  else the FR-23 fallback (FR-5 f), so it never names a row missing
+  from `templates` because of retirement.
 - **FR-3** The system MUST run
   `syncDiscoveredWebsiteTemplatesIfStale(userId)` BEFORE the read on
   `GET /api/templates?kind=website` when no built-in website template
@@ -279,7 +290,35 @@ website template, or create an App Work from the Blueprint instead.' })`.
   `getVisibleTemplateForUser` still returns the row, with `retiredReason`
   set on its `TemplateCatalogItem` (`null` on every other row), and
   `getDefaultTemplateIdForUser` still answers it as a user's default,
-  because existing references to it stay valid.
+  because existing references to it stay valid;
+  (f) MUST NOT let a Work NEWLY inherit a retired row that a user saved
+  as their `website` default before it was retired. Every Create-Work
+  form starts on "use my default" and sends no id, and a Work storing
+  no template inherits the saved default, which (e) keeps resolvable.
+  So: `getWebsiteTemplateIdForNewWork(userId, workKind)` answers `null`
+  (store no template, inherit as before) unless the saved default is
+  retired, and then answers `getWebsiteTemplateIdWithoutSavedDefault(workKind)`
+  — the template a user with no saved default gets (the kind's default
+  when that template ships, else the system default; it is the website
+  resolver's own fall-through, and the resolver spec pins the two
+  together). Work create (no id), `createDraftWork` and both
+  `WorkImportService` creates store that id when it is set.
+  `switchWebsiteTemplate` with no id and `updateWork` with
+  `websiteTemplateId: null` refuse, before any repository reset or save,
+  when the saved default is retired and is not the template the Work
+  uses now, with `BadRequestException({ status: 'error', message: 'Your
+default website template "<id>" (<owner>/<repo>) is an App Blueprint,
+not a website template, so a Work cannot newly inherit it. Choose a
+website template for this Work, or set a website template as your
+default first.' })`; they refuse rather than substitute a template
+  because the switch would reset the Work's website repository from a
+  template the user never saw named. A Work that already inherits the
+  row, or names it, may move to inheriting it (what it resolves does
+  not change). `listTemplatesForUser` reports the FR-23 fallback as
+  `defaultTemplateId` (FR-2) while the saved default is retired, and
+  `getRetiredDefaultTemplateForUser(kind, userId)` returns the retired
+  saved default (or `null`) for callers that must refuse. Works that
+  already inherit the row are not changed.
 - **FR-6** The system MUST resolve discovered template ids by:
   (a) `findBuiltInByRepositoryCoordinates(kind, owner, name)` — if a
   canonical row exists, reuse its id; otherwise (b)
@@ -373,7 +412,10 @@ summary, metadata }).catch(() => {})` for the five mutating endpoints:
   user's visible set), fall back to `getDefaultWebsiteTemplateId()`
   for `kind: 'website'` and `null` for `kind: 'work'`. A retired row
   (FR-5 c) is still visible, so a saved default pointing at one is still
-  answered: it is what the user's inheriting Works resolve.
+  answered: it is what the user's inheriting Works resolve. A NEW Work
+  and a new selection never get it (FR-5 f): the listing's
+  `defaultTemplateId` and `getWebsiteTemplateIdForNewWork` treat it as
+  no saved default.
 - **FR-24** The system MUST attach `originType` to every
   `TemplateCatalogItem`: `'standard'` for `sourceType='built_in'`,
   `'forked'` when `metadata.forkedFromTemplateId` is set, `'custom_url'`

@@ -18,6 +18,7 @@ import {
 import {
     findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
+    getWebsiteTemplateIdWithoutSavedDefault,
     listWebsiteTemplates,
     type WebsiteTemplateConfig,
 } from '@src/generators/website-generator/config/website-template.config';
@@ -199,14 +200,23 @@ export class TemplateCatalogService implements OnModuleInit {
             await this.syncDiscoveredWebsiteTemplatesIfStale(userId);
         }
 
-        const [visibleTemplates, defaultTemplateId] = await Promise.all([
+        const [visibleTemplates, savedDefault] = await Promise.all([
             this.templateRepository.findVisibleByKind(kind, userId),
-            this.getDefaultTemplateIdForUser(kind, userId),
+            this.findSavedDefaultTemplate(kind, userId),
         ]);
         // This listing feeds every picker (Create-Work, the website-template
         // switch, the defaults page), so a retired row — kept only so the
         // Works already on it keep resolving — is never offered here.
         const templates = visibleTemplates.filter((template) => !isRetiredTemplate(template));
+        // The default the pickers label "Default (…)" and the Create-Work form
+        // submits as "use my default" is the one a NEW Work gets (FR-5 f): a
+        // retired saved default is never newly inherited, so it is reported as
+        // if there were no saved default — never as an id missing from
+        // `templates`.
+        const defaultTemplateId =
+            savedDefault && !isRetiredTemplate(savedDefault)
+                ? savedDefault.id
+                : this.getDefaultTemplateIdWithoutSavedDefault(kind);
 
         const latestByTemplate = await this.customizationRepository.findLatestForTemplates(
             templates.map((t) => t.id),
@@ -624,31 +634,81 @@ export class TemplateCatalogService implements OnModuleInit {
         return this.toCatalogItem(template, defaultTemplateId);
     }
 
+    /**
+     * The default the user's INHERITING Works use: the saved default when it is
+     * visible, else the system default (`website`) or none (`work`).
+     *
+     * A retired saved default is still answered: the website resolver still
+     * resolves it for the user's inheriting Works, and the template switch
+     * compares against what those Works actually use. What a NEW Work or a new
+     * selection gets instead is {@link getWebsiteTemplateIdForNewWork} and the
+     * listing's `defaultTemplateId` (FR-5 f); SETTING a retired row as the
+     * default is refused (setDefaultTemplateForUser).
+     */
     async getDefaultTemplateIdForUser(kind: TemplateKind, userId: string): Promise<string | null> {
+        const savedDefault = await this.findSavedDefaultTemplate(kind, userId);
+        return savedDefault ? savedDefault.id : this.getDefaultTemplateIdWithoutSavedDefault(kind);
+    }
+
+    /**
+     * The user's saved default for `kind` when it is a RETIRED row, as a
+     * catalog item (with `retiredReason` set); `null` when the saved default is
+     * listed or there is none. For callers that must refuse a Work NEWLY
+     * inheriting it (templates-catalog FR-5 f) and name it in the refusal.
+     */
+    async getRetiredDefaultTemplateForUser(
+        kind: TemplateKind,
+        userId: string,
+    ): Promise<TemplateCatalogItem | null> {
+        const savedDefault = await this.findSavedDefaultTemplate(kind, userId);
+        if (!savedDefault || !isRetiredTemplate(savedDefault)) {
+            return null;
+        }
+        return this.toCatalogItem(savedDefault, savedDefault.id);
+    }
+
+    /**
+     * The website template id a NEW Work that names none must store
+     * (templates-catalog FR-5 f).
+     *
+     * `null`: store no template, and the Work inherits the user's saved
+     * default exactly as before. An id: the saved default is a RETIRED row, so
+     * storing no template would make the new Work inherit the App Blueprint
+     * (the resolver resolves a retired row for inheriting Works). The id is
+     * the template a user with NO saved default gets for this kind of Work
+     * (`getWebsiteTemplateIdWithoutSavedDefault`), and the caller pins the Work
+     * to it. Works that already inherit the retired row are not touched.
+     */
+    async getWebsiteTemplateIdForNewWork(
+        userId: string,
+        workKind?: string | null,
+    ): Promise<string | null> {
+        const retiredDefault = await this.getRetiredDefaultTemplateForUser('website', userId);
+        return retiredDefault ? getWebsiteTemplateIdWithoutSavedDefault(workKind) : null;
+    }
+
+    /** The user's saved default for `kind`, when it is visible to them (a retired row is). */
+    private async findSavedDefaultTemplate(
+        kind: TemplateKind,
+        userId: string,
+    ): Promise<Template | null> {
         const preference = await this.userTemplatePreferenceRepository.findByUserAndKind(
             userId,
             kind,
         );
-
-        if (preference) {
-            // A retired default is still answered: the website resolver still
-            // resolves it for the user's inheriting Works, and the template
-            // switch compares against what those Works actually use. Only
-            // SETTING it as a default is refused (setDefaultTemplateForUser).
-            const visibleTemplate = await this.templateRepository.findVisibleById(
-                preference.templateId,
-                userId,
-            );
-            if (visibleTemplate && visibleTemplate.kind === kind) {
-                return visibleTemplate.id;
-            }
+        if (!preference) {
+            return null;
         }
 
-        if (kind === 'website') {
-            return getDefaultWebsiteTemplateId();
-        }
+        const visibleTemplate = await this.templateRepository.findVisibleById(
+            preference.templateId,
+            userId,
+        );
+        return visibleTemplate && visibleTemplate.kind === kind ? visibleTemplate : null;
+    }
 
-        return null;
+    private getDefaultTemplateIdWithoutSavedDefault(kind: TemplateKind): string | null {
+        return kind === 'website' ? getDefaultWebsiteTemplateId() : null;
     }
 
     private async syncDiscoveredWebsiteTemplatesIfStale(userId: string): Promise<void> {

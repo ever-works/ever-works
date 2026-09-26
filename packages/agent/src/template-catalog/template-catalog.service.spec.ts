@@ -1200,6 +1200,122 @@ describe('TemplateCatalogService', () => {
                 'cal-template',
             );
         });
+
+        // FR-5 f. Review follow-up on PR #2511: the listing kept answering the
+        // retired row as `defaultTemplateId` while leaving it out of
+        // `templates`, so every "Default (…)" option named a template the
+        // server would not apply to a new Work.
+        describe('a retired saved default, for NEW selections (FR-5 f)', () => {
+            const classicRow = {
+                ...listedRow,
+                id: 'classic',
+                name: 'Classic',
+                repositoryName: 'directory-web-template',
+                metadata: {},
+            };
+
+            beforeEach(() => {
+                userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue({
+                    templateId: 'cal-template',
+                });
+                templateRepository.findVisibleById.mockImplementation(
+                    async (id: string) =>
+                        [retiredRow, listedRow, classicRow].find((row) => row.id === id) ?? null,
+                );
+                templateRepository.findVisibleByKind.mockResolvedValue([
+                    classicRow,
+                    listedRow,
+                    retiredRow,
+                ]);
+            });
+
+            it('lists the system default as the default, never the unlisted retired row', async () => {
+                const result = await service.listTemplatesForUser('website', 'user-7');
+
+                expect(result.defaultTemplateId).toBe('classic');
+                expect(result.templates.map((template) => template.id)).toContain(
+                    result.defaultTemplateId,
+                );
+                expect(
+                    result.templates
+                        .filter((template) => template.isDefault)
+                        .map((template) => template.id),
+                ).toEqual(['classic']);
+            });
+
+            it('still lists a saved default that is not retired as the default', async () => {
+                userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue({
+                    templateId: 'astro-blog-template',
+                });
+
+                const result = await service.listTemplatesForUser('website', 'user-7');
+
+                expect(result.defaultTemplateId).toBe('astro-blog-template');
+                expect(
+                    result.templates
+                        .filter((template) => template.isDefault)
+                        .map((template) => template.id),
+                ).toEqual(['astro-blog-template']);
+            });
+
+            it('returns the retired saved default, marked, for callers refusing a Work newly inheriting it', async () => {
+                await expect(
+                    service.getRetiredDefaultTemplateForUser('website', 'user-7'),
+                ).resolves.toEqual(
+                    expect.objectContaining({
+                        id: 'cal-template',
+                        repositoryOwner: 'ever-works',
+                        repositoryName: 'cal-template',
+                        retiredReason: 'app_blueprint',
+                    }),
+                );
+            });
+
+            it('returns no retired default when the saved default is listed, or there is none', async () => {
+                userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValueOnce({
+                    templateId: 'astro-blog-template',
+                });
+                await expect(
+                    service.getRetiredDefaultTemplateForUser('website', 'user-7'),
+                ).resolves.toBeNull();
+
+                userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValueOnce(null);
+                await expect(
+                    service.getRetiredDefaultTemplateForUser('website', 'user-7'),
+                ).resolves.toBeNull();
+            });
+
+            it.each([
+                [undefined, 'classic'],
+                ['default', 'classic'],
+                ['directory', 'classic'],
+                ['awesome-repo', 'classic'],
+                ['website', 'web'],
+                ['landing-page', 'web'],
+                ['blog', 'web'],
+            ])(
+                'gives a new %s Work the template a user with no saved default gets (%s), to pin',
+                async (workKind, expected) => {
+                    await expect(
+                        service.getWebsiteTemplateIdForNewWork('user-7', workKind),
+                    ).resolves.toBe(expected);
+                },
+            );
+
+            it('lets a new Work inherit (null) when the saved default is listed, or there is none', async () => {
+                userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValueOnce({
+                    templateId: 'astro-blog-template',
+                });
+                await expect(
+                    service.getWebsiteTemplateIdForNewWork('user-7', 'website'),
+                ).resolves.toBeNull();
+
+                userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValueOnce(null);
+                await expect(
+                    service.getWebsiteTemplateIdForNewWork('user-7', 'website'),
+                ).resolves.toBeNull();
+            });
+        });
     });
 
     it('rejects updates for custom templates the user does not own', async () => {

@@ -42,7 +42,10 @@ import {
 } from '@src/generators/website-generator';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
-import { retiredTemplateSelectionMessage } from '../template-catalog/template-retirement';
+import {
+    retiredDefaultInheritanceMessage,
+    retiredTemplateSelectionMessage,
+} from '../template-catalog/template-retirement';
 import {
     describeExternalRefConflicts,
     findExternalRefConflicts,
@@ -203,6 +206,11 @@ export class WorkLifecycleService {
      * selection with a 400, but re-sending the id the Work already has is not a
      * new selection: a settings save or a no-op switch on such a Work keeps
      * working, exactly as the resolver keeps resolving the row for it.
+     *
+     * An empty value ("use my default") returns null unchecked; what the Work
+     * would then inherit is each caller's concern (FR-5 f): `createWork` pins
+     * a new Work away from a retired saved default, and the update and switch
+     * call `assertMayNewlyInheritWebsiteDefault`.
      */
     private async resolveValidatedWebsiteTemplateSelection(
         value: string | null | undefined,
@@ -238,6 +246,44 @@ export class WorkLifecycleService {
         }
 
         return normalizedTemplateId;
+    }
+
+    /**
+     * Refuses moving an existing Work to "use my default" (no website template
+     * of its own) while the user's saved default is a RETIRED row the Work
+     * does not already use (templates-catalog FR-5 f). The switch and the
+     * settings update send null for that choice, and a Work storing null
+     * inherits the saved default, which the resolver still resolves — so
+     * without this the Work would newly land on the App Blueprint, and the
+     * switch would reset its website repository from it.
+     *
+     * It refuses rather than substituting another template: "use my default"
+     * cannot be honoured, and a guessed replacement could reset the
+     * repository from a template the user never saw named. (A NEW Work is
+     * pinned instead — see `createWork` — because there is nothing to reset
+     * and every Create-Work form starts on "use my default".)
+     *
+     * `currentEffectiveTemplateId` is the template the Work uses now. A Work
+     * already on the retired row — by inheritance or by id — may move to
+     * inheriting it: nothing it resolves changes.
+     */
+    private async assertMayNewlyInheritWebsiteDefault(
+        userId: string,
+        currentEffectiveTemplateId: string,
+    ): Promise<void> {
+        const retiredDefault = await this.templateCatalogService.getRetiredDefaultTemplateForUser(
+            'website',
+            userId,
+        );
+        if (retiredDefault?.retiredReason && retiredDefault.id !== currentEffectiveTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: retiredDefaultInheritanceMessage(
+                    retiredDefault,
+                    retiredDefault.retiredReason,
+                ),
+            });
+        }
     }
 
     private async getEffectiveWebsiteTemplateId(
@@ -298,9 +344,22 @@ export class WorkLifecycleService {
             ? await this.resolveRepositoryWorkSource(createWorkDto, user)
             : null;
 
-        const selectedWebsiteTemplateId = repositorySource
+        let selectedWebsiteTemplateId = repositorySource
             ? null
             : await this.resolveValidatedWebsiteTemplateSelection(websiteTemplateId, user.id);
+        if (!repositorySource && !selectedWebsiteTemplateId) {
+            // No template named: the Work would store null and inherit the
+            // user's saved default. When that default is a RETIRED row (an App
+            // Blueprint) the catalog names the template a user with no saved
+            // default gets, and the Work is pinned to it (templates-catalog
+            // FR-5 f). Every Create-Work form starts on "use my default", so
+            // this is the common path, not an API corner.
+            selectedWebsiteTemplateId =
+                await this.templateCatalogService.getWebsiteTemplateIdForNewWork(
+                    user.id,
+                    normalizedKind,
+                );
+        }
 
         const { storageProvider, deployProvider, gitProvider } = await this.resolveProviderDefaults(
             createWorkDto,
@@ -786,6 +845,17 @@ export class WorkLifecycleService {
             status: 'draft',
             deployProvider: null,
         };
+        // A draft is an ordinary Work whose website comes later, from the
+        // template it inherits. Not from a retired saved default, though: see
+        // `createWork` (templates-catalog FR-5 f).
+        const pinnedWebsiteTemplateId =
+            await this.templateCatalogService.getWebsiteTemplateIdForNewWork(
+                user.id,
+                workData.kind,
+            );
+        if (pinnedWebsiteTemplateId) {
+            workData.websiteTemplateId = pinnedWebsiteTemplateId;
+        }
 
         try {
             return await this.workRepository.create(workData, user);
@@ -945,16 +1015,16 @@ export class WorkLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
+                const currentTemplateId = this.normalizeWebsiteTemplateSelection(
+                    work.websiteTemplateId,
+                );
                 const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
                     updateDto.websiteTemplateId,
                     user.id,
-                    this.normalizeWebsiteTemplateSelection(work.websiteTemplateId),
+                    currentTemplateId,
                 );
 
-                if (
-                    nextTemplateId !==
-                    this.normalizeWebsiteTemplateSelection(work.websiteTemplateId)
-                ) {
+                if (nextTemplateId !== currentTemplateId) {
                     const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(
                         work,
                         user,
@@ -967,6 +1037,13 @@ export class WorkLifecycleService {
                                 'Website template cannot be changed after the website repository has been initialized.',
                         });
                     }
+                }
+
+                // Leaving an explicit template for "use my default" (null):
+                // not onto a retired saved default (FR-5 f). A Work that
+                // already inherits is not changing what it resolves.
+                if (!nextTemplateId && currentTemplateId) {
+                    await this.assertMayNewlyInheritWebsiteDefault(user.id, currentTemplateId);
                 }
 
                 updateData.websiteTemplateId = nextTemplateId;
@@ -1200,6 +1277,12 @@ export class WorkLifecycleService {
             work.websiteTemplateId,
         );
         const currentEffectiveTemplateId = await this.getEffectiveWebsiteTemplateId(work, user.id);
+        if (!nextTemplateId) {
+            // "Use my default": not onto a retired saved default the Work does
+            // not already use (FR-5 f) — refused before anything is reset or
+            // saved.
+            await this.assertMayNewlyInheritWebsiteDefault(user.id, currentEffectiveTemplateId);
+        }
         const nextEffectiveTemplateId =
             nextTemplateId ||
             (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
