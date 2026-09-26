@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { PLUGIN_CAPABILITIES, type FacadeOptions, type IPlugin } from '@ever-works/plugin';
 import {
     isEmailOutboundPlugin,
@@ -319,8 +319,16 @@ export class EmailFacadeService extends BaseFacadeService {
     }
 
     /**
-     * Dispatch an inbound webhook payload to the matching email-inbound
-     * plugin. Called from `apps/api/src/email/email.controller.ts`.
+     * Authenticate and decode an inbound-email webhook for the matching
+     * email-inbound plugin. Called from `apps/api/src/email/email.controller.ts`.
+     *
+     * The route is public: this signature check is its ONLY authentication,
+     * so it fails closed. Every plugin method below is called on the plugin's
+     * REAL, loaded instance ({@link getUsableInboundPlugin}), never through
+     * the registry's lazy proxy, and the verification is awaited
+     * ({@link verifyWebhookSignature}). Note that a plugin with NO secret at
+     * the resolved scope accepts unsigned webhooks (an operator opt-in in the
+     * shipped postmark and mailgun plugins).
      */
     async parseInbound(
         pluginId: string,
@@ -328,7 +336,7 @@ export class EmailFacadeService extends BaseFacadeService {
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
     ): Promise<EmailInboundMessage> {
-        const plugin = this.getInboundPluginById(pluginId);
+        const plugin = await this.getUsableInboundPlugin(pluginId, 'parseInbound');
 
         // EW-670 follow-up — resolve the recipient address's OWNER before
         // verifying the signature. The inbound webhook controller can't
@@ -352,7 +360,7 @@ export class EmailFacadeService extends BaseFacadeService {
             taskId: scope.taskId,
             settings,
         };
-        plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+        await this.verifyWebhookSignature(plugin, pluginId, rawBody, headers, emailOpts);
         return plugin.parseInboundWebhook(rawBody, headers, emailOpts);
     }
 
@@ -369,8 +377,12 @@ export class EmailFacadeService extends BaseFacadeService {
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
     ): Promise<readonly EmailDeliveryEvent[]> {
-        const plugin = this.getInboundPluginById(pluginId);
-        if (!plugin.parseEventWebhook) return [];
+        // The loaded instance, as for `parseInbound`: its optional
+        // `parseEventWebhook` is then truthfully present or absent (the lazy
+        // proxy answers a forwarding wrapper for ANY name), and the signature
+        // check below is the plugin's real, synchronous one.
+        const plugin = await this.getUsableInboundPlugin(pluginId, 'parseEventWebhook');
+        if (typeof plugin.parseEventWebhook !== 'function') return [];
         const settings = await this.resolveSettings(pluginId, options);
         const emailOpts: EmailOptions = {
             userId: options?.userId,
@@ -379,7 +391,7 @@ export class EmailFacadeService extends BaseFacadeService {
             taskId: options?.taskId,
             settings,
         };
-        plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+        await this.verifyWebhookSignature(plugin, pluginId, rawBody, headers, emailOpts);
         return plugin.parseEventWebhook(rawBody, headers, emailOpts);
     }
 
@@ -430,13 +442,23 @@ export class EmailFacadeService extends BaseFacadeService {
         options?: FacadeOptions,
     ): Promise<FacadeOptions> {
         const base: FacadeOptions = { ...options };
-        if (base.userId || !plugin.extractInboundRecipients || !this.emailAddresses) {
+        if (
+            base.userId ||
+            typeof plugin.extractInboundRecipients !== 'function' ||
+            !this.emailAddresses
+        ) {
             return base;
         }
         try {
-            const recipients = plugin.extractInboundRecipients(rawBody, headers);
+            // `plugin` is the loaded instance, so this sync method answers its
+            // array. `Promise.resolve` still tolerates an implementation that
+            // returns a Promise, and anything but an array names nobody.
+            const extracted: unknown = await Promise.resolve(
+                plugin.extractInboundRecipients(rawBody, headers),
+            );
+            const recipients: readonly unknown[] = Array.isArray(extracted) ? extracted : [];
             for (const recipient of recipients) {
-                if (!recipient) continue;
+                if (typeof recipient !== 'string' || !recipient) continue;
                 const owner = await this.emailAddresses.findByAddress(recipient);
                 // Only adopt the resolved owner when the matched address is
                 // registered to THIS plugin — a mailbox can be registered by
@@ -512,18 +534,112 @@ export class EmailFacadeService extends BaseFacadeService {
         return isEmailOutboundPlugin(registered.plugin) ? registered.plugin : undefined;
     }
 
-    private getInboundPluginById(pluginId: string): IEmailInboundPlugin {
+    /**
+     * The REAL, loaded instance of the inbound plugin `pluginId`, for a
+     * webhook about to be verified with it.
+     *
+     * The registry holds a disk-discovered plugin (mailgun, postmark) as a
+     * lazy proxy, and the proxy answers EVERY non-manifest member with an
+     * async forwarding wrapper, cold or loaded. Called through it, a SYNC
+     * method answers a Promise: a failing `verifyWebhookSignature` became a
+     * discarded rejected Promise (the forged message was parsed and
+     * dispatched, and the rejection went unhandled),
+     * `extractInboundRecipients` named no owner (so a per-user secret was
+     * never resolved), and `parseEventWebhook` was always "present". While
+     * the proxy is cold its `settingsSchema` also reads as `{}`, so settings
+     * resolved before the load missed every secret. `__materialize()` loads
+     * the plugin (import + onLoad, deduped across concurrent callers) and
+     * answers the instance itself, whose methods are the plugin's own; it runs
+     * before any settings are resolved. A caller that arrives after the import
+     * while another request's onLoad is still running gets the instance at
+     * once: its signature check is still the plugin's own synchronous one.
+     *
+     * A plugin that cannot load is refused with a 503, never accepted
+     * unverified: its import fails, or its onLoad fails. `callOnLoad` catches
+     * an onLoad failure and records `error` on the registry entry while
+     * `__materialize()` still resolves, so the entry is checked again after
+     * the load (the registry mutates its entries in place).
+     */
+    private async getUsableInboundPlugin(
+        pluginId: string,
+        operation: string,
+    ): Promise<IEmailInboundPlugin> {
         const registered = this.registry
             .getByCapability(PLUGIN_CAPABILITIES.EMAIL_INBOUND)
             .find((p) => p.plugin.id === pluginId && p.state === 'loaded');
         if (!registered || !isEmailInboundPlugin(registered.plugin)) {
             throw new EmailFacadeError(
                 `Inbound email plugin not found or disabled: ${pluginId}`,
-                'parseInbound',
+                operation,
                 pluginId,
             );
         }
-        return registered.plugin;
+        const refuse = (reason: string): never => {
+            this.logger.warn(`${operation}: refusing the webhook for ${pluginId} — ${reason}`);
+            throw new ServiceUnavailableException(
+                `Inbound email plugin ${pluginId} is unavailable`,
+            );
+        };
+        let real: unknown = registered.plugin;
+        const lazy = registered.plugin as { __materialize?: () => Promise<IPlugin> };
+        if (typeof lazy.__materialize === 'function') {
+            try {
+                real = await lazy.__materialize();
+            } catch (error) {
+                refuse(
+                    `it could not be loaded: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        // Re-read the entry: an onLoad failure is recorded on it, in place.
+        const state: string = registered.state;
+        if (state !== 'loaded') {
+            const cause = registered.error;
+            refuse(
+                `it is in the "${state}" state${
+                    cause ? `: ${cause instanceof Error ? cause.message : String(cause)}` : ''
+                }`,
+            );
+        }
+        return (real ?? registered.plugin) as IEmailInboundPlugin;
+    }
+
+    /**
+     * Run the plugin's signature check and FAIL CLOSED.
+     *
+     * The contract is synchronous: throw on a mismatch. An implementation
+     * that returns a Promise instead is a bug, but a rejection it carries
+     * must still refuse the webhook — never be left unawaited (a discarded
+     * verification Promise both skips the check and surfaces as an unhandled
+     * rejection, which terminates a Node process that has no
+     * `unhandledRejection` listener) — so a thenable is awaited. A plugin with
+     * no `verifyWebhookSignature` at all cannot authenticate anything and is
+     * refused.
+     */
+    private async verifyWebhookSignature(
+        plugin: IEmailInboundPlugin,
+        pluginId: string,
+        rawBody: Buffer,
+        headers: Readonly<Record<string, string>>,
+        emailOpts: EmailOptions,
+    ): Promise<void> {
+        if (typeof plugin.verifyWebhookSignature !== 'function') {
+            throw new EmailFacadeError(
+                `Inbound email plugin ${pluginId} cannot verify webhook signatures`,
+                'verifyWebhookSignature',
+                pluginId,
+            );
+        }
+        const outcome: unknown = plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+        if (isThenable(outcome)) {
+            this.logger.error(
+                `verifyWebhookSignature of ${pluginId} returned a Promise; the contract is ` +
+                    'synchronous (throw on mismatch). Awaiting it so the check still gates the webhook.',
+            );
+            await outcome;
+        }
     }
 
     private async resolveSettings(
@@ -631,4 +747,13 @@ export class EmailFacadeService extends BaseFacadeService {
             this.logger.warn(`PluginUsageEvent emission failed for ${pluginId}: ${String(err)}`);
         }
     }
+}
+
+/** Whether `value` is a Promise or any other thenable. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+    return (
+        (typeof value === 'object' || typeof value === 'function') &&
+        value !== null &&
+        typeof (value as { then?: unknown }).then === 'function'
+    );
 }

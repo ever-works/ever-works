@@ -145,6 +145,24 @@ describe('EmailController', () => {
                 }),
             );
         });
+
+        // PLG-1 — the facade fails closed (a bad signature throws; a plugin
+        // that cannot load is refused with a 503). The public route must pass
+        // that refusal through: never ack, never dispatch the message.
+        it.each([
+            ['a bad signature', new Error('Postmark inbound: signature mismatch.')],
+            [
+                'an inbound plugin that cannot load (503)',
+                Object.assign(new Error('Inbound email plugin postmark is unavailable'), {
+                    status: 503,
+                }),
+            ],
+        ])('refuses the webhook and dispatches nothing on %s', async (_case, refusal) => {
+            facade.parseInbound.mockRejectedValueOnce(refusal);
+
+            await expect(controller.inboundWebhook('postmark', req, headers)).rejects.toBe(refusal);
+            expect(inboundDispatcher.dispatch).not.toHaveBeenCalled();
+        });
     });
 
     describe('compose + held drafts (AW-05)', () => {
