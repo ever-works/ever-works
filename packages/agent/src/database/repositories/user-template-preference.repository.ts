@@ -34,6 +34,10 @@ export class UserTemplatePreferenceRepository {
     /**
      * Every user whose default template for `kind` is `templateId`. The
      * `(userId, kind)` unique index means each user appears at most once.
+     *
+     * No production caller: website-template discovery used this to count the
+     * Works inheriting an App Blueprint's row before deactivating it, and now
+     * RETIRES the row instead (templates-catalog FR-5 c), which needs no count.
      */
     async findUserIdsByKindAndTemplateId(
         kind: TemplateKind,

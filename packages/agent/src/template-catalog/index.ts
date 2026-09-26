@@ -1,5 +1,6 @@
 export { TemplateCatalogService } from './template-catalog.service';
 export type { ForkTemplateResult, TemplateCatalogItem } from './template-catalog.service';
+export type { TemplateRetirementReason } from './template-retirement';
 export { TemplateCatalogModule } from './template-catalog.module';
 export { TemplateCustomizationService } from './template-customization.service';
 export type {

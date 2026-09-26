@@ -42,6 +42,7 @@ import {
 } from '@src/generators/website-generator';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
+import { retiredTemplateSelectionMessage } from '../template-catalog/template-retirement';
 import {
     describeExternalRefConflicts,
     findExternalRefConflicts,
@@ -191,9 +192,22 @@ export class WorkLifecycleService {
         return normalized ? normalized : null;
     }
 
+    /**
+     * Validates a website template id a caller asks a Work to use. Every
+     * Work-side write path that takes one goes through here: create, the
+     * settings update and the template switch.
+     *
+     * `currentTemplateId` is the Work's current explicit selection (none on
+     * create). A RETIRED row (templates-catalog FR-5 c/e — an App Blueprint an
+     * earlier discovery saved as a website template) is refused as a NEW
+     * selection with a 400, but re-sending the id the Work already has is not a
+     * new selection: a settings save or a no-op switch on such a Work keeps
+     * working, exactly as the resolver keeps resolving the row for it.
+     */
     private async resolveValidatedWebsiteTemplateSelection(
         value: string | null | undefined,
         userId: string,
+        currentTemplateId: string | null = null,
     ): Promise<string | null> {
         const normalizedTemplateId = this.normalizeWebsiteTemplateSelection(value);
 
@@ -210,6 +224,16 @@ export class WorkLifecycleService {
             throw new BadRequestException({
                 status: 'error',
                 message: `Unsupported website template: ${normalizedTemplateId}`,
+            });
+        }
+
+        if (visibleTemplate.retiredReason && normalizedTemplateId !== currentTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: retiredTemplateSelectionMessage(
+                    visibleTemplate,
+                    visibleTemplate.retiredReason,
+                ),
             });
         }
 
@@ -924,6 +948,7 @@ export class WorkLifecycleService {
                 const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
                     updateDto.websiteTemplateId,
                     user.id,
+                    this.normalizeWebsiteTemplateSelection(work.websiteTemplateId),
                 );
 
                 if (
@@ -1165,6 +1190,7 @@ export class WorkLifecycleService {
         const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
             websiteTemplateId,
             user.id,
+            this.normalizeWebsiteTemplateSelection(work.websiteTemplateId),
         );
 
         const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(work, user);

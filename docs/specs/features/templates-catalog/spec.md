@@ -164,10 +164,21 @@ is already used by <owner>/<name>.`).
   `ever-works/cal-template`), **when**
   `syncDiscoveredWebsiteTemplatesForUser` runs, **then** it is not
   upserted as a website template, and an active discovered built-in row
-  an earlier discovery saved for it is deactivated, unless Works still
-  use that row (FR-5 d), in which case it stays active and a warn line
-  (`Kept discovered website template "<id>" active although <fullName>
-is an App Blueprint: …`) asks for those Works to be reassigned.
+  an earlier discovery saved for it is RETIRED (FR-5 c), whether or not
+  Works use it: it stays active, so those Works keep resolving it, but
+  it leaves every picker and is refused as a new selection (FR-5 e).
+- **Given** a retired row (FR-5 c), **when** I create a Work with it,
+  switch a Work to it, change a Work's settings to it, set it as my
+  default, or fork it, **then** the call fails with a 400 whose message
+  says `Template "<id>" (<owner>/<repo>) is an App Blueprint, not a
+website template. …`; re-sending the id a Work already has (a settings
+  save, a no-op switch) still succeeds.
+- **Given** my saved website default is a retired row, **when** I
+  create a Work WITHOUT naming a template, **then** that Work inherits
+  the retired row like any inheriting Work (inheritance, not a
+  selection); the pickers never preselect it, because it is not listed
+  and `GET /api/works/website-templates` flags the system default when
+  no listed row is my default.
 - **Given** the user has no `user_template_preferences` row for a
   given kind, **when** `getDefaultTemplateIdForUser('website',
 userId)` runs, **then** it falls back to
@@ -197,17 +208,20 @@ userId)` runs, **then** it falls back to
   `WEBSITE_TEMPLATE_MINIMAL_REPO` is set).
 - **FR-2** The system MUST expose `GET /api/templates?kind=<website|work>`
   returning `{ status: 'success', kind, defaultTemplateId, templates }`
-  with `templates` as `findVisibleByKind(kind, userId)` mapped to
-  `TemplateCatalogItem`s and ordered `sourceType DESC, name ASC`.
+  with `templates` as `findVisibleByKind(kind, userId)` minus retired
+  rows (FR-5 e) mapped to `TemplateCatalogItem`s and ordered
+  `sourceType DESC, name ASC`.
 - **FR-3** The system MUST run
   `syncDiscoveredWebsiteTemplatesIfStale(userId)` BEFORE the read on
   `GET /api/templates?kind=website` when no built-in website template
   has an `updatedAt >= now() - 1h` AND
   `metadata.discoveredFromOrganization = catalogOwner`. Only an ACTIVE
   discovered row satisfies this gate: curated rows are seeded with empty
-  `metadata`, and rows for App Blueprint repositories are deactivated
-  (FR-5 c). When the catalog org holds no other `*template` repository
-  the gate never passes, and a website list read re-runs discovery each
+  `metadata`. A retired App Blueprint row (FR-5 c) is active and keeps
+  that key, but discovery writes it only once, when it retires it, so it
+  satisfies the gate only for the hour after its retirement. When the
+  catalog org holds no other `*template` repository the gate otherwise
+  never passes, and a website list read re-runs discovery each
   time the in-process 5-minute attempt cooldown
   (`WEBSITE_DISCOVERY_ATTEMPT_COOLDOWN_MS`, per catalog org, per process)
   has elapsed, bounded by the 8-second deadline
@@ -225,24 +239,47 @@ userId)` runs, **then** it falls back to
   (b) MUST apply the name rule alone when the provider does not report
   `topics` (the field is absent) or reports an empty list, so a provider
   without topic support hides nothing;
-  (c) MUST deactivate (`isActive: false`, never delete) every active
+  (c) MUST RETIRE — never deactivate, never delete — every active
   discovered built-in website row for an excluded repository, found by
-  `findAllBuiltInByRepositoryCoordinates('website', owner, name)`.
-  Curated `WEBSITE_TEMPLATES` rows (matched by coordinates and by id) and
-  custom (user-created) rows are never touched;
-  (d) MUST keep such a row active, and warn-log it, while Works still use
-  it — any Work (across all users) whose `websiteTemplateId` is the row
-  id, or any Work with `websiteTemplateId IS NULL` whose owner's
-  `user_template_preferences` default for `website` is the row id. These
-  are the two guards archiving a custom template applies (FR-12, FR-13),
-  counted across users because a built-in row belongs to no one.
-  Deactivating a row in use would break those Works: the website resolver
-  only resolves active catalog rows and a discovered id has no static
-  config, so regenerate / update / branch sync would throw, and inheriting
-  Works would silently switch template. The next discovery after those
-  Works are reassigned deactivates the row. A failed lookup or usage
-  check is warn-logged, leaves the row active, and does not stop the
-  website templates from being discovered.
+  `findAllBuiltInByRepositoryCoordinates('website', owner, name)`: the
+  row's existing `metadata` JSON gains `retiredReason: 'app_blueprint'`
+  and `retiredAt` (ISO timestamp); `isActive` stays `true` and no other
+  column changes (no schema change, no migration). Curated
+  `WEBSITE_TEMPLATES` rows (matched by coordinates and by id) and custom
+  (user-created) rows are never retired, and an already-retired row is
+  not rewritten. A row is retired whether or not Works use it, with no
+  usage count: the website resolver resolves a retired row exactly like
+  any active row, so every Work naming it and every Work whose owner's
+  `website` default is the row keeps resolving it — including a Work
+  created, switched or defaulted onto the row while discovery runs.
+  (Deactivating instead broke those Works — the resolver only resolves
+  active rows and a discovered id has no static config — and guarding the
+  deactivation with a usage count left exactly that window.) A failed
+  lookup or write is warn-logged, leaves the row as it was, is retried by
+  the next discovery, and does not stop the website templates from being
+  discovered;
+  (d) MUST keep a retirement when the provider does not report `topics`
+  for the repository — the (b) fallback re-upserts the row with the
+  retirement marker carried over, since unreported topics are no
+  evidence the repository stopped being a Blueprint — and lift it when
+  the provider reports a topic list without `APP_BLUEPRINT_TOPIC` (the
+  name rule then makes it a website template again);
+  (e) MUST keep a retired row out of every picker and refuse it as a NEW
+  selection. `listTemplatesForUser` (FR-2, and through it
+  `GET /api/works/website-templates` and the refresh route) drops it.
+  Work create, the Work settings update (`updateWork` with
+  `websiteTemplateId`) and `switchWebsiteTemplate` refuse it, unless it
+  is the id the Work already has (a settings save or a no-op switch on a
+  Work already on it keeps working); `setDefaultTemplateForUser` and
+  `forkTemplateForUser` (whose fork would become a never-retired custom
+  template and the user's default) refuse it. Every refusal is
+  `BadRequestException({ status: 'error', message: 'Template "<id>"
+(<owner>/<repo>) is an App Blueprint, not a website template. Choose a
+website template, or create an App Work from the Blueprint instead.' })`.
+  `getVisibleTemplateForUser` still returns the row, with `retiredReason`
+  set on its `TemplateCatalogItem` (`null` on every other row), and
+  `getDefaultTemplateIdForUser` still answers it as a user's default,
+  because existing references to it stay valid.
 - **FR-6** The system MUST resolve discovered template ids by:
   (a) `findBuiltInByRepositoryCoordinates(kind, owner, name)` — if a
   canonical row exists, reuse its id; otherwise (b)
@@ -293,10 +330,12 @@ found for this user and kind.' })`.
 - **FR-15** The system MUST refuse `setDefaultTemplateForUser` when
   the template is not visible to the user or `kind` does not match
   with `NotFoundException({ status: 'error', message: 'Template not
-found for this user and kind.' })`. On success it upserts the
+found for this user and kind.' })`, and a retired row (FR-5 e) with
+  the FR-5 e `BadRequestException`. On success it upserts the
   `(userId, kind, templateId)` row.
 - **FR-16** The system MUST refuse `forkTemplateForUser` with
-  `NotFoundException` for invisible / kind-mismatched templates,
+  `NotFoundException` for invisible / kind-mismatched templates, the
+  FR-5 e `BadRequestException` for a retired row,
   `BadRequestException('Only standard templates can be forked.')` for
   custom templates, `BadRequestException('A target account or
 organization is required.')` for empty `targetOwner` (after `.trim()`),
@@ -332,7 +371,9 @@ summary, metadata }).catch(() => {})` for the five mutating endpoints:
   consulting `user_template_preferences` first; if the preference's
   template is not visible (archived / kind mismatch / not in the
   user's visible set), fall back to `getDefaultWebsiteTemplateId()`
-  for `kind: 'website'` and `null` for `kind: 'work'`.
+  for `kind: 'website'` and `null` for `kind: 'work'`. A retired row
+  (FR-5 c) is still visible, so a saved default pointing at one is still
+  answered: it is what the user's inheriting Works resolve.
 - **FR-24** The system MUST attach `originType` to every
   `TemplateCatalogItem`: `'standard'` for `sourceType='built_in'`,
   `'forked'` when `metadata.forkedFromTemplateId` is set, `'custom_url'`

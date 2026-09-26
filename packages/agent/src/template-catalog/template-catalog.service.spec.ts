@@ -1,4 +1,5 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { WebsiteTemplateResolverService } from '@src/generators/website-generator/website-template-resolver.service';
 import { TemplateCatalogService } from './template-catalog.service';
 
 describe('TemplateCatalogService', () => {
@@ -667,7 +668,26 @@ describe('TemplateCatalogService', () => {
             );
         });
 
-        it('deactivates a row an earlier discovery saved for a repository that is now an App Blueprint', async () => {
+        // The only write retirement makes: the row's `metadata` gains the
+        // retirement marker, and `isActive` is not in the patch at all.
+        const retiredMetadataPatch = {
+            metadata: expect.objectContaining({
+                discoveredFromOrganization: 'ever-works',
+                fullName: 'ever-works/cal-template',
+                retiredReason: 'app_blueprint',
+                retiredAt: expect.any(String),
+            }),
+        };
+
+        // PIN CHANGED (Greptile P1s on https://github.com/ever-works/ever-works/pull/2511).
+        // This test used to expect `updateById('cal-template', { isActive: false })`.
+        // Deactivating was the defect: the website resolver only resolves ACTIVE
+        // rows, so a Work created, switched or defaulted onto the row between
+        // the usage check and the update was left on a row that no longer
+        // resolves. The row is RETIRED instead (templates-catalog FR-5 c): it
+        // stays active, so every Work already using it keeps resolving, but it
+        // is never listed and never accepted as a new selection.
+        it('retires, and does not deactivate, a row an earlier discovery saved for a repository that is now an App Blueprint', async () => {
             gitFacade.listPublicRepositories.mockResolvedValueOnce([
                 websiteTemplateRepository,
                 appBlueprintRepository,
@@ -686,21 +706,28 @@ describe('TemplateCatalogService', () => {
                 'ever-works',
                 'cal-template',
             );
-            // The existing deactivate path (the one archive and the duplicate
-            // clean-up use): the row stays, it just stops being offered.
-            expect(templateRepository.updateById).toHaveBeenCalledWith('cal-template', {
-                isActive: false,
-            });
+            expect(templateRepository.updateById).toHaveBeenCalledWith(
+                'cal-template',
+                retiredMetadataPatch,
+            );
+            expect(templateRepository.updateById).not.toHaveBeenCalledWith(
+                'cal-template',
+                expect.objectContaining({ isActive: expect.anything() }),
+            );
             expect(templateRepository.updateById).toHaveBeenCalledTimes(1);
         });
 
-        // Deactivating a row still in use would break those Works: the website
-        // resolver only resolves ACTIVE catalog rows, and these ids have no
-        // static config to fall back to, so every regenerate / update / branch
-        // sync of a Work naming the id would throw "unavailable or inactive".
-        // Works inheriting a user default set to the row would silently switch
-        // template. Same two guards archiving a custom template applies, but
-        // across all users, since a built-in row belongs to no single user.
+        // PINS CHANGED (Greptile P1s on https://github.com/ever-works/ever-works/pull/2511).
+        // This block used to pin "a row Works still use stays active AND
+        // offered, with a warning; the discovery after they are reassigned
+        // deactivates it", counting usage first. That encoded both defects:
+        // (1) a row kept for old Works stayed in every user's picker, so NEW
+        // Works could keep selecting it; (2) count-then-deactivate was not
+        // atomic, so a Work landing on the row between the count and the
+        // update pointed at a row the resolver no longer resolves. Retiring
+        // changes neither `isActive` nor what resolves, so it needs no usage
+        // count and has no such window: a row in use is retired like any other,
+        // and the usage reads are no longer made.
         describe('while Works still use the Blueprint row', () => {
             beforeEach(() => {
                 gitFacade.listPublicRepositories.mockResolvedValueOnce([
@@ -715,27 +742,29 @@ describe('TemplateCatalogService', () => {
                 );
             });
 
-            it('keeps the row active while a Work names it explicitly, and says so', async () => {
+            it('retires the row while Works name it explicitly, without counting them', async () => {
                 workRepository.countByWebsiteTemplateId.mockImplementation(async (id: string) =>
                     id === 'cal-template' ? 2 : 0,
                 );
-                const warn = jest.spyOn((service as any).logger, 'warn');
 
                 await service.refreshTemplatesForUser('website', 'user-1');
 
-                expect(workRepository.countByWebsiteTemplateId).toHaveBeenCalledWith(
+                expect(templateRepository.updateById).toHaveBeenCalledWith(
                     'cal-template',
+                    retiredMetadataPatch,
                 );
-                expect(templateRepository.updateById).not.toHaveBeenCalled();
-                expect(warn).toHaveBeenCalledWith(expect.stringContaining('"cal-template"'));
-                expect(warn).toHaveBeenCalledWith(expect.stringContaining('2 works'));
+                expect(templateRepository.updateById).not.toHaveBeenCalledWith(
+                    'cal-template',
+                    expect.objectContaining({ isActive: expect.anything() }),
+                );
+                expect(workRepository.countByWebsiteTemplateId).not.toHaveBeenCalled();
                 // The ordinary website template is still discovered.
                 expect(templateRepository.upsert).toHaveBeenCalledWith(
                     expect.objectContaining({ id: 'astro-blog-template' }),
                 );
             });
 
-            it('keeps the row active while a user default points at it and that user has inheriting Works', async () => {
+            it('retires the row while a user default points at it and that user has inheriting Works', async () => {
                 userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId.mockImplementation(
                     async (kind: string, templateId: string) =>
                         kind === 'website' && templateId === 'cal-template' ? ['user-7'] : [],
@@ -743,18 +772,27 @@ describe('TemplateCatalogService', () => {
                 workRepository.countByUsersAndInheritedWebsiteTemplateSelection.mockImplementation(
                     async (userIds: string[]) => (userIds.includes('user-7') ? 1 : 0),
                 );
-                const warn = jest.spyOn((service as any).logger, 'warn');
 
                 await service.refreshTemplatesForUser('website', 'user-1');
 
+                expect(templateRepository.updateById).toHaveBeenCalledWith(
+                    'cal-template',
+                    retiredMetadataPatch,
+                );
+                expect(
+                    userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId,
+                ).not.toHaveBeenCalled();
                 expect(
                     workRepository.countByUsersAndInheritedWebsiteTemplateSelection,
-                ).toHaveBeenCalledWith(['user-7']);
-                expect(templateRepository.updateById).not.toHaveBeenCalled();
-                expect(warn).toHaveBeenCalledWith(expect.stringContaining('"cal-template"'));
+                ).not.toHaveBeenCalled();
+                // Retiring never touches anyone's saved default.
+                expect(userTemplatePreferenceRepository.upsertDefault).not.toHaveBeenCalled();
+                expect(
+                    userTemplatePreferenceRepository.deleteByUserKindAndTemplateId,
+                ).not.toHaveBeenCalled();
             });
 
-            it('deactivates the row when a user default points at it but no Work inherits that default', async () => {
+            it('retires the row the same way when a user default points at it but no Work inherits that default', async () => {
                 userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId.mockResolvedValue([
                     'user-7',
                 ]);
@@ -764,29 +802,177 @@ describe('TemplateCatalogService', () => {
 
                 await service.refreshTemplatesForUser('website', 'user-1');
 
-                expect(workRepository.countByWebsiteTemplateId).toHaveBeenCalledWith(
+                expect(templateRepository.updateById).toHaveBeenCalledWith(
                     'cal-template',
+                    retiredMetadataPatch,
                 );
-                expect(
-                    workRepository.countByUsersAndInheritedWebsiteTemplateSelection,
-                ).toHaveBeenCalledWith(['user-7']);
-                expect(templateRepository.updateById).toHaveBeenCalledWith('cal-template', {
-                    isActive: false,
-                });
+                expect(templateRepository.updateById).toHaveBeenCalledTimes(1);
             });
 
-            it('keeps the row active when the usage check itself fails, and still saves the website templates', async () => {
-                workRepository.countByWebsiteTemplateId.mockRejectedValue(new Error('db down'));
+            it('leaves the row as it is when retiring it fails, and still saves the website templates', async () => {
+                templateRepository.updateById.mockRejectedValue(new Error('db down'));
                 const warn = jest.spyOn((service as any).logger, 'warn');
 
                 await service.refreshTemplatesForUser('website', 'user-1');
 
-                expect(templateRepository.updateById).not.toHaveBeenCalled();
                 expect(templateRepository.upsert).toHaveBeenCalledWith(
                     expect.objectContaining({ id: 'astro-blog-template' }),
                 );
                 expect(warn).toHaveBeenCalledWith(expect.stringContaining('"cal-template"'));
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('db down'));
             });
+        });
+
+        it('does not rewrite a row that is already retired', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([appBlueprintRepository]);
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockResolvedValue([
+                {
+                    ...discoveredBlueprintRow,
+                    metadata: {
+                        ...discoveredBlueprintRow.metadata,
+                        retiredReason: 'app_blueprint',
+                        retiredAt: '2026-09-26T00:00:00.000Z',
+                    },
+                },
+            ]);
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.updateById).not.toHaveBeenCalled();
+        });
+
+        it('keeps a retirement when a provider that does not report topics rediscovers the repository', async () => {
+            // Unreported topics cannot say the repository stopped being a
+            // Blueprint, so the name-only fallback (FR-5 b) must not put a row
+            // a topic-reporting discovery retired back into the picker.
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                blueprintRepositoryWithoutTopics,
+            ]);
+            templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue({
+                ...discoveredBlueprintRow,
+                metadata: {
+                    ...discoveredBlueprintRow.metadata,
+                    retiredReason: 'app_blueprint',
+                    retiredAt: '2026-09-26T00:00:00.000Z',
+                },
+            });
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 'cal-template',
+                    isActive: true,
+                    metadata: expect.objectContaining({
+                        discoveredFromOrganization: 'ever-works',
+                        retiredReason: 'app_blueprint',
+                        retiredAt: '2026-09-26T00:00:00.000Z',
+                    }),
+                }),
+            );
+        });
+
+        it('lifts a retirement once the provider reports topics without the Blueprint topic', async () => {
+            // A REPORTED topic list is evidence: the repository is no longer
+            // a Blueprint, so the name rule makes it a website template again.
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                { ...appBlueprintRepository, topics: ['website-template'] },
+            ]);
+            templateRepository.findBuiltInByRepositoryCoordinates.mockResolvedValue({
+                ...discoveredBlueprintRow,
+                metadata: {
+                    ...discoveredBlueprintRow.metadata,
+                    retiredReason: 'app_blueprint',
+                    retiredAt: '2026-09-26T00:00:00.000Z',
+                },
+            });
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            const upserted = templateRepository.upsert.mock.calls[0][0];
+            expect(upserted).toEqual(expect.objectContaining({ id: 'cal-template' }));
+            expect(upserted.metadata).not.toHaveProperty('retiredReason');
+            expect(upserted.metadata).not.toHaveProperty('retiredAt');
+        });
+
+        // Greptile P1 #2 end to end: after discovery retires the row, the
+        // Works already on it — by id, and through an inherited user default —
+        // still resolve, because the row the resolver reads is still active.
+        // Against a stateful store shared by discovery and the resolver.
+        it('leaves a retired row resolvable for a Work naming it and for an inherited default, and out of the listing', async () => {
+            const store = new Map<string, any>([
+                [
+                    'cal-template',
+                    {
+                        ...discoveredBlueprintRow,
+                        name: 'Cal Template',
+                        description: 'Cal.com App Blueprint',
+                        branch: 'main',
+                        syncBranches: ['main'],
+                        betaBranch: null,
+                    },
+                ],
+            ]);
+            const builtInActive = (row: any) => row.sourceType === 'built_in' && row.isActive;
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
+                async (kind: string, owner: string, repo: string) =>
+                    [...store.values()].filter(
+                        (row) =>
+                            row.kind === kind &&
+                            row.sourceType === 'built_in' &&
+                            row.repositoryOwner === owner &&
+                            row.repositoryName === repo,
+                    ),
+            );
+            templateRepository.updateById.mockImplementation(async (id: string, patch: any) => {
+                store.set(id, { ...store.get(id), ...patch });
+                return store.get(id);
+            });
+            templateRepository.upsert.mockImplementation(async (row: any) => {
+                store.set(row.id, { ...store.get(row.id), ...row });
+                return store.get(row.id);
+            });
+            templateRepository.findById.mockImplementation(
+                async (id: string) => store.get(id) ?? null,
+            );
+            templateRepository.findVisibleById.mockImplementation(async (id: string) => {
+                const row = store.get(id);
+                return row && builtInActive(row) ? row : null;
+            });
+            templateRepository.findVisibleByKind.mockImplementation(async (kind: string) =>
+                [...store.values()].filter((row) => row.kind === kind && builtInActive(row)),
+            );
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                websiteTemplateRepository,
+                appBlueprintRepository,
+            ]);
+
+            const listed = await service.refreshTemplatesForUser('website', 'user-1');
+
+            const resolver = new WebsiteTemplateResolverService(templateRepository, {
+                findByUserAndKind: jest.fn(async (userId: string, kind: string) =>
+                    userId === 'user-7' && kind === 'website'
+                        ? { templateId: 'cal-template' }
+                        : null,
+                ),
+            } as any);
+            await expect(
+                resolver.resolveForWork({ userId: 'user-1', websiteTemplateId: 'cal-template' }),
+            ).resolves.toEqual(
+                expect.objectContaining({
+                    id: 'cal-template',
+                    owner: 'ever-works',
+                    repo: 'cal-template',
+                }),
+            );
+            await expect(
+                resolver.resolveForWork({ userId: 'user-7', websiteTemplateId: null }),
+            ).resolves.toEqual(
+                expect.objectContaining({ id: 'cal-template', repo: 'cal-template' }),
+            );
+            expect(listed.templates.map((template) => template.id)).toEqual([
+                'astro-blog-template',
+            ]);
         });
 
         it('still saves the website templates when looking up the rows of a Blueprint repository fails', async () => {
@@ -882,6 +1068,137 @@ describe('TemplateCatalogService', () => {
                 expect.objectContaining({ id: 'cal-template', repositoryName: 'cal-template' }),
             );
             expect(templateRepository.updateById).not.toHaveBeenCalled();
+        });
+    });
+
+    // A retired row (FR-5 c) is kept ONLY so the Works already on it keep
+    // resolving. Greptile P1 #1 on https://github.com/ever-works/ever-works/pull/2511:
+    // a row kept for old Works must not stay in every user's picker, and no
+    // path may make it a NEW selection.
+    describe('retired website-template rows', () => {
+        const retiredRow = {
+            id: 'cal-template',
+            kind: 'website',
+            sourceType: 'built_in',
+            ownerUserId: null,
+            name: 'Cal Template',
+            description: 'Cal.com App Blueprint',
+            framework: null,
+            previewImageUrl: null,
+            repositoryUrl: 'https://github.com/ever-works/cal-template',
+            repositoryOwner: 'ever-works',
+            repositoryName: 'cal-template',
+            branch: 'main',
+            syncBranches: ['main'],
+            betaBranch: null,
+            isActive: true,
+            metadata: {
+                discoveredFromOrganization: 'ever-works',
+                fullName: 'ever-works/cal-template',
+                retiredReason: 'app_blueprint',
+                retiredAt: '2026-09-26T00:00:00.000Z',
+            },
+        };
+        const listedRow = {
+            ...retiredRow,
+            id: 'astro-blog-template',
+            name: 'Astro Blog Template',
+            description: 'Astro blog template',
+            repositoryUrl: 'https://github.com/ever-works/astro-blog-template',
+            repositoryName: 'astro-blog-template',
+            metadata: {
+                discoveredFromOrganization: 'ever-works',
+                fullName: 'ever-works/astro-blog-template',
+            },
+        };
+        const blueprintRefusal = /"cal-template".*is an App Blueprint, not a website template/;
+
+        beforeEach(() => {
+            templateRepository.hasRecentDiscoveredBuiltInTemplates.mockResolvedValue(true);
+            userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue(null);
+        });
+
+        it('leaves a retired row out of the picker listing', async () => {
+            templateRepository.findVisibleByKind.mockResolvedValue([listedRow, retiredRow]);
+
+            const result = await service.listTemplatesForUser('website', 'user-1');
+
+            expect(result.templates.map((template) => template.id)).toEqual([
+                'astro-blog-template',
+            ]);
+            expect(customizationRepository.findLatestForTemplates).toHaveBeenCalledWith(
+                ['astro-blog-template'],
+                'user-1',
+            );
+        });
+
+        it('refuses a retired row as the user default, with a 400 that says why', async () => {
+            templateRepository.findVisibleById.mockResolvedValue(retiredRow);
+
+            const attempt = service.setDefaultTemplateForUser('website', 'cal-template', 'user-1');
+
+            await expect(attempt).rejects.toThrow(BadRequestException);
+            await expect(attempt).rejects.toThrow(blueprintRefusal);
+            expect(userTemplatePreferenceRepository.upsertDefault).not.toHaveBeenCalled();
+        });
+
+        it('still sets a listed built-in row as the user default', async () => {
+            templateRepository.findVisibleById.mockResolvedValue(listedRow);
+
+            await expect(
+                service.setDefaultTemplateForUser('website', 'astro-blog-template', 'user-1'),
+            ).resolves.toEqual({ defaultTemplateId: 'astro-blog-template' });
+            expect(userTemplatePreferenceRepository.upsertDefault).toHaveBeenCalledWith(
+                'user-1',
+                'website',
+                'astro-blog-template',
+            );
+        });
+
+        it('refuses to fork a retired row (the fork would become the user default)', async () => {
+            templateRepository.findVisibleById.mockResolvedValue(retiredRow);
+            gitFacade.getUser.mockResolvedValue({ login: 'acme-user' });
+            gitFacade.getOrganizations.mockResolvedValue([]);
+
+            const attempt = service.forkTemplateForUser(
+                { kind: 'website', templateId: 'cal-template', targetOwner: 'acme-user' },
+                'user-1',
+            );
+
+            await expect(attempt).rejects.toThrow(BadRequestException);
+            await expect(attempt).rejects.toThrow(blueprintRefusal);
+            expect(gitFacade.forkRepository).not.toHaveBeenCalled();
+            expect(templateRepository.upsert).not.toHaveBeenCalled();
+            expect(userTemplatePreferenceRepository.upsertDefault).not.toHaveBeenCalled();
+        });
+
+        it('still returns a retired row by id, marked retired, for callers checking an existing reference', async () => {
+            templateRepository.findVisibleById.mockResolvedValue(retiredRow);
+
+            await expect(
+                service.getVisibleTemplateForUser('website', 'cal-template', 'user-1'),
+            ).resolves.toEqual(
+                expect.objectContaining({ id: 'cal-template', retiredReason: 'app_blueprint' }),
+            );
+        });
+
+        it('marks a listed row as not retired', async () => {
+            templateRepository.findVisibleById.mockResolvedValue(listedRow);
+
+            await expect(
+                service.getVisibleTemplateForUser('website', 'astro-blog-template', 'user-1'),
+            ).resolves.toEqual(expect.objectContaining({ retiredReason: null }));
+        });
+
+        it('keeps answering a retired default as the default, since inheriting Works still resolve it', async () => {
+            userTemplatePreferenceRepository.findByUserAndKind.mockResolvedValue({
+                templateId: 'cal-template',
+            });
+            templateRepository.findVisibleById.mockResolvedValue(retiredRow);
+
+            await expect(service.getDefaultTemplateIdForUser('website', 'user-7')).resolves.toBe(
+                'cal-template',
+            );
         });
     });
 
