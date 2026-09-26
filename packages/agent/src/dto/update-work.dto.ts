@@ -254,4 +254,27 @@ export class UpdateWorkDto {
     // account-import paths. The DTO only declares the property so
     // `forbidNonWhitelisted` lets it through.
     externalRefs?: WorkExternalRefs | null;
+
+    /**
+     * APW-11 (App Launcher, plan §4.4) — the Work-level **Show in App
+     * Launcher** setting.
+     *
+     * Three states, which is why the property is nullable rather than
+     * defaulted: `true` explicitly shows the Work, `false` explicitly hides
+     * it, and `null` clears the explicit choice and returns the Work to its
+     * kind default (on for an `app` Work, off for every other kind — spec
+     * FR-19). An explicit value always wins, including after a kind change.
+     *
+     * `@IsOptional()` is what admits `null`: class-validator skips every
+     * other validator on the property when the value is `null` or
+     * `undefined`, so `@IsBoolean()` polices only the two real booleans and
+     * a non-boolean payload (`"yes"`, `1`) is still refused.
+     */
+    @ApiPropertyOptional({
+        description: "Show this Work in members' App Launcher (null = kind default)",
+        nullable: true,
+    })
+    @IsOptional()
+    @IsBoolean()
+    appLauncherExposed?: boolean | null;
 }

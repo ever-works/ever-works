@@ -25,6 +25,7 @@ import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/
 import { TemplateCustomizationService } from '@ever-works/agent/template-catalog';
 import { CategoryIconService, KnowledgeBaseGitMirrorService } from '@ever-works/agent/services';
 import { PullRequestGateService } from '@ever-works/agent/policy';
+import { APP_FORK_READY_HANDLER } from '@ever-works/agent/app-works';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -151,6 +152,23 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         // reports the binding state for observability + per-tenant
         // routing decisions.
         TenantRuntimeBindingResolverService,
+        // APW-01 T15 — APW-02's readiness hand-off, as the WORKER sees it: a remote
+        // proxy to the API process, never the class itself.
+        //
+        // 🛑 **The class is deliberately NOT provided here and `AppWorksModule` is
+        // deliberately NOT imported.** The handler owns no worker-shaped work: it
+        // clones nothing, and every dependency it needs — the database and
+        // `WorkRepository`, `ActivityLogService`, APW-03's `AppSpecService` and state
+        // row, APW-04's provisioning port — is API-side. This worker has no database
+        // module and no `ActivityLogService`, so a local provider would fail at the
+        // first call rather than at boot. This is the same shape the worker already
+        // binds `WorkRepository` and `AppForkReadinessRunner` with.
+        {
+            provide: APP_FORK_READY_HANDLER,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppSourceInitializerService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerGenerationOrchestrator,

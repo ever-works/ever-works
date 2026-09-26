@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as root from '../index.js';
 
 import * as agents from '../agents/index.js';
+import * as apps from '../apps/index.js';
 import * as backup from '../backup/index.js';
 import * as billing from '../billing/index.js';
 import * as computer from '../computer/index.js';
@@ -55,6 +56,7 @@ import * as workflow from '../workflow/index.js';
 /** [area name, namespace] for every barrel `src/index.ts` re-exports. */
 const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
+	['apps', apps],
 	['backup', backup],
 	['billing', billing],
 	['computer', computer],
@@ -129,7 +131,16 @@ describe('src/index.ts — the package root barrel', () => {
 		// `export *` lines but only 33 AREAS:
 		// `./fleet/fleet-task-workspace.types.js` is a second sub-path of the
 		// existing `fleet` area, not a new area.
-		expect(exportLines).toBe(33);
+		// 34 is COUNTED the same way after the App Works programme (APW-01…APW-13)
+		// added the `apps` area: that branch stood at 33 areas and adds exactly
+		// one (`apps`, re-exported from `src/apps/index.ts`), and re-counting the
+		// merged array gives 34. `src/index.ts` has 35 `export *` lines but only
+		// 34 AREAS: `./fleet/fleet-task-workspace.types.js` is a second sub-path
+		// of the existing `fleet` area, not a new area. Note `apps` is a PLAIN
+		// `export *`, not `export type *`, on purpose — it carries 524 runtime
+		// exports (closed-union arrays, limits, pure resolvers) that a type-only
+		// re-export would drop from the package root without any error here.
+		expect(exportLines).toBe(34);
 	});
 
 	it('has no name exported by two different areas', () => {
@@ -156,6 +167,29 @@ describe('src/index.ts — the package root barrel', () => {
 		// would be missing from `root` while still present on the area barrel.
 		const missing = Object.keys(ns).filter((name) => !(name in root));
 		expect(missing).toEqual([]);
+	});
+
+	it('surfaces the App Works RUNTIME values at the root, not only its types', () => {
+		// Named, not just counted, because `apps` is the one area where getting
+		// this wrong is invisible: its modules are mostly types, so changing
+		// `export *` to `export type *` in `src/index.ts` would keep every
+		// `tsc --noEmit` in this package green (the types still resolve) while
+		// silently dropping all 524 runtime names from the package root — the
+		// closed-union arrays behind `X = (typeof X)[number]`, the limits, and
+		// the pure resolvers consumers actually call. The generic
+		// `it.each(AREAS)` case above would catch it too; this one says why.
+		for (const name of [
+			'APP_DEPLOY_TARGET_CHOICES',
+			'APP_SOURCE_REASON_CODES',
+			'APP_READINESS_FAILURE_REASONS',
+			'APP_REPOSITORY_STAGE_LIMITS',
+			'APP_DEPENDENCY_KINDS',
+			'APPS_TIER_MAX_JOBS',
+			'EVER_ID_SCOPES',
+			'resolveAppRepositoryModes'
+		]) {
+			expect(name in root, `${name} must be visible at the package root`).toBe(true);
+		}
 	});
 
 	it('exposes at least as many runtime names as the areas contribute in total', () => {

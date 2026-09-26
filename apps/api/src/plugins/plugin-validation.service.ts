@@ -1,5 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
+import {
+    PluginRegistryService,
+    PluginSettingsService,
+    pluginLoadFailure,
+} from '@ever-works/agent/plugins';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { ConnectionValidationResult } from '@ever-works/plugin';
 
@@ -24,13 +28,25 @@ export class PluginValidationService {
      * about to invoke the plugin's validation methods anyway (which
      * materializes regardless), so materializing up front costs nothing extra
      * and makes every probe truthful.
+     *
+     * The materialise resolves once the plugin's first load has settled — and
+     * resolves even when its `onLoad` failed there, leaving the registry entry
+     * in `error`. Such a plugin is not validated (the eager boot skipped it):
+     * this throws, with the entry's reason.
      */
-    private async getRealPlugin(pluginLike: unknown): Promise<Record<string, unknown>> {
-        const maybeLazy = pluginLike as { __materialize?: () => Promise<unknown> };
+    private async getRealPlugin(
+        registered: { plugin: unknown; state?: string; error?: unknown },
+        pluginId: string,
+    ): Promise<Record<string, unknown>> {
+        const maybeLazy = registered.plugin as { __materialize?: () => Promise<unknown> };
         const real =
             typeof maybeLazy.__materialize === 'function'
                 ? await maybeLazy.__materialize()
-                : pluginLike;
+                : registered.plugin;
+        const failure = pluginLoadFailure(registered, pluginId);
+        if (failure) {
+            throw new PluginNotUsableError(failure);
+        }
         return real as Record<string, unknown>;
     }
 
@@ -51,7 +67,7 @@ export class PluginValidationService {
 
         let plugin: Record<string, unknown>;
         try {
-            plugin = await this.getRealPlugin(registered.plugin);
+            plugin = await this.getRealPlugin(registered, pluginId);
         } catch (error) {
             // Non-throwing contract: a plugin that fails to materialize has no
             // validation capability we can exercise.
@@ -135,8 +151,17 @@ export class PluginValidationService {
         });
 
         // Probe the REAL instance — lazy stubs over-report optional methods
-        // (see getRealPlugin).
-        const plugin = await this.getRealPlugin(registered.plugin);
+        // (see getRealPlugin). A plugin whose onLoad failed on this first use
+        // is "not loaded", as the check above says for one that failed at boot.
+        let plugin: Record<string, unknown>;
+        try {
+            plugin = await this.getRealPlugin(registered, pluginId);
+        } catch (error) {
+            if (error instanceof PluginNotUsableError) {
+                throw new NotFoundException(`Plugin not found or not loaded: ${pluginId}`);
+            }
+            throw error;
+        }
 
         // Prefer validateConnection() — plugins self-describe their validation logic
         const validateConnection = plugin.validateConnection as
@@ -182,3 +207,6 @@ export class PluginValidationService {
         return { success: true, message: `${registered.plugin.name} settings saved.` };
     }
 }
+
+/** The plugin loaded, but its first load left it in `error` (see `pluginLoadFailure`). */
+class PluginNotUsableError extends Error {}

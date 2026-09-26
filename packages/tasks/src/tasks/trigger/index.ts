@@ -70,3 +70,60 @@ export * from './skill-readiness-sweep.task';
 // records so the history list stays honest.
 export * from './workspace-backup.task';
 export * from './workspace-backup-sweeper.task';
+// APW-07 T17 — provision / refresh / release one App dependency of one App
+// Work, on APW-06's isolated `app-cluster-io` queue. It refuses to run in
+// production unless the operator attested the worker's isolation
+// (`EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`).
+export * from './app-dependency-provision.task';
+// APW-03 T13 — one App spec evaluation of one App Work. Delegates to the
+// runtime-neutral handler in `@ever-works/agent/tasks` and resolves
+// `AppSpecService` through the internal RPC channel, because FR-90 puts the
+// evaluation, its writes and its `app.spec.applied` event in the API process.
+export * from './app-spec-evaluate.task';
+// APW-06 T32 — the four App cluster tasks, all on APW-06's isolated
+// `app-cluster-io` queue (plan §6.2:942, §9.2:1245-1251). Every one of them
+// boots `TriggerAppRuntimeModule` (T71), which is what arms T20's
+// worker-context flag — the only thing that lets an App cluster call happen
+// anywhere. `app-deploy` runs a Deployment through T25's orchestrator;
+// `app-smoke` and `app-cluster-op` delegate to T70's service and router (both
+// still owed) and refuse by name meanwhile; `app-health-poll` is the
+// every-minute tick, guarded by `DistributedTaskLockService` and owed T27's
+// health service.
+export * from './app-deploy.task';
+export * from './app-smoke.task';
+export * from './app-cluster-op.task';
+export * from './app-health-poll.task';
+// APW-06 T32 — the `app-runtime:local-worker` entry point (plan §9.2:1267-1270).
+// NOT a Trigger task: it is a plain node process the dev machine and the e2e lane
+// start, and it drains the same exported run functions above from a local queue.
+export * from './app-runtime-local-worker';
+// APW-05 T19 — one prepare of one App Work (plan §7.2). The job that turns a
+// build REQUEST into a build PREPARATION: the workflow file and the branch
+// protection through the plugin, the build values as repository secrets, the
+// §3.1b preparation row, and the requested Builds blocked or dispatched. The
+// runner itself is API-side (it writes rows and publishes events), so the task
+// resolves it over the internal RPC channel — see the file's header for the two
+// registrations that live outside this package.
+export * from './app-build-prepare.task';
+// APW-05 T20 — one OBSERVATION of one Build (plan §7.3). It claims §7.3's
+// two-minute `watchLeaseUntil`, reads the run through the build plugin, re-stamps
+// the preparation values the run actually read (`APW05-G03`), finalises the
+// terminal transition through §7.8's one writer, removes a verification Build's
+// per-run prompted-value secret (§4.10) and releases the lease. The runner is
+// API-side, so the task resolves it over the internal RPC channel — see the
+// file's header for the two registrations that live outside this package.
+export * from './app-build-watch.task';
+// APW-05 T21 (first slice) — the Builds sweep, every two minutes (plan §7.4). It
+// re-drives a requested Build nothing dispatched (§9.2) and fails a never-adopted
+// Build as `lost`; every pass is `AppBuildSweepService.runSweep`, API-side under
+// its own `app-builds:sweep` lock, reached over the internal RPC channel. When
+// Trigger.dev is not the runtime the API's `AppBuildSweepCronService` runs it.
+export * from './app-build-sweep.task';
+// C10 — one readiness run of one App Work (APW-02 plan §6.2). The job that turns
+// a fork REQUEST into a READY repository: the private-copy push, FR-18's poll
+// schedule, Actions hygiene and the setup hand-off. It resolves
+// `AppForkReadinessRunner` over the internal RPC channel because the run writes
+// the state row and a Trigger worker owns no `DataSource`; the dispatcher that
+// queues it (`APP_FORK_READINESS_DISPATCHER`) is bound in the agent-side
+// `AppWorksModule` — see the file's header for both registrations.
+export * from './app-fork-readiness.task';

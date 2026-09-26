@@ -1,0 +1,782 @@
+[
+	{
+		"apiVersion": "v1",
+		"kind": "Namespace",
+		"metadata": {
+			"name": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app",
+				"pod-security.kubernetes.io/enforce": "baseline",
+				"pod-security.kubernetes.io/warn": "restricted",
+				"pod-security.kubernetes.io/audit": "restricted"
+			}
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "ServiceAccount",
+		"metadata": {
+			"name": "app",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"automountServiceAccountToken": false
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "LimitRange",
+		"metadata": {
+			"name": "ew-defaults",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"limits": [
+				{
+					"type": "Container",
+					"defaultRequest": {
+						"cpu": "100m",
+						"memory": "128Mi"
+					},
+					"default": {
+						"cpu": "1",
+						"memory": "512Mi",
+						"ephemeral-storage": "1Gi"
+					},
+					"max": {
+						"cpu": "8",
+						"memory": "64Gi"
+					}
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-default-deny",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {},
+			"policyTypes": ["Ingress", "Egress"]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-same-namespace",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchExpressions": [
+					{
+						"key": "ever-works.io/isolation-probe",
+						"operator": "DoesNotExist"
+					}
+				]
+			},
+			"policyTypes": ["Ingress", "Egress"],
+			"ingress": [
+				{
+					"from": [
+						{
+							"podSelector": {}
+						}
+					]
+				}
+			],
+			"egress": [
+				{
+					"to": [
+						{
+							"podSelector": {}
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-egress",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchExpressions": [
+					{
+						"key": "ever-works.io/isolation-probe",
+						"operator": "DoesNotExist"
+					}
+				]
+			},
+			"policyTypes": ["Egress"],
+			"egress": [
+				{
+					"to": [
+						{
+							"namespaceSelector": {
+								"matchLabels": {
+									"kubernetes.io/metadata.name": "kube-system"
+								}
+							},
+							"podSelector": {
+								"matchLabels": {
+									"k8s-app": "kube-dns"
+								}
+							}
+						}
+					],
+					"ports": [
+						{
+							"protocol": "UDP",
+							"port": 53
+						},
+						{
+							"protocol": "TCP",
+							"port": 53
+						}
+					]
+				},
+				{
+					"to": [
+						{
+							"ipBlock": {
+								"cidr": "0.0.0.0/0",
+								"except": [
+									"10.0.0.0/8",
+									"172.16.0.0/12",
+									"192.168.0.0/16",
+									"100.64.0.0/10",
+									"169.254.0.0/16",
+									"127.0.0.0/8",
+									"0.0.0.0/8",
+									"224.0.0.0/4",
+									"240.0.0.0/4"
+								]
+							}
+						}
+					]
+				},
+				{
+					"to": [
+						{
+							"ipBlock": {
+								"cidr": "::/0",
+								"except": ["fc00::/7", "fe80::/10", "::1/128", "ff00::/8"]
+							}
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-ingress",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchLabels": {
+					"ever-works.io/component": "web"
+				}
+			},
+			"policyTypes": ["Ingress"],
+			"ingress": [
+				{
+					"from": [
+						{
+							"namespaceSelector": {}
+						}
+					],
+					"ports": [
+						{
+							"protocol": "TCP",
+							"port": 3000
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "NetworkPolicy",
+		"metadata": {
+			"name": "ew-allow-deps",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"podSelector": {
+				"matchExpressions": [
+					{
+						"key": "ever-works.io/isolation-probe",
+						"operator": "DoesNotExist"
+					}
+				]
+			},
+			"policyTypes": ["Egress"],
+			"egress": []
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "Secret",
+		"type": "kubernetes.io/dockerconfigjson",
+		"metadata": {
+			"name": "app-pull",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"data": {
+			".dockerconfigjson": "eyJhdXRocyI6eyJyZWdpc3RyeS5leGFtcGxlLmNvbSI6eyJ1c2VybmFtZSI6ImZpeHR1cmUtcHVsbC11c2VyIiwicGFzc3dvcmQiOiJmaXh0dXJlLXBsYWNlaG9sZGVyLXB1bGwtdG9rZW4iLCJhdXRoIjoiWm1sNGRIVnlaUzF3ZFd4c0xYVnpaWEk2Wm1sNGRIVnlaUzF3YkdGalpXaHZiR1JsY2kxd2RXeHNMWFJ2YTJWdSJ9fX0="
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "Secret",
+		"metadata": {
+			"name": "app-env-5a4b3c2d1e",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"type": "Opaque",
+		"immutable": true,
+		"stringData": {
+			"APP_SECRET": "fixture-placeholder-app-secret",
+			"PUBLIC_URL": "http://app.example.com"
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "app-platform-5a4b3c2d1e",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"immutable": true,
+		"data": {
+			"EVER_WORKS_APP_URL": "http://app.example.com",
+			"EVER_WORKS_APP_HOST": "app.example.com",
+			"EVER_WORKS_APP_COMMIT": "0011223344556677889900112233445566778899"
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "PersistentVolumeClaim",
+		"metadata": {
+			"name": "admin-media",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app",
+				"ever-works.io/component": "admin",
+				"ever-works.io/retain": "true"
+			},
+			"annotations": {
+				"ever-works.io/backup": "false"
+			}
+		},
+		"spec": {
+			"accessModes": ["ReadWriteOnce"],
+			"resources": {
+				"requests": {
+					"storage": "2Gi"
+				}
+			}
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "Service",
+		"metadata": {
+			"name": "web",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"ever-works.io/component": "web",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"type": "ClusterIP",
+			"selector": {
+				"ever-works.io/component": "web"
+			},
+			"ports": [
+				{
+					"name": "http",
+					"port": 80,
+					"protocol": "TCP",
+					"targetPort": 3000
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "v1",
+		"kind": "Service",
+		"metadata": {
+			"name": "admin",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"ever-works.io/component": "admin",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			}
+		},
+		"spec": {
+			"type": "ClusterIP",
+			"selector": {
+				"ever-works.io/component": "admin"
+			},
+			"ports": [
+				{
+					"name": "http",
+					"port": 80,
+					"protocol": "TCP",
+					"targetPort": 3001
+				}
+			]
+		}
+	},
+	{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "web",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"ever-works.io/component": "web",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			},
+			"annotations": {
+				"ever-works.io/deployment-id": "11223344-6666-4777-8888-999900001111"
+			}
+		},
+		"spec": {
+			"replicas": 1,
+			"revisionHistoryLimit": 5,
+			"progressDeadlineSeconds": 750,
+			"selector": {
+				"matchLabels": {
+					"ever-works.io/component": "web"
+				}
+			},
+			"strategy": {
+				"type": "RollingUpdate",
+				"rollingUpdate": {
+					"maxSurge": 0,
+					"maxUnavailable": 1
+				}
+			},
+			"minReadySeconds": 0,
+			"template": {
+				"metadata": {
+					"labels": {
+						"ever-works.io/component": "web",
+						"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+						"app.kubernetes.io/part-of": "storefront",
+						"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+						"ever-works.io/kind": "app"
+					},
+					"annotations": {
+						"ever-works.io/env-checksum": "5a4b3c2d1e0f9876",
+						"ever-works.io/build-commit": "0011223344556677889900112233445566778899"
+					}
+				},
+				"spec": {
+					"serviceAccountName": "app",
+					"automountServiceAccountToken": false,
+					"enableServiceLinks": false,
+					"securityContext": {
+						"runAsNonRoot": true,
+						"seccompProfile": {
+							"type": "RuntimeDefault"
+						}
+					},
+					"containers": [
+						{
+							"name": "web",
+							"image": "registry.example.com/example-org/storefront@sha256:112233445566778899001122334455667788990011223344556677889900aabb",
+							"imagePullPolicy": "IfNotPresent",
+							"ports": [
+								{
+									"name": "http",
+									"containerPort": 3000,
+									"protocol": "TCP"
+								}
+							],
+							"envFrom": [
+								{
+									"secretRef": {
+										"name": "app-env-5a4b3c2d1e",
+										"optional": false
+									}
+								},
+								{
+									"configMapRef": {
+										"name": "app-platform-5a4b3c2d1e",
+										"optional": false
+									}
+								}
+							],
+							"resources": {
+								"requests": {
+									"cpu": "250m",
+									"memory": "512Mi"
+								},
+								"limits": {
+									"memory": "1Gi"
+								}
+							},
+							"readinessProbe": {
+								"tcpSocket": {
+									"port": "http"
+								},
+								"periodSeconds": 10,
+								"timeoutSeconds": 5,
+								"initialDelaySeconds": 0,
+								"failureThreshold": 3
+							},
+							"startupProbe": {
+								"tcpSocket": {
+									"port": "http"
+								},
+								"periodSeconds": 10,
+								"timeoutSeconds": 5,
+								"initialDelaySeconds": 0,
+								"failureThreshold": 60
+							},
+							"securityContext": {
+								"allowPrivilegeEscalation": false,
+								"capabilities": {
+									"drop": ["ALL"]
+								},
+								"readOnlyRootFilesystem": false
+							}
+						}
+					],
+					"topologySpreadConstraints": [
+						{
+							"maxSkew": 1,
+							"topologyKey": "kubernetes.io/hostname",
+							"whenUnsatisfiable": "ScheduleAnyway",
+							"labelSelector": {
+								"matchLabels": {
+									"ever-works.io/component": "web"
+								}
+							}
+						}
+					],
+					"imagePullSecrets": [
+						{
+							"name": "app-pull"
+						}
+					]
+				}
+			}
+		}
+	},
+	{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "admin",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"ever-works.io/component": "admin",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			},
+			"annotations": {
+				"ever-works.io/deployment-id": "11223344-6666-4777-8888-999900001111"
+			}
+		},
+		"spec": {
+			"replicas": 1,
+			"revisionHistoryLimit": 5,
+			"progressDeadlineSeconds": 300,
+			"selector": {
+				"matchLabels": {
+					"ever-works.io/component": "admin"
+				}
+			},
+			"strategy": {
+				"type": "Recreate"
+			},
+			"minReadySeconds": 0,
+			"template": {
+				"metadata": {
+					"labels": {
+						"ever-works.io/component": "admin",
+						"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+						"app.kubernetes.io/part-of": "storefront",
+						"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+						"ever-works.io/kind": "app"
+					},
+					"annotations": {
+						"ever-works.io/env-checksum": "5a4b3c2d1e0f9876",
+						"ever-works.io/build-commit": "0011223344556677889900112233445566778899"
+					}
+				},
+				"spec": {
+					"serviceAccountName": "app",
+					"automountServiceAccountToken": false,
+					"enableServiceLinks": false,
+					"securityContext": {
+						"runAsNonRoot": true,
+						"seccompProfile": {
+							"type": "RuntimeDefault"
+						},
+						"fsGroup": 10001,
+						"fsGroupChangePolicy": "OnRootMismatch",
+						"runAsUser": 10001
+					},
+					"containers": [
+						{
+							"name": "admin",
+							"image": "registry.example.com/example-org/storefront@sha256:112233445566778899001122334455667788990011223344556677889900aabb",
+							"imagePullPolicy": "IfNotPresent",
+							"ports": [
+								{
+									"name": "http",
+									"containerPort": 3001,
+									"protocol": "TCP"
+								}
+							],
+							"envFrom": [
+								{
+									"secretRef": {
+										"name": "app-env-5a4b3c2d1e",
+										"optional": false
+									}
+								},
+								{
+									"configMapRef": {
+										"name": "app-platform-5a4b3c2d1e",
+										"optional": false
+									}
+								}
+							],
+							"resources": {
+								"requests": {
+									"cpu": "100m",
+									"memory": "256Mi"
+								},
+								"limits": {
+									"memory": "512Mi"
+								}
+							},
+							"readinessProbe": {
+								"httpGet": {
+									"path": "/admin/health",
+									"port": "http"
+								},
+								"periodSeconds": 15,
+								"timeoutSeconds": 5,
+								"initialDelaySeconds": 10,
+								"failureThreshold": 4
+							},
+							"startupProbe": {
+								"tcpSocket": {
+									"port": "http"
+								},
+								"periodSeconds": 10,
+								"timeoutSeconds": 5,
+								"initialDelaySeconds": 0,
+								"failureThreshold": 60
+							},
+							"securityContext": {
+								"allowPrivilegeEscalation": false,
+								"capabilities": {
+									"drop": ["ALL"]
+								},
+								"readOnlyRootFilesystem": true
+							},
+							"volumeMounts": [
+								{
+									"name": "media",
+									"mountPath": "/var/media"
+								},
+								{
+									"name": "tmp",
+									"mountPath": "/tmp"
+								}
+							]
+						}
+					],
+					"topologySpreadConstraints": [
+						{
+							"maxSkew": 1,
+							"topologyKey": "kubernetes.io/hostname",
+							"whenUnsatisfiable": "ScheduleAnyway",
+							"labelSelector": {
+								"matchLabels": {
+									"ever-works.io/component": "admin"
+								}
+							}
+						}
+					],
+					"imagePullSecrets": [
+						{
+							"name": "app-pull"
+						}
+					],
+					"volumes": [
+						{
+							"name": "media",
+							"persistentVolumeClaim": {
+								"claimName": "admin-media"
+							}
+						},
+						{
+							"name": "tmp",
+							"emptyDir": {
+								"sizeLimit": "256Mi"
+							}
+						}
+					]
+				}
+			}
+		}
+	},
+	{
+		"apiVersion": "networking.k8s.io/v1",
+		"kind": "Ingress",
+		"metadata": {
+			"name": "web",
+			"namespace": "ew-storefront-99887766",
+			"labels": {
+				"ever-works.io/component": "web",
+				"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+				"app.kubernetes.io/part-of": "storefront",
+				"ever-works.io/work-id": "99887766-5555-4666-8777-888899990000",
+				"ever-works.io/kind": "app"
+			},
+			"annotations": {}
+		},
+		"spec": {
+			"ingressClassName": "nginx",
+			"rules": [
+				{
+					"host": "app.example.com",
+					"http": {
+						"paths": [
+							{
+								"path": "/",
+								"pathType": "Prefix",
+								"backend": {
+									"service": {
+										"name": "web",
+										"port": {
+											"number": 80
+										}
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"host": "admin.example.com",
+					"http": {
+						"paths": [
+							{
+								"path": "/",
+								"pathType": "Prefix",
+								"backend": {
+									"service": {
+										"name": "web",
+										"port": {
+											"number": 80
+										}
+									}
+								}
+							}
+						]
+					}
+				}
+			]
+		}
+	}
+]

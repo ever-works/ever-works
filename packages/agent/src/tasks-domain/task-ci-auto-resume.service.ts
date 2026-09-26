@@ -820,8 +820,12 @@ export class TaskCiAutoResumeService {
         const prNumbers = [...(input.prNumbers ?? [])];
         if (prNumbers.length > 0) {
             const link = await this.links.findByPullRequests(base, prNumbers);
-            if (link) {
-                if (link.isTaskRepo === false) return null;
+            // A link outside the Task repository is a MISS, not an answer: it
+            // is a Task that opened the same number in another repository —
+            // typically another Work that merely shares this one. Giving up
+            // there hid the real owner, whose pull request (opened by a person,
+            // so never recorded) the branch below still finds.
+            if (link && link.isTaskRepo !== false) {
                 const task = await this.tasks.findById(link.taskId);
                 return task ? { task, prNumber: link.prNumber } : null;
             }

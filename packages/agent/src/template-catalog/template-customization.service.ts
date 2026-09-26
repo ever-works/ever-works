@@ -561,7 +561,8 @@ export class TemplateCustomizationService {
         await this.gitFacade.push({ dir: baseDir, force: true }, gitOptions);
 
         const repositoryUrl =
-            created.url ?? this.gitFacade.getWebUrl(GIT_PROVIDER_ID, created.owner, created.name);
+            created.url ??
+            (await this.gitFacade.getWebUrl(GIT_PROVIDER_ID, created.owner, created.name));
 
         return {
             owner: created.owner,

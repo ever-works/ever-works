@@ -63,6 +63,31 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.ITEM_ADDED]: 'work',
     [ActivityActionType.ITEM_UPDATED]: 'work',
     [ActivityActionType.ITEM_REMOVED]: 'work',
+    // APW-11 (App Launcher, APW11-G05) — the Work-level **Show in App
+    // Launcher** setting changed. `work` is the deliberate bucket: this is
+    // Work metadata changing, exactly like the `WORK_UPDATED` row beside it.
+    // It is not `delivery` (nothing was generated or deployed) and not
+    // `decision` (nothing is held waiting on a person). Revisiting the
+    // decision means a *different* value in this same table, never an
+    // omission — `feed-kind.spec.ts:14-18` fails on any member without an
+    // entry.
+    [ActivityActionType.APP_LAUNCHER]: 'work',
+
+    // APW-03 (App spec) — Resolution R-2's first family (R-34: every new
+    // `ActivityActionType` member gets an explicit bucket here, or
+    // `feed-kind.spec.ts:14-19` fails). `deliveryWhenCompleted` is the
+    // deliberate bucket: applying the App spec is what makes a Work's declared
+    // build and runtime real (`app.spec.applied`, plan §2.3), so it reads as
+    // `work` while an evaluation is in flight and `delivery` once it has
+    // landed — the same shape as the generation and deployment families above.
+    // `app.spec.invalid` is written with `ActivityStatus.FAILED`, and
+    // `resolveFeedKind` classifies any failed status as a `problem` before it
+    // consults this table, so a spec error surfaces as a problem with no second
+    // rule. The dotted `action` values of the family
+    // (`app.spec.validated` / `app.spec.invalid` / `app.spec.applied`) are
+    // Resolution R-2's names and never appear here — the bucket is per
+    // `actionType`.
+    [ActivityActionType.APP_SPEC]: 'deliveryWhenCompleted',
 
     // Plugins
     [ActivityActionType.PLUGIN_ENABLED]: 'system',
@@ -322,6 +347,60 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.WORKSPACE_BACKUP_CREATED]: 'work',
     [ActivityActionType.WORKSPACE_BACKUP_DOWNLOADED]: 'delivery',
     [ActivityActionType.WORKSPACE_BACKUP_DELETED]: 'system',
+
+    // App Works (APW-02) — fork readiness, Actions hygiene and upstream sync.
+    // Three families, three deliberate decisions; the dotted `action` decides
+    // which event of the family a row is, so each of these is a family-level
+    // call and the row's `status` (CONTRACTS §0 R-34) finishes the job.
+    //
+    // `app_fork` is the epic's long-running operation: the job polls a fork
+    // from `preparing` to `ready`, so while it runs its row reads as `work`
+    // and the terminal success — "your fork is ready" — reads as `delivery`,
+    // the same shape as `GENERATION` / `DEPLOYMENT` above and APW-09's
+    // `app_upstream_pr`. `app.fork.timeout` and `app.fork.missing` are
+    // recorded `FAILED`, which `FEED_PROBLEM_STATUSES` turns into `problem`
+    // before this rule is ever consulted.
+    //
+    // `app_actions` records repository hygiene on the App Work — the
+    // workflows the platform switched off in the member's fork. It is not
+    // `delivery` (nothing was generated or deployed), not `decision` (nothing
+    // is held waiting on a person) and not `system` (that bucket is the
+    // member's own configuration and platform object lifecycle —
+    // `SETTINGS_UPDATED`, `ENVIRONMENT_*`, `MODEL_ACCOUNT_*`,
+    // `REPO_CONNECTION_*`). The platform's own writes into a repository are
+    // `work` beside it (`GIT_PUSHED`, `GIT_COMMITTED`), which is the closest
+    // sibling this family has.
+    //
+    // `app_upstream` is deliberately `work` and NOT `deliveryWhenCompleted`.
+    // The family holds a completed sync, a divergence reading and two failure
+    // states, and this table is keyed by family, so it cannot see the dotted
+    // `action`: `deliveryWhenCompleted` would report `app.upstream.behind` —
+    // a completed comparison in which nothing landed — as a **delivery**,
+    // which is a false claim in a user-visible bucket. `work` is coarser for
+    // `app.upstream.synced` but never false, and `app.upstream.unavailable`
+    // plus any refused or failed sync read as `problem` through their status.
+    // Revisiting any of the three means a *different* value here, never an
+    // omission — `feed-kind.spec.ts:14-19` fails on a member with no entry.
+    [ActivityActionType.APP_FORK]: 'deliveryWhenCompleted',
+    [ActivityActionType.APP_ACTIONS]: 'work',
+    [ActivityActionType.APP_UPSTREAM]: 'work',
+
+    // APW-05 (Builds) — Resolution R-2's `app_build` family (`APW05-G05`).
+    // `deliveryWhenCompleted` is the deliberate bucket, and it is the same call
+    // APW-03's `APP_SPEC` and APW-02's `APP_FORK` make: a Build is the epic's
+    // long-running operation, so its row reads as `work` while it is queued or
+    // running and as `delivery` once it succeeded — which is exactly what the
+    // `builds` tab and the Work feed should say. A `failed` or `cancelled` Build
+    // is written with those statuses and `resolveFeedKind` classifies any failed
+    // status as a `problem` before it consults this table, so a broken Build
+    // surfaces as a problem with no second rule. `blocked` writes no Activity row
+    // at all (`plan.md:1560`), which is why there is no fifth bucket to decide:
+    // the dotted `action` values of the family (`app.build.queued`,
+    // `app.build.started`, `app.build.succeeded`, `app.build.failed`,
+    // `app.build.cancelled`) never appear here — the bucket is per `actionType`.
+    // Revisiting it means a *different* value here, never an omission —
+    // `feed-kind.spec.ts:14-19` fails on a member with no entry.
+    [ActivityActionType.APP_BUILD]: 'deliveryWhenCompleted',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

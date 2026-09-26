@@ -106,7 +106,41 @@ export const PLUGIN_CAPABILITIES = {
 	// write") mapped onto the tool-grant lattice. Declared alongside a
 	// provider's main capability; see
 	// capabilities/connection-scopes.interface.ts.
-	CONNECTION_SCOPES: 'connection-scopes'
+	CONNECTION_SCOPES: 'connection-scopes',
+	// App Works (APW-07 T3) — App dependency providers: the `k8s` plugin serves
+	// the three in-cluster ids, `app-dependencies-external` the external ones,
+	// and P2's `apps-tier-dependencies` the managed ones. Consumed only through
+	// `AppDependencyFacadeService`; see
+	// capabilities/app-dependency.interface.ts.
+	APP_DEPENDENCY: 'app-dependency',
+	// App Works (APW-05 T2) — producing a container image from a commit. The
+	// `github-actions-build` plugin declares it (`IBuildPlugin`, `buildKind
+	// 'github-actions'`), and P3's `apps-builder` declares the same capability
+	// with the other `buildKind`. Consumed only through `BuildFacadeService`
+	// (APW-05 T16); see `capabilities/build.interface.ts`. Resolution R-13 keeps
+	// `build` a CAPABILITY while the strategy (`dockerfile` / `image` / `auto` /
+	// `none`) stays the App spec's own choice.
+	BUILD: 'build',
+	// App Works (APW-12 T4) — the Ever ID relying-party capability. The
+	// `oidc-identity` plugin declares it (APW-12 T5/T6), and it is consumed only
+	// through `IdentityProviderFacadeService` (APW-12 plan §4.4); see
+	// `capabilities/identity-provider.interface.ts`. Appended after `build`, and
+	// landed in the same change as the `identity` category in
+	// `plugin-manifest.types.ts` — a plugin contract with no category to be
+	// discovered under is a manifest the loader rejects.
+	IDENTITY_PROVIDER: 'identity-provider',
+	// App Works (APW-10 T2) — the managed hosting tier's zone capability. The
+	// `ever-works-apps` plugin declares it together with `deployment`
+	// (plan §5.2:602) and is consumed only through `AppsTierFacadeService`
+	// (APW-10 plan §5.3:655); see `capabilities/apps-tier.interface.ts`.
+	// Appended after `identity-provider`, and appended **last** on purpose:
+	// every existing constant keeps its value and its position, because the
+	// capability list is an append-only surface — a member that moves silently
+	// changes what a persisted manifest means. Deliberately NOT paired with a
+	// new category: the tier's plugin is a `deployment` plugin, so
+	// `PLUGIN_CATEGORIES` is untouched and every exhaustive map over it in
+	// `apps/web` stays total.
+	APPS_TIER: 'apps-tier'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

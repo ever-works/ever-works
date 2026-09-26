@@ -1,0 +1,35 @@
+name: validate
+
+# Runs on every pull request and on main. Two kinds of check:
+#   1. the JSON Schema (shape, https-only, ≤ 24 entries, icon path, status enum, length caps);
+#   2. the two rules JSON Schema cannot express — unique platform ids and the 16 KB icon byte cap —
+#      plus an SVG deny-pattern scan for the defence-in-depth rules of APW-11 plan §5.2.
+# Nothing here needs a secret: the catalog is public data by design.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate against the JSON Schema
+        run: npx --yes ajv-cli@5 validate -s schema/platforms.schema.json -d platforms.json --spec=draft2020 -m ajv-formats
+
+      - name: Unique ids, icon cap, https-only and SVG safety
+        run: node tools/validate.mjs
+
+      - name: Refuse the 25th entry
+        run: node tools/validate.mjs --expect-max-entries 24

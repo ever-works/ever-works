@@ -70,7 +70,13 @@ export const terminalSessionTask = task<'terminal-session', TerminalSessionPaylo
             return { status: 'skipped' as const, reason: 'empty-command' };
         }
 
-        const appContext = await NestFactory.createApplicationContext(TriggerTerminalModule);
+        // `abortOnError: false`: Nest's default turns a boot failure into
+        // `process.exit(1)`, which kills the worker process instead of failing
+        // this run (the context used to be unbootable — see
+        // `trigger-terminal.module.spec.ts`).
+        const appContext = await NestFactory.createApplicationContext(TriggerTerminalModule, {
+            abortOnError: false,
+        });
         appContext.useLogger(createTriggerLogger('TerminalSession'));
         const logger = new Logger('TerminalSession');
         try {

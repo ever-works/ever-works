@@ -56,7 +56,11 @@ test.describe('Home start composer', () => {
         await field.fill('');
         const oneLine = (await field.boundingBox())!.height;
 
-        await field.fill('a sentence long enough to wrap onto a second line in this field');
+        // Long enough to wrap at any viewport: at 1280 px the composer is ~976 px
+        // wide, wider than the single sentence this used to fill.
+        await field.fill(
+            'a sentence long enough to wrap onto a second line in this field '.repeat(4).trim(),
+        );
         const grown = (await field.boundingBox())!.height;
         expect(grown).toBeGreaterThan(oneLine);
 

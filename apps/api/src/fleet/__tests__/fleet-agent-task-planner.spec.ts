@@ -568,10 +568,17 @@ describe('FleetAgentTaskPlannerService', () => {
         process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
         taskWorkspace.resolveFleetRunEnvGrants.mockResolvedValue(['DATABASE_URL', 'GH_TOKEN']);
         const plan = await build().plan(payload);
+        // The DESCRIBED workspace travels with the call, so the primary's
+        // grants resolve against the same repository identity AND host its
+        // env files did — never a second, host-agnostic read of the Work.
         expect(taskWorkspace.resolveFleetRunEnvGrants).toHaveBeenCalledWith({
             task: expect.objectContaining({ id: 'task-1' }),
             userId: 'user-1',
             agentId: 'agent-1',
+            workspace: expect.objectContaining({
+                repositoryId: 'ever-works/ever-works',
+                repoUrl: 'https://github.com/ever-works/ever-works.git',
+            }),
         });
         expect(plan!.execution.envGrants).toEqual(['DATABASE_URL', 'GH_TOKEN']);
         expect(JSON.stringify(plan)).not.toContain('postgres://');

@@ -156,6 +156,22 @@ operation's `executionProfile`:
   task process is **already isolated** there, and the result returns through the
   existing job result channel.
 
+**Only declared operations can be called by name.** A plugin lists them in
+`everworks.plugin.operations` (`{ name, executionProfile? }`). Both paths
+refuse anything else, whatever the class defines. TypeScript
+`private`/`protected` are erased at runtime, so a prototype walk would otherwise
+reach every helper a plugin class or its base classes carry. The profile
+precedence is:
+
+1. an explicit profile on the call;
+2. the operation's own `executionProfile`;
+3. the manifest-level `executionProfile`;
+4. bundled mode, where an unmarked call stays in-process;
+5. in dynamic mode only, the router's operation taxonomy.
+
+A plugin whose `onLoad` fails while it loads answers a load failure and runs
+nothing.
+
 > **The worker is a separate runtime with its own store.** The Trigger.dev worker
 > is deployed independently from the API and prepares its own `./plugins` bundle
 > at deploy time — so a plugin _installed at runtime in the API_ does **not**

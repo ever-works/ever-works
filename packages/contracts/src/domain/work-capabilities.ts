@@ -35,6 +35,21 @@ export interface WorkCapabilities {
 	readonly deploy: boolean;
 	/** The knowledge-base workbench. */
 	readonly kb: boolean;
+	/**
+	 * The Builds surface and the `build` capability (APW-05).
+	 *
+	 * On only for `app` (Resolution R-7): a Work whose Work Repository holds
+	 * code the platform did not generate is the only kind with something to
+	 * build. Every generated kind ships a template that is deployed as-is.
+	 */
+	readonly builds: boolean;
+	/**
+	 * The App env and App dependencies surfaces (APW-07).
+	 *
+	 * On only for `app` (Resolution R-7): a generated site has no
+	 * environment of its own to configure and no dependencies to provision.
+	 */
+	readonly appEnvironment: boolean;
 	/** Ordered metric tiles rendered on the Overview tab. */
 	readonly metrics: readonly WorkMetricId[];
 	/**
@@ -68,6 +83,8 @@ const DIRECTORY_CAPABILITIES: WorkCapabilities = {
 	sourceValidation: true,
 	deploy: true,
 	kb: true,
+	builds: false,
+	appEnvironment: false,
 	metrics: ['total-items', 'categories', 'comparisons', 'generation-status', 'days-active'],
 	repos: { data: true, work: true, website: true }
 };
@@ -87,6 +104,8 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: true,
 		deploy: true,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['total-items', 'categories', 'tags', 'generation-status', 'days-active'],
 		repos: { data: true, work: true, website: true }
 	},
@@ -100,6 +119,8 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: false,
 		deploy: true,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['posts', 'page-views', 'registered-users', 'deploy-status', 'days-active'],
 		repos: { data: true, work: true, website: true }
 	},
@@ -113,6 +134,8 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: false,
 		deploy: true,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['page-views', 'registered-users', 'sessions', 'deploy-status', 'generation-status'],
 		repos: { data: true, work: true, website: true }
 	},
@@ -126,6 +149,8 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: false,
 		deploy: true,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['page-views', 'conversions', 'deploy-status', 'days-active'],
 		repos: { data: true, work: true, website: true }
 	},
@@ -150,6 +175,8 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: false,
 		deploy: false,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['agents', 'open-tasks', 'days-active'],
 		repos: { data: true, work: false, website: false }
 	},
@@ -165,6 +192,8 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: false,
 		deploy: false,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['works-owned', 'team-members', 'agents', 'open-tasks', 'days-active'],
 		repos: { data: true, work: true, website: false }
 	},
@@ -185,8 +214,41 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		sourceValidation: false,
 		deploy: false,
 		kb: true,
+		builds: false,
+		appEnvironment: false,
 		metrics: ['agents', 'open-tasks', 'conversions', 'days-active'],
 		repos: { data: true, work: true, website: false }
+	},
+
+	// An App Work wraps code the platform did not generate (README D1): the
+	// repository the member pasted, forked or copied IS its Work Repository,
+	// so the persisted `website` role is on and the `data` role — which holds
+	// a Work's generated data — is off. Nothing item-shaped applies: no
+	// items, taxonomy, comparisons, community-PR intake, import/export or
+	// source validation, and no generated site to render.
+	//
+	// `deploy` is ON where `repo` refuses it, which is the whole point of the
+	// kind: the second contract invariant this entry replaces is "a kind
+	// deploys only with a repository to deploy" — an App Work deploys the
+	// Work Repository without ever having generated one.
+	//
+	// `builds` and `appEnvironment` (Resolution R-7) are true HERE ONLY — the
+	// two flags exist so APW-05's Builds surface and APW-07's App env /
+	// dependencies surfaces can hang off the registry instead of off
+	// `kind === 'app'` inline tests, exactly as `deploy` does.
+	app: {
+		items: { enabled: false, labelKey: 'items' },
+		taxonomy: false,
+		comparisons: false,
+		communityPr: false,
+		itemImportExport: false,
+		sourceValidation: false,
+		deploy: true,
+		kb: true,
+		builds: true,
+		appEnvironment: true,
+		metrics: ['agents', 'open-tasks', 'deploy-status', 'days-active'],
+		repos: { data: false, work: false, website: true }
 	}
 };
 

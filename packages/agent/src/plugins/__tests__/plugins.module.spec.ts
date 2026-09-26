@@ -19,7 +19,20 @@ import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.
 jest.setTimeout(30000);
 
 jest.mock('@nestjs/event-emitter', () => {
-    const { EventEmitter2 } = require('eventemitter2');
+    // `eventemitter2` is a TRANSITIVE dependency of `@nestjs/event-emitter`, not
+    // one this package declares. Under pnpm's strict layout there is no
+    // top-level `node_modules/eventemitter2` symlink, so requiring it by name
+    // fails with `Cannot find module 'eventemitter2'` — and because the failure
+    // is at module load, the suite reports `1 failed` with `0 total`, which is
+    // easy to read as "nothing ran" rather than "nothing could run".
+    //
+    // The real module re-exports the class from its own barrel
+    // (`@nestjs/event-emitter/dist/index.d.ts:1`), so taking it from there needs
+    // no new dependency AND cannot drift from the class the real module hands
+    // out. `requireActual` inside the factory that mocks the same module is the
+    // supported shape, and the one this package already uses elsewhere.
+    const { EventEmitter2 } =
+        jest.requireActual<typeof import('@nestjs/event-emitter')>('@nestjs/event-emitter');
 
     class MockEventEmitterModule {}
 

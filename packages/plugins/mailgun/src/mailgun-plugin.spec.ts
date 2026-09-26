@@ -128,4 +128,19 @@ describe('MailgunPlugin', () => {
 		expect(msg.bodyText).toBe('please proceed');
 		expect(msg.providerMessageId).toBe('inbound-1@mg');
 	});
+
+	// The owner lookup (extractInboundRecipients) and the parsed `to` must name
+	// the same mailboxes: a display-name token kept in `to` matches no address.
+	it('parseInboundWebhook reports the same bare recipients as extractInboundRecipients', async () => {
+		const form = new URLSearchParams({
+			sender: 'human@example.com',
+			To: 'Attacker <attacker@a.test>, victim@v.test,  "Ops" <ops@o.test> ',
+			subject: 's',
+			'body-plain': 'b'
+		});
+		const raw = Buffer.from(form.toString());
+		const msg = await plugin.parseInboundWebhook(raw, {}, { userId: 'u' });
+		expect(msg.to).toEqual(['attacker@a.test', 'victim@v.test', 'ops@o.test']);
+		expect(msg.to).toEqual(plugin.extractInboundRecipients(raw, {}));
+	});
 });

@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+
 import { config } from './index';
 
 /**
@@ -1283,6 +1285,139 @@ describe('agent/config', () => {
         });
     });
 
+    describe('everWorks.apps.worksEnabled (APW-01 T7)', () => {
+        const KEY = 'EVER_WORKS_APP_WORKS_ENABLED';
+        let saved: string | undefined;
+
+        beforeEach(() => {
+            saved = process.env[KEY];
+            delete process.env[KEY];
+        });
+
+        afterEach(() => {
+            if (saved === undefined) delete process.env[KEY];
+            else process.env[KEY] = saved;
+        });
+
+        it('is OFF when the variable is unset — the default is off', () => {
+            expect(config.everWorks.apps.worksEnabled()).toBe(false);
+        });
+
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['true ', false],
+            ['', false],
+        ])('reads %p as %p — only the exact string "true" is on', (value, expected) => {
+            process.env[KEY] = value;
+            expect(config.everWorks.apps.worksEnabled()).toBe(expected);
+        });
+
+        it('is the same answer the web chip reads, from the same variable name', () => {
+            // `apps/web/src/lib/feature-flags/work-kinds.ts` reads
+            // `EVER_WORKS_APP_WORKS_ENABLED` at request time and requires exactly
+            // `'true'` too — this test exists so the two sides are pinned to one
+            // convention rather than to a comment claiming they agree.
+            process.env[KEY] = 'true';
+            expect(config.everWorks.apps.worksEnabled()).toBe(true);
+        });
+    });
+
+    describe('everWorks.apps.cloudPushEnabled (APW-08 T17, owner decision)', () => {
+        const KEY = 'APP_WORKS_CLOUD_PUSH_ENABLED';
+        let saved: string | undefined;
+
+        beforeEach(() => {
+            saved = process.env[KEY];
+            delete process.env[KEY];
+        });
+
+        afterEach(() => {
+            if (saved === undefined) delete process.env[KEY];
+            else process.env[KEY] = saved;
+        });
+
+        it('is OFF when the variable is unset — cloud runs push no App Work branch until FR-12', () => {
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(false);
+        });
+
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['true ', false],
+            ['', false],
+        ])('reads %p as %p — only the exact string "true" is on', (value, expected) => {
+            process.env[KEY] = value;
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(expected);
+        });
+
+        it('is read at call time, not captured at import', () => {
+            process.env[KEY] = 'true';
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(true);
+            delete process.env[KEY];
+            expect(config.everWorks.apps.cloudPushEnabled()).toBe(false);
+        });
+
+        it('is independent of the App Works instance setting', () => {
+            process.env[KEY] = 'true';
+            const works = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            try {
+                expect(config.everWorks.apps.worksEnabled()).toBe(false);
+                expect(config.everWorks.apps.cloudPushEnabled()).toBe(true);
+            } finally {
+                if (works === undefined) delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+                else process.env.EVER_WORKS_APP_WORKS_ENABLED = works;
+            }
+        });
+    });
+
+    describe('appLauncher (APW-11)', () => {
+        const KEY = 'EVER_WORKS_APP_LAUNCHER_ENABLED';
+        let saved: string | undefined;
+
+        beforeEach(() => {
+            saved = process.env[KEY];
+            delete process.env[KEY];
+        });
+
+        afterEach(() => {
+            if (saved === undefined) delete process.env[KEY];
+            else process.env[KEY] = saved;
+        });
+
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['', false],
+            ['true ', false],
+        ])('reads %p as %p — only the exact string "true" is on', (value, expected) => {
+            process.env[KEY] = value;
+            expect(config.appLauncher.isEnabled()).toBe(expected);
+        });
+
+        it('is off when the variable is unset', () => {
+            expect(config.appLauncher.isEnabled()).toBe(false);
+        });
+
+        it('is the ONE reader the API guard and the public config share', () => {
+            // The guard delegates through this accessor
+            // (`apps/api/src/app-launcher/guards/app-launcher-enabled.guard.ts`)
+            // and `apps/api/src/config/constants.ts` delegates to it too, so a
+            // change of semantics here moves both readers together. This test
+            // exists so that the semantics themselves are pinned in the package
+            // that owns them, not only in the API's specs.
+            process.env[KEY] = 'true';
+            expect(config.appLauncher.isEnabled()).toBe(true);
+        });
+    });
+
     describe('top-level shape (regression guard)', () => {
         it('exposes the full set of config groups', () => {
             const keys = Object.keys(config).sort();
@@ -1292,6 +1427,14 @@ describe('agent/config', () => {
                 // max batch size, etc.). Pinned alphabetically here.
                 'agentPlugins',
                 'agents',
+                // APW-11 (App Launcher) — `appLauncher.*` is the ONE accessor
+                // behind FR-54's installation switch. It is deliberately
+                // stricter than the other public feature flags (only the exact
+                // string `'true'` is on) so the API guard and
+                // `features.appLauncherEnabled` read one implementation and
+                // cannot disagree. Sorted here between `agents` and `billing`
+                // because `Object.keys().sort()` is case-sensitive.
+                'appLauncher',
                 'billing',
                 'branding',
                 'database',
@@ -1474,6 +1617,328 @@ describe('agent/config', () => {
                     expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
                 },
             );
+        });
+    });
+
+    /**
+     * APW-06 T19 — `config.everWorks.apps` (plan §8.3, §6.1; ACC-06-27, ACC-06-03).
+     *
+     * Six getters, and the one design decision worth reading before the cases:
+     *
+     * - `getDomain()` (plan §8.3:1129-1140) has **two branches**. When
+     *   `EVER_WORKS_APPS_DOMAIN` is unset the apex *is* the platform domain — the
+     *   shared default, which is what makes `<slug>.ever.works` work out of the box
+     *   (program README §2 D10, Resolution R-16) — and the equality check is
+     *   "satisfied by definition and recorded as such". When the operator sets the
+     *   variable explicitly the strict validation applies: the apex must not equal,
+     *   be under, or be a parent of `EVER_WORKS_DOMAIN` (or the host of the
+     *   platform's own web/API URL), because that is the configuration the
+     *   cookie-isolating apex exists to keep honest. T19's own task line states the
+     *   relations without the branch qualifier; the plan scopes them to the
+     *   dedicated branch, and the plan is the spec of record — the two readings are
+     *   quoted in the slice report, and the "shared default" cases below pin the
+     *   difference so it can never be a silent one.
+     * - Every other getter is a plain read with its documented default, pinned here
+     *   because the preconditions service (`app-deploy-preconditions.service.ts`),
+     *   `AppsDomainDnsService` (plan §8.3:1141) and APW-10's `capReached` all read
+     *   them without a second interpretation.
+     */
+    describe('everWorks.apps', () => {
+        let warnSpy: jest.SpyInstance;
+        let errorSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+            // The accessors report through a Nest `Logger`, the same choice
+            // `git.facade.ts:347-349` records. Spied rather than silenced, so every
+            // refusal below can assert that it was a *recorded* refusal.
+            warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        /** The union of every warning/error message the getters emitted during one test. */
+        const logged = (...spies: jest.SpyInstance[]): string =>
+            spies
+                .flatMap((spy) => spy.mock.calls)
+                .map((call) => String(call[0] ?? ''))
+                .join('\n');
+
+        it('leaves every getter at its documented default when the environment is empty', () => {
+            // The whole point of the env-gated shape: nothing is switched on by
+            // omission, and no default is a value the operator has to guess.
+            expect(config.everWorks.apps.getDomain()).toBe('ever.works');
+            expect(config.everWorks.apps.getMaxPerUser()).toBe(3);
+            expect(config.everWorks.apps.getDnsZoneId()).toBeUndefined();
+            expect(config.everWorks.apps.getDnsApiToken()).toBeUndefined();
+            expect(config.everWorks.apps.isClusterWorkerIsolated()).toBe(false);
+            expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual([]);
+        });
+
+        describe('getDomain — the shared-default branch (plan §8.3:1135-1138)', () => {
+            it('answers EVER_WORKS_DOMAIN when it is configured, so <slug>.<platform> is the managed address', () => {
+                process.env.EVER_WORKS_DOMAIN = 'preview.ever.works';
+
+                expect(config.everWorks.apps.getDomain()).toBe('preview.ever.works');
+            });
+
+            it('defaults EVER_WORKS_DOMAIN to ever.works, exactly as the allocator and the CF provider do', () => {
+                // `managed-subdomain.service.ts:298`, `cloudflare-dns.provider.ts:430`
+                // and `subdomain-allocator.service.ts:192` all read the same default;
+                // a second answer here would publish app addresses nowhere.
+                expect(config.everWorks.apps.getDomain()).toBe('ever.works');
+            });
+
+            it('treats a BLANK EVER_WORKS_APPS_DOMAIN as unset — the value envsubst renders', () => {
+                process.env.EVER_WORKS_APPS_DOMAIN = '   ';
+                process.env.EVER_WORKS_DOMAIN = 'ever.works';
+
+                expect(config.everWorks.apps.getDomain()).toBe('ever.works');
+            });
+
+            it('records the shared default once instead of logging on every read', () => {
+                process.env.EVER_WORKS_DOMAIN = 'ever.works';
+
+                config.everWorks.apps.getDomain();
+                config.everWorks.apps.getDomain();
+                config.everWorks.apps.getDomain();
+
+                expect(errorSpy).not.toHaveBeenCalled();
+            });
+
+            it('refuses rather than "repairing" an unusable EVER_WORKS_DOMAIN into ever.works', () => {
+                process.env.EVER_WORKS_DOMAIN = 'https://ever.works';
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('EVER_WORKS_DOMAIN');
+            });
+        });
+
+        describe('getDomain — the dedicated-apex branch (plan §8.3:1133-1135; ACC-06-27)', () => {
+            it('accepts a dedicated apex outside every platform domain', () => {
+                process.env.EVER_WORKS_APPS_DOMAIN = 'apps.example.com';
+
+                expect(config.everWorks.apps.getDomain()).toBe('apps.example.com');
+                expect(errorSpy).not.toHaveBeenCalled();
+            });
+
+            it('accepts the SAME apex whether or not the platform URL variables are set', () => {
+                // The relation check must not become a URL-parsing lottery: a
+                // malformed or unrelated platform URL contributes no host.
+                process.env.PLATFORM_API_URL = 'not a url';
+                process.env.NEXT_PUBLIC_APP_URL = '/relative';
+                process.env.EVER_WORKS_APPS_DOMAIN = 'apps.example.com';
+
+                expect(config.everWorks.apps.getDomain()).toBe('apps.example.com');
+            });
+
+            it('refuses an apex EQUAL to EVER_WORKS_DOMAIN', () => {
+                process.env.EVER_WORKS_DOMAIN = 'ever.works';
+                process.env.EVER_WORKS_APPS_DOMAIN = 'ever.works';
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('equal to');
+                // …and tells the operator the way out rather than only the refusal.
+                expect(logged(errorSpy)).toContain('Unset EVER_WORKS_APPS_DOMAIN');
+            });
+
+            it('refuses an apex UNDER EVER_WORKS_DOMAIN', () => {
+                process.env.EVER_WORKS_DOMAIN = 'ever.works';
+                process.env.EVER_WORKS_APPS_DOMAIN = 'apps.ever.works';
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('under the platform domain');
+            });
+
+            it('refuses an apex that is a PARENT of EVER_WORKS_DOMAIN', () => {
+                process.env.EVER_WORKS_DOMAIN = 'apps.ever.works';
+                process.env.EVER_WORKS_APPS_DOMAIN = 'ever.works';
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('a parent of');
+            });
+
+            it('refuses an apex that collides with the host of the platform API URL', () => {
+                process.env.PLATFORM_API_URL = 'https://api.ever.team';
+                process.env.EVER_WORKS_APPS_DOMAIN = 'api.ever.team';
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('equal to');
+            });
+
+            it('refuses an apex that collides with the host of the platform web URL', () => {
+                process.env.NEXT_PUBLIC_APP_URL = 'https://app.ever.team';
+                process.env.EVER_WORKS_APPS_DOMAIN = 'app.ever.team';
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('equal to');
+            });
+
+            it.each([
+                ['a scheme', 'https://apps.example.com'],
+                ['a port', 'apps.example.com:8443'],
+                ['a path', 'apps.example.com/apps'],
+                ['a wildcard', '*.example.com'],
+                ['an underscore', 'apps_example.com'],
+                ['a single label', 'localhost'],
+                ['an IP literal', '203.0.113.7'],
+                ['an empty label', 'apps..example.com'],
+                ['a leading hyphen', '-apps.example.com'],
+                ['a trailing hyphen', 'apps-.example.com'],
+                ['a label over 63 characters', `${'a'.repeat(64)}.example.com`],
+            ])('refuses %s as an apex rather than trimming it into one', (_reason, value) => {
+                process.env.EVER_WORKS_APPS_DOMAIN = value;
+
+                expect(config.everWorks.apps.getDomain()).toBeNull();
+                expect(logged(errorSpy)).toContain('not a usable apex domain');
+            });
+
+            it('normalizes case and the root dot, so two spellings are one apex', () => {
+                process.env.EVER_WORKS_APPS_DOMAIN = '  Apps.Example.COM.  ';
+
+                expect(config.everWorks.apps.getDomain()).toBe('apps.example.com');
+            });
+
+            it('never throws for the worst configuration a manifest can carry', () => {
+                for (const value of ['', ' ', '.', '..', '-', 'a'.repeat(300), '💥.example.com']) {
+                    process.env.EVER_WORKS_APPS_DOMAIN = value;
+
+                    const answer = config.everWorks.apps.getDomain();
+                    expect(answer === null || typeof answer === 'string').toBe(true);
+                }
+            });
+        });
+
+        describe('getMaxPerUser (plan §9.5, CONTRACTS §7)', () => {
+            it('defaults to 3', () => {
+                expect(config.everWorks.apps.getMaxPerUser()).toBe(3);
+            });
+
+            it('returns a configured positive limit', () => {
+                process.env.EVER_WORKS_APPS_MAX_PER_USER = '10';
+
+                expect(config.everWorks.apps.getMaxPerUser()).toBe(10);
+            });
+
+            it.each(['', '  ', 'lots', '0', '-2'])(
+                'keeps the documented 3 for %j — never NaN and never a closed tier',
+                (value) => {
+                    process.env.EVER_WORKS_APPS_MAX_PER_USER = value;
+                    expect(config.everWorks.apps.getMaxPerUser()).toBe(3);
+                },
+            );
+        });
+
+        describe('getDnsZoneId / getDnsApiToken (plan §8.3:1130-1131)', () => {
+            it('answers undefined for both when nothing is configured', () => {
+                // CONTRACTS §7: unset means no managed subdomains are written at all,
+                // which is why the absence is a value rather than an exception.
+                expect(config.everWorks.apps.getDnsZoneId()).toBeUndefined();
+                expect(config.everWorks.apps.getDnsApiToken()).toBeUndefined();
+            });
+
+            it('returns both trimmed when they are configured', () => {
+                process.env.EVER_WORKS_APPS_DNS_ZONE_ID = '  zone-123  ';
+                process.env.EVER_WORKS_APPS_DNS_API_TOKEN = '  token-abc  ';
+
+                expect(config.everWorks.apps.getDnsZoneId()).toBe('zone-123');
+                expect(config.everWorks.apps.getDnsApiToken()).toBe('token-abc');
+            });
+
+            it('answers undefined for a blank value, not an empty string', () => {
+                process.env.EVER_WORKS_APPS_DNS_ZONE_ID = '   ';
+                process.env.EVER_WORKS_APPS_DNS_API_TOKEN = '';
+
+                expect(config.everWorks.apps.getDnsZoneId()).toBeUndefined();
+                expect(config.everWorks.apps.getDnsApiToken()).toBeUndefined();
+            });
+        });
+
+        describe('isClusterWorkerIsolated (plan §6.2:950-952)', () => {
+            it('defaults to false, so production refuses App cluster jobs until an operator attests', () => {
+                expect(config.everWorks.apps.isClusterWorkerIsolated()).toBe(false);
+            });
+
+            it("is true only for the exact string 'true'", () => {
+                process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED = 'true';
+
+                expect(config.everWorks.apps.isClusterWorkerIsolated()).toBe(true);
+            });
+
+            it.each(['false', '1', 'yes', 'TRUE', 'True', '', '  '])(
+                'stays false for %j — an attestation is exact or it is absent',
+                (value) => {
+                    process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED = value;
+                    expect(config.everWorks.apps.isClusterWorkerIsolated()).toBe(false);
+                },
+            );
+        });
+
+        describe('getClusterPrivateAllowlist (plan §6.1:922-934; ACC-06-03)', () => {
+            it('answers an empty list when nothing is configured — every private address stays refused', () => {
+                expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual([]);
+            });
+
+            it('drops an invalid entry with a warning and returns the valid one', () => {
+                process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST = '10.0.0.0/8, bogus';
+
+                expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual(['10.0.0.0/8']);
+                expect(warnSpy).toHaveBeenCalledTimes(1);
+                expect(logged(warnSpy)).toContain('bogus');
+                // The warning names the variable an operator has to go and fix.
+                expect(logged(warnSpy)).toContain('EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST');
+            });
+
+            it('warns once per invalid entry and keeps every valid one, in the order given', () => {
+                process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST =
+                    '172.18.0.0/16 nope 127.0.0.1/32 10.0.0.0/33';
+
+                expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual([
+                    '172.18.0.0/16',
+                    '127.0.0.1/32',
+                ]);
+                expect(warnSpy).toHaveBeenCalledTimes(2);
+                expect(logged(warnSpy)).toContain('nope');
+                expect(logged(warnSpy)).toContain('10.0.0.0/33');
+            });
+
+            it('reads comma- and whitespace-separated lists alike, and blank tokens as nothing', () => {
+                process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST =
+                    ' 10.0.0.0/8 ,\n\t172.16.0.0/12 ,, ';
+
+                expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual([
+                    '10.0.0.0/8',
+                    '172.16.0.0/12',
+                ]);
+                expect(warnSpy).not.toHaveBeenCalled();
+            });
+
+            it('accepts a bare address, and returns it verbatim as the k8s plugin does', () => {
+                // Verbatim is the contract, not tidiness: the plugin classifies
+                // addresses against the strings the operator typed
+                // (`app-kubeconfig.guard.ts:184-201`), so both sides must read one
+                // environment value as one list.
+                process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST = '127.0.0.1,::1';
+
+                expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual([
+                    '127.0.0.1',
+                    '::1',
+                ]);
+                expect(warnSpy).not.toHaveBeenCalled();
+            });
+
+            it('accepts IPv6 CIDRs and bracketed literals, and refuses a prefix past the width', () => {
+                process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST =
+                    'fc00::/7, [::1]/128, 2001:db8::/129, 10.0.0.0/33, 10.0.0.0/abc';
+
+                expect(config.everWorks.apps.getClusterPrivateAllowlist()).toEqual([
+                    'fc00::/7',
+                    '[::1]/128',
+                ]);
+                expect(warnSpy).toHaveBeenCalledTimes(3);
+            });
         });
     });
 });

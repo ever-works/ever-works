@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=https://api.ever.works/api/schema/works.yml.schema.json
+#
+# DRAFT App Blueprint — seed content of the Blueprint repository `ever-works/umami-template` (APW-13).
+# Shape: docs/specs/features/app-works/CONTRACTS.md §1 (including the APW-13 additions).
+#
+# Purpose: the FAST real-world validation of the runtime path. It uses the upstream's published image, so a run
+# spends no build minutes. Facts were read on 2026-09-17 from umami-software/umami at release v3.4.0
+# (commit ec0ff50388c264ed8ce46f00967e92f7e71476ae) and from the GitHub Packages listing of its image; sources
+# are cited in ../README.md. "Verified" means read in source or registry metadata, not yet run.
+#
+# Consequence of the image strategy: a change an agent merges into the fork is NOT rebuilt. Switching
+# `build.strategy` to `dockerfile` (the upstream ships a Dockerfile) is a one-line pull request — see README.
+
+version: 2
+kind: app
+name: Umami
+
+spec:
+  source:
+    relation: fork
+    upstream: { repo: umami-software/umami, defaultBranch: master } # verified: default branch is `master`
+    branch: master
+
+  blueprint:
+    id: umami
+    version: 0.1.0
+    repo: ever-works/umami-template
+    sha: '0000000000000000000000000000000000000000' # TODO(release): stamped by the Blueprint release workflow
+
+  license:
+    spdx: MIT # verified: repository licence metadata
+    class: green
+    source: blueprint
+
+  display:
+    name: Umami
+    protectedPaths: [LICENSE]
+
+  build:
+    strategy: image
+    # verified: tag 3.4.0 (also `3.4`, `3`, `latest`, `postgresql-latest`) points at this index digest,
+    # published 2026-09-17. Pin by digest; a tag can move.
+    image: ghcr.io/umami-software/umami@sha256:85909afc45bdcda1917394594a087421fdbb05610fded0fa9f6fb861abb2f367
+
+  components:
+    - name: web
+      role: web
+      # No command: the image CMD runs the database check (which migrates) and then the server. That script
+      # stops on the first error, so a failed migration fails the container — no separate migrate job needed.
+      port: 3000 # verified: EXPOSE 3000, PORT=3000
+      replicas: 1
+      # TODO(verify): the boot script also updates the tracker script; try `false` on the verification lane.
+      writableRootFilesystem: true
+      probes:
+        startup: { http: /api/heartbeat, periodSeconds: 5, failureThreshold: 60 } # verified: returns {"ok":true}
+        readiness: { http: /login } # verified: page route exists
+        liveness: { http: /api/heartbeat, periodSeconds: 30 }
+      resources: { cpu: 250m, memory: 512Mi, memoryLimit: 1Gi } # TODO(verify): measure
+
+  dependencies:
+    # The upstream compose file uses Postgres 15. TODO(verify): the minimum supported major version.
+    postgres: { version: '16', directUrl: true } # verified: migrations prefer DIRECT_DATABASE_URL when set
+
+  env:
+    - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+    - { name: DIRECT_DATABASE_URL, secret: true, from: deps.postgres.directUrl }
+    - name: APP_SECRET # verified: the compose file asks for a random string
+      secret: true
+      generate: { kind: hex, bytes: 32, rotate: never }
+    - name: TWO_FACTOR_ENCRYPTION_KEY # verified: the compose file asks for a 64-character hex string
+      secret: true
+      generate: { kind: hex, bytes: 32, rotate: never }
+      validate: { length: 64, pattern: '^[0-9a-f]{64}$' }
+    - { name: DISABLE_TELEMETRY, value: '1' } # verified: read by the telemetry script route and the config route
+    - { name: DISABLE_UPDATES, value: '1' } # verified: read by the config route (no update checks)
+    - { name: EVER_WORKS_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
+    - name: EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD
+      secret: true
+      prompt: { description: 'New password for the `admin` user (at least 12 characters)', required: true }
+      validate: { pattern: '^.{12,}$' }
+
+  jobs:
+    # The upstream creates a first user with a documented default password. The Blueprint replaces it before
+    # the app is reachable (first-deploy jobs run before the ingress is published). Idempotent: when the default
+    # password is no longer accepted, the job treats the replacement as already done.
+    - name: bootstrap-admin
+      when: first-deploy
+      component: web
+      timeoutSeconds: 180
+      command:
+        - node
+        - --input-type=module
+        - -e
+        - |
+          const base = process.env.EVER_WORKS_WEB_INTERNAL_URL;
+          const login = await fetch(`${base}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ username: 'admin', password: 'umami' }),
+          });
+          if (login.status === 401) { console.log('bootstrap-admin: default password already replaced'); process.exit(0); }
+          if (!login.ok) { console.error(`bootstrap-admin: login HTTP ${login.status}`); process.exit(1); }
+          const { token } = await login.json();
+          const change = await fetch(`${base}/api/me/password`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+            body: JSON.stringify({ currentPassword: 'umami', newPassword: process.env.EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD }),
+          });
+          if (!change.ok) { console.error(`bootstrap-admin: password change HTTP ${change.status}`); process.exit(1); }
+          console.log('bootstrap-admin: default password replaced');
+
+  domains:
+    primaryComponent: web
+    publicUrlEnv: []
+    onChange: restart
+    needsHairpin: false
+
+  smoke:
+    - { name: heartbeat, http: { method: GET, path: /api/heartbeat }, expect: { status: [200] } }
+    - {
+        name: login-page,
+        http: { method: GET, path: /login },
+        expect: { status: [200], bodyNotContains: ['localhost:3000'] }
+      }
+    # The default credential must be refused once bootstrap-admin has run.
+    # TODO(verify, APW-06): smoke `http` gains a request body; until then the verification lane asserts this.
+    # - { name: default-admin-refused, http: { method: POST, path: /api/auth/login, body: { username: admin, password: umami } }, expect: { status: [401] } }
+
+  # Only meaningful after switching to `strategy: dockerfile`. TODO(verify): the upstream's own check commands.
+  checks: []
+
+  agents:
+    instructionFiles: []
+    maxPullRequestChangedLines: 400
+
+  upstreamSync:
+    schedule: '0 6 * * 2'
+    mode: merge
+
+  upstreamPullRequests:
+    enabled: false
+    requireApproval: true

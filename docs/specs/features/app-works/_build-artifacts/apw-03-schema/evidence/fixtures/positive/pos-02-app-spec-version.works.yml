@@ -1,0 +1,15 @@
+# POSITIVE FIXTURE pos-02 — `appSpecVersion` above the build's supported version.
+# Expected: JSON Schema PASS · rule layer PASS (no issue codes).
+# schema.md §1 / CONTRACTS.md C1: `appSpecVersion` is an integer 1-1000 and "a newer `appSpecVersion`
+# turns unknown-key errors into warnings". The DOWNGRADE is deliberately not in the schema: it is a
+# severity change keyed on the build, so encoding it as a schema failure would turn a warning into an
+# error in every editor. This fixture only proves the RANGE is enforced and that a newer version does
+# not fail validation on its own. `validate.mjs` does not implement the downgrade (see
+# validator-rules.md §5).
+version: 2
+kind: app
+spec:
+    appSpecVersion: 7
+    source:
+        relation: private-copy
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }

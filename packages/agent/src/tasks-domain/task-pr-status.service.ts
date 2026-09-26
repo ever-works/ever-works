@@ -14,6 +14,7 @@ import {
     PROMOTION_LANE_WATCHER,
     type PromotionLaneWatcher,
 } from '../policy/promotion-merge-guard.port';
+import { resolveTaskRepository } from './task-repository';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -614,8 +615,8 @@ export class TaskPrStatusService {
             throw new NotFoundException(`Task ${task.id} has no reachable Work.`);
         }
         return {
-            owner: work.getRepoOwner(),
-            repo: work.getDataRepo(),
+            owner: resolveTaskRepository(work).owner,
+            repo: resolveTaskRepository(work).repo,
             baseRef:
                 (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main',
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },

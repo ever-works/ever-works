@@ -1,0 +1,332 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schema/templates-manifest.schema.json",
+	"title": "Ever Works templates listing manifest",
+	"description": "Schema for `manifest.json` in the template listing repository `ever-works/templates`. Covers BOTH website templates and app templates (kind discriminator). Hand-authored; validated in CI. This file is the listing, not the resolution source of truth: the platform discovers templates by scanning the catalog organization for repositories whose name ends in `template` and reads each repository's own `.works/template.yml` and `.works/works.yml`.",
+	"type": "object",
+	"required": ["schemaVersion", "catalogOrganization", "templates"],
+	"additionalProperties": false,
+	"properties": {
+		"$schema": { "type": "string" },
+		"schemaVersion": { "const": 1 },
+		"generatedBy": { "type": "string", "maxLength": 60 },
+		"status": { "enum": ["seed", "live"] },
+		"catalogOrganization": {
+			"description": "The GitHub organization the platform scans for `-template` repositories (config.websiteTemplate.getCatalogOrganization()).",
+			"type": "string",
+			"pattern": "^[A-Za-z0-9-]{1,39}$"
+		},
+		"updatedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+		"notes": { "type": "array", "items": { "type": "string", "maxLength": 400 }, "maxItems": 40 },
+		"templates": {
+			"type": "array",
+			"description": "One row per template repository we keep. ≤ 1000 rows; `slug` unique.",
+			"maxItems": 1000,
+			"items": { "$ref": "#/$defs/template-row" }
+		},
+		"appSources": {
+			"type": "array",
+			"description": "Repositories that template rows refer to as their app source but that are NOT templates themselves (their name does not end in `template`).",
+			"maxItems": 1000,
+			"items": { "$ref": "#/$defs/app-source-row" }
+		}
+	},
+	"$defs": {
+		"slug": {
+			"type": "string",
+			"pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+		},
+		"everWorksRepo": {
+			"description": "`owner/name` inside the catalog organization. Security: the platform only ever forks repositories in this organization, so a hostile or forked manifest cannot make it clone attacker-controlled code (SAFE_REPO_RE, apps/api/src/works/works-template-catalog.service.ts:114).",
+			"type": "string",
+			"pattern": "^ever-works/[a-z0-9-]+$"
+		},
+		"githubRepo": {
+			"description": "Any `owner/name` on the Git provider — used only for upstream/app-source coordinates, which the platform never fetches as code.",
+			"type": "string",
+			"pattern": "^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$"
+		},
+		"httpsUrl": {
+			"type": "string",
+			"pattern": "^https://[^\\s]+$",
+			"maxLength": 300
+		},
+		"note": { "type": "string", "maxLength": 400 },
+		"license": {
+			"type": "object",
+			"required": ["spdx", "class"],
+			"additionalProperties": false,
+			"properties": {
+				"spdx": { "type": "string", "pattern": "^(?:[A-Za-z0-9.+-]+|LicenseRef-[A-Za-z0-9.-]+)$", "maxLength": 80 },
+				"class": { "enum": ["green", "amber", "red"] },
+				"source": {
+					"description": "Where the classification comes from: the template repository's own LICENSE, the upstream project, or the app-source repository.",
+					"enum": ["template", "upstream", "app-source"]
+				}
+			}
+		},
+		"template": {
+			"type": "object",
+			"required": ["repo"],
+			"additionalProperties": false,
+			"properties": {
+				"repo": {
+					"description": "Owner/name of the template repository to fork or generate from. Must be null only while status is `placeholder`.",
+					"oneOf": [{ "$ref": "#/$defs/everWorksRepo" }, { "type": "null" }]
+				},
+				"url": { "$ref": "#/$defs/httpsUrl" },
+				"ref": {
+					"description": "Branch to fork from, or the release tag `v<blueprint.version>` for an app template. Ignored when sha is set.",
+					"type": ["string", "null"],
+					"maxLength": 100
+				},
+				"sha": {
+					"description": "Pinned commit, 40 lower-case hex. Required for every non-placeholder row — the platform applies the sha, never a branch. This is the plan's `blueprint.sha` (APW-03 catalog.md §3.1); it is not duplicated elsewhere in the row.",
+					"oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{40}$" }, { "type": "null" }]
+				},
+				"isGitHubTemplate": {
+					"description": "True when the repository is marked as a GitHub template repository (generate-from-template); false for a plain fork/clone.",
+					"type": "boolean"
+				}
+			}
+		},
+		"upstream": {
+			"type": "object",
+			"required": ["repo"],
+			"additionalProperties": false,
+			"properties": {
+				"repo": { "$ref": "#/$defs/githubRepo" },
+				"aliases": {
+					"description": "Former names (renames and transfers), matched case-insensitively.",
+					"type": "array",
+					"items": { "$ref": "#/$defs/githubRepo" },
+					"maxItems": 5
+				},
+				"refs": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"branches": { "type": "array", "items": { "type": "string", "maxLength": 100 }, "maxItems": 10 },
+						"tags": { "type": ["string", "null"], "maxLength": 60 },
+						"exclude": { "type": "array", "items": { "type": "string", "maxLength": 100 }, "maxItems": 10 }
+					}
+				}
+			}
+		},
+		"blueprint": {
+			"type": "object",
+			"description": "The catalogue identity of an app template. `version` is the semver a tag `v<version>` in the template repository must carry; the commit that tag points to is `template.sha`.",
+			"required": ["id", "version"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "$ref": "#/$defs/slug" },
+				"version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 40 },
+				"topic": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,49}$" },
+				"verified": { "type": "boolean" }
+			}
+		},
+		"appSource": {
+			"type": "object",
+			"description": "Where the application source lives. `embedded` = it is the template repository itself (code-bearing); `repository` = a separate repository the user also forks (metadata-only); `image` = a published container image and no app-source repository (single fork).",
+			"required": ["mode"],
+			"additionalProperties": false,
+			"properties": {
+				"mode": { "enum": ["embedded", "repository", "image"] },
+				"repo": { "oneOf": [{ "$ref": "#/$defs/githubRepo" }, { "type": "null" }] },
+				"defaultBranch": { "type": ["string", "null"], "maxLength": 100 },
+				"image": { "type": ["string", "null"], "maxLength": 512 }
+			}
+		},
+		"template-row": {
+			"type": "object",
+			"required": ["slug", "name", "summary", "kind", "status", "role", "workRepositorySuffix", "template"],
+			"additionalProperties": false,
+			"properties": {
+				"slug": { "$ref": "#/$defs/slug" },
+				"name": { "type": "string", "minLength": 1, "maxLength": 120 },
+				"summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+				"kind": {
+					"description": "`website` — a Website/Work Template (the existing ever-works template family). `app` — an App Blueprint (the platform builds, runs and evolves the fork).",
+					"enum": ["website", "app"]
+				},
+				"status": {
+					"description": "`placeholder` rows name repositories that do not exist yet (sha may be null); `beta` and `production` rows must name a real, pinned, public repository.",
+					"enum": ["production", "beta", "placeholder", "deprecated"]
+				},
+				"role": {
+					"description": "The persisted RepositoryRole the template's output feeds. Always `website` — the Work Repository. No new role value exists or is added (packages/contracts/src/api/work/import-source.dto.ts:12).",
+					"const": "website"
+				},
+				"workRepositorySuffix": {
+					"description": "Suffix for the Work Repository's name when this template is used: `-app` for an app template, `-website` for a website template (and the unchanged default). Suffix only — the role stays `website`.",
+					"enum": ["-app", "-website"]
+				},
+				"featured": { "type": "boolean" },
+				"template": { "$ref": "#/$defs/template" },
+				"license": { "$ref": "#/$defs/license" },
+				"shape": {
+					"description": "App templates only. `code-bearing`: the template repository holds the application source (kept in sync as a public fork of the upstream project with our metadata added) — provisioning forks one repository. `metadata-only`: the template holds only our metadata — provisioning forks the template AND the app-source repository.",
+					"enum": ["code-bearing", "metadata-only"]
+				},
+				"appSource": { "$ref": "#/$defs/appSource" },
+				"blueprint": { "$ref": "#/$defs/blueprint" },
+				"upstreams": {
+					"description": "App templates only: the upstream repositories this template serves (1–5).",
+					"type": "array",
+					"items": { "$ref": "#/$defs/upstream" },
+					"maxItems": 5
+				},
+				"managedHosting": {
+					"description": "App templates only. `allowed: true` for an amber-licensed upstream only with a recorded agreement (CONTRACTS R-3).",
+					"type": "object",
+					"required": ["allowed"],
+					"additionalProperties": false,
+					"properties": {
+						"allowed": { "type": "boolean" },
+						"reason": { "type": "string", "maxLength": 200 },
+						"upstreamAgreement": {
+							"type": "object",
+							"required": ["reference", "recordedAt"],
+							"additionalProperties": false,
+							"properties": {
+								"reference": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,80}$" },
+								"recordedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+							}
+						}
+					}
+				},
+				"trademark": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"notice": { "type": "string", "maxLength": 300 },
+						"displayNameSuffix": { "type": "string", "maxLength": 40 },
+						"protectedPaths": { "type": "array", "items": { "type": "string", "maxLength": 200 }, "maxItems": 50 }
+					}
+				},
+				"links": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"homepage": { "$ref": "#/$defs/httpsUrl" },
+						"docs": { "$ref": "#/$defs/httpsUrl" }
+					}
+				},
+				"tags": {
+					"type": "array",
+					"items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$" },
+					"maxItems": 8
+				},
+				"notes": { "type": "array", "items": { "$ref": "#/$defs/note" }, "maxItems": 20 }
+			},
+			"allOf": [
+				{
+					"if": { "properties": { "kind": { "const": "app" } }, "required": ["kind"] },
+					"then": {
+						"required": ["shape", "appSource", "upstreams", "blueprint"],
+						"properties": {
+							"workRepositorySuffix": { "const": "-app" }
+						}
+					},
+					"else": {
+						"properties": {
+							"workRepositorySuffix": { "const": "-website" }
+						},
+						"not": { "required": ["shape"] }
+					}
+				},
+				{
+					"if": {
+						"properties": { "status": { "enum": ["production", "beta"] } },
+						"required": ["status"]
+					},
+					"then": {
+						"properties": {
+							"template": {
+								"properties": {
+									"repo": { "$ref": "#/$defs/everWorksRepo" },
+									"ref": { "type": "string", "minLength": 1, "maxLength": 100 }
+								},
+								"required": ["repo", "ref"]
+							},
+							"license": { "required": ["spdx", "class"] }
+						}
+					}
+				},
+				{
+					"comment": "An app row that is not a placeholder must pin a 40-hex commit: the platform applies the sha, never a branch (APW-03 catalog.md §3.1). Website templates keep the existing branch-fork behaviour (ref, sha null).",
+					"if": {
+						"properties": {
+							"kind": { "const": "app" },
+							"status": { "enum": ["production", "beta"] }
+						},
+						"required": ["kind", "status"]
+					},
+					"then": {
+						"properties": {
+							"template": {
+								"properties": { "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" } },
+								"required": ["sha"]
+							},
+							"blueprint": { "required": ["id", "version", "topic"] }
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": {
+							"kind": { "const": "app" },
+							"shape": { "const": "code-bearing" }
+						},
+						"required": ["kind", "shape"]
+					},
+					"then": {
+						"properties": {
+							"appSource": {
+								"properties": { "mode": { "const": "embedded" } }
+							}
+						}
+					}
+				},
+				{
+					"if": {
+						"properties": { "shape": { "const": "metadata-only" } },
+						"required": ["shape"]
+					},
+					"then": {
+						"properties": {
+							"appSource": {
+								"properties": { "mode": { "enum": ["repository", "image"] } },
+								"required": ["mode"]
+							}
+						}
+					}
+				}
+			]
+		},
+		"app-source-row": {
+			"type": "object",
+			"required": ["repo", "kind", "servesTemplates"],
+			"additionalProperties": false,
+			"properties": {
+				"repo": { "$ref": "#/$defs/githubRepo" },
+				"url": { "$ref": "#/$defs/httpsUrl" },
+				"defaultBranch": { "type": "string", "maxLength": 100 },
+				"kind": { "const": "app-source" },
+				"servesTemplates": {
+					"description": "Slugs of the template rows this repository is the app source for.",
+					"type": "array",
+					"items": { "$ref": "#/$defs/slug" },
+					"minItems": 1,
+					"maxItems": 20
+				},
+				"githubTemplateRepository": {
+					"description": "GitHub's template-repository setting. NOT a statement about App Blueprints — see the fixture conflation note in README.md §7.",
+					"type": "boolean"
+				},
+				"license": { "$ref": "#/$defs/license" },
+				"notes": { "type": "array", "items": { "$ref": "#/$defs/note" }, "maxItems": 20 }
+			}
+		}
+	}
+}

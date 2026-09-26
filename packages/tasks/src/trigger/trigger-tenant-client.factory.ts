@@ -87,7 +87,19 @@ import type {
     KbTranscribePayload,
     KbReembedWorkPayload,
     MemoryFactEmbedPayload,
+    AppDependencyProvisionPayload,
+    // APW-03 T13 — the payload of the job APW-02 T28 wires below.
+    AppSpecEvaluatePayload,
+    PluginOperationPayload,
 } from '@ever-works/agent/tasks';
+// T26 / EW-742 P3 — read inside `dispatchPluginOperation`, never at module
+// scope: several specs replace `@ever-works/agent/tasks` with a partial mock
+// that does not carry them, and a top-level read would fail the whole file.
+import {
+    PLUGIN_OPERATION_QUEUE_TTL_SECONDS,
+    PLUGIN_OPERATION_TASK_ID,
+} from '@ever-works/agent/tasks';
+import { pluginOperationRunPayload } from './plugin-operation-run-payload';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -114,6 +126,15 @@ const TASK_IDS = {
     notificationChannelDelivery: 'notification-channel-delivery',
     // AW-07 — must match `MEMORY_FACT_EMBED_JOB_ID` / the task module id.
     memoryFactEmbed: 'memory-fact-embed',
+    // APW-07 T17 — must match the `app-dependency-provision` task's own `id`
+    // (and the APW-06 `app-cluster-io` queue it declares).
+    appDependencyProvision: 'app-dependency-provision',
+    // APW-03 T13 — must match the `app-spec-evaluate` task's own `id`. Wired by
+    // APW-02 T28 so the same dispatch works for a BYO Trigger.dev tenant.
+    appSpecEvaluate: 'app-spec-evaluate',
+    // `run-plugin-operation` is not listed: its id is the shared
+    // `PLUGIN_OPERATION_TASK_ID` constant (the router, the dispatchers and the
+    // task registration all import it), read in `dispatchPluginOperation`.
 } as const;
 
 /**
@@ -182,12 +203,17 @@ export function createTenantTriggerClient(credentials: TriggerTenantCredentials)
  * client differs.
  *
  * Tenant stamping (`tenant:<id>` tag, `tenantId`-prefixed
- * `concurrencyKey`) is NOT applied here — the plugin's per-tenant view
- * carries the stamp at the binding layer (see
- * `TriggerJobRuntimeProvider.bindToTenant`'s Proxy in
- * `trigger-job-runtime.provider.ts`) and stamping at BOTH layers would
- * double-prefix the tag. This dispatcher map is the structural BYO
- * routing only; stamping stays the binding layer's job.
+ * `concurrencyKey`) is NOT applied here, and nothing else applies it to
+ * a BYO run either. The per-tenant view's Proxy
+ * (`TriggerJobRuntimeProvider.bindToTenant` in
+ * `trigger-job-runtime.provider.ts`) only puts the stamp on the stack
+ * (`triggerTenantStampStorage`); the one reader of that stamp is
+ * `TriggerService.stampTenantOptions`, which these dispatchers never
+ * call. So a BYO run carries NO `tenant:<id>` tag and no tenant
+ * concurrency key — a known gap (wave-2 review, T26). The Proxy adds no
+ * options of its own, so closing it here (reading the stamp in these
+ * dispatchers) would not double-prefix anything. This dispatcher map
+ * is the structural BYO routing only.
  *
  * Catches per-dispatcher SDK errors and returns `null` (matches the
  * `TriggerService` shared-singleton behaviour — callers fall through
@@ -388,6 +414,89 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                     ],
                     ...(delay ? { delay } : {}),
                 } as TriggerTaskOptions),
+            );
+        },
+
+        /**
+         * APW-07 T17 — app dependencies PROPAGATE errors (APW07-G24), so this
+         * uses the same `propagate` shape as `dispatchKbReembedWork` and does
+         * NOT go through `softDispatch`: a silently dropped provisioning
+         * dispatch leaves a dependency row `pending` with nothing scheduled
+         * behind it, and `AppDependenciesService` has no reconciliation pass to
+         * catch that — it records `dispatchUnavailable` and the card tells the
+         * owner, which only works if the throw escapes.
+         *
+         * The delayed re-dispatch rides the payload (`deferUntil` ISO-8601, or
+         * `notBefore` epoch ms — the same `delay` mapping the singleton uses),
+         * so a BYO tenant gets identical re-dispatch behaviour and the job never
+         * sleeps.
+         */
+        async dispatchAppDependencyProvision(
+            payload: AppDependencyProvisionPayload,
+        ): Promise<string> {
+            const deferUntil =
+                payload.deferUntil ??
+                (payload.notBefore ? new Date(payload.notBefore).toISOString() : undefined);
+            const delay = deferUntil ? new Date(deferUntil) : undefined;
+
+            const handle = await client.tasks.trigger(TASK_IDS.appDependencyProvision, payload, {
+                tags: [
+                    'app-dependency-provision',
+                    `work:${payload.workId}`,
+                    ...(payload.kind ? [`kind:${payload.kind}`] : []),
+                    `mode:${payload.mode}`,
+                ],
+                concurrencyKey: `app-dependency:${payload.workId}:${payload.kind ?? 'all'}`,
+                ...(delay ? { delay } : {}),
+            } as TriggerTaskOptions);
+
+            if (!handle?.id) {
+                throw new Error(
+                    `dispatchAppDependencyProvision(work=${payload.workId}): SDK returned no run id`,
+                );
+            }
+            return handle.id;
+        },
+
+        /**
+         * APW-03 T13's `app-spec-evaluate`, for a BYO Trigger.dev tenant — the
+         * mirror of the singleton `TriggerService.dispatchAppSpecEvaluate`
+         * (APW-02 T28 wired both). Same propagate shape as
+         * `dispatchAppDependencyProvision` above: a swallowed error here would
+         * report an evaluation as queued with nothing behind it, which is the
+         * silent no-op the shape exists to prevent.
+         */
+        async dispatchAppSpecEvaluate(payload: AppSpecEvaluatePayload): Promise<string> {
+            const handle = await client.tasks.trigger(TASK_IDS.appSpecEvaluate, payload, {
+                tags: ['app-spec-evaluate', `work:${payload.workId}`, `trigger:${payload.trigger}`],
+                concurrencyKey: `app-spec-evaluate:${payload.workId}`,
+            } as TriggerTaskOptions);
+
+            if (!handle?.id) {
+                throw new Error(
+                    `dispatchAppSpecEvaluate(work=${payload.workId}): SDK returned no run id`,
+                );
+            }
+            return handle.id;
+        },
+
+        /**
+         * T26 / EW-742 P3 — the long-running plugin operation, for a BYO
+         * Trigger.dev tenant: the mirror of the singleton
+         * `TriggerService.dispatchPluginOperation`, which the plugin execution
+         * router looks up by name on the tenant's bound view. Same payload,
+         * tags and queue `ttl`; no `machine` (like the other BYO dispatchers).
+         * Soft like the singleton: `null` when the SDK throws or answers no run
+         * id, which the router reports as JOB_RUNTIME_DISPATCH_FAILED. The
+         * tenant's project must have the `run-plugin-operation` task deployed,
+         * like every other BYO task.
+         */
+        async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(PLUGIN_OPERATION_TASK_ID, pluginOperationRunPayload(payload), {
+                    tags: ['plugin-operation', `plugin:${payload.pluginId}`],
+                    ttl: `${PLUGIN_OPERATION_QUEUE_TTL_SECONDS / 60}m`,
+                }),
             );
         },
     };

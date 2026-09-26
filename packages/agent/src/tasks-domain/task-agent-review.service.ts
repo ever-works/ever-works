@@ -41,6 +41,7 @@ import {
     type AgentReviewDispatchReason,
     type AgentReviewVerdictResult,
 } from './task-agent-review';
+import { resolveTaskRepository } from './task-repository';
 
 /** Longest reviewer-supplied summary persisted on the review row. */
 export const AGENT_REVIEW_SUMMARY_MAX_CHARS = 4000;
@@ -1292,15 +1293,22 @@ export class TaskAgentReviewService {
      */
     private resolveRepoTarget(
         task: Task,
-        work: { id: string; gitProvider: string; getRepoOwner(): string; getDataRepo(): string },
+        work: {
+            id: string;
+            gitProvider: string;
+            kind?: string | null;
+            getRepoOwner(role?: 'data' | 'work' | 'website'): string;
+            getDataRepo(): string;
+            getWebsiteRepo?(): string;
+        },
     ): {
         owner: string;
         repo: string;
         gitOptions: { userId: string; providerId: string; workId: string };
     } {
         return {
-            owner: work.getRepoOwner(),
-            repo: work.getDataRepo(),
+            owner: resolveTaskRepository(work).owner,
+            repo: resolveTaskRepository(work).repo,
             gitOptions: {
                 userId: task.userId,
                 providerId: work.gitProvider,

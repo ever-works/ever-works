@@ -1,4 +1,14 @@
 import type { IPlugin } from '../plugin.interface.js';
+// App Works fork lifecycle (APW-02 T9/T10) — the types the optional members below consume.
+import type {
+	GitActionsPermissionsInput,
+	GitActionsPermissionsResult,
+	GitForkDivergence,
+	GitForkSyncResult,
+	GitRepositoryCopyInput,
+	GitRepositoryCopyResult,
+	GitWebhookInput
+} from './git-provider.app-forks.js';
 
 export interface GitAuth {
 	readonly username: 'x-access-token' | 'oauth2' | string;
@@ -25,6 +35,69 @@ export interface GitRepository {
 		readonly name: string;
 		readonly fullName: string;
 	};
+	/**
+	 * Set by `forkRepository` only. `pending` means the provider accepted the fork request but the
+	 * repository is not readable yet, so the caller must NOT clone or push into it — a background
+	 * readiness poller owns the wait.
+	 *
+	 * Absent on every other repository read, so existing callers are unaffected.
+	 */
+	readonly forkReadiness?: 'ready' | 'pending';
+
+	// ── Repository facts (APW-02 P1, plan §3.3) ──────────────────────────────
+	//
+	// Nine OPTIONAL reads APW-01/APW-03/APW-05 use to describe an upstream
+	// repository before the platform acts on it: is it forkable, is it archived,
+	// is it empty, what licence does it carry, how big is it, did the provider
+	// redirect us. Additive only — an implementation that reports none of them
+	// still satisfies this interface, and every consumer must treat `undefined`
+	// as "the provider did not report it", never as `false` / `0` / "none".
+
+	/**
+	 * The network root this repository was forked from, when it is a fork.
+	 *
+	 * Read FIRST, before `parent`, when checking whether an existing repository
+	 * belongs to the same fork network (plan §4.3): a fork of a fork has
+	 * `source.fullName` = the upstream everyone shares, while `parent` is only
+	 * the immediate ancestor.
+	 */
+	readonly source?: { readonly owner: string; readonly name: string; readonly fullName: string };
+	/** Provider-reported "forks allowed" switch. `undefined` = not reported. */
+	readonly allowForking?: boolean;
+	/** Archived repositories are read-only upstream: never a fork or copy source. */
+	readonly archived?: boolean;
+	/**
+	 * Provider visibility. `internal` is GitHub Enterprise's third value and is
+	 * NOT private — treating it as one would refuse a repository the caller may
+	 * legitimately use.
+	 */
+	readonly visibility?: 'public' | 'private' | 'internal';
+	/** Stargazers, as reported. A popularity signal only — never an authorisation input. */
+	readonly stars?: number;
+	/** Provider-reported size in KiB, the value `GitRepositoryCopyInput.maxSizeKb` is checked against. */
+	readonly sizeKb?: number;
+	/**
+	 * Provider-detected SPDX id, or `null` when the provider found a licence it
+	 * cannot identify (`NOASSERTION`). APW-03 classifies it; nothing here does.
+	 *
+	 * `undefined` and `null` differ: `undefined` is "not reported", `null` is
+	 * "reported, and it is not a licence we can name".
+	 */
+	readonly licenseSpdx?: string | null;
+	/** True when the default branch has no commit (a repository created but never populated). */
+	readonly empty?: boolean;
+	/**
+	 * The `owner/name` the caller ASKED for, when the provider redirected to a
+	 * different one (a rename). The coordinates on this object are the resolved
+	 * ones; this field is what lets a caller notice the redirect at all.
+	 */
+	readonly movedFrom?: string;
+	/**
+	 * The repository's topics, as the provider reports them (APW-03 T22 — the
+	 * Blueprint probe checks for `ever-works-app-blueprint`). `undefined` means
+	 * "not reported", never "no topics". Optional and additive (R-26).
+	 */
+	readonly topics?: readonly string[];
 }
 
 export interface GitBranch {
@@ -56,6 +129,25 @@ export interface GitCloneOptions {
 	readonly committer?: GitCommitter;
 	readonly branch?: string;
 	readonly autoSwitchToMainBranch?: boolean;
+	/**
+	 * Selects a working copy of its own for this call, instead of the one shared by every caller
+	 * of `owner/repo`. Use it whenever the caller mutates the checkout (branch, files, remotes) or
+	 * needs it to survive alongside another call for the same repository.
+	 *
+	 * Convention: `work:<workId>:<role>`. Optional — omitted means today's per-repository
+	 * directory, so existing callers keep their current behaviour.
+	 */
+	readonly checkoutKey?: string;
+	/**
+	 * Declares that the remote repository MUST exist. When set, a missing or empty remote throws
+	 * `RepositoryNotReadyError` instead of silently falling back to `git init` — which otherwise
+	 * turns a typo'd, deleted or unauthorised repository into an empty local one that looks
+	 * successful.
+	 *
+	 * Optional and opt-in: the lenient default (initialise and add the remote) is unchanged, and
+	 * is still correct for a brand-new repository we are about to populate.
+	 */
+	readonly expectExisting?: boolean;
 }
 
 /**
@@ -92,6 +184,14 @@ export interface GitPushOptions {
 	 * silently choosing the destination.
 	 */
 	readonly remoteRef?: string;
+	/**
+	 * The repository this push is FOR. When both are given the push goes to
+	 * the URL the provider computes for them, never to one read from the
+	 * checkout's config — pass them whenever anything other than the platform
+	 * itself (an agent tool, a model) has written into the checkout.
+	 */
+	readonly owner?: string;
+	readonly repo?: string;
 }
 
 export interface CreateRepoOptions {
@@ -111,6 +211,16 @@ export interface ForkRepositoryOptions {
 	readonly name?: string;
 	readonly organization?: string;
 	readonly defaultBranchOnly?: boolean;
+	/**
+	 * `false` returns as soon as the provider has ACCEPTED the fork request, with
+	 * `forkReadiness: 'pending'`, instead of holding the caller while the fork bakes (seconds to
+	 * minutes). The returned coordinates are already usable for bookkeeping, but the repository
+	 * must not be cloned or pushed into until a readiness poller confirms it.
+	 *
+	 * Optional and opt-in: the default (`true`) keeps the existing blocking wait, so no existing
+	 * caller changes behaviour.
+	 */
+	readonly waitForReady?: boolean;
 }
 
 export interface TransferRepoOptions {
@@ -140,6 +250,37 @@ export interface CreatePROptions {
 	readonly base: string;
 	readonly body?: string;
 	readonly draft?: boolean;
+	/**
+	 * Cross-repository head (APW-09 T1, plan §4) — the OWNER the `head`
+	 * branch lives under, when that is not the base repository's owner.
+	 *
+	 * Without it `head` is a bare branch name, which can only ever name a
+	 * branch of the base repository: an upstream pull request whose head
+	 * lives in the member's fork is unexpressible. GitHub spells the pair
+	 * `head = "<headOwner>:<branch>"`; the provider composes it.
+	 *
+	 * OPTIONAL and additive. A call that omits it sends exactly the
+	 * request it sent before this field existed, which is why every
+	 * existing caller and provider compiles and behaves unchanged.
+	 */
+	readonly headOwner?: string;
+	/**
+	 * The head REPOSITORY's name, when it differs from `repo` (the member
+	 * forked `upstream/widgets` to `member/widgets-fork`). GitHub needs it
+	 * only in the one case plan §4 names — a head repository that shares
+	 * the base owner (G23) — and a provider that cannot express a
+	 * different head repository omits it rather than guessing.
+	 */
+	readonly headRepo?: string;
+	/**
+	 * "Allow edits and access to secrets by maintainers" — GitHub's
+	 * `maintainer_can_modify`.
+	 *
+	 * OPTIONAL and only SENT when defined: `false` is a value the member
+	 * chose, so a defaulting provider must not collapse "the member
+	 * unchecked it" into "the caller did not say".
+	 */
+	readonly maintainerCanModify?: boolean;
 }
 
 export interface MergeOptions {
@@ -234,6 +375,21 @@ export interface GitPullRequest {
 	 * a permission it grants.
 	 */
 	readonly labels?: readonly string[];
+	/**
+	 * `"{owner}/{repo}"` of the repository the head branch lives in, as the
+	 * provider reports it — the field that makes an upstream pull request
+	 * PROVABLE after the fact (APW-09 T1, plan §1.2/G17).
+	 *
+	 * `head` alone is a branch name, and a branch name says nothing about
+	 * which repository it is in: a tracked upstream pull request whose
+	 * head repository was deleted, renamed or never the fork would read
+	 * exactly like one that came from the member's fork. `null` is a real
+	 * answer — the provider reported no head repository (GitHub sends
+	 * `head.repo: null` once the head repository is deleted) — and is
+	 * deliberately distinct from `undefined`, which means "this read did
+	 * not report it".
+	 */
+	readonly headRepoFullName?: string | null;
 }
 
 export interface GitRepositoryPermissions {
@@ -263,6 +419,18 @@ export interface ListPullRequestsOptions {
 	readonly state?: 'open' | 'closed' | 'all';
 	readonly perPage?: number;
 	readonly page?: number;
+	/**
+	 * Filter by head (`"{owner}:{branch}"`, GitHub's own `head` filter) —
+	 * APW-09 T1 (G17).
+	 *
+	 * The upstream-recovery path asks "is there already a pull request for
+	 * MY fork branch?" after a lost open, and answering it by listing
+	 * every pull request and filtering locally both burns pages and can
+	 * miss the row (a fork with many open pull requests). OPTIONAL: a
+	 * provider without the filter omits the field and the caller keeps
+	 * paging.
+	 */
+	readonly head?: string;
 }
 
 // ── PR insights (kanban run cockpit M5/M6) ─────────────────────────
@@ -359,6 +527,14 @@ export interface GitPullRequestStatus {
 	readonly checksComplete?: boolean;
 	readonly url?: string;
 	readonly title?: string;
+	/**
+	 * `"{owner}/{repo}"` of the head branch's repository — the same fact
+	 * `GitPullRequest.headRepoFullName` carries, on the STATUS read
+	 * (APW-09 T1). The status poll is what notices that a tracked pull
+	 * request's head repository has gone; `null` means the provider
+	 * reported none, `undefined` that this read did not report it.
+	 */
+	readonly headRepoFullName?: string | null;
 }
 
 // ── Workflow runs (release promotion lane, self-build slice AI) ─────
@@ -421,6 +597,79 @@ export interface GitWorkflowRun {
 	readonly pullRequestNumbers?: readonly number[];
 }
 
+// ── Upstream pull requests (APW-09 T2, plan §3.3/§4) ────────────────
+//
+// The two review reads and the temporary-interaction-limit read an upstream
+// pull request needs, plus their element types. All three members are
+// OPTIONAL on `IGitProviderPlugin` (declared at the foot of this file), and
+// the calling rule is the one the fork-lifecycle group already states:
+// **materialise the method on the plugin instance before calling it**,
+// because the lazy-plugin proxy over-reports optional methods.
+//
+// Nothing here reuses `GitReviewDecision`: that type is GitHub's
+// `review_decision` AGGREGATE ("the pull request as a whole"), and the
+// review SUMMARY APW-09 derives (latest non-`pending`, non-`dismissed` review
+// per author, `changes_requested` > `approved` > `commented`) cannot be
+// computed from an aggregate that never says who reviewed or when.
+
+/** The five review states a provider's review list is mapped onto. */
+export type GitPullRequestReviewState = 'approved' | 'changes_requested' | 'commented' | 'dismissed' | 'pending';
+
+/**
+ * One review submitted on a pull request.
+ *
+ * The state union is closed and five-valued on purpose: `dismissed` and
+ * `pending` are NOT folded into `commented`. A dismissed review no longer
+ * counts for or against the pull request, and a pending one has not been
+ * submitted at all, so a summary that treated either as a comment would
+ * report a reviewer's opinion that the upstream project does not have.
+ */
+export interface GitPullRequestReview {
+	/** Provider-side review id — the identity a status poll diffs on. */
+	readonly id: number;
+	readonly state: GitPullRequestReviewState;
+	/** Reviewer login; `null` when the provider reports no author. */
+	readonly author: string | null;
+	/** ISO timestamp, or `null` for a review that was never submitted. */
+	readonly submittedAt: string | null;
+	/** Review body, capped by the implementation (APW-09: ≤ 8 KB). */
+	readonly body: string;
+}
+
+/**
+ * One inline review comment on a pull request — a comment on a line of a
+ * file, which is the half of a review a follow-up Task must be seeded with
+ * (a review's own `body` is the summary; the comments are the instructions).
+ */
+export interface GitPullRequestReviewComment {
+	readonly id: number;
+	/** Commenter login; `null` when the provider reports no author. */
+	readonly author: string | null;
+	/** Comment body, capped by the implementation (APW-09: ≤ 4 KB). */
+	readonly body: string;
+	/** File the comment is anchored to; `null` for a file-level comment. */
+	readonly path: string | null;
+	/**
+	 * Line the comment is anchored to; `null` when the provider reports no
+	 * line (an outdated comment on a commit the pull request no longer
+	 * points at, or a provider without line anchors).
+	 */
+	readonly line: number | null;
+	/** ISO timestamp, or `null` when the provider reports none. */
+	readonly createdAt: string | null;
+}
+
+/**
+ * A repository's TEMPORARY interaction limit — the four values GitHub's
+ * `interaction-limits` endpoint can report.
+ *
+ * `null` (the return type of `getInteractionLimit?`) is a fifth answer and
+ * NOT a synonym for `'none'`: it means "cannot tell" — the read was refused,
+ * the repository is invisible, or the provider has no such capability — and
+ * a caller must never read it as "unrestricted" (APW-09 G16).
+ */
+export type GitInteractionLimit = 'none' | 'existing_users' | 'contributors_only' | 'collaborators_only';
+
 /** Hard caps a diff request may ask for. */
 export interface GitDiffOptions {
 	readonly maxBytes?: number;
@@ -460,6 +709,20 @@ export interface GitDiffResult {
 	readonly totalDeletions: number;
 	/** Bytes of patch text actually returned. */
 	readonly patchBytes: number;
+	/**
+	 * How many COMMITS the compared range holds, as the provider reports it
+	 * (GitHub's compare payload carries `total_commits`) — APW-09 T1 (G13).
+	 *
+	 * It exists because a commit count cannot be derived from the file list
+	 * at all: one commit can touch forty files and forty commits can touch
+	 * one. APW-09's `notSingleCommit` check reads THIS and never the file
+	 * count.
+	 *
+	 * OPTIONAL, and absence is meaningful: `undefined` is "this read did
+	 * not report a commit count" (a provider whose diff endpoint has none,
+	 * or a file-list-backed read), never "zero commits".
+	 */
+	readonly totalCommits?: number;
 }
 
 /**
@@ -491,8 +754,16 @@ export interface IGitOperations {
 	getMainBranch(dir: string): Promise<string | null>;
 	switchBranch(dir: string, branch: string, create?: boolean): Promise<string>;
 	getStatus(dir: string): Promise<GitFileChange[]>;
-	getLocalDir(owner: string, repo: string): string;
-	removeLocalDir(owner: string, repo: string): Promise<void>;
+	/**
+	 * Absolute path of the working copy for `owner/repo`.
+	 *
+	 * The name is derived from the provider identity, the owner and the repository name
+	 * byte-for-byte, so two distinct coordinates can never share a directory. `checkoutKey` asks
+	 * for a working copy of its own instead (see `GitCloneOptions.checkoutKey`); omitting it keeps
+	 * the per-repository directory every existing caller already uses.
+	 */
+	getLocalDir(owner: string, repo: string, checkoutKey?: string): string;
+	removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void>;
 	replaceRemote(dir: string, remote: string, url: string): Promise<void>;
 	renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
 }
@@ -689,6 +960,230 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		path: string,
 		token: string
 	): Promise<Array<{ name: string; type: 'file' | 'dir' | 'submodule' | 'symlink'; path: string }> | null>;
+
+	// ── Fork lifecycle (APW-02 T10, plan §3.3) ───────────────────────────────
+	//
+	// Nine OPTIONAL methods: the seven of APW-02 P1 plus APW-09's two branch-ref
+	// moves (CONTRACTS §3 — whichever epic lands first creates them; APW-02 P1
+	// lands in an earlier wave, so they are declared here and implemented in the
+	// GitHub plugin with exactly these signatures).
+	//
+	// Every one of them carries the same calling rule, and it is not a formality:
+	// **the caller MUST materialise the method on the plugin instance before
+	// calling it** (`typeof impl.<method> === 'function'`). The lazy-plugin proxy
+	// over-reports optional methods, so a call that skips that check reaches a
+	// provider that never implemented the method and fails as a provider error
+	// instead of the caller-actionable "this provider does not support it"
+	// (`GitOperationNotSupportedError`, the existing 409 mapping — plan §4.2).
+	//
+	// Each method throws `GitProviderRequestError` on a provider failure; the
+	// absence of the method is the caller's to detect, never the plugin's to
+	// throw.
+
+	/**
+	 * Find a fork of `upstreamOwner/upstreamRepo` that already exists under
+	 * `targetOwner`, or `null` when there is none (FR-10: never fork twice).
+	 *
+	 * The lookup is what keeps a renamed fork from being duplicated, so an
+	 * implementation that cannot search must answer `null` honestly rather than
+	 * guess — the request then proceeds to the provider's fork endpoint, which
+	 * answers with the existing fork instead of creating a second one.
+	 *
+	 * OPTIONAL. Callers MUST materialise `findExistingFork` on the plugin before
+	 * calling it: the lazy-plugin proxy over-reports optional methods, so an
+	 * unmaterialised call fails as a provider error rather than as
+	 * `providerUnsupported`.
+	 */
+	findExistingFork?(
+		upstreamOwner: string,
+		upstreamRepo: string,
+		targetOwner: string,
+		token: string
+	): Promise<GitRepository | null>;
+
+	/**
+	 * Bring a fork's `branch` up to date with the upstream branch it was forked
+	 * from. `conflict` and `unprocessable` are returned, not thrown.
+	 *
+	 * OPTIONAL. Callers MUST materialise `syncForkBranch` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	syncForkBranch?(forkOwner: string, forkRepo: string, branch: string, token: string): Promise<GitForkSyncResult>;
+
+	/**
+	 * How far a fork's branch has drifted from its upstream branch — the read
+	 * behind "your fork is N behind". `upstreamHeadSha` is the upstream head as
+	 * the fork network sees it, not the upstream repository's live head.
+	 *
+	 * OPTIONAL. Callers MUST materialise `getForkDivergence` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	getForkDivergence?(
+		forkOwner: string,
+		forkRepo: string,
+		forkBranch: string,
+		upstreamOwner: string,
+		upstreamBranch: string,
+		token: string
+	): Promise<GitForkDivergence>;
+
+	/**
+	 * Copy one branch of a repository into another repository the platform owns
+	 * — the `private-copy` repository mode. The source is cloned, never forked,
+	 * so no fork relationship is created.
+	 *
+	 * `input.maxSizeKb` is the size the caller already authorised; an
+	 * implementation refuses a larger source before doing any git work.
+	 *
+	 * OPTIONAL. Callers MUST materialise `createRepositoryCopy` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	createRepositoryCopy?(input: GitRepositoryCopyInput, token: string): Promise<GitRepositoryCopyResult>;
+
+	/**
+	 * Apply APW-05's Actions hygiene to a repository: the repo-level Actions
+	 * switch, the workflows to enable, and the active workflows to disable.
+	 *
+	 * Omitted fields mean "leave that alone" — `disableWorkflowsExcept: []` is
+	 * an instruction, `undefined` is not. Implementations report what they
+	 * actually did (including `truncated` when the page cap was reached), and
+	 * stop on a permission failure rather than half-applying the rest silently.
+	 *
+	 * OPTIONAL. Callers MUST materialise `setActionsPermissions` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	setActionsPermissions?(
+		owner: string,
+		repo: string,
+		input: GitActionsPermissionsInput,
+		token: string
+	): Promise<GitActionsPermissionsResult>;
+
+	/**
+	 * Install a webhook on a repository. `created` is `false` when the provider
+	 * reported an existing hook for the same URL and returned it instead of
+	 * creating a second one (the idempotent case).
+	 *
+	 * APW-05 is the only caller (the `app-build-prepare` job installs the signed
+	 * `workflow_run` receiver); adding a hook must never re-create one.
+	 *
+	 * OPTIONAL. Callers MUST materialise `createWebhook` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	createWebhook?(
+		owner: string,
+		repo: string,
+		input: GitWebhookInput,
+		token: string
+	): Promise<{ id: number; created: boolean }>;
+
+	/**
+	 * Remove a webhook by id. Deleting hook `A` MUST NOT delete hook `B` — the
+	 * id is the only address, so a provider that cannot delete by id omits this
+	 * method rather than resolving the id to the wrong hook.
+	 *
+	 * OPTIONAL. Callers MUST materialise `deleteWebhook` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	deleteWebhook?(owner: string, repo: string, hookId: number, token: string): Promise<void>;
+
+	/**
+	 * Create a branch ref pointing at an exact commit sha.
+	 *
+	 * Distinct from `createBranch?`, whose `fromRef` is a branch name: pointing a
+	 * sync or preparation branch at a sha needs this, because deleting and
+	 * recreating the branch would close the pull request that is open on it
+	 * (plan §3.3, APW-09's signature — §3.3 names no return type; `GitBranch` is
+	 * the shape its sibling `createBranch?` returns).
+	 *
+	 * OPTIONAL. Callers MUST materialise `createBranchFromSha` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	createBranchFromSha?(owner: string, repo: string, name: string, sha: string, token: string): Promise<GitBranch>;
+
+	/**
+	 * Move an existing branch ref to a commit sha — **fast-forward only**.
+	 *
+	 * `options.force` is typed `false` on purpose: no force-move exists anywhere
+	 * in this epic, so a supplier of `true` is a compile error rather than a
+	 * silent history rewrite. A provider that answers "not a fast forward" is
+	 * reported as `unprocessable`.
+	 *
+	 * OPTIONAL. Callers MUST materialise `updateBranchRef` on the plugin before
+	 * calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	updateBranchRef?(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		options: { force: false },
+		token: string
+	): Promise<GitBranch>;
+
+	// ── Upstream pull requests (APW-09 T2, plan §4) ──────────────────────────
+	//
+	// Three OPTIONAL reads an upstream pull request needs while it is open,
+	// with the element types declared above. Same calling rule as the fork
+	// group: materialise the member on the plugin before calling it.
+	//
+	// The two review lists THROW when absent rather than answering `[]`,
+	// because an empty list is a fact ("nobody reviewed this yet") and the
+	// absence is a different one ("this provider cannot answer"), and only
+	// the caller can decide which of the two its surface should show. The
+	// interaction limit is the exception: its absence answers `null`, which
+	// is already this read's own honest answer for "cannot tell".
+
+	/**
+	 * Every review on a pull request, oldest first, bounded (APW-09: ≤ 100
+	 * reviews, each `body` ≤ 8 KB).
+	 *
+	 * The bound is a real one, not a hint: a status poll reads this list on
+	 * every due row, and GitHub's default page is 30. An implementation
+	 * must not silently page past the cap — the caller derives its review
+	 * summary from what it is given and diffs new ids on the next poll.
+	 *
+	 * OPTIONAL. Callers MUST materialise `listPullRequestReviews` on the
+	 * plugin before calling it (the lazy-plugin proxy over-reports optional
+	 * methods).
+	 */
+	listPullRequestReviews?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReview[]>;
+
+	/**
+	 * Inline review comments on a pull request, bounded (APW-09: ≤ 100
+	 * comments, each `body` ≤ 4 KB) — the brief a review follow-up is
+	 * seeded with.
+	 *
+	 * OPTIONAL. Callers MUST materialise `listPullRequestReviewComments` on
+	 * the plugin before calling it.
+	 */
+	listPullRequestReviewComments?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReviewComment[]>;
+
+	/**
+	 * The repository's temporary interaction limit, or `null` for "cannot
+	 * tell" — which includes every refused read (APW-09 G16: a 403, a 404
+	 * and an empty answer are NOT `'none'`).
+	 *
+	 * This answers the TEMPORARY limit only. A repository that has pull
+	 * requests switched off, or a cap on pull requests from outside
+	 * contributors, are different repository-level settings with their own
+	 * refusal codes; conflating them here would report an unrelated refusal
+	 * as "interactions are restricted".
+	 *
+	 * OPTIONAL. Callers MUST materialise `getInteractionLimit` on the
+	 * plugin before calling it.
+	 */
+	getInteractionLimit?(owner: string, repo: string, token: string): Promise<GitInteractionLimit | null>;
 }
 
 export function isGitProviderPlugin(plugin: IPlugin): plugin is IGitProviderPlugin {

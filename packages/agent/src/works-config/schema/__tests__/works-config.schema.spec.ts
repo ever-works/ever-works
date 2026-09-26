@@ -278,3 +278,162 @@ describe('worksConfigSchema', () => {
         expect(worksConfigSchema.safeParse({}).success).toBe(true);
     });
 });
+
+// ---------------------------------------------------------------------------
+// APW-03 T7 — `kind: app` goes through the App spec validator
+// ---------------------------------------------------------------------------
+
+/**
+ * A minimal App spec the App validator accepts: §24.2's shape, trimmed to one
+ * component. `build.strategy` is present because R2 requires it with components
+ * (§9:170), and `source` because §4:99 requires it in `data-repository` mode.
+ */
+const APP_DOCUMENT = {
+    version: 2,
+    kind: 'app',
+    spec: {
+        kind: 'app',
+        appSpecVersion: 1,
+        source: {
+            relation: 'fork',
+            upstream: { repo: 'example-org/analytics', defaultBranch: 'main' },
+            branch: 'main',
+        },
+        build: { strategy: 'dockerfile' },
+        components: [{ name: 'web', role: 'web', port: 3000 }],
+        'x-author-note': 'preserved and never validated (§2:74-75)',
+    },
+} as const;
+
+/** The `path` half of one `formatIssues`-shaped string. */
+function pathOf(issue: string): string {
+    return issue.slice(0, issue.indexOf(': '));
+}
+
+describe('kind: app — routed through the App spec validator (APW-03 T7, ACC-03-06)', () => {
+    it('accepts a document the App validator accepts, x- keys and all', () => {
+        const result = validateWorksConfig(APP_DOCUMENT);
+
+        expect(result.errors).toEqual([]);
+        expect(result.warnings).toEqual([]);
+        expect(result.data?.spec).toMatchObject({
+            kind: 'app',
+            'x-author-note': 'preserved and never validated (§2:74-75)',
+        });
+    });
+
+    /**
+     * The App validator's §23 issue objects reach the Work-configuration view in
+     * the same `path: message` shape `formatIssues` produces for every other
+     * kind — one string per issue, errors in `errors`.
+     */
+    it('maps an App issue into that string shape, as an error', () => {
+        const result = validateWorksConfig({
+            ...APP_DOCUMENT,
+            spec: {
+                ...APP_DOCUMENT.spec,
+                components: [{ name: 'web', role: 'web', port: 3000, replica: 2 }],
+            },
+        });
+
+        expect(result.errors).toHaveLength(1);
+        expect(pathOf(result.errors[0])).toBe('spec.components[0].replica');
+        expect(result.errors[0]).toContain('Unknown field `replica`');
+        expect(result.warnings).toEqual([]);
+        expect(result.data).toBeUndefined();
+    });
+
+    /**
+     * §2:76-77 — a newer `appSpecVersion` turns `unknown_field` into the warning
+     * `unknown_field_newer_version`. Warnings must not become errors on the way
+     * through this function, and the document stays usable.
+     */
+    it('maps App warnings into `warnings` and still returns the document', () => {
+        const result = validateWorksConfig({
+            ...APP_DOCUMENT,
+            spec: { ...APP_DOCUMENT.spec, appSpecVersion: 2, futureKey: 1 },
+        });
+
+        expect(result.errors).toEqual([]);
+        expect(result.warnings.map(pathOf)).toEqual(['spec.futureKey']);
+        expect(result.warnings[0]).toMatch(/newer|Unknown field/i);
+        expect(result.data?.spec).toMatchObject({ futureKey: 1 });
+    });
+
+    it('keeps errors and warnings apart within one document', () => {
+        // A `web` component with no `port` is R1's error; a key beyond this
+        // build's spec version is §2:76-77's warning. Both are in one response.
+        const result = validateWorksConfig({
+            version: 2,
+            kind: 'app',
+            spec: {
+                kind: 'app',
+                appSpecVersion: 2,
+                source: APP_DOCUMENT.spec.source,
+                build: { strategy: 'dockerfile' },
+                components: [{ name: 'web', role: 'web' }],
+                futureKey: 1,
+            },
+        });
+
+        expect(result.errors.map(pathOf)).toEqual(['spec.components[0].port']);
+        expect(result.warnings.map(pathOf)).toEqual(['spec.futureKey']);
+        expect(result.data).toBeUndefined();
+    });
+
+    it('compares the root kind with `spec.kind` the App way (§1:64)', () => {
+        const result = validateWorksConfig({
+            version: 2,
+            kind: 'website',
+            spec: { ...APP_DOCUMENT.spec },
+        });
+        expect(result.errors.map(pathOf)).toEqual(['spec.kind']);
+        expect(result.errors[0]).toContain('`website`');
+        expect(result.errors[0]).toContain('`app`');
+    });
+
+    it('runs in `data-repository` mode, where `source` is required (§3:87, §4:99)', () => {
+        const result = validateWorksConfig({
+            version: 2,
+            kind: 'app',
+            spec: { kind: 'app', build: { strategy: 'none' } },
+        });
+
+        expect(result.errors.map(pathOf)).toEqual(['spec.source']);
+    });
+
+    it('never throws, whatever shape the App spec is', () => {
+        for (const spec of [
+            { kind: 'app' },
+            { kind: 'app', components: 'nope' },
+            { kind: 'app', env: [null] },
+            { kind: 'app', build: { strategy: 'teleport' } },
+        ]) {
+            let result: ReturnType<typeof validateWorksConfig> | undefined;
+            expect(() => {
+                result = validateWorksConfig({ version: 2, kind: 'app', spec });
+            }).not.toThrow();
+            expect(result?.errors.length).toBeGreaterThan(0);
+        }
+    });
+
+    /**
+     * The other kinds are deliberately left exactly as they were: still the zod
+     * dispatch, still `spec.`-prefixed zod paths. (The App branch is one added
+     * `if`; nothing else in the function changed.)
+     */
+    it('leaves every other kind on the zod path it used before', () => {
+        const blog = validateWorksConfig({
+            kind: 'blog',
+            spec: { kind: 'blog', generation: { posts_per_run: 'three' } },
+        });
+        expect(pathOf(blog.errors[0])).toBe('spec.generation.posts_per_run');
+
+        const appShapedButWebsite = validateWorksConfig({
+            kind: 'website',
+            spec: { kind: 'website', template: 'web', future_thing: 42 },
+        });
+        expect(appShapedButWebsite.errors).toEqual([]);
+        expect(appShapedButWebsite.data?.spec).toMatchObject({ future_thing: 42 });
+    });
+});

@@ -1,0 +1,22 @@
+# GOLDEN — umami · target your-cluster · Namespace
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.1 (name `ew-<slug≤30>-<first 8 hex of workId>`), §4.2 (apply order step 1)
+# Spec      : APW-06 plan.md §4.4 (namespace pod security: enforce baseline, warn+audit restricted)
+# Spec      : APW-06 spec.md FR-10 (one namespace per App Work per cluster, named once)
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: ew-umami-33333333
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: umami
+        ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+        ever-works.io/kind: app
+        pod-security.kubernetes.io/enforce: baseline
+        pod-security.kubernetes.io/warn: restricted
+        pod-security.kubernetes.io/audit: restricted

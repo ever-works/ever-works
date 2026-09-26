@@ -10,6 +10,17 @@ import { PluginRegistryService } from '../services/plugin-registry.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
 import { PluginSettingsService } from '../services/plugin-settings.service';
 import { WorkOwnershipService } from '../../services/work-ownership.service';
+import { PluginInstallerService, type PacoteLike } from '../services/plugin-installer.service';
+import { PluginLoaderService } from '../services/plugin-loader.service';
+import { PluginManifestValidatorService } from '../services/plugin-manifest-validator.service';
+import { PluginVersionCheckerService } from '../services/plugin-version-checker.service';
+import { PluginClassValidatorService } from '../services/plugin-class-validator.service';
+import { PluginRepository } from '../repositories/plugin.repository';
+import { PLUGINS_MODULE_OPTIONS } from '../plugins.constants';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
 import type {
     IDeviceAuthProvider,
@@ -3037,5 +3048,187 @@ describe('PluginOperationsService', () => {
                 ).rejects.toThrow(BadRequestException);
             });
         });
+    });
+});
+
+/**
+ * EW-693 T18 + T27 (API side) — enabling a runtime-installed plugin on a
+ * replica that did not run its install.
+ *
+ * `ensurePluginInstalledOrThrow` promised to "prompt a re-discover via the
+ * loader", but only called `ensurePluginAvailable` — which trusted the shared
+ * row and fetched nothing — and registered nothing, so the lookup right after
+ * it threw NotFound. Real installer (stub pacote, tmp store), real loader,
+ * real registry; the TypeORM repositories are doubles.
+ */
+describe('PluginOperationsService — enabling a runtime-installed plugin (dynamic mode)', () => {
+    const PLUGIN_ID = 'notion-extractor';
+    const PINNED_ROW = {
+        pluginId: PLUGIN_ID,
+        source: 'registry',
+        installState: 'installed',
+        registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
+        installedVersion: '1.2.0',
+        integrity: 'sha512-pinned',
+    };
+
+    let storeDir: string;
+    let service: PluginOperationsService;
+    let registry: PluginRegistryService;
+    let userPluginRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
+    let pluginRows: {
+        findByPluginId: jest.Mock;
+        updateInstallState: jest.Mock;
+        upsert: jest.Mock;
+        updateState: jest.Mock;
+        mergeLazyRegistration: jest.Mock;
+    };
+    let extractCalls: string[];
+
+    /** What the registry's tarball holds: a plugin package, as pacote leaves it. */
+    function writeFixturePlugin(dest: string) {
+        fs.mkdirSync(dest, { recursive: true });
+        fs.writeFileSync(
+            path.join(dest, 'package.json'),
+            JSON.stringify({
+                name: '@ever-works/notion-extractor-plugin',
+                version: '1.2.0',
+                main: './index.js',
+                everworks: {
+                    plugin: {
+                        id: PLUGIN_ID,
+                        name: 'Notion Extractor',
+                        version: '1.2.0',
+                        category: 'utility',
+                        capabilities: [],
+                        description: 'A runtime-installed fixture.',
+                    },
+                },
+            }),
+        );
+        fs.writeFileSync(
+            path.join(dest, 'index.js'),
+            [
+                'module.exports = class NotionExtractorFixture {',
+                '  constructor() {',
+                `    this.id = ${JSON.stringify(PLUGIN_ID)};`,
+                "    this.name = 'Notion Extractor';",
+                "    this.version = '1.2.0';",
+                "    this.category = 'utility';",
+                '    this.capabilities = [];',
+                "    this.settingsSchema = { type: 'object', properties: {} };",
+                '  }',
+                '  async onLoad() {}',
+                '  async onUnload() {}',
+                '};',
+                '',
+            ].join('\n'),
+        );
+    }
+
+    beforeEach(async () => {
+        storeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ew693-ops-store-'));
+        extractCalls = [];
+        const pacote: PacoteLike = {
+            async manifest(spec: string) {
+                throw new Error(`a pinned install must not resolve ${spec}`);
+            },
+            async extract(spec: string, dest: string) {
+                extractCalls.push(spec);
+                writeFixturePlugin(dest);
+                return undefined;
+            },
+        };
+        pluginRows = {
+            findByPluginId: jest.fn(async (id: string) => (id === PLUGIN_ID ? PINNED_ROW : null)),
+            updateInstallState: jest.fn(async () => undefined),
+            upsert: jest.fn(async () => ({})),
+            updateState: jest.fn(async () => ({})),
+            // The lazy registration's row write (`registerLazy`).
+            mergeLazyRegistration: jest.fn(async () => ({})),
+        };
+        userPluginRepository = {
+            findOne: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockImplementation((data) => data),
+            save: jest.fn().mockImplementation((entity) => entity),
+        };
+
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                PluginOperationsService,
+                PluginInstallerService,
+                PluginLoaderService,
+                PluginRegistryService,
+                PluginManifestValidatorService,
+                PluginVersionCheckerService,
+                PluginClassValidatorService,
+                { provide: EventEmitter2, useValue: new EventEmitter2() },
+                {
+                    provide: PLUGINS_MODULE_OPTIONS,
+                    useValue: {
+                        distributionMode: 'dynamic',
+                        installDir: storeDir,
+                        pluginPaths: [],
+                        builtInPlugins: [],
+                        platformVersion: '1.0.0',
+                    },
+                },
+                { provide: 'PLUGIN_INSTALLER_PACOTE', useValue: pacote },
+                { provide: PluginRepository, useValue: pluginRows },
+                {
+                    provide: getRepositoryToken(PluginEntity),
+                    useValue: {
+                        findOne: jest.fn().mockResolvedValue({ id: 'row-1', pluginId: PLUGIN_ID }),
+                        find: jest.fn().mockResolvedValue([]),
+                    },
+                },
+                { provide: getRepositoryToken(UserPluginEntity), useValue: userPluginRepository },
+                { provide: getRepositoryToken(WorkPluginEntity), useValue: {} },
+                {
+                    provide: SettingsSchemaValidatorService,
+                    useValue: { validate: jest.fn().mockReturnValue({ valid: true, errors: [] }) },
+                },
+                {
+                    provide: PluginSettingsService,
+                    useValue: {
+                        resolveSettings: jest.fn().mockResolvedValue({}),
+                        getResolvedSettings: jest.fn().mockResolvedValue({}),
+                        getSettings: jest.fn().mockResolvedValue({}),
+                        updateUserSettings: jest.fn().mockResolvedValue(undefined),
+                    },
+                },
+                { provide: AiFacadeService, useValue: { getAvailableModels: jest.fn() } },
+                { provide: WorkOwnershipService, useValue: { ensureCanView: jest.fn() } },
+            ],
+        }).compile();
+
+        service = moduleRef.get(PluginOperationsService);
+        registry = moduleRef.get(PluginRegistryService);
+    });
+
+    afterEach(() => {
+        fs.rmSync(storeDir, { recursive: true, force: true });
+    });
+
+    it('fetches the pinned version on this replica, registers it, and enables it — writing no install row', async () => {
+        await expect(service.enablePluginForUser(PLUGIN_ID, 'user-1')).resolves.toBeDefined();
+
+        expect(extractCalls).toEqual(['@ever-works/notion-extractor-plugin@1.2.0']);
+        const entry = registry.get(PLUGIN_ID);
+        expect(entry).toBeDefined();
+        expect(entry!.builtIn).toBe(false);
+        expect(path.resolve(entry!.installPath!).startsWith(path.resolve(storeDir))).toBe(true);
+        expect(userPluginRepository.save).toHaveBeenCalledWith(
+            expect.objectContaining({ pluginId: PLUGIN_ID, enabled: true }),
+        );
+        // This replica wrote no install state: the row was already `installed`.
+        expect(pluginRows.updateInstallState).not.toHaveBeenCalled();
+    });
+
+    it('does not fetch again once the plugin is registered in this process', async () => {
+        await service.enablePluginForUser(PLUGIN_ID, 'user-1');
+        await service.enablePluginForUser(PLUGIN_ID, 'user-2');
+
+        expect(extractCalls).toHaveLength(1);
     });
 });

@@ -1,0 +1,309 @@
+# App Works — APW-01 OpenAPI fragment (create an App Work from any repository URL)
+#
+# Skeleton, not a source of truth. The generated `apps/api/openapi.json` is authoritative;
+# this fragment is the reviewable expectation that the generated document is a SUPERSET of it.
+# See ../README.md for the convention, the superset rule and the checker.
+#
+# Every operation carries:
+#   x-source  where in the programme's documents the operation is grounded
+#   x-mcp     the agent-surface decision (see ../agent-surfaces.md section 3)
+openapi: 3.0.3
+
+info:
+    title: Ever Works API — App Works fragment (APW-01)
+    description: >-
+        Routes owned by APW-01 (App Work kind & create from any repository URL). Only the
+        operations and properties the epic's plan writes down are listed; a property the
+        generated document carries and this fragment omits is expected, not a finding.
+    version: fragment
+
+paths:
+    /api/works/app-source/inspect:
+        post:
+            operationId: appSourceInspect
+            summary: Inspect a repository URL before creating an App Work
+            description: >-
+                Ownership, push access, fork possibility (including an existing fork), Blueprint
+                match and a licence preview. No side effects: nothing is persisted and no provider
+                write is issued, which is why the operation is a POST with readOnlyHint.
+                A provider-side refusal answers 200 with the reasons in the body on purpose — the
+                preview renders them and nothing failed on our side.
+            tags: [Works]
+            security:
+                - JWT-auth: []
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.1
+            x-mcp:
+                tool: inspect_app_source
+                readOnlyHint: true
+            x-throttle: 30 requests / 60 s per client (long)
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AppSourceInspectRequest'
+            responses:
+                '200':
+                    description: >-
+                        The inspection result. Provider-side refusals also answer 200 with every mode
+                        marked unavailable and a classified reason; `rate_limited` carries `retryAfter`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AppSourceInspectResponse'
+                '400':
+                    description: App Works is disabled on this instance, or the URL does not parse.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AppSourceError'
+                            examples:
+                                appWorksDisabled:
+                                    value:
+                                        status: error
+                                        code: app_works_disabled
+                                        message: App Works are not available on this instance.
+                                invalidUrl:
+                                    value:
+                                        status: error
+                                        code: invalid_url
+                                        message: That does not look like a repository URL.
+                '429':
+                    description: The route's own throttle was exceeded (Nest throttler default body).
+
+    /api/works:
+        post:
+            operationId: createWork
+            summary: Create a Work (APW-01 adds the kind `app` branch and its fields)
+            description: >-
+                The existing create route, extended. Only the properties APW-01 adds are listed
+                here; the rest of `CreateWorkDto` is unchanged and is not re-declared.
+                With `kind: app` and no Blueprint and no valid App spec, the platform starts the
+                App Provisioner; when a Blueprint applies, it is applied on ready.
+            tags: [Works]
+            security:
+                - JWT-auth: []
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md sections 4.2 and 4.3
+            x-mcp:
+                tool: create_work
+                note: >-
+                    No whitelist change: new DTO fields reach the tool automatically because the
+                    schema is generated from the OpenAPI document (APW-01 plan section 4.5).
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AppWorkCreateRequest'
+            responses:
+                '200':
+                    description: >-
+                        Created, or an existing App Work whose slug matches and whose `createdAt` is
+                        within 600 s (`alreadyExisted: true`).
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AppWorkCreateResponse'
+                '400':
+                    description: >-
+                        One of `app_works_disabled`, `invalid_url`, `target_owner_forbidden`,
+                        `managed_hosting_unavailable` (the managed target is not open — R-5) or
+                        `cluster_target_unavailable`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AppSourceError'
+                '409':
+                    description: >-
+                        One of `create_in_progress`, `app_work_exists` or `in_use_by_another_account`.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AppSourceError'
+                '503':
+                    description: The provider rate-limited the call; `Retry-After` is set.
+
+    /api/works/{id}/delete:
+        post:
+            operationId: deleteWork
+            summary: Delete a Work (APW-01 adds the kind `app` rules)
+            description: >-
+                The existing delete route. For kind `app` the platform asks APW-06's deletion
+                service first (R-15): `done` deletes the row now, `pending` answers
+                `{ deleting: true }` and the row stays until the completion call. Volumes and App
+                dependencies are kept unless the owner ticks "Also delete stored data" AND types
+                the App Work's slug. The upstream is never deleted.
+            tags: [Works]
+            security:
+                - JWT-auth: []
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.3
+            x-mcp:
+                tool: delete_work
+                destructiveHint: true
+                omitArgs: [delete_stored_data, confirm_slug]
+                note: >-
+                    An agent cannot destroy stored data through MCP: the flag is neither advertised
+                    nor forwarded (APW-01 plan section 4.5; Resolution R-15).
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+                            description: The existing delete body, extended by APW-01.
+                            properties:
+                                delete_data_repository:
+                                    type: boolean
+                                    default: false
+                                delete_stored_data:
+                                    type: boolean
+                                    default: false
+                                    description: >-
+                                        Kind `app` only. Requires `confirm_slug` to equal the App Work's slug;
+                                        the check runs server-side before anything else happens (FR-40b).
+                                confirm_slug:
+                                    type: string
+                                    description: The App Work's slug, typed by the owner.
+            responses:
+                '200':
+                    description: 'Deleted, or `{ deleting: true, message }` while removal is in flight.'
+                '400':
+                    description: 'A `link` relation with `delete_data_repository: true` — nothing is requested.'
+                '422':
+                    description: '`confirmation_mismatch`: `delete_stored_data` was set without a matching `confirm_slug`.'
+
+components:
+    securitySchemes:
+        JWT-auth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+
+    schemas:
+        AppSourceInspectRequest:
+            type: object
+            required: [repositoryUrl]
+            additionalProperties: false
+            description: >-
+                `AppSourceInspectRequestDto` (new). Types beyond the validators the plan states are
+                to be derived from the DTO — see ../openapi/README.md section 2.
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.1
+            properties:
+                repositoryUrl:
+                    type: string
+                    maxLength: 400
+                    description: Trimmed before parsing.
+                gitProvider:
+                    type: string
+                    description: >-
+                        Validated against the URL parser's host rules, not against a literal list in the
+                        controller.
+                blueprintId:
+                    type: string
+                    description: >-
+                        A catalog id. When sent, the resolver previews exactly that entry; when sent and
+                        it does not match the repository, create answers `400 blueprint_mismatch`.
+
+        AppSourceInspectResponse:
+            type: object
+            additionalProperties: true
+            description: >-
+                `AppSourceInspectResponseDto`. The plan writes the SEMANTICS of this response (a full
+                shape with every mode marked available or unavailable-with-reason; ownership, push
+                access, fork possibility and existing fork, Blueprint match, licence preview) but not
+                every property, so this fragment does not close the shape. Consumers read
+                `blueprint.status` and the per-mode availability entries.
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.1
+            properties:
+                blueprint:
+                    type: object
+                    additionalProperties: true
+                    description: '`status`: matched | none | unavailable; a match carries `id` and `matchSource`.'
+
+        AppWorkCreateRequest:
+            type: object
+            required: [repositoryUrl]
+            additionalProperties: true
+            description: >-
+                The properties APW-01 ADDS to the existing `CreateWorkDto`. `additionalProperties:
+                true` is deliberate: the generated document carries the whole pre-existing DTO and
+                this fragment must not restate it.
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.2
+            properties:
+                kind:
+                    type: string
+                    enum: [app]
+                repositoryUrl:
+                    type: string
+                    maxLength: 400
+                repositoryMode:
+                    type: string
+                    enum: [link, fork, private-copy]
+                    description: Required for kind `app`. `private-copy` is a non-fork duplicate.
+                targetOwner:
+                    type: string
+                    description: Required for `fork` and `private-copy`; the caller's account or organization.
+                blueprintId:
+                    type: string
+                    description: >-
+                        Optional. The supported path for a repository no catalog entry lists (APW-03 FR-81).
+                appEnv:
+                    type: object
+                    writeOnly: true
+                    additionalProperties:
+                        type: string
+                    description: >-
+                        Write-only prompted App env values. Never returned by any read; handed to APW-07
+                        and stored encrypted once the App spec exists (FR-55).
+
+        AppWorkCreateResponse:
+            type: object
+            additionalProperties: true
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.2
+            properties:
+                status:
+                    type: string
+                    enum: [success]
+                appSource:
+                    type: object
+                    additionalProperties: true
+                    description: >-
+                        `relation` (link | fork | private-copy), `readiness` (`preparing` on create),
+                        `dataRepository`, optional `upstream`, `deployTarget`
+                        (none | your-cluster | ever-works-apps) and optional
+                        `blueprint` ({ id, version?, name?, matchSource }) — the Blueprint the platform
+                        settled server-side, so chat, MCP and CLI callers see the same one the form showed.
+                alreadyExisted:
+                    type: boolean
+                    description: Present and true when an equivalent App Work already existed.
+
+        AppSourceError:
+            type: object
+            required: [status, code, message]
+            additionalProperties: false
+            description: The shared error body for the App-source routes.
+            x-source: docs/specs/features/app-works/APW-01-app-work-kind/plan.md section 4.2
+            properties:
+                status:
+                    type: string
+                    enum: [error]
+                code:
+                    type: string
+                    description: >-
+                        An `AppSourceReasonCode`. The closed set of user-facing create and inspect
+                        reasons is APW-01 spec section 6.3.
+                message:
+                    type: string
+                details:
+                    type: object
+                    additionalProperties: true
+                    description: >-
+                        `{ owner?, fullName?, workId?, workName?, retryAfter? }`. `workId`/`workName`
+                        appear only for the caller's own App Work.

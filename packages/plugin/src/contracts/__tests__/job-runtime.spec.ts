@@ -46,10 +46,20 @@ import type {
 import type { IPlugin } from '../plugin.interface.js';
 
 describe('IJobRuntimeProvider — contract surface', () => {
-	it('JobRuntimeId matches the 5 supported providers from the architecture spec §4', () => {
+	it('JobRuntimeId matches the 6 supported providers', () => {
 		// If this union is widened without updating the architecture
 		// spec + selector docs, this test fails — keep both in sync.
-		expectTypeOf<JobRuntimeId>().toEqualTypeOf<'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest'>();
+		//
+		// ⚠️ This assertion said FIVE and had been wrong since `'node'` was added to
+		// `JobRuntimeId` (the member's own doc comment above the union explains why: an
+		// in-process runtime that is a pull-model provider like BullMQ/pg-boss/Temporal).
+		// Nobody saw it fail, because vitest strips types — a `expectTypeOf` assertion is
+		// only checked by `tsc`, and nothing type-checked these spec files until
+		// `tsconfig.specs.json` existed. The count is now six, and the sentence that used to
+		// say "from the architecture spec §4" is gone rather than restated: that document
+		// says five, so leaving it in the title would have re-created the drift in prose.
+		// Reported to the architecture doc's owner instead — it is one runtime behind.
+		expectTypeOf<JobRuntimeId>().toEqualTypeOf<'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node'>();
 	});
 
 	it('JobRunStatus covers the 5 lifecycle states + unknown fallback', () => {

@@ -90,4 +90,21 @@ describe('TriggerModule dispatcher exports', () => {
         expect(exportedTokens()).toContain(ROSTER_PROVISION_DISPATCHER);
         expect(exportedTokens()).toContain(WORKSPACE_BACKUP_DISPATCHER);
     });
+
+    it('exports the three App Works dispatchers that were half-wired, by name', async () => {
+        // Caught by the derived assertion above the moment `develop` (which
+        // added it) was merged into `feat/app-works-implementation` (which had
+        // added these three): bound by `buildJobRuntimeProviders()`, exported
+        // by nobody, so `AppBuildsService` and `AppSpecService` — both in
+        // modules the API imports — resolved them to `undefined` and enqueued
+        // nothing, without an error.
+        const {
+            APP_BUILD_PREPARE_DISPATCHER,
+            APP_BUILD_WATCH_DISPATCHER,
+            APP_SPEC_EVALUATE_DISPATCHER,
+        } = await import('@ever-works/agent/tasks');
+        expect(exportedTokens()).toContain(APP_BUILD_PREPARE_DISPATCHER);
+        expect(exportedTokens()).toContain(APP_BUILD_WATCH_DISPATCHER);
+        expect(exportedTokens()).toContain(APP_SPEC_EVALUATE_DISPATCHER);
+    });
 });

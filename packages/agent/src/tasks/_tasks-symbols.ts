@@ -27,6 +27,34 @@
  */
 
 export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
+    // APW-05 T18 — the two Build dispatchers (plan §7.1:1312-1319): one enqueues
+    // `app-build-prepare`, one enqueues `app-build-watch`. A `null` from either
+    // means "no runtime took it" and runs the matching runner in process.
+    'APP_BUILD_PREPARE_DISPATCHER',
+    // APW-05 T18 — the runtime-neutral id of the prepare job
+    // (`packages/tasks/src/tasks/trigger/app-build-prepare.task.ts` registers it).
+    'APP_BUILD_PREPARE_TASK_ID',
+    'APP_BUILD_WATCH_DISPATCHER',
+    // APW-05 T18 — the runtime-neutral id of the watch job, declared by T18 and
+    // registered by T20's `app-build-watch.task.ts`.
+    'APP_BUILD_WATCH_TASK_ID',
+    // APW-07 T17 — the `app-dependency-provision` dispatcher symbol. The
+    // service's own provisional declaration of the same NAME is a different
+    // Symbol; this barrel entry is the one `job-runtime.providers.ts` binds
+    // and the one `TriggerModule` exports.
+    'APP_DEPENDENCY_PROVISION_DISPATCHER',
+    // APW-03 T13 — the `app-spec-evaluate` dispatcher symbol (plan §6.1:650).
+    // Bound by `job-runtime.providers.ts`; a `null` from it runs the handler
+    // in-process for this job id only.
+    'APP_SPEC_EVALUATE_DISPATCHER',
+    // APW-03 T13 — runtime-neutral id of the App spec evaluation job, and the
+    // list of job ids a `null` dispatch runs in-process (`app-works-jobs.ts`).
+    'APP_SPEC_EVALUATE_JOB_ID',
+    'APP_WORKS_IN_PROCESS_FALLBACK_JOB_IDS',
+    // APW-03 T13 — the payload refusal a malformed `app-spec-evaluate` message
+    // raises at the runtime boundary, plus the handler every provider registers
+    // and the predicate that answers "does a `null` dispatch mean run it here?".
+    'AppSpecEvaluatePayloadError',
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) — credential
     // versioning service for graceful drain on rotation. See ADR-017 §3.
     'CredentialVersionService',
@@ -64,6 +92,12 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // `JOB_RUNTIME_PROVIDER_REGISTRY`. Wired into TriggerModule per the
     // EW-685 T4 full cutover.
     'buildJobRuntimeProviders',
+    // APW-03 T13 — see the APW_SPEC_* block above: the predicate that answers
+    // whether a `null` dispatch runs a job in-process, and the runtime-neutral
+    // handler + payload parser the providers register.
+    'hasInProcessFallback',
+    'parseAppSpecEvaluatePayload',
+    'runAppSpecEvaluateJob',
     // AW-07 — runtime-neutral memory-fact job handlers. A provider's
     // registration (Trigger.dev task, BullMQ / pg-boss worker host, …) is a
     // one-line adapter over these, so behaviour is identical on every runtime.
@@ -76,6 +110,15 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // via CredentialVersionService.resolveSnapshot. See
     // `runtime-binding-stamper.service.ts` header for the per-dispatcher
     // wiring deferral.
+    // EW-693 / T27 — the long-running plugin operation job: the method the active
+    // job runtime's dispatchers expose for it, the task id it registers under,
+    // and the run's time budget — queue TTL, maxDuration and the router's
+    // default wait derived from both (`plugin-operation-dispatch.ts`).
+    'PLUGIN_OPERATION_DEFAULT_WAIT_MS',
+    'PLUGIN_OPERATION_DISPATCH_METHOD',
+    'PLUGIN_OPERATION_MAX_DURATION_SECONDS',
+    'PLUGIN_OPERATION_QUEUE_TTL_SECONDS',
+    'PLUGIN_OPERATION_TASK_ID',
     // AW-20 P1 — enqueues one roster provisioning run (a coordinator plus
     // lane-owning specialists, wired together). Sequential, retryable,
     // and reports per-lane progress, so it belongs off the request thread.

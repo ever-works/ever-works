@@ -1,12 +1,15 @@
-import { useState, useTransition } from 'react';
+'use client'; // Hooks (useState/useTransition/useRouter/useWorkPermissions) — a client component.
+
+import { useEffect, useState, useTransition } from 'react';
 import { DeleteWorkDto, Work } from '@/lib/api/types-only';
+import type { AppDeployTargetChoice } from '@ever-works/contracts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { deleteWork } from '@/app/actions/dashboard';
+import { deleteWork, getAppDeleteTarget } from '@/app/actions/dashboard';
 import { ROUTES } from '@/lib/constants';
 import {
     Dialog,
@@ -22,6 +25,32 @@ import { useWorkPermissions } from '../WorkDetailContext';
 import { TriangleAlertIcon } from 'lucide-react';
 import { getWorkCapabilities, isRepositoryWorkKind } from '@ever-works/contracts';
 
+/**
+ * The danger zone's delete dialog, per Work kind.
+ *
+ * APW-01 T39 adds the **App Work** surface (plan §5.2 `:747-750`, spec §6.5). Three
+ * things make an App Work different, and all three are about NOT deleting something
+ * the platform never created:
+ *
+ *   1. Its Work Repository (`relatedRepositories.website`, the only role
+ *      `buildWorkData` writes) is a fork, a private copy, or the repository the member
+ *      **linked** — never a repository the platform generated. The checkbox is offered
+ *      only when this Work created it, and it demands the full name typed out
+ *      (FR-38, ACC-NEG-07); a LINK is never deletable and says so instead (FR-37).
+ *   2. Deleting it removes the App's cluster workloads, and **Also delete stored
+ *      data** is a separate, independent choice that needs the Work's **slug** typed
+ *      (FR-40a/FR-40b, Resolution R-15). It is offered only when the deploy target is
+ *      not `none` — the target comes from APW-06's `GET /api/works/:id/app-target`,
+ *      and a `404` (APW-06 not merged, or no runtime row yet) is treated as `none`.
+ *   3. Neither field is ever sent speculatively: `delete_data_repository` goes only
+ *      when the fork box is ticked AND the typed name matches, `delete_stored_data`
+ *      only when the stored-data box is ticked AND the typed slug matches.
+ *
+ * Every other kind keeps the legacy three-checkbox dialog exactly as it was: the
+ * kind's provisioned roles still decide which boxes exist
+ * (`WORK_KIND_CAPABILITIES`), and the legacy `delete_website_repository` /
+ * `delete_markdown_repository` flags are still what they always were for them.
+ */
 export function DeleteComponent({ work }: { work: Work }) {
     const permissions = useWorkPermissions();
     const t = useTranslations('dashboard.workDetail.settings');
@@ -44,6 +73,65 @@ export function DeleteComponent({ work }: { work: Work }) {
     const offersRepositoryOptions =
         canDeleteDataRepository || provisioned.work || provisioned.website;
 
+    // ── APW-01 T39 — the App Work surface ────────────────────────────────────
+    const isAppWork = (work.kind ?? '').trim().toLowerCase() === 'app';
+    const appSource = work.sourceRepository;
+    /** `link` · `fork` · `private-copy`, read exactly as `AppWorkCreateService` reads it. */
+    const appRelation: 'link' | 'fork' | 'private-copy' =
+        appSource?.type === 'app_fork'
+            ? 'fork'
+            : appSource?.type === 'app_private_copy'
+              ? 'private-copy'
+              : 'link';
+    /** The Work Repository: the `website` role is the ONLY one an App Work records. */
+    const appRepositoryOwner =
+        appSource?.relatedRepositories?.website?.owner ?? appSource?.owner ?? work.owner ?? '';
+    const appRepositoryRepo =
+        appSource?.relatedRepositories?.website?.repo ?? appSource?.repo ?? work.slug;
+    const appRepositoryFullName = `${appRepositoryOwner}/${appRepositoryRepo}`;
+    /** Only a repository THIS Work created may be deleted from here (R-4, FR-38). */
+    const appRepositoryIsOurs = appSource?.createdByThisWork === true;
+
+    const [appTarget, setAppTarget] = useState<AppDeployTargetChoice | null>(null);
+    const [appForkChecked, setAppForkChecked] = useState(false);
+    const [appForkTyped, setAppForkTyped] = useState('');
+    const [appStoredDataChecked, setAppStoredDataChecked] = useState(false);
+    const [appStoredDataTyped, setAppStoredDataTyped] = useState('');
+
+    // The target is read once, when the dialog opens for an App Work: APW-06's route
+    // answers `404` today, which `getAppDeleteTarget` reports as `none` and which
+    // hides the stored-data box rather than guessing a target.
+    useEffect(() => {
+        if (!showDeleteDialog || !isAppWork || appTarget !== null) {
+            return;
+        }
+        let cancelled = false;
+        void getAppDeleteTarget(work.id).then((result) => {
+            if (cancelled) {
+                return;
+            }
+            setAppTarget(result.success ? (result.target ?? 'none') : 'none');
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [showDeleteDialog, isAppWork, appTarget, work.id]);
+
+    const appOffersStoredData = isAppWork && appTarget !== null && appTarget !== 'none';
+    const appTargetLabel =
+        appTarget === 'ever-works-apps'
+            ? t('deleteAppTargetEverWorksApps')
+            : appTarget === 'your-cluster'
+              ? t('deleteAppTargetYourCluster')
+              : t('deleteAppTargetNone');
+
+    // The fork/copy box is offered only for a repository this Work created; a link
+    // says so instead, and an adopted fork is not the platform's to delete at all.
+    const appOffersForkBox = isAppWork && appRepositoryIsOurs && appRelation !== 'link';
+    const appForkSatisfied = appForkChecked && appForkTyped.trim() === appRepositoryFullName;
+    const appStoredDataSatisfied =
+        appStoredDataChecked && appStoredDataTyped.trim() === (work.slug ?? '');
+
     // Only owners can delete works
     if (!permissions.canDelete) {
         return null;
@@ -52,6 +140,10 @@ export function DeleteComponent({ work }: { work: Work }) {
     const handleCloseDialog = () => {
         setShowDeleteDialog(false);
         setConfirmationName('');
+        setAppForkChecked(false);
+        setAppForkTyped('');
+        setAppStoredDataChecked(false);
+        setAppStoredDataTyped('');
         setDeleteOptions({
             delete_data_repository: false,
             delete_markdown_repository: false,
@@ -65,8 +157,20 @@ export function DeleteComponent({ work }: { work: Work }) {
             return;
         }
 
+        // APW-01 T39: an App Work sends ONLY what was explicitly confirmed. An
+        // unticked box (or a box whose typed confirmation does not match) sends
+        // nothing at all — never a `false`, and never a guess.
+        const payload: DeleteWorkDto = isAppWork
+            ? {
+                  ...(appForkSatisfied ? { delete_data_repository: true } : {}),
+                  ...(appStoredDataSatisfied
+                      ? { delete_stored_data: true, confirm_slug: appStoredDataTyped.trim() }
+                      : {}),
+              }
+            : deleteOptions;
+
         startTransition(async () => {
-            const result = await deleteWork(work.id, deleteOptions);
+            const result = await deleteWork(work.id, payload);
 
             if (result.success) {
                 toast.success(result.message || t('deleteSuccess'));
@@ -127,8 +231,118 @@ export function DeleteComponent({ work }: { work: Work }) {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        {/* Repository options — only the roles this kind provisions */}
-                        {offersRepositoryOptions && (
+                        {/* APW-01 T39 (R-15) — what happens to the running app. Shown
+                            only when the Work actually deploys somewhere: with target
+                            `none` (including APW-06's not-yet-mounted route) there is
+                            nothing running and nothing stored to decide about. */}
+                        {isAppWork && appTarget !== null && appTarget !== 'none' && (
+                            <p className="rounded-lg border border-card-border dark:border-border-secondary-dark px-4 py-3 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {t('deleteAppWorkloadsNote', { target: appTargetLabel })}
+                            </p>
+                        )}
+
+                        {/* APW-01 T39 — the App Work's own delete surface. */}
+                        {isAppWork && (
+                            <div className="rounded-lg border border-card-border dark:border-border-secondary-dark divide-y divide-card-border dark:divide-card-border-dark">
+                                <div className="px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                        {t('deleteOptions')}
+                                    </p>
+                                </div>
+
+                                {appRelation === 'link' && (
+                                    <div className="px-4 py-3">
+                                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                            {t('deleteAppLinkNote', {
+                                                fullName: appRepositoryFullName,
+                                            })}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {!appRepositoryIsOurs && appRelation !== 'link' && (
+                                    <div className="px-4 py-3">
+                                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                            {t('deleteAppRepositoryNotOurs', {
+                                                fullName: appRepositoryFullName,
+                                            })}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {appOffersForkBox && (
+                                    <div className="space-y-3 px-4 py-3">
+                                        <Checkbox
+                                            checked={appForkChecked}
+                                            onChange={(e) => setAppForkChecked(e.target.checked)}
+                                            label={t(
+                                                appRelation === 'private-copy'
+                                                    ? 'deleteAppPrivateCopy'
+                                                    : 'deleteAppFork',
+                                                { fullName: appRepositoryFullName },
+                                            )}
+                                            description={t('deleteAppForkHelper')}
+                                            variant="form"
+                                        />
+                                        {appForkChecked && (
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                    {t('deleteAppForkTypeToConfirm', {
+                                                        fullName: appRepositoryFullName,
+                                                    })}
+                                                </p>
+                                                <Input
+                                                    type="text"
+                                                    value={appForkTyped}
+                                                    onChange={(e) =>
+                                                        setAppForkTyped(e.target.value)
+                                                    }
+                                                    placeholder={appRepositoryFullName}
+                                                    variant="form"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {appOffersStoredData && (
+                                    <div className="space-y-3 px-4 py-3">
+                                        <Checkbox
+                                            checked={appStoredDataChecked}
+                                            onChange={(e) =>
+                                                setAppStoredDataChecked(e.target.checked)
+                                            }
+                                            label={t('deleteAppStoredData')}
+                                            description={t('deleteAppStoredDataHelper')}
+                                            variant="form"
+                                        />
+                                        {appStoredDataChecked && (
+                                            <div className="space-y-2">
+                                                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                    {t('deleteAppStoredDataTypeToConfirm', {
+                                                        slug: work.slug,
+                                                    })}
+                                                </p>
+                                                <Input
+                                                    type="text"
+                                                    value={appStoredDataTyped}
+                                                    onChange={(e) =>
+                                                        setAppStoredDataTyped(e.target.value)
+                                                    }
+                                                    placeholder={work.slug}
+                                                    variant="form"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Repository options — only the roles this kind provisions.
+                            An App Work's repository is the box above, never the
+                            generated-roles one. */}
+                        {!isAppWork && offersRepositoryOptions && (
                             <div className="rounded-lg border border-card-border dark:border-border-secondary-dark divide-y divide-card-border dark:divide-card-border-dark">
                                 <div className="px-4 py-3">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">

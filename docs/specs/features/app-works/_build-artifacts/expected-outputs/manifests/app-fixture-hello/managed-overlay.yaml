@@ -1,0 +1,298 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello, target "Ever Works Apps" — ONLY the objects that differ.
+#
+# 🛑 WHO APPLIES THIS. The platform never applies a workload on this target (Resolution R-5;
+# APW-10 spec FR-24 at APW-10/spec.md:284-286). APW-06 renders into desired state; the zone's controller
+# renders with the same renderer and applies it. The platform's write is a `Work` object `w-<workId>` in the
+# control namespace `ever-works-apps-control` (APW-10 plan.md:222-248). `destroyApp` → `removeWork`.
+#
+# Tenant namespace: `ewa-<first 20 hex of workId>` = `ewa-22222222222222222222` (APW-10 plan.md:254).
+# This is not `ew-app-fixture-hello-22222222` — see ../contradictions.md **X-8**.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ewa-22222222222222222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+    hosting.ever.works/tenant: "true"
+    hosting.ever.works/work-id: 22222222-2222-4222-8222-222222222222
+  annotations:
+    hosting.ever.works/allowed-hosts: '["app-fixture-hello.apps.example.com"]'
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ew-defaults
+  namespace: ewa-22222222222222222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: "1"
+        memory: 512Mi
+        ephemeral-storage: 1Gi
+      max:
+        cpu: "2"
+        memory: 4Gi
+---
+# The zone's quota profile must admit the fixture's own requests. APW-06 plan §4.2's defaults are shown;
+# APW-10 FR-47's Starter profile (1/2 CPU, 2/4 GiB, 10 pods, 4 volumes / 10 GiB) would NOT admit the pod as
+# rendered, because the renderer's `max(1, 4 × cpu)` cpu limits are 1 for both components but the profile's
+# `limits.cpu: 2` is shared across them — see ../contradictions.md **X-10** and ../open-questions.md Q-7.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ew-quota
+  namespace: ewa-22222222222222222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+spec:
+  hard:
+    requests.cpu: "2"
+    limits.cpu: "4"
+    requests.memory: 4Gi
+    limits.memory: 6Gi
+    pods: "20"
+    persistentvolumeclaims: "5"
+    requests.storage: 20Gi
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+    count/jobs.batch: "20"
+    count/cronjobs.batch: "20"
+    secrets: "30"
+    configmaps: "30"
+---
+# `web` — only `limits.cpu` changes: max(1, 4 × 0.05) = max(1, 0.2) = 1.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ewa-22222222222222222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/component: web
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 300
+  minReadySeconds: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      ever-works.io/component: web
+  template:
+    metadata:
+      labels:
+        ever-works.io/component: web
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+      annotations:
+        ever-works.io/env-checksum: fa90df132e185345
+        ever-works.io/build-commit: b1c2d3e4f5061728394a5b6c7d8e9f0112345678
+        ever-works.io/deployment-id: 44444444-4444-4444-8444-444444444444
+    spec:
+      serviceAccountName: app
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              ever-works.io/component: web
+      containers:
+        - name: web
+          image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - src/server.mjs
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: app-env-fa90df132e
+                optional: false
+            - configMapRef:
+                name: app-platform-fa90df132e
+                optional: false
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 0
+            timeoutSeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 0
+            timeoutSeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 0
+            timeoutSeconds: 5
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: web-uploads
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+# `worker` — only `limits.cpu` changes: max(1, 4 × 0.025) = max(1, 0.1) = 1.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: ewa-22222222222222222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/component: worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 300
+  minReadySeconds: 30
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      ever-works.io/component: worker
+  template:
+    metadata:
+      labels:
+        ever-works.io/component: worker
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+      annotations:
+        ever-works.io/env-checksum: fa90df132e185345
+        ever-works.io/build-commit: b1c2d3e4f5061728394a5b6c7d8e9f0112345678
+        ever-works.io/deployment-id: 44444444-4444-4444-8444-444444444444
+    spec:
+      serviceAccountName: app
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              ever-works.io/component: worker
+      containers:
+        - name: worker
+          image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - src/worker.mjs
+          envFrom:
+            - secretRef:
+                name: app-env-fa90df132e
+                optional: false
+            - configMapRef:
+                name: app-platform-fa90df132e
+                optional: false
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              cpu: "1"
+              memory: 96Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+# RENDER-TIME REFUSAL, not an object: `cron-tick` (`*/2 * * * *`) fires more often than every five minutes
+# and is refused with `cron_too_frequent` on this target (APW-06 plan §4.9; APW-10 plan.md:245, :268). This
+# Work renders NO CronJob on Ever Works Apps.
+#
+# APPLIED BY THE ZONE ON TOP, not by this renderer (APW-10 plan.md:336-344): runtimeClassName, priorityClassName
+# `ever-works-apps-tenant`, hostNetwork/hostPID/hostIPC false, bandwidth annotations, `imagePullSecrets:
+# [registry]`, images rewritten to `<zone registry>/t-<id>/<component>@sha256:…`, and re-forced security
+# contexts. The zone also applies its own six NetworkPolicies (`default-deny`, `allow-dns`, `allow-edge-ingress`,
+# `allow-internet-egress`, `allow-tenant-data`, `quarantine`) — a DIFFERENT name set and a different egress
+# except-list from the five this renderer produces (APW-10 plan.md:320-334 vs APW-06 plan §4.10):
+# ../contradictions.md **X-11**.

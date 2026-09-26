@@ -612,10 +612,15 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // read from the node's own environment and scrubbed back out of
         // everything the node reports. Read fresh on every plan, which is
         // what makes a revoked grant stop applying from the next run on.
+        // The DESCRIBED workspace goes with it: the primary's grants come
+        // from the registry row for that repository on that host — the same
+        // row its env files came from — never from a host-agnostic re-read
+        // of the Work that a mirror on another host could satisfy.
         const envGrants = await this.taskWorkspace.resolveFleetRunEnvGrants({
             task,
             userId: payload.userId,
             agentId: payload.agentId,
+            workspace,
         });
 
         const execution: FleetAgentModelExecution = {

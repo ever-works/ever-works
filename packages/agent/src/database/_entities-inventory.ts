@@ -179,6 +179,27 @@ import { ReleasePromotion } from '../entities/release-promotion.entity';
 import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 import { SharedView } from '../entities/shared-view.entity';
 import { WorkspaceBackup } from '../entities/workspace-backup.entity';
+// APW-11 App Launcher — one person's arrangement of one launcher item.
+import { AppLauncherPreference } from '../entities/app-launcher-preference.entity';
+// APW-02 Fork lifecycle — the per-App-Work upstream state row. Concrete path,
+// never the barrel: see the module docstring.
+import { WorkAppRuntimeState } from '../entities/work-app-runtime-state.entity';
+import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+// APW-07 App env & dependencies — one encrypted value per (Work, name), and one
+// row per (Work, kind) recording what a dependency provider provisioned.
+import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
+import { WorkAppDependency } from '../entities/work-app-dependency.entity';
+// APW-03 App spec & catalog — the per-App-Work spec state row (head reading,
+// effective spec, Blueprint and licence classification).
+import { WorkAppSpecState } from '../entities/work-app-spec-state.entity';
+// APW-05 Builds — one row per Build of an App Work (per-Work numbering), and
+// the per-App-Work preparation state that is derived, never API-written.
+import { WorkBuild } from '../entities/work-build.entity';
+import { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
+// APW-04 App Provisioner — one row per provisioning attempt of an App Work, at
+// most one of them ACTIVE (the partial unique this inventory's drift spec
+// cannot see, because it compares names, not indexes).
+import { WorkAppProvisioning } from '../entities/work-app-provisioning.entity';
 
 import {
     PluginEntity,
@@ -465,4 +486,33 @@ export const ENTITIES = [
     // unique index in the migration (never at decorator level) is what stops
     // two tabs starting two backups of the same workspace at once.
     WorkspaceBackup,
+    // APW-11 App Launcher — one person's visible / pinned / order values per
+    // launcher item. `scopeKey` carries 'global' | 'personal' | <organizationId>
+    // so uniqueness is portable, and there are deliberately no scope-stamp
+    // columns: the active Organization must never be stamped onto a 'global'
+    // row every Organization shares.
+    AppLauncherPreference,
+    // APW-06 T17 — the runtime state of one App Work: which target it deploys
+    // to, the namespace and cluster it is frozen against, the atomic deploy
+    // lock and its latest-wins queue of one, the health counters the poller
+    // orders by, and the deletion claim. Registered next to `WorkDeployment`,
+    // which is the row it points at through `currentDeploymentId`.
+    WorkAppRuntimeState,
+    // APW-02 Fork lifecycle — the Upstream state of one App Work: readiness,
+    // Actions hygiene, schedule, divergence and the manual-sync allowance.
+    WorkUpstreamState,
+    // APW-07 App env & dependencies — the stored Environment values of one App
+    // Work, and the dependency rows a provider provisions and reports on.
+    WorkAppEnvValue,
+    WorkAppDependency,
+    // APW-03 App spec & catalog — the App spec state of one App Work, and the
+    // row every evaluation and licence classification coalesces on.
+    WorkAppSpecState,
+    // APW-05 Builds — every Build of an App Work, and the per-App-Work
+    // preparation row the consumer stamps a push/pull-request Build from.
+    WorkBuild,
+    WorkBuildPreparation,
+    // APW-04 App Provisioner — the provisioning rows of an App Work: derived
+    // only, written by the start path and the step executor, read by the card.
+    WorkAppProvisioning,
 ];

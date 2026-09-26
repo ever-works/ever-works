@@ -1,0 +1,45 @@
+{
+	"$comment": "The Ever platform catalog read by the App Launcher (APW-11 FR-8…FR-14, plan §5.1). Addresses here are placeholders: the owner supplies the real per-environment addresses in ever-works/platforms, and they live only in that repository — never in the public spec tree.",
+	"schemaVersion": 1,
+	"catalogVersion": "1.0.0",
+	"platforms": [
+		{
+			"id": "ever-works",
+			"name": "Ever Works",
+			"description": "Build, run and evolve apps with agents.",
+			"icon": "icons/ever-works.svg",
+			"order": 10,
+			"status": "available",
+			"urls": {
+				"production": "https://ever.works",
+				"stage": "https://stage.ever.works",
+				"develop": "https://dev.ever.works"
+			}
+		},
+		{
+			"id": "ever-gauzy",
+			"name": "Ever Gauzy",
+			"description": "Work and time management for teams.",
+			"icon": "icons/ever-gauzy.svg",
+			"order": 20,
+			"status": "available",
+			"urls": {
+				"production": "https://gauzy.example.com",
+				"stage": "https://gauzy.stage.example.com",
+				"develop": "https://gauzy.dev.example.com"
+			}
+		},
+		{
+			"id": "ever-teams",
+			"name": "Ever Teams",
+			"description": "Plan, track and ship together.",
+			"icon": "icons/ever-teams.svg",
+			"order": 30,
+			"status": "beta",
+			"urls": {
+				"production": "https://teams.example.com",
+				"stage": "https://teams.stage.example.com"
+			}
+		}
+	]
+}

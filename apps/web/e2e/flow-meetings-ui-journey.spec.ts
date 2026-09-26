@@ -593,8 +593,11 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
                         .click({ timeout: 5_000, noWaitAfter: true })
                         .catch(() => undefined);
                 }
-                if ((await titleInput.inputValue().catch(() => '')) !== renamed) {
-                    await titleInput.fill(renamed).catch(() => undefined);
+                // Bounded: with no actionTimeout configured these calls used to wait
+                // forever for a dialog a pre-hydration click never opened, so the
+                // loop's first pass never returned and the Edit click was never retried.
+                if ((await titleInput.inputValue({ timeout: 5_000 }).catch(() => '')) !== renamed) {
+                    await titleInput.fill(renamed, { timeout: 5_000 }).catch(() => undefined);
                 }
                 await save.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
             }

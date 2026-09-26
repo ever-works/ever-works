@@ -1,0 +1,318 @@
+# App Works — task-path meter
+
+This is a METER, not a defect list. An absent path is the normal state of work that has
+not been built yet; this tree is not consistent about marking which task creates what, so
+"absent" cannot be read as "the task text is wrong". The crisp signal is the last section:
+a path a task marks as new that already exists means that surface has landed.
+
+epics: 13 · tasks: 699 · root-anchored paths: 2679 · package-relative skipped: 217
+
+present: 1690 · absent: 989 · of the absent, another task says it creates them: 679
+
+## LANDED SURFACE — marked "new", already in the repository (266)
+
+- APW-01-app-work-kind T2 — `packages/contracts/src/apps/app-source.ts`
+- APW-01-app-work-kind T2 — `packages/contracts/src/apps/index.ts`
+- APW-01-app-work-kind T11 — `packages/agent/src/app-works/app-source-catalog.port.ts`
+- APW-01-app-work-kind T11 — `packages/agent/src/app-works/app-prompted-values.port.ts`
+- APW-01-app-work-kind T12 — `packages/agent/src/app-works/app-source-inspector.service.ts`
+- APW-01-app-work-kind T13 — `packages/agent/src/app-works/app-work-create.service.ts`
+- APW-01-app-work-kind T15 — `packages/agent/src/app-works/app-source-initializer.service.ts`
+- APW-01-app-work-kind T17 — `apps/api/src/works/dto/app-source-inspect.dto.ts`
+- APW-01-app-work-kind T17 — `apps/api/src/works/app-source.controller.ts`
+- APW-01-app-work-kind T20 — `apps/web/src/lib/work-kinds/flag-gated-kinds.ts`
+- APW-01-app-work-kind T39 — `packages/agent/src/app-works/app-work-deletion.port.ts`
+- APW-01-app-work-kind T36 — `packages/agent/src/app-works/app-works-telemetry.service.ts`
+- APW-02-fork-lifecycle T9 — `packages/plugin/src/contracts/capabilities/git-provider.app-forks.ts`
+- APW-02-fork-lifecycle T11 — `packages/contracts/src/apps/app-upstream.ts`
+- APW-02-fork-lifecycle T11 — `packages/contracts/src/apps/index.ts`
+- APW-02-fork-lifecycle T12 — `packages/agent/src/entities/work-upstream-state.entity.ts`
+- APW-02-fork-lifecycle T13 — `apps/api/src/migrations/1792020000000-CreateWorkUpstreamStates.ts`
+- APW-02-fork-lifecycle T14 — `packages/agent/src/database/repositories/work-upstream-state.repository.ts`
+- APW-02-fork-lifecycle T15 — `packages/agent/src/app-works/app-works.module.ts`
+- APW-02-fork-lifecycle T16 — `packages/plugins/github/src/github-errors.ts`
+- APW-02-fork-lifecycle T23 — `packages/agent/src/app-works/app-fork-ready-handler.port.ts`
+- APW-02-fork-lifecycle T23 — `packages/agent/src/app-works/app-upstream-state.service.ts`
+- APW-02-fork-lifecycle T24 — `packages/agent/src/app-works/app-fork-readiness.service.ts`
+- APW-02-fork-lifecycle T25 — `packages/agent/src/app-works/app-actions-hygiene.service.ts`
+- APW-02-fork-lifecycle T26 — `packages/agent/src/app-works/upstream-schedule.ts`
+- APW-02-fork-lifecycle T26 — `packages/agent/src/app-works/app-upstream-sync.service.ts`
+- APW-02-fork-lifecycle T26 — `packages/agent/src/app-works/app-upstream-conflict.copy.ts`
+- APW-02-fork-lifecycle T27 — `apps/api/src/app-works/app-works.module.ts`
+- APW-02-fork-lifecycle T28 — `packages/agent/src/app-works/app-upstream-sync-dispatcher.service.ts`
+- APW-02-fork-lifecycle T30 — `apps/web/src/components/works/app/AppUpstreamCard.tsx`
+- APW-02-fork-lifecycle T32 — `packages/tasks/src/tasks/trigger/app-fork-readiness.task.ts`
+- APW-03-app-spec-and-catalog T2 — `packages/agent/src/events/app-spec-applied.event.ts`
+- APW-03-app-spec-and-catalog T3 — `packages/agent/src/works-config/schema/app-spec.schema.ts`
+- APW-03-app-spec-and-catalog T4 — `packages/agent/src/works-config/schema/app-spec.refs.ts`
+- APW-03-app-spec-and-catalog T5 — `packages/agent/src/works-config/schema/app-spec.rules.ts`
+- APW-03-app-spec-and-catalog T6 — `packages/agent/src/works-config/schema/app-spec.issues.ts`
+- APW-03-app-spec-and-catalog T6 — `packages/agent/src/works-config/schema/app-spec.validate.ts`
+- APW-03-app-spec-and-catalog T8 — `packages/agent/src/works-config/schema/emit-app-spec-json-schema.ts`
+- APW-03-app-spec-and-catalog T9 — `packages/agent/src/entities/work-app-spec-state.entity.ts`
+- APW-03-app-spec-and-catalog T10 — `apps/api/src/migrations/1792030000000-CreateWorkAppSpecStates.ts`
+- APW-03-app-spec-and-catalog T11 — `packages/agent/src/database/repositories/work-app-spec-state.repository.ts`
+- APW-03-app-spec-and-catalog T12 — `packages/agent/src/app-spec/app-spec.service.ts`
+- APW-03-app-spec-and-catalog T12 — `packages/agent/src/app-spec/app-spec-hash.ts`
+- APW-03-app-spec-and-catalog T13 — `packages/agent/src/tasks/app-spec-evaluate.types.ts`
+- APW-03-app-spec-and-catalog T15 — `apps/api/src/works/work-app-spec.controller.ts`
+- APW-03-app-spec-and-catalog T15 — `apps/api/src/works/dto/app-spec.dto.ts`
+- APW-03-app-spec-and-catalog T16 — `apps/web/src/lib/api/work-app-spec.ts`
+- APW-03-app-spec-and-catalog T16 — `apps/web/src/components/works/detail/settings/SettingsSubTabs.unit.spec.tsx`
+- APW-03-app-spec-and-catalog T18 — `apps/web/src/components/works/detail/settings/app-spec/app-spec-messages.unit.spec.ts`
+- APW-03-app-spec-and-catalog T19 — `apps/web/e2e/flow-app-spec-settings.spec.ts`
+- APW-03-app-spec-and-catalog T19 — `apps/web/e2e/flow-app-spec-recheck.spec.ts`
+- APW-03-app-spec-and-catalog T26 — `packages/agent/src/apps-catalog/app-blueprint-resolver.service.ts`
+- APW-03-app-spec-and-catalog T26 — `packages/agent/src/apps-catalog/app-source-catalog.adapter.ts`
+- APW-03-app-spec-and-catalog T39 — `packages/agent/src/app-license/spdx-expression.ts`
+- APW-04-app-provisioner T2 — `packages/agent/src/agents/repo-agent-template.reader.ts`
+- APW-04-app-provisioner T2 — `packages/agent/src/agents/__tests__/agent-templates.repo-template.spec.ts`
+- APW-04-app-provisioner T6 — `packages/contracts/src/apps/app-provisioning.ts`
+- APW-04-app-provisioner T6 — `packages/contracts/src/apps/app-provisioning-copy.ts`
+- APW-04-app-provisioner T6 — `packages/contracts/src/apps/__tests__/app-provisioning.spec.ts`
+- APW-04-app-provisioner T7 — `packages/agent/src/entities/work-app-provisioning.entity.ts`
+- APW-04-app-provisioner T7 — `packages/agent/src/database/repositories/work-app-provisioning.repository.ts`
+- APW-04-app-provisioner T7 — `packages/agent/src/entities/__tests__/work-app-provisioning.entity.spec.ts`
+- APW-04-app-provisioner T7 — `packages/agent/src/database/repositories/__tests__/work-app-provisioning.repository.spec.ts`
+- APW-04-app-provisioner T8 — `apps/api/src/migrations/1792040000000-CreateWorkAppProvisionings.ts`
+- APW-04-app-provisioner T8 — `apps/api/src/migrations/__tests__/CreateWorkAppProvisionings.spec.ts`
+- APW-04-app-provisioner T49 — `packages/contracts/src/apps/app-provisioning-copy.ts`
+- APW-05-builds T1 — `packages/contracts/src/apps/builds.ts`
+- APW-05-builds T2 — `packages/plugin/src/contracts/capabilities/build.interface.ts`
+- APW-05-builds T4 — `packages/agent/src/entities/work-build.entity.ts`
+- APW-05-builds T5 — `apps/api/src/migrations/1792050000000-CreateWorkBuilds.ts`
+- APW-05-builds T6 — `packages/agent/src/database/repositories/app-build.repository.ts`
+- APW-05-builds T8 — `packages/plugins/github-actions-build/src/workflow/generator.ts`
+- APW-05-builds T9 — `packages/plugins/github-actions-build/src/repo/branch-protection.ts`
+- APW-05-builds T10 — `packages/plugins/github-actions-build/src/repo/secret-sync.ts`
+- APW-05-builds T11 — `packages/plugins/github-actions-build/src/runner/runner-selector.ts`
+- APW-05-builds T12 — `packages/plugins/github-actions-build/src/runs/run-correlator.ts`
+- APW-05-builds T13 — `packages/plugins/github-actions-build/src/runs/failure-classifier.ts`
+- APW-05-builds T14 — `packages/plugins/github-actions-build/src/registry/ghcr-access.ts`
+- APW-05-builds T17 — `packages/agent/src/app-builds/app-builds.service.ts`
+- APW-05-builds T18 — `packages/agent/src/tasks/app-build-prepare-dispatcher.ts`
+- APW-05-builds T19 — `packages/agent/src/app-builds/app-build-prepare.runner.ts`
+- APW-05-builds T20 — `packages/agent/src/app-builds/app-build-watch.runner.ts`
+- APW-05-builds T21 — `packages/agent/src/app-builds/app-build-sweep.service.ts`
+- APW-05-builds T21 — `apps/api/src/app-builds/app-builds.module.ts`
+- APW-05-builds T41 — `packages/plugins/github-actions-build/src/workflow/checks-job.ts`
+- APW-06-app-runtime T1 — `packages/contracts/src/apps/app-runtime.ts`
+- APW-06-app-runtime T2 — `packages/plugin/src/contracts/capabilities/app-deployment.types.ts`
+- APW-06-app-runtime T2 — `packages/plugin/src/contracts/__tests__/app-deployment.types.spec.ts`
+- APW-06-app-runtime T3 — `packages/agent/src/app-runtime/ports.ts`
+- APW-06-app-runtime T3 — `packages/agent/src/app-runtime/default-ports.ts`
+- APW-06-app-runtime T3 — `packages/agent/src/app-runtime/index.ts`
+- APW-06-app-runtime T4 — `packages/plugins/k8s/src/app/app-names.ts`
+- APW-06-app-runtime T5 — `packages/plugins/k8s/src/app/app-security.ts`
+- APW-06-app-runtime T6 — `packages/plugins/k8s/src/app/app-manifest.renderer.ts`
+- APW-06-app-runtime T7 — `packages/plugins/k8s/src/app/app-network-policy.renderer.ts`
+- APW-06-app-runtime T8 — `packages/plugins/k8s/src/app/app-runner.script.ts`
+- APW-06-app-runtime T8 — `packages/plugins/k8s/src/app/app-jobs.renderer.ts`
+- APW-06-app-runtime T9 — `packages/plugins/k8s/src/app/app-rollout.ts`
+- APW-06-app-runtime T11 — `packages/plugins/k8s/src/app/app-kubeconfig.guard.ts`
+- APW-06-app-runtime T12 — `packages/plugins/k8s/src/app/app-deployer.ts`
+- APW-06-app-runtime T13 — `packages/plugins/k8s/src/app/app-status.reader.ts`
+- APW-06-app-runtime T17 — `packages/agent/src/entities/work-app-runtime-state.entity.ts`
+- APW-06-app-runtime T17 — `packages/agent/src/database/repositories/work-app-runtime-state.repository.ts`
+- APW-06-app-runtime T17 — `packages/agent/src/database/repositories/__tests__/work-app-runtime-state.repository.spec.ts`
+- APW-06-app-runtime T18 — `apps/api/src/migrations/1792060000000-ExtendWorkDeploymentsForApps.ts`
+- APW-06-app-runtime T18 — `apps/api/src/migrations/1792060100000-CreateWorkAppRuntimeStates.ts`
+- APW-06-app-runtime T20 — `packages/agent/src/facades/app-runtime.facade.ts`
+- APW-06-app-runtime T20 — `packages/agent/src/app-runtime/worker-context.ts`
+- APW-06-app-runtime T20 — `packages/agent/src/facades/__tests__/app-runtime.facade.spec.ts`
+- APW-06-app-runtime T21 — `packages/agent/src/app-runtime/app-deploy-preconditions.service.ts`
+- APW-06-app-runtime T21 — `packages/agent/src/app-runtime/app-license-gate.ts`
+- APW-06-app-runtime T22 — `packages/agent/src/app-runtime/app-render-input.builder.ts`
+- APW-06-app-runtime T22 — `packages/agent/src/app-runtime/__tests__/app-render-input.builder.spec.ts`
+- APW-06-app-runtime T23 — `packages/agent/src/app-runtime/app-public-smoke.service.ts`
+- APW-06-app-runtime T23 — `packages/agent/src/app-runtime/__tests__/app-public-smoke.service.spec.ts`
+- APW-06-app-runtime T24 — `packages/agent/src/app-runtime/app-deploy-request.service.ts`
+- APW-06-app-runtime T24 — `packages/agent/src/app-runtime/__tests__/app-deploy-request.service.spec.ts`
+- APW-06-app-runtime T25 — `packages/agent/src/app-runtime/app-deploy.orchestrator.ts`
+- APW-06-app-runtime T25 — `packages/agent/src/app-runtime/__tests__/app-deploy.orchestrator.spec.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/app-hosts.service.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/app-domains.service.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/__tests__/app-hosts.service.spec.ts`
+- APW-06-app-runtime T26 — `packages/agent/src/app-runtime/__tests__/app-domains.service.spec.ts`
+- APW-06-app-runtime T27 — `packages/agent/src/app-runtime/app-health.service.ts`
+- APW-06-app-runtime T27 — `packages/agent/src/app-runtime/__tests__/app-health.service.spec.ts`
+- APW-06-app-runtime T28 — `packages/agent/src/events/index.ts`
+- APW-06-app-runtime T32 — `packages/tasks/src/tasks/trigger/app-deploy.task.ts`
+- APW-06-app-runtime T32 — `packages/tasks/src/tasks/trigger/app-runtime-local-worker.ts`
+- APW-06-app-runtime T32 — `packages/tasks/src/__tests__/app-deploy.task.spec.ts`
+- APW-06-app-runtime T58 — `packages/agent/src/app-runtime/app-runtime-deletion.service.ts`
+- APW-06-app-runtime T58 — `packages/agent/src/app-runtime/__tests__/app-runtime-deletion.service.spec.ts`
+- APW-06-app-runtime T60 — `packages/agent/src/app-runtime/app-verification-target.service.ts`
+- APW-06-app-runtime T63 — `apps/web/e2e/accessibility-axe-deep.spec.ts`
+- APW-06-app-runtime T70 — `packages/agent/src/app-runtime/app-cluster-op.router.ts`
+- APW-06-app-runtime T70 — `packages/agent/src/app-runtime/app-lifecycle-ops.service.ts`
+- APW-06-app-runtime T70 — `packages/agent/src/app-runtime/app-smoke.service.ts`
+- APW-06-app-runtime T70 — `packages/agent/src/app-runtime/__tests__/app-lifecycle-ops.service.spec.ts`
+- APW-06-app-runtime T71 — `packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts`
+- APW-06-app-runtime T71 — `packages/tasks/src/trigger/worker/modules/__tests__/trigger-app-runtime.module.spec.ts`
+- APW-07-app-env-and-dependencies T1 — `packages/contracts/src/apps/app-env.ts`
+- APW-07-app-env-and-dependencies T2 — `packages/contracts/src/apps/app-dependencies.ts`
+- APW-07-app-env-and-dependencies T3 — `packages/plugin/src/contracts/capabilities/app-dependency.interface.ts`
+- APW-07-app-env-and-dependencies T5 — `packages/agent/src/entities/work-app-env-value.entity.ts`
+- APW-07-app-env-and-dependencies T6 — `packages/agent/src/entities/work-app-dependency.entity.ts`
+- APW-07-app-env-and-dependencies T7 — `apps/api/src/migrations/1792070000000-CreateAppEnvAndDependencies.ts`
+- APW-07-app-env-and-dependencies T8 — `packages/agent/src/database/repositories/work-app-env-value.repository.ts`
+- APW-07-app-env-and-dependencies T9 — `packages/agent/src/app-env/app-env-crypto.ts`
+- APW-07-app-env-and-dependencies T10 — `packages/agent/src/app-env/generators.ts`
+- APW-07-app-env-and-dependencies T11 — `packages/agent/src/app-env/validation.ts`
+- APW-07-app-env-and-dependencies T12 — `packages/agent/src/app-env/dotenv-parser.ts`
+- APW-07-app-env-and-dependencies T13 — `packages/agent/src/app-env/app-env.service.ts`
+- APW-07-app-env-and-dependencies T13 — `packages/agent/src/app-env/app-env.module.ts`
+- APW-07-app-env-and-dependencies T14 — `packages/agent/src/app-env/app-env.resolver.ts`
+- APW-07-app-env-and-dependencies T15 — `packages/agent/src/app-env/app-env.listener.ts`
+- APW-07-app-env-and-dependencies T16 — `packages/agent/src/facades/app-dependency.facade.ts`
+- APW-07-app-env-and-dependencies T17 — `packages/agent/src/tasks/app-dependency-provision-dispatcher.ts`
+- APW-07-app-env-and-dependencies T19 — `packages/plugins/k8s/src/app-dependencies/common.ts`
+- APW-07-app-env-and-dependencies T20 — `packages/plugins/k8s/src/app-dependencies/redis.provider.ts`
+- APW-07-app-env-and-dependencies T21 — `packages/plugins/k8s/src/app-dependencies/object-storage.provider.ts`
+- APW-07-app-env-and-dependencies T35 — `packages/contracts/src/apps/tenant-postgres-ddl.ts`
+- APW-08-evolve-loop T2 — `apps/api/src/agents/work-commit-lock.ts`
+- APW-08-evolve-loop T2 — `apps/api/src/agents/work-commit-lock.spec.ts`
+- APW-08-evolve-loop T10 — `packages/agent/src/app-works/app-work-rules.service.ts`
+- APW-08-evolve-loop T10 — `packages/agent/src/app-works/__tests__/app-work-rules.service.spec.ts`
+- APW-08-evolve-loop T17 — `packages/agent/src/app-works/app-change-guard.ts`
+- APW-08-evolve-loop T17 — `packages/agent/src/app-works/__tests__/app-change-guard.spec.ts`
+- APW-09-upstream-pull-requests T1 — `packages/plugins/github/src/__tests__/github-api.service.cross-repo.spec.ts`
+- APW-09-upstream-pull-requests T4 — `packages/agent/src/facades/__tests__/git.facade.member-token.spec.ts`
+- APW-09-upstream-pull-requests T9 — `packages/agent/src/upstream-pull-requests/upstream-pull-requests.module.ts`
+- APW-09-upstream-pull-requests T43 — `packages/agent/src/upstream-pull-requests/upstream-credential.service.ts`
+- APW-10-apps-hosting-tier T1 — `packages/contracts/src/apps/apps-tier.ts`
+- APW-10-apps-hosting-tier T1 — `packages/contracts/src/apps/__tests__/apps-tier.spec.ts`
+- APW-10-apps-hosting-tier T2 — `packages/plugin/src/contracts/capabilities/apps-tier.interface.ts`
+- APW-10-apps-hosting-tier T2 — `packages/plugin/src/contracts/__tests__/apps-tier.types.spec.ts`
+- APW-10-apps-hosting-tier T3 — `packages/hosting-crds/src/crds/__tests__/crds.spec.ts`
+- APW-10-apps-hosting-tier T6 — `apps/hosting-operator/src/main.ts`
+- APW-11-app-launcher T1 — `packages/contracts/src/apps/app-launcher.ts`
+- APW-11-app-launcher T1 — `packages/contracts/src/apps/__tests__/app-launcher.spec.ts`
+- APW-11-app-launcher T2 — `packages/agent/src/entities/app-launcher-preference.entity.ts`
+- APW-11-app-launcher T2 — `packages/agent/src/entities/__tests__/app-launcher-preference.entity.spec.ts`
+- APW-11-app-launcher T3 — `apps/api/src/migrations/1792110000000-CreateAppLauncherPreferences.ts`
+- APW-11-app-launcher T3 — `apps/api/src/migrations/__tests__/CreateAppLauncherPreferences.spec.ts`
+- APW-11-app-launcher T4 — `packages/agent/src/app-launcher/launcher-address.ts`
+- APW-11-app-launcher T4 — `packages/agent/src/app-launcher/launcher-order.ts`
+- APW-11-app-launcher T5 — `packages/agent/src/database/repositories/app-launcher-preference.repository.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/app-launcher.service.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/app-launcher.errors.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/app-launcher.module.ts`
+- APW-11-app-launcher T6 — `packages/agent/src/app-launcher/__tests__/app-launcher.service.spec.ts`
+- APW-11-app-launcher T8 — `apps/api/src/app-launcher/platform-catalog.schema.ts`
+- APW-11-app-launcher T8 — `apps/api/src/app-launcher/platform-catalog.service.ts`
+- APW-11-app-launcher T8 — `apps/api/src/app-launcher/platform-catalog.service.spec.ts`
+- APW-11-app-launcher T9 — `apps/api/src/app-launcher/guards/app-launcher-enabled.guard.ts`
+- APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.controller.ts`
+- APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.module.ts`
+- APW-11-app-launcher T9 — `apps/api/src/app-launcher/app-launcher.controller.spec.ts`
+- APW-11-app-launcher T10 — `packages/app-launcher/package.json`
+- APW-11-app-launcher T10 — `packages/app-launcher/src/__tests__/index.spec.ts`
+- APW-11-app-launcher T11 — `packages/app-launcher/src/grid-navigation.ts`
+- APW-11-app-launcher T11 — `packages/app-launcher/src/__tests__/grid-navigation.spec.ts`
+- APW-11-app-launcher T12 — `packages/app-launcher/src/ever-app-launcher.ts`
+- APW-11-app-launcher T12 — `packages/app-launcher/src/__tests__/ever-app-launcher.spec.ts`
+- APW-11-app-launcher T13 — `apps/web/src/lib/feature-flags/app-launcher.ts`
+- APW-11-app-launcher T13 — `apps/web/src/lib/feature-flags/app-launcher.unit.spec.ts`
+- APW-11-app-launcher T14 — `apps/web/src/app/api/me/apps/route.ts`
+- APW-11-app-launcher T14 — `apps/web/src/components/app-launcher/AppLauncherButton.tsx`
+- APW-11-app-launcher T14 — `apps/web/src/lib/app-launcher/app-launcher-telemetry.ts`
+- APW-11-app-launcher T14 — `apps/web/src/components/app-launcher/AppLauncherButton.unit.spec.tsx`
+- APW-11-app-launcher T16 — `apps/web/src/components/settings/AppLauncherSettings.tsx`
+- APW-11-app-launcher T16 — `apps/web/src/lib/api/app-launcher.ts`
+- APW-11-app-launcher T16 — `apps/web/src/app/actions/settings/app-launcher.ts`
+- APW-11-app-launcher T16 — `apps/web/src/components/settings/AppLauncherSettings.unit.spec.tsx`
+- APW-11-app-launcher T17 — `apps/web/src/components/works/detail/settings/AppLauncherExposureSetting.tsx`
+- APW-11-app-launcher T17 — `apps/web/src/components/works/detail/overview/AppLauncherExposureCard.tsx`
+- APW-11-app-launcher T17 — `apps/web/src/components/works/detail/overview/AppLauncherExposureCard.unit.spec.tsx`
+- APW-11-app-launcher T19 — `apps/web/src/lib/app-launcher/__tests__/app-launcher-messages.unit.spec.ts`
+- APW-11-app-launcher T20 — `apps/web/e2e/flow-app-launcher-apps.spec.ts`
+- APW-11-app-launcher T21 — `apps/web/src/lib/app-launcher/__tests__/no-sso-claims.unit.spec.ts`
+- APW-11-app-launcher T22 — `docs/features/app-launcher.md`
+- APW-11-app-launcher T26 — `apps/api/src/app-launcher/launcher-delegated-cors.middleware.ts`
+- APW-11-app-launcher T26 — `apps/api/src/app-launcher/launcher-delegated-cors.middleware.spec.ts`
+- APW-11-app-launcher T32 — `apps/web/src/components/activity-log/ActivityTypeBadge.unit.spec.tsx`
+- APW-11-app-launcher T33 — `apps/api/src/app-launcher/e2e-seed.controller.ts`
+- APW-11-app-launcher T33 — `apps/api/src/app-launcher/e2e-seed.controller.spec.ts`
+- APW-12-ever-id T3 — `packages/contracts/src/apps/ever-id.ts`
+- APW-12-ever-id T4 — `packages/plugin/src/contracts/capabilities/identity-provider.interface.ts`
+- APW-12-ever-id T4 — `packages/plugin/src/contracts/__tests__/identity-provider.interface.spec.ts`
+- APW-12-ever-id T5 — `packages/plugins/oidc-identity/src/__tests__/settings.schema.spec.ts`
+- APW-12-ever-id T6 — `packages/plugins/oidc-identity/src/discovery.ts`
+- APW-12-ever-id T6 — `packages/plugins/oidc-identity/src/__tests__/test-connection.spec.ts`
+- APW-12-ever-id T7 — `packages/plugins/oidc-identity/src/__tests__/authorization-request.spec.ts`
+- APW-12-ever-id T8 — `packages/plugins/oidc-identity/src/testing/fake-oidc-provider.ts`
+- APW-12-ever-id T8 — `packages/plugins/oidc-identity/src/__tests__/access-token.spec.ts`
+- APW-13-golden-paths T1 — `apps/web/e2e/fakes/github-fake/fixtures/README.md`
+- APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/server.mjs`
+- APW-13-golden-paths T2 — `apps/web/e2e/fakes/github-fake/__tests__/server.unit.spec.ts`
+- APW-13-golden-paths T3 — `apps/web/e2e/fakes/github-fake/__tests__/contract.unit.spec.ts`
+- APW-13-golden-paths T4 — `apps/web/vitest.e2e-harness.config.ts`
+- APW-13-golden-paths T5 — `packages/plugins/github/src/__tests__/e2e-fakes-switch.spec.ts`
+- APW-13-golden-paths T6 — `apps/web/e2e/helpers/app-works.ts`
+- APW-13-golden-paths T6 — `apps/web/e2e/helpers/__tests__/app-works.unit.spec.ts`
+- APW-13-golden-paths T7 — `apps/web/e2e/helpers/app-works-poll.ts`
+- APW-13-golden-paths T7 — `apps/web/e2e/helpers/__tests__/app-works-poll.unit.spec.ts`
+- APW-13-golden-paths T8 — `apps/web/e2e/helpers/app-works-live.ts`
+- APW-13-golden-paths T8 — `apps/web/e2e/helpers/__tests__/app-works-live.unit.spec.ts`
+- APW-13-golden-paths T9 — `apps/web/e2e/helpers/github-estate.ts`
+- APW-13-golden-paths T9 — `apps/web/e2e/helpers/__tests__/github-estate.unit.spec.ts`
+- APW-13-golden-paths T10 — `apps/web/e2e/helpers/k8s-assert.ts`
+- APW-13-golden-paths T10 — `apps/web/e2e/helpers/__tests__/k8s-assert.unit.spec.ts`
+- APW-13-golden-paths T11 — `apps/web/e2e/helpers/canary-sink.ts`
+- APW-13-golden-paths T11 — `apps/web/e2e/helpers/__tests__/app-works-evidence.unit.spec.ts`
+- APW-13-golden-paths T12 — `apps/web/playwright.app-works.config.ts`
+- APW-13-golden-paths T14 — `apps/web/e2e/flow-repo-work-kind-regression.spec.ts`
+- APW-13-golden-paths T15 — `apps/web/e2e/flow-template-fork-success.spec.ts`
+- APW-13-golden-paths T16 — `apps/web/e2e/flow-activity-deploy-and-pr-events.spec.ts`
+- APW-13-golden-paths T17 — `apps/web/e2e/flow-github-intake-signed-delivery.spec.ts`
+- APW-13-golden-paths T18 — `apps/web/e2e/flow-managed-subdomain-allocation.spec.ts`
+- APW-13-golden-paths T30 — `apps/web/e2e/flow-app-work-create-from-url.spec.ts`
+- APW-13-golden-paths T31 — `apps/web/e2e/flow-app-work-fork-lifecycle.spec.ts`
+- APW-13-golden-paths T32 — `apps/web/e2e/sec-pin-app-works-license-gate.spec.ts`
+- APW-13-golden-paths T33 — `apps/web/e2e/flow-app-work-delete-retains.spec.ts`
+- APW-13-golden-paths T33 — `apps/web/e2e/flow-app-work-target-none.spec.ts`
+- APW-13-golden-paths T56 — `docs/runbooks/app-works-acceptance-lanes.md`
+- APW-13-golden-paths T63 — `apps/web/e2e/helpers/github-connection.ts`
+- APW-13-golden-paths T63 — `apps/web/e2e/helpers/__tests__/github-connection.unit.spec.ts`
+- APW-13-golden-paths T64 — `docs/runbooks/app-works-acceptance-lanes.md`
+
+## PER EPIC — named / already present / landed (13 epics)
+
+| Epic | Named | Landed paths (marked new, exists) | Landed tasks | Tasks |
+| ---- | ----- | --------------------------------- | ------------ | ----- |
+| APW-01-app-work-kind | 53 | 12 | 9 | 44 |
+| APW-02-fork-lifecycle | 47 | 19 | 15 | 53 |
+| APW-03-app-spec-and-catalog | 118 | 23 | 17 | 59 |
+| APW-04-app-provisioner | 122 | 12 | 5 | 60 |
+| APW-05-builds | 65 | 19 | 18 | 48 |
+| APW-06-app-runtime | 140 | 54 | 29 | 73 |
+| APW-07-app-env-and-dependencies | 66 | 21 | 20 | 48 |
+| APW-08-evolve-loop | 121 | 6 | 3 | 56 |
+| APW-09-upstream-pull-requests | 91 | 4 | 4 | 46 |
+| APW-10-apps-hosting-tier | 148 | 6 | 4 | 53 |
+| APW-11-app-launcher | 72 | 48 | 22 | 33 |
+| APW-12-ever-id | 121 | 9 | 6 | 53 |
+| APW-13-golden-paths | 91 | 33 | 24 | 73 |
+
+Landed tasks **176 of 699** — a task counts once when any path it marks new exists, so this is a surfaces count and never an effort count (see the ledger's §3 for why that distinction matters).
+
+## ABSENT PATHS (989) — grouped by epic
+
+Listed by count only: an absent path is the normal state of unbuilt work, and a 1 500-line list of them
+in the repository would be noise. Pass `--full` to print every path to stdout instead.
+
+- APW-10-apps-hosting-tier: 142
+- APW-08-evolve-loop: 115
+- APW-12-ever-id: 112
+- APW-04-app-provisioner: 110
+- APW-03-app-spec-and-catalog: 95
+- APW-09-upstream-pull-requests: 87
+- APW-06-app-runtime: 86
+- APW-13-golden-paths: 58
+- APW-05-builds: 46
+- APW-07-app-env-and-dependencies: 45
+- APW-01-app-work-kind: 41
+- APW-02-fork-lifecycle: 28
+- APW-11-app-launcher: 24

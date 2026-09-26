@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import JSZip from 'jszip';
 import type { DataSource } from 'typeorm';
 import { BACKUP_DOMAINS } from '@ever-works/contracts';
 import { referencedEntities } from './collectors/domain-specs';
@@ -802,6 +803,78 @@ describe('WorkspaceBackupRunner', () => {
             const names = worksDomain(h.terminal()).files.map((file) => file.name);
             expect(names).toContain('data/works/works.jsonl');
             expect(names.some((name) => name.includes('/content/'))).toBe(false);
+        });
+    });
+
+    describe('the App Launcher preference file (APW-11 T30)', () => {
+        // T30's "Done when" is a statement about the ARCHIVE, not about the
+        // coverage table: a workspace whose owner pinned one item must list
+        // `data/account/app-launcher-preferences.jsonl`, and that file must
+        // carry the row. So this reads the zip back rather than the manifest —
+        // a manifest that named a file the writer never produced is exactly
+        // the failure the coverage table's own guard cannot see.
+        const PINNED = {
+            id: 'p1',
+            userId: 'u1',
+            scopeKey: 'personal',
+            itemKey: 'work:w1',
+            visible: true,
+            pinned: true,
+            pinOrder: 0,
+            sortOrder: 0,
+        };
+
+        const PREFERENCE_FILE = 'data/account/app-launcher-preferences.jsonl';
+
+        function accountDomain(terminal: Record<string, unknown> | undefined) {
+            const summary = terminal?.manifestSummary as {
+                domains: {
+                    key: string;
+                    status: string;
+                    records: number;
+                    files: { name: string; records: number }[];
+                }[];
+            };
+            return summary.domains.find((domain) => domain.key === 'account')!;
+        }
+
+        it('lists it in the manifest and carries the pinned row inside the zip', async () => {
+            let archived = Buffer.alloc(0);
+            const h = harness({
+                rows: {
+                    // Every other table present but empty, so the account
+                    // domain is complete rather than reported as "this build
+                    // does not have it".
+                    ...Object.fromEntries(
+                        referencedEntities().map((entity) => [
+                            entity,
+                            [] as Record<string, unknown>[],
+                        ]),
+                    ),
+                    AppLauncherPreference: [PINNED],
+                },
+                putArchive: jest.fn().mockImplementation(async (source: Readable) => {
+                    const chunks: Buffer[] = [];
+                    for await (const chunk of source) {
+                        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+                    }
+                    archived = Buffer.concat(chunks);
+                    return { key: 'u1/archive.zip', backend: 'fixture-backend' };
+                }) as unknown as BackupStorage['putArchive'],
+            });
+
+            const result = await h.runner.run('b1', OPTIONS);
+            expect(result.status).toBe('ready');
+
+            const account = accountDomain(h.terminal());
+            expect(account.files.map((file) => file.name)).toContain(PREFERENCE_FILE);
+            expect(account.files.find((file) => file.name === PREFERENCE_FILE)?.records).toBe(1);
+
+            const zip = await JSZip.loadAsync(archived);
+            const entry = zip.file(PREFERENCE_FILE);
+            expect(entry).not.toBeNull();
+            const lines = (await entry!.async('string')).trim().split('\n').filter(Boolean);
+            expect(lines.map((line) => JSON.parse(line) as unknown)).toEqual([PINNED]);
         });
     });
 

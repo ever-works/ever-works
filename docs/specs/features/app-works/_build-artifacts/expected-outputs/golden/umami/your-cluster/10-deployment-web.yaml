@@ -1,0 +1,122 @@
+# GOLDEN — umami · target your-cluster · Deployment `web`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.3 (replicas, `revisionHistoryLimit: 5`, `progressDeadlineSeconds` = the
+# Spec      : component deadline, Recreate when the component has volumes else RollingUpdate,
+# Spec      : `minReadySeconds: 30` for a worker without probes, pod annotations, `envFrom` NOT optional,
+# Spec      : `enableServiceLinks: false`, soft topology spread, `imagePullPolicy: IfNotPresent`)
+# Spec      : APW-06 plan.md §4.4 (security context), §4.5 (probes and resources from the App spec)
+# Spec      : APW-06 plan.md §5.3 (deadline clamp 300…2400 s)
+# Spec      : APW-06 spec.md FR-11, FR-14, FR-15, FR-28
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: web
+    namespace: ew-umami-33333333
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: umami
+        ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+        ever-works.io/kind: app
+        ever-works.io/component: web
+spec:
+    replicas: 1
+    revisionHistoryLimit: 5
+    progressDeadlineSeconds: 450
+    minReadySeconds: 0
+    strategy:
+        type: RollingUpdate
+        rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+    selector:
+        matchLabels:
+            ever-works.io/component: web
+    template:
+        metadata:
+            labels:
+                ever-works.io/component: web
+                app.kubernetes.io/managed-by: ever-works-k8s-plugin
+                app.kubernetes.io/part-of: umami
+                ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+                ever-works.io/kind: app
+            annotations:
+                ever-works.io/env-checksum: 3289ab9d92092265
+                ever-works.io/build-commit: c3d4e5f60718293a4b5c6d7e8f9012345678b1c2
+                ever-works.io/deployment-id: 99999999-9999-4999-8999-999999999999
+        spec:
+            serviceAccountName: app
+            automountServiceAccountToken: false
+            enableServiceLinks: false
+            securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                    type: RuntimeDefault
+            imagePullSecrets:
+                - name: app-pull
+            topologySpreadConstraints:
+                - maxSkew: 1
+                  topologyKey: kubernetes.io/hostname
+                  whenUnsatisfiable: ScheduleAnyway
+                  labelSelector:
+                      matchLabels:
+                          ever-works.io/component: web
+            containers:
+                - name: web
+                  image: ghcr.io/umami-software/umami@sha256:85909afc45bdcda1917394594a087421fdbb05610fded0fa9f6fb861abb2f367
+                  imagePullPolicy: IfNotPresent
+                  ports:
+                      - name: http
+                        containerPort: 3000
+                        protocol: TCP
+                  envFrom:
+                      - secretRef:
+                            name: app-env-3289ab9d92
+                            optional: false
+                      - configMapRef:
+                            name: app-platform-3289ab9d92
+                            optional: false
+                  startupProbe:
+                      httpGet:
+                          path: /api/heartbeat
+                          port: http
+                      initialDelaySeconds: 0
+                      timeoutSeconds: 5
+                      periodSeconds: 5
+                      failureThreshold: 60
+                  readinessProbe:
+                      httpGet:
+                          path: /login
+                          port: http
+                      initialDelaySeconds: 0
+                      timeoutSeconds: 5
+                      periodSeconds: 10
+                      failureThreshold: 3
+                  livenessProbe:
+                      httpGet:
+                          path: /api/heartbeat
+                          port: http
+                      initialDelaySeconds: 0
+                      timeoutSeconds: 5
+                      periodSeconds: 30
+                      failureThreshold: 3
+                  resources:
+                      requests:
+                          cpu: 250m
+                          memory: 512Mi
+                      limits:
+                          memory: 1Gi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: false
+                      capabilities:
+                          drop:
+                              - ALL
+            volumes:
+                - name: tmp
+                  emptyDir:
+                      sizeLimit: 256Mi

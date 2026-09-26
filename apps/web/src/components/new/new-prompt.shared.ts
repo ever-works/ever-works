@@ -26,53 +26,31 @@ import { ROUTES } from '@/lib/constants';
  * both live at the call site.
  */
 
-export type ChipType =
-    | 'mission'
-    | 'idea'
-    | 'agent'
-    | 'task'
-    | 'website'
-    | 'landing-page'
-    | 'blog'
-    | 'directory'
-    | 'awesome-repo'
-    | 'repo'
-    | 'company';
-
 /**
- * Spec §6.3 order:
- * `Mission · Idea · Website · Landing Page · Store · Blog · Directory
- *  · Awesome Repo · Knowledge Base · Company`.
+ * The chip CATALOG itself lives one level up, in `@/lib/work-kinds/chip-values`
+ * — a module with no `'use client'` directive — and is re-exported here.
  *
- * Live chips below stay in their current order (mission first, ideas
- * second, then content chips). `Company` joins at the end of the live
- * chip list per the spec, sitting next to the inert `store` chip which
- * is appended afterwards.
+ * It is not declared in this file, and that is load-bearing in two directions:
+ *
+ *  - the two server components `app/[locale]/(dashboard)/new/page.tsx` and
+ *    `…/works/new/page.tsx` import the arrays directly and hand them to
+ *    `getDisabledWorkKinds`, whose first act is `values.filter(…)`. A server
+ *    component that imports a plain value from a CLIENT module receives a client
+ *    reference rather than the array, which threw
+ *    `TypeError: a.filter is not a function` during the server render and 500'd
+ *    both pages. `chip-values.ts` exists to be the one module both sides may read;
+ *  - `lib/work-kinds/chip-values.unit.spec.ts` asserts **identity**, not equality
+ *    (`expect(VIA_NEW_INDEX).toBe(ALL_NEW_CHIP_VALUES)`), and asserts that the
+ *    array is declared exactly once in the tree. A second literal here would pass
+ *    an equality check and then drift silently, which is the failure that spec was
+ *    written to catch.
+ *
+ * Everything BELOW this re-export — icons, placeholders, descriptions, routes —
+ * is genuinely per-surface presentation and stays here, shared by `/new` and the
+ * Dashboard composer.
  */
-export const CHIP_ORDER: readonly ChipType[] = [
-    'mission',
-    'idea',
-    'agent',
-    'task',
-    'website',
-    'landing-page',
-    'blog',
-    'directory',
-    'awesome-repo',
-    // Self-build slice D (EW-766) — an existing code repository as a Work.
-    'repo',
-    'company',
-];
-
-/**
- * Every chip value whose availability is gated by a `works-<value>`
- * PostHog feature flag (fail-open — see
- * `@/lib/feature-flags/work-kinds`). Includes the live chips (which now
- * cover `company`, graduated in EW-662 Phase 10) plus the inert baseline
- * `store` so the caller can resolve one flag set covering the whole
- * catalog.
- */
-export const ALL_NEW_CHIP_VALUES: ReadonlyArray<ChipType | 'store'> = [...CHIP_ORDER, 'store'];
+export { CHIP_ORDER, ALL_NEW_CHIP_VALUES, type ChipType } from '@/lib/work-kinds/chip-values';
+import type { ChipType } from '@/lib/work-kinds/chip-values';
 
 export const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     mission: Target,

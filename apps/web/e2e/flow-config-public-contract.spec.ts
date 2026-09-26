@@ -119,6 +119,7 @@ test.describe('Public config contract — /api/config deep integration', () => {
         expect(isPlainObject(features)).toBe(true);
         expect(Object.keys(features).sort()).toEqual([
             'anonymousAuthEnabled',
+            'appLauncherEnabled',
             'emailVerificationRequired',
             'magicLinkEnabled',
             'subscriptionsEnabled',

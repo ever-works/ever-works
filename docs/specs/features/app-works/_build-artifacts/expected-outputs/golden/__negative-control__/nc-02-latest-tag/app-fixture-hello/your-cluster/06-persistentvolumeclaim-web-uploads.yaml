@@ -1,0 +1,33 @@
+# GOLDEN — app-fixture-hello · target your-cluster · PersistentVolumeClaim `web-uploads`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.1 (name `<component>-<volume>`, label `ever-works.io/retain: "true"`)
+# Spec      : APW-06 plan.md §4.6 (`accessModes: [ReadWriteOnce]`, `resources.requests.storage: size`;
+# Spec      : annotation `ever-works.io/backup` from `volume.backup`)
+# Spec      : APW-06 spec.md FR-16 (redeploying, pausing, rolling back and removing never delete a claim)
+# Spec      : `storageClassName` is omitted so the cluster default applies (the target setting is operator
+# Spec      : state, not an App spec field) — see ../../README.md §"Values chosen".
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: web-uploads
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+        ever-works.io/component: web
+        ever-works.io/retain: 'true'
+    annotations:
+        ever-works.io/backup: 'false'
+spec:
+    accessModes:
+        - ReadWriteOnce
+    resources:
+        requests:
+            storage: 1Gi

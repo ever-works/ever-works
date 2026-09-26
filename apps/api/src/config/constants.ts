@@ -1,3 +1,5 @@
+import { config as agentConfig } from '@ever-works/agent/config';
+
 export const authConstants = {
     bcryptSaltRounds: 10,
     refreshTokenLength: 32,
@@ -479,6 +481,49 @@ export const config = {
         installDir: (): string => process.env.PLUGIN_INSTALL_DIR || '/app/plugins',
 
         /**
+         * EW-693 T27 — the most time the dynamic-mode boot warmup gives one
+         * plugin's fetch, in ms (`PLUGIN_WARMUP_TIMEOUT_MS`). The API awaits
+         * the warmup before it serves, and a registry fetch has no overall
+         * deadline of its own; the plugins are warmed in parallel, so this
+         * also bounds the whole warmup. `0` = no bound. Unset, or anything but
+         * a whole number ≥ 0: `undefined`, and the installer's default
+         * (60000) applies.
+         */
+        warmupTimeoutMs: (): number | undefined => {
+            const raw = (process.env.PLUGIN_WARMUP_TIMEOUT_MS ?? '').trim();
+            return /^\d+$/.test(raw) ? Number(raw) : undefined;
+        },
+
+        /**
+         * EW-693 T26 / FR-15 — install-on-use for facades
+         * (`PLUGIN_FACADE_INSTALL_ON_USE`). ON makes a facade that resolves
+         * a plugin this API process has not registered (an explicit provider
+         * override, or the Work's active plugin) ask the installer for it
+         * first — only a plugin the platform already installed, and only in
+         * `dynamic` mode. OFF (default): facades resolve only what is
+         * registered, as before. `true` (case-insensitive, trimmed) is ON;
+         * anything else, including unset, is OFF. When ON, the pinned version
+         * is placed on THIS replica (`ensureLocalInstall`, never writing the
+         * shared row) and registered (EW-693 T27; see
+         * `FacadePluginAvailabilityService`).
+         */
+        facadeInstallOnUse: (): boolean =>
+            (process.env.PLUGIN_FACADE_INSTALL_ON_USE ?? '').trim().toLowerCase() === 'true',
+
+        /**
+         * EW-693 T26 / FR-16 — run restricted-network sandbox sessions
+         * (`ManagedAgentSandboxRunnerService`, on the pipeline plugin its
+         * caller selected) through the job runtime
+         * (`PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`). OFF (default): the
+         * session runs in this process, through the plugin. ON: it runs in the
+         * `run-plugin-operation` worker task, with the Work's tenant. Same
+         * parsing as {@link facadeInstallOnUse}.
+         */
+        sandboxSessionsViaJobRuntime: (): boolean =>
+            (process.env.PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME ?? '').trim().toLowerCase() ===
+            'true',
+
+        /**
          * Fail-fast at boot: when `dynamic` mode is selected, at least
          * `PLUGIN_REGISTRY_URL` must be non-empty. Default-resolution
          * always returns a value (public npm), so this guard only
@@ -509,5 +554,25 @@ export const config = {
                 );
             }
         },
+    },
+
+    /**
+     * APW-11 (App Launcher) — FR-54's installation switch, as this public list
+     * reads it.
+     *
+     * **It delegates; it does not re-read the variable.** The semantics live in
+     * one place, `config.appLauncher.isEnabled()` in
+     * `@ever-works/agent/config`, so this list and the API's own
+     * `AppLauncherEnabledGuard` cannot disagree about whether the launcher
+     * exists (APW11-G12, plan §7) — which is the only thing that makes
+     * publishing the flag useful: a web UI that hid the surface while the API
+     * served it, or the reverse, is worse than not publishing it at all.
+     *
+     * That accessor is deliberately stricter than this file's other feature
+     * flags: only the exact string `'true'` is on (see its docstring for why a
+     * surface-wide gate fails closed instead of accepting `1`/`yes`).
+     */
+    appLauncher: {
+        isEnabled: () => agentConfig.appLauncher.isEnabled(),
     },
 };

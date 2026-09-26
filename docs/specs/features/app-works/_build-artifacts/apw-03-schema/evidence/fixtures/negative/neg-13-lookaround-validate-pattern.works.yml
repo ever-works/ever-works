@@ -1,0 +1,21 @@
+# NEGATIVE FIXTURE neg-13 — error class: `validate.pattern` that RE2 cannot compile.
+# Expected: JSON Schema PASS · rule layer FAIL `pattern_unsupported`.
+# schema.md §12: "`pattern` ≤ 500 chars, RE2 syntax (no back-references or look-around:
+# `pattern_unsupported`)". A JSON Schema `pattern` is ECMA-262 and WOULD accept this, so encoding the RE2
+# restriction in the schema would make editors disagree with the platform — it stays rule-level.
+# Cal.diy's APP_BOOTSTRAP_ADMIN_PASSWORD uses exactly this construct (working tree line 147).
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - name: ADMIN_PASSWORD
+          secret: true
+          prompt: { description: 'Password of the first administrator', required: true }
+          validate: { pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{15,}$" }

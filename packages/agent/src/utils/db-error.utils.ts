@@ -19,7 +19,10 @@ export function isUniqueConstraintError(err: unknown): boolean {
         code === '23505' || // postgres unique_violation
         code === 'SQLITE_CONSTRAINT_UNIQUE' ||
         code === 'SQLITE_CONSTRAINT' || // older better-sqlite3 / node-sqlite codes
+        code === 'ER_DUP_ENTRY' || // MySQL / MariaDB (mysql2 driver code)
+        code === '1062' || // MySQL / MariaDB (server error number)
         message.includes('unique constraint failed') || // sqlite text
-        message.includes('duplicate key value') // postgres text
+        message.includes('duplicate key value') || // postgres text
+        message.includes('duplicate entry') // MySQL / MariaDB text
     );
 }

@@ -1,0 +1,526 @@
+# App Works — APW-12 OpenAPI fragment (Ever ID relying party)
+#
+# Skeleton, not a source of truth. The generated `apps/api/openapi.json` is authoritative;
+# this fragment is the reviewable expectation that the generated document is a SUPERSET of it.
+# See ../README.md for the convention, the superset rule and the checker.
+#
+# The controller is `@Controller('api/auth/ever-id')`; the thirteen routes below are its
+# members plus the `everId` addition to the existing `GET /api/auth/providers`.
+# Every `x-mcp: not-exposed` below is a decision, with its reason, from ../agent-surfaces.md.
+openapi: 3.0.3
+
+info:
+    title: Ever Works API — App Works fragment (APW-12)
+    description: >-
+        Routes owned by APW-12 (Ever ID single sign-on). Method, path, auth class, throttle and
+        request → response are taken from the epic plan's endpoint table; DTO property types are
+        to be derived from `apps/api/src/auth/dto/ever-id.dto.ts` and are not invented here.
+    version: fragment
+
+paths:
+    /api/auth/providers:
+        get:
+            operationId: listAuthProviders
+            summary: List the configured sign-in providers (APW-12 adds `everId`)
+            description: The existing public route; APW-12 adds one entry describing Ever ID.
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed
+            responses:
+                '200':
+                    description: The provider list, extended.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                additionalProperties: true
+                                properties:
+                                    everId:
+                                        type: object
+                                        required: [enabled, displayName]
+                                        additionalProperties: false
+                                        properties:
+                                            enabled:
+                                                type: boolean
+                                            displayName:
+                                                type: string
+                                                maxLength: 40
+
+    /api/auth/ever-id/authorize:
+        post:
+            operationId: everIdAuthorize
+            summary: Start an Ever ID sign-in
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — a browser redirect flow with an OIDC transaction; no machine equivalent)
+            x-throttle: 20 / 60 s per IP
+            requestBody:
+                required: false
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                                returnTo:
+                                    type: string
+                                    maxLength: 2048
+                                    description: Must start with `/` but not `//`.
+            responses:
+                '200':
+                    description: The authorization URL and its transaction handle.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AuthorizationStart'
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+                '400':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/callback:
+        post:
+            operationId: everIdCallback
+            summary: Complete an Ever ID sign-in or account link
+            description: >-
+                A bearer token is read only when the transaction's intent is `connect`. Refuses any
+                token in the query string (`400 tokenInQuery`) before the handler runs.
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — browser redirect flow)
+            x-throttle: 20 / 60 s per IP
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [code, state, transaction]
+                            additionalProperties: false
+                            properties:
+                                code:
+                                    type: string
+                                state:
+                                    type: string
+                                iss:
+                                    type: string
+                                transaction:
+                                    type: string
+                                    maxLength: 4096
+            responses:
+                '200':
+                    description: >-
+                        An `EverIdCallbackOutcome`: `signedIn` (with an access token and user),
+                        `confirmSignUp` (pending handle + identity), `confirmConnect` (pending handle +
+                        identity + account email) or `emailInUse` (the address only, because the person
+                        just proved control of it at Ever ID).
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EverIdCallbackOutcome'
+                '400':
+                    $ref: '#/components/responses/EverIdError'
+                '401':
+                    $ref: '#/components/responses/EverIdError'
+                '403':
+                    $ref: '#/components/responses/EverIdError'
+                '422':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/sign-up/confirm:
+        post:
+            operationId: everIdSignUpConfirm
+            summary: Confirm an Ever ID sign-up
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — browser redirect flow)
+            x-throttle: 10 / 60 s per IP
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [pending, acceptedTerms]
+                            additionalProperties: false
+                            properties:
+                                pending:
+                                    type: string
+                                    maxLength: 4096
+                                acceptedTerms:
+                                    type: array
+                                    maxItems: 10
+                                    items:
+                                        type: string
+            responses:
+                '200':
+                    description: A token response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/TokenResponse'
+                '403':
+                    $ref: '#/components/responses/EverIdError'
+                '422':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/connect/authorize:
+        post:
+            operationId: everIdConnectAuthorize
+            summary: Start linking an Ever ID to the signed-in account
+            description: Session-only; a non-session credential is refused with `403 sessionRequired`.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — the API admits only `authMethod === 'session'`)
+            x-throttle: 10 / 60 s per user
+            responses:
+                '200':
+                    description: The authorization URL and its transaction handle.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AuthorizationStart'
+                '403':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/connect/confirm:
+        post:
+            operationId: everIdConnectConfirm
+            summary: Finish linking an Ever ID to the signed-in account
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — session-only)
+            x-throttle: 10 / 60 s per user
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [pending]
+                            additionalProperties: false
+                            properties:
+                                pending:
+                                    type: string
+                                    maxLength: 4096
+            responses:
+                '200':
+                    description: The linked identity (issuer and subject are never returned).
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ExternalIdentity'
+                '409':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/identities:
+        get:
+            operationId: listExternalIdentities
+            summary: List the signed-in account's linked Ever ID identities
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — session-only)
+            responses:
+                '200':
+                    description: The linked identities plus whether disconnecting is allowed.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [items, canDisconnect]
+                                additionalProperties: false
+                                properties:
+                                    items:
+                                        type: array
+                                        items:
+                                            $ref: '#/components/schemas/ExternalIdentity'
+                                    canDisconnect:
+                                        type: boolean
+                                    disconnectBlockedReason:
+                                        type: string
+                '403':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/identities/{id}:
+        delete:
+            operationId: unlinkExternalIdentity
+            summary: Unlink an Ever ID identity
+            description: Refused with `409 lastSignInMethod` when it would lock the account out.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — session-only; also T3, it can remove the last way in)
+            x-throttle: 10 / 3600 s per user
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '204':
+                    description: Unlinked.
+                '403':
+                    $ref: '#/components/responses/EverIdError'
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+                '409':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/logout-url:
+        get:
+            operationId: everIdLogoutUrl
+            summary: The provider's logout URL for the current session
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — session-only)
+            x-throttle: 10 / 60 s per user
+            responses:
+                '200':
+                    description: The URL, when the current session was opened by an Ever ID identity.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [url]
+                                additionalProperties: false
+                                properties:
+                                    url:
+                                        type: string
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/backchannel-logout:
+        post:
+            operationId: everIdBackchannelLogout
+            summary: OIDC back-channel logout notification
+            description: Called by the identity provider, not by a user; the body is form-encoded.
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T4 — provider-to-platform, not a user action)
+            x-throttle: 60 / 60 s per IP
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            type: object
+                            required: [logout_token]
+                            additionalProperties: false
+                            properties:
+                                logout_token:
+                                    type: string
+            responses:
+                '200':
+                    description: 'Accepted. Answered with `Cache-Control: no-store`.'
+                '400':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/session:
+        post:
+            operationId: everIdSessionExchange
+            summary: Exchange an Ever ID access token for a platform session
+            description: Public with a bearer Ever ID token; the caller is a local client only.
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (T2/T4 — a client-credential path that carries a bearer token)
+            x-throttle: 10 / 60 s per IP
+            responses:
+                '200':
+                    description: A token response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/TokenResponse'
+                '401':
+                    $ref: '#/components/responses/EverIdError'
+                '403':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/client-config:
+        get:
+            operationId: everIdClientConfig
+            summary: The client configuration a local client needs to start a device sign-in
+            security: []
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            x-mcp: not-exposed (nothing in the agent loop needs it; the CLI device flow reads it)
+            x-throttle: 30 / 60 s per IP
+            responses:
+                '200':
+                    description: Issuer, local clients and scopes — no secrets.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [issuer, localClients, scopes]
+                                additionalProperties: false
+                                properties:
+                                    issuer:
+                                        type: string
+                                    localClients:
+                                        type: array
+                                        items:
+                                            type: object
+                                            additionalProperties: false
+                                            properties:
+                                                kind:
+                                                    type: string
+                                                    enum: [cli, node]
+                                                clientId:
+                                                    type: string
+                                    scopes:
+                                        type: array
+                                        items:
+                                            type: string
+
+    /api/auth/ever-id/admin/test:
+        post:
+            operationId: everIdAdminTest
+            summary: Run the identity provider's connection checks
+            description: Platform admin only; a non-admin answers `404`.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/tasks.md (admin routes)
+            x-mcp: not-exposed (T4 — platform admin)
+            x-throttle: 10 / 60 s per user
+            responses:
+                '200':
+                    description: One check per probe.
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    type: object
+                                    additionalProperties: true
+                                    description: An `IdentityProviderCheck`.
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/admin/health:
+        get:
+            operationId: everIdAdminHealth
+            summary: Identity provider health
+            description: Platform admin only; a non-admin answers `404`.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/tasks.md (admin routes)
+            x-mcp: not-exposed (T4 — platform admin)
+            responses:
+                '200':
+                    description: Refresh timestamps.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                additionalProperties: false
+                                properties:
+                                    discoveryRefreshedAt:
+                                        type: string
+                                        nullable: true
+                                    jwksRefreshedAt:
+                                        type: string
+                                        nullable: true
+                                    lastLogoutNoticeAt:
+                                        type: string
+                                        nullable: true
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+
+components:
+    securitySchemes:
+        JWT-auth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+
+    responses:
+        EverIdError:
+            description: >-
+                The shared Ever ID error body: `{ code }` from the epic's closed set —
+                `everIdDisabled` (404), `providerUnavailable` (503), `transactionInvalid` (400/401),
+                `emailNotVerified` (422), `signUpNotAllowed` (403), `subjectLinked`/`userHasIssuer`
+                (409), `reauthRequired` (403), `sessionRequired` (403), `lastSignInMethod` (409),
+                `notConnected` (403), `accountDisabled` (403), `tokenInQuery` (400),
+                `insufficientScope` (403).
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.2
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        required: [code]
+                        additionalProperties: true
+                        properties:
+                            code:
+                                type: string
+
+    schemas:
+        AuthorizationStart:
+            type: object
+            required: [authorizationUrl, transaction]
+            additionalProperties: false
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            properties:
+                authorizationUrl:
+                    type: string
+                transaction:
+                    type: string
+                    maxLength: 4096
+
+        EverIdCallbackOutcome:
+            description: >-
+                A discriminated union on `outcome`, written out in the epic's shared-types section.
+                This fragment names the four variants and their discriminators; the property lists
+                are to be derived from `packages/contracts/src/apps/ever-id.ts`.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md sections 3.5 and 5.1
+            oneOf:
+                - type: object
+                  required: [outcome]
+                  properties:
+                      outcome:
+                          const: signedIn
+                - type: object
+                  required: [outcome]
+                  properties:
+                      outcome:
+                          const: confirmSignUp
+                - type: object
+                  required: [outcome]
+                  properties:
+                      outcome:
+                          const: confirmConnect
+                - type: object
+                  required: [outcome]
+                  properties:
+                      outcome:
+                          const: emailInUse
+
+        ExternalIdentity:
+            description: >-
+                `ExternalIdentityDto`. The issuer and subject are never returned to the browser.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            type: object
+            additionalProperties: true
+            properties:
+                id:
+                    type: string
+                displayName:
+                    type: string
+                email:
+                    type: string
+                linkedAt:
+                    type: string
+                linkedVia:
+                    type: string
+                    enum: [sign-up, settings]
+                lastLoginAt:
+                    type: string
+                    nullable: true
+                delegatedClients:
+                    type: array
+                    items:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                            clientId:
+                                type: string
+                            lastSeenAt:
+                                type: string
+
+        TokenResponse:
+            description: >-
+                The platform's existing token response shape. Named, not redefined — this fragment
+                cites it rather than inventing its properties.
+            x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.1
+            type: object
+            additionalProperties: true

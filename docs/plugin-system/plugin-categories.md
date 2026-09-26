@@ -11,7 +11,7 @@ Every plugin in the Ever Works platform declares a **category** and one or more 
 
 ## Plugin Categories
 
-Categories are defined as a single source of truth in `@ever-works/plugin` via the `PLUGIN_CATEGORIES` constant, in `packages/plugin/src/contracts/plugin-manifest.types.ts`. It started at twelve entries and now carries **twenty-four**:
+Categories are defined as a single source of truth in `@ever-works/plugin` via the `PLUGIN_CATEGORIES` constant, in `packages/plugin/src/contracts/plugin-manifest.types.ts`. It started at twelve entries and now carries **twenty-seven** — the last three joined with their owning epics: `app-dependency` (APW-07), `build` (APW-05) and `identity` (APW-12).
 
 ```typescript
 const PLUGIN_CATEGORIES = [
@@ -40,7 +40,11 @@ const PLUGIN_CATEGORIES = [
 	'job-runtime', // background execution engines
 	'memory', // org-wide memory frameworks (contract only)
 	'rag', // composed retrieval pipelines (contract only)
-	'metrics' // read-only metric collectors for Goals
+	'metrics', // read-only metric collectors for Goals
+	// Added with their owning App Works epics (2026)
+	'app-dependency', // dependency providers the app environment needs (APW-07)
+	'build', // build providers that turn a source repository into a deployable image (APW-05)
+	'identity' // identity providers for Ever ID browser sign-in (APW-12)
 ] as const;
 
 type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
@@ -48,7 +52,7 @@ type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
 
 Each plugin declares exactly one category. The category is set on the plugin class and included in the plugin manifest.
 
-**Nineteen of the twenty-four carry at least one shipped plugin.** The counts below come from the 102 plugin packages under `packages/plugins/` — `ls` returns 103 entries, one of which is the workspace `README.md` — read from each package's `everworks.plugin.category` field. The remaining five (`form`, `integration`, `theme`, `memory`, `rag`) are contracts with nothing registered under them yet.
+**Twenty-one of the twenty-seven carry at least one shipped plugin.** The counts below come from the 105 plugin packages under `packages/plugins/` (every directory there declares an `everworks.plugin.category`) — read from each package's `everworks.plugin.category` field. The remaining six (`form`, `integration`, `theme`, `memory`, `rag` and `app-dependency`) are contracts with nothing registered under them yet; `app-dependency` joined that list with APW-07, whose providers declare the `deployment` category and the `app-dependency` **capability**.
 
 ### Category Overview
 
@@ -118,7 +122,7 @@ Every category that ships a plugin has a user-facing page describing what it doe
 | `secret-store-resolver` | [Secret Stores](../features/secret-stores.md)                                                                           |
 | `metrics`               | [Goals](../features/goals.md)                                                                                           |
 | `utility`               | [Built-in Plugins](./built-in-plugins.md)                                                                               |
-| Everything else         | [Plugins](../features/plugins.md) — the dashboard view of all twenty-four                                               |
+| Everything else         | [Plugins](../features/plugins.md) — the dashboard view of all twenty-seven                                              |
 
 ### Dashboard grouping and display order
 
@@ -138,7 +142,7 @@ Every category that ships a plugin has a user-facing page describing what it doe
 | `memory`                | Memory Frameworks     |
 | `rag`                   | RAG Pipelines         |
 
-`CATEGORY_DISPLAY_ORDER` in the same file pins twenty of the twenty-four into a fixed sequence. **`connector`, `metrics`, `memory` and `rag` are absent from that array**, so `compareCategoryOrder()` sorts them to the end, after Themes. A chip only appears for a category that has at least one registered plugin on the install, which is why Memory Frameworks and RAG Pipelines never show up.
+`CATEGORY_DISPLAY_ORDER` in the same file pins twenty of the twenty-seven into a fixed sequence. **`connector`, `metrics`, `memory`, `rag`, `app-dependency`, `build` and `identity` are absent from that array**, so `compareCategoryOrder()` sorts them to the end, after Themes. A chip only appears for a category that has at least one registered plugin on the install, which is why Memory Frameworks and RAG Pipelines never show up.
 
 ## Plugin Capabilities
 

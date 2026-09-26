@@ -8,6 +8,7 @@ import { NotificationDropdown } from './NotificationDropdown';
 import { WhatsNewButton } from './WhatsNewButton';
 import { WorkSwitcher } from './WorkSwitcher';
 import { CommandPaletteTrigger } from '@/components/command-palette/CommandPaletteTrigger';
+import { AppLauncherButton } from '@/components/app-launcher/AppLauncherButton';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Menu, HelpCircle, Sparkles, X } from 'lucide-react';
 
@@ -34,12 +35,26 @@ interface DashboardHeaderProps {
     onHelpClick?: () => void;
     onboardingBadge?: DashboardHeaderOnboardingBadge;
     whatsNew?: DashboardHeaderWhatsNew;
+    /**
+     * APW-11 — whether the App Launcher exists for this installation and this
+     * person, resolved ONCE in the dashboard layout
+     * (`app/[locale]/(dashboard)/layout.tsx` → `lib/feature-flags/app-launcher.ts`)
+     * and defaulted to `false` here so a caller that has not resolved it never
+     * renders a launcher by accident.
+     *
+     * The header is where the launcher's trigger mounts (APW-11 T14); until that
+     * lands this prop carries the resolved answer so no surface has to ask the
+     * config endpoint again — and so a stale answer cannot differ from the one
+     * the API's own guard uses.
+     */
+    appLauncherEnabled?: boolean;
 }
 
 export function DashboardHeader({
     onMenuClick,
     isSidebarOpen = true,
     onHelpClick,
+    appLauncherEnabled = false,
     onboardingBadge,
     whatsNew,
 }: DashboardHeaderProps) {
@@ -147,6 +162,16 @@ export function DashboardHeader({
                                 <HelpCircle className="w-3.5 h-3.5" />
                             </button>
                         </Tooltip>
+
+                        {/*
+                          APW-11 T14 — the App Launcher, AFTER the Help button, and
+                          only when the installation resolved the flag. The control
+                          mounts the `<ever-app-launcher>` element itself (it is the
+                          element's own trigger) and renders a disabled control if
+                          the element's chunk cannot load, so the header never breaks
+                          and this slot is never empty-but-clickable (ACC-11-01).
+                        */}
+                        {appLauncherEnabled && <AppLauncherButton />}
                     </div>
                 </div>
             </div>

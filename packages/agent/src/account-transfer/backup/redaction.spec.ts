@@ -595,7 +595,20 @@ describe('workspace backup redaction', () => {
             join(__dirname, '..', '..', 'plugins', 'entities'),
             join(__dirname, '..', 'entities'),
         ];
-        const SECRET_SHAPED = /secret|password|token|hash|credential/i;
+        // Key MATERIAL is matched with its qualifier attached (`privateKey`,
+        // `keyPem`, `passphrase`) and never as the bare substring `key` / `pem`.
+        // Those were measured on 2026-09-18 against the 172 entity files / 3,114
+        // declared properties in this package: a bare `key` adds 34 mandatory
+        // decisions — every one of them an identifier (`dedupKey`,
+        // `idempotencyKey`, `scopeKey`, `workspaceKey`…), with the single
+        // key-material column in that set, `ApiKey.hashedKey`, already covered by
+        // `hash` — and a bare `pem` fires on `domainTypeManuallySet` through
+        // "tyPeManually". The anchored form below adds ZERO decisions to today's
+        // 84 matching columns while still catching the shapes that matter
+        // (`privateKeyPem`, `apiKey`, `signingKey`, `sshKey`, `passphrase`,
+        // `certificatePem`). Widen the domain by measuring it, never by guessing.
+        const SECRET_SHAPED =
+            /secret|password|token|hash|credential|(private|secret|signing|encryption|api|access|auth|ssh|deploy)key|keypem|keypair|keymaterial|passphrase|pem$/i;
         /** Family 2 — envelope-encrypted at rest, said in the column name. */
         const ENCRYPTED_NAMED = /encrypted$/i;
         /** Family 3 — envelope-encrypted at rest, said only by the decorator. */
@@ -1025,6 +1038,35 @@ describe('workspace backup redaction', () => {
             expect(isDroppedColumn(entity, column)).toBe(false);
             expect(isRedactedColumn(entity, column)).toBe(false);
             expect(isBenignColumn(column)).toBe(false);
+        });
+
+        it('catches key material while ignoring identifier keys and pem false-friends', () => {
+            // The pattern's domain is a decision, so pin it: a future widening
+            // that re-admits bare `key` / `pem` has to argue with this test.
+            for (const column of [
+                'privateKeyPem',
+                'apiKey',
+                'signingKey',
+                'encryptionKey',
+                'sshKey',
+                'deployKeyMaterial',
+                'passphrase',
+                'certificatePem',
+            ]) {
+                expect([column, SECRET_SHAPED.test(column)]).toEqual([column, true]);
+            }
+            for (const column of [
+                'dedupKey',
+                'idempotencyKey',
+                'scopeKey',
+                'threadKey',
+                'externalKey',
+                'storageKey',
+                'monkeyBusiness',
+                'domainTypeManuallySet',
+            ]) {
+                expect([column, SECRET_SHAPED.test(column)]).toEqual([column, false]);
+            }
         });
 
         it('fails on a future @EncryptedJsonColumn whose name looks harmless', () => {

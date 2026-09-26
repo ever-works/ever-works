@@ -1,0 +1,19 @@
+# NEGATIVE FIXTURE neg-07 — error class: well-formed `from:` that does not RESOLVE.
+# Expected: JSON Schema PASS · rule layer FAIL `reference_unresolved`.
+# This is the fixture that shows the layer split the program keeps repeating (schema.md §25: "JSON Schema
+# cannot express §21–§22"). `deps.redis.url` matches the grammar, so the schema accepts it; only the
+# resolver can see that `dependencies.redis` was never declared (§21 table, row `deps.<kind>.<out>`).
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    dependencies:
+        postgres: { version: '16' }
+    env:
+        - { name: REDIS_URL, secret: true, from: deps.redis.url }

@@ -77,6 +77,7 @@ The following areas are actively being worked on in the Platform repository:
 - [Agent Email & Inboxes](/features/agent-email) — inbound/outbound mailboxes per Agent and per Mission/Idea/Work, backed by pluggable email providers
 - [Knowledge Base & Memory](/features/knowledge-base) — per-Work, Git-backed institutional context and long-term memory
 - [Store](/features/store-builder) and [Company](/features/company-builder) builders — new Work shapes that turn a goal into a self-maintaining storefront or AI-run company. **Update:** Company registration v1 has shipped (see [Recently shipped](#recently-shipped)); what remains here is the incorporation and banking provider integrations behind it, plus the Store kind, which has no code path yet
+- [App Works](/features/app-works) — run an existing GitHub repository as a Work (linked, forked or privately copied into your account) and let agents evolve it under a change guard. **In development:** a preview that is off by default; creating one works through the API, while the create form, Blueprints, Builds and Deployments are still being built
 - [Desktop App](/features/desktop-app) — the full stack running locally as a single application. **Update:** an early-access app exists with local-stack and client modes; the remaining work is a published installer
 - Dynamic plugin distribution — install plugins on demand at runtime rather than bundling everything. **Update:** shipped (see [Recently shipped](#recently-shipped)); what is left is publishing the distributable packages openly and a self-service allowlist
 

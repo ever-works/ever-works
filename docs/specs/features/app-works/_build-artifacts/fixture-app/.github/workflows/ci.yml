@@ -1,0 +1,76 @@
+# The fixture's own CI.
+#
+# The platform's checks do NOT use this file — the APW-05 build plugin writes its own
+# `.github/workflows/ever-works-build.yml` and runs the App spec's `checks` as its own jobs (Resolution R-9).
+# This workflow exists because `ever-works/app-fixture-hello` is a real public repository that an evolve-loop
+# change may target, and a repository whose own tests never run is a trap for whoever edits it.
+#
+# `npm ci` — not `npm install` — because the App spec's `unit` check runs exactly that and a missing or stale
+# lockfile must fail here first, where the cause is obvious.
+
+name: ci
+
+on:
+    push:
+        branches: [main, 'variant/**']
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    unit:
+        name: unit (node --test)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+
+            - name: Install (the App spec's `unit` check runs this too)
+              run: npm ci
+
+            - name: Test
+              run: npm test
+
+    format:
+        name: format:check
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+
+            - run: npm ci
+
+            - name: Format check (advisory in the App spec, required here)
+              run: npm run format:check
+
+    profiles:
+        name: profiles are in step with the base Blueprint
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+
+            - run: npm ci
+
+            # `--check` writes nothing and fails if any profile would change, so a base-spec edit that was
+            # not propagated to `profiles/` is caught here rather than in an acceptance lane.
+            - name: Profiles are up to date
+              run: node profiles/_generate.mjs --check

@@ -63,11 +63,15 @@ A few features share a sidebar entry rather than owning one. **Teams** is the hu
 
 ## Work types & templates
 
-A Work's **kind** is chosen once, at creation, and decides what that Work has. The kinds you can pick are `website`, `landing-page`, `blog`, `directory` and `awesome-repo`; the platform also mints `company` and `campaign` Works through their own dedicated flows. This section covers those kinds, the templates a Work is built from, and the places Works and Agents actually run.
+A Work's **kind** is chosen once, at creation, and decides what that Work has. The kinds you can pick are `website`, `landing-page`, `blog`, `directory` and `awesome-repo`; the platform also mints `company` and `campaign` Works through their own dedicated flows. `app` — an existing GitHub repository run as a Work — is a preview an operator has to switch on. This section covers those kinds, the templates a Work is built from, and the places Works and Agents actually run.
 
 | Feature                                   | Description                                                                                                                                                            |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Work Kinds & Capabilities](./work-kinds) | What each kind has — the tabs, tiles, repositories and default website template a Work inherits from its kind                                                          |
+| [App Works](./app-works)                  | _(Preview, off by default)_ Run an existing GitHub repository as a Work — link, fork or private copy — and let agents evolve it under a change guard                   |
+| [App Builds & Deployments](./app-runtime) | _(Preview)_ How an App Work is built in your own GitHub Actions and where it runs: None, your cluster, or the managed tier                                             |
+| [App Blueprints](./app-blueprints)        | _(Preview)_ Ready-made App specs for known open-source apps, listed in `ever-works/templates`                                                                          |
+| [App Launcher](./app-launcher)            | The top-bar tiles for the Ever apps and your live Works — pins, hides and order, off by default per installation                                                       |
 | [Website Templates](./website-templates)  | Catalogue of base templates a Work's website is generated from (Next.js / Astro, directory / general)                                                                  |
 | [Work Templates](./work-templates)        | Pre-baked starters that point at a real GitHub boilerplate repository you fork into a new Work                                                                         |
 | [Work Blueprints](./work-blueprints)      | Ready-made Work definitions from the public `ever-works/works` catalog, offered in the Template picker                                                                 |

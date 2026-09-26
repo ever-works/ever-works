@@ -13,12 +13,14 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isDnsProvider } from '@ever-works/plugin';
 import type { IDnsProvider } from '@ever-works/plugin';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitFacadeService } from './git.facade';
 import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
+import { AppDomainsService } from '../app-runtime/app-domains.service';
 import { EverWorksK8sDeployProvider } from '../ever-works-providers';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
 import type { Work } from '../entities/work.entity';
@@ -30,6 +32,15 @@ import {
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
+
+/**
+ * APW-06 T26 — the `work.kind` an App Work carries.
+ *
+ * APW-01 adds `'app'` to the shared `WORK_KINDS` union additively; until that lands, `Work.kind` is
+ * typed as a union that does not contain it, so the comparison goes through a string — the same rule
+ * `app-launcher/managed-host-root.resolver.ts:48-70` already documents for its own copy.
+ */
+const APP_WORK_KIND = 'app';
 
 // Security: allow-list of plugin IDs whose secret settings the deploy
 // orchestrator is permitted to read via `getOtherPluginSettings`. The k8s
@@ -123,6 +134,12 @@ export class DeployFacadeService implements IDeployFacade {
         // time. Registered as a real Nest provider in the work + deploy modules.
         @Optional()
         private readonly everWorksDeployProvider: EverWorksK8sDeployProvider = new EverWorksK8sDeployProvider(),
+        // APW-06 T26 (plan §8.4) — the App branch of the four domain methods. **Optional and last**,
+        // so every existing construction (the 33 specs under `facades/__tests__/`, the account
+        // transfer, the internal CLI) keeps compiling and keeps its behaviour: with nothing bound
+        // there is no App branch at all. The module binds `AppDomainsService`.
+        @Optional()
+        private readonly appDomains?: AppDomainsService,
     ) {}
 
     resolveProviderId(providerId: string): string {
@@ -471,10 +488,56 @@ export class DeployFacadeService implements IDeployFacade {
     // DB is the primary source of truth; provider APIs are used for sync and verification.
 
     /**
+     * APW-06 T26 (plan §8.4:1152-1157) — the **early kind-`app` branch** of the four domain methods.
+     *
+     * §8.4: "`DeployFacadeService.getDomains/addDomain/removeDomain/verifyDomain` and
+     * `ManagedSubdomainService` gain an early `if (work.kind === 'app')` branch that delegates to
+     * `AppDomainsService`: rows stored as today; verify uses
+     * `verifyDomainResolution(domain, runtimeState.ingressAddress)`; success → `updateVerified` +
+     * reconcile/onChange; remove → row delete + reconcile."
+     *
+     * **Inert unless `AppDomainsService` is bound.** Every existing caller — every hand-constructed
+     * fixture in `__tests__/deploy.facade.spec.ts` included — passes no seventh argument, so
+     * `appDomains` is `undefined`, this returns `null` before it reads anything, and all four methods
+     * take exactly the path they took before this branch existed. That is what keeps
+     * `deploy.facade.spec.ts` green **unchanged** (`tasks.md:479`), and it is also why the kind check
+     * costs no extra read for a non-App Work in a fixture.
+     *
+     * In production the module binds it, and the one `findById` below is the price of branching
+     * before the provider conversation — a domain operation is a member's explicit click, not a hot
+     * path.
+     */
+    private async appDomainsFor(options: DeployFacadeOptions): Promise<AppDomainsService | null> {
+        if (!this.appDomains) return null;
+
+        try {
+            const work = await this.workRepository.findById(options?.workId);
+            // `work.kind` is compared as a string, never narrowed: APW-01 adds `'app'` to the shared
+            // union additively and this facade must not care whether it has landed
+            // (`app-launcher/managed-host-root.resolver.ts:48-70` is the same rule).
+            return String(work?.kind ?? '')
+                .trim()
+                .toLowerCase() === APP_WORK_KIND
+                ? this.appDomains
+                : null;
+        } catch (error) {
+            // A Work that cannot be read is not an App Work here: the method's own resolution below
+            // reports the missing Work with the error its callers already handle.
+            this.logger.warn(`Reading work ${options?.workId} for its kind failed: ${error}`);
+
+            return null;
+        }
+    }
+
+    /**
      * Get domains for a deployed work.
      * Reads from DB, enriches with provider verification data when available.
      */
     async getDomains(options: DeployFacadeOptions): Promise<DeploymentDomain[]> {
+        const appDomains = await this.appDomainsFor(options);
+
+        if (appDomains) return appDomains.getDomains(options);
+
         const dbDomains = await this.domainRepository.findByWork(options.workId);
         const hasCustomDomain = dbDomains.some(
             (domain) => !this.isAutoAssignedDomain(domain.domain),
@@ -589,6 +652,10 @@ export class DeployFacadeService implements IDeployFacade {
      * Provider state is checked first so domains already attached outside Ever Works are imported.
      */
     async addDomain(domain: string, options: DeployFacadeOptions): Promise<AddDomainResult> {
+        const appDomains = await this.appDomainsFor(options);
+
+        if (appDomains) return appDomains.addDomain(domain, options);
+
         const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
         if (!plugin.addDomain) {
             throw new DeployFacadeError(
@@ -838,6 +905,10 @@ export class DeployFacadeService implements IDeployFacade {
      * Removes from provider first, then from DB.
      */
     async removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean> {
+        const appDomains = await this.appDomainsFor(options);
+
+        if (appDomains) return (await appDomains.removeDomain(domain, options)).removed;
+
         const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
         let deploymentContext: EffectiveDeploymentOperationContext | undefined;
         const getDeploymentContext = async (): Promise<EffectiveDeploymentOperationContext> => {
@@ -907,6 +978,14 @@ export class DeployFacadeService implements IDeployFacade {
      * Verifies at provider, updates DB with result.
      */
     async verifyDomain(domain: string, options: DeployFacadeOptions): Promise<DeploymentDomain> {
+        const appDomains = await this.appDomainsFor(options);
+
+        // §8.4: "verify uses `verifyDomainResolution(domain, runtimeState.ingressAddress)`; success
+        // → `updateVerified` + reconcile/onChange" — all of it inside `AppDomainsService`, so the
+        // facade keeps its own contract (`DeploymentDomain`) and no provider is asked for an App
+        // Work's domain.
+        if (appDomains) return (await appDomains.verifyDomain(domain, options)).domain;
+
         const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
         if (!plugin.verifyDomain) {
             throw new DeployFacadeError(
@@ -1009,8 +1088,11 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         if (!token) {
+            // The plugin may still be a cold lazy proxy, whose `providerName`
+            // read is its forwarding wrapper — a function, whose source text
+            // ended up in the message. The manifest name then.
             const providerName =
-                (registered.plugin as IDeploymentPlugin).providerName || registered.plugin.name;
+                readPluginString(registered.plugin, 'providerName') || registered.plugin.name;
             throw new NoDeployCredentialsError(providerId, options.userId, providerName);
         }
 

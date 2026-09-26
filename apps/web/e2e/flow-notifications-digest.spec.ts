@@ -373,7 +373,8 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
         // HARDENING (KEEP): POST /preferences/mute validates `category` against
         // the NotificationCategory enum via @IsEnum — the canonical mute
         // vocabulary (ai_credits, subscription, generation, system, security,
-        // agent, task). The notification EVENT-TYPE registry, however, uses a
+        // agent, task, digest — `digest` since cde05986a / a29dcc698, which
+        // registered `digest_ready`). The notification EVENT-TYPE registry, however, uses a
         // partially-overlapping category vocabulary (it carries `integrations`
         // and `agents` — note the plural — which are NOT enum members). So the
         // event categories split into two buckets: those that ARE valid mute
@@ -388,6 +389,7 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
             'security',
             'agent',
             'task',
+            'digest',
         ]);
 
         const events = await getEventTypes(request, token);

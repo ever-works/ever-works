@@ -1,0 +1,44 @@
+npm warn Unknown user config "msvs_version". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> app-fixture-hello@0.1.0 smoke
+> node tools/smoke.mjs
+
+smoke: stub postgres on 127.0.0.1:59723
+  migrate: applied 0001_init.sql (label=app, sha256=b93f1139be14)
+  migrate: applied 0002_ticks.sql (label=app, sha256=e64be1e2b928)
+  migrate: applied 0003_bootstrap.sql (label=app, sha256=676b16312a11)
+  migrate: 3 applied, 0 already present, label=app, database=127.0.0.1:59723/app_fixture
+{"t":"2026-09-17T19:35:14.713Z","method":"GET","path":"/","status":200,"ms":3}
+PASS  GET / renders the greeting         HTTP 200, 642 bytes
+{"t":"2026-09-17T19:35:14.727Z","method":"GET","path":"/healthz","status":200,"ms":1}
+PASS  GET /healthz is 200 without the db HTTP 200 body="ok"
+{"t":"2026-09-17T19:35:14.745Z","method":"GET","path":"/readyz","status":200,"ms":16}
+PASS  GET /readyz is 200 after migrating HTTP 200 pending=[]
+{"t":"2026-09-17T19:35:14.748Z","method":"GET","path":"/marker","status":200,"ms":0}
+PASS  GET /marker reports marker, sha, build label marker=smoke-marker-1 sha=01234567… buildLabel=fixture-blueprint-0.1.0
+PASS  GET /marker carries no localhost   publicUrl="http://127.0.0.1:59725"
+{"t":"2026-09-17T19:35:14.794Z","method":"GET","path":"/state","status":200,"ms":44}
+PASS  GET /state lists every applied migration migrations=[0001_init.sql, 0002_ticks.sql, 0003_bootstrap.sql]
+PASS  GET /state reports a fresh worker heartbeat workerHeartbeatAt=2026-09-17T19:35:14.695Z age=0.056s beats=1
+PASS  GET /state reports the volume writable uploadsPath=E:\Coding\Worktrees\ever-works-platform-any-repo-works\docs\specs\features\app-works\_build-artifacts\fixture-app\.data\smoke\uploads
+PASS  GET /state publishes only the secret fingerprint length=32 sha256Prefix8=653bb124
+PASS  GET /state carries no secret value searched the whole body for both secrets
+{"t":"2026-09-17T19:35:14.797Z","method":"POST","path":"/cron/tick","status":401,"ms":0}
+PASS  POST /cron/tick refuses an anonymous call HTTP 401
+{"t":"2026-09-17T19:35:14.800Z","method":"POST","path":"/cron/tick","status":401,"ms":1}
+PASS  POST /cron/tick refuses a wrong token HTTP 401
+{"t":"2026-09-17T19:35:14.812Z","method":"POST","path":"/cron/tick","status":204,"ms":11}
+{"t":"2026-09-17T19:35:14.852Z","method":"GET","path":"/state","status":200,"ms":38}
+PASS  POST /cron/tick counts the tick    HTTP 204 cronTicks=1 lastCronTickAt=2026-09-17T19:35:14.811Z
+{"t":"2026-09-17T19:35:14.855Z","method":"POST","path":"/mail/test","status":503,"ms":0}
+PASS  POST /mail/test is 503 without SMTP HTTP 503 SMTP_HOST is not set (the smtp dependency is missing)
+{"t":"2026-09-17T19:35:14.859Z","method":"GET","path":"/brand/logo.svg","status":200,"ms":2}
+PASS  GET /brand/logo.svg serves the protected asset HTTP 200 image/svg+xml
+{"t":"2026-09-17T19:35:14.860Z","method":"GET","path":"/nope","status":404,"ms":0}
+PASS  GET /nope is 404                   HTTP 404
+{"t":"2026-09-17T19:35:14.861Z","method":"POST","path":"/marker","status":405,"ms":0}
+PASS  POST /marker is 405                HTTP 405
+{"t":"2026-09-17T19:35:14.862Z","method":"GET","path":"/marker","status":200,"ms":0}
+PASS  the bootstrap probe accepts the internal address the app answered with this App Work's marker
+
+smoke: 18/18 checks passed (fingerprint {"length":32,"sha256Prefix8":"653bb124","set":true})

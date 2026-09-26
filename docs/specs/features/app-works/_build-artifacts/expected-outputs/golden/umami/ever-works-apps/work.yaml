@@ -1,0 +1,132 @@
+# GOLDEN — umami · target ever-works-apps · the `Work` resource handed to the tier
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Producer  : packages/plugins/ever-works-apps/src/desired-state.mapper.ts (APW-10 plan.md §5.2),
+#             writing CRD group hosting.ever.works/v1alpha1 (APW-10 plan.md §3.1).
+# This is DESIRED STATE handed to the tier (Resolution R-5, APW-06 spec.md FR-7) — the platform
+# applies no Deployment, Service, Ingress, Secret or namespace of its own for this target.
+# The zone controller renders it with APW-06’s renderer and applies its own non-overridable
+# overlays (APW-10 plan.md §2.1 D-C, §3.4). `status` is written by the tier, never here.
+# Pinned inputs and the placeholder convention: ../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — `env.sealed` is a sealed payload, never plaintext.
+#
+# GAPS this file cannot express (reported, not fixed — see ../README.md §"Blueprint ✗ spec"):
+#   · `authScheme` (APW-13 addition, CONTRACTS §1) has no field in the Work cron shape:
+#     APW-10 plan.md:245 lists `http: { method, path, authEnv }` only.
+#   · `dependencies[].kind` is `postgres|redis|objectStorage` — an `smtp` dependency cannot appear.
+#   · `components[].volumes[].backup` is not in the Work volume shape (name, path, size).
+apiVersion: hosting.ever.works/v1alpha1
+kind: Work
+metadata:
+    name: w-33333333-3333-4333-8333-333333333333
+    namespace: ever-works-apps-control
+    labels:
+        hosting.ever.works/owner: 66666666-6666-4666-8666-666666666666
+        hosting.ever.works/canary: 'false'
+spec:
+    workId: 33333333-3333-4333-8333-333333333333
+    ownerUserId: 66666666-6666-4666-8666-666666666666
+    organizationId: null
+    generation: 1
+    quotaProfile: starter
+    desiredState: running
+    pausedReplicas: null
+    dataDeletion: null
+    quarantine: null
+    egressThrottle: false
+    images:
+        - component: web
+          source: ghcr.io/umami-software/umami@sha256:85909afc45bdcda1917394594a087421fdbb05610fded0fa9f6fb861abb2f367
+          pullCredential:
+              sealed: '<sealed pull credential — APW-05 FR-19, sealed to the controller key>'
+    components:
+        - name: web
+          role: web
+          port: 3000
+          replicas: 1
+          resources:
+              cpu: 250m
+              memory: 512Mi
+              memoryLimit: 1Gi
+          probes:
+              startup:
+                  http: /api/heartbeat
+                  periodSeconds: 5
+                  failureThreshold: 60
+              readiness:
+                  http: /login
+              liveness:
+                  http: /api/heartbeat
+                  periodSeconds: 30
+          writableRootFilesystem: true
+    jobs:
+        - name: bootstrap-admin
+          when: first-deploy
+          component: web
+          command:
+              - node
+              - '--input-type=module'
+              - '-e'
+              - |
+                  const base = process.env.APP_WEB_INTERNAL_URL;
+                  const login = await fetch(`${base}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'umami' }),
+                  });
+                  if (login.status === 401) { console.log('bootstrap-admin: default password already replaced'); process.exit(0); }
+                  if (!login.ok) { console.error(`bootstrap-admin: login HTTP ${login.status}`); process.exit(1); }
+                  const { token } = await login.json();
+                  const change = await fetch(`${base}/api/me/password`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ currentPassword: 'umami', newPassword: process.env.APP_BOOTSTRAP_ADMIN_PASSWORD }),
+                  });
+                  if (!change.ok) { console.error(`bootstrap-admin: password change HTTP ${change.status}`); process.exit(1); }
+                  console.log('bootstrap-admin: default password replaced');
+          timeoutSeconds: 180
+    cron: []
+    smoke:
+        - name: heartbeat
+          component: web
+          path: /api/heartbeat
+          method: GET
+          expect:
+              status:
+                  - 200
+          firstDeployOnly: false
+        - name: login-page
+          component: web
+          path: /login
+          method: GET
+          expect:
+              status:
+                  - 200
+              bodyNotContains:
+                  - localhost:3000
+          firstDeployOnly: false
+        - name: default-admin-refused
+          component: web
+          path: /api/auth/login
+          method: POST
+          expect:
+              status:
+                  - 401
+          firstDeployOnly: false
+    hosts:
+        - host: umami.ever.works
+          kind: managed
+          customHostnameRef: null
+    env:
+        sealed: <sealed env payload — hybrid RSA-OAEP-256 + AES-256-GCM to the controller public key>
+        names:
+            - DATABASE_URL
+            - DIRECT_DATABASE_URL
+            - APP_SECRET
+            - TWO_FACTOR_ENCRYPTION_KEY
+            - DISABLE_TELEMETRY
+            - DISABLE_UPDATES
+            - APP_WEB_INTERNAL_URL
+            - APP_BOOTSTRAP_ADMIN_PASSWORD
+    dependencies:
+        - kind: postgres
+          ref: <apw-07 dependency ref for postgres>

@@ -408,6 +408,81 @@ export enum ActivityActionType {
     WORKSPACE_BACKUP_CREATED = 'workspace_backup_created',
     WORKSPACE_BACKUP_DOWNLOADED = 'workspace_backup_downloaded',
     WORKSPACE_BACKUP_DELETED = 'workspace_backup_deleted',
+    // APW-11 (App Launcher) — the Work-level **Show in App Launcher**
+    // setting changed. The dotted `action` carries the direction
+    // (`app.launcher.exposed` / `app.launcher.hidden`, Resolution R-2) and
+    // `metadata` carries `{ explicit, previousEffective }`; no field ever
+    // names the Work or its address (spec FR-21, FR-61). Additive member —
+    // `activity_log.actionType` is a plain varchar, so no migration is
+    // needed. Program contract R-34 (Activity completeness) is satisfied by
+    // this member plus its `FEED_KIND_RULES` entry in
+    // `packages/agent/src/activity-log/feed-kind.ts`; the Shared-view
+    // classification needs no edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS`
+    // is the derived complement of the publishable allow-list, so this
+    // member is unpublished by construction.
+    APP_LAUNCHER = 'app_launcher',
+    // APW-02 (Fork lifecycle) — Resolution R-2: three families for the App
+    // Work's fork readiness, its Actions hygiene and its upstream sync. The
+    // dotted CONTRACTS §6 event goes in `action` (`app.fork.ready`,
+    // `app.fork.timeout`, `app.fork.missing`, `app.actions.disabled`,
+    // `app.upstream.synced`, `app.upstream.behind`, `app.upstream.conflict`,
+    // `app.upstream.unavailable`) and `details` carry counts, shas, pull
+    // request numbers and reason codes. Workflow paths appear ONLY in
+    // `app.actions.disabled`: they are repository file names, never secrets.
+    // Additive members — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Program contract R-34 (Activity completeness) is
+    // satisfied by the three `FEED_KIND_RULES` entries in
+    // `packages/agent/src/activity-log/feed-kind.ts`; the Shared-view
+    // classification needs no edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS`
+    // is the derived complement of the publishable allow-list, so these three
+    // are unpublished by construction.
+    APP_FORK = 'app_fork',
+    APP_ACTIONS = 'app_actions',
+    APP_UPSTREAM = 'app_upstream',
+    // APW-03 (App spec, Apps catalog and license gate) — Resolution R-2's
+    // first family: the App spec read true. The dotted CONTRACTS §6 event goes
+    // in `action` (`app.spec.validated`, `app.spec.invalid`, `app.spec.applied`
+    // — plan §6.2:666-669) and `details` carry `{ commitSha, errorCount,
+    // warningCount, codes: first 10 codes }` or the applied transition's
+    // `{ commitSha, previousCommitSha, specHash, addedDependencies,
+    // changedEnvNames, changedBlocks }`. Codes, counts and shas only: no
+    // secret value and no `env` value ever reaches a row (R8, FR-6).
+    //
+    // Additive member — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Program contract R-34 (Activity completeness) is
+    // satisfied by this member plus its `FEED_KIND_RULES` entry in
+    // `packages/agent/src/activity-log/feed-kind.ts` (`feed-kind.spec.ts:14-19`
+    // fails on a member without one); the Shared-view classification needs no
+    // edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
+    // the publishable allow-list, so this member is unpublished by construction.
+    //
+    // 🛑 APW-03 T2 owns APP_BLUEPRINT = 'app_blueprint' and
+    // APP_LICENSE = 'app_license' and has NOT landed. T12 needs this one member
+    // (its Activity rows are written with `actionType: APP_SPEC`) and appends it
+    // here rather than declaring a second name for the same family. When T2
+    // lands it appends its two and must NOT append this one again (a duplicate
+    // enum member is a TypeScript error) — its ledger comment should count this
+    // member as already present.
+    APP_SPEC = 'app_spec',
+    // APW-05 (Builds) — Resolution R-2's next family: one Activity row per
+    // `app.build.*` transition, written by the ONE writer
+    // `AppBuildsService.publish` (plan §7.8, `APW05-G05`). The dotted
+    // CONTRACTS §6 event goes in `action` — `app.build.queued`,
+    // `app.build.started`, `app.build.succeeded`, `app.build.failed`,
+    // `app.build.cancelled` — and `metadata` carries `{ buildId, number,
+    // commitSha, trigger, failureClass }`: names, ids and shas only, never a
+    // value and never a log line (FR-40). A `blocked` Build publishes nothing,
+    // because `blocked` is not one of the five CONTRACTS §6 names
+    // (`plan.md:1560`).
+    //
+    // Additive member — `activity_log.actionType` is a plain varchar, so no
+    // migration is needed. Program contract R-34 (Activity completeness) is
+    // satisfied by this member plus its `FEED_KIND_RULES` entry in
+    // `packages/agent/src/activity-log/feed-kind.ts` (`feed-kind.spec.ts:14-19`
+    // fails on a member without one); the Shared-view classification needs no
+    // edit because `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
+    // the publishable allow-list, so this member is unpublished by construction.
+    APP_BUILD = 'app_build',
 }
 
 /**

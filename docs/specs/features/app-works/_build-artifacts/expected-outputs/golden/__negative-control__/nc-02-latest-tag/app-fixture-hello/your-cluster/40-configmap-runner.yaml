@@ -1,0 +1,92 @@
+# GOLDEN — app-fixture-hello · target your-cluster · ConfigMap `ew-runner-918eaf204a`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.1 (Probe/runner ConfigMap `ew-runner-<hash10>` — script + check list)
+# Spec      : APW-06 plan.md §4.8 (`http` jobs, `http` cron and every smoke run execute the runner script
+# Spec      : mounted read-only, reading the request list from a second mounted file; paths, bodies and
+# Spec      : expectations are DATA read with `JSON.parse`, never interpolated into a command line)
+# Spec      : APW-06 plan.md §4.9 (`http` cron targets `http://<component>.<ns>.svc:80<path>`)
+# Spec      : The runner script is source code owned by packages/plugins/k8s/src/app/app-runner.script.ts
+# Spec      : (APW-06 T8); these specs do not contain it, so that ONE key is a placeholder (README).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: ew-runner-918eaf204a
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+immutable: true
+data:
+    app-runner.script.mjs: |
+        <APP_RUNNER_SCRIPT — packages/plugins/k8s/src/app/app-runner.script.ts (APW-06 T8)>
+    requests.json: |
+        [
+          {
+            "name": "healthz",
+            "kind": "smoke",
+            "component": "web",
+            "method": "GET",
+            "path": "/healthz",
+            "expect": {
+              "status": [
+                200
+              ]
+            }
+          },
+          {
+            "name": "readyz",
+            "kind": "smoke",
+            "component": "web",
+            "method": "GET",
+            "path": "/readyz",
+            "expect": {
+              "status": [
+                200
+              ]
+            }
+          },
+          {
+            "name": "marker",
+            "kind": "smoke",
+            "component": "web",
+            "method": "GET",
+            "path": "/marker",
+            "expect": {
+              "status": [
+                200
+              ],
+              "bodyNotContains": [
+                "localhost"
+              ]
+            }
+          },
+          {
+            "name": "cron-refuses-anonymous",
+            "kind": "smoke",
+            "component": "web",
+            "method": "POST",
+            "path": "/cron/tick",
+            "expect": {
+              "status": [
+                401
+              ]
+            }
+          },
+          {
+            "name": "tick",
+            "kind": "cron",
+            "component": "web",
+            "method": "POST",
+            "path": "/cron/tick",
+            "authEnv": "FIXTURE_CRON_TOKEN",
+            "authScheme": "bearer",
+            "expect": null
+          }
+        ]

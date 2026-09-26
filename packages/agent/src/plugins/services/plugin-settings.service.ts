@@ -14,7 +14,7 @@ import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { WorkPluginEntity } from '../entities/work-plugin.entity';
-import { PluginRegistryService } from './plugin-registry.service';
+import { PluginRegistryService, loadPluginSchema } from './plugin-registry.service';
 import { PluginEvents } from '../plugins.constants';
 import { PluginSecretEncService } from './plugin-secret-enc.service';
 import {
@@ -134,6 +134,10 @@ export class PluginSettingsService {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
 
+        // The schema drives every level below — its `x-envVar` bindings, its
+        // defaults — and `configurationMode` decides which levels count. A
+        // cold lazy proxy answers `{}` / `undefined` for both.
+        await loadPluginSchema(registered.plugin, registered);
         const plugin = registered.plugin;
         const settingsSchema = plugin.settingsSchema;
         const configMode = this.getConfigurationMode(plugin);
@@ -436,6 +440,9 @@ export class PluginSettingsService {
         if (!registered) {
             throw new Error(`Plugin "${pluginId}" not found`);
         }
+        // configurationMode and the schema's x-secret / x-envVar / x-scope
+        // markers decide what may be written, and where (cold proxy: none).
+        await loadPluginSchema(registered.plugin, registered);
 
         if (scope !== 'global') {
             const configMode = this.getConfigurationMode(registered.plugin);
@@ -541,11 +548,14 @@ export class PluginSettingsService {
     }
 
     /**
-     * Get the settings schema for a plugin
+     * Get the settings schema for a plugin — the plugin class's, even while
+     * the registry still holds it as a cold lazy proxy.
      */
-    getSettingsSchema(pluginId: string): JsonSchema | undefined {
+    async getSettingsSchema(pluginId: string): Promise<JsonSchema | undefined> {
         const registered = this.registry.get(pluginId);
-        return registered?.plugin.settingsSchema;
+        if (!registered) return undefined;
+        await loadPluginSchema(registered.plugin, registered);
+        return registered.plugin.settingsSchema;
     }
 
     /**
@@ -561,6 +571,7 @@ export class PluginSettingsService {
         if (!registered) {
             return { valid: false, errors: [`Plugin "${pluginId}" not found`] };
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         const errors: string[] = [];
 
@@ -875,11 +886,11 @@ export class PluginSettingsService {
      * @param context - 'user' shows global+user, 'work' shows global+work
      * @returns Filtered schema or undefined if plugin not found
      */
-    getSettingsSchemaForContext(
+    async getSettingsSchemaForContext(
         pluginId: string,
         context: 'user' | 'work',
-    ): JsonSchema | undefined {
-        const schema = this.getSettingsSchema(pluginId);
+    ): Promise<JsonSchema | undefined> {
+        const schema = await this.getSettingsSchema(pluginId);
         if (!schema?.properties) return schema;
 
         const allowedScopes: SettingScope[] =

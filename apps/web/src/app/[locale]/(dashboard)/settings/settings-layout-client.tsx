@@ -23,11 +23,13 @@ import {
     Bell,
     MessagesSquare,
     Mail,
+    LayoutGrid,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import type { SettingsMenuResponse, SettingsMenuCategory } from '@/lib/api/plugins';
+import { ROUTES } from '@/lib/constants';
 import { getCategoryIcon } from '@/lib/utils/plugin-category-icons';
 
 interface SettingsLayoutClientProps {
@@ -40,6 +42,18 @@ interface SettingsLayoutClientProps {
      * shipped default depend on someone remembering to pass a prop.
      */
     fleetEnabled?: boolean;
+    /**
+     * Whether this deployment shows the App Launcher (APW-11 T16, FR-54/FR-65,
+     * ACC-11-28), resolved on the server by `isAppLauncherEnabled` and passed
+     * through `settings/layout.tsx`.
+     *
+     * The default is the **opposite** of `fleetEnabled` on purpose: the launcher
+     * is off by default per installation and fails closed, so a caller that
+     * forgets the prop — or a deployment whose flag service cannot be reached —
+     * must get no tab, exactly as the API answers `404` for the routes behind
+     * it. A tab to a route that 404s is worse than no tab.
+     */
+    appLauncherEnabled?: boolean;
 }
 
 interface StaticTab {
@@ -57,6 +71,8 @@ export function SettingsLayoutClient({
     // and passed by the server layout but never destructured, so FLEET_ENABLED
     // had no effect on the nav — the tab rendered unconditionally.)
     fleetEnabled = true,
+    // Default FALSE — the launcher fails closed (see the prop's contract).
+    appLauncherEnabled = false,
 }: SettingsLayoutClientProps) {
     const pathname = usePathname();
     const t = useTranslations('dashboard.settings');
@@ -174,6 +190,17 @@ export function SettingsLayoutClient({
                     icon: Bell,
                     href: `${baseSettingsPath}/notifications`,
                 },
+                // APW-11 T16 — Manage apps, directly AFTER Notifications (plan
+                // §7): it is the App Launcher's own preference page, and it is
+                // declared here unconditionally so the ordering comment above it
+                // stays true, then filtered below when the server said the
+                // launcher is off for this deployment.
+                {
+                    id: 'app-launcher',
+                    label: t('tabs.appLauncher'),
+                    icon: LayoutGrid,
+                    href: ROUTES.DASHBOARD_SETTINGS_APP_LAUNCHER,
+                },
                 {
                     id: 'channels',
                     label: t('tabs.channels'),
@@ -205,8 +232,16 @@ export function SettingsLayoutClient({
                 // and filtered here when the operator has turned Fleet off — the
                 // same FLEET_ENABLED switch the API and the Fleet page enforce, so
                 // a disabled deployment has no entry point and no route.
-            ].filter((tab) => tab.id !== 'fleet' || fleetEnabled),
-        [t, fleetEnabled],
+                //
+                // The App Launcher tab is filtered the same way, from the
+                // opposite default: `appLauncherEnabled` is false unless the
+                // server layout resolved the launcher ON (FR-54/FR-65).
+            ].filter(
+                (tab) =>
+                    (tab.id !== 'fleet' || fleetEnabled) &&
+                    (tab.id !== 'app-launcher' || appLauncherEnabled),
+            ),
+        [t, fleetEnabled, appLauncherEnabled],
     );
 
     // Danger zone tab (always at bottom)

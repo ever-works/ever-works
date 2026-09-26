@@ -1,0 +1,18 @@
+[
+    {
+        "id": 800001,
+        "user": {
+            "login": "apw-e2e-reviewer",
+            "id": 40401,
+            "type": "User",
+            "site_admin": false
+        },
+        "body": "Looks good.",
+        "state": "APPROVED",
+        "html_url": "https://github.com/ever-works/templates/pull/1#pullrequestreview-800001",
+        "pull_request_url": "https://api.github.com/repos/ever-works/templates/pulls/1",
+        "submitted_at": "2026-09-18T09:31:47Z",
+        "commit_id": "c3d4e5f60718293a4b5c6d7e8f90123456789012",
+        "author_association": "MEMBER"
+    }
+]

@@ -31,7 +31,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *        subscriptionsEnabled: boolean,        // env SUBSCRIPTIONS_ENABLED
  *        magicLinkEnabled: boolean,            // env MAGIC_LINK_ENABLED
  *        anonymousAuthEnabled: boolean,        // env ANONYMOUS_AUTH_ENABLED
- *        emailVerificationRequired: boolean    // env REQUIRE_EMAIL_VERIFICATION !== 'false'
+ *        emailVerificationRequired: boolean,   // env REQUIRE_EMAIL_VERIFICATION !== 'false'
+ *        appLauncherEnabled: boolean           // env EVER_WORKS_APP_LAUNCHER_ENABLED === 'true'
+ *                                              // (APW-11; `config.appLauncher.isEnabled()`)
  *      },
  *      auth:     { providers: { github: boolean, google: boolean, facebook: boolean } },
  *      limits:   { bodyLimit: string }         // env BODY_LIMIT || '1mb'
@@ -83,6 +85,7 @@ type PublicConfig = {
         magicLinkEnabled: boolean;
         anonymousAuthEnabled: boolean;
         emailVerificationRequired: boolean;
+        appLauncherEnabled: boolean;
     };
     auth: { providers: { github: boolean; google: boolean; facebook: boolean } };
     limits: { bodyLimit: string };
@@ -115,11 +118,17 @@ test.describe('Feature flags — runtime config contract & consistency', () => {
 
         // features.* — every flag MUST be a real boolean (coerced server-side),
         // never a raw env string like "true"/"1"/undefined.
+        // `appLauncherEnabled` joined the allow-list with APW-11 (the App Launcher's
+        // installation switch, read through the same accessor as its route guard).
+        // The exact-key assertion below is what made that addition visible here — e2e run
+        // 35455975352, job 105940305971 — so the key is added, not the check loosened.
+        // `flow-config-public-contract.spec.ts` pins the same five keys.
         const FLAG_KEYS = [
             'subscriptionsEnabled',
             'magicLinkEnabled',
             'anonymousAuthEnabled',
             'emailVerificationRequired',
+            'appLauncherEnabled',
         ] as const;
         expect(Object.keys(cfg.features).sort()).toEqual([...FLAG_KEYS].sort());
         for (const k of FLAG_KEYS) {

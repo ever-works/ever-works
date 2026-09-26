@@ -1,0 +1,14 @@
+# NEGATIVE FIXTURE neg-06 — error class: missing required `source.relation`.
+# Expected: JSON Schema FAIL (`required` on /spec/source) · rule layer — (structural only; no rule code,
+#           the issue is reported with the structural code `required`, schema.md §23).
+# schema.md §5: `relation` is **required**. §24.4 shows `web_component_needs_port` and the others, but the
+# missing-relation class is what a hand-written spec most often gets wrong.
+version: 2
+kind: app
+spec:
+    source:
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }

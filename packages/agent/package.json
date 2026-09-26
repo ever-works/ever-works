@@ -101,6 +101,14 @@
             "types": "./dist/deployment-context/index.d.ts",
             "default": "./dist/deployment-context/index.js"
         },
+        "./app-launcher": {
+            "types": "./dist/app-launcher/index.d.ts",
+            "default": "./dist/app-launcher/index.js"
+        },
+        "./app-runtime": {
+            "types": "./dist/app-runtime/index.d.ts",
+            "default": "./dist/app-runtime/index.js"
+        },
         "./plugins": {
             "types": "./dist/plugins/index.d.ts",
             "default": "./dist/plugins/index.js"
@@ -260,6 +268,30 @@
         "./validation": {
             "types": "./dist/validation/index.d.ts",
             "default": "./dist/validation/index.js"
+        },
+        "./app-works": {
+            "types": "./dist/app-works/index.d.ts",
+            "default": "./dist/app-works/index.js"
+        },
+        "./app-env": {
+            "types": "./dist/app-env/index.d.ts",
+            "default": "./dist/app-env/index.js"
+        },
+        "./app-dependencies": {
+            "types": "./dist/app-dependencies/index.d.ts",
+            "default": "./dist/app-dependencies/index.js"
+        },
+        "./app-spec": {
+            "types": "./dist/app-spec/index.d.ts",
+            "default": "./dist/app-spec/index.js"
+        },
+        "./app-builds": {
+            "types": "./dist/app-builds/index.d.ts",
+            "default": "./dist/app-builds/index.js"
+        },
+        "./upstream-pull-requests": {
+            "types": "./dist/upstream-pull-requests/index.d.ts",
+            "default": "./dist/upstream-pull-requests/index.js"
         }
     },
     "scripts": {
@@ -350,10 +382,12 @@
         "jszip": "^3.10.1",
         "lodash": "^4.18.1",
         "mammoth": "^1.8.0",
+        "minimatch": "10.2.6",
         "p-map": "^7.0.4",
         "pacote": "^21.5.1",
         "papaparse": "^5.5.3",
         "pdf-parse": "^1.1.1",
+        "re2js": "^1.2.1",
         "rrule": "^2.8.1",
         "semver": "^7.7.3",
         "stripe": "^22.3.2",

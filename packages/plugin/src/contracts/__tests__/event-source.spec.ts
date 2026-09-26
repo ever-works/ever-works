@@ -5,7 +5,11 @@ import {
 	supportsEventSourceBackfill,
 	clampEventSourceBackfillDays,
 	EVENT_SOURCE_BACKFILL_MAX_DAYS,
-	type IEventSourcePlugin
+	type IEventSourcePlugin,
+	// Annotated so the destructured `backfill` parameter is typed: without it the
+	// three bindings were implicitly `any`, which `tsc` reported as TS7031 and the
+	// runtime (vitest strips types) never noticed. `tsconfig.specs.json` closes that.
+	type EventSourceBackfillInput
 } from '../capabilities/event-source.interface.js';
 import { ALL_PLUGIN_CAPABILITIES, PLUGIN_CAPABILITIES } from '../facade-capabilities.js';
 import type { IPlugin } from '../plugin.interface.js';
@@ -69,7 +73,7 @@ describe('event-source backfill (audit item (l))', () => {
 		capabilities: ['event-source'],
 		providerName: 'with-backfill',
 		pullEvents: async () => ({ events: [] }),
-		backfill: async ({ since, until, cursor }) => ({
+		backfill: async ({ since, until, cursor }: EventSourceBackfillInput) => ({
 			events: [
 				{
 					id: 'env-b1',

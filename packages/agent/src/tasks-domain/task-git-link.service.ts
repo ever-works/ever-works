@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
-import {
-    WORK_TASK_REPO_ROLE,
-    matchWorkRepoRole,
-    type WorkRepoRole,
-} from '../works/work-repo-match';
+import { matchWorkRepoRoles, type WorkRepoRole } from '../works/work-repo-match';
+import { taskRepositoryRole } from './task-repository';
 
 /** What a git ref resolved to inside the platform, when it resolved at all. */
 export interface TaskGitLink {
@@ -20,8 +17,9 @@ export interface TaskGitLink {
     repoRoles?: readonly WorkRepoRole[];
     /**
      * True when the repository is the one this Work's TASKS live in (the
-     * data repo — see {@link WORK_TASK_REPO_ROLE}), i.e. the one
-     * `tasks.prNumber` and `tasks.branchRef` are unique within.
+     * data repo, or the website repo for a kind with no data repo — see
+     * `resolveTaskRepository`), i.e. the one `tasks.prNumber` and
+     * `tasks.branchRef` are unique within.
      *
      * A consumer that merely decorates an ingested event can ignore this.
      * A consumer that ACTS on the Task it resolved — rewriting its CI
@@ -55,7 +53,7 @@ export interface TaskGitLookupBase {
  *
  *   1. **Owner-scoped, always.** Candidate Works come from
  *      `WorkRepository.findByUser(userId)` and the repo is matched with
- *      the shared `matchWorkByRepo`, so a delivery can never resolve into
+ *      the shared `matchWorkRepoRoles`, so a delivery can never resolve into
  *      another tenant's Task.
  *   2. **`null` is a normal outcome.** A repository that is not a Work, a
  *      branch nobody's Task owns, a PR opened by a human — all ordinary.
@@ -105,20 +103,33 @@ export class TaskGitLinkService {
     ): Promise<(TaskGitLink & { prNumber: number }) | null> {
         const wanted = prNumbers.filter((n) => Number.isInteger(n));
         if (wanted.length === 0) return null;
-        const matched = await this.matchWork(base);
-        if (!matched) return null;
+        const matches = await this.matchWorks(base);
+        if (matches.length === 0) return null;
         try {
-            for (const prNumber of wanted) {
-                const task = await this.tasks.findByWorkAndPrNumber(matched.work.id, prNumber);
-                if (task) {
-                    return {
-                        workId: matched.work.id,
-                        taskId: task.id,
-                        taskSlug: task.slug ?? null,
-                        repoRoles: matched.roles,
-                        isTaskRepo: matched.roles.includes(WORK_TASK_REPO_ROLE),
-                        prNumber,
-                    };
+            // Works whose Task repository this is, for EVERY number, before any
+            // Work that merely has the repository in another role: a Task found
+            // in the second tier opened its pull request in a different
+            // repository, so it must not win over a real owner of a later
+            // number. Within a tier, the caller's preferred number first.
+            for (const tier of [true, false]) {
+                for (const prNumber of wanted) {
+                    for (const matched of matches) {
+                        if (matched.isTaskRepo !== tier) continue;
+                        const task = await this.tasks.findByWorkAndPrNumber(
+                            matched.work.id,
+                            prNumber,
+                        );
+                        if (task) {
+                            return {
+                                workId: matched.work.id,
+                                taskId: task.id,
+                                taskSlug: task.slug ?? null,
+                                repoRoles: matched.roles,
+                                isTaskRepo: matched.isTaskRepo,
+                                prNumber,
+                            };
+                        }
+                    }
                 }
             }
         } catch (error) {
@@ -151,18 +162,22 @@ export class TaskGitLinkService {
         base: TaskGitLookupBase,
         findTask: (workId: string) => Promise<{ id: string; slug?: string | null } | null>,
     ): Promise<TaskGitLink | null> {
-        const matched = await this.matchWork(base);
-        if (!matched) return null;
+        const matches = await this.matchWorks(base);
+        if (matches.length === 0) return null;
         try {
-            const task = await findTask(matched.work.id);
-            if (!task) return null;
-            return {
-                workId: matched.work.id,
-                taskId: task.id,
-                taskSlug: task.slug ?? null,
-                repoRoles: matched.roles,
-                isTaskRepo: matched.roles.includes(WORK_TASK_REPO_ROLE),
-            };
+            // `matches` is already ordered Task-repository Works first.
+            for (const matched of matches) {
+                const task = await findTask(matched.work.id);
+                if (!task) continue;
+                return {
+                    workId: matched.work.id,
+                    taskId: task.id,
+                    taskSlug: task.slug ?? null,
+                    repoRoles: matched.roles,
+                    isTaskRepo: matched.isTaskRepo,
+                };
+            }
+            return null;
         } catch (error) {
             this.logger.warn(
                 `Task link lookup failed for ${base.owner}/${base.repo}: ${
@@ -173,21 +188,46 @@ export class TaskGitLinkService {
         }
     }
 
-    /** Owner-scoped repo→Work walk. One `findByUser` per call, never more. */
-    private async matchWork(
-        base: TaskGitLookupBase,
-    ): Promise<{ work: { id: string }; roles: readonly WorkRepoRole[] } | null> {
-        if (!base.userId || !base.owner || !base.repo) return null;
+    /**
+     * Owner-scoped repo→Work walk. One `findByUser` per call, never more.
+     *
+     * EVERY Work that has the repository, not the first: one account may hold
+     * two Works on one repository, and the Task that owns a pull request lives
+     * in only one of them. Works whose TASK repository this is come first, so
+     * the common case is still one Task query; `findByUser` has no order of its
+     * own, and stopping at the first match made which Work's Tasks were found
+     * depend on it.
+     */
+    private async matchWorks(base: TaskGitLookupBase): Promise<
+        {
+            work: { id: string };
+            roles: readonly WorkRepoRole[];
+            // WHICH role is the Task repository depends on the Work's kind —
+            // see `taskRepositoryRole` — so it is decided here, once.
+            isTaskRepo: boolean;
+        }[]
+    > {
+        if (!base.userId || !base.owner || !base.repo) return [];
         try {
             const candidates = await this.works.findByUser(base.userId);
-            return matchWorkRepoRole(candidates ?? [], base.owner, base.repo);
+            const matches = matchWorkRepoRoles(candidates ?? [], base.owner, base.repo).map(
+                (m) => ({
+                    work: m.work,
+                    roles: m.roles,
+                    isTaskRepo: m.roles.includes(taskRepositoryRole(m.work.kind)),
+                }),
+            );
+            return [
+                ...matches.filter((m) => m.isTaskRepo),
+                ...matches.filter((m) => !m.isTaskRepo),
+            ];
         } catch (error) {
             this.logger.warn(
                 `Work lookup failed for ${base.owner}/${base.repo}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
-            return null;
+            return [];
         }
     }
 }

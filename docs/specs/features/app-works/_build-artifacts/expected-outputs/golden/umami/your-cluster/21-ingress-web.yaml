@@ -1,0 +1,43 @@
+# GOLDEN — umami · target your-cluster · Ingress `web`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.11 (only `domains.primaryComponent` gets an Ingress; rules for
+# Spec      : `hosts.primary ∪ hosts.extra ∪ hosts.previous`; TLS block only for `tls: cert-manager`,
+# Spec      : with the issuer annotation)
+# Spec      : APW-06 spec.md FR-38…FR-42 (primary address, managed subdomain, TLS mode)
+# Spec      : `hosts.primary` = `<slug>.<apps-domain>` with the spec’s own default apex (spec.md FR-40)
+# Spec      : and `ingress.tls: cert-manager` + issuer `letsencrypt` are pinned — ../../README.md.
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: web
+    namespace: ew-umami-33333333
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: umami
+        ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+        ever-works.io/kind: app
+        ever-works.io/component: web
+    annotations:
+        cert-manager.io/cluster-issuer: letsencrypt
+spec:
+    ingressClassName: nginx
+    tls:
+        - hosts:
+              - umami.ever.works
+          secretName: umami-ever-works-tls
+    rules:
+        - host: umami.ever.works
+          http:
+              paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: web
+                            port:
+                                number: 80

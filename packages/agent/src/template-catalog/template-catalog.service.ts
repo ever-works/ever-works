@@ -18,6 +18,7 @@ import {
 import {
     findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
+    getWebsiteTemplateIdWithoutSavedDefault,
     listWebsiteTemplates,
     type WebsiteTemplateConfig,
 } from '@src/generators/website-generator/config/website-template.config';
@@ -29,10 +30,20 @@ import {
 // Work Templates catalog source — powers the "Work Templates" tab.
 import { listWorkTemplates, type WorkTemplateConfig } from '@src/works/work-template.config';
 import { randomUUID } from 'node:crypto';
-import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
+import type { Template, TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
+import { APP_BLUEPRINT_TOPIC } from '@src/apps-catalog/app-blueprint.constants';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
+import type { GitRepository } from '@ever-works/plugin';
 import { hasCustomizationPromptForBaseTemplate } from './customization-prompts';
+import {
+    getTemplateRetirementReason,
+    isRetiredTemplate,
+    pickTemplateRetirement,
+    retiredTemplateSelectionMessage,
+    withTemplateRetirement,
+    type TemplateRetirementReason,
+} from './template-retirement';
 import { inferFrameworkFromRepository } from './utils/framework-inference';
 
 export interface TemplateCatalogItem {
@@ -69,6 +80,10 @@ export interface TemplateCatalogItem {
     // Latest customization run for this template (most recent by createdAt),
     // surfaced so the UI can render a status chip without an extra fetch.
     latestCustomization?: TemplateCustomizationSummary | null;
+    // Set on a RETIRED built-in row (templates-catalog FR-5 c/e): kept active
+    // only so the Works already using it keep resolving. Never listed, and
+    // refused as a new selection; `null` for every other row.
+    retiredReason?: TemplateRetirementReason | null;
 }
 
 export interface TemplateCustomizationSummary {
@@ -92,6 +107,14 @@ export interface ForkTemplateResult {
         url: string;
     };
     created: boolean;
+    /**
+     * APW-02 P0 — readiness of the fork this call asked for. `pending` means the provider accepted
+     * the request but the repository is not readable yet: a background readiness poller finishes
+     * that job, and the caller must not clone or push into the repository until it reports ready.
+     * `ready` means an existing fork was resolved and is usable now. Absent when the provider
+     * reported no readiness (pre-existing providers).
+     */
+    forkReadiness?: 'ready' | 'pending';
 }
 
 @Injectable()
@@ -185,10 +208,23 @@ export class TemplateCatalogService implements OnModuleInit {
             await this.syncDiscoveredWebsiteTemplatesIfStale(userId);
         }
 
-        const [templates, defaultTemplateId] = await Promise.all([
+        const [visibleTemplates, savedDefault] = await Promise.all([
             this.templateRepository.findVisibleByKind(kind, userId),
-            this.getDefaultTemplateIdForUser(kind, userId),
+            this.findSavedDefaultTemplate(kind, userId),
         ]);
+        // This listing feeds every picker (Create-Work, the website-template
+        // switch, the defaults page), so a retired row — kept only so the
+        // Works already on it keep resolving — is never offered here.
+        const templates = visibleTemplates.filter((template) => !isRetiredTemplate(template));
+        // The default the pickers label "Default (…)" and the Create-Work form
+        // submits as "use my default" is the one a NEW Work gets (FR-5 f): a
+        // retired saved default is never newly inherited, so it is reported as
+        // if there were no saved default — never as an id missing from
+        // `templates`.
+        const defaultTemplateId =
+            savedDefault && !isRetiredTemplate(savedDefault)
+                ? savedDefault.id
+                : this.getDefaultTemplateIdWithoutSavedDefault(kind);
 
         const latestByTemplate = await this.customizationRepository.findLatestForTemplates(
             templates.map((t) => t.id),
@@ -278,6 +314,7 @@ export class TemplateCatalogService implements OnModuleInit {
                 message: 'Template not found for this user and kind.',
             });
         }
+        this.assertNotRetired(template);
 
         await this.userTemplatePreferenceRepository.upsertDefault(userId, kind, template.id);
 
@@ -439,13 +476,10 @@ export class TemplateCatalogService implements OnModuleInit {
                 message: 'Template not found for this user and kind.',
             });
         }
-
-        if (template.sourceType !== 'built_in') {
-            throw new BadRequestException({
-                status: 'error',
-                message: 'Only standard templates can be forked.',
-            });
-        }
+        // A fork of a retired row would become a custom website template —
+        // never retired — AND the user's default: a new selection by another
+        // name.
+        this.assertNotRetired(template);
 
         const providerId = 'github';
         const targetOwner = input.targetOwner.trim();
@@ -475,6 +509,39 @@ export class TemplateCatalogService implements OnModuleInit {
 
         const targetOrganizationLogin = isPersonalTarget ? undefined : organization!.login;
 
+        // **The rule the owner actually stated: "if the repo is not yours, fork
+        // it."** So the only thing that cannot be forked is a repository the
+        // target ALREADY owns — there is nothing to fork, and GitHub refuses to
+        // fork a repository into the account that owns it.
+        //
+        // What used to stand here instead, near the top of this method, was
+        // `if (template.sourceType !== 'built_in') -> 400 "Only standard
+        // templates can be forked."` That single line was the whole distance
+        // between this platform and the App Works brief's steps 1 and 2:
+        // `addCustomTemplate` (`:206`) already registers ANY GitHub repository
+        // URL as a template, and everything below this point already works for
+        // one — a `custom` row carries `repositoryOwner` / `repositoryName` from
+        // the parsed URL, which is all the fork path reads. The refusal was a
+        // curation policy, not a technical limit.
+        //
+        // Checked against the programme's own decisions before removing it
+        // (2026-09-21): **D1 does not cover this.** D1 is "a new Work kind
+        // `app`; the `repo` kind is not modified", and the two alternatives it
+        // rejects are lifting `repo`'s guard and extending Work Import
+        // `link_existing` (`docs/specs/features/app-works/README.md:124-129`).
+        // It says nothing about `template-catalog`, so reusing this path needs
+        // no decision reversed.
+        if (
+            template.repositoryOwner.trim().toLowerCase() === targetOwner.toLowerCase() &&
+            template.sourceType === 'custom'
+        ) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'This repository already belongs to the selected account — there is nothing to fork. Use it directly instead.',
+            });
+        }
+
         const existingTemplate =
             await this.templateRepository.findOwnedCustomByRepositoryCoordinates(
                 input.kind,
@@ -499,11 +566,11 @@ export class TemplateCatalogService implements OnModuleInit {
                     fullName: `${existingTemplate.repositoryOwner}/${existingTemplate.repositoryName}`,
                     url:
                         existingTemplate.repositoryUrl ||
-                        this.gitFacade.getWebUrl(
+                        (await this.gitFacade.getWebUrl(
                             providerId,
                             existingTemplate.repositoryOwner,
                             existingTemplate.repositoryName,
-                        ),
+                        )),
                 },
                 created: false,
             };
@@ -514,6 +581,13 @@ export class TemplateCatalogService implements OnModuleInit {
             template.repositoryName,
             {
                 organization: targetOrganizationLogin,
+                // `waitForReady` is deliberately NOT set here. The provider can now fork
+                // non-blockingly (`waitForReady: false` → `forkReadiness: 'pending'`), but P0 ships
+                // no readiness poller: `WorkUpstreamState` and the `app-fork-readiness` job are
+                // APW-02 P1 (T12/T24), and this epic's P0 gate allows no migration, job or route.
+                // Asking for a pending fork here would leave it pending forever, so this caller
+                // keeps the provider's blocking default until that poller exists. The provider
+                // resolves an existing fork first either way, so a repeat fork is already cheap.
             },
             { userId, providerId },
         );
@@ -536,7 +610,11 @@ export class TemplateCatalogService implements OnModuleInit {
             previewImageUrl: template.previewImageUrl || null,
             repositoryUrl:
                 forkedRepository.url ||
-                this.gitFacade.getWebUrl(providerId, forkedRepository.owner, forkedRepository.name),
+                (await this.gitFacade.getWebUrl(
+                    providerId,
+                    forkedRepository.owner,
+                    forkedRepository.name,
+                )),
             repositoryOwner: forkedRepository.owner,
             repositoryName: forkedRepository.name,
             branch: forkedRepository.defaultBranch || template.branch,
@@ -570,16 +648,23 @@ export class TemplateCatalogService implements OnModuleInit {
                 fullName: forkedRepository.fullName,
                 url:
                     forkedRepository.url ||
-                    this.gitFacade.getWebUrl(
+                    (await this.gitFacade.getWebUrl(
                         providerId,
                         forkedRepository.owner,
                         forkedRepository.name,
-                    ),
+                    )),
             },
             created: true,
+            forkReadiness: forkedRepository.forkReadiness,
         };
     }
 
+    /**
+     * A template the user can see, by id. This INCLUDES a retired row (marked
+     * by `retiredReason`), because an existing reference to one is still valid:
+     * a caller validating a NEW selection must refuse a retired row itself
+     * (`WorkLifecycleService.resolveValidatedWebsiteTemplateSelection` does).
+     */
     async getVisibleTemplateForUser(
         kind: TemplateKind,
         templateId: string,
@@ -595,27 +680,81 @@ export class TemplateCatalogService implements OnModuleInit {
         return this.toCatalogItem(template, defaultTemplateId);
     }
 
+    /**
+     * The default the user's INHERITING Works use: the saved default when it is
+     * visible, else the system default (`website`) or none (`work`).
+     *
+     * A retired saved default is still answered: the website resolver still
+     * resolves it for the user's inheriting Works, and the template switch
+     * compares against what those Works actually use. What a NEW Work or a new
+     * selection gets instead is {@link getWebsiteTemplateIdForNewWork} and the
+     * listing's `defaultTemplateId` (FR-5 f); SETTING a retired row as the
+     * default is refused (setDefaultTemplateForUser).
+     */
     async getDefaultTemplateIdForUser(kind: TemplateKind, userId: string): Promise<string | null> {
+        const savedDefault = await this.findSavedDefaultTemplate(kind, userId);
+        return savedDefault ? savedDefault.id : this.getDefaultTemplateIdWithoutSavedDefault(kind);
+    }
+
+    /**
+     * The user's saved default for `kind` when it is a RETIRED row, as a
+     * catalog item (with `retiredReason` set); `null` when the saved default is
+     * listed or there is none. For callers that must refuse a Work NEWLY
+     * inheriting it (templates-catalog FR-5 f) and name it in the refusal.
+     */
+    async getRetiredDefaultTemplateForUser(
+        kind: TemplateKind,
+        userId: string,
+    ): Promise<TemplateCatalogItem | null> {
+        const savedDefault = await this.findSavedDefaultTemplate(kind, userId);
+        if (!savedDefault || !isRetiredTemplate(savedDefault)) {
+            return null;
+        }
+        return this.toCatalogItem(savedDefault, savedDefault.id);
+    }
+
+    /**
+     * The website template id a NEW Work that names none must store
+     * (templates-catalog FR-5 f).
+     *
+     * `null`: store no template, and the Work inherits the user's saved
+     * default exactly as before. An id: the saved default is a RETIRED row, so
+     * storing no template would make the new Work inherit the App Blueprint
+     * (the resolver resolves a retired row for inheriting Works). The id is
+     * the template a user with NO saved default gets for this kind of Work
+     * (`getWebsiteTemplateIdWithoutSavedDefault`), and the caller pins the Work
+     * to it. Works that already inherit the retired row are not touched.
+     */
+    async getWebsiteTemplateIdForNewWork(
+        userId: string,
+        workKind?: string | null,
+    ): Promise<string | null> {
+        const retiredDefault = await this.getRetiredDefaultTemplateForUser('website', userId);
+        return retiredDefault ? getWebsiteTemplateIdWithoutSavedDefault(workKind) : null;
+    }
+
+    /** The user's saved default for `kind`, when it is visible to them (a retired row is). */
+    private async findSavedDefaultTemplate(
+        kind: TemplateKind,
+        userId: string,
+    ): Promise<Template | null> {
         const preference = await this.userTemplatePreferenceRepository.findByUserAndKind(
             userId,
             kind,
         );
-
-        if (preference) {
-            const visibleTemplate = await this.templateRepository.findVisibleById(
-                preference.templateId,
-                userId,
-            );
-            if (visibleTemplate && visibleTemplate.kind === kind) {
-                return visibleTemplate.id;
-            }
+        if (!preference) {
+            return null;
         }
 
-        if (kind === 'website') {
-            return getDefaultWebsiteTemplateId();
-        }
+        const visibleTemplate = await this.templateRepository.findVisibleById(
+            preference.templateId,
+            userId,
+        );
+        return visibleTemplate && visibleTemplate.kind === kind ? visibleTemplate : null;
+    }
 
-        return null;
+    private getDefaultTemplateIdWithoutSavedDefault(kind: TemplateKind): string | null {
+        return kind === 'website' ? getDefaultWebsiteTemplateId() : null;
     }
 
     private async syncDiscoveredWebsiteTemplatesIfStale(userId: string): Promise<void> {
@@ -711,18 +850,83 @@ export class TemplateCatalogService implements OnModuleInit {
                 );
             }
 
-            const standardTemplates = repositories.filter((repository) =>
+            // An App Blueprint (e.g. ever-works/cal-template) is named like a
+            // website template but generates an App Work, never a website: its
+            // topic is what tells the two apart. A provider that does not report
+            // topics leaves `topics` undefined and the name rule alone applies,
+            // exactly as before.
+            const templateNamedRepositories = repositories.filter((repository) =>
                 this.isStandardTemplateRepository(repository.name),
+            );
+            const standardTemplates = templateNamedRepositories.filter(
+                (repository) => !this.isAppBlueprintRepository(repository),
+            );
+            const appBlueprintRepositories = templateNamedRepositories.filter((repository) =>
+                this.isAppBlueprintRepository(repository),
             );
 
             // Repos already represented by a curated WEBSITE_TEMPLATES entry —
             // skip them in discovery so we don't re-create a `<repo-name>` row
             // alongside the curated one and end up with duplicate catalog
             // cards for the same GitHub repo.
+            const curatedWebsiteTemplates = listWebsiteTemplates();
             const curatedRepoCoordinates = new Set(
-                listWebsiteTemplates().map(
+                curatedWebsiteTemplates.map(
                     (template) => `${template.owner.toLowerCase()}/${template.repo.toLowerCase()}`,
                 ),
+            );
+            const curatedTemplateIds = new Set(
+                curatedWebsiteTemplates.map((template) => template.id),
+            );
+
+            // A row an earlier discovery saved for a repository that is now an
+            // App Blueprint must stop being offered as a website template. It is
+            // RETIRED (see ./template-retirement.ts), never deactivated: it stays
+            // active, so every Work already on it keeps resolving, while the
+            // pickers stop listing it and every write path refuses it as a new
+            // selection. `findAllBuiltInByRepositoryCoordinates` only returns
+            // built-in rows, so user-created templates are never touched;
+            // curated WEBSITE_TEMPLATES rows are skipped by coordinates and by
+            // id. A failure here is logged and never blocks discovery of the
+            // real website templates below.
+            await Promise.all(
+                appBlueprintRepositories.map(async (repository) => {
+                    const coordinateKey = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
+                    if (curatedRepoCoordinates.has(coordinateKey)) {
+                        return;
+                    }
+                    let discoveredRows: Template[];
+                    try {
+                        discoveredRows =
+                            await this.templateRepository.findAllBuiltInByRepositoryCoordinates(
+                                'website',
+                                repository.owner,
+                                repository.name,
+                            );
+                    } catch (error) {
+                        this.logger.warn(
+                            `Could not look up discovered website templates for App Blueprint ${repository.fullName}; ` +
+                                `retrying on the next discovery: ${
+                                    error instanceof Error ? error.message : String(error)
+                                }`,
+                        );
+                        return;
+                    }
+                    await Promise.all(
+                        discoveredRows
+                            .filter(
+                                (row) =>
+                                    row.isActive &&
+                                    row.kind === 'website' &&
+                                    row.sourceType === 'built_in' &&
+                                    !curatedTemplateIds.has(row.id) &&
+                                    !isRetiredTemplate(row),
+                            )
+                            .map((row) =>
+                                this.retireAppBlueprintTemplateRow(row, repository.fullName),
+                            ),
+                    );
+                }),
             );
 
             await Promise.all(
@@ -759,6 +963,20 @@ export class TemplateCatalogService implements OnModuleInit {
                         }
                     }
 
+                    const metadata: Record<string, unknown> = {
+                        discoveredFromOrganization: catalogOwner,
+                        fullName: repository.fullName,
+                    };
+                    // A provider that does not REPORT topics cannot say the
+                    // repository stopped being an App Blueprint, so the name-only
+                    // fallback keeps a retirement an earlier topic-reporting
+                    // discovery recorded rather than put the row back in the
+                    // pickers. A reported topic list without the Blueprint topic
+                    // is evidence, and the upsert below lifts the retirement.
+                    if (!Array.isArray(repository.topics) && canonicalTemplate) {
+                        Object.assign(metadata, pickTemplateRetirement(canonicalTemplate));
+                    }
+
                     await this.templateRepository.upsert({
                         id: canonicalId,
                         kind: 'website',
@@ -782,10 +1000,7 @@ export class TemplateCatalogService implements OnModuleInit {
                         syncBranches: [repository.defaultBranch || 'main'],
                         betaBranch: null,
                         isActive: true,
-                        metadata: {
-                            discoveredFromOrganization: catalogOwner,
-                            fullName: repository.fullName,
-                        },
+                        metadata,
                     });
 
                     if (canonicalId !== discoveredId) {
@@ -943,6 +1158,7 @@ export class TemplateCatalogService implements OnModuleInit {
             latestCustomization: latestCustomization
                 ? this.toCustomizationSummary(latestCustomization)
                 : null,
+            retiredReason: getTemplateRetirementReason(template),
         };
     }
 
@@ -1046,5 +1262,72 @@ export class TemplateCatalogService implements OnModuleInit {
 
     private isStandardTemplateRepository(repo: string): boolean {
         return /template$/i.test(repo.trim());
+    }
+
+    /**
+     * Retires a discovered website-template row whose repository is an App
+     * Blueprint (./template-retirement.ts): the retirement marker joins the
+     * row's `metadata`, and nothing else changes.
+     *
+     * In particular `isActive` stays true. Deactivating a row in use broke its
+     * Works — the website resolver only resolves ACTIVE rows and a discovered
+     * id has no static config to fall back to — and guarding the deactivation
+     * with a usage count left a window in which a Work created, switched or
+     * defaulted onto the row between the count and the update ended up on a
+     * row that no longer resolved. A retired row keeps resolving for every Work
+     * already on it, whenever that Work got there, so there is nothing to count
+     * and no window. What stops NEW Works from choosing it is the picker
+     * listing and the selection guards, not the row's state.
+     *
+     * Never throws: a failed write is logged, and the next discovery retries.
+     */
+    private async retireAppBlueprintTemplateRow(
+        row: Pick<Template, 'id' | 'metadata'>,
+        repositoryFullName: string,
+    ): Promise<void> {
+        try {
+            await this.templateRepository.updateById(row.id, {
+                metadata: withTemplateRetirement(row.metadata, 'app_blueprint'),
+            });
+            this.logger.log(
+                `Retired discovered website template "${row.id}": ${repositoryFullName} is an App Blueprint. ` +
+                    'Works already using it keep resolving it; it is no longer listed or selectable.',
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Could not retire discovered website template "${row.id}" (${repositoryFullName} is an ` +
+                    `App Blueprint); retrying on the next discovery: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+            );
+        }
+    }
+
+    /**
+     * Refuses a retired row as a NEW selection (the user default, a fork) with
+     * a 400 that says why. An existing reference to it stays valid.
+     */
+    private assertNotRetired(template: {
+        id: string;
+        repositoryOwner?: string | null;
+        repositoryName?: string | null;
+        metadata?: Record<string, unknown> | null;
+    }): void {
+        const retiredReason = getTemplateRetirementReason(template);
+        if (retiredReason) {
+            throw new BadRequestException({
+                status: 'error',
+                message: retiredTemplateSelectionMessage(template, retiredReason),
+            });
+        }
+    }
+
+    /**
+     * True only when the provider REPORTED the App Blueprint topic. `topics`
+     * undefined means "not reported" (git-provider contract), which keeps
+     * today's name-only behaviour rather than hiding the repository.
+     */
+    private isAppBlueprintRepository(repository: Pick<GitRepository, 'topics'>): boolean {
+        return Array.isArray(repository.topics) && repository.topics.includes(APP_BLUEPRINT_TOPIC);
     }
 }

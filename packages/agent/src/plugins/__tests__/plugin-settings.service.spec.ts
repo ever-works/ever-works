@@ -889,18 +889,18 @@ describe('PluginSettingsService', () => {
     });
 
     describe('getSettingsSchema', () => {
-        it('should return settings schema', () => {
-            const result = service.getSettingsSchema('test-plugin');
+        it('should return settings schema', async () => {
+            const result = await service.getSettingsSchema('test-plugin');
 
             expect(result).toBeDefined();
             expect(result?.type).toBe('object');
             expect(result?.properties).toBeDefined();
         });
 
-        it('should return undefined for non-existent plugin', () => {
+        it('should return undefined for non-existent plugin', async () => {
             jest.spyOn(registry, 'get').mockReturnValue(undefined);
 
-            const result = service.getSettingsSchema('non-existent');
+            const result = await service.getSettingsSchema('non-existent');
 
             expect(result).toBeUndefined();
         });
@@ -1220,9 +1220,9 @@ describe('PluginSettingsService', () => {
     });
 
     describe('getSettingsSchemaForContext', () => {
-        it('should filter properties for user context', () => {
+        it('should filter properties for user context', async () => {
             // Default schema has: apiKey (global), enabled (global), maxItems (work), theme (user)
-            const result = service.getSettingsSchemaForContext('test-plugin', 'user');
+            const result = await service.getSettingsSchemaForContext('test-plugin', 'user');
 
             expect(result).toBeDefined();
             expect(result?.properties).toBeDefined();
@@ -1232,8 +1232,8 @@ describe('PluginSettingsService', () => {
             expect('maxItems' in result!.properties!).toBe(false); // work - should be filtered out
         });
 
-        it('should filter properties for work context', () => {
-            const result = service.getSettingsSchemaForContext('test-plugin', 'work');
+        it('should filter properties for work context', async () => {
+            const result = await service.getSettingsSchemaForContext('test-plugin', 'work');
 
             expect(result).toBeDefined();
             expect(result?.properties).toBeDefined();
@@ -1243,15 +1243,15 @@ describe('PluginSettingsService', () => {
             expect('theme' in result!.properties!).toBe(false); // user - should be filtered out
         });
 
-        it('should return undefined for non-existent plugin', () => {
+        it('should return undefined for non-existent plugin', async () => {
             jest.spyOn(registry, 'get').mockReturnValue(undefined);
 
-            const result = service.getSettingsSchemaForContext('non-existent', 'user');
+            const result = await service.getSettingsSchemaForContext('non-existent', 'user');
 
             expect(result).toBeUndefined();
         });
 
-        it('should filter required array to only included properties', () => {
+        it('should filter required array to only included properties', async () => {
             const schema: JsonSchema = {
                 type: 'object',
                 properties: {
@@ -1269,13 +1269,13 @@ describe('PluginSettingsService', () => {
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
 
-            const result = service.getSettingsSchemaForContext('test-plugin', 'user');
+            const result = await service.getSettingsSchemaForContext('test-plugin', 'user');
 
             expect(result?.required).toEqual(['globalSetting']);
             expect(result?.required).not.toContain('workSetting');
         });
 
-        it('should return schema unchanged if no properties', () => {
+        it('should return schema unchanged if no properties', async () => {
             const schema: JsonSchema = {
                 type: 'object',
             } as unknown as JsonSchema;
@@ -1283,7 +1283,7 @@ describe('PluginSettingsService', () => {
             const plugin = createMockPlugin(schema);
             jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
 
-            const result = service.getSettingsSchemaForContext('test-plugin', 'user');
+            const result = await service.getSettingsSchemaForContext('test-plugin', 'user');
 
             expect(result).toEqual(schema);
         });

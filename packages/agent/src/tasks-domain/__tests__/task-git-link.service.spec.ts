@@ -20,11 +20,14 @@ describe('TaskGitLinkService (git activity ingestion)', () => {
      * CI feedback + autonomous fix loop (slice AC, EW-806) added two
      * fields to every link: WHICH of the Work's repo roles the delivery's
      * repository fills, and whether that is the repository this Work's
-     * Tasks actually live in (the DATA repo — see `WORK_TASK_REPO_ROLE`).
+     * Tasks actually live in (the DATA repo for every kind that has one, the
+     * website-role Work Repository for an App Work — see `taskRepositoryRole`).
      * The default fixture below declares only a `work` repo, so a
-     * consumer that ACTS on the Task it resolved must refuse this link;
-     * the git-activity consumer, which only decorates an ingested event,
-     * goes on ignoring both fields.
+     * consumer that ACTS on the Task it resolved must refuse this link —
+     * and since the third adversarial review so does the git-activity
+     * decoration (`taskFields` in the PR review bridge): naming a Task that
+     * opened the same number in another repository labels the event with
+     * the wrong Task.
      */
     const WORK_REPO_LINK = {
         workId: 'work-1',
@@ -155,6 +158,210 @@ describe('TaskGitLinkService (git activity ingestion)', () => {
                     prNumber: 42,
                 }),
             ).resolves.toMatchObject({ repoRoles: ['work', 'data'], isTaskRepo: true });
+        });
+
+        it('marks an App Work’s own pull request as the Task repository — the WEBSITE role', async () => {
+            // An App Work has no data repository (`repos.data: false`): its
+            // Tasks branch and open pull requests in its `website`-role Work
+            // Repository. Keying on the data role alone would call every one
+            // of those pull requests "not the Task repository", and every
+            // consumer that acts on a Task would drop it.
+            works.findByUser = jest.fn().mockResolvedValue([
+                {
+                    id: 'work-1',
+                    kind: 'app',
+                    getRepoOwner: () => 'acme',
+                    getMainRepo: () => 'their-app-main',
+                    getWebsiteRepo: () => 'their-app',
+                    getDataRepo: () => 'their-app-data',
+                },
+            ]);
+            await expect(
+                makeSvc().findByPullRequest({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'their-app',
+                    prNumber: 42,
+                }),
+            ).resolves.toMatchObject({ repoRoles: ['website'], isTaskRepo: true });
+        });
+
+        it('does NOT mark a directory Work’s website pull request as the Task repository', async () => {
+            // The other half of the same rule: a directory Work's Tasks live in
+            // its data repository, so pull request #42 in its website repository
+            // is a different pull request that happens to share a number.
+            works.findByUser = jest.fn().mockResolvedValue([
+                {
+                    id: 'work-1',
+                    kind: 'directory',
+                    getRepoOwner: () => 'acme',
+                    getMainRepo: () => 'widgets-main',
+                    getWebsiteRepo: () => 'widgets-www',
+                    getDataRepo: () => 'widgets',
+                },
+            ]);
+            await expect(
+                makeSvc().findByPullRequest({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'widgets-www',
+                    prNumber: 42,
+                }),
+            ).resolves.toMatchObject({ repoRoles: ['website'], isTaskRepo: false });
+        });
+    });
+
+    /**
+     * One account can register the same repository as two Works: an App Work
+     * over a directory Work's generated website repository, or two App Works
+     * over one code repository. The Task that owns a pull request lives in
+     * only ONE of them, and `findByUser` returns them in no particular order.
+     *
+     * The lookup used to stop at the FIRST Work that had the repository, so
+     * whether the right Task was found depended on that order: the other
+     * Work's pull requests were never linked, and a check on one of them
+     * could resolve to an unrelated Task that opened the same number in a
+     * different repository.
+     */
+    describe('an account with two Works on one repository', () => {
+        // A directory Work: its Tasks live in `site-data`; `site` is only
+        // the website it generates.
+        const directory = {
+            id: 'dir-1',
+            kind: 'directory',
+            getRepoOwner: () => 'acme',
+            getMainRepo: () => 'site-main',
+            getWebsiteRepo: () => 'site',
+            getDataRepo: () => 'site-data',
+        };
+        // An App Work wrapped around that same `site` repository: its Tasks
+        // live there.
+        const app = {
+            id: 'app-1',
+            kind: 'app',
+            getRepoOwner: () => 'acme',
+            getMainRepo: () => 'site-app-main',
+            getWebsiteRepo: () => 'site',
+            getDataRepo: () => 'site-app-data',
+        };
+        const APP_TASK = { id: 'app-task', slug: 'A-12' };
+        const DIR_TASK = { id: 'dir-task', slug: 'D-12' };
+
+        it.each([
+            ['the directory Work first', [directory, app]],
+            ['the App Work first', [app, directory]],
+        ])('finds the App Work’s pull request with %s', async (_order, list) => {
+            works.findByUser = jest.fn().mockResolvedValue(list);
+            tasks.findByWorkAndPrNumber = jest
+                .fn()
+                .mockImplementation(async (workId: string) =>
+                    workId === 'app-1' ? APP_TASK : null,
+                );
+
+            await expect(
+                makeSvc().findByPullRequest({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'site',
+                    prNumber: 12,
+                }),
+            ).resolves.toMatchObject({ workId: 'app-1', taskId: 'app-task', isTaskRepo: true });
+            expect(works.findByUser).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            ['the directory Work first', [directory, app]],
+            ['the App Work first', [app, directory]],
+        ])(
+            'prefers the Work whose TASK repository this is over a same-numbered Task elsewhere, with %s',
+            async (_order, list) => {
+                // Both Works have a Task #12 — the directory Work's opened #12 in
+                // `site-data`, a different pull request. The delivery is about
+                // `site`, so the App Work's Task is the owner.
+                works.findByUser = jest.fn().mockResolvedValue(list);
+                tasks.findByWorkAndPrNumber = jest
+                    .fn()
+                    .mockImplementation(async (workId: string) =>
+                        workId === 'app-1' ? APP_TASK : DIR_TASK,
+                    );
+
+                await expect(
+                    makeSvc().findByPullRequest({
+                        userId: 'u1',
+                        owner: 'acme',
+                        repo: 'site',
+                        prNumber: 12,
+                    }),
+                ).resolves.toMatchObject({ workId: 'app-1', isTaskRepo: true });
+            },
+        );
+
+        it('finds a Task branch in the SECOND of two App Works on one repository', async () => {
+            const otherApp = { ...app, id: 'app-2' };
+            works.findByUser = jest.fn().mockResolvedValue([app, otherApp]);
+            tasks.findByWorkAndBranchRef = jest
+                .fn()
+                .mockImplementation(async (workId: string) =>
+                    workId === 'app-2' ? APP_TASK : null,
+                );
+
+            await expect(
+                makeSvc().findByBranch({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'site',
+                    branch: 'task/a-12',
+                }),
+            ).resolves.toMatchObject({ workId: 'app-2', taskId: 'app-task', isTaskRepo: true });
+            expect(tasks.findByWorkAndBranchRef).toHaveBeenCalledTimes(2);
+        });
+
+        it('a Task-repository owner of a LATER number beats a same-numbered Task elsewhere', async () => {
+            // The delivery lists #12 then #13. The directory Work has a Task #12
+            // (in `site-data`); the App Work owns #13 in `site`. Trying #12 in
+            // every Work first would hand back the directory Work's Task —
+            // which the CI consumer then drops as "not the Task repository",
+            // losing the real match.
+            works.findByUser = jest.fn().mockResolvedValue([directory, app]);
+            tasks.findByWorkAndPrNumber = jest
+                .fn()
+                .mockImplementation(async (workId: string, prNumber: number) => {
+                    if (workId === 'dir-1' && prNumber === 12) return DIR_TASK;
+                    if (workId === 'app-1' && prNumber === 13) return APP_TASK;
+                    return null;
+                });
+
+            await expect(
+                makeSvc().findByPullRequests(
+                    { userId: 'u1', owner: 'acme', repo: 'site' },
+                    [12, 13],
+                ),
+            ).resolves.toMatchObject({ workId: 'app-1', prNumber: 13, isTaskRepo: true });
+            expect(works.findByUser).toHaveBeenCalledTimes(1);
+        });
+
+        it('still reports a Task found only in a Work that merely shares the repository — marked as NOT its Task repository', async () => {
+            // Decorating consumers keep their old link; acting consumers see
+            // `isTaskRepo: false` and refuse it, exactly as before.
+            works.findByUser = jest.fn().mockResolvedValue([app, directory]);
+            tasks.findByWorkAndPrNumber = jest
+                .fn()
+                .mockImplementation(async (workId: string) =>
+                    workId === 'dir-1' ? DIR_TASK : null,
+                );
+
+            await expect(
+                makeSvc().findByPullRequest({
+                    userId: 'u1',
+                    owner: 'acme',
+                    repo: 'site',
+                    prNumber: 12,
+                }),
+            ).resolves.toMatchObject({
+                workId: 'dir-1',
+                repoRoles: ['website'],
+                isTaskRepo: false,
+            });
         });
     });
 

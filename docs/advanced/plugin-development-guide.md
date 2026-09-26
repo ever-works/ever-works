@@ -261,6 +261,33 @@ The `resolvePluginEnabled()` function determines whether a plugin is active for 
 6. Fallback to manifest autoEnable (default false)
 ```
 
+## Operations the platform may call by name
+
+The platform's execution router can call a plugin method **by name**: in the API process for a short call, or in the `run-plugin-operation` worker job for a long one. Only methods the manifest lists in `everworks.plugin.operations` can be called that way. Anything else the class defines, including inherited helpers and methods TypeScript marks `private` or `protected`, is refused with `OPERATION_NOT_FOUND`. Those markers are erased at runtime, so the list is the only boundary.
+
+```json
+"everworks": {
+	"plugin": {
+		"id": "my-agent",
+		"executionProfile": "sync",
+		"operations": [
+			{ "name": "runSandboxSession", "executionProfile": "long-running" },
+			{ "name": "listModels" }
+		]
+	}
+}
+```
+
+- **Omitted or empty:** nothing can be called by name. Capability calls through the facades are unaffected.
+- **`name`:** the method name. It uses letters and digits, optionally dot-separated, with no leading `_` or `$`. These names are reserved and can never be listed: `constructor`, `onLoad`, `onUnload`, `onEnable`, `onDisable`, `healthCheck`, `getManifest`, `getSettings`, `validateSettings`, `validateConnection`, `configure`, `initialize` and `dispose`.
+- **`executionProfile`** (optional, per operation): `sync` or `long-running`. It overrides the manifest-level `executionProfile` for that operation. A `long-running` operation runs in the worker, in bundled mode too.
+
+Declare `operations` (and `executionProfile`) in `package.json`. A lazily loaded plugin is routed before it loads, so these two fields are never taken from what `getManifest()` returns.
+
+A malformed list fails manifest validation, and **the plugin is not loaded at all**: a bad or reserved name, a duplicate, or an unknown profile. Discovery logs the reason ("Skipping plugin package … invalid manifest").
+
+The method is called with one argument, the call's `args` object. On the long-running path, its result must be serialisable.
+
 ## Settings JSON Schema Extensions
 
 | Extension  | Purpose                                      | Example                        |

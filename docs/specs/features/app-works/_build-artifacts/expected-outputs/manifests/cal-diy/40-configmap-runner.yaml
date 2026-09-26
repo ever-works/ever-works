@@ -1,0 +1,179 @@
+# GOLDEN RENDERED OUTPUT — cal-diy. Runner ConfigMap `ew-runner-<hash10>` (APW-06 plan §4.1 names table,
+# §4.8, §4.9).
+#
+# Every `http` job, every `http` cron and every smoke run is executed by the RUNNER: a Job on a digest-pinned
+# public Node.js runtime image (`APP_RUNNER_IMAGE`) that executes `app-runner.script.ts` mounted read-only
+# from this ConfigMap, reading the request list from a second mounted file. "**Paths, bodies and expectations
+# are data read with `JSON.parse`, never interpolated into a command line**" (APW-06 plan §4.8) — which is why
+# this ConfigMap exists at all and why the Job's `command` carries only a request id.
+#
+# Requests use `redirect: 'manual'`: smoke, job and cron requests never follow redirects, so `expect.status`
+# judges the first response (CONTRACTS §1, APW-06 plan §4.8). `found` is truncated to 200 characters and
+# scrubbed of every mounted secret value. `authScheme: bearer` sends `Authorization: Bearer <value>`;
+# `authScheme: raw` sends `Authorization: <value>` (CONTRACTS §1 APW-13 addition), for jobs and cron alike.
+#
+# ⚠️ `runner.mjs` is a faithful transcription of the documented behaviour, not a byte-specified artifact: the
+# epic fixes the runner's behaviour and its output shape, never its source text. See ../contradictions.md
+# **X-14** and ../open-questions.md **Q-3**.
+#
+# `ew-runner-1bd8272a14`: the epic names the ConfigMap `ew-runner-<hash10>` and does not say what is hashed.
+# This golden set defines it as the first 10 hex of
+#   sha256("<workId>|ever-works-runner|v1")   = 1bd8272a143518c8f44ec11cf717f0d808749eff6d8cc143e77e46f2cda729ac
+# (open question Q-4).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ew-runner-1bd8272a14
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+immutable: true
+data:
+  runner.mjs: |
+    import { readFileSync } from 'node:fs';
+
+    const requestId = process.argv[2];
+    const requests = JSON.parse(readFileSync('/ew/requests.json', 'utf8'));
+    const request = requests[requestId];
+    if (!request) {
+    	console.log(JSON.stringify({ name: requestId, status: 0, latencyMs: 0, failedExpectation: 'unknown request' }));
+    	process.exit(2);
+    }
+
+    const resolve = (value) =>
+    	String(value).replace(/\{\{env\.([A-Z_][A-Z0-9_]*)\}\}/g, (_match, name) => process.env[name] ?? '');
+
+    const scrub = (text) => {
+    	let out = String(text);
+    	for (const value of Object.values(process.env)) {
+    		if (value && value.length >= 8) out = out.split(value).join('***');
+    	}
+    	return out;
+    };
+
+    const headers = {};
+    if (request.authEnv && process.env[request.authEnv]) {
+    	headers.authorization =
+    		request.authScheme === 'raw' ? process.env[request.authEnv] : `Bearer ${process.env[request.authEnv]}`;
+    }
+    if (request.body !== undefined) headers['content-type'] = 'application/json';
+
+    const started = Date.now();
+    let status = 0;
+    let body = '';
+    try {
+    	const response = await fetch(request.url, {
+    		method: request.method ?? 'GET',
+    		headers,
+    		body: request.body === undefined ? undefined : resolve(JSON.stringify(request.body)),
+    		redirect: 'manual'
+    	});
+    	status = response.status;
+    	body = Buffer.from(await response.arrayBuffer()).subarray(0, 1048576).toString('utf8');
+    } catch {
+    	status = 0;
+    }
+
+    const expect = request.expect ?? {};
+    const statuses = expect.status ?? [200];
+    let failedExpectation;
+    let found;
+    if (!statuses.includes(status)) failedExpectation = `status ${status}`;
+    for (const needle of expect.bodyContains ?? []) {
+    	if (!body.includes(needle)) failedExpectation = failedExpectation ?? 'missing expected text';
+    }
+    for (const needle of expect.bodyNotContains ?? []) {
+    	if (body.includes(needle)) {
+    		failedExpectation = failedExpectation ?? 'unexpected text present';
+    		found = scrub(needle).slice(0, 200);
+    	}
+    }
+
+    console.log(
+    	JSON.stringify({
+    		name: requestId,
+    		status,
+    		latencyMs: Date.now() - started,
+    		...(failedExpectation ? { failedExpectation } : {}),
+    		...(found ? { found } : {})
+    	})
+    );
+    process.exit(failedExpectation ? 1 : 0);
+  requests.json: |
+    {
+      "cron/booking-reminder": {
+        "authEnv": "CRON_API_KEY",
+        "authScheme": "raw",
+        "expect": { "status": [200, 201, 204] },
+        "method": "POST",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/cron/bookingReminder"
+      },
+      "cron/calendar-subscriptions": {
+        "authEnv": "CRON_SECRET",
+        "authScheme": "bearer",
+        "expect": { "status": [200, 201, 204] },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/cron/calendar-subscriptions"
+      },
+      "cron/calendar-subscriptions-cleanup": {
+        "authEnv": "CRON_SECRET",
+        "authScheme": "bearer",
+        "expect": { "status": [200, 201, 204] },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/cron/calendar-subscriptions-cleanup"
+      },
+      "cron/change-time-zone": {
+        "authEnv": "CRON_API_KEY",
+        "authScheme": "raw",
+        "expect": { "status": [200, 201, 204] },
+        "method": "POST",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/cron/changeTimeZone"
+      },
+      "cron/tasker": {
+        "authEnv": "CRON_SECRET",
+        "authScheme": "bearer",
+        "expect": { "status": [200, 201, 204] },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/tasks/cron"
+      },
+      "cron/tasker-cleanup": {
+        "authEnv": "CRON_SECRET",
+        "authScheme": "bearer",
+        "expect": { "status": [200, 201, 204] },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/tasks/cleanup"
+      },
+      "cron/webhook-triggers": {
+        "authEnv": "CRON_API_KEY",
+        "authScheme": "raw",
+        "expect": { "status": [200, 201, 204] },
+        "method": "POST",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/cron/webhookTriggers"
+      },
+      "smoke/cron-refuses-anonymous": {
+        "expect": { "status": [401] },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/tasks/cron"
+      },
+      "smoke/login": {
+        "expect": {
+          "status": [200],
+          "bodyNotContains": ["localhost:3000", "NEXT_PUBLIC_WEBAPP_URL_PLACEHOLDER"]
+        },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/auth/login"
+      },
+      "smoke/setup-closed": {
+        "expect": { "status": [400] },
+        "method": "POST",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/auth/setup"
+      },
+      "smoke/version": {
+        "expect": { "status": [200] },
+        "method": "GET",
+        "url": "http://web.ew-cal-diy-11111111.svc:80/api/version"
+      }
+    }

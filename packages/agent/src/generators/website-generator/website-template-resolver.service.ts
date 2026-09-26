@@ -40,6 +40,14 @@ import type { Work } from '@src/entities/work.entity';
  * means operators flipping `isActive` off don't necessarily take the
  * template offline. Use the static-config purge if you need a hard
  * disable.
+ *
+ * Retired rows: a RETIRED catalog row (templates-catalog FR-5 c — an App
+ * Blueprint an earlier discovery saved as a website template) is still
+ * `isActive` and resolves like any other, by id and as a saved preference.
+ * That is the point of retiring instead of deactivating: the Works already on
+ * it keep working. Retirement only removes it from the pickers and refuses it
+ * as a new selection (`TemplateCatalogService`, `WorkLifecycleService`), so
+ * this service deliberately does not read the retirement marker.
  */
 @Injectable()
 export class WebsiteTemplateResolverService {

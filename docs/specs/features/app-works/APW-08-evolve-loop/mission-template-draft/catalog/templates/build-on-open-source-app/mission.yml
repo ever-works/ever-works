@@ -1,0 +1,22 @@
+# Catalog-conformant copy of the "Build on an open-source app" Mission template (added 2026-09-17 — EXT-13).
+#
+# This file is the shape the `ever-works/missions` catalog requires
+# (`templates/<slug>/{mission.yml,BRIEF.md,README.md}` plus a manifest row; schema
+# `schema/mission-template.schema.json`): `slug`, `title`, `type`, `summary` and `schedule` are required, and
+# `version`, `defaults`, `kb`, `appWork`, `suggestedGoals` are **additional properties the catalog schema rejects**.
+#
+# It is published **alongside** the runtime manifest at `mission-template-draft/.works/mission.yml` (which lives in
+# the standalone seed repository the platform actually reads), never instead of it. The runtime keys this catalog
+# shape cannot carry — `defaults.guardrails`, `defaults.outputMode`, `defaults.taskOutput`, `kb.seedPaths`,
+# `appWork.recommendedAppSpec` and `suggestedGoals` — stay in the standalone repository; the `summary` and
+# `BRIEF.md` below describe them for a human reader.
+slug: build-on-open-source-app
+title: Build on an open-source app
+type: SCHEDULED
+schedule: '0 8 * * 1'
+summary: >-
+  Build my own product for my business on top of an open-source app I already run: every Monday it files up to two
+  small, budgeted, approval-gated changes on an App Work and follows each one until it is live.
+suggestedAgentTemplates:
+  - slug: app-provisioner
+    reason: Prepares the app and can change it; the Mission's Tasks run on an Agent that may commit.

@@ -115,6 +115,10 @@ Key fields in `everworks.plugin`:
 | `autoEnable`   | If `true`, the plugin is enabled by default for new users                    |
 | `envVars`      | Environment variables the plugin uses (for documentation and `.env.example`) |
 
+:::note Declare decision fields in package.json
+The platform loads your plugin's code on first use, and until then it knows only this `everworks.plugin` block. Declare here every field that decides whether the plugin is enabled or how its calls are routed: `systemPlugin`, `autoEnable`, `category`, `capabilities`, `operations` and `executionProfile`. `operations` and `executionProfile` are read from package.json only, never from `getManifest()`. Where package.json and `getManifest()` both set a field, package.json wins. See [Lazy Loading and the First Load](./architecture#lazy-loading-and-the-first-load).
+:::
+
 ## 2. tsup.config.ts
 
 Build configuration for dual CJS/ESM output:

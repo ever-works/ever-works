@@ -1,0 +1,21 @@
+{
+	"$comment": "Manifest row for the `ever-works/missions` catalog (added 2026-09-17 — EXT-13). Add this object to the catalog's manifest.json. The catalog's own schema requires slug, title, type, summary and schedule; it rejects `version`, `defaults`, `kb`, `appWork` and `suggestedGoals`, which is why the runtime manifest stays in the standalone seed repository `ever-works/build-on-open-source-app-mission-template` and this row only describes the listing.",
+	"slug": "build-on-open-source-app",
+	"title": "Build on an open-source app",
+	"type": "SCHEDULED",
+	"schedule": "0 8 * * 1",
+	"summary": "Build my own product for my business on top of an open-source app I already run: every Monday it files up to two small, budgeted, approval-gated changes on an App Work and follows each one until it is live.",
+	"path": "templates/build-on-open-source-app",
+	"runtimeRepository": {
+		"owner": "ever-works",
+		"repo": "build-on-open-source-app-mission-template",
+		"branch": "main",
+		"manifest": ".works/mission.yml"
+	},
+	"suggestedAgentTemplates": [
+		{
+			"slug": "app-provisioner",
+			"reason": "Prepares the app and can change it; the Mission's Tasks run on an Agent that may commit."
+		}
+	]
+}

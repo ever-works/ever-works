@@ -538,7 +538,7 @@ export class SourceRepoAnalyzerService {
         for (const branch of branches) {
             for (const filename of readmeFiles) {
                 try {
-                    const rawUrl = this.gitFacade.getRawFileUrl(
+                    const rawUrl = await this.gitFacade.getRawFileUrl(
                         provider || 'github', // getRawFileUrl requires providerId
                         owner,
                         repo,

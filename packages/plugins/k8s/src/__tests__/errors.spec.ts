@@ -42,6 +42,44 @@ clusters: []`;
 		const out = scrubString(`failed to push: 401 Unauthorized for ${literal}`, [pattern]);
 		expect(out).not.toContain(literal);
 	});
+
+	/**
+	 * A replacer's second argument is the first CAPTURE GROUP — unless the pattern
+	 * has no group, in which case it is the match OFFSET. `buildSecretPattern`
+	 * returns a group-less pattern (a runtime secret has no prefix worth keeping)
+	 * and the `Authorization: Bearer …` pattern above is group-less too, so both
+	 * spliced the offset into the output whenever the secret was not at index 0:
+	 * `401 Unauthorized for 45[REDACTED]`.
+	 *
+	 * The existing assertions could not see it. `not.toContain(literal)` holds
+	 * either way — the secret really is gone — so the corruption only shows when
+	 * the redaction is asserted by EQUALITY, which is what these cases do.
+	 */
+	it('redacts a runtime secret mid-line without splicing the match offset in', () => {
+		const literal = 'mYr3gistryPwD!';
+		const pattern = buildSecretPattern(literal)!;
+
+		expect(scrubString(`failed to push: 401 Unauthorized for ${literal}`, [pattern])).toBe(
+			'failed to push: 401 Unauthorized for [REDACTED]'
+		);
+		// Why nobody noticed: at index 0 the offset is `0`, which is falsy, so the
+		// bug was invisible in the common "the line IS the secret" case.
+		expect(scrubString(`${literal} is wrong`, [pattern])).toBe('[REDACTED] is wrong');
+	});
+
+	it('redacts a Bearer token mid-line without splicing the match offset in', () => {
+		expect(scrubString('failed: Authorization: Bearer ya29.fake-bearer-token')).toBe('failed: [REDACTED]');
+	});
+
+	it('keeps the prefix of a pattern that really does capture one', () => {
+		expect(scrubString('detail: token: very-secret-12345')).toBe('detail: token: [REDACTED]');
+	});
+
+	it('leaves a string with no secret alone', () => {
+		expect(scrubString('nothing to hide here', [buildSecretPattern('mYr3gistryPwD!')!])).toBe(
+			'nothing to hide here'
+		);
+	});
 });
 
 describe('scrubError', () => {

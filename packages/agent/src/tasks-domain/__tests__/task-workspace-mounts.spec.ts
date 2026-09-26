@@ -1,6 +1,7 @@
 import type { Task } from '../../entities/task.entity';
 import {
     TaskWorkspaceService,
+    cloneUrlHost,
     credentialFreeUrlForMessages,
     repositoryIdFromCloneUrl,
 } from '../task-workspace.service';
@@ -84,6 +85,13 @@ describe('repositoryIdFromCloneUrl', () => {
         ],
         ['git@github.com:ever-works/workspace.git', 'ever-works/workspace'],
         ['ssh://git@gitlab.com/group/project.git', 'group/project'],
+        // A trailing slash AFTER `.git` used to keep the suffix
+        // (`ever-works/ever-works.git`) — an identity no comparison with the
+        // primary recognised, while git resolves the URL to the real repository.
+        ['https://github.com/ever-works/ever-works.git/', 'ever-works/ever-works'],
+        ['https://github.com/ever-works/ever-works.git//', 'ever-works/ever-works'],
+        ['https://github.com/ever-works/ever-works.GIT/', 'ever-works/ever-works'],
+        ['git@github.com:ever-works/ever-works.git/', 'ever-works/ever-works'],
     ])('parses %s', (url, expected) => {
         expect(repositoryIdFromCloneUrl(url)).toBe(expected);
     });
@@ -96,6 +104,35 @@ describe('repositoryIdFromCloneUrl', () => {
         ['free text', 'not a url'],
     ])('rejects %s', (_label, url) => {
         expect(repositoryIdFromCloneUrl(url)).toBeNull();
+    });
+});
+
+describe('cloneUrlHost', () => {
+    // `repositoryIdFromCloneUrl` drops the host on purpose (it is an
+    // `owner/repo` identity). The registry match for a Task's PRIMARY
+    // repository must not: a mirror on another host with the same path is a
+    // different repository, and its env files and grants are not the primary's.
+    it.each([
+        ['https://github.com/o/r.git', 'github.com'],
+        ['https://GitHub.COM/o/r', 'github.com'],
+        ['https://github.example.com:8443/o/r', 'github.example.com'],
+        ['https://user:sekret@gitlab.example.com/o/r.git', 'gitlab.example.com'],
+        ['ssh://git@github.com/o/r.git', 'github.com'],
+        ['git@github.com:o/r.git', 'github.com'],
+        ['git@GitHub.com:o/r.git', 'github.com'],
+        ['github.com:o/r', 'github.com'],
+    ])('reads the host of %s', (url, expected) => {
+        expect(cloneUrlHost(url)).toBe(expected);
+    });
+
+    it.each([
+        ['empty input', ''],
+        ['whitespace', '   '],
+        ['free text', 'not a url'],
+        ['a hostless URL', 'file:///srv/git/o/r.git'],
+        ['a non-string', undefined as unknown as string],
+    ])('answers null for %s (never throws)', (_label, url) => {
+        expect(cloneUrlHost(url)).toBeNull();
     });
 });
 
@@ -289,6 +326,36 @@ describe('TaskWorkspaceService.describeFleetWorkspace — mounts', () => {
                 agentId: 'agent-1',
             }),
         ).rejects.toThrow(/is used by another mount/);
+    });
+
+    it('skips an attachment that is the PRIMARY spelled with a trailing `.git/`', async () => {
+        // Before canonicalisation this mounted the Task's own repository a second
+        // time under the identity `ever-works/ever-works.git`.
+        attachments.listEnabledForAgentWithRepos.mockResolvedValue([
+            attachment({ url: 'https://github.com/ever-works/ever-works.git/', name: 'self' }),
+        ]);
+        const spec = await build().describeFleetWorkspace({
+            task: makeTask(),
+            userId: 'user-1',
+            agentId: 'agent-1',
+        });
+        expect(spec?.mounts).toBeUndefined();
+    });
+
+    it('names a mounted repository the provider does not find, instead of a TypeError', async () => {
+        attachments.listEnabledForAgentWithRepos.mockResolvedValue([
+            attachment({ defaultBranch: null }),
+        ]);
+        gitFacade.getRepository.mockImplementation(async (_owner: string, repo: string) =>
+            repo === 'directory-web-template' ? null : { defaultBranch: 'develop', cloneUrl: '' },
+        );
+        await expect(
+            build().describeFleetWorkspace({
+                task: makeTask(),
+                userId: 'user-1',
+                agentId: 'agent-1',
+            }),
+        ).rejects.toThrow(/ever-works\/directory-web-template .*the git provider does not find it/);
     });
 
     it('ignores attachments entirely when no agent is given', async () => {

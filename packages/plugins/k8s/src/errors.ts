@@ -18,6 +18,8 @@ export type K8sPluginErrorCode =
 	| 'REGISTRY_AUTH_FAILED'
 	| 'APPLY_FAILED'
 	| 'ROLLOUT_TIMEOUT'
+	| 'KUBECONFIG_UNSUPPORTED'
+	| 'CLUSTER_ADDRESS_NOT_PUBLIC'
 	| 'UNKNOWN';
 
 export class K8sPluginError extends Error {
@@ -57,10 +59,32 @@ const SCRUB_PATTERNS: ReadonlyArray<RegExp> = [
 	/(\b(?:token|password|client-certificate-data|client-key-data|certificate-authority-data)\b\s*[:=]\s*)[^\s,;}"']+/gi
 ];
 
+/**
+ * Replace every match of every pattern with `[REDACTED]`, keeping the prefix of
+ * the patterns that capture one (`token: hunter2` → `token: [REDACTED]`).
+ *
+ * ## Why the replacer checks the TYPE of its second argument
+ *
+ * A `String.replace` callback receives the capture groups after the match — and
+ * when the pattern has NO group, the argument in that position is the match
+ * **offset**, a number. Two of the patterns here are deliberately group-less:
+ * the `Authorization: Bearer …` pattern (there is no prefix worth keeping) and
+ * `buildSecretPattern`, which matches a runtime secret literally.
+ *
+ * Reading that argument as a group therefore spliced the offset into the
+ * message whenever the secret was not at index 0 — a registry failure read
+ * `401 Unauthorized for 37[REDACTED]`. It went unnoticed because `0` is falsy,
+ * so the "the whole line is the secret" case was correct, and because every
+ * assertion was `not.toContain(secret)`, which holds either way. The spec now
+ * asserts these redactions by equality.
+ */
 export function scrubString(input: string, extraPatterns: RegExp[] = []): string {
 	let out = input;
 	for (const pattern of [...SCRUB_PATTERNS, ...extraPatterns]) {
-		out = out.replace(pattern, (_match, prefix?: string) => (prefix ? `${prefix}${REDACTED}` : REDACTED));
+		out = out.replace(pattern, (_match: string, ...groups: unknown[]) => {
+			const prefix = typeof groups[0] === 'string' ? groups[0] : '';
+			return prefix ? `${prefix}${REDACTED}` : REDACTED;
+		});
 	}
 	return out;
 }

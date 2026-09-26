@@ -63,7 +63,13 @@
 			"builtIn": true,
 			"autoEnable": false,
 			"visibility": "public",
-			"distribution": "registry"
+			"distribution": "registry",
+			"operations": [
+				{
+					"name": "runSandboxSession",
+					"executionProfile": "long-running"
+				}
+			]
 		}
 	},
 	"publishConfig": {

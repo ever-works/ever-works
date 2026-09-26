@@ -2,10 +2,13 @@ import {
     BadRequestException,
     ConflictException,
     HttpException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     ServiceUnavailableException,
+    UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
@@ -43,6 +46,10 @@ import {
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
 import {
+    retiredDefaultInheritanceMessage,
+    retiredTemplateSelectionMessage,
+} from '../template-catalog/template-retirement';
+import {
     describeExternalRefConflicts,
     findExternalRefConflicts,
     validateWorkExternalRefs,
@@ -62,6 +69,7 @@ import { config } from '@src/config';
 import {
     isRepositoryWorkKind,
     normalizeWorkRepoDeclaredCommandPolicy,
+    type AppSourceRecord,
 } from '@ever-works/contracts';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
@@ -77,6 +85,52 @@ import {
     hasRepositoryRole,
     isRepositoryWork,
 } from '@src/works/repository-work-guard';
+import { ActivityLogService } from '@src/activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '@src/entities/activity-log.types';
+import { AppWorkCreateService } from '@src/app-works/app-work-create.service';
+import {
+    APP_WORK_DELETION_PORT,
+    type AppWorkDeletionOutcome,
+    type AppWorkDeletionPort,
+} from '@src/app-works/app-work-deletion.port';
+import {
+    APP_WORKS_TELEMETRY_EVENTS,
+    AppWorksTelemetryService,
+} from '@src/app-works/app-works-telemetry.service';
+
+/**
+ * APW-11 (App Launcher) — the kind whose exposure default is **on**.
+ *
+ * The literal is compared against the raw `work.kind` column rather than
+ * through the `WorkKind` union, because `@ever-works/contracts` does not
+ * carry `'app'` in `WORK_KINDS` yet (APW-01 owns that vocabulary). Reading
+ * the column as a string means this file is already correct on the day the
+ * kind lands, and it cannot narrow anything if the vocabulary grows
+ * differently.
+ */
+const APP_WORK_KIND = 'app';
+
+/** Is this Work an App Work (spec FR-19: App Works default to exposed)? */
+function isAppWorkKind(kind: string | null | undefined): boolean {
+    return typeof kind === 'string' && kind.trim().toLowerCase() === APP_WORK_KIND;
+}
+
+/**
+ * APW-11 (plan §4.4, spec FR-61) — everything the exposure write and its
+ * Activity record need, decided once.
+ */
+interface AppLauncherExposureChange {
+    /** Did the `(value, explicit)` pair move? `null → null` did not. */
+    changed: boolean;
+    /** The value to persist: `true`, `false`, or `null` for "kind default". */
+    value: boolean | null;
+    /** Whether the NEW state is an explicit choice (spec FR-61). */
+    explicit: boolean;
+    /** The effective value AFTER the write — the recorded direction. */
+    effective: boolean;
+    /** The effective value BEFORE the write (`metadata.previousEffective`). */
+    previousEffective: boolean;
+}
 
 /**
  * Map a wizard "storage" choice onto the existing `gitProvider` field.
@@ -134,6 +188,40 @@ export class WorkLifecycleService {
         // only the Repository Work create path probes the git provider, so
         // every other positional construction can leave the slot empty.
         private readonly gitFacade: GitFacadeService,
+        // Appended last, and `@Optional()`, for the same reason again (APW-11
+        // T7 — App Launcher exposure): `WorkModule` imports `ActivityLogModule`,
+        // so the real service is injected in production, while an existing
+        // positional construction that stops before this slot keeps working —
+        // it simply records no exposure Activity. The exposure write itself
+        // never depends on this.
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
+        // Appended LAST, and `@Optional()`, for the positional-spec arity rule
+        // this constructor documents above (APW-01 T13 — the App Work create
+        // path). `WorkModule` imports `AppWorksModule`, so the real service is
+        // injected in production; a positional construction that stops before
+        // this slot keeps working and simply never receives an `app` create —
+        // `createWork` answers `500` with a named message rather than calling
+        // `undefined.create`, because only `kind: 'app'` reaches for it.
+        @Optional()
+        private readonly appWorkCreate?: AppWorkCreateService,
+        // Appended LAST, and `@Optional()`, for the same positional-arity rule
+        // (APW-01 T39 — deleting an App Work). The binding is APW-06's
+        // `APP_WORK_DELETION_PORT_PROVIDER` (`app-runtime-deletion.service.ts`),
+        // which provides this exact token, imported from
+        // `app-works/app-work-deletion.port.ts`. No API module provides it yet
+        // (APW-06 T33), so the token is unbound and `deleteWork` treats that as
+        // "no App runtime exists, so nothing can be running" and keeps today's
+        // behaviour (the row goes now). Only `kind: 'app'` ever reads it.
+        @Optional()
+        @Inject(APP_WORK_DELETION_PORT)
+        private readonly appWorkDeletion?: AppWorkDeletionPort,
+        // Appended LAST, and `@Optional()`, for the same positional-arity rule
+        // (APW-01 T36 — FR-53's `app_work.deleted`). `WorkModule` imports
+        // `AppWorksModule`, which exports the service; absent, no event is emitted
+        // and the delete is unchanged. Only `kind: 'app'` ever reads it.
+        @Optional()
+        private readonly appWorksTelemetry?: AppWorksTelemetryService,
     ) {}
 
     /**
@@ -191,9 +279,27 @@ export class WorkLifecycleService {
         return normalized ? normalized : null;
     }
 
+    /**
+     * Validates a website template id a caller asks a Work to use. Every
+     * Work-side write path that takes one goes through here: create, the
+     * settings update and the template switch.
+     *
+     * `currentTemplateId` is the Work's current explicit selection (none on
+     * create). A RETIRED row (templates-catalog FR-5 c/e — an App Blueprint an
+     * earlier discovery saved as a website template) is refused as a NEW
+     * selection with a 400, but re-sending the id the Work already has is not a
+     * new selection: a settings save or a no-op switch on such a Work keeps
+     * working, exactly as the resolver keeps resolving the row for it.
+     *
+     * An empty value ("use my default") returns null unchecked; what the Work
+     * would then inherit is each caller's concern (FR-5 f): `createWork` pins
+     * a new Work away from a retired saved default, and the update and switch
+     * call `assertMayNewlyInheritWebsiteDefault`.
+     */
     private async resolveValidatedWebsiteTemplateSelection(
         value: string | null | undefined,
         userId: string,
+        currentTemplateId: string | null = null,
     ): Promise<string | null> {
         const normalizedTemplateId = this.normalizeWebsiteTemplateSelection(value);
 
@@ -213,7 +319,55 @@ export class WorkLifecycleService {
             });
         }
 
+        if (visibleTemplate.retiredReason && normalizedTemplateId !== currentTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: retiredTemplateSelectionMessage(
+                    visibleTemplate,
+                    visibleTemplate.retiredReason,
+                ),
+            });
+        }
+
         return normalizedTemplateId;
+    }
+
+    /**
+     * Refuses moving an existing Work to "use my default" (no website template
+     * of its own) while the user's saved default is a RETIRED row the Work
+     * does not already use (templates-catalog FR-5 f). The switch and the
+     * settings update send null for that choice, and a Work storing null
+     * inherits the saved default, which the resolver still resolves — so
+     * without this the Work would newly land on the App Blueprint, and the
+     * switch would reset its website repository from it.
+     *
+     * It refuses rather than substituting another template: "use my default"
+     * cannot be honoured, and a guessed replacement could reset the
+     * repository from a template the user never saw named. (A NEW Work is
+     * pinned instead — see `createWork` — because there is nothing to reset
+     * and every Create-Work form starts on "use my default".)
+     *
+     * `currentEffectiveTemplateId` is the template the Work uses now. A Work
+     * already on the retired row — by inheritance or by id — may move to
+     * inheriting it: nothing it resolves changes.
+     */
+    private async assertMayNewlyInheritWebsiteDefault(
+        userId: string,
+        currentEffectiveTemplateId: string,
+    ): Promise<void> {
+        const retiredDefault = await this.templateCatalogService.getRetiredDefaultTemplateForUser(
+            'website',
+            userId,
+        );
+        if (retiredDefault?.retiredReason && retiredDefault.id !== currentEffectiveTemplateId) {
+            throw new BadRequestException({
+                status: 'error',
+                message: retiredDefaultInheritanceMessage(
+                    retiredDefault,
+                    retiredDefault.retiredReason,
+                ),
+            });
+        }
     }
 
     private async getEffectiveWebsiteTemplateId(
@@ -265,6 +419,27 @@ export class WorkLifecycleService {
         // column default `'default'` applies, exactly as before.
         const normalizedKind = normalizeCreateWorkKind(createWorkDto.kind);
 
+        // App Work (APW-01 T13, README D1) — a kind of its own, with a create
+        // path of its own. The branch sits FIRST because an App Work shares
+        // nothing with the generated-website path below: it provisions no
+        // website template, no provider repository and no data repository, it
+        // resolves its own deploy target (so `resolveProviderDefaults` — and with
+        // it every onboarding default — is deliberately skipped for the kind),
+        // and it writes the Work row plus its `WorkUpstreamState` row in one
+        // transaction. Falling through to the generator path is exactly the bug
+        // this branch removes: it silently created a generated website for an
+        // `app` request and acted on none of `repositoryMode`, `targetOwner`,
+        // `blueprintId` or `autoProvision`.
+        if (isAppWorkKind(normalizedKind)) {
+            if (!this.appWorkCreate) {
+                throw new ServiceUnavailableException(
+                    'App Works are not available in this deployment: the App Work create service is ' +
+                        'not wired into WorkModule.',
+                );
+            }
+            return this.appWorkCreate.create(createWorkDto, user);
+        }
+
         // Repository Work (self-build slice D, EW-766) — resolve and verify
         // the source repository FIRST so a bad, missing, unreachable or
         // already-wrapped URL fails before any side effect. A `repo` Work
@@ -274,9 +449,22 @@ export class WorkLifecycleService {
             ? await this.resolveRepositoryWorkSource(createWorkDto, user)
             : null;
 
-        const selectedWebsiteTemplateId = repositorySource
+        let selectedWebsiteTemplateId = repositorySource
             ? null
             : await this.resolveValidatedWebsiteTemplateSelection(websiteTemplateId, user.id);
+        if (!repositorySource && !selectedWebsiteTemplateId) {
+            // No template named: the Work would store null and inherit the
+            // user's saved default. When that default is a RETIRED row (an App
+            // Blueprint) the catalog names the template a user with no saved
+            // default gets, and the Work is pinned to it (templates-catalog
+            // FR-5 f). Every Create-Work form starts on "use my default", so
+            // this is the common path, not an API corner.
+            selectedWebsiteTemplateId =
+                await this.templateCatalogService.getWebsiteTemplateIdForNewWork(
+                    user.id,
+                    normalizedKind,
+                );
+        }
 
         const { storageProvider, deployProvider, gitProvider } = await this.resolveProviderDefaults(
             createWorkDto,
@@ -762,6 +950,17 @@ export class WorkLifecycleService {
             status: 'draft',
             deployProvider: null,
         };
+        // A draft is an ordinary Work whose website comes later, from the
+        // template it inherits. Not from a retired saved default, though: see
+        // `createWork` (templates-catalog FR-5 f).
+        const pinnedWebsiteTemplateId =
+            await this.templateCatalogService.getWebsiteTemplateIdForNewWork(
+                user.id,
+                workData.kind,
+            );
+        if (pinnedWebsiteTemplateId) {
+            workData.websiteTemplateId = pinnedWebsiteTemplateId;
+        }
 
         try {
             return await this.workRepository.create(workData, user);
@@ -921,15 +1120,16 @@ export class WorkLifecycleService {
             }
 
             if (updateDto.websiteTemplateId !== undefined) {
+                const currentTemplateId = this.normalizeWebsiteTemplateSelection(
+                    work.websiteTemplateId,
+                );
                 const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
                     updateDto.websiteTemplateId,
                     user.id,
+                    currentTemplateId,
                 );
 
-                if (
-                    nextTemplateId !==
-                    this.normalizeWebsiteTemplateSelection(work.websiteTemplateId)
-                ) {
+                if (nextTemplateId !== currentTemplateId) {
                     const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(
                         work,
                         user,
@@ -942,6 +1142,13 @@ export class WorkLifecycleService {
                                 'Website template cannot be changed after the website repository has been initialized.',
                         });
                     }
+                }
+
+                // Leaving an explicit template for "use my default" (null):
+                // not onto a retired saved default (FR-5 f). A Work that
+                // already inherits is not changing what it resolves.
+                if (!nextTemplateId && currentTemplateId) {
+                    await this.assertMayNewlyInheritWebsiteDefault(user.id, currentTemplateId);
                 }
 
                 updateData.websiteTemplateId = nextTemplateId;
@@ -1080,6 +1287,23 @@ export class WorkLifecycleService {
                 );
             }
 
+            // App Launcher exposure (APW-11 T7, plan §4.4, spec FR-19/FR-60/
+            // FR-61). One Work-level field, and it is the ONLY field this
+            // request writes: the value joins `updateData` only when the
+            // `(value, explicit)` pair actually moved, so a save that leaves
+            // the effective value and the explicit flag alone writes nothing
+            // from this block and records nothing. Edit rights are already
+            // enforced above by `ensureCanEdit` — a viewer never reaches this
+            // line, and no second permission path is introduced (spec FR-20).
+            const exposureChange =
+                updateDto.appLauncherExposed !== undefined
+                    ? this.resolveAppLauncherExposureChange(work, updateDto.appLauncherExposed)
+                    : null;
+
+            if (exposureChange?.changed) {
+                updateData.appLauncherExposed = exposureChange.value;
+            }
+
             const updatedWork = await this.workRepository.update(id, updateData);
 
             if (!updatedWork) {
@@ -1087,6 +1311,17 @@ export class WorkLifecycleService {
             }
 
             updatedWork.owner = updatedWork.getRepoOwner();
+
+            // The record is written once per REAL change and only after the
+            // column is persisted, so the row can never describe a write that
+            // did not happen. A logging failure is reported and swallowed —
+            // the setting is already saved, and turning that into a request
+            // failure would tell the member their choice was lost when it was
+            // not (the same posture `WorksController.updateWork` takes for its
+            // own `work.updated` row).
+            if (exposureChange?.changed) {
+                await this.logAppLauncherExposure(id, user.id, exposureChange);
+            }
 
             // EW-612: when `deployProvider` changes via the dashboard,
             // commit the new value to `.works/works.yml` in the data repo
@@ -1114,6 +1349,92 @@ export class WorkLifecycleService {
             };
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'updating work');
+        }
+    }
+
+    /**
+     * APW-11 (plan §4.4, spec FR-19/FR-61) — decide what a submitted
+     * `appLauncherExposed` means for this Work.
+     *
+     * "Changed" is the PAIR `(storedValue, storedExplicit)` compared with
+     * `(newValue, newExplicit)`, never `storedValue !== newValue`. The two
+     * differ in exactly the cases the spec calls out:
+     *
+     *   - `null → true` on an `app` Work: the effective value was already on,
+     *     and what moved is the **explicit flag** — a real change, recorded;
+     *   - `null → false` on any other kind: the mirror image, also recorded;
+     *   - `null → null`: the pair is identical, so it is a no-op — nothing is
+     *     written and nothing is logged;
+     *   - `true → true`: likewise a no-op.
+     *
+     * The kind default is `true` for an `app` Work and `false` for every
+     * other kind (spec FR-19), and an explicit value always wins — which is
+     * why the effective value is derived from the stored/submitted value
+     * first and only falls back to the kind.
+     */
+    private resolveAppLauncherExposureChange(
+        work: Pick<Work, 'kind' | 'appLauncherExposed'>,
+        nextValue: boolean | null,
+    ): AppLauncherExposureChange {
+        const value: boolean | null = nextValue ?? null;
+        const storedValue: boolean | null = work.appLauncherExposed ?? null;
+        const explicit = value !== null;
+        const storedExplicit = storedValue !== null;
+        const kindDefault = isAppWorkKind(work.kind);
+
+        return {
+            changed: value !== storedValue || explicit !== storedExplicit,
+            value,
+            explicit,
+            effective: value ?? kindDefault,
+            previousEffective: storedValue ?? kindDefault,
+        };
+    }
+
+    /**
+     * APW-11 (plan §4.4, spec FR-21/FR-61) — record one exposure change.
+     *
+     * The row carries the actor (`userId`, the member who made the choice),
+     * the direction through the dotted `action`, whether the new state is
+     * explicit or the kind default, and the effective value it moved to.
+     * `metadata` carries **exactly** `{ explicit, previousEffective }`.
+     *
+     * The summary is a fixed English sentence that names **neither the Work
+     * nor its address** — Activity rows are readable by every member of a
+     * Work, and the launcher's host must never leak into one (spec §5.2,
+     * FR-43). The summary is not localized, like every other Activity row.
+     */
+    private async logAppLauncherExposure(
+        workId: string,
+        userId: string,
+        change: AppLauncherExposureChange,
+    ): Promise<void> {
+        if (!this.activityLog) {
+            return;
+        }
+
+        try {
+            await this.activityLog.log({
+                userId,
+                workId,
+                actionType: ActivityActionType.APP_LAUNCHER,
+                action: change.effective ? 'app.launcher.exposed' : 'app.launcher.hidden',
+                status: ActivityStatus.COMPLETED,
+                summary: change.explicit
+                    ? change.effective
+                        ? 'Show in App Launcher turned on'
+                        : 'Show in App Launcher turned off'
+                    : 'Show in App Launcher reset to the default for this Work kind',
+                metadata: {
+                    explicit: change.explicit,
+                    previousEffective: change.previousEffective,
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to record app_launcher activity for work ${workId}: ${message}`,
+            );
         }
     }
 
@@ -1165,6 +1486,7 @@ export class WorkLifecycleService {
         const nextTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
             websiteTemplateId,
             user.id,
+            this.normalizeWebsiteTemplateSelection(work.websiteTemplateId),
         );
 
         const websiteRepoInitialized = await this.hasInitializedWebsiteRepository(work, user);
@@ -1174,6 +1496,12 @@ export class WorkLifecycleService {
             work.websiteTemplateId,
         );
         const currentEffectiveTemplateId = await this.getEffectiveWebsiteTemplateId(work, user.id);
+        if (!nextTemplateId) {
+            // "Use my default": not onto a retired saved default the Work does
+            // not already use (FR-5 f) — refused before anything is reset or
+            // saved.
+            await this.assertMayNewlyInheritWebsiteDefault(user.id, currentEffectiveTemplateId);
+        }
         const nextEffectiveTemplateId =
             nextTemplateId ||
             (await this.templateCatalogService.getDefaultTemplateIdForUser('website', user.id)) ||
@@ -1316,6 +1644,20 @@ export class WorkLifecycleService {
         // clone of somebody's code repository into the shared checkout, for
         // content that cannot be there.
         assertNotRepositoryWork(work, 'syncing from the data repository');
+        // A kind that provisions no data repository (`repos.data: false` in
+        // the capability registry — today the App Work) has nothing to sync
+        // FROM. Without this the snapshot below cloned the derived
+        // `<slug>-data` name, failed, and logged "Error syncing work from data
+        // repository" on every Work page mount. Answer the same shape as the
+        // "already up to date" case below so the controller's activity log
+        // and the web action need no new branch.
+        if (!hasRepositoryRole(work, 'data')) {
+            return {
+                status: 'success',
+                updated: [] as string[],
+                message: `Nothing to sync: a "${work.kind}" Work has no data repository.`,
+            };
+        }
         const updates: Record<string, any> = {};
 
         try {
@@ -1397,10 +1739,54 @@ export class WorkLifecycleService {
             });
         }
 
+        // What the caller must be told about a repository that STAYS: a role this
+        // kind never provisions, a repository this Work did not create, or a
+        // removal that failed (FR-40: "the response MUST say which repository
+        // remains and why"). Empty for every kind that deletes everything it was
+        // asked for, so their message is byte-identical to before.
+        const keptNotes: string[] = [];
+
+        // APW-01 T39 (FR-37 … FR-40b, Resolution R-15) — the App Work delete
+        // surface, ALL of it before the first repository step: a linked-repository
+        // request is refused, the typed-slug confirmation is enforced server-side,
+        // and the App runtime is asked to remove the workloads.
+        let appDeletionPending = false;
+        if (isAppWorkKind(work.kind)) {
+            this.refuseAppWorkRepositoryDeletion(work, deleteWorkDto);
+
+            const deleteStoredData = deleteWorkDto.delete_stored_data === true;
+            if (deleteStoredData && deleteWorkDto.confirm_slug !== work.slug) {
+                throw new UnprocessableEntityException({
+                    status: 'error',
+                    code: 'confirmation_mismatch',
+                    message:
+                        `Deleting the stored data of Work "${work.name}" needs its slug typed exactly ` +
+                        `("${work.slug}"), and nothing was removed.`,
+                });
+            }
+
+            appDeletionPending = await this.requestAppWorkRemoval(
+                work,
+                user,
+                deleteStoredData,
+                keptNotes,
+            );
+        }
+
         try {
             const deletedRepositories: string[] = [];
 
-            if (!wrapsExistingRepository && deleteWorkDto.delete_data_repository !== false) {
+            // Role gates (self-build slice D, EW-766 for `repo`; APW-01 T39 for
+            // `app`): a kind that provisions no data repository must never have a
+            // DERIVED `<slug>-data` name deleted on its behalf. For an App Work
+            // that name is nobody's: `buildWorkData` records only the `website`
+            // role, so `getDataRepo()` is a fabrication that resolves to whatever
+            // real repository happens to carry it under the Work's owner.
+            if (
+                hasRepositoryRole(work, 'data') &&
+                !wrapsExistingRepository &&
+                deleteWorkDto.delete_data_repository !== false
+            ) {
                 try {
                     await this.dataGenerator.removeRepository(work, user);
                     deletedRepositories.push(`${work.getRepoOwner()}/${work.getDataRepo()}`);
@@ -1411,6 +1797,11 @@ export class WorkLifecycleService {
 
                     this.logger.error('Failed to delete data repository:', error);
                 }
+            } else if (isAppWorkKind(work.kind) && deleteWorkDto.delete_data_repository === true) {
+                keptNotes.push(
+                    `${work.getRepoOwner()}/${work.getDataRepo()} (an App Work provisions no data ` +
+                        'repository, so this name was never created and was not touched)',
+                );
             }
 
             // Roles this kind never provisions are skipped, not attempted:
@@ -1434,25 +1825,70 @@ export class WorkLifecycleService {
                 }
             }
 
-            if (
-                hasRepositoryRole(work, 'website') &&
-                deleteWorkDto.delete_website_repository !== false
-            ) {
+            // The `website` role. For every kind but `app` it is the generated
+            // website repository and the rule is unchanged (`!== false`, so an
+            // omitted flag keeps the MCP / CLI default it always had).
+            //
+            // For an App Work the role IS the Work Repository: `buildWorkData`
+            // writes `relatedRepositories.website` and nothing else
+            // (`app-work-create.service.ts:1181-1183`), so this single branch
+            // resolves to the fork, the private copy, or the repository the
+            // member LINKED. `websiteRoleRemoval` decides whether it is the
+            // platform's to remove, and every refusal it makes is reported in
+            // the response.
+            const websiteRoleRemoval = this.websiteRoleRemoval(work, deleteWorkDto);
+            // For an App Work the `website` role IS the Work Repository (see above), so
+            // this is FR-53's `repositoryDeleted` for `app_work.deleted`.
+            let workRepositoryDeleted = false;
+            if (hasRepositoryRole(work, 'website') && websiteRoleRemoval.remove) {
                 try {
                     await this.websiteGenerator.removeRepository(work, user);
                     deletedRepositories.push(
                         `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
                     );
+                    workRepositoryDeleted = true;
                 } catch (error) {
                     if (error instanceof HttpException) {
                         throw error;
                     }
 
                     this.logger.error('Failed to delete website repository:', error);
+                    // FR-40: the Work is still deleted, but the caller is told
+                    // which repository remains and why.
+                    keptNotes.push(
+                        `${work.getRepoOwner('website')}/${work.getWebsiteRepo()} ` +
+                            `(its removal failed: ${describeFailureCode(error)})`,
+                    );
                 }
+            } else if (hasRepositoryRole(work, 'website') && websiteRoleRemoval.keepBecause) {
+                keptNotes.push(
+                    `${work.getRepoOwner('website')}/${work.getWebsiteRepo()} ` +
+                        `(${websiteRoleRemoval.keepBecause})`,
+                );
+            }
+
+            // APW-01 T39 / FR-40a: the App runtime owns the removal from here. The
+            // Work row stays (it reads **Deleting…**) and the local checkouts stay
+            // with it until APW-06 calls `completeAppWorkDeletion(workId)` — the
+            // same two steps the `done` branch below performs. The CNAME teardown is
+            // skipped for the same reason: the Work has not gone anywhere yet.
+            if (appDeletionPending) {
+                this.trackAppWorkDeleted(work, workRepositoryDeleted, user);
+                return {
+                    status: 'pending',
+                    slug: work.slug,
+                    deleting: true,
+                    message: withDeleteNotes(
+                        `Work '${work.slug}' is being deleted and keeps its row until the App runtime ` +
+                            'has removed its workloads',
+                        keptNotes,
+                    ),
+                    deleted_repositories: deletedRepositories,
+                };
             }
 
             await this.workRepository.delete(work.id);
+            this.trackAppWorkDeleted(work, workRepositoryDeleted, user);
 
             // Local checkouts are keyed by `owner/repo`, not by Work. Nothing
             // was ever cloned for a Repository Work by the generators, so the
@@ -1479,7 +1915,10 @@ export class WorkLifecycleService {
             return {
                 status: 'success',
                 slug: work.slug,
-                message: `Work '${work.slug}' and associated repositories have been deleted`,
+                message: withDeleteNotes(
+                    `Work '${work.slug}' and associated repositories have been deleted`,
+                    keptNotes,
+                ),
                 deleted_repositories: deletedRepositories,
             };
         } catch (error) {
@@ -1488,4 +1927,296 @@ export class WorkLifecycleService {
             });
         }
     }
+
+    /**
+     * APW-01 T36 (FR-53, plan §9.1) — `app_work.deleted`, once per accepted App Work
+     * delete REQUEST: when the row goes, or when the App runtime holds it pending (the
+     * member's request is complete either way). `completeAppWorkDeletion` emits
+     * nothing, so the runtime finishing a pending removal does not count it again. A
+     * member who repeats the delete while the row is still held pending DOES count
+     * again: that request reaches `requestAppWorkRemoval` like the first (the port
+     * answers `pending` once more, typically `already_deleting`), exactly as the
+     * controller writes a second `work.deleted` Activity row for it. The relation and
+     * whether the Work Repository was removed — never its name. A no-op for every
+     * other kind.
+     */
+    private trackAppWorkDeleted(work: Work, repositoryDeleted: boolean, user: User): void {
+        if (!isAppWorkKind(work.kind)) {
+            return;
+        }
+        this.appWorksTelemetry?.track(
+            APP_WORKS_TELEMETRY_EVENTS.deleted,
+            { mode: appWorkRepositoryRelation(work), repositoryDeleted },
+            user?.id,
+        );
+    }
+
+    /**
+     * APW-01 T39 (FR-40a, Resolution R-15) — the second half of an App Work's
+     * deletion, called by APW-06's `AppRuntimeDeletionService` once the workloads are
+     * gone (or given up on after 3 attempts).
+     *
+     * It deletes exactly what the `done` branch of {@link deleteWork} deletes — the row
+     * and the local checkouts, which are keyed by `owner/repo` — and **never touches a
+     * repository**: the fork / copy decision was carried out during the request, when
+     * the member's answer was still in hand. Idempotent: a Work that is already gone is
+     * a no-op, so a retried or replayed completion cannot fail a caller that is only
+     * trying to finish a deletion.
+     */
+    async completeAppWorkDeletion(workId: string): Promise<boolean> {
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            return false;
+        }
+
+        // A row deleted between the read and the write is the same no-op.
+        await this.workRepository.delete(workId).catch((error) => {
+            this.logger.warn(
+                `Work ${workId} could not be removed after its App deletion completed: ` +
+                    `${describeFailureCode(error)}`,
+            );
+        });
+
+        await Promise.all([
+            this.dataGenerator.cleanup(work),
+            this.markdownGenerator.cleanup(work),
+            this.websiteGenerator.cleanup(work),
+        ]).catch((error) => this.logger.error('Failed to cleanup repositories:', error));
+
+        return true;
+    }
+
+    /**
+     * APW-01 T39 (FR-37) — an App Work's repository is never deleted unless this Work
+     * created it, and asking for one anyway is REFUSED rather than ignored.
+     *
+     * Two cases reach the refusal, and both name what is protected:
+     *
+     *   - a **link**: the Work Repository is the repository the member registered with
+     *     the platform. FR-37 — "an explicit request to delete a linked repository MUST
+     *     be refused" — because the platform never created it;
+     *   - an **adopted fork** (`createdByThisWork: false`, R-4): it exists because the
+     *     member already had it, not because this Work asked for it.
+     *
+     * `delete_data_repository` and `delete_website_repository` are both checked because
+     * for this kind the two legacy field names resolve to app-code repositories: the
+     * Work Repository under the `website` role, and — for a link — the derived
+     * `<slug>-data` name under `data` (`app-work-create.service.ts:1151-1156`).
+     */
+    private refuseAppWorkRepositoryDeletion(work: Work, dto: DeleteWorkDto): void {
+        const askedForARepository =
+            dto.delete_data_repository === true || dto.delete_website_repository === true;
+        if (!askedForARepository || appWorkCreatedItsRepository(work)) {
+            return;
+        }
+
+        const fullName = `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`;
+        const relation = appWorkRepositoryRelation(work);
+        throw new BadRequestException({
+            status: 'error',
+            code:
+                relation === 'link'
+                    ? 'linked_repository_not_deletable'
+                    : 'app_repository_not_created_by_this_work',
+            message:
+                relation === 'link'
+                    ? `Work "${work.name}" is linked to ${fullName}, which the platform never created and ` +
+                      'never deletes. Delete the Work without asking for that repository.'
+                    : `Work "${work.name}" uses the existing fork ${fullName}, which this Work did not ` +
+                      'create, so the platform never deletes it. Delete the Work without asking for that ' +
+                      'repository.',
+        });
+    }
+
+    /**
+     * APW-01 T39 — ask the App runtime to remove the Work's workloads (FR-40a).
+     *
+     * Returns `true` when the removal is `pending`, i.e. the caller must keep the row
+     * and answer `200 { deleting: true }`. An **unbound** port means APW-06 has not
+     * merged, so no App runtime exists and nothing can be running: the outcome is taken
+     * as `done`, which is what keeps today's behaviour byte-identical until it lands. A
+     * **throw** is caught, logged by reason code, reported in the response message and
+     * also taken as `done` — the Work is still deleted, and the member is told what may
+     * remain and where (FR-40a; plan §7 `:978-980`).
+     */
+    private async requestAppWorkRemoval(
+        work: Work,
+        user: User,
+        deleteStoredData: boolean,
+        keptNotes: string[],
+    ): Promise<boolean> {
+        if (!this.appWorkDeletion) {
+            return false;
+        }
+
+        let outcome: AppWorkDeletionOutcome;
+        try {
+            outcome = await this.appWorkDeletion.requestDeletion({
+                workId: work.id,
+                userId: user.id,
+                deleteStoredData,
+            });
+        } catch (error) {
+            const target = appDeployTargetOf(work);
+            const code = describeFailureCode(error);
+            this.logger.error(`App Work ${work.id} could not be removed from ${target}: ${code}`);
+            keptNotes.push(
+                `the App runtime could not remove the workloads from ${target} (${code}), so they may ` +
+                    'still be running there',
+            );
+            return false;
+        }
+
+        if (outcome.status !== 'pending') {
+            return false;
+        }
+
+        // The runtime owns the rest; a reason code, never a value.
+        if (outcome.reason) {
+            this.logger.log(
+                `App Work ${work.id} deletion pending on ${outcome.target}: ${outcome.reason}`,
+            );
+        }
+        return true;
+    }
+
+    /**
+     * APW-01 T39 (FR-38, FR-39, FR-40) — may the `website` role be removed?
+     *
+     * For every kind but `app` this is the unchanged rule: remove unless the caller
+     * said `false`.
+     *
+     * For an App Work the role is the Work Repository, and the platform's to remove
+     * only when **this Work created it** (`sourceRepository.createdByThisWork`, written
+     * at create time — `true` only for a fork or private copy this Work requested, and
+     * `false` for an adopted fork, a link and a pasted fork) **and the caller asked
+     * explicitly**. `=== true` rather than `!== false` is the whole point: a caller
+     * whose DTO object simply lacks the field — a positional construction, or
+     * `apps/internal-cli`, whose prompt defaults all three flags to `true` — must mean
+     * KEEP, per FR-39 ("omitting the flag MUST mean 'keep the repository' for every
+     * caller, including chat and MCP"). A repository that IS the upstream is refused
+     * for the same reason FR-37 refuses a link: the platform never created it.
+     */
+    private websiteRoleRemoval(
+        work: Work,
+        dto: DeleteWorkDto,
+    ): { remove: boolean; keepBecause?: string } {
+        if (!isAppWorkKind(work.kind)) {
+            return { remove: dto.delete_website_repository !== false };
+        }
+
+        const askedForTheRepository =
+            dto.delete_data_repository === true || dto.delete_website_repository === true;
+        if (!askedForTheRepository) {
+            return { remove: false, keepBecause: 'kept: no explicit request named it' };
+        }
+        if (!appWorkCreatedItsRepository(work)) {
+            const relation = appWorkRepositoryRelation(work);
+            return {
+                remove: false,
+                keepBecause:
+                    relation === 'link'
+                        ? 'kept: the platform never created the linked repository'
+                        : 'kept: this Work did not create that fork',
+            };
+        }
+        if (appWorkRepositoryIsUpstream(work)) {
+            return { remove: false, keepBecause: 'kept: it is the upstream repository' };
+        }
+
+        return { remove: true };
+    }
+}
+
+/**
+ * APW-01 T39 (FR-40a) — the sentence a partial or refused deletion ends with.
+ *
+ * Notes are only ever APPENDED, so a caller that matched on the base sentence (the
+ * `have been deleted` e2e assertions) keeps matching, and a caller that reads the
+ * whole message learns which repositories stayed and why.
+ */
+function withDeleteNotes(base: string, notes: string[]): string {
+    if (notes.length === 0) {
+        return base;
+    }
+    return `${base}. Kept: ${notes.join('; ')}.`;
+}
+
+/**
+ * The relation an App Work was created with, read the way
+ * `AppWorkCreateService.appSourceViewOf` reads it (`:1363-1368`) so the two surfaces
+ * cannot disagree about what a row means. Anything unrecognised reads as `link`, which
+ * is the safe reading: the platform cannot prove it created the repository.
+ */
+function appWorkRepositoryRelation(work: Work): 'link' | 'fork' | 'private-copy' {
+    const type = (work.sourceRepository as unknown as AppSourceRecord | undefined)?.type;
+    if (type === 'app_fork') {
+        return 'fork';
+    }
+    if (type === 'app_private_copy') {
+        return 'private-copy';
+    }
+    return 'link';
+}
+
+/** Did THIS Work create the Work Repository? (R-4: only a fork or private copy it asked for.) */
+function appWorkCreatedItsRepository(work: Work): boolean {
+    return (
+        (work.sourceRepository as unknown as AppSourceRecord | undefined)?.createdByThisWork ===
+        true
+    );
+}
+
+/** Is the `website` role literally the upstream repository? Full-name compare, case-insensitive. */
+function appWorkRepositoryIsUpstream(work: Work): boolean {
+    const upstream = (work.sourceRepository as unknown as AppSourceRecord | undefined)?.upstream;
+    if (!upstream?.owner || !upstream.repo) {
+        return false;
+    }
+    return sameFullName(
+        upstream.owner,
+        upstream.repo,
+        work.getRepoOwner('website'),
+        work.getWebsiteRepo(),
+    );
+}
+
+function sameFullName(ownerA: string, repoA: string, ownerB: string, repoB: string): boolean {
+    return (
+        ownerA.toLowerCase() === ownerB.toLowerCase() && repoA.toLowerCase() === repoB.toLowerCase()
+    );
+}
+
+/**
+ * The deploy target an App Work's workloads live on, derived the way
+ * `AppWorkCreateService.appSourceViewOf` derives it (`:1372-1378`): `null` ⇒ **None**,
+ * the managed choice ⇒ **Ever Works Apps**, anything else ⇒ **Your cluster**.
+ *
+ * Used only for the failure message of a removal the App runtime could not confirm —
+ * the authoritative reader is APW-06's `GET /api/works/:id/app-target`, which is not
+ * mounted yet (a `404` there means **None**).
+ */
+function appDeployTargetOf(work: Work): AppWorkDeletionOutcome['target'] {
+    const persisted = (work.deployProvider ?? '').trim();
+    if (!persisted) {
+        return 'none';
+    }
+    return persisted.toLowerCase() === 'ever-works-apps' ? 'ever-works-apps' : 'your-cluster';
+}
+
+/**
+ * The reason CODE of a failed removal — never a message body, which could carry a
+ * provider's response text, and never a value (plan §7's "reason code only").
+ */
+function describeFailureCode(error: unknown): string {
+    const code = (error as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && code.length > 0) {
+        return code;
+    }
+    const status = (error as { status?: unknown } | null)?.status;
+    if (typeof status === 'number') {
+        return `http_${status}`;
+    }
+    const name = (error as { name?: unknown } | null)?.name;
+    return typeof name === 'string' && name.length > 0 && name !== 'Error' ? name : 'unknown';
 }

@@ -1,0 +1,27 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. Service `web` only (APW-06 plan §4.3).
+# The `worker` component gets NO Service and NO Ingress — ACC-E2E-05 asserts exactly this: "Service and
+# Ingress for web only" (ACCEPTANCE.md:334-335).
+# `components.web.internalUrl` resolves through this Service:
+#   http://web.ew-app-fixture-hello-22222222.svc.cluster.local
+# which is what `FIXTURE_INTERNAL_URL` receives and what ACC-13-03 uses to prove the first-deploy job saw the
+# app through its internal address and not its public one.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    ever-works.io/component: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP

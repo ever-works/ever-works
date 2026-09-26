@@ -1,0 +1,166 @@
+# GOLDEN RENDERED OUTPUT — cal-diy. The five NetworkPolicies (APW-06 plan §4.10, T7).
+# Rendered whenever `network.isolation` is true. With `isolation: false` (a Your-cluster opt-out) NONE of
+# the five is rendered and existing objects with these names are deleted (APW-06 plan §4.10; ACC-06-17).
+#
+# Apply order (APW-06 plan §4.2): NetworkPolicies come after LimitRange/ResourceQuota and BEFORE the pull
+# Secret, env Secret, PVCs and Services — so no pod can ever exist under an open default.
+#
+# `ew-allow-ingress` uses `namespaceSelector: kubernetes.io/metadata.name=<controllerNamespace>` because the
+# connection check detected the ingress controller's namespace. When it is unknown the rule falls back to
+# `namespaceSelector: {}` on the web port only, with warning `ingress_controller_namespace_unknown`
+# (APW-06 plan §4.10).
+#
+# `ew-allow-egress` excepts exactly the ranges APW-06 plan §4.10 lists, IPv4 and IPv6. `except` entries must
+# be CIDRs contained in the rule's `cidr`, which is why each family is its own rule rather than one list.
+#
+# `ew-allow-deps` carries `extraEgress` (dependencies outside the namespace, resolved by the platform at
+# render time) plus — because cal-diy sets `domains.needsHairpin: true` — the ingress address on 80/443 so
+# the app can call its own public URL from inside the cluster (APW-06 spec FR-37). The SMTP dependency is
+# external; its host and ports are APW-07 data, so the placeholder below marks where they are substituted.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ew-default-deny
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ew-allow-same-namespace
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ew-allow-ingress
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+spec:
+  podSelector:
+    matchLabels:
+      ever-works.io/component: web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 3000
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ew-allow-egress
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 0.0.0.0/8
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 224.0.0.0/4
+              - 240.0.0.0/4
+    - to:
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fc00::/7
+              - fe80::/10
+              - ::1/128
+              - ff00::/8
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ew-allow-deps
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # extraEgress — the external SMTP dependency (APW-07 `smtp-external` provider). Host and ports are
+    # rendered from APW-07's dependency egress data, never from a hostname in the App spec.
+    - to:
+        - ipBlock:
+            cidr: 203.0.113.10/32
+      ports:
+        - port: 587
+          protocol: TCP
+        - port: 465
+          protocol: TCP
+    # needsHairpin: the app calls its own public address server-side (works.yml:247).
+    - to:
+        - ipBlock:
+            cidr: 198.51.100.20/32
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP

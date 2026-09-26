@@ -1,0 +1,19 @@
+{
+    "key": "mit",
+    "name": "MIT License",
+    "spdx_id": "MIT",
+    "url": "https://api.github.com/licenses/mit",
+    "html_url": "https://github.com/ever-works/templates/blob/main/LICENSE",
+    "description": "A short and simple permissive license.",
+    "implementation": "Create a text file in the root of your source code.",
+    "permissions": ["commercial-use", "modifications", "distribution", "private-use"],
+    "conditions": ["include-copyright"],
+    "limitations": ["liability", "warranty"],
+    "body": "MIT License\n\nCopyright (c) Ever Works\n",
+    "licensed": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+    }
+}

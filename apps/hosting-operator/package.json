@@ -1,0 +1,38 @@
+{
+	"name": "ever-works-hosting-operator",
+	"version": "0.1.0",
+	"description": "Ever Works Apps hosting tier — the in-cluster controller process that reconciles `hosting.ever.works` objects into tenant workloads (APW-10)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "dist/main.js",
+	"bin": {
+		"ever-works-hosting-operator": "dist/main.js"
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit && tsc -p tsconfig.specs.json --noEmit",
+		"clean": "rm -rf dist",
+		"start": "node dist/main.js",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests"
+	},
+	"dependencies": {
+		"@ever-works/hosting-crds": "workspace:*",
+		"@ever-works/contracts": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	}
+}

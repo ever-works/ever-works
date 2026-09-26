@@ -1,0 +1,11 @@
+{
+	"objects": [],
+	"warnings": [],
+	"deleteNames": [
+		"ew-default-deny",
+		"ew-allow-same-namespace",
+		"ew-allow-egress",
+		"ew-allow-ingress",
+		"ew-allow-deps"
+	]
+}

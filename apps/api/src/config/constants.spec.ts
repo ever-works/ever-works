@@ -583,6 +583,58 @@ describe('config/constants', () => {
             });
         });
 
+        // T27 — the boot warmup is awaited before the API serves; this bounds it.
+        describe('warmupTimeoutMs (T27)', () => {
+            it('is undefined when unset, so the installer applies its default (60 s)', () => {
+                expect(config.plugins.warmupTimeoutMs()).toBeUndefined();
+            });
+
+            it.each([
+                ['120000', 120000],
+                [' 5000 ', 5000],
+                ['0', 0],
+            ])('reads %p as %p ms (0 = no bound)', (value, expected) => {
+                process.env.PLUGIN_WARMUP_TIMEOUT_MS = value;
+                expect(config.plugins.warmupTimeoutMs()).toBe(expected);
+            });
+
+            it.each(['', 'soon', '-1', '1.5', '60s'])(
+                'ignores %p — the installer default applies',
+                (value) => {
+                    process.env.PLUGIN_WARMUP_TIMEOUT_MS = value;
+                    expect(config.plugins.warmupTimeoutMs()).toBeUndefined();
+                },
+            );
+        });
+
+        // T26 (owner decision 2026-09-25) — both switches default OFF, so an
+        // install that sets nothing keeps today's behaviour.
+        describe.each([
+            ['facadeInstallOnUse', 'PLUGIN_FACADE_INSTALL_ON_USE'],
+            ['sandboxSessionsViaJobRuntime', 'PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME'],
+        ] as const)('%s (T26)', (accessor, variable) => {
+            it('is OFF when the variable is unset', () => {
+                expect(config.plugins[accessor]()).toBe(false);
+            });
+
+            it.each(['true', 'TRUE', 'True', ' true '])('is ON for %p', (value) => {
+                process.env[variable] = value;
+                expect(config.plugins[accessor]()).toBe(true);
+            });
+
+            it.each(['', 'false', '1', 'yes', 'on', 'enabled'])('is OFF for %p', (value) => {
+                process.env[variable] = value;
+                expect(config.plugins[accessor]()).toBe(false);
+            });
+
+            it('is read at call time, not captured at import', () => {
+                process.env[variable] = 'true';
+                expect(config.plugins[accessor]()).toBe(true);
+                delete process.env[variable];
+                expect(config.plugins[accessor]()).toBe(false);
+            });
+        });
+
         describe('validate', () => {
             it('is a no-op in bundled mode (FR-22)', () => {
                 // No env set at all — bundled is the default. validate() must not throw.

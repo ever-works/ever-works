@@ -1,5 +1,29 @@
 import type {
 	AddDomainResult,
+	AppClusterCheckRequest,
+	AppDeployHooks,
+	AppDeployResult,
+	AppDependencyBackupStatus,
+	AppDependencyContext,
+	AppDependencyDeprovisionOptions,
+	AppDependencyDeprovisionOutcome,
+	AppDependencyKind,
+	AppDependencyProviderDescriptor,
+	AppDependencyProvisionOutcome,
+	AppDependencySupport,
+	AppDependencyTarget,
+	AppDestroyResult,
+	AppJobResult,
+	AppJobRunRequest,
+	AppLimitRangeInput,
+	AppLogRequest,
+	AppLogTail,
+	AppRenderInput,
+	AppScaleResult,
+	AppSmokeInput,
+	AppStatusSnapshot,
+	AppStatusSpec,
+	AppTargetRef,
 	ConnectionValidationResult,
 	DeploymentConfig,
 	DeploymentDomain,
@@ -33,6 +57,27 @@ import {
 	pullSecretNameFor
 } from './manifest.renderer.js';
 import { parseKubeconfig } from './kubeconfig.parser.js';
+// APW-07 T19 — the in-cluster App dependencies. The plugin is the wiring: it publishes the descriptors and
+// delegates each of the five contract methods to the provider that owns the behaviour, exactly as the App
+// runtime members above delegate to `AppDeployer` / `AppLifecycle` / `AppStatusReader`.
+import { APP_DEPENDENCY_SIZE_DEFAULTS } from './app-dependencies/common.js';
+// APW-07 T21 — the S3-compatible object store.
+import {
+	OBJECT_STORAGE_PROVIDER_DESCRIPTOR,
+	OBJECT_STORAGE_PROVIDER_ID,
+	ObjectStorageDependencyProvider
+} from './app-dependencies/object-storage.provider.js';
+import {
+	POSTGRES_PROVIDER_DESCRIPTOR,
+	POSTGRES_PROVIDER_ID,
+	PostgresDependencyProvider
+} from './app-dependencies/postgres.provider.js';
+// APW-07 T20 — the single-replica cache.
+import {
+	REDIS_PROVIDER_DESCRIPTOR,
+	REDIS_PROVIDER_ID,
+	RedisDependencyProvider
+} from './app-dependencies/redis.provider.js';
 import {
 	appendHostToIngress,
 	buildDnsGuidance,
@@ -41,6 +86,24 @@ import {
 	verifyDomainResolution,
 	type DnsResolver
 } from './domain.handler.js';
+// The App runtime (APW-06 T14). The plugin is the wiring: §6.1's guard runs over every credential
+// here, once, and each method then delegates to the module that owns the behaviour — `AppDeployer`
+// (T12), `AppStatusReader` / `AppLifecycle` (T13) and `AppClusterChecker` (T13).
+import { AppClusterChecker } from './app/app-cluster-check.js';
+import { AppDeployer } from './app/app-deployer.js';
+import { AppLifecycle } from './app/app-lifecycle.js';
+import { AppStatusReader } from './app/app-status.reader.js';
+// §4.12's verification expiry annotation — the one name, taken from `app-names.ts` rather
+// than restated here.
+import { APP_ANNOTATION_EXPIRES_AT } from './app/app-names.js';
+import {
+	assertSupportedKubeconfig,
+	CLUSTER_PRIVATE_ALLOWLIST_ENV,
+	pinKubeconfigServer,
+	readClusterPrivateAllowlist
+} from './app/app-kubeconfig.guard.js';
+import type { AppClusterCheckReport } from './app/app-cluster-check.js';
+import type { KubeconfigDnsResolver } from './app/app-kubeconfig.guard.js';
 import type {
 	ClusterNodeDescriptor,
 	ClusterSource,
@@ -52,6 +115,16 @@ import type {
 } from './types.js';
 
 const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works-shared', 'k8s-works', 'custom-kubeconfig'];
+
+/**
+ * The three in-cluster dependency providers this plugin publishes — APW-07 T19, T20 and T21.
+ *
+ * They share one structural shape: `descriptor` plus the four contract methods (`supports`, `provision`,
+ * `getOutputs`, `deprovision`, `backupStatus`), so the delegation below is written once against the union
+ * rather than three times against three classes. A provider that stopped answering one of them would be a
+ * compile error here rather than a `undefined is not a function` at the first dependency of that kind.
+ */
+type AppDependencyK8sProvider = PostgresDependencyProvider | RedisDependencyProvider | ObjectStorageDependencyProvider;
 
 function isClusterSource(value: unknown): value is ClusterSource {
 	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);
@@ -299,8 +372,32 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	readonly name = 'Kubernetes';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'deployment';
-	readonly capabilities: readonly string[] = ['deployment'];
+	/**
+	 * APW-07 T19 (plan §4.9:570): the plugin answers for App dependencies as well as deployments. Appended,
+	 * never replaced — `'deployment'` is what every pre-existing routing decision in the platform selects on.
+	 */
+	readonly capabilities: readonly string[] = ['deployment', 'app-dependency'];
 	readonly providerName = 'kubernetes';
+
+	/**
+	 * This plugin implements APW-06's App members (below), so `isAppDeploymentPlugin` narrows it and
+	 * the runtime target resolver may route `your-cluster` App Work operations here. It deliberately
+	 * does **not** serve `ever-works-apps`: on the managed tier the platform never applies manifests
+	 * (R-5) — APW-10's `apps-tier` plugin reconciles a `Work` resource in-zone from the same renderer.
+	 */
+	readonly supportsApps = true;
+
+	/**
+	 * APW-07 T19/T20/T21 — the dependency providers this plugin answers for (plan §4.9:570, §4.9:617-618).
+	 *
+	 * All three in-cluster providers, and the AppDependencyFacadeService orders the whole set by
+	 * `preference` — which is why the list is a `readonly` array of descriptors rather than three named fields.
+	 */
+	readonly dependencyProviders: readonly AppDependencyProviderDescriptor[] = [
+		POSTGRES_PROVIDER_DESCRIPTOR,
+		REDIS_PROVIDER_DESCRIPTOR,
+		OBJECT_STORAGE_PROVIDER_DESCRIPTOR
+	];
 
 	readonly configurationMode: 'admin-only' | 'user-required' | 'hybrid' = 'user-required';
 
@@ -421,6 +518,73 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				default: DEFAULT_MEMORY_LIMIT,
 				description:
 					"Kubernetes quantity, e.g. '2Gi'. Must fit the target node: a limit larger than a node's allocatable memory schedules fine (requests are small) and then OOM-kills the pod climbing toward a ceiling that does not exist."
+			},
+			// APW-07 T19 (plan §4.9:630-633). Declared here because `PluginSettingsService` resolves settings by
+			// iterating THIS schema's keys — a setting the schema does not declare is silently dropped before a
+			// provider could ever read it (the same trap `cpuRequest`/`memoryLimit` above record).
+			appDependencyStorageClass: {
+				type: 'string',
+				title: 'Dependency storage class',
+				description:
+					"StorageClass every in-cluster dependency volume is created on. Leave blank to use the cluster's own default class; a cluster with neither fails Postgres with 'no default storage class'."
+			},
+			appDependencySizes: {
+				type: 'object',
+				title: 'Dependency sizes',
+				description:
+					'Default volume size in GiB per dependency kind. A default for the configure dialog, not a floor — the owner may pick any size at or above the provider minimum before first provisioning (FR-37).',
+				properties: {
+					postgres: {
+						type: 'integer',
+						title: 'Postgres (GiB)',
+						minimum: 1,
+						default: APP_DEPENDENCY_SIZE_DEFAULTS.postgres
+					},
+					objectStorage: {
+						type: 'integer',
+						title: 'Object storage (GiB)',
+						minimum: 1,
+						default: APP_DEPENDENCY_SIZE_DEFAULTS.objectStorage
+					},
+					redis: {
+						type: 'integer',
+						title: 'Redis (GiB)',
+						minimum: 1,
+						default: APP_DEPENDENCY_SIZE_DEFAULTS.redis
+					}
+				}
+			},
+			appDependencyImages: {
+				type: 'object',
+				title: 'Dependency images (admin)',
+				description:
+					'Digest-pinned image overrides per kind and version. Leave a field blank to use the pinned default. A value that is not a sha256 digest is ignored, so a typo can never publish an unpinned image.',
+				'x-adminOnly': true,
+				properties: {
+					postgres: {
+						type: 'object',
+						title: 'Postgres server',
+						properties: {
+							'14': { type: 'string', title: 'Postgres 14' },
+							'15': { type: 'string', title: 'Postgres 15' },
+							'16': { type: 'string', title: 'Postgres 16' },
+							'17': { type: 'string', title: 'Postgres 17' }
+						}
+					},
+					postgresClient: {
+						type: 'object',
+						title: 'Postgres client (extension job)',
+						properties: {
+							'14': { type: 'string', title: 'Postgres 14 client' },
+							'15': { type: 'string', title: 'Postgres 15 client' },
+							'16': { type: 'string', title: 'Postgres 16 client' },
+							'17': { type: 'string', title: 'Postgres 17 client' }
+						}
+					},
+					redis: { type: 'string', title: 'Redis 7' },
+					objectStorage: { type: 'string', title: 'S3-compatible server' },
+					objectStorageClient: { type: 'string', title: 'S3 client (init job)' }
+				}
 			}
 		},
 		// `kubeconfig` is only required when `clusterSource === 'custom-kubeconfig'`
@@ -445,6 +609,30 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	private readonly registries: RegistryProviderRegistry;
 	private readonly ingressStrategies: IngressStrategyRegistry;
 	private readonly dnsResolver: DnsResolver;
+	// The App runtime's four collaborators (APW-06 T14). Built over the same `KubernetesApiService`
+	// the pre-existing deployment path uses, so an App call and a website deploy reach one client.
+	private readonly appDeployer: AppDeployer;
+	private readonly appStatusReader: AppStatusReader;
+	private readonly appLifecycle: AppLifecycle;
+	private readonly appClusterChecker: AppClusterChecker;
+	/**
+	 * APW-07 T19/T20/T21's three providers (plan §4.9:568-633). Built over the same `KubernetesApiService`
+	 * the App runtime members use, so a dependency call and a deploy reach one client.
+	 */
+	private readonly postgresDependencies: PostgresDependencyProvider;
+	/** T20's provider (`k8s-inline-redis`). */
+	private readonly redisDependencies: RedisDependencyProvider;
+	/** T21's provider (`k8s-inline-minio`). */
+	private readonly objectStorageDependencies: ObjectStorageDependencyProvider;
+	/**
+	 * The providers by id — the one lookup {@link dependencyProviderFor} performs, so adding a provider is one
+	 * entry in the published descriptor list and one entry here, and the two cannot drift silently: a
+	 * descriptor without an instance answers `null` (`providerNotSupported`), never another provider's
+	 * implementation.
+	 */
+	private readonly dependencyProviderInstances: Readonly<Partial<Record<string, AppDependencyK8sProvider>>>;
+	/** §6.1 step 2's DNS seam. Unset in production (the guard falls back to `node:dns`). */
+	private readonly clusterAddressResolver?: KubeconfigDnsResolver;
 
 	constructor(
 		opts: {
@@ -452,12 +640,27 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			registries?: RegistryProviderRegistry;
 			ingressStrategies?: IngressStrategyRegistry;
 			dnsResolver?: DnsResolver;
+			/** Test seam for §6.1: the resolver `pinKubeconfigServer` resolves the cluster host with. */
+			clusterAddressResolver?: KubeconfigDnsResolver;
 		} = {}
 	) {
 		this.api = opts.api ?? new KubernetesApiService();
 		this.registries = opts.registries ?? defaultRegistryProviderRegistry;
 		this.ingressStrategies = opts.ingressStrategies ?? defaultIngressStrategyRegistry;
 		this.dnsResolver = opts.dnsResolver ?? defaultDnsResolver;
+		this.appDeployer = new AppDeployer(this.api);
+		this.appStatusReader = new AppStatusReader(this.api);
+		this.appLifecycle = new AppLifecycle(this.api);
+		this.appClusterChecker = new AppClusterChecker(this.api);
+		this.postgresDependencies = new PostgresDependencyProvider(this.api);
+		this.redisDependencies = new RedisDependencyProvider(this.api);
+		this.objectStorageDependencies = new ObjectStorageDependencyProvider(this.api);
+		this.dependencyProviderInstances = {
+			[POSTGRES_PROVIDER_ID]: this.postgresDependencies,
+			[REDIS_PROVIDER_ID]: this.redisDependencies,
+			[OBJECT_STORAGE_PROVIDER_ID]: this.objectStorageDependencies
+		};
+		this.clusterAddressResolver = opts.clusterAddressResolver;
 	}
 
 	// IPlugin lifecycle ------------------------------------------------------
@@ -1102,6 +1305,290 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			out.REGISTRY_PASSWORD = registry.password;
 		}
 		return out;
+	}
+
+	// App members (APW-06 T14) ----------------------------------------------
+
+	/**
+	 * Deploy an App Work to `your-cluster` (plan §5.5). The phase machine, the rollback and the
+	 * object rendering all live in `AppDeployer`; this method's own job is the §6.1 guard plus the
+	 * `ever-works-apps` refusal R-5 requires, and it is the first thing that runs.
+	 */
+	async deployApp(input: AppRenderInput, credential: string, hooks: AppDeployHooks): Promise<AppDeployResult> {
+		this.assertThisPluginServes(input?.ref);
+		const pinned = await this.guardedAppCredential(credential, input?.ref?.kubeContext);
+		return this.appDeployer.deployApp(input, pinned, hooks);
+	}
+
+	/** Observe the App Work's live state (FR-46) — `AppStatusReader.getAppStatus`. */
+	async getAppStatus(ref: AppTargetRef, credential: string, spec: AppStatusSpec): Promise<AppStatusSnapshot> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appStatusReader.getAppStatus(ref, pinned, spec);
+	}
+
+	/** Run one App spec job once (FR-51) — `AppLifecycle.runAppJob`. */
+	async runAppJob(ref: AppTargetRef, credential: string, job: AppJobRunRequest): Promise<AppJobResult> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.runAppJob(ref, pinned, job);
+	}
+
+	/** Remove the App Work's workloads while keeping its data (FR-50) — `AppLifecycle.destroyApp`. */
+	async destroyApp(
+		ref: AppTargetRef,
+		credential: string,
+		opts: { deleteVolumes: boolean }
+	): Promise<AppDestroyResult> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.destroyApp(ref, pinned, opts);
+	}
+
+	/**
+	 * The expiry a **verification** namespace declares, or `null` — the read APW-06
+	 * T20's facade reported missing from the contract.
+	 *
+	 * §4.12:646-647 has the namespace carry `ever-works.io/expires-at`
+	 * (`now + ttlMinutes`), and §4.12:659-660 says that annotation is what lets
+	 * APW-04's `app-provision-sweep` clean up a namespace a crashed run left behind.
+	 * So this answers the annotation verbatim, and `null` when there is none — never a
+	 * computed TTL: the caller compares the instant, and inventing one here would make
+	 * a namespace look alive or expired for a reason nobody can see.
+	 *
+	 * The same discipline as every other App member: the target must be one this plugin
+	 * serves, and the credential is asserted AND pinned before the call. A namespace
+	 * that cannot be read answers `null` rather than throwing — a status report is not
+	 * the place to fail a sweep, and `null` is already the documented "no expiry known"
+	 * answer (T20's seam logs a warning and reports an empty value).
+	 */
+	async readNamespaceExpiry(ref: AppTargetRef, credential: string): Promise<string | null> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		const namespace = String(ref?.namespace ?? '');
+		if (!namespace) return null;
+
+		try {
+			// The same read the status reader uses for a namespace (`readObject` is the
+			// `KubernetesApiService` member that takes a credential and a context; the
+			// `readNamespace` helper is not on this class). `''` is the cluster-scoped
+			// namespace argument a Namespace read needs — `app-status.reader.ts:648-655`
+			// is the precedent, and it is deliberately not re-derived here.
+			const live = await this.api.readObject<{
+				metadata?: { annotations?: Record<string, string> };
+			}>(pinned, 'v1', 'Namespace', '', namespace, ref?.kubeContext ?? undefined);
+			const value = live?.metadata?.annotations?.[APP_ANNOTATION_EXPIRES_AT];
+			return typeof value === 'string' && value.trim() ? value.trim() : null;
+		} catch (error) {
+			this.context?.logger?.warn?.(
+				`App runtime: reading the expiry of namespace '${namespace}' failed (${scrubError(error).message}).`
+			);
+			return null;
+		}
+	}
+
+	/** Pause or resume the App Work's components (FR-49) — `AppLifecycle.scaleApp`. */
+	async scaleApp(
+		ref: AppTargetRef,
+		credential: string,
+		mode: 'pause' | 'resume',
+		replicas: Record<string, number>,
+		resumeChecks?: { smoke: AppSmokeInput[]; deadlines: Record<string, number> }
+	): Promise<AppScaleResult> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.scaleApp(ref, pinned, mode, replicas, resumeChecks);
+	}
+
+	/** Tail component or job logs, redacted by value (FR-48) — `AppLifecycle.getAppLogs`. */
+	async getAppLogs(ref: AppTargetRef, credential: string, req: AppLogRequest): Promise<AppLogTail> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.getAppLogs(ref, pinned, req);
+	}
+
+	/**
+	 * Verify what the credential may do and report what the cluster has (plan §6.3) —
+	 * `AppClusterChecker.checkAppCluster`. The report is T13's `AppClusterCheckReport`, a superset of
+	 * the frozen `AppClusterCheck` that also carries the ingress controller's address (GAP-09).
+	 */
+	async checkAppCluster(credential: string, req: AppClusterCheckRequest): Promise<AppClusterCheckReport> {
+		const pinned = await this.guardedAppCredential(credential);
+		return this.appClusterChecker.checkAppCluster(pinned, req);
+	}
+
+	/** Namespace preparation for dependency provisioning (GAP-06) — `AppLifecycle.prepareAppNamespace`. */
+	async prepareAppNamespace(
+		ref: AppTargetRef,
+		credential: string,
+		opts: { isolation: boolean; limitRange: AppLimitRangeInput }
+	): Promise<{ warnings: Array<{ code: string; message: string }> }> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.prepareAppNamespace(ref, pinned, opts);
+	}
+
+	/**
+	 * Re-apply only the `Ingress` for the given hosts — `AppLifecycle.publishAppHosts`. The
+	 * `ingress-reconcile` op calls this and never `deployApp` (APW06-G03).
+	 */
+	async publishAppHosts(
+		ref: AppTargetRef,
+		credential: string,
+		hosts: {
+			primary: string | null;
+			extra: string[];
+			previous: string[];
+			tls: string;
+			issuer: string | null;
+		}
+	): Promise<{ ingressAddress: { ip?: string; hostname?: string } | null }> {
+		this.assertThisPluginServes(ref);
+		const pinned = await this.guardedAppCredential(credential, ref?.kubeContext);
+		return this.appLifecycle.publishAppHosts(ref, pinned, hosts);
+	}
+
+	// App dependency members (APW-07 T19) -----------------------------------
+
+	/**
+	 * May this plugin serve `(kind, target)`? (plan §4.7:516-520, §4.8:543-546.)
+	 *
+	 * The answer is the descriptor list's: a pair no descriptor offers is `providerNotSupported` without
+	 * consulting a provider, and a pair one offers is the provider's own answer. The context is accepted
+	 * because the contract passes it — a provider whose *offer* depends on it (`platform-smtp-relay` is
+	 * offered only while its admin settings are complete) needs it, and this one does not.
+	 *
+	 * The target half is what keeps R-5 true for dependencies as well: every descriptor here declares
+	 * `your-cluster` only, so `ever-works-apps` is never served from this plugin.
+	 */
+	async supports(
+		kind: AppDependencyKind,
+		target: AppDependencyTarget,
+		_ctx: AppDependencyContext
+	): Promise<AppDependencySupport> {
+		const descriptor = (this.dependencyProviders ?? []).find(
+			(entry) => entry.kind === kind && (entry.targets ?? []).includes(target)
+		);
+		const provider = descriptor ? this.dependencyProviderFor(descriptor.id) : null;
+		if (!provider) return { supported: false, reason: 'providerNotSupported' };
+		return provider.supports(kind, target);
+	}
+
+	/**
+	 * Provision one dependency (`providerId` selects among this plugin's providers) — plan §4.9.
+	 *
+	 * The credential is **not** re-guarded here, and that is deliberate: §4.8:547-557 makes APW-06's
+	 * `AppRuntimeTargetPort.prepareDependencyTarget(workId)` the one thing that resolves a target, and the job
+	 * builds `ctx.cluster` from it before calling a provider. Re-running §6.1's guard over that YAML would
+	 * re-resolve an address APW-06 has already pinned, which is exactly the double-resolution the guard exists
+	 * to prevent.
+	 */
+	async provision(providerId: string, ctx: AppDependencyContext): Promise<AppDependencyProvisionOutcome> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) {
+			return { state: 'failed', reason: 'providerNotSupported', transient: false, detail: { providerId } };
+		}
+		return provider.provision(providerId, ctx);
+	}
+
+	/** Re-read a dependency's outputs — the `refresh` mode (FR-42). */
+	async getOutputs(providerId: string, ctx: AppDependencyContext): Promise<Record<string, string>> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) {
+			throw new K8sPluginError('NOT_CONFIGURED', `No Kubernetes dependency provider serves '${providerId}'.`);
+		}
+		return provider.getOutputs(providerId, ctx);
+	}
+
+	/**
+	 * Release, or destroy, one dependency (plan §4.9:624-628).
+	 *
+	 * A provider this plugin does not serve answers `released` rather than throwing: the caller is releasing a
+	 * row it already decided to let go, and failing the release because its provider moved would leave the row
+	 * stuck in `deleting` forever.
+	 */
+	async deprovision(
+		providerId: string,
+		ctx: AppDependencyContext,
+		opts: AppDependencyDeprovisionOptions
+	): Promise<AppDependencyDeprovisionOutcome> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) return { state: 'released' };
+		return provider.deprovision(providerId, ctx, opts);
+	}
+
+	/** FR-48/FR-49 — the card's one backup state, read from individual records. */
+	async backupStatus(providerId: string, ctx: AppDependencyContext): Promise<AppDependencyBackupStatus> {
+		const provider = this.dependencyProviderFor(providerId);
+		if (!provider) return { state: 'none' };
+		return provider.backupStatus(providerId, ctx);
+	}
+
+	/**
+	 * The provider behind one id, or `null`.
+	 *
+	 * One lookup path for all five members, so "which provider answers" is answered once: the descriptor list is
+	 * the published contract and {@link dependencyProviderInstances} is what implements it. An id this plugin
+	 * does not publish — or publishes without an instance — is `null`, never a fallback to another provider,
+	 * because provisioning a dependency with an implementation the owner did not choose is the thing
+	 * `AppDependencyFacadeService.select` refuses (plan §4.8:543-544).
+	 */
+	private dependencyProviderFor(providerId: string): AppDependencyK8sProvider | null {
+		const provider = this.dependencyProviderInstances[providerId];
+		if (!provider) return null;
+		const published = (this.dependencyProviders ?? []).some((entry) => entry.id === providerId);
+		return published ? provider : null;
+	}
+
+	/**
+	 * R-5: this plugin serves App Work targets on `your-cluster` only.
+	 *
+	 * `ever-works-apps` is APW-10's `apps-tier` plugin — the platform never applies manifests on the
+	 * managed tier — and `none` is "no cluster chosen yet". Neither may ever reach a cluster through
+	 * here, so the refusal is a property of *this* plugin rather than of the routing that happens to
+	 * call it. A ref with no `target` at all is read as `your-cluster`, which is how the App modules
+	 * themselves default it (`minimalRenderInput`, `app-lifecycle.ts`).
+	 */
+	private assertThisPluginServes(ref: AppTargetRef | undefined): void {
+		const target = ref?.target;
+		if (target === undefined || target === 'your-cluster') return;
+		throw new K8sPluginError(
+			'NOT_CONFIGURED',
+			`The Kubernetes plugin serves App Work targets on 'your-cluster' only; '${target}' is served by the apps-tier plugin (APW-06 R-5).`
+		);
+	}
+
+	/**
+	 * §6.1 over one App credential, whoever supplied it — the reason every App method above calls
+	 * this before it touches a collaborator.
+	 *
+	 * Three steps, in the plan's order: the kubeconfig shapes App Works do not support are refused
+	 * (`assertSupportedKubeconfig` — pure, no I/O); every address the server names must be public, or
+	 * covered by the operator's own `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`; and the rewritten
+	 * YAML pins `server:` to the validated address with the original name kept as `tls-server-name`,
+	 * so nothing can re-resolve between this check and the call.
+	 *
+	 * The **pinned** YAML is what the `src/app/*` modules receive — it is the credential they hand
+	 * to `KubernetesApiService`, and therefore the one the client loads.
+	 */
+	private async guardedAppCredential(credential: string, kubeContext?: string | null): Promise<string> {
+		const allowlist = readClusterPrivateAllowlist();
+		if (allowlist.invalid.length > 0) {
+			// Plan §6.1: an entry that does not parse never widens the policy — it is reported, then
+			// ignored. This is the only reader of the variable in the plugin; it is never shared with
+			// the agent's configuration (the k8s plugin does not import agent config at all).
+			this.context?.logger.warn(
+				`Ignoring ${allowlist.invalid.length} unparseable ${CLUSTER_PRIVATE_ALLOWLIST_ENV} entr${allowlist.invalid.length === 1 ? 'y' : 'ies'}: ${allowlist.invalid.join(', ')}`
+			);
+		}
+
+		const context = kubeContext ?? undefined;
+		assertSupportedKubeconfig(credential, context);
+		return pinKubeconfigServer(credential, {
+			allowlist: allowlist.cidrs,
+			context,
+			resolver: this.clusterAddressResolver
+		});
 	}
 
 	// Helpers ---------------------------------------------------------------

@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import { serverFetch, serverMutation } from './server-api';
+import { serverFetch, serverMutation, ApiResponseError } from './server-api';
 import {
     GenerateStatusType,
     WorkScheduleCadence,
@@ -28,10 +28,12 @@ import {
     type WorkLastRunDto,
 } from '@ever-works/contracts/api';
 import type {
+    AppUpstreamStateResponse,
     MergePolicyOverride,
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    AppDeployTargetChoice,
 } from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -151,6 +153,36 @@ export interface UpdateWorkDto {
      *  Work. `null` clears every claim. Rejected server-side when another
      *  Work you own already claims one of the identifiers. */
     externalRefs?: WorkExternalRefs | null;
+    /**
+     * APW-11 (plan §4.4, spec FR-19/FR-60) — the Work-level **Show in App
+     * Launcher** setting. Three states: `true` shows the Work, `false` hides
+     * it, `null` clears the explicit choice and returns the Work to its kind
+     * default (`true` for an `app` Work, `false` otherwise).
+     *
+     * Written ONLY by `setWorkAppLauncherExposureAction`
+     * (`apps/web/src/app/actions/dashboard/works.ts`): the General settings
+     * form's zod object does not list it, so a save through `updateWork`
+     * would strip it AND rewrite the Work's README (APW11-G02).
+     */
+    appLauncherExposed?: boolean | null;
+}
+
+/**
+ * APW-11 (App Launcher, plan §4.4) — `work.appLauncher` on the Work detail
+ * payload, mirroring `WorkAppLauncherStatus` in
+ * `packages/agent/src/services/work-query.service.ts`.
+ *
+ *   - `exposed` — the stored choice: `true`, `false`, or `null` for "no
+ *     explicit choice, follow the kind default" (spec FR-19);
+ *   - `effectiveExposed` — what the Work does today
+ *     (`exposed ?? (kind === 'app')`);
+ *   - `live` — whether the launcher has an address to open for this Work, i.e.
+ *     whether the setting is offered enabled (spec FR-15/FR-23).
+ */
+export interface WorkAppLauncherExposure {
+    exposed: boolean | null;
+    effectiveExposed: boolean;
+    live: boolean;
 }
 
 /** Wave 2 M7 — Work-level worktree-per-Task isolation settings. */
@@ -162,6 +194,19 @@ export interface DeleteWorkDto {
     delete_data_repository?: boolean;
     delete_markdown_repository?: boolean;
     delete_website_repository?: boolean;
+    /**
+     * APW-01 T39 (FR-40a, Resolution R-15) — **Also delete stored data**, App Works
+     * only: the App's volumes and App dependencies go with the Work. Sent `true` by
+     * `DeleteComponent` only when the box is ticked AND the member typed the Work's
+     * slug (FR-40b). The API refuses `true` without `confirm_slug` with
+     * `422 confirmation_mismatch`, and the MCP `delete_work` tool omits both fields.
+     */
+    delete_stored_data?: boolean;
+    /**
+     * APW-01 T39 (FR-40b) — the App Work's **slug**, typed by the member. The
+     * server-side half of the typed confirmation.
+     */
+    confirm_slug?: string;
 }
 
 export interface GenerateWorkDetailDto {
@@ -345,6 +390,13 @@ export interface Work {
     // Work. Absent/null means the Work claims nothing and only its
     // repositories route events.
     externalRefs?: WorkExternalRefs | null;
+    /**
+     * APW-11 — the Work-level **Show in App Launcher** projection
+     * (plan §4.4). Present on the **Work detail** payload only; the list
+     * payload keeps its existing shape, so treat `undefined` as "the API
+     * did not answer" and render nothing rather than guessing.
+     */
+    appLauncher?: WorkAppLauncherExposure;
 }
 
 /** Wave 4 M3 — per-Work AgentRun summary counts
@@ -386,6 +438,12 @@ export interface DeleteWorkResponse {
     slug: string;
     message: string;
     deleted_repositories?: string[];
+    /**
+     * APW-01 T39 (FR-40a, ACC-NEG-07) — `true` when the App runtime took the removal
+     * over: the Work stays (it reads **Deleting…**) until it reports back. Absent on
+     * every other outcome.
+     */
+    deleting?: boolean;
 }
 
 export interface WorkDetails {
@@ -671,6 +729,33 @@ export interface ComparisonResult {
     message: string;
 }
 
+/**
+ * APW-02 T29 — the Upstream routes' answer shapes (`plan.md:487-516`).
+ *
+ * `AppUpstreamStateResponse` is the whole Upstream card in one answer and is
+ * imported from the shared contracts folder rather than restated here: the card,
+ * the API controller and the state service must agree on it by construction
+ * (`packages/contracts/src/apps/app-upstream.ts:267-277`, Resolution R-1).
+ */
+export type {
+    AppUpstreamStateResponse,
+    AppUpstreamWarning,
+    AppUpstreamWarningCode,
+} from '@ever-works/contracts';
+
+/**
+ * What `POST /api/works/:id/upstream/sync` and
+ * `POST /api/works/:id/upstream/readiness/retry` answer — `202
+ * { queued: true, runId }` (`plan.md:495-496`, `plan.md:106-107`).
+ *
+ * `runId` is `null` when the job was queued without a provider run id, which is
+ * a success: the request never waits for the run (FR-33, ACC-02-14).
+ */
+export interface AppUpstreamDispatchResult {
+    queued: true;
+    runId: string | null;
+}
+
 export const workAPI = {
     // Get all works with pagination and search
     getAll: async (options?: { limit?: number; offset?: number; search?: string }) => {
@@ -858,6 +943,75 @@ export const workAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    // ── Upstream (APW-02 T29, Resolution R-8) ────────────────────────────────
+    //
+    // The three routes of `plan.md:492-496`, mirroring
+    // `apps/api/src/app-works/app-upstream.controller.ts` exactly:
+    // `GET  /api/works/:id/upstream`                  → the whole card
+    // `POST /api/works/:id/upstream/sync`             → 202, never awaited
+    // `POST /api/works/:id/upstream/readiness/retry`  → 202, never awaited
+    //
+    // The GET is deliberately **not** wrapped in React `cache()` the way `get`
+    // is: the Upstream tab polls it while a sync runs (plan §5.2), and a
+    // per-request memo would hand every poll the first answer of that render,
+    // which is the one thing a poll must never do.
+
+    /** Read one App Work's upstream state (`plan.md:494`, FR-46/FR-56). */
+    getUpstream: async (id: string): Promise<AppUpstreamStateResponse> => {
+        return serverFetch<AppUpstreamStateResponse>(`/works/${id}/upstream`);
+    },
+
+    /**
+     * **Sync now** (FR-33). Answers as soon as the job is queued; a refusal is
+     * an `ApiResponseError` whose `code` is one of `no_upstream`, `not_ready`,
+     * `sync_in_progress`, `sync_paused`, `sync_limit_reached` (`plan.md:504-516`).
+     */
+    syncUpstream: async (id: string): Promise<AppUpstreamDispatchResult> => {
+        return serverMutation<AppUpstreamDispatchResult>({
+            endpoint: `/works/${id}/upstream/sync`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * **Try again** for a readiness that timed out or failed (FR-19). Refusals:
+     * `not_retryable` and `retry_limit_reached` (`plan.md:514-515`).
+     */
+    retryUpstreamReadiness: async (id: string): Promise<AppUpstreamDispatchResult> => {
+        return serverMutation<AppUpstreamDispatchResult>({
+            endpoint: `/works/${id}/upstream/readiness/retry`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // ── App delete (APW-01 T39, FR-34/FR-40a) ────────────────────────────────
+
+    /**
+     * **The App Work's deploy target** — APW-06's `GET /api/works/:id/app-target`,
+     * read by the delete dialog to decide whether **Also delete stored data** is
+     * offered at all (`none` means there is nothing to delete stored data *from*, so
+     * the checkbox is hidden).
+     *
+     * APW-06 is not merged yet, so this route answers `404` today. That is a
+     * **documented non-answer, not a failure** (FR-34, plan §7 `:952-953`): the
+     * caller treats it as `none`. Anything else — a 403, a 500, an unreachable
+     * API — is rethrown, so a real fault cannot be mistaken for "no target".
+     */
+    getAppTarget: async (id: string): Promise<{ target: AppDeployTargetChoice }> => {
+        try {
+            return await serverFetch<{ target: AppDeployTargetChoice }>(`/works/${id}/app-target`);
+        } catch (error) {
+            if (error instanceof ApiResponseError && error.statusCode === 404) {
+                return { target: 'none' };
+            }
+            throw error;
+        }
     },
 
     // Import methods

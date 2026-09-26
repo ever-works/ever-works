@@ -227,3 +227,28 @@ export * from './shared-view.entity';
 // dated archive of one workspace, with the manifest summary that keeps the
 // history legible after the archive itself expires.
 export * from './workspace-backup.entity';
+// APW-11 App Launcher — one person's visible / pinned / order values per
+// launcher item, keyed by a portable `scopeKey` rather than a nullable
+// organization id. Written only by the launcher's own save path.
+export * from './app-launcher-preference.entity';
+// APW-02 Fork lifecycle — one row per App Work: readiness, Actions hygiene,
+// the sync schedule, the divergence reading and the manual-sync allowance.
+export * from './work-upstream-state.entity';
+// APW-07 App env & dependencies — one encrypted value per (Work, name) and one
+// row per (Work, kind) recording what a dependency provider provisioned.
+export * from './work-app-env-value.entity';
+export * from './work-app-dependency.entity';
+// APW-03 App spec & catalog — one row per App Work: the head reading, the
+// effective spec at a commit, the Blueprint it came from and the licence
+// classification, plus the sequence columns the evaluation coalesces on.
+export * from './work-app-spec-state.entity';
+// APW-05 Builds — one row per Build of an App Work (numbered per Work), plus
+// the per-App-Work preparation state that is derived, never API-written.
+export * from './work-build.entity';
+export * from './work-build-preparation.entity';
+// APW-04 App Provisioner — one row per provisioning ATTEMPT of an App Work:
+// the §2.5 step table, the attempts, the spend, the open question and the step
+// executor's lease. At most one ACTIVE row per Work (a partial unique).
+export * from './work-app-provisioning.entity';
+// APW-06 T17 — the per-App-Work runtime state row.
+export * from './work-app-runtime-state.entity';

@@ -285,6 +285,14 @@ jobs:
       - name: Contracts — fleet wire types and the package inventory guard
         run: pnpm --filter @ever-works/contracts test
 
+      # Spec files are excluded from every package's `type-check` tsconfig (and vitest
+      # strips types before running), so `type-check:tests` is the ONLY thing that type-
+      # checks a `.spec.ts` here. The script already existed — `tsconfig.speccheck.json`
+      # says so in its own header — and no workflow ran it, so a broken cast in a spec
+      # stayed invisible until someone tripped over it. Green as of this commit.
+      - name: Contracts — the spec files type-check too
+        run: pnpm --filter @ever-works/contracts type-check:tests
+
       - name: Platform side — the DTOs still accept what a deployed node sends
         run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
 
@@ -577,6 +585,48 @@ jobs:
       - name: run test on all packages
         if: steps.scope.outputs.code == 'true'
         run: pnpm test
+
+      # The App Works e2e harness's own unit specs (`apps/web/vitest.e2e-harness.config.ts`):
+      # the fake GitHub and its recorded-fixture contract, the platform-catalog fake, the
+      # harness helpers, and `flags-on-lane.unit.spec.ts`, which reads `e2e.yml` and fails
+      # when the flags-on job's env drifts from the 32-shard matrix's or its apps apex is one
+      # `config.everWorks.apps.getDomain()` refuses. `pnpm test` above cannot reach them:
+      # apps/web's `vitest.config.ts` includes only `src/**`, on purpose. About 10 s. It needs
+      # no stack and no network, only `git` on PATH (the fake's smart-HTTP round-trip) and the
+      # build above (`@ever-works/contracts`).
+      - name: App Works e2e harness unit specs (apps/web)
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm --filter ever-works-web test:e2e-harness
+
+      # The server/client boundary guard (C22 + C27). Two React Server Components
+      # crashes shipped because a server component imported a VALUE from a
+      # `'use client'` module: the server render receives a client reference
+      # instead of the value, and the failure is request-time only — `next build`
+      # stays green and only a live request (or a lane spec) reveals it. Neither
+      # instance was found by a gate; both were found by accident. This is the
+      # gate. It is cheap and needs no build: it parses `apps/web/src` and
+      # resolves specifiers against `apps/web/tsconfig.json` read from disk.
+      #
+      # `--skip-component-renders` is the gate because rendering a Client
+      # Component FROM a server component is legal and extremely common (185 such
+      # imports today); the flag only skips a binding that is never used in any
+      # non-JSX shape anywhere in the file it is imported into. The unfiltered run
+      # (`pnpm run boundary:check:all`, ~190 hits on a clean tree) is for humans.
+      #
+      # `--follow-barrels` is included because it costs nothing and closes the one
+      # remaining hiding place: a value re-exported through a plain barrel
+      # (`export { X } from './client-module'`) leaves both the importer and its
+      # target server-labelled, so the direct rule stays silent while the server
+      # render still receives a client reference. Measured before wiring it: 229
+      # hits, every one a legal Client Component render, i.e. 0 real findings — so
+      # this step fails only on a genuinely new route.
+      - name: Server/client boundary guard (apps/web)
+        if: steps.scope.outputs.code == 'true'
+        working-directory: apps/web
+        run: |
+          pnpm run boundary:test
+          pnpm run boundary:check
+          pnpm run boundary:barrels
 
       - name: Build Internal CLI
         if: steps.scope.outputs.code == 'true'

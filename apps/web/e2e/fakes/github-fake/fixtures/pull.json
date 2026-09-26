@@ -1,0 +1,160 @@
+{
+    "id": 700001,
+    "number": 1,
+    "state": "open",
+    "locked": false,
+    "title": "Add the App spec",
+    "body": "",
+    "user": {
+        "login": "apw-e2e-user",
+        "id": 40401,
+        "type": "User",
+        "site_admin": false
+    },
+    "created_at": "2026-09-18T09:12:04Z",
+    "updated_at": "2026-09-18T09:31:47Z",
+    "closed_at": null,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "draft": false,
+    "merged": false,
+    "mergeable": true,
+    "merged_by": null,
+    "comments": 0,
+    "commits": 1,
+    "additions": 24,
+    "deletions": 0,
+    "changed_files": 1,
+    "url": "https://api.github.com/repos/ever-works/templates/pulls/1",
+    "html_url": "https://github.com/ever-works/templates/pull/1",
+    "diff_url": "https://github.com/ever-works/templates/pull/1.diff",
+    "patch_url": "https://github.com/ever-works/templates/pull/1.patch",
+    "head": {
+        "label": "apw-e2e-user:apw-e2e-branch",
+        "ref": "apw-e2e-branch",
+        "sha": "c3d4e5f60718293a4b5c6d7e8f90123456789012",
+        "user": {
+            "login": "apw-e2e-user",
+            "id": 40401,
+            "type": "User",
+            "site_admin": false
+        },
+        "repo": {
+            "id": 5190001,
+            "name": "templates",
+            "full_name": "apw-e2e-user/templates",
+            "private": false,
+            "owner": {
+                "login": "apw-e2e-user",
+                "id": 40401,
+                "type": "Organization",
+                "site_admin": false
+            },
+            "html_url": "https://github.com/apw-e2e-user/templates",
+            "description": "A fork of ever-works/templates (APW-13 fixture)",
+            "fork": true,
+            "url": "https://api.github.com/repos/apw-e2e-user/templates",
+            "forks_url": "https://api.github.com/repos/apw-e2e-user/templates/forks",
+            "clone_url": "https://github.com/apw-e2e-user/templates.git",
+            "default_branch": "main",
+            "archived": false,
+            "disabled": false,
+            "visibility": "public",
+            "allow_forking": true,
+            "size": 108,
+            "topics": ["ever-works", "app-template"],
+            "license": {
+                "key": "mit",
+                "name": "MIT License",
+                "spdx_id": "MIT",
+                "url": "https://api.github.com/licenses/mit"
+            },
+            "permissions": {
+                "admin": false,
+                "maintain": false,
+                "push": true,
+                "triage": false,
+                "pull": true
+            },
+            "parent": null,
+            "source": null,
+            "created_at": "2026-09-18T09:12:04Z",
+            "updated_at": "2026-09-18T09:31:47Z",
+            "pushed_at": "2026-09-18T09:31:47Z"
+        }
+    },
+    "base": {
+        "label": "ever-works:main",
+        "ref": "main",
+        "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "user": {
+            "login": "ever-works",
+            "id": 40401,
+            "type": "Organization",
+            "site_admin": false
+        },
+        "repo": {
+            "id": 5180001,
+            "name": "templates",
+            "full_name": "ever-works/templates",
+            "private": false,
+            "owner": {
+                "login": "ever-works",
+                "id": 40401,
+                "type": "Organization",
+                "site_admin": false
+            },
+            "html_url": "https://github.com/ever-works/templates",
+            "description": "The App Blueprint listing (APW-13 fixture)",
+            "fork": false,
+            "url": "https://api.github.com/repos/ever-works/templates",
+            "forks_url": "https://api.github.com/repos/ever-works/templates/forks",
+            "clone_url": "https://github.com/ever-works/templates.git",
+            "default_branch": "main",
+            "archived": false,
+            "disabled": false,
+            "visibility": "public",
+            "allow_forking": true,
+            "size": 108,
+            "topics": ["ever-works", "app-template"],
+            "license": {
+                "key": "mit",
+                "name": "MIT License",
+                "spdx_id": "MIT",
+                "url": "https://api.github.com/licenses/mit"
+            },
+            "permissions": {
+                "admin": false,
+                "maintain": false,
+                "push": true,
+                "triage": false,
+                "pull": true
+            },
+            "parent": null,
+            "source": null,
+            "created_at": "2026-09-18T09:12:04Z",
+            "updated_at": "2026-09-18T09:31:47Z",
+            "pushed_at": "2026-09-18T09:31:47Z"
+        }
+    },
+    "_links": {
+        "self": {
+            "href": "https://api.github.com/repos/ever-works/templates/pulls/1"
+        },
+        "html": {
+            "href": "https://github.com/ever-works/templates/pull/1"
+        },
+        "issue": {
+            "href": "https://api.github.com/repos/ever-works/templates/issues/1"
+        },
+        "comments": {
+            "href": "https://api.github.com/repos/ever-works/templates/issues/1/comments"
+        },
+        "review_comments": {
+            "href": "https://api.github.com/repos/ever-works/templates/pulls/1/comments"
+        },
+        "commits": {
+            "href": "https://api.github.com/repos/ever-works/templates/pulls/1/commits"
+        }
+    }
+}

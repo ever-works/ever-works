@@ -53,3 +53,47 @@ describe('WorkTabs — Generator tab per Work kind', () => {
         expect(screen.queryByText(`${T}.generator`)).not.toBeInTheDocument();
     });
 });
+
+/**
+ * APW-02 T30 (Resolution R-8, FR-59, ACC-02-23) — exactly one Upstream tab,
+ * offered to an App Work that has an upstream at all.
+ *
+ * The relation lives in the upstream state row, not on the Work, so the layout
+ * reads it and passes it in; `undefined` means "not read" and must withhold the
+ * tab rather than assume a fork.
+ */
+describe('WorkTabs — the Upstream tab', () => {
+    const U = 'dashboard.workDetail.upstream.tabName';
+
+    it.each<['fork' | 'private-copy']>([['fork'], ['private-copy']])(
+        'offers one Upstream tab for an App Work whose repository is a %s',
+        (appRelation) => {
+            render(<WorkTabs work={makeWork('app')} appRelation={appRelation} />);
+
+            expect(screen.getAllByText(U)).toHaveLength(1);
+            expect(screen.getByText(U).closest('a')).toHaveAttribute('href', '/works/w1/upstream');
+        },
+    );
+
+    it('withholds it for a linked App Work, which has no upstream (FR-44)', () => {
+        render(<WorkTabs work={makeWork('app')} appRelation="link" />);
+
+        expect(screen.getByText(`${T}.overview`)).toBeInTheDocument();
+        expect(screen.queryByText(U)).not.toBeInTheDocument();
+    });
+
+    it('withholds it while the relation has not been read', () => {
+        render(<WorkTabs work={makeWork('app')} />);
+
+        expect(screen.queryByText(U)).not.toBeInTheDocument();
+    });
+
+    it.each<[string]>([['default'], ['repo'], ['website'], ['blog'], ['directory']])(
+        'withholds it for kind %s even when a relation was passed',
+        (kind) => {
+            render(<WorkTabs work={makeWork(kind)} appRelation="fork" />);
+
+            expect(screen.queryByText(U)).not.toBeInTheDocument();
+        },
+    );
+});

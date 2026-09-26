@@ -14,11 +14,13 @@ import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { hasActiveCapability } from '../utils/active-capabilities.util';
 import {
     createLazyPluginProxy,
+    isColdLazyPlugin,
     LazyPluginStub,
     OnFirstMaterialize,
     OnMaterializeError,
     PluginInstanceLoader,
 } from './lazy-plugin-proxy';
+import { pluginLoadFailure } from './plugin-operation.util';
 
 export interface PluginEnableContext {
     systemPlugin?: boolean;
@@ -53,6 +55,224 @@ export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
         return ctx.userPlugin.enabled;
     }
     return ctx.autoEnable ?? false;
+}
+
+/**
+ * How many plugins one fan-out loads at a time when nothing overrides it —
+ * see {@link pluginLoadConcurrency}.
+ */
+export const DEFAULT_PLUGIN_LOAD_CONCURRENCY = 6;
+
+/**
+ * How many plugins one fan-out that loads plugins ({@link loadRegisteredPlugins},
+ * {@link loadPluginSchemas}, {@link loadPluginsForListing}) imports at a time.
+ *
+ * The first load of a plugin is a dynamic import, its synchronous module
+ * evaluation, the loader's manifest DB upsert (find + update + find) and its
+ * `onLoad`. A plugins page or onboarding catalog over ~100 cold plugins used to
+ * start all of them at once, queueing ~300 queries on the pool (pg's 10
+ * connections, no wait timeout) and ~5 s of module evaluation in front of every
+ * other request of the process.
+ *
+ * {@link DEFAULT_PLUGIN_LOAD_CONCURRENCY} (6) unless the `PLUGIN_LOAD_CONCURRENCY`
+ * environment variable is a positive integer, which overrides it — read on each
+ * fan-out, so it applies without a rebuild. The bound is per fan-out, not
+ * process-wide: a process-wide pool would deadlock a load whose `onLoad` loads
+ * another plugin while every slot is held.
+ */
+export function pluginLoadConcurrency(): number {
+    const raw = process.env.PLUGIN_LOAD_CONCURRENCY?.trim();
+    if (raw && /^\d+$/.test(raw)) {
+        const parsed = Number.parseInt(raw, 10);
+        if (parsed > 0) return parsed;
+    }
+    return DEFAULT_PLUGIN_LOAD_CONCURRENCY;
+}
+
+/**
+ * `task` over `items` with at most `limit` running at a time (default
+ * {@link pluginLoadConcurrency}), answering the results in `items` order. The
+ * one bounded fan-out every plugin-loading list goes through.
+ */
+export async function mapWithPluginLoadLimit<T, R>(
+    items: readonly T[],
+    task: (item: T, index: number) => Promise<R>,
+    limit: number = pluginLoadConcurrency(),
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async (): Promise<void> => {
+        while (next < items.length) {
+            const index = next++;
+            results[index] = await task(items[index], index);
+        }
+    };
+    const workers = Math.max(1, Math.min(Math.floor(limit) || 1, items.length));
+    await Promise.all(Array.from({ length: workers }, worker));
+    return results;
+}
+
+/**
+ * Make `plugin.settingsSchema` and `plugin.configurationMode` answer the plugin
+ * CLASS's values before a caller reads them synchronously.
+ *
+ * The registry holds every plugin discovered on disk as a lazy proxy
+ * (`lazy-plugin-proxy.ts`). Until the proxy materialises, it answers `{}` for
+ * the schema and `undefined` for the configuration mode — the package.json
+ * manifest carries neither — so a reader sees no fields, no `required` list,
+ * no `x-envVar` / `x-secret` / `x-scope` markers and the `hybrid` default.
+ * Await this first.
+ *
+ * A plugin that is not a lazy proxy, or one whose plugin is imported already,
+ * answers at once without importing or waiting. Otherwise the plugin is
+ * imported (and its first-materialise hook — `onLoad` — runs, as on any first
+ * use), and this resolves once that first load has settled. A reader reached
+ * from inside the plugin's own `onLoad` (e.g. through `context.getSettings`)
+ * finds it imported already, so this never waits on the `onLoad` calling it.
+ *
+ * That is also why this is for READING the schema only, never for picking a
+ * plugin to use: a caller that arrives while another caller's first load is
+ * still running (the plugin is imported before the hook has run `onLoad`) gets
+ * `true` at once, before `onLoad` has settled — or failed. A caller that
+ * selects or uses the plugin takes {@link loadRegisteredPlugins} or
+ * `materializePlugin`, which wait for that first load.
+ *
+ * The same load brings the rest of what only the class knows onto the
+ * registry entry: the loader folds the class's `getManifest()` into the
+ * entry's manifest in the same synchronous step that marks the proxy
+ * materialised (icon, `uiHints`, `visibility`, `defaultForCapabilities`,
+ * `supplementary`, `selectableProviderCategories` — whatever package.json
+ * leaves unset), and a failing `onLoad` leaves the entry in `error`.
+ *
+ * @param entry - the plugin's registry entry, when the caller has it. An entry
+ *   already in `error` is not loaded again (answers `false`): a proxy whose
+ *   import failed resets itself, so every read would re-run the import and the
+ *   failure hook (another `error` write to the database, another state-history
+ *   entry, another STATE_CHANGED event) — and could not bring the plugin back
+ *   anyway, as `callOnLoad` refuses a plugin in `error`.
+ * @returns `false` when the plugin cannot be materialised, or `entry` is in
+ *   `error`. On a failed import the proxy's failure hook has recorded `error`
+ *   on the registry entry and the schema reads stay cold, so a caller should
+ *   treat the plugin as unusable — as the readiness filters skip any entry in
+ *   `error`.
+ */
+export async function loadPluginSchema(
+    plugin: unknown,
+    entry?: Pick<RegisteredPlugin, 'state'>,
+): Promise<boolean> {
+    if (entry?.state === 'error') return false;
+    const lazy = plugin as Partial<Pick<LazyPluginStub, '__isMaterialized' | '__materialize'>>;
+    if (!lazy || typeof lazy.__materialize !== 'function' || lazy.__isMaterialized === true) {
+        return true;
+    }
+    try {
+        await lazy.__materialize();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * {@link loadPluginSchema} over several registry entries, at most
+ * {@link pluginLoadConcurrency} at a time; the results in `entries` order.
+ */
+export function loadPluginSchemas(entries: readonly RegisteredPlugin[]): Promise<boolean[]> {
+    return mapWithPluginLoadLimit(entries, (entry) => loadPluginSchema(entry.plugin, entry));
+}
+
+/**
+ * Load, for a LIST or CATALOG, the plugins whose class-only fields the list may
+ * show or decide on: the `builtIn` ones among `entries` — those the boot
+ * before lazy builtIns (60916d328) had loaded — and every entry in
+ * `options.inUse`, whatever its `builtIn` flag. One bounded fan-out: at most
+ * {@link pluginLoadConcurrency} at a time.
+ *
+ * `inUse` is what the list's viewer USES: the plugins the user has enabled
+ * (the settings menu and settings page list exactly those), or the ones a Work
+ * has enabled (its list picks the Work's capability providers from them). A
+ * plugin in use is loaded when it is used anyway, and deciding on it by its
+ * package.json manifest alone is wrong: notion-extractor declares
+ * `supplementary` only in its class, and a cold `{}` schema has no settings to
+ * show or configure.
+ *
+ * Any other plugin that is not `builtIn` and still cold stays cold: a list
+ * shows its package.json manifest and the cold proxy's `{}` schema, exactly as
+ * it did when disk builtIns loaded at boot. Loading it for a catalog would
+ * import a plugin nobody uses and run its `onLoad` side effects
+ * (github-storage's `onLoad` throws without its git-lfs binaries, putting it
+ * in `error`). One already imported, or already in `error`, needs no load
+ * either way. A caller that USES a plugin — its detail page, its settings, a
+ * selection — loads it whatever its `builtIn` flag says.
+ *
+ * With `PLUGIN_EAGER_BUILTINS=true` every builtIn is loaded at boot, so only
+ * the non-builtIns in use are loaded here.
+ */
+export async function loadPluginsForListing(
+    entries: readonly RegisteredPlugin[],
+    options: { readonly inUse?: readonly RegisteredPlugin[] } = {},
+): Promise<void> {
+    const toLoad = new Set(entries.filter((entry) => entry.builtIn));
+    for (const entry of options.inUse ?? []) toLoad.add(entry);
+    await loadPluginSchemas([...toLoad]);
+}
+
+/**
+ * Whether a LIST leaves `entry`'s plugin as it is — a cold lazy proxy that
+ * {@link loadPluginsForListing} did not load (not `builtIn`, and not in use by
+ * the list's viewer, so still cold). Anything the list would otherwise read
+ * through a service that loads the plugin (the settings service's resolution)
+ * is skipped for it: with the cold `{}` schema it projects nothing anyway.
+ */
+export function staysColdForListing(entry: Pick<RegisteredPlugin, 'plugin' | 'builtIn'>): boolean {
+    return !entry.builtIn && isColdLazyPlugin(entry.plugin);
+}
+
+/**
+ * Load several registry entries for USE, answering — in their order — the ones
+ * that are still `loaded` once their first load has SETTLED. At most
+ * {@link pluginLoadConcurrency} load at a time.
+ *
+ * For a caller that picks among candidates by what only the plugin class knows
+ * (its schema, its configuration mode, the manifest fields its `getManifest()`
+ * adds) and must skip a candidate that cannot load, exactly as it would have
+ * skipped one whose load failed at boot. Pass only the entries the caller may
+ * actually use (e.g. those enabled for the scope): each one is imported. An
+ * entry not `loaded` beforehand is left out without being loaded (again).
+ *
+ * Unlike {@link loadPluginSchema}, this WAITS for a first load another caller
+ * started: a lazy proxy is imported before its first-materialise hook has run
+ * `onLoad` (and the loader's manifest DB upsert), so without the wait a second
+ * caller inside that window would be answered a plugin whose `onLoad` has not
+ * run — or is about to fail and put the entry in `error`. Called from inside a
+ * plugin's own `onLoad` for that same plugin, the wait would be on itself: that
+ * entry is then left out (the proxy refuses the wait rather than hang).
+ */
+export async function loadRegisteredPlugins(
+    entries: readonly RegisteredPlugin[],
+): Promise<RegisteredPlugin[]> {
+    const loaded = await mapWithPluginLoadLimit(entries, (entry) =>
+        entry.state === 'loaded' ? loadForUse(entry.plugin) : Promise.resolve(false),
+    );
+    return entries.filter((entry, index) => loaded[index] && entry.state === 'loaded');
+}
+
+/**
+ * Materialise `plugin` and wait until its first load — `onLoad` included — has
+ * settled (`__materialize({ waitForLoad: true })`). `false` when the import
+ * fails (or the proxy refuses a wait on itself); an `onLoad` failure resolves
+ * `true` here and shows as the entry's `error` state, which
+ * {@link loadRegisteredPlugins} checks afterwards.
+ */
+async function loadForUse(plugin: unknown): Promise<boolean> {
+    const lazy = plugin as Partial<Pick<LazyPluginStub, '__materialize'>>;
+    if (!lazy || typeof lazy.__materialize !== 'function') return true;
+    try {
+        await lazy.__materialize({ waitForLoad: true });
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export interface RegisteredPlugin {
@@ -107,17 +327,23 @@ export class PluginRegistryService {
         if (this.plugins.has(manifest.id)) {
             throw new Error(`Plugin "${manifest.id}" is already registered`);
         }
+        // The entry, once registered below: a method call that waited through
+        // the proxy for the first load is refused when that load put it in
+        // `error` (a failing onLoad — callOnLoad records it here).
+        let entry: RegisteredPlugin | undefined;
         const stub: LazyPluginStub = createLazyPluginProxy(
             manifest,
             loader,
             options?.onFirstMaterialize,
             options?.onMaterializeError,
+            () => pluginLoadFailure(entry, manifest.id),
         );
-        return this.register(stub, manifest, {
+        entry = this.register(stub, manifest, {
             builtIn: options?.builtIn,
             installPath: options?.installPath,
             state: 'loaded',
         });
+        return entry;
     }
 
     /**
@@ -296,7 +522,15 @@ export class PluginRegistryService {
         return this.getByCapability('notification-channel').filter((p) => p.state === 'loaded');
     }
 
-    /** Returns first ready plugin with this capability in defaultForCapabilities */
+    /**
+     * Returns first ready plugin with this capability in defaultForCapabilities.
+     *
+     * Synchronous, so it reads each entry's manifest as registered: a plugin
+     * still cold (a lazy proxy nothing has used yet) carries only its
+     * package.json manifest, without the `defaultForCapabilities` its class's
+     * `getManifest()` may add. Prefer {@link getDefaultForCapabilityScoped},
+     * which loads its candidates first.
+     */
     getDefaultForCapability(capability: string): RegisteredPlugin | undefined {
         const plugins = this.getByCapability(capability);
         const readyPlugins = plugins.filter((p) => p.state === 'loaded');
@@ -404,6 +638,12 @@ export class PluginRegistryService {
         const plugins = this.getByCapability(capability);
         const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
 
+        // Every candidate returned below is loaded first (loadRegisteredPlugins):
+        // a plugin nobody has used yet is a cold lazy proxy whose entry lacks
+        // the `defaultForCapabilities` its class's getManifest() may add, and
+        // whose import or onLoad may yet fail — a failure found here puts it in
+        // `error` and it is skipped, as it would have been had it failed at boot.
+        // A first load another request started is waited for, onLoad included.
         if (workId && this.workPluginRepository) {
             for (const registered of enabledPlugins) {
                 try {
@@ -411,7 +651,11 @@ export class PluginRegistryService {
                         workId,
                         registered.plugin.id,
                     );
-                    if (dp?.enabled && hasActiveCapability(dp, capability)) {
+                    if (
+                        dp?.enabled &&
+                        hasActiveCapability(dp, capability) &&
+                        (await loadRegisteredPlugins([registered])).length > 0
+                    ) {
                         return registered;
                     }
                 } catch {
@@ -420,17 +664,7 @@ export class PluginRegistryService {
             }
         }
 
-        for (const registered of enabledPlugins) {
-            const isEnabled = await this.isPluginEnabledForScope(
-                registered.plugin.id,
-                workId,
-                userId,
-            );
-            if (isEnabled && registered.manifest.defaultForCapabilities?.includes(capability)) {
-                return registered;
-            }
-        }
-
+        const enabledForScope: RegisteredPlugin[] = [];
         for (const registered of enabledPlugins) {
             const isEnabled = await this.isPluginEnabledForScope(
                 registered.plugin.id,
@@ -438,13 +672,31 @@ export class PluginRegistryService {
                 userId,
             );
             if (isEnabled) {
-                return registered;
+                enabledForScope.push(registered);
             }
         }
 
-        return undefined;
+        const usable = await loadRegisteredPlugins(enabledForScope);
+        return (
+            usable.find((registered) =>
+                registered.manifest.defaultForCapabilities?.includes(capability),
+            ) ?? usable[0]
+        );
     }
 
+    /**
+     * The `loaded` plugins (for `capability`, or all) enabled for the scope.
+     *
+     * Each returned entry has materialised and finished its first load, onLoad
+     * included — one another caller started is waited for
+     * ({@link loadRegisteredPlugins}):
+     * callers pick a provider by reading `settingsSchema` / `configurationMode`
+     * (its required settings, its `x-envVar` bindings) and manifest fields such
+     * as `defaultForCapabilities` synchronously, which a cold lazy proxy
+     * answers with `{}` / `undefined` / the package.json manifest alone. An
+     * entry that cannot be materialised, or whose onLoad fails, is left out —
+     * it is now in `error`, the state every readiness filter skips.
+     */
     async getEnabledPluginsScoped(
         capability?: string,
         workId?: string,
@@ -466,7 +718,7 @@ export class PluginRegistryService {
             }
         }
 
-        return result;
+        return loadRegisteredPlugins(result);
     }
 
     /**

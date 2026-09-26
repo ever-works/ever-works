@@ -1,0 +1,9 @@
+{
+    "ref": "refs/heads/main",
+    "url": "https://api.github.com/repos/ever-works/templates/git/refs/heads/main",
+    "object": {
+        "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "type": "commit",
+        "url": "https://api.github.com/repos/ever-works/templates/git/commits/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+}

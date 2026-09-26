@@ -5,6 +5,19 @@
  * - Copies built artifacts from packages/plugins to packages/tasks/plugins
  * - Creates minimal runtime package.json (removes "type": "module" for CJS compatibility)
  * - Dependencies installed by Trigger.dev via additionalPackages in trigger.config.ts
+ *
+ * EW-693 T27 (owner decision: "core-only + third-party") — which plugins are
+ * copied follows `PLUGIN_DISTRIBUTION_MODE` at build time, the same variable
+ * (and the same parse) the API and the worker read at run time:
+ *
+ * - `bundled` (default — anything but `dynamic`): every first-party plugin, as
+ *   before.
+ * - `dynamic`: only CORE plugins — `everworks.plugin.distribution: 'core'`, or
+ *   no `distribution` and `systemPlugin: true` (the SDK's
+ *   `resolvePluginDistribution` rule). A distributable plugin is then absent
+ *   from the image, so the worker installs the version the API pinned into its
+ *   own store at run time instead of running whatever version the image
+ *   carried (mirrors T29's core-only API image).
  */
 
 const fs = require('fs');
@@ -24,44 +37,89 @@ const RUNTIME_PKG_FIELDS = [
     'everworks',
 ];
 
-function main() {
-    console.log('==> Preparing plugins for Trigger.dev...');
-    console.log(`==> Source: ${PLUGINS_SRC}`);
-    console.log(`==> Destination: ${PLUGINS_DEST}`);
+/** `dynamic` (case-insensitive) or `bundled` — as `config.plugins.distributionMode()`. */
+function resolveDistributionMode(env) {
+    return String((env && env.PLUGIN_DISTRIBUTION_MODE) || '').toLowerCase() === 'dynamic'
+        ? 'dynamic'
+        : 'bundled';
+}
 
-    if (fs.existsSync(PLUGINS_DEST)) {
-        fs.rmSync(PLUGINS_DEST, { recursive: true, force: true });
+/**
+ * Whether a plugin manifest (`everworks.plugin`) is CORE — the SDK's
+ * `resolvePluginDistribution` rule: an explicit `distribution` wins, otherwise
+ * `systemPlugin: true` means core.
+ */
+function isCorePlugin(manifest) {
+    if (!manifest) return false;
+    if (manifest.distribution === 'core') return true;
+    if (manifest.distribution === 'registry') return false;
+    return manifest.systemPlugin === true;
+}
+
+/**
+ * Copy the built plugins from `source` into `destination` (wiped first).
+ * Answers `{ mode, copied, skipped }` (directory names). Throws when `source`
+ * does not exist.
+ */
+function preparePlugins({
+    source = PLUGINS_SRC,
+    destination = PLUGINS_DEST,
+    env = process.env,
+    log = console.log,
+} = {}) {
+    const mode = resolveDistributionMode(env);
+    log('==> Preparing plugins for Trigger.dev...');
+    log(`==> Source: ${source}`);
+    log(`==> Destination: ${destination}`);
+    log(
+        mode === 'dynamic'
+            ? '==> PLUGIN_DISTRIBUTION_MODE=dynamic: copying CORE plugins only; the worker installs the rest at run time'
+            : '==> PLUGIN_DISTRIBUTION_MODE=bundled: copying every plugin',
+    );
+
+    if (fs.existsSync(destination)) {
+        fs.rmSync(destination, { recursive: true, force: true });
     }
-    fs.mkdirSync(PLUGINS_DEST, { recursive: true });
+    fs.mkdirSync(destination, { recursive: true });
 
-    if (!fs.existsSync(PLUGINS_SRC)) {
-        console.error('==> ❌ Plugin source work not found!');
-        process.exit(1);
+    if (!fs.existsSync(source)) {
+        throw new Error(`Plugin source work not found: ${source}`);
     }
 
     const pluginDirs = fs
-        .readdirSync(PLUGINS_SRC, { withFileTypes: true })
+        .readdirSync(source, { withFileTypes: true })
         .filter((d) => d.isDirectory());
 
-    let copiedCount = 0;
+    const copied = [];
+    const skipped = [];
 
     for (const dir of pluginDirs) {
-        const pluginPath = path.join(PLUGINS_SRC, dir.name);
+        const pluginPath = path.join(source, dir.name);
         const distPath = path.join(pluginPath, 'dist');
         const pkgJsonPath = path.join(pluginPath, 'package.json');
 
         if (!fs.existsSync(distPath) || !fs.existsSync(pkgJsonPath)) {
-            console.log(`  -> ${dir.name}: skipping (no dist or package.json)`);
+            log(`  -> ${dir.name}: skipping (no dist or package.json)`);
+            skipped.push(dir.name);
             continue;
         }
 
         const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
         if (!pkgJson.everworks?.plugin) {
-            console.log(`  -> ${dir.name}: skipping (no everworks.plugin manifest)`);
+            log(`  -> ${dir.name}: skipping (no everworks.plugin manifest)`);
+            skipped.push(dir.name);
             continue;
         }
 
-        const destDir = path.join(PLUGINS_DEST, dir.name);
+        if (mode === 'dynamic' && !isCorePlugin(pkgJson.everworks.plugin)) {
+            log(
+                `  -> ${dir.name}: skipping (distributable; installed at run time in dynamic mode)`,
+            );
+            skipped.push(dir.name);
+            continue;
+        }
+
+        const destDir = path.join(destination, dir.name);
         fs.mkdirSync(destDir, { recursive: true });
 
         copyDirSync(distPath, path.join(destDir, 'dist'));
@@ -78,13 +136,14 @@ function main() {
             JSON.stringify(runtimePkg, null, 2) + '\n',
         );
 
-        copiedCount++;
+        copied.push(dir.name);
         const typeModuleNote = removedTypeModule ? ' (removed "type": "module")' : '';
-        console.log(`  -> ✓ ${dir.name}${typeModuleNote}`);
+        log(`  -> ✓ ${dir.name}${typeModuleNote}`);
     }
 
-    console.log(`==> ✓ Copied ${copiedCount} plugins`);
-    console.log(`==> Plugin dependencies installed by Trigger.dev via additionalPackages`);
+    log(`==> ✓ Copied ${copied.length} plugins`);
+    log(`==> Plugin dependencies installed by Trigger.dev via additionalPackages`);
+    return { mode, copied, skipped };
 }
 
 function copyDirSync(src, dest) {
@@ -96,4 +155,13 @@ function copyDirSync(src, dest) {
     }
 }
 
-main();
+module.exports = { preparePlugins, resolveDistributionMode, isCorePlugin };
+
+if (require.main === module) {
+    try {
+        preparePlugins();
+    } catch (err) {
+        console.error(`==> ❌ ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+    }
+}

@@ -33,10 +33,11 @@
  *     false, installed stays true; invalid settings enum → 400 { message, errors }.
  *   • PATCH settings: renderMode enum + maxBytes bounds enforced → 400.
  *   • Work scope: enable-for-work requires user-level enable first (400);
- *     enable-for-work with activeCapability "content-extractor" → workEnabled;
- *     the dedicated /capability route REFUSES it (supplementary → 400); an
- *     unowned capability → 400 "does not provide"; cross-user work access → 403;
- *     unknown/malformed work → 404.
+ *     enable-for-work without a capability → workEnabled; naming it the work's
+ *     provider is REFUSED (supplementary → 400) both by enable-for-work with
+ *     activeCapability "content-extractor" and by the dedicated /capability
+ *     route; an unowned capability → 400 "does not provide"; cross-user work
+ *     access → 403; unknown/malformed work → 404.
  *   • Every route is auth-gated → 401 with no bearer.
  *
  * Fully API-orchestrated; a FRESH registerUserViaAPI() owner per test (never the
@@ -348,7 +349,15 @@ test.describe('OfficeCLI extractor — work-scoped enablement', () => {
         expect(body.message).toContain('must be enabled at user level first');
     });
 
-    test('full flow: user-enable → work-enable(activeCapability) → work list shows it → disable-for-work', async ({
+    // Pin changed (content-extractor fix after CI run 36220455888 on
+    // 7411a3529): work-enable WITH activeCapability used to answer 200 and
+    // record "content-extractor" on this supplementary plugin's binding — a
+    // provider binding the work list's capabilityProviders never honours
+    // (supplementary specialists run for their URLs on top of the work's
+    // provider, never as it), which the /capability route already refused.
+    // The enable route now refuses it the same way; the specialist binds to
+    // the work without a capability.
+    test('full flow: user-enable → work-enable (provider binding refused) → work list shows it → disable-for-work', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -357,11 +366,21 @@ test.describe('OfficeCLI extractor — work-scoped enablement', () => {
         });
         await enableForUser(request, user.access_token);
 
-        const enable = await request.post(
+        const asProvider = await request.post(
             `${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/enable`,
             {
                 headers: authedHeaders(user.access_token),
                 data: { activeCapability: 'content-extractor' },
+            },
+        );
+        expect(asProvider.status()).toBe(400);
+        expect((await asProvider.json()).message).toContain('supplementary plugin');
+
+        const enable = await request.post(
+            `${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/enable`,
+            {
+                headers: authedHeaders(user.access_token),
+                data: {},
             },
         );
         expect(enable.status(), `work-enable body=${await enable.text().catch(() => '')}`).toBe(
@@ -370,7 +389,7 @@ test.describe('OfficeCLI extractor — work-scoped enablement', () => {
         const wp = await enable.json();
         expect(wp.workEnabled).toBe(true);
         expect(wp.enabled).toBe(true);
-        expect(wp.activeCapabilities).toContain('content-extractor');
+        expect(wp.activeCapabilities ?? []).not.toContain('content-extractor');
         expect(typeof wp.workPluginId).toBe('string');
 
         const list = await request.get(`${API_BASE}/api/works/${workId}/plugins`, {
@@ -379,10 +398,11 @@ test.describe('OfficeCLI extractor — work-scoped enablement', () => {
         expect(list.status()).toBe(200);
         const listBody = await list.json();
         expect(listBody).toHaveProperty('capabilityProviders');
+        expect(listBody.capabilityProviders['content-extractor']).not.toBe(PLUGIN_ID);
         const entry = listBody.plugins.find((p: { id: string }) => p.id === PLUGIN_ID);
         expect(entry, 'officecli should appear in the work plugin list').toBeTruthy();
         expect(entry.workEnabled).toBe(true);
-        expect(entry.activeCapabilities).toContain('content-extractor');
+        expect(entry.activeCapabilities ?? []).not.toContain('content-extractor');
 
         const disable = await request.post(
             `${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/disable`,
@@ -402,10 +422,13 @@ test.describe('OfficeCLI extractor — work-scoped enablement', () => {
             name: `OfficeCLI Cap ${stamp()}`,
         });
         await enableForUser(request, user.access_token);
-        await request.post(`${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/enable`, {
-            headers: authedHeaders(user.access_token),
-            data: { activeCapability: 'content-extractor' },
-        });
+        // Bound without a capability: naming a supplementary plugin the work's
+        // provider on the enable route is refused too (see the full flow).
+        const bind = await request.post(
+            `${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/enable`,
+            { headers: authedHeaders(user.access_token), data: {} },
+        );
+        expect(bind.status()).toBe(200);
 
         // content-extractor IS in its manifest, but it is supplementary → refused.
         const owned = await request.post(
@@ -427,10 +450,13 @@ test.describe('OfficeCLI extractor — work-scoped enablement', () => {
             name: `OfficeCLI Cap2 ${stamp()}`,
         });
         await enableForUser(request, user.access_token);
-        await request.post(`${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/enable`, {
-            headers: authedHeaders(user.access_token),
-            data: { activeCapability: 'content-extractor' },
-        });
+        // Bound without a capability: naming a supplementary plugin the work's
+        // provider on the enable route is refused too (see the full flow).
+        const bind = await request.post(
+            `${API_BASE}/api/works/${workId}/plugins/${PLUGIN_ID}/enable`,
+            { headers: authedHeaders(user.access_token), data: {} },
+        );
+        expect(bind.status()).toBe(200);
 
         // `search` is checked BEFORE the supplementary guard → "does not provide".
         const notOwned = await request.post(

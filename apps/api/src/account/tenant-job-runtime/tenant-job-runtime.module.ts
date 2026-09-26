@@ -9,9 +9,7 @@ import {
 } from '@ever-works/agent/entities';
 import {
     CredentialVersionService,
-    InMemoryJobRuntimeProviderRegistry,
     InProcessSecretStoreResolver,
-    JOB_RUNTIME_PROVIDER_REGISTRY,
     RuntimeBindingStamperService,
     SECRET_STORE_RESOLVER,
     TenantAwareRuntimeResolver,
@@ -46,11 +44,17 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
  * needs the same services, hoist them into a dedicated providers
  * module and import.
  *
- * The `JOB_RUNTIME_PROVIDER_REGISTRY` provider binds the in-memory
- * default implementation per EW-685 P0 T4 — same single-active-runtime
- * semantic as before. The resolver wraps it without changing the
- * registry contract; non-overridden tenants still resolve to whatever
- * the registry returns from `getActive()`.
+ * `JOB_RUNTIME_PROVIDER_REGISTRY` is deliberately NOT bound here. The
+ * resolver injects the registry the @Global `TriggerModule`
+ * (`packages/tasks/src/trigger/trigger.module.ts`) binds and registers the
+ * Trigger.dev adapter into — the same instance every `*_DISPATCHER`
+ * binding reads. A module-local binding would shadow that global one for
+ * every service declared in this module, and nothing registers into a
+ * local registry: the resolver then answered `null` (no runtime) for
+ * every tenant while the platform's `getActive()` answered Trigger.dev.
+ * The resolver wraps the registry without changing its contract;
+ * non-overridden tenants resolve to whatever `getActive()` returns.
+ * (`tenant-job-runtime.module.spec.ts` pins both halves.)
  *
  * `TenantCredentialCache` is a dumb in-memory LRU+TTL bag (zero DI deps)
  * exposed via `exports` so the P3 resolver and future P4 worker host
@@ -105,10 +109,8 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         // (same wiring pattern as `BudgetsModule` for the EW-602
         // AdminUsageController gate).
         IsPlatformAdminGuard,
-        {
-            provide: JOB_RUNTIME_PROVIDER_REGISTRY,
-            useClass: InMemoryJobRuntimeProviderRegistry,
-        },
+        // No `JOB_RUNTIME_PROVIDER_REGISTRY` binding here — see the class
+        // docstring: the resolver must read the @Global TriggerModule's.
         {
             // EW-742 P3.2 — default in-process SecretStoreResolver.
             // Supports `inline:` only; production deployments override

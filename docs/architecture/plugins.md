@@ -87,6 +87,19 @@ For each valid manifest the loader:
 4. Registers the instance in the in-memory `PluginRegistryService`.
 5. Builds a `PluginContext` and calls `plugin.onLoad(context)`.
 
+That is the eager order (`PLUGIN_LAZY_LOAD=false`). By default the loader
+registers each discovered plugin as a **lazy proxy** built from its manifest
+alone: the `import()`, the instantiation and `onLoad` happen when the plugin
+is first materialised, and `onLoad` runs exactly once, through the proxy's
+first-materialise hook. Which plugins are materialised at boot rather than on
+first use is described in the plugin system's
+[Bootstrap Flow](../plugin-system/architecture.md#bootstrap-flow): by
+default only the programmatic `builtInPlugins`, since every plugin
+discovered on disk, `builtIn: true` included, loads on first use unless
+`PLUGIN_EAGER_BUILTINS=true`. Who waits for a plugin's first `onLoad`, and
+which fields a cold plugin does not have yet, is in
+[Lazy Loading and the First Load](../plugin-system/architecture.md#lazy-loading-and-the-first-load).
+
 `PluginContext` is the only surface a plugin sees of the platform. It
 gives the plugin a **plugin-scoped logger, cache, http client, env-var
 accessor, and settings reader**, plus an event bus for plugin-to-plugin

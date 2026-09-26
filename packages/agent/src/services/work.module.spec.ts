@@ -33,6 +33,13 @@ jest.mock('../comparison-generator/comparison-generator.module', () => ({
 jest.mock('../template-catalog/template-catalog.module', () => ({
     TemplateCatalogModule: class TemplateCatalogModule {},
 }));
+// APW-01 T11/T13 — `WorkModule` imports `AppWorksModule` so
+// `WorkLifecycleService` receives `AppWorkCreateService`. Shelled here for the same
+// reason as every other import: the real one pulls TypeORM + the facades + the
+// plugin registry into a spec that is about THIS module's metadata.
+jest.mock('../app-works/app-works.module', () => ({
+    AppWorksModule: class AppWorksModule {},
+}));
 jest.mock('@src/subscriptions', () => ({
     SubscriptionsModule: class SubscriptionsModule {},
 }));
@@ -158,12 +165,13 @@ import { DeployReadyPollerService } from './deploy-ready-poller.service';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
 import { TemplateCatalogModule } from '../template-catalog/template-catalog.module';
+import { AppWorksModule } from '../app-works/app-works.module';
 
 const meta = (key: string): unknown[] => Reflect.getMetadata(key, WorkModule) ?? [];
 
 describe('WorkModule', () => {
     describe('imports', () => {
-        it('imports the documented 13-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog + ActivityLogModule)', () => {
+        it('imports the documented 14-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog/AppWorksModule + ActivityLogModule)', () => {
             const imports = meta('imports') as Array<{ name?: string }>;
             const names = imports.map((m) => m?.name).filter(Boolean) as string[];
 
@@ -184,10 +192,15 @@ describe('WorkModule', () => {
                     // Schedules P2: provides ActivityLogService so the schedule
                     // dispatcher can emit schedule_executed activity rows.
                     'ActivityLogModule',
+                    // APW-01 T11/T13: provides and exports `AppWorkCreateService`,
+                    // which `WorkLifecycleService.createWork` branches to for
+                    // `kind: 'app'`. Without this import the create path would
+                    // answer `500` with the named "not wired" message instead.
+                    'AppWorksModule',
                 ]),
             );
             // Pin the count too — silent additions break this regression guard.
-            expect(imports).toHaveLength(13);
+            expect(imports).toHaveLength(14);
         });
 
         it('does NOT import PluginsModule directly (it is registered globally via forRoot at the app root, per JSDoc)', () => {

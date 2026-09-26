@@ -1,0 +1,15 @@
+# NEGATIVE FIXTURE neg-01 — error class: unknown field (typo).
+# Expected: JSON Schema FAIL (`additionalProperties` on /spec/components/0) · rule layer `unknown_field`
+#           with the suggestion `replicas`.
+# schema.md §2.1 / CONTRACTS.md C1: an unknown key inside `spec` is an error, not a silent no-op. §24.4
+# shows exactly this case (`replica` → `replicas`).
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000, replica: 2 }

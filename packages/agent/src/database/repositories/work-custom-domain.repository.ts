@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Raw, Repository } from 'typeorm';
+import { In, Raw, Repository } from 'typeorm';
 import { WorkCustomDomain } from '../../entities/work-custom-domain.entity';
+import { DomainEnvironment } from '../../entities/types';
 
 const SQLITE_MAX_ATTEMPTS = 6;
 
@@ -256,5 +257,53 @@ export class WorkCustomDomainRepository {
         const record = await this.findOne(workId, domain);
         if (!record) return;
         await this.repository.update({ id: record.id }, { provider });
+    }
+
+    /**
+     * APW-11 (App Launcher, plan §4.1 step 3, FR-16) — the **verified
+     * production** domains of many Works in one query, grouped by Work and
+     * ordered oldest first.
+     *
+     * The order is the point: FR-16's first preference is the Work's
+     * *earliest-added* verified production domain, so adding a second domain
+     * never silently moves the tile and removing the first falls back to the
+     * second (ACC-11-10). `createdAt ASC` is that order, and `id ASC` breaks a
+     * same-millisecond tie so two calls over the same rows return the same
+     * array.
+     *
+     * Both filters are exact (`verified = true`, `environment =
+     * 'production'`): a preview or unverified domain is not an address a
+     * launcher may open, and it is never a fallback either.
+     *
+     * Returns an empty `Map` for an empty input rather than issuing a query —
+     * `IN ()` is not valid SQL on either supported driver.
+     */
+    async findVerifiedProductionForWorks(
+        workIds: string[],
+    ): Promise<Map<string, WorkCustomDomain[]>> {
+        const uniqueIds = [...new Set(workIds.filter(Boolean))];
+        if (uniqueIds.length === 0) {
+            return new Map();
+        }
+
+        const rows = await this.repository.find({
+            where: {
+                workId: In(uniqueIds),
+                verified: true,
+                environment: DomainEnvironment.PRODUCTION,
+            },
+            order: { createdAt: 'ASC', id: 'ASC' },
+        });
+
+        const grouped = new Map<string, WorkCustomDomain[]>();
+        for (const row of rows) {
+            const bucket = grouped.get(row.workId);
+            if (bucket) {
+                bucket.push(row);
+            } else {
+                grouped.set(row.workId, [row]);
+            }
+        }
+        return grouped;
     }
 }

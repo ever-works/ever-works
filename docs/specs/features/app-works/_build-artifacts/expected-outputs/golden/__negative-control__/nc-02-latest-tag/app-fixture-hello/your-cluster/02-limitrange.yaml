@@ -1,0 +1,34 @@
+# GOLDEN — app-fixture-hello · target your-cluster · LimitRange `ew-defaults`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.2 (default request 100m/128Mi, default limit 1 CPU / 512Mi,
+# Spec      : ephemeral-storage default limit 1Gi, max per container 8 CPU / 64Gi on `your-cluster`)
+# Spec      : APW-06 spec.md FR-15 (namespace defaults apply to anything the platform starts)
+# Spec      : Not rendered on `ever-works-apps`: ResourceQuota `ew-quota` is that target only (§4.2).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: v1
+kind: LimitRange
+metadata:
+    name: ew-defaults
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+spec:
+    limits:
+        - type: Container
+          defaultRequest:
+              cpu: 100m
+              memory: 128Mi
+          default:
+              cpu: '1'
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+          max:
+              cpu: '8'
+              memory: 64Gi

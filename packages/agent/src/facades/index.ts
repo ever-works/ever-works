@@ -153,6 +153,48 @@ export { MetricsFacadeService, MetricsFacadeError } from './metrics.facade';
 // Connection Scopes Facade — AW-15. Which plain-English access levels a
 // provider plugin declares; the tool-grant lattice stores the chosen level.
 export { ConnectionScopesFacadeService } from './connection-scopes.facade';
+
+// App Runtime Facade — APW-06 T20. The ONE place a Deployment plugin and its
+// credential are assembled (R-5): `your-cluster` through the Work's own
+// `deployProvider` plugin and its Work-scoped `custom-kubeconfig` settings,
+// `ever-works-apps` through the enabled `apps-tier` plugin and
+// `AppsTierPolicy.resolveClusterCredential`, only while the tier is open.
+// It implements the two seams T58 and T60 declared provisionally
+// (`resolveDeletionTarget`, `resolveVerificationTarget`) so those two services
+// wire to it unchanged, plus the general `resolveClusterAccess` §9.10's op
+// handlers resolve through.
+//
+// ⚠️ Worker-only, per call: every method throws `APP_CLUSTER_IO_IN_API` unless
+// `isAppClusterWorkerContext()` is true. Outside the isolated App runtime
+// worker only its CONSTRUCTION is expected — `FacadesModule` provides it so the
+// API's plugin graph is complete (APW06-G02), never so the API can call it.
+export {
+    AppRuntimeFacadeService,
+    type AppRuntimeFacadeRefusal,
+    type AppRuntimeClusterAccess,
+    type AppRuntimeAccessResult,
+    type AppDeploymentPlugin,
+    type AppRuntimeStateTargetStore,
+    type AppRuntimeStateTargetView,
+} from './app-runtime.facade';
+
+// App Dependency Facade — APW-07 T16. The ONE place an App dependency provider
+// is chosen for a (kind, deploy target) and called: enabled plugins declaring
+// the `app-dependency` capability are asked `supports` in ascending
+// `preference`, and the owner's explicit choice wins when it is supported
+// (plan §4.8:543-546). It also carries the `awaitingConfig` flag of plan §4.9a,
+// which is what makes a provider needing the owner's settings land in
+// `awaiting_config` instead of burning its deadline.
+export {
+    AppDependencyFacadeService,
+    AppDependencyFacadeError,
+    NoAppDependencyProviderError,
+    AppDependencyProviderNotFoundError,
+    type AppDependencyFacadeOptions,
+    type AppDependencySelection,
+    type AppDependencySelectionResult,
+    type ResolvedAppDependencyProvider,
+} from './app-dependency.facade';
 export type {
     IMetricsProviderPlugin,
     MetricDescriptor,

@@ -14,6 +14,19 @@ import {
     KB_TRANSCRIBE_DISPATCHER,
     KB_REEMBED_WORK_DISPATCHER,
     MEMORY_FACT_EMBED_DISPATCHER,
+    // APW-07 T17 — the `app-dependency-provision` dispatcher. Bound by the
+    // `buildJobRuntimeProviders()` spread below like every other symbol and
+    // EXPORTED here so `AppDependenciesService` (declared in the agent-side
+    // `AppDependenciesModule`) can inject it. The API imports that module through
+    // `AppDeployRequestModule` since 2026-09-26; before that no API module did, so
+    // this export reached nothing.
+    APP_DEPENDENCY_PROVISION_DISPATCHER,
+    // APW-05 T19/T20 and APW-03 T12 — the three App dispatchers that were
+    // BOUND (they are `DISPATCHER_SYMBOLS`, so `buildJobRuntimeProviders()`
+    // spreads them in) and never exported. See the export block below.
+    APP_BUILD_PREPARE_DISPATCHER,
+    APP_BUILD_WATCH_DISPATCHER,
+    APP_SPEC_EVALUATE_DISPATCHER,
     ROSTER_PROVISION_DISPATCHER,
     WORKSPACE_BACKUP_DISPATCHER,
     JOB_RUNTIME_PROVIDER_REGISTRY,
@@ -184,6 +197,31 @@ import {
         ROSTER_PROVISION_DISPATCHER,
         WORKSPACE_BACKUP_DISPATCHER,
         NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
+        // APW-07 T17 — exported for the API's dependency wiring; the token
+        // itself is bound by `...buildJobRuntimeProviders()` above (all
+        // `DISPATCHER_SYMBOLS` flow through the registry), so this line is the
+        // export and nothing else.
+        APP_DEPENDENCY_PROVISION_DISPATCHER,
+        // APW-05 T19/T20 and APW-03 T12 — the same story, three more times, and
+        // these three were HALF-WIRED until 2026-09-21.
+        //
+        // They are `DISPATCHER_SYMBOLS`, so `buildJobRuntimeProviders()` bound
+        // them; nothing exported them. A token bound in `providers` and absent
+        // from `exports` is not shared even by an `@Global()` module — it
+        // resolves to `undefined` at every `@Optional() @Inject()` site in
+        // another module, silently, and the app still boots. The sites are
+        // `AppBuildsService` (`app-builds.module.ts`) and `AppSpecService`
+        // (`app-spec.module.ts`), both of which the API imports, so the
+        // observable effect was: a build prepare or a spec evaluation was
+        // “requested”, nothing was ever enqueued, and no error was raised.
+        //
+        // Found by develop's own `trigger.module.spec.ts` guard the moment
+        // `develop` was merged into this branch — which is what that guard was
+        // added for. It names the tokens it catches, so this cannot regress
+        // quietly.
+        APP_BUILD_PREPARE_DISPATCHER,
+        APP_BUILD_WATCH_DISPATCHER,
+        APP_SPEC_EVALUATE_DISPATCHER,
     ],
 })
 export class TriggerModule {}

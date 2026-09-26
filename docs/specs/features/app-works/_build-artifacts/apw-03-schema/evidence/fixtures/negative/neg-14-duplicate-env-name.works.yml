@@ -1,0 +1,19 @@
+# NEGATIVE FIXTURE neg-14 — error class: duplicate `env` name.
+# Expected: JSON Schema PASS · rule layer FAIL `duplicate_name`.
+# schema.md R4 / §12: "`name` unique". `uniqueItems: true` cannot express it, because two entries with the
+# same `name` differ in every other field.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    dependencies:
+        postgres: { version: '16' }
+    env:
+        - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+        - { name: DATABASE_URL, value: 'postgresql://localhost:5432/app' }

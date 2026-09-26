@@ -135,6 +135,28 @@ describe('activity-log.types', () => {
             ['WORKSPACE_BACKUP_CREATED', 'workspace_backup_created'],
             ['WORKSPACE_BACKUP_DOWNLOADED', 'workspace_backup_downloaded'],
             ['WORKSPACE_BACKUP_DELETED', 'workspace_backup_deleted'],
+            // APW-11 App Launcher (T7) — the Work-level **Show in App
+            // Launcher** setting changed.
+            ['APP_LAUNCHER', 'app_launcher'],
+            // APW-02 Fork lifecycle (T15, Resolution R-2) — three families for
+            // the App Work's fork readiness, Actions hygiene and upstream sync.
+            // The dotted CONTRACTS §6 event (`app.fork.ready`, `app.fork.timeout`,
+            // `app.fork.missing`, `app.actions.disabled`, `app.upstream.synced`,
+            // `app.upstream.behind`, `app.upstream.conflict`,
+            // `app.upstream.unavailable`) is stored in `action`.
+            ['APP_FORK', 'app_fork'],
+            ['APP_ACTIONS', 'app_actions'],
+            ['APP_UPSTREAM', 'app_upstream'],
+            // APW-03 App spec (T12, Resolution R-2) — the App spec family. The
+            // dotted CONTRACTS §6 events (`app.spec.validated`,
+            // `app.spec.invalid`, `app.spec.applied`) are stored in `action`.
+            ['APP_SPEC', 'app_spec'],
+            // APW-05 Builds (T17, Resolution R-2) — the `app_build` family. The
+            // dotted CONTRACTS §6 events (`app.build.queued`,
+            // `app.build.started`, `app.build.succeeded`, `app.build.failed`,
+            // `app.build.cancelled`) are stored in `action`; `blocked` is a
+            // stored status and publishes nothing (plan.md:1560).
+            ['APP_BUILD', 'app_build'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -407,7 +429,55 @@ describe('activity-log.types', () => {
             // the only ones this branch lacked. Neither 186 nor 197 is the
             // answer, and 186 + 197 is nonsense — 200 was COUNTED off the merged
             // enum, and must be recounted after every merge.
-            expect(literals).toHaveLength(200);
+            //
+            // +1 app_launcher (APW-11 App Launcher, T7 — the Work-level
+            //    **Show in App Launcher** setting changed) — this branch's own
+            //    addition, disjoint from everything the branches above carry,
+            //    and counted from the merged enum the same way -> 201. Its
+            //    `FEED_KIND_RULES` entry lands in the same change
+            //    (`activity-log/feed-kind.ts`, program contract R-34), and its
+            //    Shared-view classification needs no edit because
+            //    `NEVER_PUBLISH_ACTIVITY_ACTIONS` is the derived complement of
+            //    the publishable allow-list.
+            //
+            // +3 app_fork / app_actions / app_upstream (APW-02 Fork lifecycle,
+            //    T15 — Resolution R-2: fork readiness, Actions hygiene and
+            //    upstream sync, with the dotted CONTRACTS §6 event in `action`)
+            //    — this branch's own additions, disjoint from everything the
+            //    branches above carry, and COUNTED from the merged enum the
+            //    same way -> 204. Each one carries its `FEED_KIND_RULES` row in
+            //    `activity-log/feed-kind.ts` in the same change (program
+            //    contract R-34; `feed-kind.spec.ts:14-19` fails on a member
+            //    without one), and the Shared-view classification needs no edit
+            //    for the same derived-complement reason as `app_launcher`
+            //    above. The count moves by exactly the three members this task
+            //    appends: no existing pair is renamed, retyped or removed.
+            //
+            // +1 app_spec (APW-03 App spec, T12 — Resolution R-2's first family:
+            //    the App spec read true, with the dotted CONTRACTS §6 event in
+            //    `action`) — this branch's own addition, disjoint from everything
+            //    the branches above carry, and COUNTED from the merged enum the
+            //    same way -> 205. It carries its `FEED_KIND_RULES` row in
+            //    `activity-log/feed-kind.ts` in the same change (program contract
+            //    R-34; `feed-kind.spec.ts:14-19` fails on a member without one),
+            //    and the Shared-view classification needs no edit for the same
+            //    derived-complement reason as `app_launcher` above. T12 appends
+            //    THIS member and no other: APW-03 T2 owns `app_blueprint` and
+            //    `app_license` and has not landed, so when it does it appends its
+            //    two and counts 207 — never this one again.
+            //
+            // +1 app_build (APW-05 Builds, T17 — Resolution R-2's `app_build`
+            //    family: one Activity row per `app.build.*` transition, written by
+            //    the ONE writer `AppBuildsService.publish`) — this branch's own
+            //    addition, disjoint from everything the branches above carry, and
+            //    COUNTED from the merged enum the same way -> 206. It carries its
+            //    `FEED_KIND_RULES` row in `activity-log/feed-kind.ts` in the same
+            //    change (program contract R-34; `feed-kind.spec.ts:14-19` fails on
+            //    a member without one), and the Shared-view classification needs no
+            //    edit for the same derived-complement reason as `app_launcher`
+            //    above. The count moves by exactly the one member this task
+            //    appends: no existing member is renamed, retyped or removed.
+            expect(literals).toHaveLength(206);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {
@@ -432,6 +502,70 @@ describe('activity-log.types', () => {
             for (const v of literals) {
                 expect(v).toMatch(/^[a-z][a-z0-9_]*$/);
             }
+        });
+    });
+
+    /**
+     * Resolution R-2 has two halves: the snake_case family is the
+     * `actionType` (pinned above) and the dotted CONTRACTS §6 event is the
+     * `action`. APW-02's three families own exactly the eight events below —
+     * the six CONTRACTS §6 already listed plus the two APW-02 added
+     * (`app.fork.missing`, `app.upstream.unavailable`). A seventh event is
+     * added to CONTRACTS §6 and to this list together, never to one alone, so
+     * a family cannot quietly start writing an event nobody specified.
+     */
+    describe('APW-02 App Works families — the dotted `action` each one carries', () => {
+        const FAMILIES: Array<{
+            actionType: ActivityActionType;
+            namespace: string;
+            events: readonly string[];
+        }> = [
+            {
+                actionType: ActivityActionType.APP_FORK,
+                namespace: 'app.fork',
+                events: ['app.fork.ready', 'app.fork.timeout', 'app.fork.missing'],
+            },
+            {
+                actionType: ActivityActionType.APP_ACTIONS,
+                namespace: 'app.actions',
+                events: ['app.actions.disabled'],
+            },
+            {
+                actionType: ActivityActionType.APP_UPSTREAM,
+                namespace: 'app.upstream',
+                events: [
+                    'app.upstream.synced',
+                    'app.upstream.behind',
+                    'app.upstream.conflict',
+                    'app.upstream.unavailable',
+                ],
+            },
+        ];
+
+        it.each(FAMILIES)(
+            '$actionType writes $namespace.* events, and only those',
+            ({ actionType, namespace, events }) => {
+                // The family and its namespace are the same word — snake_case in
+                // `actionType`, dotted in `action` (R-2).
+                expect(actionType).toBe(namespace.split('.').join('_'));
+                for (const event of events) {
+                    expect(event.startsWith(`${namespace}.`)).toBe(true);
+                    expect(event).toMatch(/^app(\.[a-z][a-z0-9_]*)+$/);
+                }
+            },
+        );
+
+        it('pins the whole APW-02 event set — six from CONTRACTS §6 plus the two APW-02 adds', () => {
+            expect(FAMILIES.flatMap((family) => [...family.events])).toEqual([
+                'app.fork.ready',
+                'app.fork.timeout',
+                'app.fork.missing',
+                'app.actions.disabled',
+                'app.upstream.synced',
+                'app.upstream.behind',
+                'app.upstream.conflict',
+                'app.upstream.unavailable',
+            ]);
         });
     });
 

@@ -41,14 +41,24 @@ export function matchWorkByRepo<T extends Work>(
 }
 
 /**
- * The repo role a Task's own branch and pull request live in.
+ * The repo role a Task's own branch and pull request live in, for every kind
+ * that HAS a data repository — which is every kind except `app`.
  *
- * `data`, not `work`: `TaskWorkspaceService` clones `work.getDataRepo()`
- * for every isolated Task worktree and opens the pull request there, and
- * `TaskPrStatusService.resolveRepo` polls the same repository. So
- * `tasks.branchRef` and `tasks.prNumber` are only unique inside the DATA
- * repository — a pull request #7 in the Work's `work` or `website` repo
- * is a different pull request that happens to share a number.
+ * ⚠ **Not the whole rule any more.** The per-kind answer is
+ * `taskRepositoryRole(kind)` in `tasks-domain/task-repository.ts`, and a
+ * caller that keys on a Task's own coordinates must use THAT. An App Work has
+ * no data repository at all (`repos.data: false` in the capability registry),
+ * so its Tasks branch and open pull requests in its `website`-role Work
+ * Repository; checking this constant for one would call every App Work Task's
+ * own pull request "not the Task repository". `task-git-link.service.ts` used
+ * to, and no longer does.
+ *
+ * `data`, not `work`, for the kinds it covers: `TaskWorkspaceService` clones
+ * that repository for every isolated Task worktree and opens the pull request
+ * there, and `TaskPrStatusService.resolveRepo` polls the same repository. So
+ * `tasks.branchRef` and `tasks.prNumber` are only unique inside the Task
+ * repository — a pull request #7 in the Work's other repositories is a
+ * different pull request that happens to share a number.
  */
 export const WORK_TASK_REPO_ROLE: WorkRepoRole = 'data';
 
@@ -80,6 +90,33 @@ export function matchWorkRepoRole<T extends Work>(
         if (roles.length > 0) return { work, roles };
     }
     return null;
+}
+
+/**
+ * EVERY Work in `works` that has `owner/repo` in some role, each with the roles
+ * it fills, in the order given.
+ *
+ * {@link matchWorkRepoRole} stops at the first, which is right for callers that
+ * only decorate an event with "which Work is this about". It is wrong for a
+ * caller that must find the TASK that owns a pull request or branch: one
+ * account may register the same repository as two Works — a `repo` Work and an
+ * App Work over one code repository, or an App Work over a directory Work's
+ * generated website repository — and the Task lives in only one of them. The
+ * first match could be the wrong one, and `findByUser` has no order.
+ */
+export function matchWorkRepoRoles<T extends Work>(
+    works: readonly T[],
+    owner: string,
+    repo: string,
+): { work: T; roles: readonly WorkRepoRole[] }[] {
+    const target = `${owner}/${repo}`.trim().toLowerCase();
+    if (!target || target === '/') return [];
+    const matches: { work: T; roles: readonly WorkRepoRole[] }[] = [];
+    for (const work of works) {
+        const roles = WORK_REPO_ROLES.filter((role) => getWorkRepoFullName(work, role) === target);
+        if (roles.length > 0) matches.push({ work, roles });
+    }
+    return matches;
 }
 
 /**

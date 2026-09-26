@@ -150,9 +150,15 @@ export class MarkdownGeneratorService {
         // and `work.getDataRepo()` can be the SAME repo. `GitOperations.getLocalDir`
         // is deterministic —
         //
-        //     path.join(baseDir, slugifyText(`${owner}-${repo}`))
+        //     path.join(baseDir, checkoutDirectoryName(providerScopedKey))   // APW-02 P0
         //
         // — so the two clones above then resolve to the SAME working directory.
+        // APW-02 P0 replaced the old `slugifyText(`${owner}-${repo}`)` key, which
+        // collided across case and across providers, with a provider-scoped,
+        // case-preserving key; `getLocalDir` also keeps the legacy directory as a
+        // read fallback so checkouts made before the change keep working. The
+        // comparison below is on RESOLVED PATHS, so it is correct under either
+        // key and needs no change.
         // Everything below that treats them as two independent checkouts becomes
         // destructive: `resetFiles()` is an `rm -rf` of everything outside a
         // six-entry allowlist, and the PR path runs two concurrent `switchBranch`
@@ -161,7 +167,7 @@ export class MarkdownGeneratorService {
         // Compare the resolved paths rather than the repo names — the names come
         // from different sources (a created-repository target vs the entity's
         // role lookup) and can differ in case or owner spelling while still
-        // slugifying to one directory.
+        // resolving to one directory.
         const sharesOneRepo = path.resolve(markdownRepo.dir) === path.resolve(dataRepo.dir);
         if (sharesOneRepo) {
             this.logger.log(
@@ -586,7 +592,7 @@ export class MarkdownGeneratorService {
                 workId: work.id,
             });
 
-            const dataDir = this.gitFacade.getLocalDir(
+            const dataDir = await this.gitFacade.getLocalDir(
                 work.gitProvider,
                 work.getRepoOwner(),
                 work.getMainRepo(),
@@ -607,7 +613,7 @@ export class MarkdownGeneratorService {
     }
 
     async cleanup(work: Work) {
-        const dataDir = this.gitFacade.getLocalDir(
+        const dataDir = await this.gitFacade.getLocalDir(
             work.gitProvider,
             work.getRepoOwner(),
             work.getMainRepo(),

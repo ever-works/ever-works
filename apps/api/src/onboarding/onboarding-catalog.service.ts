@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
-import { PluginRegistryService } from '@ever-works/agent/plugins';
+import { PluginRegistryService, loadPluginsForListing } from '@ever-works/agent/plugins';
 import type {
     OnboardingCatalogResponse,
     OnboardingCard,
@@ -42,7 +42,7 @@ export const COMMUNICATION_PLUGIN_IDS: readonly string[] = ['slack-connector', '
 export class OnboardingCatalogService {
     constructor(private readonly registry: PluginRegistryService) {}
 
-    getCatalog(): OnboardingCatalogResponse {
+    async getCatalog(): Promise<OnboardingCatalogResponse> {
         const everWorksGitEnabled = config.everWorks.git.isEnabled();
         const everWorksDeployEnabled = config.everWorks.deploy.isEnabled();
         const everWorksDbEnabled = config.everWorks.sharedDb.isEnabled();
@@ -245,16 +245,28 @@ export class OnboardingCatalogService {
             ].filter((id): id is string => Boolean(id)),
         );
 
-        const plugins = this.collectPluginsStepCards(reservedPluginIds);
+        const plugins = await this.collectPluginsStepCards(reservedPluginIds);
 
         return { ai, storage, db, deploy, desktop, plugins };
     }
 
-    private collectPluginsStepCards(reservedPluginIds: Set<string>): OnboardingPluginCard[] {
-        const all = this.registry.getAll();
-        return all
+    private async collectPluginsStepCards(
+        reservedPluginIds: Set<string>,
+    ): Promise<OnboardingPluginCard[]> {
+        const candidates = this.registry
+            .getAll()
+            .filter((entry) => !reservedPluginIds.has(entry.manifest.id));
+        // Plugins declare `uiHints` in their class's getManifest() (none does
+        // in package.json), which the registry entry of a plugin nobody has
+        // used yet — a cold lazy proxy — does not carry until it loads. Load
+        // the candidates first — a bounded number at a time, and only the
+        // builtIns (loadPluginsForListing): a cold plugin that is not builtIn
+        // stays cold and keeps its package.json manifest, as when builtIns
+        // loaded at boot, so it is not offered. One that cannot load keeps its
+        // package.json manifest and is not offered either.
+        await loadPluginsForListing(candidates);
+        return candidates
             .filter((entry) => entry.manifest.uiHints?.includeInOnboarding === true)
-            .filter((entry) => !reservedPluginIds.has(entry.manifest.id))
             .map(
                 (entry): OnboardingPluginCard => ({
                     pluginId: entry.manifest.id,

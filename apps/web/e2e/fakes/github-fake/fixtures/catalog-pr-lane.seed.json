@@ -1,0 +1,225 @@
+{
+    "organizations": ["ever-works", "apw-e2e-org"],
+    "users": [
+        {
+            "login": "apw-e2e-user",
+            "token": "apw-e2e-user-token",
+            "permissions": [
+                {
+                    "login": "ever-works/templates",
+                    "push": true
+                }
+            ]
+        },
+        {
+            "login": "apw-e2e-reviewer",
+            "token": "apw-e2e-reviewer-token",
+            "permissions": []
+        },
+        {
+            "login": "apw-e2e-stranger",
+            "token": "apw-e2e-stranger-token",
+            "permissions": []
+        }
+    ],
+    "repositories": [
+        {
+            "owner": "ever-works",
+            "name": "templates",
+            "defaultBranch": "main",
+            "license": {
+                "key": "mit",
+                "name": "MIT License",
+                "spdx_id": "MIT"
+            },
+            "topics": ["ever-works", "app-template"],
+            "permissions": [
+                {
+                    "login": "apw-e2e-user",
+                    "push": true,
+                    "admin": false
+                }
+            ]
+        },
+        {
+            "owner": "ever-works",
+            "name": "umami-template",
+            "defaultBranch": "main",
+            "license": {
+                "key": "mit",
+                "name": "MIT License",
+                "spdx_id": "MIT"
+            },
+            "topics": ["ever-works", "app-template"],
+            "permissions": [
+                {
+                    "login": "apw-e2e-user",
+                    "push": true,
+                    "admin": false
+                }
+            ]
+        },
+        {
+            "owner": "ever-works",
+            "name": "cal-diy-template",
+            "defaultBranch": "main",
+            "license": {
+                "key": "agpl-3.0",
+                "name": "GNU Affero General Public License v3.0",
+                "spdx_id": "AGPL-3.0"
+            },
+            "topics": ["ever-works", "app-template"],
+            "permissions": [
+                {
+                    "login": "apw-e2e-user",
+                    "push": true,
+                    "admin": false
+                }
+            ],
+            "interactionLimits": {
+                "limit": "collaborators_only",
+                "origin": "repository",
+                "expiresAt": "2026-10-01T00:00:00Z"
+            },
+            "checkRuns": [
+                {
+                    "id": 900101,
+                    "name": "build",
+                    "status": "completed",
+                    "conclusion": "action_required",
+                    "startedAt": "2026-09-18T09:12:04Z",
+                    "completedAt": "2026-09-18T09:16:04Z",
+                    "detailsUrl": "https://github.com/ever-works/cal-diy-template/actions/runs/960001",
+                    "headSha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+                    "externalId": "apw-e2e-check-build",
+                    "outputTitle": "build",
+                    "outputSummary": "Waiting for maintainers to approve this workflow run."
+                },
+                {
+                    "id": 900102,
+                    "name": "lint",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "startedAt": "2026-09-18T09:12:04Z",
+                    "completedAt": "2026-09-18T09:14:04Z",
+                    "detailsUrl": "https://github.com/ever-works/cal-diy-template/actions/runs/960002",
+                    "headSha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+                    "externalId": "apw-e2e-check-lint",
+                    "outputTitle": "lint",
+                    "outputSummary": "No lint errors."
+                }
+            ],
+            "commitStatuses": [
+                {
+                    "id": 900200,
+                    "context": "continuous-integration/apw-e2e",
+                    "state": "success",
+                    "description": "Build and checks passed",
+                    "targetUrl": "https://ci.example.invalid/apw-e2e/cal-diy-template",
+                    "createdAt": "2026-09-18T09:16:04Z",
+                    "updatedAt": "2026-09-18T09:16:04Z",
+                    "creatorLogin": "apw-e2e-user"
+                }
+            ]
+        },
+        {
+            "owner": "ever-works",
+            "name": "app-fixture-hello-template",
+            "defaultBranch": "main",
+            "license": {
+                "key": "mit",
+                "name": "MIT License",
+                "spdx_id": "MIT"
+            },
+            "topics": ["ever-works", "app-template", "ever-works-app-fixture"],
+            "permissions": [
+                {
+                    "login": "apw-e2e-user",
+                    "push": true,
+                    "admin": false
+                }
+            ]
+        },
+        {
+            "owner": "apw-e2e-user",
+            "name": "templates",
+            "defaultBranch": "main",
+            "fork": true,
+            "parentFullName": "ever-works/templates",
+            "sourceFullName": "ever-works/templates",
+            "license": {
+                "key": "mit",
+                "name": "MIT License",
+                "spdx_id": "MIT"
+            },
+            "topics": ["ever-works", "app-template"],
+            "permissions": [
+                {
+                    "login": "apw-e2e-user",
+                    "push": true,
+                    "admin": true
+                }
+            ]
+        },
+        {
+            "owner": "apw-e2e-upstream",
+            "name": "amber-app",
+            "defaultBranch": "main",
+            "license": {
+                "key": "busl-1.1",
+                "name": "Business Source License 1.1",
+                "spdx_id": "BUSL-1.1"
+            },
+            "permissions": []
+        },
+        {
+            "owner": "apw-e2e-upstream",
+            "name": "red-app",
+            "defaultBranch": "main",
+            "license": {
+                "key": "other",
+                "name": "Other",
+                "spdx_id": "NOASSERTION"
+            },
+            "permissions": []
+        }
+    ],
+    "catalog": {
+        "manifestRef": "ever-works/templates@main",
+        "licenses": [
+            {
+                "spdx": "MIT",
+                "class": "green"
+            },
+            {
+                "spdx": "AGPL-3.0",
+                "class": "green"
+            },
+            {
+                "spdx": "BUSL-1.1",
+                "class": "amber"
+            },
+            {
+                "spdx": "NOASSERTION",
+                "class": "red"
+            }
+        ]
+    },
+    "blueprints": [
+        {
+            "id": "umami",
+            "repo": "ever-works/umami-template",
+            "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+        },
+        {
+            "id": "cal-diy",
+            "repo": "ever-works/cal-diy-template",
+            "sha": "b2c3d4e5f60718293a4b5c6d7e8f901234567890"
+        },
+        {
+            "id": "app-fixture-hello",
+            "repo": "ever-works/app-fixture-hello-template",
+            "sha": "c3d4e5f60718293a4b5c6d7e8f90123456789012"
+        }
+    ]
+}

@@ -8,13 +8,28 @@ jest.mock('@ever-works/monitoring', () => ({}));
 // `config.branding.appName()` reads env on every call; stub it to a
 // deterministic value so the /api/config spec doesn't depend on which
 // env vars the test runner has set.
-jest.mock('./config/constants', () => ({
-    config: {
-        branding: {
-            appName: () => 'Ever Works',
+//
+// APW-11: `appLauncher.isEnabled()` is NOT stubbed to a literal — it delegates
+// to the REAL accessor, because the point of that row is that this public list
+// and the API's own guard read one implementation. A stub here would let the
+// two disagree while this spec stayed green, which is the failure mode the
+// delegation exists to prevent.
+jest.mock('./config/constants', () => {
+    const { config: agentConfig } = jest.requireActual<typeof import('@ever-works/agent/config')>(
+        '@ever-works/agent/config',
+    );
+
+    return {
+        config: {
+            branding: {
+                appName: () => 'Ever Works',
+            },
+            appLauncher: {
+                isEnabled: () => agentConfig.appLauncher.isEnabled(),
+            },
         },
-    },
-}));
+    };
+});
 
 import { APIController } from './api.controller';
 import type { AnalyticsService } from '@ever-works/monitoring';
@@ -90,6 +105,7 @@ describe('APIController', () => {
             'SUBSCRIPTIONS_ENABLED',
             'MAGIC_LINK_ENABLED',
             'ANONYMOUS_AUTH_ENABLED',
+            'EVER_WORKS_APP_LAUNCHER_ENABLED',
             'REQUIRE_EMAIL_VERIFICATION',
             'GH_CLIENT_ID',
             'GOOGLE_CLIENT_ID',
@@ -133,6 +149,35 @@ describe('APIController', () => {
             process.env[envKey] = 'true';
             const r = controller.getConfig();
             expect((r.features as Record<string, boolean>)[flagKey]).toBe(true);
+        });
+
+        // APW-11 (App Launcher) — its switch is published on this list so the
+        // web UI can hide the surface, and it is read through
+        // `config.appLauncher.isEnabled()` rather than the `truthy()` helper
+        // above, so it can never disagree with the API's own guard. That
+        // accessor is deliberately STRICTER than `truthy()`: the rows below are
+        // the whole contract, and `'1'` / `'yes'` are OFF on purpose (FR-54's
+        // surface-wide gate fails closed; see the accessor's docstring for why
+        // the wider set does not apply to a variable this epic introduces).
+        it.each([
+            ['true', true],
+            ['1', false],
+            ['yes', false],
+            ['TRUE', false],
+            ['', false],
+        ] as const)(
+            'publishes features.appLauncherEnabled = %p for EVER_WORKS_APP_LAUNCHER_ENABLED=%p',
+            (value, expected) => {
+                process.env.EVER_WORKS_APP_LAUNCHER_ENABLED = value;
+                const r = controller.getConfig();
+                expect((r.features as Record<string, boolean>).appLauncherEnabled).toBe(expected);
+            },
+        );
+
+        it('publishes features.appLauncherEnabled = false when the variable is unset', () => {
+            delete process.env.EVER_WORKS_APP_LAUNCHER_ENABLED;
+            const r = controller.getConfig();
+            expect((r.features as Record<string, boolean>).appLauncherEnabled).toBe(false);
         });
 
         it('treats REQUIRE_EMAIL_VERIFICATION as default-true (only "false" opts out)', () => {

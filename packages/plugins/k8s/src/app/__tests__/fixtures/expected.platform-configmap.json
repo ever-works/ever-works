@@ -1,0 +1,20 @@
+{
+	"apiVersion": "v1",
+	"kind": "ConfigMap",
+	"metadata": {
+		"name": "app-platform-9c1f0a4b7d",
+		"namespace": "ew-analytics-0f8e2c1a",
+		"labels": {
+			"app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+			"app.kubernetes.io/part-of": "analytics",
+			"ever-works.io/work-id": "0f8e2c1a-1111-4a2b-9c3d-4e5f60718293",
+			"ever-works.io/kind": "app"
+		}
+	},
+	"immutable": true,
+	"data": {
+		"EVER_WORKS_APP_URL": "https://analytics.example.com",
+		"EVER_WORKS_APP_HOST": "analytics.example.com",
+		"EVER_WORKS_APP_COMMIT": "0123456789abcdef0123456789abcdef01234567"
+	}
+}

@@ -1,0 +1,9 @@
+[
+    {
+        "login": "ever-works",
+        "id": 90000,
+        "type": "Organization",
+        "site_admin": false,
+        "description": "ever-works (APW-13 fake GitHub fixture)"
+    }
+]

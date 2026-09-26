@@ -1,0 +1,17 @@
+# NEGATIVE FIXTURE neg-22 — error class: a sync schedule that fires more often than once an hour.
+# Expected: JSON Schema PASS · rule layer FAIL `schedule_too_frequent` (R21).
+# schema.md §19: "Consecutive fires at least 60 minutes apart (`schedule_too_frequent`)". The schema
+# validates the five-field SHAPE only; the interval is arithmetic over the parsed expression.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    upstreamSync:
+        schedule: '*/5 * * * *'
+        mode: merge

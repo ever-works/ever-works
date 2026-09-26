@@ -1,0 +1,14 @@
+# NEGATIVE FIXTURE neg-12 — error class: a `web` component without `port`.
+# Expected: JSON Schema FAIL (`if`/`then`: /spec/components/0 requires `port`) · rule layer `web_component_needs_port`.
+# schema.md R1. Note this one is ALSO reachable through the envelope's per-kind `oneOf` in
+# works.v2.schema.json once the `app` branch is registered, which is what plan.md §2.2 line 160 exists for.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, command: ['node', 'dist/server.js'] }

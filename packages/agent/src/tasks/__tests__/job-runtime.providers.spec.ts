@@ -1,4 +1,8 @@
 import type { IJobRuntimeProvider, JobRuntimeDispatchers } from '@ever-works/plugin';
+import { APP_BUILD_PREPARE_DISPATCHER } from '../app-build-prepare-dispatcher';
+import { APP_BUILD_WATCH_DISPATCHER } from '../app-build-watch-dispatcher';
+import { APP_DEPENDENCY_PROVISION_DISPATCHER } from '../app-dependency-provision-dispatcher';
+import { APP_SPEC_EVALUATE_DISPATCHER } from '../app-spec-evaluate-dispatcher';
 import { KB_BACKFILL_SKELETON_DISPATCHER } from '../kb-backfill-skeleton-dispatcher';
 import { KB_EMBED_DOCUMENT_DISPATCHER } from '../kb-embed-document-dispatcher';
 import { KB_MIRROR_DOCUMENT_DISPATCHER } from '../kb-mirror-document-dispatcher';
@@ -14,6 +18,7 @@ import { WORK_GENERATION_DISPATCHER } from '../work-generation-dispatcher';
 import { WORK_IMPORT_DISPATCHER } from '../work-import-dispatcher';
 import { WORKSPACE_BACKUP_DISPATCHER } from '../workspace-backup-dispatcher';
 import {
+    DISPATCHER_SYMBOLS,
     InMemoryJobRuntimeProviderRegistry,
     JOB_RUNTIME_PROVIDER_REGISTRY,
     buildJobRuntimeProviders,
@@ -31,8 +36,10 @@ import {
  *   2. The default in-memory registry returns `null` until something is
  *      registered, and last-`register()` wins (single-active-runtime per
  *      EW-683 §4).
- *   3. {@link buildJobRuntimeProviders} returns exactly 12 NestJS providers
- *      — one per `*_DISPATCHER` symbol exported from `@ever-works/agent/tasks`.
+ *   3. {@link buildJobRuntimeProviders} returns exactly one NestJS provider
+ *      per `*_DISPATCHER` symbol in `DISPATCHER_SYMBOLS` — asserted as a COUNT
+ *      against that list, never as a literal, so merging two branches that each
+ *      added a dispatcher cannot pass over a stale number.
  *      Drift here means a dispatcher silently fails to rebind when the
  *      cutover PR flips the bindings.
  *   4. Each factory function delegates to `registry.getActive().dispatchers`
@@ -131,16 +138,19 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
     });
 
     describe('buildJobRuntimeProviders()', () => {
-        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 14)', () => {
+        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = DISPATCHER_SYMBOLS.length)', () => {
             const providers = buildJobRuntimeProviders();
-            // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER +
-            // develop's ROSTER_PROVISION_DISPATCHER + AW-22's
-            // WORKSPACE_BACKUP_DISPATCHER. COUNTED off the merged
-            // DISPATCHER_SYMBOLS list, not added up from either branch:
-            // develop reached 13 with MEMORY_FACT_EMBED + ROSTER_PROVISION and
-            // this branch reached 12 with WORKSPACE_BACKUP from a base of 11.
-            // The merged list carries all of them -> 14.
-            expect(providers).toHaveLength(14);
+            // COUNTED off the live `DISPATCHER_SYMBOLS` list, never a magic
+            // number: the count has moved four times in this file's life (11 →
+            // 13 on develop, → 14 with AW-22's WORKSPACE_BACKUP_DISPATCHER, → 15
+            // with APW-07's APP_DEPENDENCY_PROVISION_DISPATCHER, → 16 with
+            // APW-03 T13's APP_SPEC_EVALUATE_DISPATCHER, → 18 with APW-05 T18's
+            // two Build dispatchers), and a literal
+            // here is exactly what let a merge add a dispatcher without the
+            // provider count following it. The explicit symbol-set assertion
+            // below is what pins the MEMBERSHIP; this pins the ARITY against
+            // the same source of truth the factory reads.
+            expect(providers).toHaveLength(DISPATCHER_SYMBOLS.length);
         });
 
         it('binds every *_DISPATCHER symbol exported from @ever-works/agent/tasks', () => {
@@ -152,8 +162,17 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 14-symbol list is the actual invariant we care about.
+            // 18-symbol list is the actual invariant we care about — it is
+            // also what keeps `DISPATCHER_SYMBOLS` itself from silently
+            // losing an entry (the arity assertion above would still pass).
+            // Eighteen since APW-05 T18 added the two Build dispatchers
+            // (sixteen before them — COUNTED off `DISPATCHER_SYMBOLS`, never
+            // added up from a branch's own number).
             const expected = new Set<symbol>([
+                APP_BUILD_PREPARE_DISPATCHER,
+                APP_BUILD_WATCH_DISPATCHER,
+                APP_DEPENDENCY_PROVISION_DISPATCHER,
+                APP_SPEC_EVALUATE_DISPATCHER,
                 KB_BACKFILL_SKELETON_DISPATCHER,
                 KB_EMBED_DOCUMENT_DISPATCHER,
                 KB_MIRROR_DOCUMENT_DISPATCHER,
@@ -170,6 +189,11 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
                 WORKSPACE_BACKUP_DISPATCHER,
             ]);
             expect(provideTokens).toEqual(expected);
+            // The pin list and the factory's own list are the same set — this
+            // is the line that fails if someone edits one and forgets the
+            // other (the failure mode the EW-683 §3 conformance suite exists
+            // to catch).
+            expect(new Set(DISPATCHER_SYMBOLS)).toEqual(expected);
             // Belt-and-suspenders: no duplicate provide tokens (a duplicate
             // would silently shadow the earlier binding in NestJS).
             expect(provideTokens.size).toBe(providers.length);
@@ -243,7 +267,8 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
 
         it('symbols filter binds only the requested subset (pull-model provider partial bind)', () => {
             // EW-685 T4 full cutover landed in trigger.module.ts with no
-            // `symbols:` filter (all 12 bind through the registry). The
+            // `symbols:` filter (every DISPATCHER_SYMBOLS entry binds through
+            // the registry). The
             // `symbols:` option remains for tests and for future modules
             // that want to bind a strict subset (e.g. a pull-model worker
             // host that only owns a subset of the dispatcher surface).
@@ -274,7 +299,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             const registry = new InMemoryJobRuntimeProviderRegistry();
             const providers = buildJobRuntimeProviders();
             // Take the first provider as representative; the assertions
-            // above already cover identical behaviour across all 12.
+            // above already cover identical behaviour across every symbol.
             const factory = (
                 providers[0] as { useFactory: (r: JobRuntimeProviderRegistry) => unknown }
             ).useFactory;

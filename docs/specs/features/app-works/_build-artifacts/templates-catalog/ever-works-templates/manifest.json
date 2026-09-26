@@ -1,0 +1,280 @@
+{
+	"$schema": "./schema/templates-manifest.schema.json",
+	"schemaVersion": 1,
+	"generatedBy": "manual",
+	"status": "seed",
+	"catalogOrganization": "ever-works",
+	"updatedAt": "2026-09-17",
+	"notes": [
+		"SEED / DRAFT — hand-authored on 2026-09-17 to create the repository with real content.",
+		"This file is the LISTING: one row per template repository we keep, website and app alike.",
+		"It is NOT the machine source of truth for resolution. A template is usable because its",
+		"repository exists and carries its own metadata; the platform discovers templates by scanning",
+		"catalogOrganization for repositories whose name ends in 'template' and reads each one's",
+		".works/template.yml and .works/works.yml. This file adds curation (pin, license class,",
+		"managed-hosting decision, verification) and makes a template listed, badgeable and searchable.",
+		"Rows with status 'placeholder' name repositories that do not exist yet (created by APW-13).",
+		"`template.ref` is a branch for a website row (the existing fork-from-branch behaviour) and for an app row while it is a placeholder; on publication an app row's `template.ref` becomes the release tag `v<blueprint.version>` and `template.sha` its commit (CI check 3 in README.md §2)."
+	],
+	"templates": [
+		{
+			"slug": "directory-web",
+			"name": "Directory (Next.js)",
+			"summary": "Standard Next.js directory site with categories, search, submissions and SEO defaults — the flagship Work shape.",
+			"kind": "website",
+			"status": "production",
+			"role": "website",
+			"workRepositorySuffix": "-website",
+			"featured": true,
+			"template": {
+				"repo": "ever-works/directory-web-template",
+				"url": "https://github.com/ever-works/directory-web-template",
+				"ref": "develop",
+				"sha": null,
+				"isGitHubTemplate": true
+			},
+			"license": { "spdx": "AGPL-3.0-only", "class": "green", "source": "template" },
+			"tags": ["nextjs", "directory", "seo"],
+			"notes": [
+				"Named by the ever-works/works blueprint entry 'directory' (ref develop, isGitHubTemplate true).",
+				"The ever-works/works blueprint entry 'marketing-site' still names ever-works/ever-works-website-template;",
+				"GitHub resolves that name to THIS repository (same repo id 912916449, verified 2026-09-17), so two",
+				"blueprint slugs currently point at one template repository. See open-questions.md OQ-09."
+			]
+		},
+		{
+			"slug": "directory-web-minimal",
+			"name": "Directory (Minimal, Astro)",
+			"summary": "Lightweight Astro directory for fast, content-first listings with a small build footprint.",
+			"kind": "website",
+			"status": "production",
+			"role": "website",
+			"workRepositorySuffix": "-website",
+			"template": {
+				"repo": "ever-works/directory-web-minimal-template",
+				"url": "https://github.com/ever-works/directory-web-minimal-template",
+				"ref": "develop",
+				"sha": null,
+				"isGitHubTemplate": true
+			},
+			"license": { "spdx": "AGPL-3.0-only", "class": "green", "source": "template" },
+			"tags": ["astro", "directory", "minimal"],
+			"notes": ["Named by the ever-works/works blueprint entry 'directory-minimal' (ref develop)."]
+		},
+		{
+			"slug": "web",
+			"name": "Website (Next.js)",
+			"summary": "General-purpose Next.js website template for marketing, landing and content sites.",
+			"kind": "website",
+			"status": "production",
+			"role": "website",
+			"workRepositorySuffix": "-website",
+			"template": {
+				"repo": "ever-works/web-template",
+				"url": "https://github.com/ever-works/web-template",
+				"ref": "main",
+				"sha": null,
+				"isGitHubTemplate": false
+			},
+			"license": { "spdx": "AGPL-3.0-only", "class": "green", "source": "template" },
+			"tags": ["nextjs", "marketing", "landing"],
+			"notes": [
+				"Reachable today only through the suffix scan (no ever-works/works blueprint names it).",
+				"Default branch main; the repository is not marked as a GitHub template repository."
+			]
+		},
+		{
+			"slug": "web-minimal",
+			"name": "Website (Minimal, Astro)",
+			"summary": "General-purpose minimal static Astro website template for marketing, landing and content sites.",
+			"kind": "website",
+			"status": "production",
+			"role": "website",
+			"workRepositorySuffix": "-website",
+			"template": {
+				"repo": "ever-works/web-minimal-template",
+				"url": "https://github.com/ever-works/web-minimal-template",
+				"ref": "main",
+				"sha": null,
+				"isGitHubTemplate": false
+			},
+			"license": { "spdx": "AGPL-3.0-only", "class": "green", "source": "template" },
+			"tags": ["astro", "marketing", "static"],
+			"notes": ["Reachable today only through the suffix scan (no ever-works/works blueprint names it)."]
+		},
+		{
+			"slug": "cal-diy",
+			"name": "Cal.diy (community build)",
+			"summary": "Open-source scheduling: booking pages, calendar sync, reminders and a large Next.js app.",
+			"kind": "app",
+			"status": "placeholder",
+			"role": "website",
+			"workRepositorySuffix": "-app",
+			"shape": "code-bearing",
+			"appSource": {
+				"mode": "embedded",
+				"repo": "calcom/cal.diy",
+				"defaultBranch": "main"
+			},
+			"template": {
+				"repo": "ever-works/cal-diy-template",
+				"url": "https://github.com/ever-works/cal-diy-template",
+				"ref": "main",
+				"sha": null,
+				"isGitHubTemplate": false
+			},
+			"blueprint": {
+				"id": "cal-diy",
+				"version": "0.1.0",
+				"topic": "ever-works-app-blueprint",
+				"verified": false
+			},
+			"upstreams": [
+				{
+					"repo": "calcom/cal.diy",
+					"aliases": ["calcom/cal.com"],
+					"refs": { "branches": ["main"], "exclude": ["v6.*", "v5.*"] }
+				}
+			],
+			"license": { "spdx": "MIT", "class": "green", "source": "upstream" },
+			"managedHosting": {
+				"allowed": false,
+				"reason": "Upstream recommends personal, non-production use; the community build stays on the user's own cluster."
+			},
+			"trademark": {
+				"notice": "Cal.diy® is a trademark of Cal.com, Inc. This community build is not affiliated with or endorsed by Cal.com, Inc.",
+				"displayNameSuffix": "(community build)",
+				"protectedPaths": [
+					"LICENSE",
+					"apps/web/public/cal-*",
+					"apps/web/public/calcom-*",
+					"apps/web/public/favicon*",
+					"apps/web/public/apple-touch-icon.png",
+					"packages/ui/components/logo/**"
+				]
+			},
+			"tags": ["calendar", "booking", "nextjs"],
+			"notes": [
+				"THE code-bearing example: the template repository is a public fork of calcom/cal.diy with our",
+				"metadata added (.works/works.yml, .works/template.yml, README.md, topic). Provisioning forks ONE",
+				"repository — the template — and that fork is the App Work's Work Repository (role 'website').",
+				"Created by APW-13 T28 (seed content: APW-13-golden-paths/blueprints/cal-diy/).",
+				"sha is null only because the repository does not exist yet; a non-placeholder row requires a 40-hex sha."
+			]
+		},
+		{
+			"slug": "umami",
+			"name": "Umami",
+			"summary": "Privacy-first, cookieless web analytics: one container, one Postgres, heartbeat health check.",
+			"kind": "app",
+			"status": "placeholder",
+			"role": "website",
+			"workRepositorySuffix": "-app",
+			"shape": "metadata-only",
+			"appSource": {
+				"mode": "repository",
+				"repo": "umami-software/umami",
+				"defaultBranch": "master"
+			},
+			"template": {
+				"repo": "ever-works/umami-template",
+				"url": "https://github.com/ever-works/umami-template",
+				"ref": "main",
+				"sha": null,
+				"isGitHubTemplate": false
+			},
+			"blueprint": {
+				"id": "umami",
+				"version": "0.1.0",
+				"topic": "ever-works-app-blueprint",
+				"verified": false
+			},
+			"upstreams": [
+				{
+					"repo": "umami-software/umami",
+					"aliases": [],
+					"refs": { "branches": ["master"], "tags": ">=3.4.0" }
+				}
+			],
+			"license": { "spdx": "MIT", "class": "green", "source": "upstream" },
+			"managedHosting": { "allowed": true },
+			"tags": ["analytics", "privacy", "postgres"],
+			"notes": [
+				"Metadata-only: the template holds the App spec and nothing else. The app source stays in",
+				"umami-software/umami, so provisioning forks TWO repositories (the app source first, the template",
+				"second). The App Work's Work Repository is the app-source fork.",
+				"The shipped spec deploys the upstream's published image pinned by digest; switching build.strategy",
+				"to dockerfile builds the fork, which is why the app-source fork must exist (blueprint README §Evolving).",
+				"Created by APW-13 T27 (seed content: APW-13-golden-paths/blueprints/umami/)."
+			]
+		},
+		{
+			"slug": "app-fixture-hello",
+			"name": "App fixture (hello)",
+			"summary": "The acceptance fixture: the smallest app that makes every App spec feature observable.",
+			"kind": "app",
+			"status": "placeholder",
+			"role": "website",
+			"workRepositorySuffix": "-app",
+			"shape": "metadata-only",
+			"appSource": {
+				"mode": "repository",
+				"repo": "ever-works/app-fixture-hello",
+				"defaultBranch": "main"
+			},
+			"template": {
+				"repo": "ever-works/app-fixture-hello-template",
+				"url": "https://github.com/ever-works/app-fixture-hello-template",
+				"ref": "main",
+				"sha": null,
+				"isGitHubTemplate": false
+			},
+			"blueprint": {
+				"id": "app-fixture-hello",
+				"version": "0.1.0",
+				"topic": "ever-works-app-blueprint",
+				"verified": false
+			},
+			"upstreams": [
+				{
+					"repo": "ever-works/app-fixture-hello",
+					"aliases": [],
+					"refs": { "branches": ["main"] }
+				}
+			],
+			"license": { "spdx": "MIT", "class": "green", "source": "app-source" },
+			"managedHosting": {
+				"allowed": false,
+				"reason": "Test fixture; it is exercised by the acceptance lanes and is not offered for hosting."
+			},
+			"tags": ["fixture", "acceptance"],
+			"notes": [
+				"TWO DIFFERENT REPOSITORIES — do not conflate them (the plan does today; see plan-changes.md §5):",
+				"  ever-works/app-fixture-hello          = the fixture APPLICATION (source only, no .works/), and it is a",
+				"                                          GitHub *template repository* so the estate helper can generate",
+				"                                          per-run upstreams from it. It is NOT an App Blueprint repository.",
+				"  ever-works/app-fixture-hello-template = the App BLUEPRINT repository (the App spec).",
+				"'template repository' in the GitHub sentence above means the repository setting, not a Blueprint.",
+				"Created by APW-13 T22 (application) and T24 (Blueprint)."
+			]
+		}
+	],
+	"appSources": [
+		{
+			"repo": "ever-works/app-fixture-hello",
+			"url": "https://github.com/ever-works/app-fixture-hello",
+			"defaultBranch": "main",
+			"kind": "app-source",
+			"servesTemplates": ["app-fixture-hello"],
+			"githubTemplateRepository": true,
+			"license": { "spdx": "MIT", "class": "green", "source": "app-source" },
+			"notes": [
+				"Listed because it is referred to by a template row above, not because it is a template:",
+				"its name does not end in 'template', so the suffix scan never returns it",
+				"(isStandardTemplateRepository in packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049).",
+				"Acceptance lanes never fork it directly — they generate throwaway upstreams from it in the test",
+				"organization so every run gets a fresh fork network (APW-13 plan §2.2, ACCEPTANCE §0.3)."
+			]
+		}
+	]
+}

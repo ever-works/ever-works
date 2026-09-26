@@ -83,6 +83,15 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskAgentReviewService: class TaskAgentReviewService {},
     TaskStatus: {},
     RUN_STEERING_PORT: 'RUN_STEERING_PORT',
+    // APW-08 T17 — the App Work change gate the git tools ask.
+    APP_WORK_CHANGE_GATE: 'APP_WORK_CHANGE_GATE',
+    // APW-08 FR-12 / T12 — the REAL cloud App Work push gate, loaded from its
+    // leaf file (the barrel would drag the entity graph in). A stub here could
+    // let the tools publish whatever the switch says, which is the defect the
+    // "cloud App Work pushes are OFF by default" cases below pin.
+    ...jest.requireActual<Record<string, unknown>>(
+        '../../../../packages/agent/src/tasks-domain/app-work-cloud-push',
+    ),
 }));
 jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestModule: class EventIngestModule {},
@@ -160,6 +169,10 @@ jest.mock('./agent-template-catalog.service', () => ({
 }));
 
 import 'reflect-metadata';
+// APW-08 P0 (T1 case 7) — the adapter's SOURCE is asserted, not only its
+// runtime calls: a hardcoded provider id is invisible to a stub.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AgentsModule } from './agents.module';
 import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
@@ -175,6 +188,7 @@ import {
     TaskReviewerRepository,
     TaskApproverRepository,
     TaskAgentReviewService,
+    APP_WORK_CHANGE_GATE,
 } from '@ever-works/agent/tasks-domain';
 import {
     AgentRepository,
@@ -442,13 +456,50 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
 
     const buildFacade = (gate: { assertAllowed: jest.Mock }, git: Record<string, jest.Mock>) => {
         const factory = findProvider(AGENT_GIT_FACADE);
-        return factory?.useFactory?.(git, { findById: jest.fn() }, gate, {
-            findById: jest.fn().mockResolvedValue({ id: 'work-1', checksPolicy: 'required' }),
-        }) as OpenPrFacade;
+        return factory?.useFactory?.(
+            git,
+            { findById: jest.fn() },
+            gate,
+            {
+                // APW-08 P0 — the adapter now resolves provider + owner + repo
+                // from the Work before it opens anything, so the fixture has to
+                // be a Work that HAS them. A Work without a git provider is a
+                // refusal (see the fail-closed specs below), not a `''` target.
+                findById: jest.fn().mockResolvedValue({
+                    id: 'work-1',
+                    kind: 'website',
+                    checksPolicy: 'required',
+                    gitProvider: 'github',
+                    getRepoOwner: () => 'acme',
+                    getWebsiteRepo: () => 'acme-website',
+                }),
+            },
+            {
+                resolve: jest.fn().mockResolvedValue({
+                    policy: { protectedBranches: ['main', 'master', 'develop', 'stage'] },
+                    source: 'default',
+                    chain: [],
+                }),
+            },
+        ) as OpenPrFacade;
     };
 
     const makeGit = () => ({
+        // APW-08 P0 — the gate's working copy is now a `cloneOrPull` of the
+        // Work's own repository base branch; `getRepoDir` (which clones the
+        // Work's IMPORT source) is kept only as a never-called spy.
         getRepoDir: jest.fn().mockResolvedValue('/tmp/work-1'),
+        cloneOrPull: jest.fn().mockResolvedValue('/tmp/work-1'),
+        // APW-08 P0 — `openPullRequest` now resolves the base branch from the
+        // Work's repository when the caller omits it, so the facade it calls
+        // has to answer that question. An explicit `base` still bypasses both.
+        getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
+        getMainBranch: jest.fn().mockResolvedValue('main'),
+        // APW-08 P0 (T4) — `openPullRequest` verifies the head branch against the
+        // provider's own branch list before it names it (FR-5), so the facade it
+        // calls has to answer that question too. The list contains the head the
+        // cases below open with; a case that wants a missing head overrides it.
+        listBranches: jest.fn().mockResolvedValue([{ name: 'feature' }, { name: 'main' }]),
         createPullRequest: jest.fn().mockResolvedValue({ number: 12, url: 'https://pr/12' }),
     });
 
@@ -458,6 +509,15 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
             AgentRepository,
             PullRequestGateService,
             WorkRepository,
+            // APW-08 P0 — APPENDED so the adapter can refuse a protected
+            // release branch from the Work's EFFECTIVE merge policy rather
+            // than from a second, hand-rolled list. Positional, like every
+            // argument above it.
+            MergePolicyService,
+            // APW-08 T17 — APPENDED, and optional so every positional
+            // construction keeps working; the tools refuse an App Work change
+            // when it is absent rather than skipping the check.
+            { token: APP_WORK_CHANGE_GATE, optional: true },
         ]);
     });
 
@@ -594,5 +654,1512 @@ describe('api-side AgentsModule — AGENT_EMAIL_FACADE approve-before-send', () 
             { origin: 'agent' },
         );
         expect(result).toMatchObject({ held: true, messageId: 'm-2', targetAddress: 'peer@x.com' });
+    });
+});
+
+/**
+ * APW-08 P0 — the Agent-facing git tools resolve the provider, owner, repo
+ * and branch from the Work's OWN repository, and a push to a protected
+ * release branch is impossible.
+ *
+ * Before this, `commitToRepo` hardcoded `providerId = 'github'`, committed
+ * on whatever branch the clone happened to be on, and then RETURNED
+ * `branch ?? 'main'` — a branch it had not committed to; `openPullRequest`
+ * hardcoded `'github'` too and passed `owner: ''` / `repo: ''` to
+ * `createPullRequest`, which is not a pull request target at all. These
+ * specs pin the replacement: resolve from the Work (the same source
+ * `work.getRepoOwner('website')` / `work.getWebsiteRepo()` /
+ * `work.gitProvider` the rest of the platform reads), thread the branch
+ * into the commit, refuse the protected release branches BEFORE any git
+ * operation, and fail CLOSED — never back to `'github'`, `''` or `'main'`.
+ */
+describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution (APW-08 P0)', () => {
+    const WORK_ID = 'work-1';
+    const WORK_DIR = '/tmp/ever-works/work-1';
+
+    /** A non-GitHub provider id, so "resolved from the Work" is observable. */
+    const WORK_PROVIDER = 'gitlab';
+
+    type GitTools = CommitFacade & PrFacade;
+
+    type CommitFacade = {
+        commitToRepo: (input: Record<string, unknown>) => Promise<{
+            sha: string | null;
+            branch: string;
+            filesChanged: number;
+        }>;
+    };
+
+    type PrFacade = {
+        openPullRequest: (input: Record<string, unknown>) => Promise<{
+            number: number;
+            url: string;
+            state: string;
+        }>;
+    };
+
+    interface WorkOverrides {
+        kind?: string;
+        gitProvider?: string;
+        owner?: string;
+        websiteRepo?: string;
+        dataRepo?: string;
+        /** The Work's IMPORT source (`sourceRepository`) — never the repo the tools act on. */
+        sourceRepository?: { owner: string; repo: string } | null;
+        /** Where Task branches fork from; NULL means the repository's own default. */
+        taskIsolationBaseBranch?: string | null;
+    }
+
+    interface Harness {
+        facade: GitTools;
+        git: ReturnType<typeof makeGit>;
+        works: { findById: jest.Mock };
+        mergePolicy: { resolve: jest.Mock };
+        prGate: { assertAllowed: jest.Mock };
+    }
+
+    const PLATFORM_POLICY = { protectedBranches: ['main', 'master', 'develop', 'stage'] };
+
+    const makeWork = (overrides: WorkOverrides = {}) => {
+        const owner = overrides.owner ?? 'acme';
+        return {
+            id: WORK_ID,
+            kind: overrides.kind ?? 'website',
+            gitProvider: overrides.gitProvider ?? WORK_PROVIDER,
+            checksPolicy: 'off',
+            getRepoOwner: jest.fn(() => owner),
+            getWebsiteRepo: jest.fn(() => overrides.websiteRepo ?? 'acme-website'),
+            getDataRepo: jest.fn(() => overrides.dataRepo ?? 'acme-data'),
+            // APW-08 P0 (T1 case 2) — a Work's `sourceRepository` is where the
+            // Work was IMPORTED from, and `getRepoDir` clones exactly that. It
+            // is deliberately set to coordinates no assertion should ever see:
+            // the tools act on the Work's OWN repository record.
+            sourceRepository:
+                overrides.sourceRepository === undefined
+                    ? { owner: 'import-source', repo: 'imported-thing' }
+                    : overrides.sourceRepository,
+            taskIsolationBaseBranch: overrides.taskIsolationBaseBranch ?? null,
+        };
+    };
+
+    const makeGit = () => ({
+        // APW-08 P0 (T3) — kept ONLY as a spy. `getRepoDir` resolves the Work's
+        // IMPORT source, so the adapter must no longer call it at all; every
+        // caller now goes through `cloneOrPull` with explicit coordinates.
+        getRepoDir: jest.fn().mockResolvedValue(WORK_DIR),
+        // The call that replaced it: the Work's OWN repository, based on the
+        // resolved base branch, in a per-Work working copy (`checkoutKey`).
+        cloneOrPull: jest.fn().mockResolvedValue(WORK_DIR),
+        getRepository: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
+        getMainBranch: jest.fn().mockResolvedValue(null),
+        // APW-08 P0 (T4) — the head branch is verified against the provider's
+        // own branch list before a pull request names it (FR-5). The default
+        // list carries the head every PR case opens with; the missing-head case
+        // overrides it with a list the head is genuinely absent from.
+        listBranches: jest.fn().mockResolvedValue([{ name: 'feature/pricing' }, { name: 'main' }]),
+        switchBranch: jest.fn().mockResolvedValue('feature/x'),
+        // The tool stages exactly what it writes before committing — see the
+        // staging case below for why that call exists.
+        add: jest.fn().mockResolvedValue(undefined),
+        // APW-08 T17 — what the shared working copy already holds, which an
+        // App Work commit is judged on as well as the files it writes.
+        getStatus: jest.fn().mockResolvedValue([]),
+        commit: jest.fn().mockResolvedValue('sha-1'),
+        push: jest.fn().mockResolvedValue(undefined),
+        createPullRequest: jest
+            .fn()
+            .mockResolvedValue({ number: 7, url: 'https://git.test/pr/7', state: 'open' }),
+    });
+
+    const build = (
+        options: {
+            work?: unknown;
+            git?: ReturnType<typeof makeGit>;
+            protectedBranches?: string[];
+            /** APW-08 T17 — the sixth, optional argument. Absent by default. */
+            appChangeGate?: unknown;
+        } = {},
+    ): Harness => {
+        const git = options.git ?? makeGit();
+        const works = {
+            findById: jest
+                .fn()
+                .mockResolvedValue(options.work === undefined ? makeWork() : options.work),
+        };
+        const mergePolicy = {
+            resolve: jest.fn().mockResolvedValue({
+                policy: {
+                    protectedBranches:
+                        options.protectedBranches ?? PLATFORM_POLICY.protectedBranches,
+                },
+                source: 'default',
+                chain: [],
+            }),
+        };
+        const prGate = { assertAllowed: jest.fn().mockResolvedValue({ allowed: true }) };
+        const facade = findProvider(AGENT_GIT_FACADE)?.useFactory?.(
+            git,
+            { findById: jest.fn().mockResolvedValue({ id: 'agent-1', name: 'Ada', slug: 'ada' }) },
+            prGate,
+            works,
+            mergePolicy,
+            options.appChangeGate,
+        ) as GitTools;
+        return { facade, git, works, mergePolicy, prGate };
+    };
+
+    const commitInput = (extra: Record<string, unknown> = {}) => ({
+        userId: 'user-1',
+        agentId: 'agent-1',
+        workId: WORK_ID,
+        message: 'Add the pricing page',
+        ...extra,
+    });
+
+    const prInput = (extra: Record<string, unknown> = {}) => ({
+        userId: 'user-1',
+        agentId: 'agent-1',
+        workId: WORK_ID,
+        title: 'Add pricing',
+        body: 'Because the page was missing.',
+        head: 'feature/pricing',
+        ...extra,
+    });
+
+    /** Let every microtask and macrotask queued so far run. */
+    const settle = async (): Promise<void> => {
+        for (let i = 0; i < 6; i += 1) {
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+    };
+
+    /**
+     * "BEFORE any git operation runs" — one assertion for EVERY read and write
+     * the adapter could reach, so a git call added to this path later is caught
+     * here rather than only where somebody remembered to look.
+     */
+    const expectNoGitWork = (git: ReturnType<typeof makeGit>): void => {
+        expect(git.getRepoDir).not.toHaveBeenCalled();
+        expect(git.cloneOrPull).not.toHaveBeenCalled();
+        expect(git.switchBranch).not.toHaveBeenCalled();
+        expect(git.add).not.toHaveBeenCalled();
+        expect(git.commit).not.toHaveBeenCalled();
+        expect(git.push).not.toHaveBeenCalled();
+        // APW-08 P0 (T4) — `openPullRequest` reads the provider's branch list
+        // (FR-5). It is a git read like any other: a refusal that should land
+        // before any git operation must not reach for it either.
+        expect(git.listBranches).not.toHaveBeenCalled();
+    };
+
+    /**
+     * APW-08 FR-12 / T12 — the owner's switch for cloud App Work pushes
+     * (`APP_WORKS_CLOUD_PUSH_ENABLED`, default OFF until T12 lands). Set per
+     * describe and always restored, exactly as the `finalizeRun` cloud-path specs
+     * in `task-workspace.app-change-guard.spec.ts` do. A nested describe that
+     * calls it again wins: its `beforeEach` runs after the outer one.
+     */
+    const CLOUD_PUSH_ENV = 'APP_WORKS_CLOUD_PUSH_ENABLED';
+    const withCloudPush = (value: string | undefined): void => {
+        let saved: string | undefined;
+        beforeEach(() => {
+            saved = process.env[CLOUD_PUSH_ENV];
+            if (value === undefined) delete process.env[CLOUD_PUSH_ENV];
+            else process.env[CLOUD_PUSH_ENV] = value;
+        });
+        afterEach(() => {
+            if (saved === undefined) delete process.env[CLOUD_PUSH_ENV];
+            else process.env[CLOUD_PUSH_ENV] = saved;
+        });
+    };
+
+    /**
+     * APW-08 T17 — the agent git tools are how an agent reaches a pull request
+     * WITHOUT the finalize path, so for an App Work they ask the same change
+     * gate. Every other kind is untouched: the first case of each tool below is
+     * the proof.
+     */
+    describe('App Works — the tools ask the change gate', () => {
+        // PINNED-STATE CHANGE (APW-08 FR-12 / T12, owner decision 2026-09-25).
+        // These cases used to run with the switch unset, because the tools
+        // ignored it: an App Work commit was judged by `checkPaths` and then
+        // PUSHED from the API, and a pull request was judged by `evaluate` and
+        // then OPENED, with cloud App Work pushes off. That was the defect — the
+        // tools run in the API process, the cloud path, where the owner said "not
+        // yet". With the switch off they now refuse before anything is judged
+        // (the nested describe at the end of this block). What these cases pin —
+        // the judgement itself, its inputs, its order and its refusals — is
+        // unchanged, and is what the switch turned ON still does.
+        withCloudPush('true');
+
+        const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+        const os = jest.requireActual<typeof import('node:os')>('node:os');
+        const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+        let dir: string;
+
+        beforeEach(() => {
+            dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'app-work-gate-'));
+        });
+        afterEach(() => {
+            fs.rmSync(dir, { recursive: true, force: true });
+        });
+
+        const appWork = () =>
+            makeWork({ kind: 'app', taskIsolationBaseBranch: 'production' } as WorkOverrides);
+        const gitIn = () => {
+            const git = makeGit();
+            git.cloneOrPull.mockResolvedValue(dir);
+            return git;
+        };
+        const allow = () => ({
+            checkPaths: jest.fn().mockResolvedValue({ allowed: true, note: null }),
+            evaluate: jest.fn().mockResolvedValue({ allowed: true, note: null }),
+        });
+        const refuse = (paths: string[] = ['infra/main.tf']) => ({
+            checkPaths: jest.fn().mockResolvedValue({
+                allowed: false,
+                message: 'This Work protects `infra/main.tf`, so an agent may not write it.',
+                paths,
+            }),
+            evaluate: jest.fn().mockResolvedValue({
+                allowed: false,
+                message:
+                    'This change edits paths this Work protects, which an agent may not change.',
+                paths,
+            }),
+        });
+        const files = [{ path: 'infra/main.tf', body: 'resource "x" "y" {}\n' }];
+
+        describe('commitToRepo', () => {
+            it('does not ask the gate for a Work that is not kind `app`', async () => {
+                const gate = allow();
+                const { facade } = build({ git: gitIn(), appChangeGate: gate });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing', files }));
+
+                expect(gate.checkPaths).not.toHaveBeenCalled();
+            });
+
+            it('asks BEFORE writing, with the Work base and the written paths', async () => {
+                const gate = allow();
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing', files }));
+
+                expect(gate.checkPaths).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        baseRef: 'production',
+                        paths: ['infra/main.tf'],
+                        owner: 'acme',
+                        repo: 'acme-website',
+                    }),
+                );
+                expect(gate.checkPaths.mock.invocationCallOrder[0]).toBeLessThan(
+                    git.add.mock.invocationCallOrder[0],
+                );
+            });
+
+            it('writes, stages, commits and pushes NOTHING when refused', async () => {
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork(), appChangeGate: refuse() });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(
+                    /commitToRepo: .*infra\/main\.tf.*Nothing was written, committed or pushed/,
+                );
+
+                expect(fs.existsSync(nodePath.join(dir, 'infra/main.tf'))).toBe(false);
+                // Judged before the commit slot is taken: not even a checkout.
+                expect(git.cloneOrPull).not.toHaveBeenCalled();
+                expect(git.switchBranch).not.toHaveBeenCalled();
+                expect(git.add).not.toHaveBeenCalled();
+                expect(git.commit).not.toHaveBeenCalled();
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it('judges ONLY the paths this call writes — nothing staged earlier can ride along', async () => {
+                // The branch switch resets the index to the branch, so this call's
+                // paths are the whole commit. A scan of the working copy used to be
+                // judged too, and any leftover file in it wedged every later commit.
+                const gate = allow();
+                const git = gitIn();
+                git.getStatus.mockResolvedValue([
+                    { path: '.github/workflows/ci.yml', status: 'modified' },
+                ]);
+                const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                await facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/pricing',
+                        files: [{ path: 'src/app.ts', body: 'export {};\n' }],
+                    }),
+                );
+
+                expect(gate.checkPaths.mock.calls[0][0].paths).toEqual(['src/app.ts']);
+            });
+
+            it('sends the new spec content, so guarded blocks are judged BEFORE the write', async () => {
+                // This tool is how follow-up commits reach an open pull request; a
+                // check of paths alone let one loosen `display.protectedPaths`.
+                const gate = allow();
+                const { facade } = build({ git: gitIn(), work: appWork(), appChangeGate: gate });
+                const spec = 'version: 1\nkind: app\nspec: {}\n';
+
+                await facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/pricing',
+                        files: [{ path: '.works/works.yml', body: spec }],
+                    }),
+                );
+
+                expect(gate.checkPaths.mock.calls[0][0].contents).toEqual({
+                    '.works/works.yml': spec,
+                });
+            });
+
+            it.each([['production'], ['refs/heads/production'], [undefined]])(
+                'refuses a commit onto the base branch the rules are read from (branch %p)',
+                async (branch) => {
+                    // An agent that could commit to it could rewrite the rules it is
+                    // judged by. No branch means "the base", so that refuses too.
+                    const gate = allow();
+                    const git = gitIn();
+                    const { facade } = build({ git, work: appWork(), appChangeGate: gate });
+
+                    await expect(
+                        facade.commitToRepo(commitInput({ ...(branch ? { branch } : {}), files })),
+                    ).rejects.toThrow(/changes only through a pull request/);
+                    expect(gate.checkPaths).not.toHaveBeenCalled();
+                    expect(git.cloneOrPull).not.toHaveBeenCalled();
+                },
+            );
+
+            it('fails CLOSED when no gate is bound — never skips the check', async () => {
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork() });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/change gate is not available/);
+                expect(git.commit).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('openPullRequest', () => {
+            it('does not ask the gate for a Work that is not kind `app`', async () => {
+                const gate = allow();
+                const { facade } = build({ appChangeGate: gate });
+
+                await facade.openPullRequest(prInput());
+
+                expect(gate.evaluate).not.toHaveBeenCalled();
+            });
+
+            it('opens the pull request when the gate allows, judging the VERIFIED head', async () => {
+                const gate = allow();
+                const { facade, git } = build({ work: appWork(), appChangeGate: gate });
+
+                await facade.openPullRequest(prInput());
+
+                expect(gate.evaluate).toHaveBeenCalledWith(
+                    expect.objectContaining({ baseRef: 'production', branch: 'feature/pricing' }),
+                );
+                expect(git.createPullRequest).toHaveBeenCalledTimes(1);
+            });
+
+            it('reads the rules from the WORK base, not a base the model chose', async () => {
+                // A pull request into a branch whose spec the agent had loosened
+                // would otherwise be judged by the loosened rules.
+                const gate = allow();
+                const { facade } = build({ work: appWork(), appChangeGate: gate });
+
+                await facade.openPullRequest(prInput({ base: 'loosened-rules' }));
+
+                expect(gate.evaluate.mock.calls[0][0].baseRef).toBe('production');
+            });
+
+            it('opens nothing when refused, and says so', async () => {
+                const { facade, git } = build({ work: appWork(), appChangeGate: refuse() });
+
+                await expect(facade.openPullRequest(prInput())).rejects.toThrow(
+                    /openPullRequest: .*The pull request was not opened/,
+                );
+                expect(git.createPullRequest).not.toHaveBeenCalled();
+            });
+
+            it('fails CLOSED when no gate is bound', async () => {
+                const { facade, git } = build({ work: appWork() });
+
+                await expect(facade.openPullRequest(prInput())).rejects.toThrow(
+                    /change gate is not available/,
+                );
+                expect(git.createPullRequest).not.toHaveBeenCalled();
+            });
+        });
+
+        /**
+         * Owner decision (2026-09-25): the API-side (cloud) path publishes no App
+         * Work change until APW-08 FR-12's isolated-run admission (T12) lands,
+         * unless `APP_WORKS_CLOUD_PUSH_ENABLED` is exactly `true`. `finalizeRun`
+         * was the switch's only reader, while these two tools run in the SAME API
+         * process — `AGENT_GIT_FACADE` is bound nowhere else — and pushed a
+         * feature branch or opened a pull request whatever it said.
+         *
+         * A Fleet node never reaches this adapter: it pushes with its own scoped
+         * credential and is judged by `finalizeRemotePush`, and its MCP bridge
+         * reaches REST routes only. So refusing here cannot touch the Fleet path.
+         */
+        describe('cloud App Work pushes are OFF by default (FR-12 / T12)', () => {
+            withCloudPush(undefined);
+
+            /** The refusal's text, or `null` when the tool went ahead. */
+            const refusalOf = async (call: Promise<unknown>): Promise<string | null> => {
+                try {
+                    await call;
+                    return null;
+                } catch (error) {
+                    return error instanceof Error ? error.message : String(error);
+                }
+            };
+
+            it('commitToRepo writes, commits and pushes NOTHING, and refuses naming FR-12 and T12', async () => {
+                const gate = allow();
+                const git = gitIn();
+                const { facade, mergePolicy } = build({
+                    git,
+                    work: appWork(),
+                    appChangeGate: gate,
+                });
+
+                const message = await refusalOf(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                );
+
+                expect(git.push).not.toHaveBeenCalled();
+                expect(message).toMatch(
+                    /^commitToRepo: Cloud runs do not publish App Work changes yet\./,
+                );
+                expect(message).toContain('FR-12');
+                expect(message).toContain('T12');
+                expect(message).toContain('Nothing was written, committed or pushed.');
+                expect(message).toContain('APP_WORKS_CLOUD_PUSH_ENABLED');
+                expectNoGitWork(git);
+                // Refused before any provider or policy read, and before the
+                // change is judged: the answer does not depend on either.
+                expect(git.getRepository).not.toHaveBeenCalled();
+                expect(mergePolicy.resolve).not.toHaveBeenCalled();
+                expect(gate.checkPaths).not.toHaveBeenCalled();
+                expect(fs.existsSync(nodePath.join(dir, 'infra/main.tf'))).toBe(false);
+            });
+
+            it('openPullRequest opens NOTHING, and refuses naming FR-12 and T12', async () => {
+                const gate = allow();
+                const { facade, git, prGate } = build({ work: appWork(), appChangeGate: gate });
+
+                const message = await refusalOf(facade.openPullRequest(prInput()));
+
+                expect(git.createPullRequest).not.toHaveBeenCalled();
+                expect(message).toMatch(
+                    /^openPullRequest: Cloud runs do not publish App Work changes yet\./,
+                );
+                expect(message).toContain('FR-12');
+                expect(message).toContain('T12');
+                expect(message).toContain('Nothing was pushed and no pull request was opened.');
+                expectNoGitWork(git);
+                expect(prGate.assertAllowed).not.toHaveBeenCalled();
+                expect(gate.evaluate).not.toHaveBeenCalled();
+            });
+
+            it.each([['false'], ['TRUE'], ['1'], ['yes'], ['']])(
+                'stays off for %j — only exactly `true` enables it',
+                async (value) => {
+                    process.env[CLOUD_PUSH_ENV] = value;
+                    const git = gitIn();
+                    const { facade } = build({ git, work: appWork(), appChangeGate: allow() });
+
+                    await expect(
+                        facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                    ).rejects.toThrow(/FR-12/);
+                    await expect(facade.openPullRequest(prInput())).rejects.toThrow(/FR-12/);
+                    expect(git.push).not.toHaveBeenCalled();
+                    expect(git.createPullRequest).not.toHaveBeenCalled();
+                },
+            );
+
+            it('refuses even with no gate bound — the switch is asked first', async () => {
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork() });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/Cloud runs do not publish App Work changes yet/);
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it.each([['website'], ['directory'], ['repo']])(
+                'leaves a %s Work exactly as it was — committed, pushed and opened',
+                async (kind) => {
+                    const gate = allow();
+                    const git = gitIn();
+                    const { facade } = build({
+                        git,
+                        work: makeWork({ kind, taskIsolationBaseBranch: 'production' }),
+                        appChangeGate: gate,
+                    });
+
+                    const commit = await facade.commitToRepo(
+                        commitInput({ branch: 'feature/pricing', files }),
+                    );
+                    const pr = await facade.openPullRequest(prInput());
+
+                    expect(commit).toMatchObject({ sha: 'sha-1', branch: 'feature/pricing' });
+                    expect(git.push).toHaveBeenCalledTimes(1);
+                    expect(pr.number).toBe(7);
+                    expect(gate.checkPaths).not.toHaveBeenCalled();
+                    expect(gate.evaluate).not.toHaveBeenCalled();
+                },
+            );
+        });
+    });
+
+    /**
+     * The names an agent hands the git tools are checked BEFORE anything runs.
+     *
+     * Two of them were ways out of the tool's intended shape:
+     *
+     *   - a file path inside `.git`. The write loop only stopped paths leaving
+     *     the checkout, and `.git/config` does not leave it; `pull` and `push`
+     *     send the git credentials to whatever `origin` points at there.
+     *     Reproduced against the real `GitOperations`: a written `.git/config`
+     *     sent the token to a stand-in server on its first `401` challenge.
+     *   - a branch spelled as a ref. isomorphic-git expands a pushed ref through
+     *     `refs/<ref>`, `refs/tags/<ref>` and `refs/heads/<ref>`, so `heads/main`
+     *     reached `main` past the protected-branch check and `tags/v9` pushed a
+     *     tag.
+     */
+    describe('agent-supplied names are checked before anything runs', () => {
+        it.each([
+            '.git/config',
+            '.GIT/config',
+            '.Git/hooks/pre-push',
+            'sub/.git/HEAD',
+            './.git/config',
+            'src/../.git/config',
+        ])('refuses a write inside .git: %s', async (path) => {
+            const { facade, git } = build();
+
+            await expect(
+                facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files: [{ path, body: 'x' }] }),
+                ),
+            ).rejects.toThrow(/inside \.git are never written/);
+            expectNoGitWork(git);
+        });
+
+        it.each([
+            ['../outside.txt', /inside the repository/],
+            ['src\\app.ts', /forward slashes/],
+            ['/etc/passwd', /relative to the repo root/],
+            ['C:/Windows/win.ini', /relative to the repo root/],
+            ['src/', /inside the repository/],
+            ['', /non-empty path/],
+        ])('refuses the path %j before any git work', async (path, message) => {
+            const { facade, git } = build();
+
+            await expect(
+                facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files: [{ path, body: 'x' }] }),
+                ),
+            ).rejects.toThrow(message);
+            expectNoGitWork(git);
+        });
+
+        it('stages the NORMALISED path — the string judged is the string written and staged', async () => {
+            // A REAL checkout directory. Every write is now checked against where
+            // its path resolves on disk (`assertRealWriteTarget`), which needs the
+            // checkout to exist — as it always does behind a real `cloneOrPull`.
+            // The fake `WORK_DIR` only worked because the old write loop's
+            // `mkdir -p` created it in the shared /tmp; on a clean runner this
+            // case failed while passing on any machine that had run it before.
+            const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+            const os = jest.requireActual<typeof import('node:os')>('node:os');
+            const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+            const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-normalise-'));
+            try {
+                const { facade, git } = build();
+                git.cloneOrPull.mockResolvedValue(dir);
+
+                await facade
+                    .commitToRepo(
+                        commitInput({
+                            branch: 'feature/pricing',
+                            files: [{ path: './src//nested/../app.ts', body: 'export {};\n' }],
+                        }),
+                    )
+                    .catch(() => undefined);
+
+                expect(git.add).toHaveBeenCalledWith(WORK_PROVIDER, dir, ['src/app.ts']);
+                expect(fs.readFileSync(nodePath.join(dir, 'src', 'app.ts'), 'utf8')).toBe(
+                    'export {};\n',
+                );
+            } finally {
+                fs.rmSync(dir, { recursive: true, force: true });
+            }
+        });
+
+        it.each([
+            'heads/main',
+            'tags/v9.9.9',
+            'refs/tags/v9.9.9',
+            'refs/heads/heads/main',
+            'remotes/origin/main',
+            'feature..x',
+            'feature~1',
+            'feature:x',
+            '-feature',
+            'feature/',
+            'feature.lock',
+            'feature @{0}',
+        ])('refuses the branch %j before any git work', async (branch) => {
+            const { facade, git } = build();
+
+            await expect(facade.commitToRepo(commitInput({ branch }))).rejects.toThrow(
+                /not a plain branch name/,
+            );
+            expectNoGitWork(git);
+        });
+
+        it('accepts one leading refs/heads/ and pushes the fully-qualified branch', async () => {
+            const { facade, git } = build();
+
+            const result = await facade.commitToRepo(
+                commitInput({ branch: 'refs/heads/feature/pricing' }),
+            );
+
+            expect(result.branch).toBe('feature/pricing');
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    ref: 'refs/heads/feature/pricing',
+                    remoteRef: 'refs/heads/feature/pricing',
+                }),
+                expect.anything(),
+            );
+        });
+    });
+
+    /**
+     * `commitToRepo` against the REAL `GitOperations`, on a real repository.
+     *
+     * The two bugs this tool shipped with were both invisible to doubles: it
+     * never staged what it wrote, and after that was fixed it switched branch
+     * AFTER staging — isomorphic-git's checkout resets staged entries and
+     * deletes staged new files, so the commit was empty and the agent's edits
+     * were erased. A mocked `switchBranch` cannot see either. Here only the
+     * network push is doubled; `switchBranch`, `add`, `commit`, `getStatus` and
+     * `getMainBranch` are the library's own.
+     */
+    describe('against the real GitOperations', () => {
+        const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+        const os = jest.requireActual<typeof import('node:os')>('node:os');
+        const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+        const { execFileSync } =
+            jest.requireActual<typeof import('node:child_process')>('node:child_process');
+        const { GitOperations } =
+            jest.requireActual<typeof import('@ever-works/plugin/git')>('@ever-works/plugin/git');
+        const who = { name: 'probe', email: 'probe@example.test' };
+        let dir: string;
+        let ops: InstanceType<typeof GitOperations>;
+
+        beforeEach(async () => {
+            dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-real-'));
+            execFileSync('git', ['init', '--initial-branch=main'], { cwd: dir, stdio: 'ignore' });
+            ops = new GitOperations(
+                () => ({ username: 'unused', password: 'unused' }),
+                (owner, repo) => `https://example.test/${owner}/${repo}.git`,
+            );
+            fs.writeFileSync(nodePath.join(dir, 'README.md'), '# v1\n');
+            fs.writeFileSync(nodePath.join(dir, '.gitignore'), 'secrets.env\n');
+            await ops.add(dir, ['README.md', '.gitignore']);
+            await ops.commit(dir, 'initial', who);
+        });
+        afterEach(() => {
+            fs.rmSync(dir, { recursive: true, force: true });
+        });
+
+        /** makeGit(), with every local operation delegated to the real library. */
+        const realGit = () => {
+            const git = makeGit();
+            git.cloneOrPull.mockResolvedValue(dir);
+            git.switchBranch.mockImplementation((_p: string, d: string, b: string, c: boolean) =>
+                ops.switchBranch(d, b, c),
+            );
+            git.add.mockImplementation((_p: string, d: string, paths: string[]) =>
+                ops.add(d, paths),
+            );
+            git.commit.mockImplementation((_p: string, d: string, m: string, c: unknown) =>
+                ops.commit(d, m, c as never),
+            );
+            git.getStatus.mockImplementation((_p: string, d: string) => ops.getStatus(d));
+            git.getMainBranch.mockImplementation((_p: string, d: string) => ops.getMainBranch(d));
+            return git;
+        };
+        const committedFiles = (sha: string): string[] =>
+            execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: dir })
+                .toString()
+                .split('\n')
+                .map((line: string) => line.trim())
+                .filter(Boolean)
+                .sort();
+
+        it('commits the files it wrote, on the branch it names, and keeps them on disk', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/pricing',
+                    files: [
+                        { path: 'src/pricing.ts', body: 'export const price = 1;\n' },
+                        { path: 'README.md', body: '# v2\n' },
+                    ],
+                }),
+            );
+
+            expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+            expect(result).toMatchObject({ branch: 'feature/pricing', filesChanged: 2 });
+            expect(committedFiles(result.sha as string)).toEqual(['README.md', 'src/pricing.ts']);
+            expect(fs.readFileSync(nodePath.join(dir, 'README.md'), 'utf8')).toBe('# v2\n');
+            expect(fs.existsSync(nodePath.join(dir, 'src/pricing.ts'))).toBe(true);
+            expect(
+                execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir })
+                    .toString()
+                    .trim(),
+            ).toBe('feature/pricing');
+        });
+
+        it('counts only what changed — identical content and gitignored paths are not changes', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/pricing',
+                    files: [
+                        { path: 'README.md', body: '# v1\n' },
+                        { path: 'secrets.env', body: 'TOKEN=nope\n' },
+                        { path: 'src/new.ts', body: 'export {};\n' },
+                    ],
+                }),
+            );
+
+            expect(result.filesChanged).toBe(1);
+            expect(committedFiles(result.sha as string)).toEqual(['src/new.ts']);
+        });
+
+        it('commits nothing new when handed no files — and says so', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(commitInput({ branch: 'feature/empty' }));
+
+            expect(result).toMatchObject({ sha: null, filesChanged: 0 });
+        });
+
+        /**
+         * The text check refuses `.git` by name, but a path can reach `.git`
+         * under another name: through a link that is already in the checkout, or
+         * — on Windows — through a short name or a stream name the filesystem
+         * resolves. A written `.git/config` sends the push, and the member's
+         * token, wherever it says. Each case must leave `.git/config` untouched.
+         */
+        describe('never writes git metadata under another name', () => {
+            const POISON = '[remote "origin"]\n\turl = http://127.0.0.1:9/stranger.git\n';
+            const gitConfig = () => fs.readFileSync(nodePath.join(dir, '.git', 'config'), 'utf8');
+
+            it('refuses a write through a link in the checkout that points at .git', async () => {
+                // A repository can commit `docs -> .git`; a junction needs no
+                // privileges on Windows and is a plain directory link elsewhere.
+                fs.symlinkSync(nodePath.join(dir, '.git'), nodePath.join(dir, 'docs'), 'junction');
+                const before = gitConfig();
+                const { facade } = build({ git: realGit() });
+
+                await expect(
+                    facade.commitToRepo(
+                        commitInput({
+                            branch: 'feature/x',
+                            files: [{ path: 'docs/config', body: POISON }],
+                        }),
+                    ),
+                ).rejects.toThrow(/symbolic link/);
+                expect(gitConfig()).toBe(before);
+            });
+
+            it('refuses a Windows short name for .git where the filesystem has one', async () => {
+                // `GIT~1` is `.git` on an NTFS volume with 8.3 names enabled. On
+                // any other filesystem it is an ordinary new directory, and the
+                // write is harmless — which this case also pins.
+                const aliases = fs.existsSync(nodePath.join(dir, 'GIT~1', 'config'));
+                const before = gitConfig();
+                const { facade } = build({ git: realGit() });
+
+                const attempt = facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/x',
+                        files: [{ path: 'GIT~1/config', body: POISON }],
+                    }),
+                );
+
+                if (aliases) {
+                    await expect(attempt).rejects.toThrow(/resolves inside \.git/);
+                } else {
+                    await expect(attempt).resolves.toMatchObject({ filesChanged: 1 });
+                }
+                expect(gitConfig()).toBe(before);
+            });
+
+            // The stream name opens `.git` itself on NTFS (measured through Node).
+            // A trailing dot or space did NOT alias through Node on the machine
+            // this was measured on, but the Win32 path layer other tools use
+            // strips both, and git refuses all three under `core.protectNTFS`.
+            it.each([
+                ['an NTFS stream name', '.git::$INDEX_ALLOCATION/config', /alternate data stream/],
+                ['a trailing dot', '.git./config', /dot or a space/],
+                ['a trailing space', '.git /config', /dot or a space/],
+            ])('refuses %s after .git', async (_what, path, why) => {
+                const before = gitConfig();
+                const { facade } = build({ git: realGit() });
+
+                await expect(
+                    facade.commitToRepo(
+                        commitInput({ branch: 'feature/x', files: [{ path, body: POISON }] }),
+                    ),
+                ).rejects.toThrow(why);
+                expect(gitConfig()).toBe(before);
+            });
+        });
+    });
+    describe('commitToRepo', () => {
+        /**
+         * The tool writes files and then commits — and until this case existed
+         * it never STAGED them. isomorphic-git commits the index, not the
+         * working copy, so `commit` found nothing staged and returned `null`;
+         * the push sent nothing new and the tool still answered `filesChanged:
+         * N`. Every case above passes no `files`, so the write path had no
+         * coverage at all, and `commit` is mocked to return a sha, so nothing
+         * could have noticed. These cases write into a REAL temporary directory.
+         */
+        describe('stages exactly what it writes', () => {
+            const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
+            const os = jest.requireActual<typeof import('node:os')>('node:os');
+            const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
+            let dir: string;
+
+            beforeEach(() => {
+                dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-'));
+            });
+            afterEach(() => {
+                fs.rmSync(dir, { recursive: true, force: true });
+            });
+
+            const gitIn = (overrides: Record<string, unknown> = {}) => {
+                const git = makeGit();
+                git.cloneOrPull.mockResolvedValue(dir);
+                Object.assign(git, overrides);
+                return git;
+            };
+            const files = [
+                { path: 'src/pricing.ts', body: 'export const price = 1;\n' },
+                { path: 'README.md', body: '# Pricing\n' },
+            ];
+
+            it('switches, THEN stages the written paths, and only those, THEN commits', async () => {
+                const git = gitIn();
+                // What the working copy reports after the writes: both paths differ.
+                git.getStatus.mockResolvedValue([
+                    { path: 'src/pricing.ts', status: 'added' },
+                    { path: 'README.md', status: 'modified' },
+                ]);
+                const { facade } = build({ git });
+
+                const result = await facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files }),
+                );
+
+                expect(fs.readFileSync(nodePath.join(dir, 'src/pricing.ts'), 'utf8')).toBe(
+                    'export const price = 1;\n',
+                );
+                expect(git.add).toHaveBeenCalledTimes(1);
+                expect(git.add).toHaveBeenCalledWith(WORK_PROVIDER, dir, [
+                    'src/pricing.ts',
+                    'README.md',
+                ]);
+                // Order is the point. Staging after the commit was the first no-op;
+                // switching after staging was the second — checkout reset the
+                // staged edits and deleted the new file.
+                expect(git.switchBranch.mock.invocationCallOrder[0]).toBeLessThan(
+                    git.add.mock.invocationCallOrder[0],
+                );
+                expect(git.add.mock.invocationCallOrder[0]).toBeLessThan(
+                    git.commit.mock.invocationCallOrder[0],
+                );
+                expect(result).toMatchObject({ sha: 'sha-1', filesChanged: 2 });
+            });
+
+            it('reports NO changed files when nothing was committed', async () => {
+                // `commit` answers `null` when nothing is staged — e.g. every file
+                // was written with the content it already had. Reporting N changed
+                // files for that is how the no-op used to look like success.
+                const git = gitIn({ commit: jest.fn().mockResolvedValue(null) });
+                const { facade } = build({ git });
+
+                const result = await facade.commitToRepo(
+                    commitInput({ branch: 'feature/pricing', files }),
+                );
+
+                expect(result).toMatchObject({ sha: null, filesChanged: 0 });
+            });
+
+            it('stages nothing of its own when it is handed no files', async () => {
+                // Empty `files` means "commit what earlier tool calls staged";
+                // sweeping in the rest of the shared working copy would commit
+                // changes nobody asked this call to make.
+                const git = gitIn();
+                const { facade } = build({ git });
+
+                await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+                expect(git.add).not.toHaveBeenCalled();
+                expect(git.commit).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        it("uses the Work's OWN provider id — never the 'github' literal", async () => {
+            const { facade, git } = build();
+            await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            expect(git.commit).toHaveBeenCalledTimes(1);
+            expect(git.commit.mock.calls[0][0]).toBe(WORK_PROVIDER);
+            // The literal is gone from the whole call chain, not just one hop.
+            expect(JSON.stringify(git.commit.mock.calls)).not.toContain('github');
+
+            // APW-08 P0 (T3) — the working copy is the Work's OWN repository,
+            // cloned per Work, based on the resolved base branch. `getRepoDir`
+            // resolved the Work's IMPORT source and is gone from the adapter.
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    owner: 'acme',
+                    repo: 'acme-website',
+                    branch: 'main',
+                    autoSwitchToMainBranch: false,
+                    checkoutKey: `work:${WORK_ID}:agent-commit`,
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+            // …and no git call is reached with the empty provider id that used
+            // to be handed to `getRepoDir`.
+            expect(git.cloneOrPull.mock.calls[0][1].providerId).not.toBe('');
+
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dir: WORK_DIR,
+                    force: false,
+                    ref: 'refs/heads/feature/pricing',
+                    remoteRef: 'refs/heads/feature/pricing',
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER }),
+            );
+        });
+
+        it("clones the Work's OWN repository — never its `sourceRepository` import source", async () => {
+            const { facade, git } = build();
+
+            await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            // Every git call the adapter made is searched, not just the clone:
+            // an import-source coordinate must appear nowhere in the chain.
+            const everyCall = JSON.stringify([
+                ...git.cloneOrPull.mock.calls,
+                ...git.switchBranch.mock.calls,
+                ...git.commit.mock.calls,
+                ...git.push.mock.calls,
+            ]);
+            expect(everyCall).not.toContain('import-source');
+            expect(everyCall).not.toContain('imported-thing');
+        });
+
+        it('threads the branch into the commit AND returns that same branch', async () => {
+            const { facade, git } = build();
+            const result = await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            expect(git.switchBranch).toHaveBeenCalledWith(
+                WORK_PROVIDER,
+                WORK_DIR,
+                'feature/pricing',
+                true,
+            );
+            expect(git.commit).toHaveBeenCalledWith(
+                WORK_PROVIDER,
+                WORK_DIR,
+                'Add the pricing page',
+                expect.objectContaining({ name: 'Ada' }),
+            );
+            // The switch happens BEFORE the commit: the commit lands on the
+            // branch we report, instead of the message merely claiming so.
+            expect(git.switchBranch.mock.invocationCallOrder[0]).toBeLessThan(
+                git.commit.mock.invocationCallOrder[0],
+            );
+            expect(result.branch).toBe('feature/pricing');
+            // The push NAMES the branch it pushes (`ref`/`remoteRef`), so the
+            // remote receives the branch we committed to — never "whatever HEAD
+            // happened to be", which is how the commit used to go missing.
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    dir: WORK_DIR,
+                    ref: 'refs/heads/feature/pricing',
+                    remoteRef: 'refs/heads/feature/pricing',
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER }),
+            );
+        });
+
+        it('bases the clone on that same branch when the caller names one', async () => {
+            const { facade, git } = build();
+            await facade.commitToRepo(commitInput({ branch: 'feature/pricing' }));
+
+            // The resolved repository default is the CLONE's base — never a
+            // substitute for the branch the caller named, which is what the
+            // switch, the commit, the push and the result all carry.
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({ branch: 'main' }),
+                expect.anything(),
+            );
+            expect(git.switchBranch.mock.calls[0][2]).toBe('feature/pricing');
+        });
+
+        it("bases the clone on the Work's task-isolation base branch when it declares one", async () => {
+            const git = makeGit();
+            // The repository default is deliberately different, so "the Work's
+            // own base won" is observable rather than coincidental.
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({
+                git,
+                work: makeWork({ taskIsolationBaseBranch: 'integration' }),
+            });
+
+            const result = await facade.commitToRepo(commitInput());
+
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({ branch: 'integration' }),
+                expect.anything(),
+            );
+            expect(git.switchBranch).toHaveBeenCalledWith(
+                WORK_PROVIDER,
+                WORK_DIR,
+                'integration',
+                true,
+            );
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    ref: 'refs/heads/integration',
+                    remoteRef: 'refs/heads/integration',
+                }),
+                expect.anything(),
+            );
+            expect(result.branch).toBe('integration');
+            // A Work that declares its own base needs no provider lookup at all.
+            expect(git.getRepository).not.toHaveBeenCalled();
+        });
+
+        it("resolves the Work's default branch when the caller supplies none — never assumes 'main'", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({ git });
+
+            const result = await facade.commitToRepo(commitInput());
+
+            expect(git.getRepository).toHaveBeenCalledWith(
+                'acme',
+                'acme-website',
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({ owner: 'acme', repo: 'acme-website', branch: 'trunk' }),
+                expect.anything(),
+            );
+            expect(git.switchBranch).toHaveBeenCalledWith(WORK_PROVIDER, WORK_DIR, 'trunk', true);
+            expect(git.push).toHaveBeenCalledWith(
+                expect.objectContaining({ ref: 'refs/heads/trunk', remoteRef: 'refs/heads/trunk' }),
+                expect.anything(),
+            );
+            expect(result.branch).toBe('trunk');
+        });
+
+        it.each(['main', 'master', 'stage', 'MAIN', 'Master', 'STAGE', 'refs/heads/main'])(
+            'refuses the protected release branch %s BEFORE any git operation runs',
+            async (branch) => {
+                const { facade, git } = build();
+
+                const attempt = facade.commitToRepo(commitInput({ branch }));
+                await expect(attempt).rejects.toThrow(/protected/i);
+                await expect(attempt).rejects.toThrow(branch);
+
+                expectNoGitWork(git);
+            },
+        );
+
+        it('refuses a protected BASE branch too — with files to write and no branch named (T1 case 4)', async () => {
+            const { facade, git } = build({
+                work: makeWork({ taskIsolationBaseBranch: 'main' }),
+            });
+
+            const attempt = facade.commitToRepo(
+                commitInput({ files: [{ path: 'index.html', body: '<h1>pricing</h1>' }] }),
+            );
+            await expect(attempt).rejects.toThrow(/protected/i);
+            await expect(attempt).rejects.toThrow('main');
+
+            // No clone means no directory the inline file writes could land in,
+            // and no switch / commit / push to carry them anywhere.
+            expectNoGitWork(git);
+        });
+
+        it("honours the platform's modelled protectedBranches, not just the built-in list", async () => {
+            const { facade, git, mergePolicy } = build({
+                protectedBranches: ['develop', 'release/frozen'],
+            });
+
+            const attempt = facade.commitToRepo(commitInput({ branch: 'release/frozen' }));
+            await expect(attempt).rejects.toThrow(/protected/i);
+            await expect(attempt).rejects.toThrow('release/frozen');
+
+            expect(mergePolicy.resolve).toHaveBeenCalledWith(
+                expect.objectContaining({ workId: WORK_ID }),
+            );
+            expect(git.commit).not.toHaveBeenCalled();
+            expect(git.push).not.toHaveBeenCalled();
+        });
+
+        it("refuses the Work's own default branch when the policy protects it", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue({ defaultBranch: 'develop' });
+            const { facade } = build({ git });
+
+            const attempt = facade.commitToRepo(commitInput());
+            await expect(attempt).rejects.toThrow(/protected/i);
+            await expect(attempt).rejects.toThrow('develop');
+
+            // The refusal still lands before anything is staged, committed or pushed.
+            expectNoGitWork(git);
+        });
+
+        it('fails closed when the Work has no git provider configured', async () => {
+            const { facade, git } = build({ work: makeWork({ gitProvider: '' }) });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /git provider/i,
+            );
+            expectNoGitWork(git);
+        });
+
+        it('fails closed when the Work cannot be found', async () => {
+            const { facade, git } = build({ work: null });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                WORK_ID,
+            );
+            expectNoGitWork(git);
+        });
+
+        it('fails closed when owner/repo cannot be resolved — never an empty-string target', async () => {
+            const { facade, git } = build({ work: makeWork({ owner: '', websiteRepo: '' }) });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /owner|repositor/i,
+            );
+            expectNoGitWork(git);
+        });
+
+        it("fails closed when the Work's default branch cannot be resolved", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue(null);
+            git.getMainBranch.mockResolvedValue(null);
+            const { facade } = build({ git });
+
+            await expect(facade.commitToRepo(commitInput())).rejects.toThrow(/default branch/i);
+            expect(git.commit).not.toHaveBeenCalled();
+            expect(git.push).not.toHaveBeenCalled();
+        });
+
+        it('still does not swallow a push failure', async () => {
+            const git = makeGit();
+            git.push.mockRejectedValue(new Error('remote rejected the ref'));
+            const { facade } = build({ git });
+
+            await expect(facade.commitToRepo(commitInput({ branch: 'feature/x' }))).rejects.toThrow(
+                /push failed/,
+            );
+        });
+
+        it('serializes two commits to ONE Work — the second switch starts after the first push resolves (T1 case 6)', async () => {
+            const git = makeGit();
+            const order: string[] = [];
+            let releaseFirstPush!: () => void;
+            const firstPush = new Promise<void>((resolve) => {
+                releaseFirstPush = resolve;
+            });
+            let pushes = 0;
+            git.push.mockImplementation(async () => {
+                pushes += 1;
+                const attempt = pushes;
+                order.push(`push:${attempt}:start`);
+                if (attempt === 1) await firstPush;
+                order.push(`push:${attempt}:end`);
+            });
+            git.switchBranch.mockImplementation(async (_provider, _dir, branch) => {
+                order.push(`switch:${branch}`);
+                return branch;
+            });
+            const { facade } = build({ git });
+
+            const first = facade.commitToRepo(commitInput({ branch: 'feature/one' }));
+            await settle();
+            const second = facade.commitToRepo(commitInput({ branch: 'feature/two' }));
+            await settle();
+
+            // The Work's slot is held: the second commit has not reached the
+            // working copy at all, so nothing it does can move the checkout
+            // under the first commit's push.
+            expect(order).toEqual(['switch:feature/one', 'push:1:start']);
+            expect(git.cloneOrPull).toHaveBeenCalledTimes(1);
+
+            releaseFirstPush();
+            await Promise.all([first, second]);
+
+            expect(order).toEqual([
+                'switch:feature/one',
+                'push:1:start',
+                'push:1:end',
+                'switch:feature/two',
+                'push:2:start',
+                'push:2:end',
+            ]);
+        });
+    });
+
+    describe('openPullRequest', () => {
+        it("passes the Work's REAL owner and repo — never empty strings", async () => {
+            const { facade, git } = build();
+
+            await facade.openPullRequest(prInput());
+
+            expect(git.createPullRequest).toHaveBeenCalledTimes(1);
+            const [prOptions, facadeOptions] = git.createPullRequest.mock.calls[0];
+            expect(prOptions.owner).toBe('acme');
+            expect(prOptions.repo).toBe('acme-website');
+            expect(prOptions.owner).not.toBe('');
+            expect(prOptions.repo).not.toBe('');
+            expect(facadeOptions.providerId).toBe(WORK_PROVIDER);
+        });
+
+        it("defaults the base branch to the Work's default branch and keeps an explicit base", async () => {
+            const git = makeGit();
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({ git });
+
+            await facade.openPullRequest(prInput());
+            expect(git.createPullRequest.mock.calls[0][0].base).toBe('trunk');
+
+            git.createPullRequest.mockClear();
+            await facade.openPullRequest(prInput({ base: 'release/next' }));
+            expect(git.createPullRequest.mock.calls[0][0].base).toBe('release/next');
+        });
+
+        it('fails closed when owner/repo cannot be resolved', async () => {
+            const { facade, git } = build({ work: makeWork({ owner: '', websiteRepo: '' }) });
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow(/owner|repositor/i);
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when the Work has no git provider configured', async () => {
+            const { facade, git } = build({ work: makeWork({ gitProvider: '' }) });
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow(/git provider/i);
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('runs the gate against a REAL working copy of the base branch — never `getRepoDir` (T3 Done-when)', async () => {
+            const { facade, git, prGate } = build();
+
+            await facade.openPullRequest(prInput());
+
+            // The gate still runs, and it is still handed a checkout — but the
+            // checkout is the Work's OWN repository, based on the resolved base
+            // branch, in the same per-Work working copy `commitToRepo` uses.
+            expect(prGate.assertAllowed).toHaveBeenCalledWith(
+                expect.objectContaining({ cwd: WORK_DIR }),
+            );
+            expect(git.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    owner: 'acme',
+                    repo: 'acme-website',
+                    branch: 'main',
+                    autoSwitchToMainBranch: false,
+                    checkoutKey: `work:${WORK_ID}:agent-commit`,
+                }),
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+            expect(git.getRepoDir).not.toHaveBeenCalled();
+        });
+
+        // APW-08 P0 (T1 case 5, second half) — the OTHER side of the base rule:
+        // a Work that declares where Task branches fork from uses THAT branch as
+        // the pull request's base, not the repository default it also has.
+        it("bases the pull request on the Work's task-isolation branch when it declares one", async () => {
+            const git = makeGit();
+            // The repository default is deliberately different, so "the Work's
+            // own base won" is observable rather than coincidental.
+            git.getRepository.mockResolvedValue({ defaultBranch: 'trunk' });
+            const { facade } = build({
+                git,
+                work: makeWork({ taskIsolationBaseBranch: 'integration' }),
+            });
+
+            await facade.openPullRequest(prInput());
+
+            expect(git.createPullRequest.mock.calls[0][0].base).toBe('integration');
+            // A Work that declares its own base needs no provider lookup at all.
+            expect(git.getRepository).not.toHaveBeenCalled();
+        });
+
+        // APW-08 P0 (T4, ACC-08-04) — FR-5. A head branch the repository does
+        // not have is refused with a copy that NAMES what is missing, and the
+        // pull request is never opened: `createPullRequest` is the one call this
+        // case exists to prove does not happen.
+        it('refuses a head branch the repository does not have — the FR-5 copy, and NO createPullRequest', async () => {
+            const git = makeGit();
+            // The repository HAS `main` (so the base resolves) and does NOT have
+            // the head: precisely "the branch the Agent believes it pushed".
+            git.listBranches.mockResolvedValue([{ name: 'main' }]);
+            const { facade } = build({ git });
+
+            await expect(
+                facade.openPullRequest(prInput({ head: 'feature/never-pushed' })),
+            ).rejects.toThrow(
+                "openPullRequest: head branch 'feature/never-pushed' does not exist in " +
+                    'acme/acme-website. Push the branch before opening a pull request.',
+            );
+
+            // The refusal is the whole story — no pull request was opened with it.
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+            // …and the question was asked of the Work's OWN repository, with the
+            // Work's own provider, rather than of an empty target.
+            expect(git.listBranches).toHaveBeenCalledWith(
+                'acme',
+                'acme-website',
+                expect.objectContaining({ providerId: WORK_PROVIDER, workId: WORK_ID }),
+            );
+        });
+
+        it('opens the head branch it VERIFIED — one value, resolved once', async () => {
+            const git = makeGit();
+            const { facade } = build({ git });
+
+            await facade.openPullRequest(prInput({ head: '  feature/pricing  ' }));
+
+            expect(git.listBranches).toHaveBeenCalledTimes(1);
+            // The verified (trimmed) head is the head the provider is handed: a
+            // check whose answer is thrown away is not a check.
+            expect(git.createPullRequest.mock.calls[0][0].head).toBe('feature/pricing');
+        });
+
+        it('fails closed when the branch list cannot be read — never "assume the head exists"', async () => {
+            const git = makeGit();
+            git.listBranches.mockRejectedValue(new Error('listing forbidden'));
+            const { facade } = build({ git });
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow(
+                'openPullRequest: could not read the branches of acme/acme-website to verify ' +
+                    "the head branch 'feature/pricing' (listing forbidden).",
+            );
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('keeps the quality gate FIRST — a refused gate never reaches the branch read', async () => {
+            const { facade, git, prGate } = build({});
+            prGate.assertAllowed.mockRejectedValue(new Error('Quality gate red — build (red).'));
+
+            await expect(facade.openPullRequest(prInput())).rejects.toThrow('Quality gate red');
+            expect(git.listBranches).not.toHaveBeenCalled();
+            expect(git.createPullRequest).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('regression guards', () => {
+        it('still succeeds when a caller supplies a providerId explicitly (legacy path)', async () => {
+            const { facade, git } = build();
+
+            const result = await facade.commitToRepo(
+                commitInput({ branch: 'feature/pricing', providerId: 'github' }),
+            );
+
+            expect(git.commit.mock.calls[0][0]).toBe('github');
+            expect(result.branch).toBe('feature/pricing');
+            expect(git.push).toHaveBeenCalledTimes(1);
+        });
+
+        it("keeps the `repo` Work kind's guarantee: its repository is the data repo, not a website repo", async () => {
+            const { facade, git } = build({
+                work: makeWork({ kind: 'repo', websiteRepo: 'must-not-be-used' }),
+            });
+
+            await facade.openPullRequest(prInput());
+
+            expect(git.createPullRequest.mock.calls[0][0].repo).toBe('acme-data');
+        });
+    });
+
+    /**
+     * T1 case 7 — the provider id is RESOLVED, so the source must not carry a
+     * hardcoded provider anywhere in the adapter. Reading the file is
+     * deliberate: a runtime stub cannot see a literal that only a future edit
+     * would reintroduce.
+     */
+    describe('adapter source', () => {
+        const adapterSource = (): string =>
+            readFileSync(join(__dirname, 'agents.module.ts'), 'utf8');
+
+        /** The AGENT_GIT_FACADE provider block, from its token to the next binding. */
+        const factoryBody = (): string => {
+            const source = adapterSource();
+            const start = source.indexOf('provide: AGENT_GIT_FACADE,');
+            const end = source.indexOf('provide: AGENT_EMAIL_FACADE,');
+            expect(start).toBeGreaterThan(-1);
+            expect(end).toBeGreaterThan(start);
+            return source.slice(start, end);
+        };
+
+        it("contains no 'github' literal — the provider is never hardcoded", () => {
+            const body = factoryBody();
+
+            expect(body).not.toContain("'github'");
+            expect(body).not.toContain('"github"');
+            // …and the property is satisfied by RESOLUTION, not by an empty
+            // body: the Work's own provider column is what feeds it.
+            expect(body).toContain('work.gitProvider');
+        });
+
+        it('reaches every git call with coordinates the Work resolved, not an empty target', () => {
+            const body = factoryBody();
+
+            expect(body).toContain('getRepoOwner');
+            // `getRepoDir` cloned the Work's import source — it is gone.
+            expect(body).not.toContain('getRepoDir');
+            // The per-Work working copy key (APW08-G24) is what keeps another
+            // caller of the same repository from moving the checkout.
+            expect(body).toContain('checkoutKey');
+        });
     });
 });

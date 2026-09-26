@@ -21,6 +21,7 @@ const previousMinimalRepo = process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
 process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-minimal-template';
 
 import { NotFoundException } from '@nestjs/common';
+import { getWorkCapabilities, WORK_KINDS } from '@ever-works/contracts';
 import { WorkLifecycleService } from '../work-lifecycle.service';
 import { GenerateStatusType } from '@src/entities/types';
 
@@ -176,6 +177,80 @@ describe('WorkLifecycleService', () => {
             expect.objectContaining({
                 generateStatus: null,
             }),
+        );
+    });
+
+    describe('syncFromDataRepository — kinds without a data repository', () => {
+        // An App Work provisions no data repository by design
+        // (`WORK_KIND_CAPABILITIES.app.repos.data === false`), yet every App
+        // Work page mount reached this method and cloned `<slug>-data` — a
+        // pointless GitHub round-trip that failed and logged "Error syncing
+        // work from data repository" on every render. The gate is the
+        // capability registry, never a `kind === 'app'` test, so the kinds
+        // are derived from it here too.
+        const kindsWithoutDataRepo = WORK_KINDS.filter(
+            (kind) => !getWorkCapabilities(kind).repos.data,
+        );
+
+        it('the registry still has at least one such kind (app)', () => {
+            expect(kindsWithoutDataRepo).toContain('app');
+        });
+
+        it.each(kindsWithoutDataRepo)(
+            'kind %s: returns the no-op result without cloning or writing',
+            async (kind) => {
+                const work = {
+                    id: 'app-1',
+                    name: 'My App',
+                    slug: 'my-app',
+                    kind,
+                    itemsCount: 0,
+                    lastPullRequest: null,
+                    readmeConfig: null,
+                    getDataRepo: jest.fn(() => 'my-app-data'),
+                } as any;
+                ownershipService.ensureCanEdit.mockResolvedValue({ work });
+
+                const result = await service.syncFromDataRepository(work.id, user);
+
+                // Authorization still runs first — a no-op is not a way around it.
+                expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith(work.id, user.id);
+                expect(dataGenerator.getDataSyncSnapshot).not.toHaveBeenCalled();
+                expect(work.getDataRepo).not.toHaveBeenCalled();
+                expect(workRepository.update).not.toHaveBeenCalled();
+                // Same shape the controller already returns for "nothing to
+                // sync" (`status` / `updated` / `message`), so its activity
+                // log and the web action need no new branch.
+                expect(result).toEqual({
+                    status: 'success',
+                    updated: [],
+                    message: expect.stringContaining('no data repository'),
+                });
+            },
+        );
+
+        it.each(['website', 'directory', 'default'])(
+            'kind %s: still reads the data repository snapshot',
+            async (kind) => {
+                const work = {
+                    id: 'web-1',
+                    kind,
+                    itemsCount: 3,
+                    lastPullRequest: null,
+                    readmeConfig: {},
+                } as any;
+                ownershipService.ensureCanEdit.mockResolvedValue({ work });
+                dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                    itemsCount: 3,
+                    prUpdate: null,
+                    readmeTemplate: null,
+                });
+
+                const result = await service.syncFromDataRepository(work.id, user);
+
+                expect(dataGenerator.getDataSyncSnapshot).toHaveBeenCalledWith(work, user);
+                expect(result).toMatchObject({ status: 'success' });
+            },
         );
     });
 

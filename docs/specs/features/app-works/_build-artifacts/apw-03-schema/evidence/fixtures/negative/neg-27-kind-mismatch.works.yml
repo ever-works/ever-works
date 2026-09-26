@@ -1,0 +1,12 @@
+# NEGATIVE FIXTURE neg-27 — error class: `spec.kind` disagrees with the root `kind`.
+# Expected: JSON Schema FAIL (`const` on /spec/kind) · rule layer `kind_mismatch`.
+# schema.md §1: "`spec.kind` … Must equal the root `kind` when both are present — else error `kind_mismatch`."
+# The schema carries the VALUE (both spellings must be `app`); the EQUALITY and the code are rule-level,
+# because two independent `const`s do not compare with each other.
+version: 2
+kind: app
+spec:
+    kind: blog
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }

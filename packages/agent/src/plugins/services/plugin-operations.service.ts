@@ -5,6 +5,7 @@ import {
     ForbiddenException,
     Logger,
     Optional,
+    UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -40,7 +41,10 @@ import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import {
     PluginRegistryService,
     type RegisteredPlugin,
+    loadPluginSchema,
+    loadPluginsForListing,
     resolvePluginEnabled,
+    staysColdForListing,
 } from './plugin-registry.service';
 import {
     SettingsSchemaValidatorService,
@@ -59,6 +63,9 @@ import { buildProviderModelSummaries } from '../utils/plugin-model-settings.util
 // EW-693 — install-on-enable hook (T18). Optional so bundled-mode
 // deployments don't structurally depend on the installer.
 import { PluginInstallerService } from './plugin-installer.service';
+// EW-693 T27 — registers what the installer placed on this node.
+import { PluginLoaderService } from './plugin-loader.service';
+import { materializePlugin, materializeUsablePlugin } from './plugin-operation.util';
 import { WorkOwnershipService } from '../../services/work-ownership.service';
 
 @Injectable()
@@ -96,6 +103,11 @@ export class PluginOperationsService {
         // paths before any repository access so a foreign workId cannot
         // be probed or mutated.
         private readonly workOwnershipService?: WorkOwnershipService,
+        // EW-693 T27 — registers a plugin the installer placed on this node.
+        // Appended LAST and @Optional() for the same positional reason as
+        // the gate above; graphs without the plugins module skip registration.
+        @Optional()
+        private readonly pluginLoader?: PluginLoaderService,
     ) {}
 
     /**
@@ -103,23 +115,76 @@ export class PluginOperationsService {
      *
      * Called at the top of every enable path. In bundled mode this is
      * a no-op (the installer is undefined or returns immediately). In
-     * dynamic mode, if the plugin isn't already registered, this calls
-     * `installer.ensurePluginAvailable(pluginId)` so the package is
-     * downloaded + verified + placed under the install dir's
-     * `node_modules/`, then prompts a re-discover via the loader (the
-     * existing path scan picks up the new symlink). If install fails,
-     * the original NotFoundException-with-context is thrown so the
-     * caller surfaces the registry/install error.
+     * dynamic mode, if the plugin isn't registered in this process:
      *
-     * Failure here MUST NOT register a half-loaded plugin (FR-14).
-     * `ensurePluginAvailable` writes installState='error' on its own;
-     * this method only forwards the error.
+     * 1. `installer.ensurePluginAvailable(pluginId)` places the package on
+     *    THIS node — from the local store when it is there, the pinned
+     *    version fetched without touching the shared row when another
+     *    replica installed it (FR-13), or a full install for a plugin no
+     *    node has installed yet;
+     * 2. {@link registerInstalledPlugin} registers the directory it
+     *    answers. (This docstring used to promise "a re-discover via the
+     *    loader"; nothing did, so the lookup right after this threw
+     *    NotFound for every runtime-installed plugin — T27.)
+     *
+     * An install failure is forwarded (`install()` records
+     * installState='error' itself); a package that cannot be registered is
+     * a 422. Neither registers a half-loaded plugin (FR-14).
      */
     private async ensurePluginInstalledOrThrow(pluginId: string): Promise<void> {
         if (!this.pluginInstaller) return;
         if (this.pluginInstaller.getDistributionMode() !== 'dynamic') return;
         if (this.pluginRegistryService.get(pluginId)) return;
-        await this.pluginInstaller.ensurePluginAvailable(pluginId);
+        const installed = await this.pluginInstaller.ensurePluginAvailable(pluginId);
+        if (installed) await this.registerInstalledPlugin(pluginId, installed.installPath);
+    }
+
+    /**
+     * EW-693 T27 — register, in this process, a plugin the installer placed
+     * at `installPath` on this node (`POST /plugins/:id/install` calls it
+     * after an install; the enable path through
+     * {@link ensurePluginInstalledOrThrow}). A plugin already registered is
+     * left as it is.
+     *
+     * The plugin is registered lazily, then materialised at once: the
+     * settings paths read `registered.plugin.settingsSchema` synchronously,
+     * and a cold lazy proxy answers `{}` for it. A materialisation failure is
+     * recorded on the registry entry (`error` state) by the loader's hook and
+     * logged here; it is not thrown.
+     *
+     * @throws UnprocessableEntityException when the directory is not the
+     *   plugin asked for (not a plugin package, or another plugin id) — the
+     *   loader then registered nothing.
+     */
+    async registerInstalledPlugin(pluginId: string, installPath: string): Promise<void> {
+        if (this.pluginRegistryService.get(pluginId)) return;
+        if (!this.pluginLoader) {
+            this.logger.warn(
+                `Plugin "${pluginId}" is installed at ${installPath}, but no plugin loader is bound ` +
+                    `to register it in this process.`,
+            );
+            return;
+        }
+        const result = await this.pluginLoader.registerFromPath(installPath, {
+            expectedId: pluginId,
+        });
+        if (!result.success) {
+            throw new UnprocessableEntityException(
+                `Plugin "${pluginId}" is installed on this node, but its package could not be ` +
+                    `registered: ${result.error ?? 'unknown error'}`,
+            );
+        }
+        const registered = this.pluginRegistryService.get(pluginId);
+        if (!registered) return;
+        try {
+            await materializePlugin(registered.plugin);
+        } catch (err) {
+            this.logger.warn(
+                `Plugin "${pluginId}" was registered but could not be loaded: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
     }
 
     // ============================================
@@ -131,14 +196,11 @@ export class PluginOperationsService {
      */
     async listPlugins(userId: string, category?: string): Promise<PluginListResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
-        const visiblePlugins = allPlugins.filter(
-            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
-        );
 
         // Filter by category if provided
         let filteredPlugins = category
-            ? visiblePlugins.filter((p) => p.manifest.category === category)
-            : visiblePlugins;
+            ? allPlugins.filter((p) => p.manifest.category === category)
+            : allPlugins;
 
         // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
@@ -147,19 +209,35 @@ export class PluginOperationsService {
 
         const userPluginMap = new Map(userPlugins.map((up) => [up.pluginId, up]));
 
+        const enabledForUser = (registered: RegisteredPlugin) =>
+            resolvePluginEnabled({
+                systemPlugin: registered.manifest?.systemPlugin,
+                autoEnable: registered.manifest?.autoEnable,
+                userPlugin: userPluginMap.get(registered.plugin.id) ?? null,
+                workPlugin: null,
+                hasWorkContext: false,
+            });
+
         // When filtering by category (settings page), only show enabled plugins
         if (category) {
-            filteredPlugins = filteredPlugins.filter((registered) => {
-                const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
-                return resolvePluginEnabled({
-                    systemPlugin: registered.manifest?.systemPlugin,
-                    autoEnable: registered.manifest?.autoEnable,
-                    userPlugin,
-                    workPlugin: null,
-                    hasWorkContext: false,
-                });
-            });
+            filteredPlugins = filteredPlugins.filter(enabledForUser);
         }
+
+        // Hidden plugins are not listed. Many builtIns set `visibility` only in
+        // their class's getManifest(), which a cold lazy proxy's entry does
+        // not carry yet — so load the candidates first, a bounded number at a
+        // time: the builtIns, and the plugins the user has enabled whatever
+        // their builtIn flag (loadPluginsForListing: the settings page renders
+        // an enabled plugin's settings form from this list; a cold non-builtIn
+        // the user has not enabled is listed by its package.json manifest, as
+        // before lazy builtIns). A `hidden` the package.json manifest sets is
+        // final: it wins over getManifest(). Visibility is filtered again
+        // AFTER the load.
+        const candidates = filteredPlugins.filter((p) => p.manifest?.visibility !== 'hidden');
+        await loadPluginsForListing(candidates, { inUse: candidates.filter(enabledForUser) });
+        filteredPlugins = filteredPlugins.filter(
+            (p) => (p.manifest?.visibility ?? 'public') !== 'hidden',
+        );
 
         // Map to response
         const plugins = await Promise.all(
@@ -169,6 +247,7 @@ export class PluginOperationsService {
                     registered,
                     userPlugin,
                     userId,
+                    { listing: true },
                 );
             }),
         );
@@ -187,10 +266,6 @@ export class PluginOperationsService {
      */
     async getPluginsForSettingsMenu(userId: string): Promise<SettingsMenuResponse> {
         const allPlugins = this.pluginRegistryService.getAll();
-        const hasVisiblePipelineCategory = allPlugins.some((registered) => {
-            const visibility = registered.manifest?.visibility ?? 'public';
-            return visibility !== 'hidden' && registered.manifest.category === 'pipeline';
-        });
 
         // Get user's plugin installations
         const userPlugins = await this.userPluginRepository.find({
@@ -203,24 +278,39 @@ export class PluginOperationsService {
         // 2. Are installed and enabled by the user
         // 3. Have user-configurable settings (configurationMode !== 'admin-only')
         // 4. Have settings schema with properties
-        const configurablePlugins = allPlugins.filter((registered) => {
-            const visibility = registered.manifest?.visibility ?? 'public';
-            if (visibility === 'hidden') return false;
-
-            const hasOAuth = registered.plugin.capabilities?.includes('oauth') ?? false;
-
-            const configMode = registered.plugin.configurationMode || 'hybrid';
-            if (configMode === 'admin-only' && !hasOAuth) return false;
+        // 3 and 4 read the plugin class's configurationMode / settingsSchema,
+        // which a cold lazy proxy answers with `undefined` / `{}` — so load
+        // the visible, enabled plugins first, builtIn or not: the user has
+        // enabled each one (loadPluginsForListing with them all in use,
+        // bounded). A cold non-builtIn left cold here would be dropped from
+        // the menu for want of settings. The load can bring a
+        // `visibility: 'hidden'` only the class's getManifest() declares, so
+        // visibility is filtered again after it.
+        const isVisible = (registered: RegisteredPlugin) =>
+            (registered.manifest?.visibility ?? 'public') !== 'hidden';
+        const enabledCandidates = allPlugins.filter((registered) => {
+            if (!isVisible(registered)) return false;
 
             const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
-            const isEnabled = resolvePluginEnabled({
+            return resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
                 userPlugin,
                 workPlugin: null,
                 hasWorkContext: false,
             });
-            if (!isEnabled) return false;
+        });
+        await loadPluginsForListing(enabledCandidates, { inUse: enabledCandidates });
+        const visibleEnabled = enabledCandidates.filter(isVisible);
+        const hasVisiblePipelineCategory = allPlugins.some(
+            (registered) => isVisible(registered) && registered.manifest.category === 'pipeline',
+        );
+
+        const configurablePlugins = visibleEnabled.filter((registered) => {
+            const hasOAuth = registered.plugin.capabilities?.includes('oauth') ?? false;
+
+            const configMode = registered.plugin.configurationMode || 'hybrid';
+            if (configMode === 'admin-only' && !hasOAuth) return false;
 
             // Check if plugin has user-configurable settings
             const schema = registered.plugin.settingsSchema;
@@ -451,6 +541,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have user settings
         if (settings || secretSettings) {
@@ -610,6 +701,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have user settings
         if (settings || secretSettings) {
@@ -886,7 +978,17 @@ export class PluginOperationsService {
         // 500. Materializing first (the same reason `PluginValidationService`
         // and `BaseFacade.materializeForUse` do it) makes the probe truthful
         // and keeps the rejection a clean 400 at save time.
-        const real = await this.materializePlugin(target.plugin);
+        // A plugin whose first load fails (its import, or its onLoad — which
+        // leaves the entry in `error` without rejecting) is not usable.
+        let unusable = '';
+        const real = await materializeUsablePlugin<IPlugin>(target, pluginId, (reason) => {
+            unusable = reason;
+        });
+        if (!real) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" cannot be used for voice transcription: ${unusable}`,
+            );
+        }
         if (typeof (real as { transcribe?: unknown }).transcribe !== 'function') {
             throw new BadRequestException(
                 `Plugin "${pluginId}" does not support voice transcription`,
@@ -899,16 +1001,6 @@ export class PluginOperationsService {
         }
 
         return { pluginId, pluginEntityId: pluginEntity.id };
-    }
-
-    /**
-     * Return the real instance behind a possibly-lazy registry stub.
-     * A non-lazy plugin (bundled mode, or a unit-test double) is its own
-     * real instance and is passed straight through.
-     */
-    private async materializePlugin(plugin: IPlugin): Promise<IPlugin> {
-        const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
-        return typeof stub.__materialize === 'function' ? await stub.__materialize() : plugin;
     }
 
     /**
@@ -941,13 +1033,6 @@ export class PluginOperationsService {
 
         const allPlugins = this.pluginRegistryService.getAll();
 
-        // Filter: visible + applicable to work scope
-        // 'hidden' and 'user-only' plugins are not shown in work plugins list
-        const visiblePlugins = allPlugins.filter((p) => {
-            const visibility = p.manifest?.visibility ?? 'public';
-            return visibility !== 'hidden' && visibility !== 'user-only';
-        });
-
         const userPlugins = await this.userPluginRepository.find({
             where: { userId },
         });
@@ -961,6 +1046,34 @@ export class PluginOperationsService {
 
         // Build registry map for quick supplementary lookups
         const registryMap = new Map(allPlugins.map((p) => [p.plugin.id, p]));
+
+        // `visibility` and `supplementary` are often set only by a plugin
+        // class's getManifest(), which a cold lazy proxy's entry does not
+        // carry yet: load, bounded, the builtIns that could be listed and
+        // every plugin the Work has enabled, builtIn or not — the capability
+        // providers below are picked from those, and a Work-enabled
+        // notion-extractor declares `supplementary` only in its class
+        // (loadPluginsForListing; any other cold non-builtIn keeps its
+        // package.json manifest, as before lazy builtIns). A visibility the
+        // package.json manifest sets is final — it wins over getManifest() —
+        // so a plugin it already excludes is not loaded to be listed.
+        // Visibility is read after the load.
+        const listable = allPlugins.filter((p) => {
+            const visibility = p.manifest?.visibility;
+            return visibility !== 'hidden' && visibility !== 'user-only';
+        });
+        const workEnabled = workPlugins
+            .filter((dp) => dp.enabled)
+            .map((dp) => registryMap.get(dp.pluginId))
+            .filter((registered): registered is RegisteredPlugin => registered !== undefined);
+        await loadPluginsForListing(listable, { inUse: workEnabled });
+
+        // Filter: visible + applicable to work scope
+        // 'hidden' and 'user-only' plugins are not shown in work plugins list
+        const visiblePlugins = allPlugins.filter((p) => {
+            const visibility = p.manifest?.visibility ?? 'public';
+            return visibility !== 'hidden' && visibility !== 'user-only';
+        });
 
         // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
@@ -990,6 +1103,7 @@ export class PluginOperationsService {
                 return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
                     userId,
                     workId,
+                    listing: true,
                 });
             }),
         );
@@ -1025,6 +1139,12 @@ export class PluginOperationsService {
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+        await loadPluginSchema(registered.plugin, registered);
+
+        // Naming the Work's provider here obeys setActiveCapability's rule.
+        if (options?.activeCapability) {
+            this.refuseSupplementaryProvider(registered, pluginId);
         }
 
         // Enforce configurationMode — admin-only plugins cannot have work settings
@@ -1200,6 +1320,7 @@ export class PluginOperationsService {
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
+        await loadPluginSchema(registered.plugin, registered);
 
         // Enforce configurationMode — admin-only plugins cannot have work settings
         if (settings || secretSettings) {
@@ -1334,11 +1455,10 @@ export class PluginOperationsService {
             );
         }
 
-        if (registered.manifest.supplementary) {
-            throw new BadRequestException(
-                `Plugin "${pluginId}" is a supplementary plugin and cannot be set as an active capability provider`,
-            );
-        }
+        // `supplementary` may come from the class's getManifest() only, which
+        // a cold lazy proxy's entry does not carry yet.
+        await loadPluginSchema(registered.plugin, registered);
+        this.refuseSupplementaryProvider(registered, pluginId);
 
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
@@ -1382,6 +1502,35 @@ export class PluginOperationsService {
             userId,
             workId,
         });
+    }
+
+    /**
+     * A supplementary plugin (notion-extractor, pdf-extractor,
+     * officecli-extractor) is a URL-pattern specialist: the content-extractor
+     * facade runs it for the URLs it claims, on top of the Work's provider,
+     * never as that provider, and listWorkPlugins leaves it out of
+     * `capabilityProviders`. So neither of this service's paths that name a
+     * Work's provider — setActiveCapability, and enablePluginForWork with
+     * `activeCapability` — may record it as one: the binding would be
+     * accepted and never honoured, and `findActiveByCapability` could answer
+     * it ahead of the real provider.
+     *
+     * This guards those two paths only. Account import
+     * (account-import.service.ts) upserts an export's `activeCapabilities`
+     * straight into the repository, so it can still store such a binding, as
+     * can any row saved before this guard. Only `findActiveByCapability` (or
+     * the facade reading it) skipping supplementary rows would cover every
+     * write path.
+     *
+     * The caller loads the plugin first: `supplementary` may be declared in
+     * getManifest() only.
+     */
+    private refuseSupplementaryProvider(registered: RegisteredPlugin, pluginId: string): void {
+        if (registered.manifest.supplementary) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" is a supplementary plugin and cannot be set as an active capability provider`,
+            );
+        }
     }
 
     private requestWorksConfigSync(
@@ -1566,13 +1715,26 @@ export class PluginOperationsService {
         };
     }
 
+    /**
+     * @param options.listing - the response is one row of a LIST: the plugin
+     *   is loaded only as {@link loadPluginsForListing} does (a builtIn — the
+     *   list has already loaded the plugins its viewer has enabled), and a
+     *   cold non-builtIn stays cold — its settings are not resolved (the
+     *   settings service would load it), which with its cold `{}` schema
+     *   projects nothing anyway, as before lazy builtIns.
+     */
     private async toUserPluginResponseWithResolvedSettings(
         registered: RegisteredPlugin,
         userPlugin: UserPluginEntity | null | undefined,
         userId: string,
-        options: { includeConnectionStatus?: boolean } = {},
+        options: { includeConnectionStatus?: boolean; listing?: boolean } = {},
     ): Promise<UserPluginResponse> {
+        // Every projection below reads the plugin class's settingsSchema /
+        // configurationMode (a cold lazy proxy answers `{}` / `undefined`).
+        if (options.listing) await loadPluginsForListing([registered]);
+        else await loadPluginSchema(registered.plugin, registered);
         const response = this.toUserPluginResponse(registered, userPlugin);
+        const staysCold = options.listing === true && staysColdForListing(registered);
 
         // Fan out the two independent reads in parallel:
         //   (1) resolve the user-scope settings (used for the display
@@ -1591,7 +1753,8 @@ export class PluginOperationsService {
         // the list-path savings (the probe is `Promise.resolve(undefined)`
         // when `includeConnectionStatus` is false, so no extra work).
         const schema = registered.plugin.settingsSchema;
-        const needsResolved = !!schema?.properties || this.hasAiProviderCapability(registered);
+        const needsResolved =
+            !staysCold && (!!schema?.properties || this.hasAiProviderCapability(registered));
         const resolvedP = needsResolved
             ? this.settingsService.getResolvedSettings(registered.plugin.id, { userId })
             : Promise.resolve(undefined);
@@ -1646,6 +1809,9 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         userId: string,
     ): Promise<PluginConnectionStatus | undefined> {
+        // `uiHints` may come from the class's getManifest() only, which a cold
+        // lazy proxy's entry does not carry yet.
+        await loadPluginSchema(registered.plugin, registered);
         if (!registered.manifest?.uiHints?.includeInOnboarding) {
             return undefined;
         }
@@ -1810,8 +1976,13 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
         workPlugin?: WorkPluginEntity | null,
-        options?: { userId: string; workId: string },
+        options?: { userId: string; workId: string; listing?: boolean },
     ): Promise<WorkPluginResponse> {
+        // As in toUserPluginResponseWithResolvedSettings: the class's schema —
+        // and on a list, a cold non-builtIn stays cold.
+        if (options?.listing) await loadPluginsForListing([registered]);
+        else await loadPluginSchema(registered.plugin, registered);
+        const staysCold = options?.listing === true && staysColdForListing(registered);
         const userResponse = this.toUserPluginResponse(registered, userPlugin);
         const rawWorkSettings = this.maskSecretSettings(
             workPlugin ? { ...workPlugin.settings, ...workPlugin.secretSettings } : undefined,
@@ -1820,7 +1991,9 @@ export class PluginOperationsService {
         const [resolvedSettings, models, workSettings] = options
             ? await Promise.all([
                   this.getResolvedDisplaySettings(registered, options.userId),
-                  this.getProviderModelSummaries(registered, options),
+                  // Resolving settings would load a plugin a list leaves cold
+                  // (its cold `{}` schema has no model fields anyway).
+                  staysCold ? undefined : this.getProviderModelSummaries(registered, options),
                   this.getWorkOverrideDisplaySettings(registered, options),
               ])
             : [undefined, undefined, rawWorkSettings];

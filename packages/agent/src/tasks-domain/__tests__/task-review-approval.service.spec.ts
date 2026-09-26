@@ -52,6 +52,62 @@ describe('TaskReviewApprovalService', () => {
         approvedAt: new Date('2026-09-01T10:00:00Z'),
     };
 
+    describe('an account with two Works on one repository', () => {
+        /**
+         * One account can register a repository as two Works: here an App Work
+         * wraps a directory Work's generated website repository `acme/site`.
+         * The App Work's Tasks open their pull requests THERE; the directory
+         * Work's Task #7 opened #7 in `acme/site-data`, a different pull
+         * request. The recorder used to take whichever Work the database
+         * listed first, in ANY role — while the resume path reads the review
+         * back only from the Work whose Task repository this is.
+         */
+        const directory = {
+            id: 'dir-1',
+            kind: 'directory',
+            getRepoOwner: () => 'acme',
+            getMainRepo: () => 'site-main',
+            getWebsiteRepo: () => 'site',
+            getDataRepo: () => 'site-data',
+        };
+        const app = {
+            id: 'app-1',
+            kind: 'app',
+            getRepoOwner: () => 'acme',
+            getMainRepo: () => 'site-app-main',
+            getWebsiteRepo: () => 'site',
+            getDataRepo: () => 'site-app-data',
+        };
+
+        it.each([
+            ['the directory Work first', () => [directory, app]],
+            ['the App Work first', () => [app, directory]],
+        ])('stamps and clears the App Work’s Task with %s', async (_order, list) => {
+            const { service, tasks } = build({ work: list() });
+            tasks.findByWorkAndPrNumber.mockImplementation(async (workId: string) =>
+                workId === 'app-1'
+                    ? { id: 'app-task', prNumber: 7 }
+                    : { id: 'dir-task', prNumber: 7 },
+            );
+            const onSite = { ...INPUT, repo: 'site', prNumber: 7 };
+
+            await service.recordPullRequestApproval(onSite);
+            await service.clearPullRequestApproval(onSite);
+
+            expect(tasks.recordPullRequestReviewApproval).toHaveBeenCalledWith(
+                'app-task',
+                7,
+                expect.anything(),
+            );
+            expect(tasks.clearPullRequestReviewApproval).toHaveBeenCalledWith(
+                'app-task',
+                7,
+                'octocat',
+            );
+            expect(tasks.findByWorkAndPrNumber).not.toHaveBeenCalledWith('dir-1', 7);
+        });
+    });
+
     it('stamps the approval onto the Task with the commit the reviewer saw', async () => {
         const { service, tasks } = build();
         await expect(service.recordPullRequestApproval(INPUT)).resolves.toBe(true);

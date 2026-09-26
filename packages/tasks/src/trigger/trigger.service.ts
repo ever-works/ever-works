@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable, Logger } from '@nestjs/common';
-import { configure, runs } from '@trigger.dev/sdk';
+import { configure, runs, tasks } from '@trigger.dev/sdk';
 import { config } from '@ever-works/agent/config';
 import {
     WorkGenerationPayload,
@@ -31,8 +31,28 @@ import {
     WorkspaceBackupDispatcher,
     MemoryFactEmbedPayload,
     MemoryFactEmbedDispatcher,
+    AppDependencyProvisionPayload,
+    AppDependencyProvisionDispatcher,
+    // APW-03 T13 — the `app-spec-evaluate` payload, re-exported by the agent
+    // package's tasks barrel. (APW-02 T28 wires the dispatch below.)
+    AppSpecEvaluatePayload,
+    // APW-05 T18 — the two Build dispatchers, their payloads and the runtime-neutral
+    // job ids they are enqueued under (plan §7.1:1312-1319). The ids come from the
+    // agent barrel rather than being re-typed here, so the dispatch site and the task
+    // modules can never disagree about the string on the wire.
+    AppBuildPreparePayload,
+    AppBuildPrepareDispatcher,
+    AppBuildWatchPayload,
+    AppBuildWatchDispatcher,
+    APP_BUILD_PREPARE_TASK_ID,
+    APP_BUILD_WATCH_TASK_ID,
+    // EW-693 / T27 — the long-running plugin operation job, named once in the agent.
+    PLUGIN_OPERATION_QUEUE_TTL_SECONDS,
+    PLUGIN_OPERATION_TASK_ID,
+    type PluginOperationPayload,
 } from '@ever-works/agent/tasks';
 import type {
+    JobRunResult,
     JobRunStatus,
     JobRuntimeDispatchers,
     JobRuntimeId,
@@ -56,7 +76,37 @@ import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
 import { memoryFactEmbedTask } from '../tasks/trigger/memory-fact-embed.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import { workspaceBackupTask } from '../tasks/trigger/workspace-backup.task';
+import { appDependencyProvisionTask } from '../tasks/trigger/app-dependency-provision.task';
+// APW-03 T13's job — dispatched by `dispatchAppSpecEvaluate` below (APW-02 T28).
+import { appSpecEvaluateTask } from '../tasks/trigger/app-spec-evaluate.task';
+// APW-05 T18 — the `app-build-prepare` job, reached by ID below rather than through its
+// handle, so a TYPE-only import is all this file needs from it: the generic type argument
+// on `tasks.trigger<…>` is what keeps the payload checked at compile time. The job id
+// itself comes from `@ever-works/agent/tasks` (`APP_BUILD_PREPARE_TASK_ID`), which is the
+// same string that module registers its task under.
+import type { appBuildPrepareTask } from '../tasks/trigger/app-build-prepare.task';
+// APW-06 T32 — the `app-deploy` one-shot. Imported as a VALUE (unlike the two
+// Build tasks above, which are reached by id) because this dispatcher passes no
+// `queue` of its own: the task declares `APP_RUNTIME_TASK_QUEUE` and its
+// two-hour `maxDuration`, and triggering the object keeps both with the task
+// instead of restating them at every call site.
+import { appDeployTask, type AppDeployTaskPayload } from '../tasks/trigger/app-deploy.task';
+// C10 — the `app-fork-readiness` job (APW-02 plan §6.1/§6.2). Both the id and the type
+// come from the task module itself here: T31's planned agent-side
+// `app-fork-readiness.types.ts` has not landed, and unlike the Build pair there is no
+// second declaration to keep in step — the id is imported, never re-typed, so the
+// dispatch site and the `task({ id })` registration cannot disagree.
+import {
+    APP_FORK_READINESS_TASK_ID,
+    type appForkReadinessTask,
+} from '../tasks/trigger/app-fork-readiness.task';
+import type { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
+import { pluginOperationRunPayload } from './plugin-operation-run-payload';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
+// C10 — the readiness payload and dispatcher contract T23 declared (provisionally) in
+// `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
+// payload is API-side, and this file only needs the shape the SDK call is checked against.
+import type { AppForkReadinessJobPayload } from '@ever-works/agent/app-works';
 
 /**
  * EW-742 P3.2 T22 (stamping) — minimal stamp payload set on the
@@ -97,6 +147,9 @@ export interface TriggerTenantStamp {
  */
 export const triggerTenantStampStorage = new AsyncLocalStorage<TriggerTenantStamp>();
 
+// APW-05 T18 — the two Build dispatchers below. They carry the same `string | null`
+// contract and the same tenant stamping as every sibling here; `null` is what §7.1's
+// in-process fallback keys on.
 @Injectable()
 export class TriggerService
     implements
@@ -113,7 +166,10 @@ export class TriggerService
         KbTranscribeDispatcher,
         KbReembedWorkDispatcher,
         WorkspaceBackupDispatcher,
-        MemoryFactEmbedDispatcher
+        MemoryFactEmbedDispatcher,
+        AppDependencyProvisionDispatcher,
+        AppBuildPrepareDispatcher,
+        AppBuildWatchDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -265,6 +321,28 @@ export class TriggerService
         } catch (error) {
             this.logger.debug(`getRunStatus(${runId}) failed: ${error}`);
             return 'unknown';
+        }
+    }
+
+    /**
+     * EW-693 / T27 — the contract's optional `getRunResult`: the run's status
+     * AND its output (`runs.retrieve`, which also fetches an output stored
+     * behind a presigned URL). The only request/response read the platform
+     * makes of a Trigger.dev run — `PluginExecutionRouterService` uses it to
+     * wait for a long-running plugin operation. Never throws: an unreadable run
+     * is `{ status: 'unknown' }`.
+     */
+    async getRunResult(runId: string): Promise<JobRunResult> {
+        if (!this.ensureConfigured()) {
+            return { status: 'unknown' };
+        }
+
+        try {
+            const run = await runs.retrieve(runId);
+            return triggerRunResult(this.mapTriggerStatus(run.status), run);
+        } catch (error) {
+            this.logger.debug(`getRunResult(${runId}) failed: ${error}`);
+            return { status: 'unknown' };
         }
     }
 
@@ -975,4 +1053,483 @@ export class TriggerService
             return null;
         }
     }
+
+    /**
+     * APW-07 T17 — enqueue one `app-dependency-provision` run.
+     *
+     * **Errors PROPAGATE (APW07-G24).** This is the loud-error shape, like
+     * {@link dispatchKbReembedWork} and unlike every `… | null` dispatcher
+     * above: a dropped provisioning dispatch leaves a dependency row at
+     * `pending` with nothing scheduled behind it, the Dependencies card reads
+     * *Provisioning* forever, and no reconciliation pass exists to notice. The
+     * caller (`AppDependenciesService`) records `dispatchUnavailable` and the
+     * card tells the owner; a `null` here would tell it nothing.
+     *
+     * **Two refusals, both before anything is enqueued:**
+     *
+     * 1. the runtime is disabled (`shouldUseTrigger()` false / no secret key) —
+     *    the in-process fallback every other dispatcher relies on does not exist
+     *    for this job, because the job needs APW-06's isolated worker;
+     * 2. `NODE_ENV=production` without
+     *    `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true` (APW-06 plan
+     *    §6.2:950-952) — the operator's attestation that this queue's worker has
+     *    no route to internal networks. This work dials the owner's own cluster
+     *    and external servers, so an unattested production worker must not be
+     *    handed it. The task itself refuses to run under the same condition, so
+     *    a message already queued when the flag flips still cannot dial.
+     *
+     * **The delayed re-dispatch.** A `pending` outcome or a transient failure is
+     * re-dispatched by the RUNNER through this same method, with the instant it
+     * wants the run to start on the payload (`deferUntil` as ISO-8601, or
+     * `notBefore` as epoch ms). It becomes the runtime's own `delay` — the exact
+     * shape {@link dispatchNotificationChannelDelivery} already uses for
+     * quiet-hours — so the job never sleeps and every attempt is its own
+     * observable run.
+     *
+     * The `concurrencyKey` is per (Work, kind): two kinds provision in parallel,
+     * the same kind never twice at once — which is what makes a re-dispatch
+     * arriving while the previous attempt is still running queue instead of
+     * racing it for the row's lease.
+     */
+    async dispatchAppDependencyProvision(payload: AppDependencyProvisionPayload): Promise<string> {
+        if (!this.ensureConfigured()) {
+            throw new Error(
+                'app-dependency-provision dispatch attempted while Trigger.dev is disabled — ' +
+                    'the dependency would stay pending with nothing scheduled behind it.',
+            );
+        }
+
+        // Optional-chained on purpose: `config.everWorks` is absent in several
+        // specs' partial config mocks, and a missing accessor must fail CLOSED
+        // (undefined !== true) rather than throw a TypeError that reads like a
+        // dispatch bug.
+        if (
+            process.env.NODE_ENV === 'production' &&
+            config.everWorks?.apps?.isClusterWorkerIsolated?.() !== true
+        ) {
+            throw new Error(
+                'worker_not_isolated: refusing to dispatch app-dependency-provision in production ' +
+                    'unless EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true — this job dials the ' +
+                    "owner's cluster and external servers from the App cluster worker.",
+            );
+        }
+
+        // `deferUntil` (ISO-8601) is the wire spelling; `notBefore` (epoch ms) is
+        // the runner's arithmetic spelling. Either is honoured (plan §7:875-876).
+        const deferUntil =
+            payload.deferUntil ??
+            (payload.notBefore ? new Date(payload.notBefore).toISOString() : undefined);
+        const delay = deferUntil ? new Date(deferUntil) : undefined;
+
+        const handle = await appDependencyProvisionTask.trigger(
+            payload,
+            this.stampTenantOptions({
+                tags: [
+                    'app-dependency-provision',
+                    `work:${payload.workId}`,
+                    ...(payload.kind ? [`kind:${payload.kind}`] : []),
+                    `mode:${payload.mode}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `app-dependency:${payload.workId}:${payload.kind ?? 'all'}`,
+                ...(delay ? { delay } : {}),
+            }),
+        );
+
+        if (!handle?.id) {
+            throw new Error(
+                `dispatchAppDependencyProvision(work=${payload.workId}): SDK returned no run id`,
+            );
+        }
+
+        return handle.id;
+    }
+
+    /**
+     * APW-06 T32 — enqueue one `app-deploy` run (plan §2.2 step 5, §9.2:1245).
+     *
+     * ## Why this returns `string | null` and the dependency dispatcher throws
+     *
+     * A dropped dependency dispatch strands a row at `pending` with nothing
+     * behind it, so that one is loud. A Deployment is different: the row already
+     * exists by the time this is called, `AppDeployRequestService` gives the
+     * dispatch a **2 s budget** and reports `dispatched: false` when it is not
+     * met, and the orchestrator releases the lock on every outcome. A `null`
+     * therefore reaches a caller that has somewhere to put it; an exception
+     * would be caught by that same budget and reported identically, with a stack
+     * nobody reads.
+     *
+     * ## The two refusals, both BEFORE anything is enqueued
+     *
+     * 1. the runtime is disabled (no secret key / `shouldUseTrigger()` false).
+     *    There is deliberately **no in-process fallback**: App cluster work must
+     *    run on the isolated worker (FR-5), and running it in the API is the
+     *    exact thing the isolation rule exists to prevent;
+     * 2. `NODE_ENV=production` without `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true`
+     *    (plan §6.2:950-952) — the operator's attestation that this queue's worker
+     *    has no route to internal networks. A Deployment dials the owner's own
+     *    cluster; an unattested production worker must not be handed it.
+     *
+     * The same pair guards {@link dispatchAppDependencyProvision}, and the task
+     * itself refuses under condition 2 as well, so a message already queued when
+     * the flag flips still cannot dial.
+     *
+     * ## `concurrencyKey` is per WORK, not per Deployment
+     *
+     * Two Deployments of one App Work must never roll out at once — that is the
+     * whole point of the `work_app_runtime_states` deploy lock, and the queue key
+     * is the second line of defence behind it. Per-deployment would let a queued
+     * row start while the row holding the lock was still applying objects.
+     *
+     * `opts.delayMs` is the dequeue's own re-dispatch (§5.6 step 7): the
+     * orchestrator asks for the queued Deployment to start after the current one
+     * finishes releasing, rather than sleeping inside a run.
+     */
+    async dispatchAppDeploy(
+        payload: AppDeployTaskPayload,
+        opts: { delayMs?: number } = {},
+    ): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            this.logger.warn(
+                `Refusing to dispatch app-deploy for Work ${payload.workId}: the job runtime is ` +
+                    'disabled, and App cluster work has no in-process fallback (FR-5).',
+            );
+            return null;
+        }
+
+        // Optional-chained on purpose, and failing CLOSED: `config.everWorks` is
+        // absent in several specs' partial config mocks, and a missing accessor
+        // must read as "not attested" rather than throw a TypeError that looks
+        // like a dispatch bug.
+        if (
+            process.env.NODE_ENV === 'production' &&
+            config.everWorks?.apps?.isClusterWorkerIsolated?.() !== true
+        ) {
+            this.logger.warn(
+                `Refusing to dispatch app-deploy for Work ${payload.workId}: production requires ` +
+                    'EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true, the operator attestation that ' +
+                    "this worker has no route to internal networks. A Deployment dials the owner's cluster.",
+            );
+            return null;
+        }
+
+        try {
+            const delayMs = typeof opts.delayMs === 'number' && opts.delayMs > 0 ? opts.delayMs : 0;
+            const handle = await appDeployTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'app-deploy',
+                        `work:${payload.workId}`,
+                        `deployment:${payload.deploymentId}`,
+                        ...(payload.trigger ? [`trigger:${payload.trigger}`] : []),
+                    ],
+                    machine: this.machine() as any,
+                    // Per WORK — see the docstring. The deploy lock is the first
+                    // line of defence; this is the second.
+                    concurrencyKey: `app-deploy:${payload.workId}`,
+                    ...(delayMs > 0 ? { delay: new Date(Date.now() + delayMs) } : {}),
+                }),
+            );
+            return handle?.id ?? null;
+        } catch (error) {
+            // Swallowed and reported, for the reason in the docstring: the caller
+            // has a budget and a `dispatched: false` field to put this in, and
+            // the Deployment row already exists either way.
+            this.logger.error(
+                `Failed to dispatch app-deploy for Work ${payload.workId} ` +
+                    `(deployment ${payload.deploymentId})`,
+                error as Error,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * APW-03 T13's `app-spec-evaluate` job, dispatched through the **propagate**
+     * shape — the same one {@link dispatchAppDependencyProvision} uses above and
+     * for the same reason.
+     *
+     * `AppSpecService.evaluate` reaches the job through the
+     * `APP_SPEC_EVALUATE_DISPATCHER` port (`packages/agent/src/tasks/job-runtime.providers.ts`
+     * binds it through `buildJobRuntimeProviders()`), and it answers a **missing or
+     * throwing** dispatcher with the documented in-process path (plan §6.1:661-662,
+     * `app-spec.module.ts`'s docstring). That fallback is a *fallback*: when a
+     * dispatcher IS bound and the enqueue fails, a swallowed error would leave the
+     * evaluation reported as queued with nothing behind it — the silent no-op the
+     * propagate shape exists to prevent. So this method never `softDispatch`es and
+     * never swallows: it returns the run id or throws.
+     *
+     * Wired by APW-02 T28 at the packaging owner's request: the dispatcher whose
+     * service cannot be reached from the worker is a silent no-op, and the two
+     * registration points (`remoteMap` on the API side, this method plus its
+     * `dispatchersFromTenantClient` mirror for a BYO tenant) are what make the
+     * worker-side call land.
+     */
+    async dispatchAppSpecEvaluate(payload: AppSpecEvaluatePayload): Promise<string> {
+        if (!this.ensureConfigured()) {
+            throw new Error(
+                'app-spec-evaluate dispatch attempted while Trigger.dev is disabled — ' +
+                    'the evaluation would never be recorded against the App spec.',
+            );
+        }
+
+        const handle = await appSpecEvaluateTask.trigger(
+            payload,
+            this.stampTenantOptions({
+                tags: ['app-spec-evaluate', `work:${payload.workId}`, `trigger:${payload.trigger}`],
+                machine: this.machine() as any,
+                // Per Work: two evaluations of the same App spec never run at once,
+                // which is what makes the job's own per-Work lock a second belt
+                // rather than the only one.
+                concurrencyKey: `app-spec-evaluate:${payload.workId}`,
+            }),
+        );
+
+        if (!handle?.id) {
+            throw new Error(
+                `dispatchAppSpecEvaluate(work=${payload.workId}): SDK returned no run id`,
+            );
+        }
+
+        return handle.id;
+    }
+
+    /**
+     * APW-05 T18 — the `app-build-prepare` job (plan §7.1:1312-1319, §7.2).
+     *
+     * `AppBuildsService.requestPrepare(workId, reason, buildId?)` is the single producer
+     * (§7.2:1366-1369): the `app.spec.applied` listener, Rebuild, a verification request and
+     * a pull-token save all reach the job through this method, and §7.2's coalescing pass is
+     * the same payload with `reason: 'coalesced'`.
+     *
+     * The shape is `dispatchWorkspaceBackup`'s — and the `null` means the opposite thing.
+     * There it is a hard failure the caller reports; here it is §7.1's documented fallback:
+     * `AppBuildsService.dispatchPrepare` runs `AppBuildPrepareRunner.run(payload)` **in
+     * process**, unawaited, under the same `app-build-prepare:<workId>` lock
+     * (§7.1:1321-1331, `APW05-G20`). So this method must never throw — a rejection would
+     * turn the local e2e stack's only working path into a failed request, and Rebuild's
+     * 2-second budget (FR-41) belongs to the caller, not here.
+     *
+     * ## Why this method dispatches by ID rather than through the task handle
+     *
+     * Its sibling below has no task module in this tree yet — T20 owns
+     * `tasks/trigger/app-build-watch.task.ts` — so the id-based `tasks.trigger(id, payload,
+     * options)` form is the only dispatch both halves of the pair can share, and one
+     * mechanism for a pair beats two that can drift. Nothing is lost on the prepare side:
+     * the explicit `typeof appBuildPrepareTask` type argument keeps the payload and the
+     * return shape compile-checked against T19's own `task<'app-build-prepare', …>`
+     * declaration, exactly as `dispatchers/agent-task-dispatchers.ts` does it.
+     *
+     * `concurrencyKey` is per Work — the queue-side half of §7.2's
+     * `app-build-prepare:<workId>` key. The real mutual exclusion is the job's own
+     * `DistributedTaskLockService` pass (a dispatch that cannot take the lock exits as
+     * `skipped`); serialising the queue only stops a coalesced burst from queueing three
+     * passes that would each find nothing to do.
+     */
+    async dispatchAppBuildPrepare(payload: AppBuildPreparePayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof appBuildPrepareTask>(
+                APP_BUILD_PREPARE_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'app-build-prepare',
+                        `work:${payload.workId}`,
+                        // Absent on §7.2's coalesced dispatch, which carries no Build: a
+                        // `build:undefined` tag would be dashboard noise.
+                        ...(payload.buildId ? [`build:${payload.buildId}`] : []),
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-build-prepare:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-build-prepare task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * APW-05 T18 — the `app-build-watch` job (plan §7.1:1315, §7.3).
+     *
+     * One dispatch is one observation of one Build. `AppBuildsService.dispatchWatch` calls it
+     * from the webhook consumer on `requested` / `in_progress` / `completed` deliveries and
+     * from §7.4's two-minute sweep; a `null` runs `AppBuildWatchRunner.run(payload)` **in
+     * process**, unawaited, capped at 10 concurrent runs per API process, with the excess
+     * left to the next sweep tick (§7.1:1321-1331). As above, `null` is a deferral and never
+     * a failure — a throw here would surface inside a webhook handler, which is the one
+     * place an observation must not be able to fail a delivery ack.
+     *
+     * Duplicated and late dispatches are harmless by construction: §7.3:1386-1388's
+     * `watchLeaseUntil` claim (0 rows updated ⇒ exit) is what makes an in-process run and a
+     * dispatched one mutually exclusive, and the terminal transition is guarded by its own
+     * conditional update. `concurrencyKey` keeps the queue side of that honest too.
+     */
+    async dispatchAppBuildWatch(payload: AppBuildWatchPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger(
+                APP_BUILD_WATCH_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: ['app-build-watch', `build:${payload.buildId}`],
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-build-watch:${payload.buildId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-build-watch task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-693 / T27 — start the `run-plugin-operation` worker task for one
+     * long-running plugin operation (`PluginExecutionRouterService` looks this
+     * method up by name on the active runtime's dispatchers). Answers the run
+     * id, or `null` when Trigger.dev is not configured or the enqueue failed.
+     *
+     * `ttl` bounds the time in the QUEUE, which `maxDuration` does not count: a
+     * run no worker picks up within `PLUGIN_OPERATION_QUEUE_TTL_SECONDS` (15
+     * minutes) expires, and the router reads it as failed instead of waiting on
+     * it. The router's default wait is derived from the same constant.
+     *
+     * A tenant call's payload also carries `tenantId`, `providerId` and
+     * `credentialVersion` (T26 / EW-742 P3 FR-5), forwarded as they are; the
+     * worker does not read them. Reached through a tenant's bound view, the
+     * call runs under the tenant stamp, so `stampTenantOptions` adds the
+     * `tenant:<id>` tag and the tenant's concurrency key.
+     */
+    async dispatchPluginOperation(payload: PluginOperationPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof runPluginOperationTask>(
+                PLUGIN_OPERATION_TASK_ID,
+                pluginOperationRunPayload(payload),
+                this.stampTenantOptions({
+                    tags: ['plugin-operation', `plugin:${payload.pluginId}`],
+                    machine: this.machine() as any,
+                    ttl: `${PLUGIN_OPERATION_QUEUE_TTL_SECONDS / 60}m`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch run-plugin-operation task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * C10 — the `app-fork-readiness` job (APW-02 plan §6.1:655, §6.2).
+     *
+     * This is the enqueue half of the gap `docs/internal/app-works-build-progress.md`
+     * §5.2 row C10 measured: `AppWorkCreateService.dispatchReadiness` (the create path)
+     * and `AppUpstreamStateService.retryReadiness` (**Try again**, FR-19) both inject
+     * `APP_FORK_READINESS_DISPATCHER` `@Optional()`, and with the token unbound in every
+     * module they logged "no readiness dispatcher is bound" and left the row at
+     * `dispatch_unavailable` — so an App Work could never reach `ready` anywhere.
+     *
+     * The **agent** `AppWorksModule` now binds that token to the active runtime's
+     * `dispatchers.dispatchAppForkReadiness` (this method, named by
+     * `FORK_READINESS_DISPATCH_METHOD` there), which is what makes the dispatch leave the
+     * process.
+     *
+     * ## Shape — `dispatchAppBuildPrepare`'s, and `null` means the same deferral
+     *
+     * A `null` return is not a failure here either: the two call sites record
+     * `readinessReason = 'dispatch_unavailable'` on the row and APW-02's sweeper
+     * re-dispatches, which is the documented fail-closed path when no job runtime is
+     * configured (the local e2e stack, a CLI context). The dispatch must therefore
+     * resolve `null` rather than throw — a rejection would surface inside the create
+     * request and turn "the queue is not configured" into a failed create.
+     *
+     * `concurrencyKey` is per Work: two readiness runs for one Work would race over the
+     * same row. The real mutual exclusion is the run's own attempt claim
+     * (`beginAttempt`, which exits `already_ready`), so serialising the queue only stops
+     * a create + Try again pair from queueing two polls that would each find nothing to
+     * do.
+     */
+    async dispatchAppForkReadiness(payload: AppForkReadinessJobPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof appForkReadinessTask>(
+                APP_FORK_READINESS_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'app-fork-readiness',
+                        `work:${payload.workId}`,
+                        `trigger:${payload.reason ?? 'initial'}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-fork-readiness:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-fork-readiness task', error as Error);
+            return null;
+        }
+    }
+}
+
+/**
+ * A retrieved Trigger.dev run as the contract's {@link JobRunResult}: the
+ * output only once the run completed, the error message when it has one.
+ * Shared by the platform service and the per-tenant provider view, so a BYO
+ * tenant's result reads the same.
+ *
+ * An output over the SDK's inline limit is stored behind `outputPresignedUrl`,
+ * and `runs.retrieve` downloads it — but swallows a failed download and leaves
+ * `output` undefined. A completed run in that state is answered `completed`
+ * with `outputUnavailable: true`: its work is done (never dispatch it again),
+ * and reading it again may return the output. Answered as a plain `completed`
+ * without output, the router reported a run that succeeded as failed; answered
+ * `unknown`, a download that never succeeds left callers told "may still be
+ * running" forever.
+ */
+export function triggerRunResult(
+    status: JobRunStatus,
+    run: { output?: unknown; error?: unknown; outputPresignedUrl?: unknown },
+): JobRunResult {
+    if (
+        status === 'completed' &&
+        run.output === undefined &&
+        typeof run.outputPresignedUrl === 'string' &&
+        run.outputPresignedUrl.length > 0
+    ) {
+        return { status: 'completed', outputUnavailable: true };
+    }
+    const error = run.error as { message?: unknown } | string | null | undefined;
+    const message =
+        typeof error === 'string'
+            ? error
+            : error && typeof error.message === 'string'
+              ? error.message
+              : null;
+    return {
+        status,
+        ...(status === 'completed' ? { output: run.output } : {}),
+        ...(message ? { error: { message } } : {}),
+    };
 }

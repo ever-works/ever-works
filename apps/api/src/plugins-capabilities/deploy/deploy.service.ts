@@ -1,5 +1,7 @@
 import {
     BadRequestException,
+    HttpException,
+    HttpStatus,
     Injectable,
     InternalServerErrorException,
     Logger,
@@ -36,7 +38,7 @@ import {
     SubdomainAllocator,
     EverWorksDbProvisionService,
 } from '@ever-works/agent/ever-works-providers';
-import { isRepositoryWorkKind } from '@ever-works/contracts';
+import { isAppWorkKind, isRepositoryWorkKind } from '@ever-works/contracts';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -44,6 +46,10 @@ import {
     WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
+import {
+    AppDeployRequestService,
+    type AppDeployRequestResult,
+} from '@ever-works/agent/app-runtime';
 import type {
     DeploymentConfig,
     DeploymentResult,
@@ -84,6 +90,14 @@ export interface DeployOptions {
 export interface DeployResult {
     dispatched: boolean;
     deploymentId: string;
+    /**
+     * App Works only (APW-06 §2.2): `true` when the request was put in the
+     * latest-wins queue behind the Deployment holding the lock (or matched the
+     * entry already there). Absent otherwise — in particular for an ACCEPTED
+     * request whose dispatch was still in flight when FR-23's 2 s budget ran out,
+     * which is `dispatched: false` too but is not queued behind anything.
+     */
+    queued?: boolean;
 }
 
 /**
@@ -128,6 +142,15 @@ export class DeployService {
         // fixtures that construct DeployService directly keep working (a
         // missing provider means "don't auto-provision", same as feature-off).
         private readonly dbProvisionService?: EverWorksDbProvisionService,
+        // APW-06 §2.2's SECOND caller. `deploy()` is reached by the batch route
+        // and `POST /api/deploy/works/:id` (the legacy rollback route refuses an
+        // App Work first); an App Work arriving through either must take the App
+        // path, not the website one.
+        // Optional in DI for the same reason as the two above — fixtures
+        // construct this service directly — and an absent service is a named
+        // refusal rather than a silent fall-through to the website path, which
+        // would push the member's App repository at a website provider.
+        private readonly appDeployRequest?: AppDeployRequestService,
     ) {}
 
     /**
@@ -173,6 +196,80 @@ export class DeployService {
      * Returns the dispatched flag plus the deployment-history row id so the
      * caller can start verification keyed by environment.
      */
+    /**
+     * APW-06 §2.2 — route an App Work's deploy to the App request path.
+     *
+     * `DeployResult` carries `{ dispatched, deploymentId }`, which is what every
+     * caller of {@link deploy} reads, so an ACCEPTED or QUEUED request maps
+     * straight onto it. A refusal cannot: the callers treat a resolved
+     * `DeployResult` as "we queued something", and `deployBatch` records it as a
+     * success. So a refusal throws, carrying the request service's own status
+     * and code — `422 APP_DEPLOY_PRECONDITIONS`, `409 APP_DEPLOY_IN_PROGRESS`,
+     * `422 worker_not_isolated` — which is the same body
+     * `work-app-deploy.controller.ts` answers with, so the two paths cannot
+     * describe one refusal two ways.
+     *
+     * `trigger` is `manual` rather than the caller's `triggerSource`: the FR-23
+     * sources are a different vocabulary (`manual` · `build` · `domain-change` ·
+     * `rollback` · `target-saved`) and mapping `scheduled` onto one of them would
+     * invent a source the spec does not have. A scheduled App deploy is a manual
+     * one as far as the Deployment row is concerned, until APW-06 gives
+     * schedules a source of their own.
+     */
+    private async deployAppWork(
+        workId: string,
+        userId: string,
+        options: DeployOptions,
+    ): Promise<DeployResult> {
+        if (!this.appDeployRequest) {
+            throw new BadRequestException({
+                status: 'error',
+                code: 'app_deploy_unavailable',
+                message:
+                    'This process cannot request an App Work Deployment: the App deploy request ' +
+                    'service is not available. Nothing was queued.',
+            });
+        }
+
+        const result: AppDeployRequestResult = await this.appDeployRequest.request({
+            workId,
+            userId,
+            trigger: 'manual',
+            ...(options.commitSha ? { headCommitSha: options.commitSha } : {}),
+            ...(options.branch ? { branch: options.branch } : {}),
+        });
+
+        if (result.status === 'refused' || !result.deploymentId) {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: result.code ?? 'app_deploy_refused',
+                    message:
+                        result.unmet[0]?.message ??
+                        'The App Work Deployment was refused; nothing was queued.',
+                    unmet: result.unmet,
+                },
+                result.httpStatus || HttpStatus.UNPROCESSABLE_ENTITY,
+            );
+        }
+
+        // Two successes answer `dispatched: false`, and they are not the same:
+        //  - `queued`: the row is in the latest-wins queue of one and runs when the
+        //    Deployment holding the lock releases it — reported with `queued: true`;
+        //  - `accepted` with the dispatch still in flight when FR-23's 2 s budget
+        //    ran out (`app-deploy-request.service.ts`, `dispatch`): nothing is
+        //    queued, the dispatch is simply not confirmed yet.
+        // `dispatched` means "the dispatcher answered inside the budget", nothing more.
+        if (result.status === 'queued') {
+            return {
+                dispatched: result.dispatched,
+                deploymentId: result.deploymentId,
+                queued: true,
+            };
+        }
+        return { dispatched: result.dispatched, deploymentId: result.deploymentId };
+    }
+
     async deploy(
         workId: string,
         userId: string,
@@ -199,6 +296,23 @@ export class DeployService {
             throw new BadRequestException(
                 `Work "${candidate.slug}" is a Repository Work — it has no website repository and nothing to deploy`,
             );
+        }
+
+        // APW-06 §2.2 — an App Work deploys to a Kubernetes cluster through its
+        // own runtime state, not to a website provider. Checked here, beside the
+        // Repository-Work refusal and BEFORE the facade resolves a provider, for
+        // the same reason that one is: `resolvePluginAndTokenWithWork` would
+        // throw `NoDeployProviderError` first and the member would be told their
+        // configuration is wrong when the real answer is that this Work deploys
+        // somewhere else entirely.
+        //
+        // The member-facing route is `POST /api/works/:id/deploy`
+        // (`work-app-deploy.controller.ts`). This branch is what catches the
+        // OTHER callers — `deployBatch` and the legacy `POST /api/deploy/works/:id`
+        // — so one deploy lock serves all of them. (The legacy rollback route
+        // refuses an App Work before it gets here: APW-06 T34.)
+        if (candidate && isAppWorkKind(candidate.kind)) {
+            return this.deployAppWork(candidate.id, userId, options);
         }
 
         const { plugin, token, work, settings, settingSources } =
@@ -462,14 +576,30 @@ export class DeployService {
                 };
             }
 
-            const { dispatched, deploymentId } = await this.deploy(workId, userId, { teamScope });
+            const { dispatched, deploymentId, queued } = await this.deploy(workId, userId, {
+                teamScope,
+            });
+
+            // APW-06 T34: for an App Work a RESOLVED result is always a success —
+            // `deployAppWork` throws every refusal, which lands in the catch below —
+            // so `dispatched: false` is never "failed to initiate" there. It is
+            // either QUEUED behind the Deployment holding the lock (`queued: true`)
+            // or a dispatch still in flight past FR-23's 2 s budget, which is
+            // pending but queued behind nothing.
+            const started = dispatched || isAppWorkKind(work.kind);
 
             return {
                 workId,
                 deploymentId,
                 slug: work.slug,
-                status: dispatched ? 'pending' : 'error',
-                message: dispatched ? 'Deployment started' : 'Failed to initiate deployment',
+                status: started ? 'pending' : 'error',
+                message: dispatched
+                    ? 'Deployment started'
+                    : !started
+                      ? 'Failed to initiate deployment'
+                      : queued
+                        ? 'Deployment queued'
+                        : 'Deployment pending',
                 owner: work.getRepoOwner('website'),
                 repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             };

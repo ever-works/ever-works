@@ -1,0 +1,386 @@
+[
+ {
+  "id": "APW01-G01",
+  "area": "APW-01",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "Prerequisites and merge order omit the tasks APW-01 P1 actually compiles against (APW-03 P2/P3, APW-06 T2-T3, APW-13 P0)",
+  "evidence": "APW-01 tasks.md:22 lists only 'APW-02 P0/P1 and APW-03 P1 (resolver, App spec service, apply job, commitFiles?, AppsCatalogBrowser)'. In APW-03 tasks.md those are Phase P2 (line 310): T22 commitFiles? (314), T26 resolver + AppSourceCatalogAdapter (366), T28 apply job (393), T32 AppsCatalogBrowser (446); AppLicenseService is Phase P3 T42 (505, 548). APW-01 T12/T13/T14 inject APPS_TIER_POLICY from packages/agent/src/app-runtime/ports.ts and test supportsApps, but those are created by APW-06 T3 (APW-06 tasks.md:71) and T2 (55); TRACKER.md:32 merges 'APW-01 P1 -> APW-05 P1 -> APW-06 P1', so ports.ts does not exist when APW-01 is built. T40 needs APW-13 P0 fake GitHub (APW-13 tasks.md T2/T5), which TRACKER merge order never schedules before APW-01. README.md:245 lists APW-01 Dep as only 'APW-02 P0'.",
+  "proposedFix": "Rewrite the tasks.md Prerequisites line to name exact tasks: APW-03 T1-T21 plus T22, T26, T28, T32 (and T42 or state AppLicenseService is @Optional until APW-03 P3), APW-06 T2-T3, APW-13 T1-T5 for T40. Either move those APW-03/APW-06 tasks into their P1 or reorder TRACKER merge order (APW-03 P2 and APW-06 T2-T3 before APW-01 P1) and fix README §5 Dep column.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-01-app-work-kind/tasks.md",
+   "docs/specs/features/app-works/APW-01-app-work-kind/plan.md",
+   "docs/specs/features/app-works/TRACKER.md",
+   "docs/specs/features/app-works/README.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "XC-02",
+  "area": "APW-02",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "New upstream workflows run before Actions hygiene and can read the repository's EW_ secrets",
+  "evidence": "APW-02 FR-28 (spec line 298) runs hygiene only AFTER a sync that changed the tracked branch. S18 (lines 191-194) disables a new workflow only 'once the sync pull request is merged'. S4/FR-35 fast-forwards the tracked branch directly, which fires `push` events. The sync PR comes from a branch in the same repository, so workflows it adds run on `pull_request` with repository secrets. CONTRACTS §9 line 436 stores build values as repository-level Actions secrets (`EW_`), which any workflow can read. FR-27 also keeps inherited workflows the member turned back on. The result: a workflow added upstream runs with the user's build secrets before hygiene ever sees it.",
+  "proposedFix": "Before a fast-forward, or before creating or updating the sync PR, diff the upstream range for `.github/workflows/**`. When workflows changed, never fast-forward and say so on the card. Make APW-05 scope EW_ secrets to an environment or branch policy that only ever-works-build.yml on the tracked branch can read, so inherited or new workflows cannot reference them. Add an ACC: an upstream commit adding an on:push workflow that echoes secrets is synced and the canary sees nothing.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-02-fork-lifecycle/spec.md",
+   "docs/specs/features/app-works/APW-02-fork-lifecycle/plan.md",
+   "docs/specs/features/app-works/APW-05-builds/plan.md",
+   "docs/specs/features/app-works/CONTRACTS.md",
+   "docs/specs/features/app-works/ACCEPTANCE.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW03-G01",
+  "area": "APW-03",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "APW-03 P2 and APW-01/APW-06 depend on each other in a loop; no merge order can satisfy them",
+  "evidence": "APW-01 tasks.md:22-24 requires 'APW-03 P1 (resolver, App spec service, apply job, commitFiles?, AppsCatalogBrowser)' merged first. In APW-03 tasks.md those pieces are P2: T22 (line 314), T26 (366), T28 (393), T32 (446). APW-03 T26 (tasks.md:372-375) binds APW-01's APP_SOURCE_CATALOG_PORT in packages/agent/src/app-works/app-source-catalog.port.ts, which APW-01 T11 creates (APW-01 tasks.md:175-178). That folder comes from APW-02 T15. APW-03 T24 (tasks.md:343-345) injects APPS_TIER_POLICY from packages/agent/src/app-runtime/ports.ts, which APW-06 T3 creates (APW-06 tasks.md:71-72); APW-06 P1 merges after APW-01 (TRACKER.md:33). TRACKER.md:31-33 schedules only APW-03 P1 and never places APW-03 P2 or P3. At HEAD, neither packages/agent/src/app-works/ nor packages/agent/src/app-runtime/ exists (ls).",
+  "proposedFix": "Pick one order and write it down. Either (a) APW-03 T24 and T26 create the port and token files with the exact CONTRACTS §3 shapes when absent, and the owning epic's task becomes 'modify if present', or (b) move T22/T26/T28/T32/T53 into an APW-03 phase listed before APW-01 in TRACKER, with APW-01 T11 and APW-06 T3 split out as tiny prerequisite PRs. Add APW-03 P2 and P3 to the TRACKER merge order. Fix APW-01's prerequisite line to say 'APW-03 P2'.",
+  "targetFiles": [
+   "docs/specs/features/app-works/TRACKER.md",
+   "docs/specs/features/app-works/APW-03-app-spec-and-catalog/tasks.md",
+   "docs/specs/features/app-works/APW-01-app-work-kind/tasks.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/tasks.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "EXT-01",
+  "area": "APW-03",
+  "kind": "missing-artifact",
+  "severity": "blocker",
+  "title": "Apps catalog repository ever-works/apps does not exist; only its format is specified",
+  "evidence": "gh api GET repos/ever-works/apps returns 404 (2026-09-17). APW-03 catalog.md sections 2-8 define the layout (manifest.json, licenses.yml, schema/manifest.schema.json, schema/licenses.schema.json, schema/app-spec.schema.json, icons/, evidence/, scripts/validate.mjs with checks C1-C12, workflows validate.yml, schema-sync.yml, verify-expiry.yml, CODEOWNERS, CONTRIBUTING.md, README.md, test-only e2e branch), but no file of that tree is drafted anywhere in the program folder (the folder holds no .json file at all). APW-03 T33 and APW-13 T29 create it; the platform default EVER_WORKS_APPS_CATALOG_REPO is ever-works/apps, ACCEPTANCE 0.3 pins dev/stage to its e2e branch, and the only manifest entry shown (catalog.md 3.3) carries a fake sha. The Blueprint path of ACC-E2E-05 and ACC-E2E-14 cannot run without it.",
+  "proposedFix": "Draft the complete repository tree in docs/specs/features/app-works/APW-03-app-spec-and-catalog/apps-catalog-draft/: manifest.json with three beta/candidate entries (app-fixture-hello, umami, cal-diy; sha fields marked as release placeholders), schema/manifest.schema.json and schema/licenses.schema.json matching catalog.md 3-4, scripts/validate.mjs implementing C1-C12 with scripts/__tests__/validate.test.mjs (one failing fixture per check, incl. red C5 and amber-without-agreement C6), the three workflows, CODEOWNERS with a named reviewer-team placeholder, CONTRIBUTING.md, README.md, evidence/README.md and e2e-branch/manifest.json listing test upstreams by placeholder. Owner then creates the public repository, protects main with validate.yml required, and tags the first release.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-03-app-spec-and-catalog/apps-catalog-draft/",
+   "docs/specs/features/app-works/APW-03-app-spec-and-catalog/tasks.md",
+   "ever-works/apps:manifest.json",
+   "ever-works/apps:scripts/validate.mjs"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW04-G01",
+  "area": "APW-04",
+  "kind": "missing-task",
+  "severity": "blocker",
+  "title": "No execution path puts a provisioning Task run inside the restricted-network managed sandbox",
+  "evidence": "plan.md:176-182 and tasks.md:63-69 (T3) say the worker 'passes the row's runtimeEnvironment and attachedRepos to the pipeline'. But the worker calls AgentRunService.execute (packages/tasks/src/tasks/trigger/agent-task-execute.task.ts:314, 605-623). AgentRunContext (packages/agent/src/agents/agent-run.service.ts:74-142) has no runtimeEnvironment or attachedRepos field, and the run is an in-process tool loop over AiFacadeService.createChatCompletion (apps/api/src/agents/agents.module.ts:498-590; agent-run.service.ts:656). runtimeEnvironment is only threaded through FullPipelineExecutorService / PipelineFacadeService (git grep), and nothing on the platform ever passes attachedRepos. claude-managed-agent is a Work-generation pipeline: execute(work, GenerationRequest, existing, options), fixed buildSystemPrompt(), seed manifest, perSessionBudgetUsd read from plugin config (claude-managed-agent.plugin.ts:440-640). It pins allow_mcp_servers:false (utils/runtime-environment.ts:45-52), so the platform tools the Skill needs (ask_human, appProvisionReport, appSpecValidateDraft; T15 registers them in agent-tool.service.ts, i.e. the in-process loop) are unreachable from the sandbox. No task builds a session runner, a way to return the final message, or a per-run budget override. T1 only adds a flag, T14 only builds a constant.",
+  "proposedFix": "Add a P0/P1 task (and plan section) for a provisioning session runner. It opens a managed session with the pre-resolved Environment, mounts the data repository, sends the Skill body plus the brief as the prompt, sets a per-run USD budget, waits for idle and returns the final assistant text to the job, which records tokens on the AgentRun. Drop the in-sandbox platform tools: questions come through the provision-output 'question' outcome and validation runs in the job. Alternatively, record an owner decision on a different isolated runtime. Update T1, T3, T14, T15, the Skill draft (allowedTools), and CONTRACTS §3 if a new capability method is needed.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-04-app-provisioner/plan.md",
+   "docs/specs/features/app-works/APW-04-app-provisioner/tasks.md",
+   "docs/specs/features/app-works/APW-04-app-provisioner/skill-draft/SKILL.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "APW05-G01",
+  "area": "APW-05",
+  "kind": "missing-task",
+  "severity": "blocker",
+  "title": "Push and pull-request runs are never discovered without a webhook, and no task installs one",
+  "evidence": "spec.md:290-292 (FR-34 says a push Build is recorded 'by event or by polling'; FR-35) and spec.md:159-160 (S18), ACC-05-11 (spec.md:576). plan.md:80 admits 'No webhook is guaranteed. Repository webhooks are APW-02 (createWebhook?)'. No epic calls createWebhook: grep over docs/specs/features/app-works finds it only in CONTRACTS.md:272 and APW-02 plan/tasks, and APW-02 tasks.md:294-299 only implements the plugin method. The only poller, plan.md:989-996 (§7.4), selects existing work_builds rows with status queued/running, so it cannot create a Build for a new push run. plan.md:715-716 names listWorkflowRuns(head_sha), but no task calls it for discovery. Downstream: APW-08 plan.md:230-233 reconciles merges against the 'newest WorkBuild rows… created after the merge', and ACCEPTANCE.md:429 (E2E-07) expects a deployable Build for merge_commit_sha. Both stall when no delivery arrives. The platform App is not installed on personal forks connected through OAuth.",
+  "proposedFix": "Add a P1 task. (a) Install or update a repository webhook for workflow_run on every App Work data repository through APW-02's createWebhook?: name the URL (/api/ingest/github/events), the per-install secret source, events [workflow_run], when it runs (after prepareRepository first succeeds) and removal on delete. (b) Extend app-build-sweep with a per-App-Work discovery pass: list runs of APP_BUILD_WORKFLOW_PATH since the last seen run id, upsert push and pull_request runs through upsertByProviderRun, and add a cursor column or setting plus a batch limit. Add a CONTRACTS §3 row naming APW-05 as the createWebhook caller, and tests in app-build-sweep.service.spec.ts for 'no delivery ⇒ push run recorded within 3 min'.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-05-builds/plan.md",
+   "docs/specs/features/app-works/APW-05-builds/tasks.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "APW05-G02",
+  "area": "APW-05",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "The App Provisioner's verification Build cannot run: no workflow exists yet, and verify mode builds no image",
+  "evidence": "The workflow is only generated from the applied (effective) App spec: plan.md:963-966 (§7.2 step 1) and plan.md:1010-1013 (listener fires only on app.spec.applied or app.env.changed). APW-04 plan.md:158-161 verifies the proposal's PR head before merge ('open PR … validate … startBuild(head, verification)'), and that PR adds only the App spec and maybe a Dockerfile (README D5). So no ever-works-build.yml exists on the default branch or in the PR. workflow_dispatch needs the workflow file on the default branch, and the pull_request trigger (S6, spec.md:108-110) needs it in the PR. The normative sketch also skips building: the build, secret-check and Push steps carry `if: inputs.ew_mode != 'verify'` (plan.md:189, 213, 217). The dispatch inputs (plan.md:155-159) have no field for reuseImageDigest, so 'Verify in the runner' (plan.md:219-222) has no image. plan.md:758-762 and FR-52 (spec.md:334-337) say verification builds the image or reuses a confirmed digest.",
+  "proposedFix": "Define how a verification run gets a workflow. Options: prepareRepository writes the workflow to the default branch whenever a build plugin is resolvable, before any App spec exists (a checks-less, dispatch-only skeleton), or APW-04's proposal PR includes the generated workflow and startVerification dispatches on the PR branch. Fix the §2.4 sketch: in verify mode, build with load:true and push nothing (or push only a pr-/verify- tag) unless an `ew_reuse_digest` input is set, in which case log in and `docker pull` that digest. Add the input, a golden fixture for verify mode, and a T43 test proving that a verification on an App Work with no workflow dispatches successfully.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-05-builds/plan.md",
+   "docs/specs/features/app-works/APW-05-builds/tasks.md",
+   "docs/specs/features/app-works/APW-04-app-provisioner/plan.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "APW05-G03",
+  "area": "APW-05",
+  "kind": "underspecified",
+  "severity": "blocker",
+  "title": "Push-started Builds can never be deployable, and per-App-Work preparation state has no defined storage",
+  "evidence": "plan.md:902-905: the verdict requires `secretsSyncedAt <= startedAt && buildInputsHash == currentInputsHash`, otherwise staleInputs. Those values live only as work_builds columns (plan.md:281-283). They are 'persisted' in §7.2 step 5 (plan.md:972) only for a requested manual or verification Build. The consumer creates push and PR Builds (plan.md:998-1006) and stamps neither value, so every push Build gets NULL and fails the verdict. T20 (tasks.md:322-324) still expects a push Build to be `deployable: true`, and ACCEPTANCE.md:332-333 and 429 depend on it. PrepareRepositoryInput needs previouslyWrittenSecretNames and lastWrittenWorkflowSha256 (plan.md:513-514), but only workflowSha256 and workflowPullRequestNumber get a home, as 'Work-scoped plugin settings' (plan.md:698-699). Those keys are missing from the settings schema (plan.md:647-655, T7 tasks.md:122-125), so the settings scope validator would refuse them, and users could PATCH them. The list response's `workflow: { state, pullRequestUrl }` (plan.md:869) cannot be derived from them.",
+  "proposedFix": "Choose one storage for per-App-Work preparation state: lastBuildInputsHash, lastSecretsSyncedAt, writtenSecretNames[], workflowSha256, workflowState, workflowPullRequestNumber and workflowPullRequestUrl. Either add columns on a small work_build_preparations table in the 17920500 migration, or add platform-only, non-user-writable plugin settings keys declared in the schema. The consumer then stamps secretsSyncedAt and buildInputsHash from that state when it inserts push and PR Builds. Update T4/T5/T6, T19 and T24, and add a T20 case where a push Build created by the consumer is deployable.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-05-builds/plan.md",
+   "docs/specs/features/app-works/APW-05-builds/tasks.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "XC-01",
+  "area": "APW-05",
+  "kind": "missing-task",
+  "severity": "blocker",
+  "title": "Pull-request and verification builds hand every EW_ build secret to code no human has reviewed",
+  "evidence": "In the APW-05 plan §2 workflow, the build job's `if` (line 166) admits pull requests from the same repository, and build-args pass `<NAME>=${{ secrets.EW_<NAME> }}` (line 202). Agents open their pull requests from branches in that same repository: App Provisioner proposals, evolve-loop Task branches (APW-08) and the `ever-works/upstream-sync` branch (APW-02). Those branches build the PR head's Dockerfile and package scripts on GitHub-hosted runners, which have open egress. FR-21 (spec line 255) scans only the image metadata. FR-53 also sends owner-set prompted values to the agent-written proposal through `EW_VERIFY__PROMPTED`. The APW-08 FR-20 guard protects `.github/workflows/**` but not Dockerfiles or `package.json`. ACC-NEG-05 plants the honeytoken \"under a name no fixture code reads\" (ACCEPTANCE.md line 366), so it passes even though nothing blocks the leak.",
+  "proposedFix": "APW-05: pull-request and verification builds get no secret build value. Use throwaway generated values; these builds are already not deployable. Alternatively, move EW_ values into a GitHub Environment limited to the tracked branch and the ever-works-build workflow. Deliver prompted values to a verification only after the owner approves the diff of the build files (Dockerfile, lockfiles, package scripts). Add an ACC: the honeytoken is a `fromEnv` build value that the injection fixture's Dockerfile reads on an agent PR, and the canary sink receives nothing. Update ACC-NEG-05.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-05-builds/spec.md",
+   "docs/specs/features/app-works/APW-05-builds/plan.md",
+   "docs/specs/features/app-works/APW-05-builds/tasks.md",
+   "docs/specs/features/app-works/APW-04-app-provisioner/spec.md",
+   "docs/specs/features/app-works/ACCEPTANCE.md",
+   "docs/specs/features/app-works/APW-13-golden-paths/plan.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "GAP-07",
+  "area": "APW-05",
+  "kind": "missing-task",
+  "severity": "blocker",
+  "title": "Push and pull-request Builds are discovered only from webhook deliveries, and no epic installs a webhook on the data repository",
+  "evidence": "APW-05 plan §7.5 (L998-1004): only `AppBuildWorkflowRunConsumer` creates Build rows for push and pull_request runs. The sweep (§7.4 L991-996) only re-polls existing `queued`/`running` rows. The plan admits 'No webhook is guaranteed … App deliveries may not cover a fork' (L80). EXISTING-SUBSTRATE L70: 'nothing installs a webhook on a user repository'. APW-02 FR-55 (spec L360) adds only the `createWebhook?` capability, and no task in APW-02 or APW-05 calls it. APW-05 spec FR-34 (L290) still promises discovery 'by event or by polling'. Without a delivery, the first Build (workflow commit), every post-merge Build (ACC-E2E-07/14) and sync-merge Builds are never recorded. Consequently `app.build.succeeded` never fires, auto-deploy never starts and APW-08 delivery stays at `merged` (APW-08 plan L230-233 only reads WorkBuild rows).",
+  "proposedFix": "Pick one or both. (1) APW-05 `app-build-prepare` installs the signed repository webhook (events workflow_run, push, pull_request) through APW-02 `createWebhook` after writing the workflow, and removes it on App Work deletion. (2) Add a discovery pass to `app-build-sweep`: for each App Work whose tracked-branch head (or open same-repo PR head) has no Build row, call `listWorkflowRuns(file, head_sha)` and upsert. Add tests and update CONTRACTS §5.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-05-builds/spec.md",
+   "docs/specs/features/app-works/APW-05-builds/plan.md",
+   "docs/specs/features/app-works/APW-05-builds/tasks.md",
+   "docs/specs/features/app-works/APW-02-fork-lifecycle/tasks.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW06-G01",
+  "area": "APW-06",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "Saving the App Work kubeconfig through the existing Work plugin-settings route connects to the pasted cluster from the API process, before any App guard runs",
+  "evidence": "plan.md:815 says the kubeconfig for `POST :id/app-target/check` is saved through the existing plugin-settings API first. At HEAD, apps/api/src/plugins/plugins.controller.ts:536-570 (`@Patch('works/:workId/plugins/:pluginId/settings')`) calls `pluginValidationService.tryValidateConnection(pluginId, userId, workId)` right after the save. plugin-validation.service.ts:121-147 then calls `plugin.validateConnection(settings)`, and packages/plugins/k8s/src/k8s.plugin.ts:595-616 loads the kubeconfig and dials it (`this.api.validateConnection(cfg.kubeconfig, …)`). This happens in the API process, before `assertSupportedKubeconfig`, the public-address check or the isolated worker. It contradicts spec FR-3 (refused before any connection attempt), FR-4, FR-5 and ACC-06-02/03/04. No task (T33, T36, T37) names another save path.",
+  "proposedFix": "Add a dedicated route, `PUT /api/works/:id/app-target` (or `POST app-target/kubeconfig`), that stores the kubeconfig as the Work-scoped x-secret without calling `tryValidateConnection`. It first runs the pure structural checks of `assertSupportedKubeconfig` (no DNS, no dialing) in the API, then dispatches `cluster-check` to the worker. Say explicitly in plan §9.1 and T33/T37 that the App path must never use `PATCH /api/works/:workId/plugins/k8s/settings` for kind `app`. Add a controller test with a spy on `KubernetesPlugin.validateConnection` that records zero calls, and add the route to CONTRACTS §4.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-06-app-runtime/plan.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/tasks.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "APW06-G02",
+  "area": "APW-06",
+  "kind": "underspecified",
+  "severity": "blocker",
+  "title": "The Trigger worker cannot host app-deploy as planned: in-process services, event relay to Activity, dispatcher wiring and the no-runtime fallback are all undefined",
+  "evidence": "T32 (tasks.md:441-451) creates four Trigger tasks but never names the Nest module they boot. At HEAD, worker services reach the API through remote proxies (packages/tasks/src/trigger/worker/modules/trigger-internal.module.ts:51-60 onward, served by apps/api/src/trigger/trigger-internal.controller.ts:163-201,456). If `app-deploy` follows that pattern, the cluster is dialled from the API, which breaks FR-5. If it does not, nothing says which repositories, AppSpec/license/env sources or NotificationService run in the worker. T28 maps Activity with `@OnEvent` in apps/api/src/activity-log/activity-log.listener.ts, but events emitted with EventEmitter2 inside the worker never reach that API-process listener. plan.md:667 says the facade throws when *constructed* outside the worker, yet T20 (tasks.md:295-302) registers it in `FacadesModule`, which the API boots. T31 (tasks.md:428-439) also leaves out three things. (a) The `TriggerService.dispatchAppDeploy/…` methods that back the provider's `dispatchers` view: a recent dispatcher needed `packages/tasks/src/trigger/trigger.service.ts:700`. (b) The arity pin at `packages/agent/src/tasks/__tests__/job-runtime.providers.spec.ts:134-143`. (c) What happens when the registry returns `null` (job-runtime.providers.ts:160-176: the call site's in-process dev fallback), which would run cluster I/O in the API and leaves the PR — cluster lane with no runtime.",
+  "proposedFix": "Add a plan section 'Worker composition' that covers five things. (1) A new `TriggerAppRuntimeModule`, listing each provider as real (DatabaseModule, TriggerPluginsModule, AppRuntime services, repositories) or remote-proxied. (2) How Activity and notifications cross the process boundary, either an `ActivityLogService`/`NotificationService` remote proxy or a proxied API method that emits the event. (3) The facade throws on call, not on construction. (4) The `TriggerService` dispatch methods, plus the arity-spec update. (5) The null-runtime behaviour: refuse with `worker_not_isolated` in production; outside production use an explicit local worker mode for the PR — cluster lane. Add a boot test that creates the module's application context.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-06-app-runtime/plan.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/tasks.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "GAP-06",
+  "area": "APW-06",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "Circular ordering: in-cluster dependencies need namespace policies that only a Deployment creates, while a Deployment needs dependencies Ready",
+  "evidence": "APW-07 plan §4.9 (L533-535): k8s providers 'verify both [`ew-default-deny` + `ew-allow-deps`] exist before provisioning and otherwise fail `namespacePoliciesMissing`'; objects live 'in the App Work's namespace chosen by APW-06'. APW-06 creates the Namespace and NetworkPolicies only in Deployment phase 1 `prepare` (plan §4.2 L313; spec FR-26 row 1), and FR-10 names the namespace 'at first Deployment'. APW-06 FR-24 (spec L325-329) refuses to start a Deployment until 'every dependency is ready'. No `app-cluster-op` creates the namespace beforehand (plan §9.2). The two policies also disagree in meaning: APW-06 `ew-allow-deps` covers egress to dependencies outside the namespace (plan L434). Every App Work with postgres on Your cluster (fixture, Umami, Cal.diy) can never reach a first Deployment.",
+  "proposedFix": "Add an APW-06 `app-cluster-op` op `prepare-namespace` (namespace, labels, `ew-default-deny`, `ew-allow-same-namespace`), run when the target is saved or checked and before dependency provisioning. Expose it as `AppRuntimeTargetResolver.ensureNamespace(workId)` in CONTRACTS §3. Make APW-07 providers check for `ew-allow-same-namespace` rather than `ew-allow-deps`. Update ACCEPTANCE E2E-05 event order.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-06-app-runtime/spec.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/plan.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/tasks.md",
+   "docs/specs/features/app-works/APW-07-app-env-and-dependencies/plan.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW07-G01",
+  "area": "APW-07",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "First Deployment deadlocks: dependency providers need a namespace and policies that APW-06 only creates during a Deployment, and a Deployment waits for ready dependencies",
+  "evidence": "APW-07 plan.md:533-535 says the provider checks that `ew-default-deny` and `ew-allow-deps` exist before provisioning and otherwise fails with `namespacePoliciesMissing`. T19 (tasks.md:263-264) tests that. APW-06 plan.md:713 says `namespace` is 'Frozen at first Deployment', and the five policies are drawn by the App renderer inside deployApp (APW-06 plan.md:301, 425-436). APW-06 refuses a Deployment on `dependency_not_ready` (APW-06 plan.md:493), and APW-07 FR-26/FR-41 require dependencies to be ready before the first Deployment. The result is a circular wait. Two more problems: `ew-allow-deps` in APW-06 only allows egress to outside addresses (APW-06 plan.md:434), so it is not what keeps other pods away from the dependency pods (T19's reason for ACC-07-14 is wrong). And with `isolation: false` no policies are drawn at all (APW-06 plan.md:436), so FR-38 cannot hold and every provider would fail.",
+  "proposedFix": "Add a CONTRACTS §3 row owned by APW-06 for a runtime target preparation step. On target save or connection check it fixes and stores the namespace, and an `app-cluster-op` op (e.g. `prepare-namespace`) applies the namespace, the policies and the LimitRange before any dependency is provisioned. Change APW-07 plan §4.9 and T19 to check the policies APW-06 really draws (`ew-default-deny` + `ew-allow-same-namespace`). Add a dependency-scoped ingress policy `dep-<kind>` that admits only the app's pod labels, and define what happens when isolation is off (draw `dep-<kind>` anyway, or show a warning). Add the matching APW-06 task.",
+  "targetFiles": [
+   "docs/specs/features/app-works/CONTRACTS.md",
+   "docs/specs/features/app-works/APW-07-app-env-and-dependencies/plan.md",
+   "docs/specs/features/app-works/APW-07-app-env-and-dependencies/tasks.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/plan.md",
+   "docs/specs/features/app-works/APW-06-app-runtime/tasks.md"
+  ],
+  "confirmed": true
+ },
+ {
+  "id": "APW10-G01",
+  "area": "APW-10",
+  "kind": "missing-task",
+  "severity": "blocker",
+  "title": "In-zone App dependency provisioning is contracted to APW-10 but no APW-10 task builds it",
+  "evidence": "CONTRACTS.md:300 names APW-10 as owner of `Work.status.dependencies[] { kind, ref, phase, lastBackupAt }`, of swapping `ew-dep://<kind>/<output>` tokens inside the sealed env for real values in the zone, and of applying the tenant Postgres DDL from `packages/contracts/src/apps/tenant-postgres-ddl.ts`. APW-07 plan.md:576-592 and tasks.md:427-460 (T35-T37) assume the zone controller creates managed Postgres, Redis and object storage, does that token swap and reports readiness and lastBackupAt. APW-10 spec.md:506 marks 'provisioning dependencies (APW-07)' out of scope. In APW-10 tasks.md, dependencies appear only as a CRD field (T3, line 90) and as the removal condition (T39, lines 596-602), which waits for `released` — and nothing ever sets `released`. IAppsTierProvider (plan.md:469-488) has no dependency method, yet APW-07 T36 writes `{kind, ref}` 'through IAppsTierProvider.applyWork', which replaces the whole desired state. LG-14 (plan.md:389) only checks CROSS_TENANT_DB_REACHABLE, while APW-07 relies on LG-14 for ACC-07-26 (20-connection cap, 60 s statement timeout). ACC-E2E-10 (b) dependency cards and ACC-10-47 data deletion cannot pass.",
+  "proposedFix": "Add P2 tasks to APW-10: (1) `apps/apps-tier-controller/src/dependencies/dependency.reconciler.ts` runs `buildTenantPostgresDdl`, creates per-Work Redis and a bucket with its user on tier data servers named in a new zone-config Secret shape, and writes `status.dependencies[]` with phase `pending|ready|failed|released` and `lastBackupAt`. (2) `src/seal/dep-token-substitution.ts` swaps `ew-dep://` tokens after unsealing and refuses unknown tokens with a new code `DEPENDENCY_TOKEN_UNKNOWN`. (3) Add `setDependencies(workId, deps)` and `releaseDependencies(workId, { deleteData })` to IAppsTierProvider and CONTRACTS row 295, and point APW-07 T36 at them instead of applyWork. (4) Extend the LG-14 probe with CONNECTION_LIMIT_NOT_ENFORCED and STATEMENT_TIMEOUT_NOT_ENFORCED. (5) Fix the out-of-scope line in spec §7. Add a unit spec next to each new file.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-10-apps-hosting-tier/tasks.md",
+   "docs/specs/features/app-works/APW-10-apps-hosting-tier/plan.md",
+   "docs/specs/features/app-works/APW-10-apps-hosting-tier/spec.md",
+   "docs/specs/features/app-works/CONTRACTS.md",
+   "docs/specs/features/app-works/APW-07-app-env-and-dependencies/tasks.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "GAP-22",
+  "area": "APW-10",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "No SMTP dependency can work on Ever Works Apps; Cal.diy and the fixture (ACC-E2E-10b) both require one",
+  "evidence": "Cal.diy (works.yml L93) and app-fixture-hello (L66) declare `smtp: { required: true }`. On the tier, LG-08 (APW-10 spec L190) and FR-21 (L270-273) refuse outbound mail ports 25, 465 and 587. APW-07 Wave 2 providers are only managed-postgres, managed-redis and managed-object-storage (FR-51 L352-354; plan L96-97). The zone desired state lists `dependencies: postgres|redis|objectStorage` (APW-10 plan L248), and APW-07 turns every `deps.*` reference into `ew-dep://` tokens that the zone rejects when unknown. No SMTP provider, relay egress exception or token exists for `ever-works-apps`, so ACC-E2E-10 (b) and a managed Cal.diy stay `dependency_not_ready` forever.",
+  "proposedFix": "Add a managed SMTP path for Wave 2: `platform-smtp-relay` supported on target `ever-works-apps` through an allow-listed relay endpoint exempt from LG-08 (per App Work credential, rate-limited), with `smtp` added to `Work.spec.dependencies` and zone token substitution. Or explicitly exclude apps requiring SMTP from Wave 2 and change the fixture's managed profile.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-10-apps-hosting-tier/spec.md",
+   "docs/specs/features/app-works/APW-10-apps-hosting-tier/plan.md",
+   "docs/specs/features/app-works/APW-07-app-env-and-dependencies/spec.md",
+   "docs/specs/features/app-works/APW-07-app-env-and-dependencies/plan.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW13-G01",
+  "area": "APW-13",
+  "kind": "wrong-fact",
+  "severity": "blocker",
+  "title": "No working mechanism gives a throwaway test user a GitHub connection (plugin-settings PAT path is refused)",
+  "evidence": "plan.md:25 says patchPluginSettingsViaAPI -> PATCH /api/plugins/:id/settings is 'how a live run attaches the test user's GitHub token without OAuth'; tasks.md:156-157 (T12) and ACCEPTANCE.md:127-128 rely on it; tasks.md:177 (T14) needs 'a seeded fake connection'. At HEAD packages/plugins/github/src/github.plugin.ts:136 declares configurationMode 'admin-only', its settingsSchema (lines 65-133) has no accessToken field, and packages/agent/src/plugins/services/plugin-operations.service.ts:614-617 + 2094-2100 throw ForbiddenException for any user-scope settings on an admin-only plugin. The facade only reads settings.accessToken (packages/agent/src/facades/git.facade.ts:1685) or an OAuth account row. So every live lane (create/fork/link) and every PR-lane success spec (T14, T15, T16, T30, T31) has no way to connect GitHub.",
+  "proposedFix": "Decide and document one supported path: (a) a user-scope x-secret accessToken setting on the GitHub plugin (hybrid mode) with a security review, or (b) a non-production OAuth account seeding path for the fake plus a real-OAuth pre-connected machine account for live lanes. Update plan §1.1/§8.2, T12, T14, ACCEPTANCE §0.5 and add a CONTRACTS row for whichever surface is chosen.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-13-golden-paths/plan.md",
+   "docs/specs/features/app-works/APW-13-golden-paths/tasks.md",
+   "docs/specs/features/app-works/ACCEPTANCE.md",
+   "docs/specs/features/app-works/CONTRACTS.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW13-G02",
+  "area": "APW-13",
+  "kind": "external-dependency",
+  "severity": "blocker",
+  "title": "PR and PR-cluster lanes start no background job runtime, so fork readiness and all App cluster I/O never run",
+  "evidence": "plan.md:430-432 (§8.4) and plan.md:479-484 (§9.1), tasks.md:164-169 (T13) and tasks.md:347-350 (T34) start only the fake, API and web; .github/workflows/e2e.yml has no Trigger.dev/job-runtime env. APW-01 plan.md:856 and APW-02 plan.md:855 state a null dispatch gives 'dispatch_unavailable' with NO in-process fallback (fork readiness then times out). APW-06 plan.md:664-670 and APW-06 tasks.md:301: App cluster I/O runs only in the Trigger.dev worker on queue app-cluster-io and throws APP_CLUSTER_IO_IN_API elsewhere. Consequence: ACC-E2E-02 PR twin, ACC-NEG-09 (ACCEPTANCE.md:662), APW-01 T40, and the whole kind lane T35 (ACC-13-02/03/08, E2E-05 cluster half) cannot go green.",
+  "proposedFix": "Specify how the PR lanes run the job runtime: a Trigger.dev dev worker with a CI project credential (name the secret, add to ACCEPTANCE §0.4) or a sanctioned non-production local runtime that sets the worker-context flag; add the start step to T13/T34 and the plan lane sections.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-13-golden-paths/plan.md",
+   "docs/specs/features/app-works/APW-13-golden-paths/tasks.md",
+   "docs/specs/features/app-works/ACCEPTANCE.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "GAP-01",
+  "area": "APW-13",
+  "kind": "inconsistency",
+  "severity": "blocker",
+  "title": "All three Blueprint drafts fail APW-03 blueprint-mode validation; Cal.diy and Umami also declare reserved EVER_WORKS_* env names",
+  "evidence": "blueprints/cal-diy/.works/works.yml declares `source` (L22-25) and `blueprint` (L27-31) blocks, plus env entries EVER_WORKS_WEB_INTERNAL_URL (L119), EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL (L134) and EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD (L137). umami/.works/works.yml L76-77 does the same. app-fixture-hello declares source/blueprint (L16-25). APW-03 schema.md L80 says `source` and `blueprint` are forbidden in `blueprint` mode (`blueprint_mode_forbidden_key`), and R23 (L464) makes any `EVER_WORKS_*` env name an error (`reserved_env_name`). APW-07 spec FR-18 (L249-250) also refuses storing such names. catalog.md C4 (L311) runs blueprint-mode validation in catalog CI. APW-03 plan apply step 2 (L267) validates in blueprint mode and aborts. Result: the Cal.diy Blueprint cannot be listed or applied, the admin email and password prompts cannot be stored, and the bootstrap-admin job never gets its inputs, so ACC-E2E-14 and FR-25 of APW-13 cannot pass.",
+  "proposedFix": "Remove `source` and `blueprint` from all three drafts, since APW-03 composes them at apply time. Rename the Cal.diy and Umami variables (for example BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD, WEB_INTERNAL_URL) in both env and job scripts. Add an APW-13 task that runs the APW-03 validator in `blueprint` mode over every draft, as a pre-publication check.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml",
+   "docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml",
+   "docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml",
+   "docs/specs/features/app-works/APW-13-golden-paths/tasks.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "EXT-02",
+  "area": "APW-13",
+  "kind": "missing-artifact",
+  "severity": "blocker",
+  "title": "Blueprint drafts (fixture, Umami, Cal.diy) are not valid Blueprint repositories and would fail catalog check C4",
+  "evidence": "gh api GET repos/ever-works/{app-fixture-hello-template,umami-template,cal-diy-template} all return 404. The drafts under APW-13-golden-paths/blueprints/<id>/ contain only .works/works.yml and README.md. All three works.yml files declare spec.source and spec.blueprint (fixture lines 16-25, umami 19-28, cal-diy 22-31) although APW-03 schema.md section 3 says blueprint mode forbids both keys (blueprint_mode_forbidden_key), so catalog C4 fails; blueprint.sha is forty zeros. The READMEs are maintainer fact sheets and lack the headings catalog.md section 5 requires (What it runs, Dependencies, First run, Known limits, License and trademarks). No overlay.yml, overlay/, LICENSE, tests/ or .github/workflows exist in any draft; the Umami smoke with a request body is left as TODO(verify, APW-06).",
+  "proposedFix": "For each Blueprint, turn docs/specs/features/app-works/APW-13-golden-paths/blueprints/<id>/ into a full repository tree: .works/works.yml in blueprint mode (move the source/blueprint blocks into an examples/data-repository.works.yml), a public README.md with the five required headings, MAINTAINERS.md holding the facts tables (re-checked against APW-13 plan 7.3 so no upstream security observation is published), overlay.yml (files: [] when none), LICENSE (MIT), and the CI workflows defined in EXT-05. Repository creation, topic ever-works-app-blueprint and tags are owner actions.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/",
+   "docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/",
+   "docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/",
+   "docs/specs/features/app-works/APW-03-app-spec-and-catalog/catalog.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "EXT-03",
+  "area": "APW-13",
+  "kind": "missing-artifact",
+  "severity": "blocker",
+  "title": "Fixture application ever-works/app-fixture-hello has no source, image or CI",
+  "evidence": "gh api GET repos/ever-works/app-fixture-hello returns 404. APW-13 plan 4.1-4.5 specifies the file layout, HTTP surface (/, /healthz, /readyz, /marker, /state, /cron/tick, /mail/test), build budget and published image ghcr.io/ever-works/app-fixture-hello:<sha>, and T22 creates it, but no source is drafted in the program. Every PR-cluster, nightly and golden-path lane, ACC-13-01/03 and the kind lane's build.strategy: image path depend on it; the kind lane also needs the GHCR package to be public.",
+  "proposedFix": "Draft the complete application in docs/specs/features/app-works/APW-13-golden-paths/fixture-app-draft/: Dockerfile (stage runtime), package.json with the single pg dependency, src/{server,worker,migrate,bootstrap,greeting,mail}.mjs, migrations/0001-0003, public/brand/logo.svg, test/*.test.mjs (node --test), AGENTS.md, CONTRIBUTING.md with the PR template, .github/workflows/{ci,scheduled,image,variants}.yml, LICENSE. Owner creates the repository as a template repository and makes the GHCR package public.",
+  "targetFiles": [
+   "docs/specs/features/app-works/APW-13-golden-paths/fixture-app-draft/",
+   "docs/specs/features/app-works/APW-13-golden-paths/tasks.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "EXT-04",
+  "area": "APW-13",
+  "kind": "external-dependency",
+  "severity": "blocker",
+  "title": "Test estate (test organizations, machine user, long-lived repos, test cluster, DNS zone, sinks, GitHub environments) does not exist",
+  "evidence": "ACCEPTANCE 0.3-0.4 define placeholders <e2e-upstream-org>, <e2e-fork-org>, <e2e-user>, long-lived <e2e-fork-org>/umami and /cal-diy, license-variant upstreams, <e2e-user-cluster> with wildcard DNS, <e2e-dns-zone>, a mail sink reachable from the cluster, the canary sink, a model-spend budget and managed-agent key, and the GitHub environments app-works-dev/app-works-stage holding the APW_E2E_* secrets. APW-13 T20 and T21 are unchecked owner actions; nothing is recorded as existing. Drift check against the 14 commits after e5f43f44d: the new clone-URL allow-list (packages/contracts/src/fleet/fleet-task-workspace.types.ts isRemoteCloneUrl, token-free https/http/ssh only) does not block a fake GitHub serving http(s) URLs; no other external-artifact drift was found.",
+  "proposedFix": "Owner creates the two organizations and the machine user (read-only on the upstream org), the long-lived repositories, the test cluster(s) with an operations claim procedure, the DNS zone, mail and canary sinks, and the two GitHub environments with the ACCEPTANCE 0.4 secret names; addresses recorded only in the private operations repository; prove with the T20 dry-run dispatch.",
+  "targetFiles": [
+   "docs/specs/features/app-works/ACCEPTANCE.md",
+   "docs/specs/features/app-works/APW-13-golden-paths/tasks.md",
+   "docs/specs/features/app-works/TRACKER.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW13-UF-01",
+  "area": "APW-13",
+  "kind": "wrong-fact",
+  "severity": "blocker",
+  "title": "Umami image switches to a user by NAME; under the platform's runAsNonRoot default the pod is refused",
+  "evidence": "Pin check: umami-software/umami v3.4.0 = commit ec0ff50388c264ed8ce46f00967e92f7e71476ae = master head on 2026-09-17, so the pin is current. Dockerfile runner stage: `adduser --system --uid 1001 nextjs` (L60) then `USER nextjs` (L97). That is a user name, not a uid: https://github.com/umami-software/umami/blob/ec0ff50388c264ed8ce46f00967e92f7e71476ae/Dockerfile#L59-L97. Image sha256:85909afc… is built from this Dockerfile by .github/workflows/cd.yml (linux/amd64 and linux/arm64). APW-06 plan §4.4 renders pod `runAsNonRoot: true` with no `runAsUser` on both targets, maps kubelet's 'image has non-numeric user' message to `image_user_unverifiable`, and on ever-works-apps refuses before apply (AppImageConfigReader). kubelet verifyRunAsNonRoot refuses a non-numeric image user unless `runAsUser` is set: https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kuberuntime/security_context_others.go#L41-L53. APW-03 schema §10 (components) has no user field, so the Blueprint cannot declare the uid. The fast path (ACC-13-05) cannot start as drafted.",
+  "proposedFix": "1) Add an optional numeric `components[].runAsUser` (integer >= 1) to CONTRACTS.md §1 and APW-03 schema.md §10.\n2) In APW-06 plan §4.4, render it as container `securityContext.runAsUser` and let it satisfy the image-user check.\n3) Set `runAsUser: 1001` on Umami's `web` component.\n4) blueprints/umami/README.md facts table: replace 'non-root user' with 'image user `nextjs`, uid 1001, set by name (Dockerfile L59-L97); the Blueprint declares uid 1001 so the platform can verify it is not root'.\n5) Until the field exists, plan §6 and ACC-13-05 record the Umami path as depending on it.",
+  "targetFiles": [
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/README.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/plan.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/CONTRACTS.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-03-app-spec-and-catalog/schema.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-06-app-runtime/plan.md"
+  ],
+  "confirmed": false
+ },
+ {
+  "id": "APW13-UF-02",
+  "area": "APW-13",
+  "kind": "wrong-fact",
+  "severity": "blocker",
+  "title": "Cal.diy image runs as root and writes into its own files at boot; nothing in the Blueprint or spec says so",
+  "evidence": "Pin check: calcom/cal.diy 6bc45298226f96ff79e0c070c8b2ce39727e8477 is still the main head (last push 2026-09-14), so the pin is current. None of the three stages (builder L1, builder-two L53, runner L77-L94) has a USER instruction, and node:20 defaults to root: https://github.com/calcom/cal.diy/blob/6bc45298226f96ff79e0c070c8b2ce39727e8477/Dockerfile. The runner copies the whole root-owned /calcom tree (L83). At boot, scripts/start.sh runs scripts/replace-placeholder.sh, which does `sed -i` over apps/web/.next and apps/web/public. The build deletes apps/web/.next/cache (L51), so the running server must be able to recreate it. APW-06 plan §4.4 renders `runAsNonRoot: true` unless the deploy target's `allowRoot` is set; targetSettings default `allowRoot: false` (APW-06 plan L712). ever-works-apps always refuses root (`managed_root_forbidden`). kubelet refuses 'image will run as root'. Cal.diy README 'Runtime' row, spec FR-26 and plan §7.1 are silent on this. FR-41 schedules the managed tier in the Cal.diy golden-path lane.",
+  "proposedFix": "1) blueprints/cal-diy/README.md, 'What the Blueprint decides', Runtime row: add 'The upstream image runs as root (no USER in any Dockerfile stage at the pin) and rewrites its own files at boot. It runs only on a Your cluster deploy target that allows root, or from a fork-side Dockerfile that sets a numeric non-root USER owning apps/web/.next and apps/web/public (that variant is unverified).'\n2) plan §7.1: add the row 'No USER in any stage → the deploy target must allow root'.\n3) Spec FR-26: add the same sentence.\n4) ACC-13-07/09 and T46: add the precondition that the golden-path lane's deploy target has `allowRoot: true`.\n5) FR-41: drop 'the managed tier' for Cal.diy until a non-root variant passes verification.\n6) Add the root requirement to the README 'Unverified' list as the non-root variant.",
+  "targetFiles": [
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/README.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/spec.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/plan.md",
+   "E:/Coding/Worktrees/ever-works-platform-any-repo-works/docs/specs/features/app-works/APW-13-golden-paths/tasks.md"
+  ],
+  "confirmed": false
+ }
+]

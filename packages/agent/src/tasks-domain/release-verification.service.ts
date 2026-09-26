@@ -36,6 +36,7 @@ import type { FleetJob } from '../entities/fleet-job.entity';
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import { TasksService } from './tasks.service';
+import { resolveTaskRepository, taskRepositoryFullName } from './task-repository';
 
 /** Longest note kept on the row. Half of what lands here is node-reported. */
 const DETAIL_MAX = 512;
@@ -1287,8 +1288,8 @@ export class ReleaseVerificationService {
         userId: string,
     ): { owner: string; repo: string; gitOptions: GitFacadeOptions } {
         return {
-            owner: work.getRepoOwner(),
-            repo: work.getDataRepo(),
+            owner: resolveTaskRepository(work).owner,
+            repo: resolveTaskRepository(work).repo,
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
         };
     }
@@ -1437,7 +1438,7 @@ function revertTaskDescription(
     work: Work | null,
     withReading: boolean,
 ): string {
-    const repo = work ? `${work.getRepoOwner()}/${work.getDataRepo()}` : 'the release repository';
+    const repo = work ? `${taskRepositoryFullName(work)}` : 'the release repository';
     return [
         `Post-deploy verification FAILED after \`${promotion.headBranch}\` → \`${promotion.baseBranch}\` ` +
             `landed in ${repo}.`,

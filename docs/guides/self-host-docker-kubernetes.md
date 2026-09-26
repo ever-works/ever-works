@@ -361,16 +361,30 @@ By default every bundled plugin ships inside the API image and is discovered at 
 
 The alternative pulls distributable plugins from an npm-compatible registry on first enable:
 
-| Variable                     | Default                      | Notes                                                                    |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------ |
-| `PLUGIN_DISTRIBUTION_MODE`   | `bundled`                    | Anything other than `dynamic` coerces to `bundled` — fail-safe.          |
-| `FEATURE_DYNAMIC_PLUGINS`    | `false`                      | Gates the catalog, the install/uninstall API and the admin allowlist.    |
-| `PLUGIN_REGISTRY_URL`        | `https://registry.npmjs.org` | Point at your own mirror if you run one.                                 |
-| `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | Used when an allowlist row's `source` is `github-packages`.              |
-| `PLUGIN_REGISTRY_TOKEN`      | unset                        | Bearer token. Secret — never logged.                                     |
-| `PLUGIN_INSTALL_DIR`         | `/app/plugins`               | **Must be writable in dynamic mode.** Use a separate path in Kubernetes. |
+| Variable                                  | Default                      | Notes                                                                                                |
+| ----------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DISTRIBUTION_MODE`                | `bundled`                    | Anything other than `dynamic` coerces to `bundled` — fail-safe.                                      |
+| `FEATURE_DYNAMIC_PLUGINS`                 | `false`                      | Gates the catalog, the install/uninstall API and the admin allowlist.                                |
+| `PLUGIN_REGISTRY_URL`                     | `https://registry.npmjs.org` | Point at your own mirror if you run one.                                                             |
+| `PLUGIN_REGISTRY_GITHUB_URL`              | `https://npm.pkg.github.com` | Used when an allowlist row's `source` is `github-packages`.                                          |
+| `PLUGIN_REGISTRY_TOKEN`                   | unset                        | Bearer token. Secret — never logged.                                                                 |
+| `PLUGIN_INSTALL_DIR`                      | `/app/plugins`               | **Must be writable in dynamic mode.** Use a separate path in Kubernetes.                             |
+| `PLUGIN_LAZY_LOAD`                        | unset                        | Both modes. Exactly `false` (lower case) loads the plugins on disk at startup (API and worker).      |
+| `PLUGIN_EAGER_BUILTINS`                   | `false`                      | Both modes. Exactly `true` (lower case) loads the built-in plugins at startup (API and worker).      |
+| `PLUGIN_LOAD_CONCURRENCY`                 | `6`                          | Both modes. How many plugins one list or lookup loads at a time (API and worker).                    |
+| `PLUGIN_WARMUP_TIMEOUT_MS`                | `60000`                      | Dynamic mode only. The longest the API waits at startup for one plugin's fetch. `0` means no limit.  |
+| `PLUGIN_FACADE_INSTALL_ON_USE`            | `false`                      | Dynamic mode only. A replica fetches and registers a plugin another replica installed, on first use. |
+| `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME` | `false`                      | Both modes. Sandbox sessions run inside the API (`false`) or as a background job (`true`).           |
 
 Selecting `dynamic` with both registry URLs explicitly cleared fails at boot with a message naming the fix, rather than surfacing later as a confusing 502 on the first install. The image is built differently too: `--build-arg PLUGIN_DISTRIBUTION_MODE=dynamic` keeps only the core plugins inside it, and everything else is fetched at runtime.
+
+The last three rows are read by the API. For its two switches, `PLUGIN_FACADE_INSTALL_ON_USE` and `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`, only `true` (any letter case) turns them on; anything else, including unset, leaves them off. `PLUGIN_LAZY_LOAD` and `PLUGIN_EAGER_BUILTINS` are case-sensitive: only the exact lower-case value counts, so `FALSE` or `True` is ignored. `PLUGIN_LAZY_LOAD=false` covers only the plugins on disk at startup: in dynamic mode, a plugin installed later is still registered lazily, and in this mode its `onLoad` does not run.
+
+- **`PLUGIN_WARMUP_TIMEOUT_MS`.** In dynamic mode the API fetches the installed plugins into its own install directory before it starts serving. Plugins are fetched in parallel, so this bound also caps the whole wait. A fetch that takes longer keeps going in the background and still lands in the install directory. The warmup only places files: it runs after the API has loaded its plugins at startup, and it registers nothing. A plugin it placed, in time or late, is used once it is registered: when it is enabled or installed through the API, or on its first use when `PLUGIN_FACADE_INSTALL_ON_USE=true`. With that switch off, an ordinary feature call does not register it. In Kubernetes, give the startup probe more time than this bound plus the plugin bootstrap.
+- **`PLUGIN_FACADE_INSTALL_ON_USE`.** Each replica keeps its own install directory, so a plugin enabled through one replica may be missing on another. With this on, the first time a feature asks for such a plugin by id, the replica fetches the exact version and integrity the platform recorded, registers it and uses it. It never changes the platform's install record, and a third-party package must still be on the allowlist.
+- **`PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`.** Where restricted-network agent sessions run. See [Sandbox sessions](../features/plugins.md#sandbox-sessions).
+
+The Trigger.dev worker reads `PLUGIN_DISTRIBUTION_MODE`, `PLUGIN_REGISTRY_URL`, `PLUGIN_REGISTRY_GITHUB_URL`, `PLUGIN_REGISTRY_TOKEN` and `PLUGIN_INSTALL_DIR` exactly as the API does, so set them there too. On the worker, `PLUGIN_INSTALL_DIR` defaults to `.plugin-store` under its working directory. In dynamic mode the worker installs a plugin its image does not carry the first time a background plugin call needs it, and setting `PLUGIN_DISTRIBUTION_MODE=dynamic` when you run `pnpm deploy:trigger` keeps only the core plugins in the worker image. Only that plugin-call job installs at run time — content generation, agent tasks, the terminal and workflow runs do not — so build a core-only worker image only if none of those needs a distributable plugin.
 
 ### The allowlist
 
@@ -401,6 +415,25 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/jso
 | `/admin/tenants/:tenantId/runtime-allowlist` | Which job runtimes a given tenant may select           |
 
 All three dashboard pages answer 404 to non-admins — they call `notFound()` rather than rendering a refusal (`apps/web/src/app/[locale]/(dashboard)/admin/**/page.tsx`), so the route stays invisible instead of advertising itself. The API endpoints behind them are guarded by `IsPlatformAdminGuard` (`apps/api/src/auth/guards/platform-admin.guard.ts`) and answer **403** — which is what the `curl` calls above return for a non-admin token.
+
+## App Works switches
+
+App Works (a Work built from an existing GitHub repository) and the App Launcher ship switched off. Each switch below is on only for exactly `true`; unset, empty and any other value are off. The API reads them from its own environment, so a change takes effect when the API restarts or is redeployed.
+
+| Variable                          | Default | What it does                                                                                                                                                   |
+| --------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EVER_WORKS_APP_WORKS_ENABLED`    | `false` | Lets the API create App Works. Whether the web offers the App Work kind is decided separately; see below.                                                      |
+| `EVER_WORKS_APP_LAUNCHER_ENABLED` | `false` | Turns the [App Launcher](../features/app-launcher.md) on. Off, its routes answer as described in [Turning it off](../features/app-launcher.md#turning-it-off). |
+| `APP_WORKS_CLOUD_PUSH_ENABLED`    | `false` | Lets runs on the platform itself (not on a Fleet node) publish an App Work's changes: a Task's push, and an Agent's `commitToRepo` / `openPullRequest`.        |
+
+With `APP_WORKS_CLOUD_PUSH_ENABLED` off, a platform-side Task run on an App Work commits its change but pushes nothing and opens no pull request, and the Task is blocked with a message saying why. An Agent's git tools, `commitToRepo` and `openPullRequest`, also refuse an App Work while it is off, with a message saying why, and nothing is written, pushed or opened. Runs on your own [Fleet](../features/fleet.md) nodes and every other kind of Work are not affected. With it on, the platform checks the exact commit against the App Work's change rules before it pushes that commit, then checks the pushed branch again; the two tools check the change against the same rules before they push or open a pull request. Leave it off unless your API runtime already keeps these runs away from platform secrets: the platform does not check that isolation for you yet.
+
+The web deployment decides what the pages show, and it reads its own environment, not the API's:
+
+- **The App Work chip** on the pages that create a Work. With no `POSTHOG_API_KEY` on the web deployment, the chip follows the web deployment's own `EVER_WORKS_APP_WORKS_ENABLED`, read on each request (`apps/web/src/lib/feature-flags/work-kinds.ts`). So set the variable on both the API and the web deployment, and restart both. With `POSTHOG_API_KEY` set, the chip follows only the PostHog feature flag `works-app`, and the web does not read the variable at all: the flag must be on as well, and it must agree with the API's variable, or the chip offers a kind the API refuses.
+- **The App Launcher.** The web asks the API (`features.appLauncherEnabled` on `GET /api/config`), so `EVER_WORKS_APP_LAUNCHER_ENABLED` is read on the API only. With `POSTHOG_API_KEY` set on the web deployment, the PostHog flag `app-launcher` must also be on (`apps/web/src/lib/feature-flags/app-launcher.ts`).
+
+One reader of `EVER_WORKS_APP_WORKS_ENABLED` is looser than the rest. The App Launcher's `meta.appWorksAvailable` (`packages/agent/src/app-launcher/app-launcher.service.ts`) also accepts `1` and `yes`, in any letter case. So `EVER_WORKS_APP_WORKS_ENABLED=1` leaves the App Work kind off while the launcher reports App Works as available. Use `true`.
 
 ## Upgrades
 

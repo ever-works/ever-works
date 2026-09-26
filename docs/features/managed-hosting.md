@@ -328,6 +328,7 @@ Self-hosting Ever Works and want to offer the managed path to your own users? Th
 
 ## Related
 
+- [The App Launcher](./app-launcher.md) — where a live Work's address appears, and where its owner arranges it.
 - [Custom Domains](./custom-domains.md) — bringing your own domain to a Work.
 - [Kubernetes Deployment](./k8s-deployment.md) — the bring-your-own-cluster path and its registry and ingress options.
 - [Onboarding](./onboarding.md) — where the Git, DB and deployment choices are made.

@@ -52,6 +52,7 @@ The strip step is **idempotent**. Re-running it is safe.
 | `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | Secondary registry; used when an allowlist row's `source` is `github-packages`.                                   |
 | `PLUGIN_REGISTRY_TOKEN`      | (unset)                      | Bearer token. SECRET. Pulled from a Kubernetes secret in prod.                                                    |
 | `PLUGIN_INSTALL_DIR`         | `/app/plugins`               | Writable dir Node `import()`s installed plugins from. Must be writable in `dynamic` mode.                         |
+| `PLUGIN_WARMUP_TIMEOUT_MS`   | `60000`                      | Dynamic mode: the longest the boot warmup waits for one plugin's fetch (run in parallel). `0` = no limit.         |
 | `FEATURE_DYNAMIC_PLUGINS`    | `false`                      | Independent master switch for the dynamic-distribution feature surface (catalog endpoint, install/uninstall API). |
 
 `config.plugins.validate()` runs at boot from
@@ -72,7 +73,9 @@ additions for `dynamic` mode that are also safe for `bundled`:
    at typical sizes; bump if your catalog is larger.
 2. **`startupProbe` allowing ~5 minutes for boot reconcile warmup**
    (60 attempts × 5 s). The warmup is a no-op in `bundled` mode, so
-   this is also safe there.
+   this is also safe there. The API awaits the warmup before it serves,
+   so keep this budget above `PLUGIN_WARMUP_TIMEOUT_MS` (default 60 s per
+   plugin, fetched in parallel) plus the plugin bootstrap time.
 
 The existing `livenessProbe` and `readinessProbe` are unchanged.
 
@@ -102,6 +105,42 @@ circuits) so existing deployments see no behaviour change.
 `.deploy/docker/api/entrypoint.sh` is unchanged — its only job is
 forwarding to `node /app/dist/main`, and that one process now handles
 both legacy bundled boot and EW-693 warmup.
+
+## Trigger.dev worker (EW-693 T27, added 2026-09-26)
+
+Long-running plugin operations run in the Trigger.dev worker's
+`run-plugin-operation` task. The worker reads the same variables as the
+API (`workerDistributionOptionsFromEnv` in
+`packages/tasks/src/trigger/worker/modules/trigger-run-plugin-operation.module.ts`):
+
+| Env var                                                                      | Worker default        | Notes                                                                                                                                        |
+| ---------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DISTRIBUTION_MODE`                                                   | `bundled`             | `dynamic` (case-insensitive) turns on runtime installs; anything else is `bundled`.                                                          |
+| `PLUGIN_REGISTRY_URL`, `PLUGIN_REGISTRY_GITHUB_URL`, `PLUGIN_REGISTRY_TOKEN` | the installer's       | Passed only when set; the installer has the same defaults as on the API.                                                                     |
+| `PLUGIN_INSTALL_DIR`                                                         | `<cwd>/.plugin-store` | The worker's own store. It must sit under the directory whose `node_modules` holds the plugins' external dependencies, so not `os.tmpdir()`. |
+
+- **Core-only worker build.** Set `PLUGIN_DISTRIBUTION_MODE=dynamic` in
+  the `pnpm deploy:trigger` environment:
+  `packages/tasks/scripts/prepare-plugins.js` then copies core plugins
+  only (bundled, the default, copies every plugin). The image is fixed
+  when the worker is deployed; runtime installs follow the mode the
+  worker runs with.
+- **`pacote`**, the registry client the installer imports lazily in
+  dynamic mode, is kept out of the bundle and installed as a real package
+  through `additionalPackages` in `packages/tasks/trigger.config.ts`
+  (keep its range in step with `packages/agent/package.json`).
+- In dynamic mode, a plugin the image does not carry is installed into the
+  worker's store on first use (the version the API pinned, integrity
+  checked, allowlist first) and registered. The worker never writes the
+  API's shared install row. Codes: `WORKER_INSTALL_REFUSED` (refused before
+  any download) and `WORKER_INSTALL_FAILED`.
+- A worker that runs with `PLUGIN_DISTRIBUTION_MODE=dynamic` on an image
+  built without it runs the image's copy of a distributable plugin and
+  logs one warning per plugin version per process. Set the variable for
+  `pnpm deploy:trigger` in the CI release workflows too.
+- Only `run-plugin-operation` installs at run time. Build a core-only
+  worker image only while no other worker task needs a distributable
+  plugin.
 
 ## Vercel and other read-only-FS serverless targets
 

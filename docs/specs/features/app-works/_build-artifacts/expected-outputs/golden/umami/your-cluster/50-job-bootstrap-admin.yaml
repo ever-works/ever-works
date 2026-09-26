@@ -1,0 +1,93 @@
+# GOLDEN — umami · target your-cluster · Job `job-bootstrap-admin-99999999` (when: first-deploy)
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.8 (`command` jobs: the component’s image, env, security context and
+# Spec      : resources; `backoffLimit: retries`, `activeDeadlineSeconds: timeoutSeconds`,
+# Spec      : `ttlSecondsAfterFinished: 86400`, `restartPolicy: Never`; the last 3 Jobs per name are kept)
+# Spec      : APW-06 spec.md FR-26 row 2 (pre-deploy jobs in declared order) and row 4 (first-deploy jobs
+# Spec      : run before the app is published), FR-51 (Run now reuses this definition)
+# Spec      : `retries` is pinned to 0 — the App spec schema declares no default (../../README.md).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: job-bootstrap-admin-99999999
+    namespace: ew-umami-33333333
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: umami
+        ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+        ever-works.io/kind: app
+        ever-works.io/job: bootstrap-admin
+        ever-works.io/component: web
+spec:
+    backoffLimit: 0
+    activeDeadlineSeconds: 180
+    ttlSecondsAfterFinished: 86400
+    template:
+        metadata:
+            labels:
+                ever-works.io/job: bootstrap-admin
+                ever-works.io/component: web
+                app.kubernetes.io/managed-by: ever-works-k8s-plugin
+                app.kubernetes.io/part-of: umami
+                ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+                ever-works.io/kind: app
+        spec:
+            restartPolicy: Never
+            serviceAccountName: app
+            automountServiceAccountToken: false
+            enableServiceLinks: false
+            securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                    type: RuntimeDefault
+            imagePullSecrets:
+                - name: app-pull
+            containers:
+                - name: bootstrap-admin
+                  image: ghcr.io/umami-software/umami@sha256:85909afc45bdcda1917394594a087421fdbb05610fded0fa9f6fb861abb2f367
+                  imagePullPolicy: IfNotPresent
+                  command:
+                      - node
+                      - '--input-type=module'
+                      - '-e'
+                      - |
+                          const base = process.env.APP_WEB_INTERNAL_URL;
+                          const login = await fetch(`${base}/api/auth/login`, {
+                            method: 'POST',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify({ username: 'admin', password: 'umami' }),
+                          });
+                          if (login.status === 401) { console.log('bootstrap-admin: default password already replaced'); process.exit(0); }
+                          if (!login.ok) { console.error(`bootstrap-admin: login HTTP ${login.status}`); process.exit(1); }
+                          const { token } = await login.json();
+                          const change = await fetch(`${base}/api/me/password`, {
+                            method: 'POST',
+                            headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ currentPassword: 'umami', newPassword: process.env.APP_BOOTSTRAP_ADMIN_PASSWORD }),
+                          });
+                          if (!change.ok) { console.error(`bootstrap-admin: password change HTTP ${change.status}`); process.exit(1); }
+                          console.log('bootstrap-admin: default password replaced');
+                  envFrom:
+                      - secretRef:
+                            name: app-env-3289ab9d92
+                            optional: false
+                      - configMapRef:
+                            name: app-platform-3289ab9d92
+                            optional: false
+                  resources:
+                      requests:
+                          cpu: 250m
+                          memory: 512Mi
+                      limits:
+                          memory: 1Gi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: false
+                      capabilities:
+                          drop:
+                              - ALL

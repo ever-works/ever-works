@@ -50,17 +50,25 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *         -> 400 "Plugin \"<id>\" must be enabled at user level first" when the
  *            extractor was never installed for the user (e.g. jina). The system
  *            default (local-content-extractor) enables for a work WITHOUT a prior
- *            user enable (it's auto-installed).
+ *            user enable (it's auto-installed). With `activeCapability` on a
+ *            SUPPLEMENTARY extractor (notion-extractor, pdf-extractor) -> 400
+ *            "... is a supplementary plugin and cannot be set as an active
+ *            capability provider"; without it the specialist binds (200).
  *
  *     POST /api/works/:workId/plugins/:pluginId/capability { capability }
  *         -> 200 for 'content-extractor'; 400 "Plugin \"<id>\" does not provide
- *            capability \"search\"" for a capability the plugin lacks.
+ *            capability \"search\"" for a capability the plugin lacks; 400
+ *            "... is a supplementary plugin ..." for a supplementary extractor.
  *
  *     GET  /api/works/:workId/plugins
  *         -> { plugins[], total, capabilityProviders }. `capabilityProviders` is
  *            the per-work OVERRIDE map: {} while only the system DEFAULT extractor
- *            is active, and { 'content-extractor': '<pluginId>' } once a NON-default
- *            extractor (e.g. notion-extractor) is enabled+active for the work.
+ *            is active, and { 'content-extractor': '<pluginId>' } once a NON-default,
+ *            NON-supplementary extractor (e.g. jina) is enabled+active for the work.
+ *            A supplementary extractor is a URL-pattern specialist the facade runs
+ *            for its URLs on top of the work's provider, never AS the provider
+ *            (docs/plugin-system/plugin-categories.md "Supplementary Plugins"), so
+ *            it never appears in this map even when bound to the work.
  *
  * GOTCHAS honored:
  *   - register DTO = {username,email,password}; login DTO = {email,password} only.
@@ -285,15 +293,71 @@ test.describe('flow: content-extractor plugin capability', () => {
         expect(premature.status()).toBe(400);
         expect(String((await premature.json()).message)).toContain('user level');
 
-        // Install notion-extractor at the user level, then bind it (active) to the work.
-        const userEnable = await request.post(`${API_BASE}/api/plugins/notion-extractor/enable`, {
+        // Pin changed (CI run 36220455888 on 7411a3529, shard 17): the override
+        // used to flip to notion-extractor, and the list answered `undefined`.
+        // notion-extractor is SUPPLEMENTARY (its class's getManifest() says so):
+        // a URL-pattern specialist that runs for notion.so URLs on top of the
+        // work's provider, never AS it, so the work list leaves it out of
+        // capabilityProviders by design. The old pin held only while the list
+        // read notion's lean package.json manifest, which lacks the flag, and
+        // the enable route accepted a provider binding it never honoured (now a
+        // 400). The flip is pinned on jina, a general extractor, and the
+        // supplementary rule is asserted on its own.
+
+        // A supplementary extractor still binds to the work (it then runs for
+        // its URLs), but it is not the work's provider.
+        const notionUserEnable = await request.post(
+            `${API_BASE}/api/plugins/notion-extractor/enable`,
+            { headers: authedHeaders(user.access_token), data: {} },
+        );
+        expect(notionUserEnable.status()).toBe(200);
+        const notionBind = await request.post(
+            `${API_BASE}/api/works/${workId}/plugins/notion-extractor/enable`,
+            { headers: authedHeaders(user.access_token), data: {} },
+        );
+        expect(
+            notionBind.status(),
+            `notion work enable body=${await notionBind.text().catch(() => '')}`,
+        ).toBe(200);
+        const bound = await listWorkPlugins(request, user.access_token, workId);
+        expect(bound.plugins.find((p) => p.id === 'notion-extractor')?.workEnabled).toBe(true);
+        expect(bound.capabilityProviders[EXTRACTOR_CAPABILITY]).toBeUndefined();
+
+        // Naming it as the provider is refused on the enable route and on the
+        // capability route alike (no binding is accepted and then ignored).
+        const notionAsProvider = await request.post(
+            `${API_BASE}/api/works/${workId}/plugins/notion-extractor/enable`,
+            {
+                headers: authedHeaders(user.access_token),
+                data: { activeCapability: EXTRACTOR_CAPABILITY, priority: 5 },
+            },
+        );
+        expect(notionAsProvider.status()).toBe(400);
+        expect(String((await notionAsProvider.json()).message)).toContain('supplementary plugin');
+        const notionCapability = await request.post(
+            `${API_BASE}/api/works/${workId}/plugins/notion-extractor/capability`,
+            {
+                headers: authedHeaders(user.access_token),
+                data: { capability: EXTRACTOR_CAPABILITY },
+            },
+        );
+        expect(notionCapability.status()).toBe(400);
+        expect(String((await notionCapability.json()).message)).toContain('supplementary plugin');
+
+        // Configure jina at the user level (a FAKE key satisfies its required
+        // user-scoped apiKey; enabling makes no outbound call), then bind it
+        // (active) to the work.
+        const userEnable = await request.post(`${API_BASE}/api/plugins/jina/enable`, {
             headers: authedHeaders(user.access_token),
-            data: {},
+            data: { secretSettings: { apiKey: `jina-fake-${Date.now()}` } },
         });
-        expect(userEnable.status()).toBe(200);
+        expect(
+            userEnable.status(),
+            `user enable body=${await userEnable.text().catch(() => '')}`,
+        ).toBe(200);
 
         const workEnable = await request.post(
-            `${API_BASE}/api/works/${workId}/plugins/notion-extractor/enable`,
+            `${API_BASE}/api/works/${workId}/plugins/jina/enable`,
             {
                 headers: authedHeaders(user.access_token),
                 data: { activeCapability: EXTRACTOR_CAPABILITY, priority: 5 },
@@ -306,9 +370,11 @@ test.describe('flow: content-extractor plugin capability', () => {
 
         // The override map now names the non-default extractor for the capability.
         const overridden = await listWorkPlugins(request, user.access_token, workId);
-        expect(overridden.capabilityProviders[EXTRACTOR_CAPABILITY]).toBe('notion-extractor');
-        const notionInWork = overridden.plugins.find((p) => p.id === 'notion-extractor');
-        expect(notionInWork?.workEnabled).toBe(true);
+        expect(overridden.capabilityProviders[EXTRACTOR_CAPABILITY]).toBe('jina');
+        const jinaInWork = overridden.plugins.find((p) => p.id === 'jina');
+        expect(jinaInWork?.workEnabled).toBe(true);
+        // The specialist stays bound alongside it.
+        expect(overridden.plugins.find((p) => p.id === 'notion-extractor')?.workEnabled).toBe(true);
     });
 
     test('per-work capability endpoint: accepts content-extractor, rejects a foreign capability', async ({
@@ -367,24 +433,28 @@ test.describe('flow: content-extractor plugin capability', () => {
         });
         expect(workId).toBeTruthy();
 
-        // Install two real BYOK extractors at the user level.
-        for (const id of ['notion-extractor', 'pdf-extractor']) {
-            const r = await request.post(`${API_BASE}/api/plugins/${id}/enable`, {
-                headers: authedHeaders(user.access_token),
-                data: {},
-            });
-            expect(r.status(), `user enable ${id}`).toBe(200);
-        }
+        // Install two real BYOK extractors at the user level. Pin changed (CI run
+        // 36220455888 on 7411a3529): the active one was notion-extractor, which
+        // is supplementary and so never the work's provider (see the per-work
+        // override test above); jina, a general extractor, takes its place. The
+        // supplementary pdf-extractor still coexists, bound without a capability.
+        const jinaUser = await request.post(`${API_BASE}/api/plugins/jina/enable`, {
+            headers: authedHeaders(user.access_token),
+            data: { secretSettings: { apiKey: `jina-fake-${Date.now()}` } },
+        });
+        expect(jinaUser.status(), 'user enable jina').toBe(200);
+        const pdfUser = await request.post(`${API_BASE}/api/plugins/pdf-extractor/enable`, {
+            headers: authedHeaders(user.access_token),
+            data: {},
+        });
+        expect(pdfUser.status(), 'user enable pdf-extractor').toBe(200);
 
         // Bind both to the work with DIFFERENT priorities (lower = higher priority).
-        const notionWork = await request.post(
-            `${API_BASE}/api/works/${workId}/plugins/notion-extractor/enable`,
-            {
-                headers: authedHeaders(user.access_token),
-                data: { activeCapability: EXTRACTOR_CAPABILITY, priority: 1 },
-            },
-        );
-        expect(notionWork.status()).toBe(200);
+        const jinaWork = await request.post(`${API_BASE}/api/works/${workId}/plugins/jina/enable`, {
+            headers: authedHeaders(user.access_token),
+            data: { activeCapability: EXTRACTOR_CAPABILITY, priority: 1 },
+        });
+        expect(jinaWork.status()).toBe(200);
         const pdfWork = await request.post(
             `${API_BASE}/api/works/${workId}/plugins/pdf-extractor/enable`,
             {
@@ -402,17 +472,17 @@ test.describe('flow: content-extractor plugin capability', () => {
         // Both extractors plus the system default are all present for the work.
         const extractorEntries = plugins.filter((p) => p.category === EXTRACTOR_CAPABILITY);
         const enabledExtractorIds = extractorEntries.filter((p) => p.workEnabled).map((p) => p.id);
-        expect(enabledExtractorIds).toContain('notion-extractor');
+        expect(enabledExtractorIds).toContain('jina');
         expect(enabledExtractorIds).toContain('pdf-extractor');
         expect(enabledExtractorIds).toContain(DEFAULT_EXTRACTOR);
 
         // The ACTIVE (override) extractor for the capability is the one bound with
-        // activeCapability — notion-extractor — not whichever has the lowest priority
+        // activeCapability — jina — not whichever has the lowest priority
         // alone. Priority is recorded on the binding regardless.
-        expect(capabilityProviders[EXTRACTOR_CAPABILITY]).toBe('notion-extractor');
-        const notionEntry = extractorEntries.find((p) => p.id === 'notion-extractor');
+        expect(capabilityProviders[EXTRACTOR_CAPABILITY]).toBe('jina');
+        const jinaEntry = extractorEntries.find((p) => p.id === 'jina');
         const pdfEntry = extractorEntries.find((p) => p.id === 'pdf-extractor');
-        expect(notionEntry?.priority).toBe(1);
+        expect(jinaEntry?.priority).toBe(1);
         expect(pdfEntry?.priority).toBe(9);
 
         // SECURITY: an anonymous client cannot read the work's plugin bindings.

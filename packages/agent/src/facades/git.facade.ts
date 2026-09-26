@@ -35,9 +35,34 @@ import type {
     GitPullRequestStatus,
     // Release promotion lane (self-build slice AI, EW-808).
     GitWorkflowRun,
+    // Upstream pull requests (APW-09 T2) — the two review reads and the
+    // temporary interaction limit, with their element types. Declared in
+    // `packages/plugin`'s git-provider contract; this facade owns no copy.
+    GitPullRequestReview,
+    GitPullRequestReviewComment,
+    GitInteractionLimit,
+    // APW-09 T1's review-state union, for the deprecated aliases below.
+    GitPullRequestReviewState,
+    // Fork lifecycle (APW-02 plan §3.3, §4.2) — the plugin contract's
+    // provider-neutral types for the seven optional capabilities below.
+    // Declared in `packages/plugin`'s `git-provider.app-forks.ts`; this
+    // facade owns no copy (Resolution R-1).
+    GitForkSyncResult,
+    GitForkDivergence,
+    GitRepositoryCopyInput,
+    GitRepositoryCopyResult,
+    GitActionsPermissionsInput,
+    GitActionsPermissionsResult,
+    GitWebhookInput,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
+import {
+    loadRegisteredPlugins,
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import {
     AuthAccountRepository,
@@ -60,6 +85,18 @@ export interface FacadeCloneOptions {
     readonly committer?: GitCommitter;
     readonly branch?: string;
     readonly autoSwitchToMainBranch?: boolean;
+    /**
+     * Per-caller working copy key (`work:<workId>:<role>`). Two calls for one repository with
+     * different keys get different directories and are never coalesced onto one git operation;
+     * omitted keeps the shared per-repository directory every existing caller uses.
+     */
+    readonly checkoutKey?: string;
+    /**
+     * Declares that the remote repository MUST exist, so a missing/empty remote fails loudly
+     * instead of being replaced by an empty local repository. Opt-in; absent keeps the lenient
+     * default.
+     */
+    readonly expectExisting?: boolean;
 }
 
 /**
@@ -82,6 +119,12 @@ export interface FacadePushOptions {
     readonly ref?: string;
     /** Receiving branch on the remote. Omitted → derived from `ref`. */
     readonly remoteRef?: string;
+    /**
+     * The repository this push is for. Given both, the provider pushes to the
+     * URL it computes for them rather than one read from the checkout's config.
+     */
+    readonly owner?: string;
+    readonly repo?: string;
 }
 
 export class GitFacadeError extends FacadeError {
@@ -258,6 +301,58 @@ export interface AgentMergeActor {
 
 export type { GitProviderInfo };
 
+/**
+ * The member's OWN git credentials — APW-09 FR-24 / plan §2.3.
+ *
+ * There is deliberately no `workId` on this input, and that is the whole
+ * point of the type: a Work-scoped token (the `ever-works-git` platform PAT
+ * or a GitHub App installation token) is a *platform* credential, while an
+ * upstream pull request must be opened, prepared and fast-forwarded with the
+ * member's own credential — the one the upstream project sees, and the one
+ * whose fork push permission FR-3 depends on. Making `workId` unexpressible
+ * means the two Work-scoped short-circuits cannot be reached from here even
+ * by accident, which is what the spec asserts by spy.
+ */
+export interface MemberAccountTokenOptions {
+    readonly userId: string;
+    readonly providerId: string;
+}
+
+/**
+ * ── APW-09 reviews, review comments and interaction limits ────────────────
+ *
+ * `listPullRequestReviews?`, `listPullRequestReviewComments?` and
+ * `getInteractionLimit?` are APW-09 T2's additions to `IGitProviderPlugin`,
+ * declared with their element types in
+ * `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` and
+ * imported above — there is no local shape here any more. Every optional
+ * method is read off the MATERIALISED plugin (`typeof impl === 'function'`)
+ * because the lazy-plugin proxy over-reports optional methods.
+ *
+ * ## The four former local types are still exported, as aliases
+ *
+ * The temporary seam declared `UpstreamReviewState`,
+ * `UpstreamPullRequestReview`, `UpstreamPullRequestReviewComment` and
+ * `UpstreamInteractionLimit` here, and T2's arrival made them redundant. They
+ * were **aliased rather than deleted**: this module is re-exported from the
+ * package root, so those four names are somebody's import today, and a rename
+ * that breaks a consumer to save twelve lines is not a trade worth making.
+ * Each alias is the contract type, so a consumer still on the old name keeps
+ * compiling and keeps getting the canonical shape.
+ */
+
+/** @deprecated Import `GitPullRequestReviewState` from `@ever-works/plugin`. */
+export type UpstreamReviewState = GitPullRequestReviewState;
+
+/** @deprecated Import `GitPullRequestReview` from `@ever-works/plugin`. */
+export type UpstreamPullRequestReview = GitPullRequestReview;
+
+/** @deprecated Import `GitPullRequestReviewComment` from `@ever-works/plugin`. */
+export type UpstreamPullRequestReviewComment = GitPullRequestReviewComment;
+
+/** @deprecated Import `GitInteractionLimit` from `@ever-works/plugin`. */
+export type UpstreamInteractionLimit = GitInteractionLimit;
+
 @Injectable()
 export class GitFacadeService implements IGitFacade {
     private readonly CAPABILITY = PLUGIN_CAPABILITIES.GIT_PROVIDER;
@@ -376,7 +471,9 @@ export class GitFacadeService implements IGitFacade {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
-            name: (p.plugin as IGitProviderPlugin).providerName,
+            // Sync, so a plugin may still be a cold lazy proxy, whose
+            // `providerName` read is its forwarding wrapper: the manifest name then.
+            name: readPluginString(p.plugin, 'providerName') ?? p.plugin.name,
             enabled: p.state === 'loaded',
             icon: p.manifest.icon,
             description: p.manifest.description,
@@ -445,6 +542,38 @@ export class GitFacadeService implements IGitFacade {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * The member's own git token — APW-09 FR-24, plan §2.3.
+     *
+     * Resolves the connected provider account first (the GitHub integration
+     * OAuth account, the credential that can push to the member's fork and
+     * open the upstream pull request), then the member's own plugin-settings
+     * PAT. `workId` is passed as `undefined` to that settings read on
+     * purpose: there is no Work scope in this credential, so a Work-level
+     * setting can never answer for it.
+     *
+     * What is deliberately NOT here, and is the reason this method exists
+     * instead of a flag on `getAccessToken`: the two Work-scoped
+     * short-circuits of `resolvePluginAndToken` — the `ever-works-git`
+     * platform PAT (`tryResolveEverWorksGitPlatformToken`) and the GitHub App
+     * installation token (`getInstallationTokenForWork`). Both need a
+     * `workId`, this method has no way to receive one, and
+     * `git.facade.member-token.spec.ts` spies on both to prove they are never
+     * called — an upstream pull request opened with a platform credential
+     * would be attributed to the platform, not to the member who authored it.
+     *
+     * Returns `null` when the member has neither, so the caller refuses with
+     * `connectionScope` rather than falling back to a credential the member
+     * does not own.
+     */
+    async getMemberAccountToken(options: MemberAccountTokenOptions): Promise<string | null> {
+        const account = await this.findUsableGitProviderAccount(options.userId, options.providerId);
+        if (account?.accessToken) {
+            return account.accessToken;
+        }
+        return this.getPatFromSettings(options.providerId, options.userId, undefined);
     }
 
     async getCommitter(options: GitFacadeOptions): Promise<GitCommitter | null> {
@@ -547,7 +676,7 @@ export class GitFacadeService implements IGitFacade {
         perPage?: number,
         listOptions?: ListRepositoriesOptions,
     ): Promise<GitRepositoryWithPermissions[]> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         if (plugin.listRepositories) {
             return plugin.listRepositories('', page, perPage, listOptions);
         }
@@ -784,14 +913,14 @@ export class GitFacadeService implements IGitFacade {
         return null;
     }
 
-    getRawFileUrl(
+    async getRawFileUrl(
         providerId: string,
         owner: string,
         repo: string,
         branch: string,
         path: string,
-    ): string {
-        const plugin = this.getPluginSync(providerId);
+    ): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         if (plugin.getRawFileUrl) {
             return plugin.getRawFileUrl(owner, repo, branch, path);
         }
@@ -1337,6 +1466,142 @@ export class GitFacadeService implements IGitFacade {
         return impl.call(plugin, owner, repo, base, head, diffOptions, token);
     }
 
+    // ── APW-09 upstream pull requests (cross-repository) ──────────────
+    //
+    // T1's cross-repository fields need no code here, and that is worth
+    // stating rather than assuming: `headOwner` / `headRepo` /
+    // `maintainerCanModify` ride on the `CreatePROptions` object that
+    // `createPullRequest` forwards verbatim, `head` on the
+    // `ListPullRequestsOptions` object `listPullRequests` forwards verbatim,
+    // and `totalCommits` is mapped inside the provider's own diff reads. A
+    // field that lands on the plugin contract therefore reaches the provider
+    // through the existing pass-throughs unchanged — `git.facade.spec.ts`
+    // asserts the object identity, so a field this facade has never heard of
+    // still arrives.
+    //
+    // Every method below is OPTIONAL on `IGitProviderPlugin`, so the absence
+    // path is explicit: the method is materialised off the resolved plugin
+    // (the lazy-plugin proxy over-reports optional methods) and a missing one
+    // raises `GitOperationNotSupportedError` (→ 409, mapped by `name`) rather
+    // than a bare `GitFacadeError` (→ 500) or a TypeError. Plan §11: "provider
+    // lacks any optional method used" is a refusal, never a crash.
+
+    /**
+     * Create a branch ref at an exact commit sha (APW-09 T3) — the
+     * preparation branch `upstream-pr/{slug}-{4 hex}` cut in the FORK at the
+     * upstream head (plan §2.5), and the `--update-<n>` branch of the review
+     * follow-up (plan §2.6 step 1).
+     *
+     * `createBranch` cannot stand in for it: its `fromRef` is a branch NAME,
+     * so pointing the new ref at an upstream-only sha would need a delete +
+     * recreate, and that closes any pull request already open on the branch.
+     */
+    async createBranchFromSha(
+        owner: string,
+        repo: string,
+        name: string,
+        sha: string,
+        options: GitFacadeOptions,
+    ): Promise<GitBranch> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.createBranchFromSha;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('createBranchFromSha', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, name, sha, token);
+    }
+
+    /**
+     * Move an existing branch ref to a commit sha — fast-forward only
+     * (APW-09 T3, plan §2.6 step 4). `force: false` is typed, not merely
+     * defaulted: no force-move exists anywhere in this epic, so the facade
+     * cannot be talked into one, and a provider that answers "not a fast
+     * forward" reports it as `unprocessable` — the caller re-prepares the
+     * update approval instead of rewriting the pull request branch.
+     */
+    async updateBranchRef(
+        owner: string,
+        repo: string,
+        name: string,
+        sha: string,
+        refOptions: { force: false },
+        options: GitFacadeOptions,
+    ): Promise<GitBranch> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.updateBranchRef;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('updateBranchRef', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, name, sha, refOptions, token);
+    }
+
+    /**
+     * Reviews on one pull request (APW-09 T2) — the read behind the review
+     * summary FR-30 derives and the "changes requested" trigger FR-31 acts
+     * on.
+     *
+     * Absence THROWS rather than answering `[]`: an empty list means "nobody
+     * reviewed", which is a different fact from "this provider cannot list
+     * reviews", and only the second one is true here. Plan §11 maps the throw
+     * to the `providerUnsupported` refusal.
+     */
+    async listPullRequestReviews(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequestReview[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.listPullRequestReviews;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('listPullRequestReviews', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, token);
+    }
+
+    /**
+     * Inline review comments on one pull request (APW-09 T2) — the brief a
+     * review follow-up Task is seeded with (plan §2.6 step 2). Absence
+     * throws, for the same reason as the review list above.
+     */
+    async listPullRequestReviewComments(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequestReviewComment[]> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.listPullRequestReviewComments;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('listPullRequestReviewComments', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, token);
+    }
+
+    /**
+     * The repository's TEMPORARY interaction limit (APW-09 T2, G16) —
+     * `'none' | 'existing_users' | 'contributors_only' | 'collaborators_only'`.
+     *
+     * The one read in this section whose absence path is `null` and not a
+     * throw, because `null` is already this read's honest answer for "cannot
+     * tell": the provider answers `null` on a 403/404 (G16 — a caller must
+     * never read a failed lookup as "unrestricted"), and a provider with no
+     * such capability is in exactly that position. `'none'` is only ever the
+     * provider's own explicit answer; this pass-through never fabricates it.
+     */
+    async getInteractionLimit(
+        owner: string,
+        repo: string,
+        options: GitFacadeOptions,
+    ): Promise<GitInteractionLimit | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getInteractionLimit;
+        if (typeof impl !== 'function') {
+            return null;
+        }
+        return impl.call(plugin, owner, repo, token);
+    }
+
     async createPullRequestComment(
         owner: string,
         repo: string,
@@ -1372,6 +1637,192 @@ export class GitFacadeService implements IGitFacade {
         );
     }
 
+    // ── APW-02 fork lifecycle (plan §4.2) ─────────────────────────────
+    //
+    // One method per new capability of the fork-lifecycle contract:
+    // `findExistingFork`, `syncForkBranch`, `getForkDivergence`,
+    // `createRepositoryCopy`, `setActionsPermissions`, `createWebhook` and
+    // `deleteWebhook`. The other two names plan §4.2 lists —
+    // `createBranchFromSha` and `updateBranchRef` — are APW-09's and are already
+    // above; they follow the same guard, so all nine are reachable here through
+    // one shape.
+    //
+    // Every one of the seven is OPTIONAL on `IGitProviderPlugin`, so the absence
+    // path is explicit and identical each time: the method is materialised off
+    // the RESOLVED plugin (the lazy-plugin proxy over-reports optional methods —
+    // see the class doc) and a missing one raises
+    // `GitOperationNotSupportedError`, which `FacadeExceptionFilter` maps to
+    // HTTP 409 by that exact `name`. A provider that cannot do this is a
+    // refusal the caller resolves by switching provider, never a 500 from a
+    // TypeError and never a silent `undefined`.
+    //
+    // Plan §7 is why these live here and nowhere else: the agent package sees
+    // only the capability methods through this facade, all provider behaviour
+    // stays inside `packages/plugins/github`, and absence degrades to a typed
+    // refusal the services map to `failed/provider_unsupported`.
+
+    /**
+     * The member's existing fork of an upstream, found by the provider's
+     * three-step lookup (APW-02 T17/T52, FR-10).
+     *
+     * `null` is the provider's honest "no fork of this upstream by this
+     * account", which is what makes a fork request safe to issue — a fork the
+     * member renamed answers to its current name, so a name check alone cannot
+     * answer this question.
+     */
+    async findExistingFork(
+        upstreamOwner: string,
+        upstreamRepo: string,
+        targetOwner: string,
+        options: GitFacadeOptions,
+    ): Promise<GitRepository | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.findExistingFork;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('findExistingFork', plugin.id);
+        }
+        return impl.call(plugin, upstreamOwner, upstreamRepo, targetOwner, token);
+    }
+
+    /**
+     * Bring a fork's branch up to date with the upstream branch it was forked
+     * from (APW-02 FR-35). The outcome is an answer, not an exception:
+     * `conflict` and `unprocessable` are the two the sync run turns into a pull
+     * request, and nothing here ever force-moves a ref.
+     */
+    async syncForkBranch(
+        forkOwner: string,
+        forkRepo: string,
+        branch: string,
+        options: GitFacadeOptions,
+    ): Promise<GitForkSyncResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.syncForkBranch;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('syncForkBranch', plugin.id);
+        }
+        return impl.call(plugin, forkOwner, forkRepo, branch, token);
+    }
+
+    /**
+     * How far a fork has drifted from its upstream (APW-02 FR-46): the counts
+     * the Upstream card renders and the upstream head a sync acts on.
+     *
+     * The upstream is named by OWNER and branch — the whole point of the
+     * cross-owner `basehead` compare — so the signature carries both sides
+     * rather than assuming one repository.
+     */
+    async getForkDivergence(
+        forkOwner: string,
+        forkRepo: string,
+        forkBranch: string,
+        upstreamOwner: string,
+        upstreamBranch: string,
+        options: GitFacadeOptions,
+    ): Promise<GitForkDivergence> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getForkDivergence;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getForkDivergence', plugin.id);
+        }
+        return impl.call(
+            plugin,
+            forkOwner,
+            forkRepo,
+            forkBranch,
+            upstreamOwner,
+            upstreamBranch,
+            token,
+        );
+    }
+
+    /**
+     * Push one branch of a source repository, with its full history, into a
+     * repository the platform owns (APW-02 FR-21) — the private copy's initial
+     * content.
+     *
+     * The ceiling travels in the input rather than being read here: it is the
+     * caller's authorisation, and the provider refuses a source it cannot show
+     * to be within it (`unprocessable` + `too_large`) before any git work. Safe
+     * to repeat — a copy already holding the same head is not pushed again.
+     */
+    async createRepositoryCopy(
+        input: GitRepositoryCopyInput,
+        options: GitFacadeOptions,
+    ): Promise<GitRepositoryCopyResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.createRepositoryCopy;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('createRepositoryCopy', plugin.id);
+        }
+        return impl.call(plugin, input, token);
+    }
+
+    /**
+     * Actions hygiene and the build preparation's Actions switch (APW-02
+     * FR-25…FR-31, APW-05): the one call that lists a repository's workflows
+     * and disables/enables the ones the input names.
+     *
+     * The input is forwarded verbatim, `enabled` included — and hygiene
+     * deliberately never sets that field, because switching Actions off for a
+     * whole repository is the one thing FR-26 forbids. A 403 comes back as
+     * `GitProviderRequestError` (`permission_missing` + the permission) rather
+     * than a bare failure, so the caller can name what is missing.
+     */
+    async setActionsPermissions(
+        owner: string,
+        repo: string,
+        input: GitActionsPermissionsInput,
+        options: GitFacadeOptions,
+    ): Promise<GitActionsPermissionsResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.setActionsPermissions;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('setActionsPermissions', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, input, token);
+    }
+
+    /**
+     * Install the platform's webhook on a repository, idempotently by URL
+     * (APW-02 FR-55): an existing hook at the same `config.url` is updated and
+     * answers `created: false`.
+     *
+     * The signing secret is an input owned by the consumer; it is never logged
+     * here, never cached, and never returned (plan §12.VII).
+     */
+    async createWebhook(
+        owner: string,
+        repo: string,
+        input: GitWebhookInput,
+        options: GitFacadeOptions,
+    ): Promise<{ id: number; created: boolean }> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.createWebhook;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('createWebhook', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, input, token);
+    }
+
+    /**
+     * Remove one webhook. A hook that is already gone is a success, which the
+     * provider decides (404 ⇒ resolved), not this facade.
+     */
+    async deleteWebhook(
+        owner: string,
+        repo: string,
+        hookId: number,
+        options: GitFacadeOptions,
+    ): Promise<void> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.deleteWebhook;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('deleteWebhook', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, hookId, token);
+    }
+
     async cloneOrPull(
         cloneOptions: FacadeCloneOptions,
         options: GitFacadeOptions,
@@ -1383,12 +1834,24 @@ export class GitFacadeService implements IGitFacade {
         // coordinate, and two callers with different tokens still resolve to
         // the same on-disk directory — sharing the in-flight operation is
         // exactly what we want, and it keeps secrets out of map keys.
+        //
+        // `checkoutKey` IS part of the key: a key asks for a working copy of
+        // its own, so coalescing two different keys would hand both callers
+        // the same directory again — the very sharing the key prevents.
         const key = [
             plugin.id,
             cloneOptions.owner,
             cloneOptions.repo,
             cloneOptions.branch ?? '',
             cloneOptions.autoSwitchToMainBranch === false ? 'no-switch' : 'switch',
+            cloneOptions.checkoutKey ?? '',
+            // `expectExisting` is part of the key too (APW-02 FR-8, plan §4.2):
+            // a plain clone that finds an empty repository legitimately leaves
+            // an initialised directory behind, and handing THAT to an
+            // `expectExisting` caller would answer success for a repository
+            // that does not exist yet. Two calls with the same coordinates and
+            // opposite expectations therefore never share one in-flight clone.
+            cloneOptions.expectExisting === true,
         ].join('\0');
 
         const inFlight = this.cloneOrPullRequests.get(key);
@@ -1443,12 +1906,12 @@ export class GitFacadeService implements IGitFacade {
     }
 
     async add(providerId: string, dir: string, paths: string | string[]): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.add(dir, paths);
     }
 
     async addAll(providerId: string, dir: string): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.addAll(dir);
     }
 
@@ -1458,7 +1921,7 @@ export class GitFacadeService implements IGitFacade {
         message: string,
         committer?: GitCommitter,
     ): Promise<string | null> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.commit(dir, message, committer);
     }
 
@@ -1538,12 +2001,12 @@ export class GitFacadeService implements IGitFacade {
     }
 
     async getCurrentBranch(providerId: string, dir: string): Promise<string | null> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getCurrentBranch(dir);
     }
 
     async getMainBranch(providerId: string, dir: string): Promise<string | null> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getMainBranch(dir);
     }
 
@@ -1553,45 +2016,72 @@ export class GitFacadeService implements IGitFacade {
         branch: string,
         create?: boolean,
     ): Promise<string> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.switchBranch(dir, branch, create);
     }
 
     async getStatus(providerId: string, dir: string): Promise<GitFileChange[]> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getStatus(dir);
     }
 
-    getCloneUrl(providerId: string, owner: string, repo: string): string {
-        const plugin = this.getPluginSync(providerId);
+    // `getCloneUrl` / `getWebUrl` / `getLocalDir` (and `getRawFileUrl`) are
+    // SYNC on the provider but async here: the provider may be a COLD lazy
+    // proxy (disk builtIns such as `github` stay cold until first use), on
+    // which a sync member reads as the async forwarding wrapper — so a sync
+    // facade answered a Promise where its callers expect a string. The
+    // provider is loaded first (`getPlugin`), and the call made on the real
+    // instance.
+    async getCloneUrl(providerId: string, owner: string, repo: string): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         return plugin.getCloneUrl(owner, repo);
     }
 
-    getWebUrl(providerId: string, owner: string, repo: string): string {
-        const plugin = this.getPluginSync(providerId);
+    async getWebUrl(providerId: string, owner: string, repo: string): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         return plugin.getWebUrl(owner, repo);
     }
 
-    getLocalDir(providerId: string, owner: string, repo: string): string {
-        const plugin = this.getPluginSync(providerId);
-        return plugin.getLocalDir(owner, repo);
+    async getLocalDir(
+        providerId: string,
+        owner: string,
+        repo: string,
+        checkoutKey?: string,
+    ): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
+        return plugin.getLocalDir(owner, repo, checkoutKey);
     }
 
-    private getPluginSync(providerId: string): IGitProviderPlugin {
+    /**
+     * The git provider `providerId` names — or, when that one is not usable,
+     * the first usable git provider, as before — LOADED: its first load
+     * (import and `onLoad`) has settled, including one another caller started
+     * (`loadRegisteredPlugins` waits for it), and the REAL instance is
+     * returned, so its sync members answer values and its optional-method
+     * probes are truthful. A provider that cannot be imported or whose
+     * `onLoad` fails is now in `error` and is passed over, exactly as one that
+     * failed at boot was.
+     */
+    private async getPlugin(providerId: string): Promise<IGitProviderPlugin> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
+        const requested = providerId ? plugins.find((p) => p.plugin.id === providerId) : undefined;
+        const candidates = requested
+            ? [requested, ...plugins.filter((p) => p !== requested)]
+            : plugins;
 
-        if (providerId) {
-            const registered = plugins.find((p) => p.plugin.id === providerId);
-            if (registered?.state === 'loaded') {
-                return registered.plugin as IGitProviderPlugin;
-            }
+        for (const registered of candidates) {
+            const plugin = await this.loadForUse(registered);
+            if (plugin) return plugin;
         }
+        throw new NoGitProviderError();
+    }
 
-        const enabled = plugins.find((p) => p.state === 'loaded');
-        if (!enabled) {
-            throw new NoGitProviderError();
-        }
-        return enabled.plugin as IGitProviderPlugin;
+    /** `registered`'s real instance once loaded, or `null` when it cannot load. */
+    private async loadForUse(registered: RegisteredPlugin): Promise<IGitProviderPlugin | null> {
+        if (registered.state !== 'loaded') return null;
+        const [usable] = await loadRegisteredPlugins([registered]);
+        if (!usable) return null;
+        return (await materializePlugin(usable.plugin)) as IGitProviderPlugin;
     }
 
     async replaceRemote(
@@ -1600,13 +2090,18 @@ export class GitFacadeService implements IGitFacade {
         remote: string,
         url: string,
     ): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.replaceRemote(dir, remote, url);
     }
 
-    async removeLocalDir(providerId: string, owner: string, repo: string): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
-        return plugin.removeLocalDir(owner, repo);
+    async removeLocalDir(
+        providerId: string,
+        owner: string,
+        repo: string,
+        checkoutKey?: string,
+    ): Promise<void> {
+        const plugin = await this.getPlugin(providerId);
+        return plugin.removeLocalDir(owner, repo, checkoutKey);
     }
 
     async renameBranch(
@@ -1615,7 +2110,7 @@ export class GitFacadeService implements IGitFacade {
         oldName: string,
         newName: string,
     ): Promise<void> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.renameBranch(dir, oldName, newName);
     }
 
@@ -1742,7 +2237,13 @@ export class GitFacadeService implements IGitFacade {
                 userId,
             );
             if (isEnabled) {
-                return registered.plugin as IGitProviderPlugin;
+                // Loaded before use (see `getPlugin`): a cold provider's
+                // optional-method probes (`if (plugin.getReadme)`) would
+                // otherwise all read truthy, and its methods could run before
+                // its `onLoad` has settled. One that cannot load is `error`
+                // now — not found, as when it failed at boot.
+                const plugin = await this.loadForUse(registered);
+                if (plugin) return plugin;
             }
         }
         throw new GitProviderNotFoundError(providerId);
