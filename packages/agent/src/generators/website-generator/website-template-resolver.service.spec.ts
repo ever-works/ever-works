@@ -1,4 +1,5 @@
 import { WebsiteTemplateResolverService } from './website-template-resolver.service';
+import { getWebsiteTemplateIdWithoutSavedDefault } from './config/website-template.config';
 
 describe('WebsiteTemplateResolverService', () => {
     let templateRepository: any;
@@ -183,6 +184,29 @@ describe('WebsiteTemplateResolverService', () => {
                 expect.objectContaining({ id: 'classic' }),
             );
         });
+
+        // templates-catalog FR-5 f pins a NEW Work whose saved default is a
+        // retired row to `getWebsiteTemplateIdWithoutSavedDefault(kind)`,
+        // promising it the template a user with no saved default gets. That
+        // promise is this resolver's fall-through, so the two must not drift.
+        it.each([
+            'website',
+            'landing-page',
+            'landing',
+            'blog',
+            'default',
+            'directory',
+            'awesome-repo',
+            'not-a-kind',
+            null,
+            undefined,
+        ])(
+            'kind %s → the same template getWebsiteTemplateIdWithoutSavedDefault names',
+            async (kind) => {
+                const resolved = await service.resolveForWork(workOfKind(kind));
+                expect(resolved.id).toBe(getWebsiteTemplateIdWithoutSavedDefault(kind));
+            },
+        );
 
         it('never auto-selects the opt-in `web-minimal` template from a kind', async () => {
             for (const kind of ['website', 'landing-page', 'blog']) {
