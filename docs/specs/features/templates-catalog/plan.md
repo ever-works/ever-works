@@ -125,19 +125,20 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
     blueprints = [repo in named where isAppBlueprintRepository(repo)]
     curated = listWebsiteTemplates()   # skipped by coordinates below and by id here
 
-    for repo in blueprints (skip curated coordinates):           # FR-5 c/d
+    for repo in blueprints (skip curated coordinates):           # FR-5 c
         rows = await templateRepository.findAllBuiltInByRepositoryCoordinates('website', repo.owner, repo.name)
             (lookup failure: warn-log, continue)
         for row in rows where row.isActive && row.kind === 'website'
-                            && row.sourceType === 'built_in' && row.id not in curated ids:
+                            && row.sourceType === 'built_in' && row.id not in curated ids
+                            && !isRetiredTemplate(row):
+            # RETIRE, never deactivate: isActive stays true, so every Work on the
+            # row (by id or through an inherited default) keeps resolving; no
+            # usage count, so no count-then-update window. See template-retirement.ts.
             try:
-                usage = workRepository.countByWebsiteTemplateId(row.id)            # all users
-                if usage === 0:
-                    userIds = userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId('website', row.id)
-                    usage = workRepository.countByUsersAndInheritedWebsiteTemplateSelection(userIds)
-                if usage > 0: warn-log(`Kept discovered website template "<id>" active …`); continue
-                await templateRepository.updateById(row.id, { isActive: false })
-            catch: warn-log(`Could not retire discovered website template "<id>" …`)   # row stays active
+                await templateRepository.updateById(row.id, {
+                    metadata: { ...row.metadata, retiredReason: 'app_blueprint', retiredAt: now },
+                })
+            catch: warn-log(`Could not retire discovered website template "<id>" …`)   # retried next discovery
 
     for repo in named where !isAppBlueprintRepository(repo) (skip curated coordinates):
         canonical = await templateRepository.findBuiltInByRepositoryCoordinates('website', repo.owner, repo.name)
@@ -148,6 +149,9 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
                             || existing.repositoryOwner !== repo.owner
                             || existing.repositoryName !== repo.name):
                 warn-log(`Skipping … id "<discoveredId>" already used by …`); continue
+        metadata = { discoveredFromOrganization: catalogOwner, fullName: repo.fullName }
+        if repo.topics is not reported && canonical:                # FR-5 d
+            metadata += retirement marker of canonical, if any      # unreported topics keep a retirement
         await templateRepository.upsert({
             id: canonicalId, kind: 'website', sourceType: 'built_in',
             name: humanizeRepositoryName(repo.name),
@@ -158,7 +162,7 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
             syncBranches: [repo.defaultBranch || 'main'],
             betaBranch: null,
             isActive: true,
-            metadata: { discoveredFromOrganization: catalogOwner, fullName: repo.fullName },
+            metadata,
         })
         if canonicalId !== repo.name.toLowerCase():
             duplicate = await templateRepository.findById(repo.name.toLowerCase())

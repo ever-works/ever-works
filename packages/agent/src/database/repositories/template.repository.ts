@@ -14,6 +14,13 @@ export class TemplateRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    /**
+     * Every template of `kind` the user can see: active built-ins plus the
+     * user's own active custom rows. This includes RETIRED built-in rows
+     * (templates-catalog FR-5 c: active, so existing references keep
+     * resolving); `TemplateCatalogService.listTemplatesForUser` drops them from
+     * the picker listing, and so must any other caller that offers choices.
+     */
     async findVisibleByKind(kind: TemplateKind, userId: string): Promise<Template[]> {
         return this.repository.find({
             where: [
@@ -27,6 +34,7 @@ export class TemplateRepository {
         });
     }
 
+    /** One visible template by id. Like {@link findVisibleByKind}, a RETIRED row is returned too. */
     async findVisibleById(id: string, userId: string): Promise<Template | null> {
         return this.repository.findOne({
             where: [
