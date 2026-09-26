@@ -30,10 +30,13 @@ describe('TemplateCatalogService', () => {
             findByUserAndKind: jest.fn(),
             upsertDefault: jest.fn(),
             deleteByUserKindAndTemplateId: jest.fn(),
+            findUserIdsByKindAndTemplateId: jest.fn().mockResolvedValue([]),
         };
         workRepository = {
             countByUserAndWebsiteTemplateId: jest.fn(),
             countByUserAndInheritedWebsiteTemplateSelection: jest.fn(),
+            countByWebsiteTemplateId: jest.fn().mockResolvedValue(0),
+            countByUsersAndInheritedWebsiteTemplateSelection: jest.fn().mockResolvedValue(0),
         };
         gitFacade = {
             hasValidCredentials: jest.fn().mockResolvedValue(false),
@@ -689,6 +692,120 @@ describe('TemplateCatalogService', () => {
                 isActive: false,
             });
             expect(templateRepository.updateById).toHaveBeenCalledTimes(1);
+        });
+
+        // Deactivating a row still in use would break those Works: the website
+        // resolver only resolves ACTIVE catalog rows, and these ids have no
+        // static config to fall back to, so every regenerate / update / branch
+        // sync of a Work naming the id would throw "unavailable or inactive".
+        // Works inheriting a user default set to the row would silently switch
+        // template. Same two guards archiving a custom template applies, but
+        // across all users, since a built-in row belongs to no single user.
+        describe('while Works still use the Blueprint row', () => {
+            beforeEach(() => {
+                gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                    websiteTemplateRepository,
+                    appBlueprintRepository,
+                ]);
+                templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
+                    async (kind: string, owner: string, repo: string) =>
+                        kind === 'website' && owner === 'ever-works' && repo === 'cal-template'
+                            ? [discoveredBlueprintRow]
+                            : [],
+                );
+            });
+
+            it('keeps the row active while a Work names it explicitly, and says so', async () => {
+                workRepository.countByWebsiteTemplateId.mockImplementation(async (id: string) =>
+                    id === 'cal-template' ? 2 : 0,
+                );
+                const warn = jest.spyOn((service as any).logger, 'warn');
+
+                await service.refreshTemplatesForUser('website', 'user-1');
+
+                expect(workRepository.countByWebsiteTemplateId).toHaveBeenCalledWith(
+                    'cal-template',
+                );
+                expect(templateRepository.updateById).not.toHaveBeenCalled();
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('"cal-template"'));
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('2 works'));
+                // The ordinary website template is still discovered.
+                expect(templateRepository.upsert).toHaveBeenCalledWith(
+                    expect.objectContaining({ id: 'astro-blog-template' }),
+                );
+            });
+
+            it('keeps the row active while a user default points at it and that user has inheriting Works', async () => {
+                userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId.mockImplementation(
+                    async (kind: string, templateId: string) =>
+                        kind === 'website' && templateId === 'cal-template' ? ['user-7'] : [],
+                );
+                workRepository.countByUsersAndInheritedWebsiteTemplateSelection.mockImplementation(
+                    async (userIds: string[]) => (userIds.includes('user-7') ? 1 : 0),
+                );
+                const warn = jest.spyOn((service as any).logger, 'warn');
+
+                await service.refreshTemplatesForUser('website', 'user-1');
+
+                expect(
+                    workRepository.countByUsersAndInheritedWebsiteTemplateSelection,
+                ).toHaveBeenCalledWith(['user-7']);
+                expect(templateRepository.updateById).not.toHaveBeenCalled();
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('"cal-template"'));
+            });
+
+            it('deactivates the row when a user default points at it but no Work inherits that default', async () => {
+                userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId.mockResolvedValue([
+                    'user-7',
+                ]);
+                workRepository.countByUsersAndInheritedWebsiteTemplateSelection.mockResolvedValue(
+                    0,
+                );
+
+                await service.refreshTemplatesForUser('website', 'user-1');
+
+                expect(workRepository.countByWebsiteTemplateId).toHaveBeenCalledWith(
+                    'cal-template',
+                );
+                expect(
+                    workRepository.countByUsersAndInheritedWebsiteTemplateSelection,
+                ).toHaveBeenCalledWith(['user-7']);
+                expect(templateRepository.updateById).toHaveBeenCalledWith('cal-template', {
+                    isActive: false,
+                });
+            });
+
+            it('keeps the row active when the usage check itself fails, and still saves the website templates', async () => {
+                workRepository.countByWebsiteTemplateId.mockRejectedValue(new Error('db down'));
+                const warn = jest.spyOn((service as any).logger, 'warn');
+
+                await service.refreshTemplatesForUser('website', 'user-1');
+
+                expect(templateRepository.updateById).not.toHaveBeenCalled();
+                expect(templateRepository.upsert).toHaveBeenCalledWith(
+                    expect.objectContaining({ id: 'astro-blog-template' }),
+                );
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining('"cal-template"'));
+            });
+        });
+
+        it('still saves the website templates when looking up the rows of a Blueprint repository fails', async () => {
+            gitFacade.listPublicRepositories.mockResolvedValueOnce([
+                websiteTemplateRepository,
+                appBlueprintRepository,
+            ]);
+            templateRepository.findAllBuiltInByRepositoryCoordinates.mockRejectedValue(
+                new Error('db down'),
+            );
+            const warn = jest.spyOn((service as any).logger, 'warn');
+
+            await service.refreshTemplatesForUser('website', 'user-1');
+
+            expect(templateRepository.updateById).not.toHaveBeenCalled();
+            expect(templateRepository.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'astro-blog-template' }),
+            );
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining('ever-works/cal-template'));
         });
 
         it('leaves an already-inactive discovered Blueprint row alone', async () => {

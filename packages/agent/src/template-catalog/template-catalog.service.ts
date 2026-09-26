@@ -29,7 +29,7 @@ import {
 // Work Templates catalog source — powers the "Work Templates" tab.
 import { listWorkTemplates, type WorkTemplateConfig } from '@src/works/work-template.config';
 import { randomUUID } from 'node:crypto';
-import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
+import type { Template, TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
 import { APP_BLUEPRINT_TOPIC } from '@src/apps-catalog/app-blueprint.constants';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
@@ -789,25 +789,37 @@ export class TemplateCatalogService implements OnModuleInit {
             );
 
             // A row an earlier discovery saved for a repository that is now an
-            // App Blueprint must stop being offered as a website template. Same
-            // deactivate path as the duplicate clean-up below and seed-time
-            // de-duplication: the row stays (works may still reference its id),
-            // it just leaves the catalog. `findAllBuiltInByRepositoryCoordinates`
+            // App Blueprint must stop being offered as a website template, via
+            // the same isActive=false path as the duplicate clean-up below and
+            // seed-time de-duplication. `findAllBuiltInByRepositoryCoordinates`
             // only returns built-in rows, so user-created templates are never
             // touched; curated WEBSITE_TEMPLATES rows are skipped by coordinates
-            // and by id.
+            // and by id. A row still in use is kept active instead (see
+            // retireAppBlueprintTemplateRow), and a failure here is logged and
+            // never blocks discovery of the real website templates below.
             await Promise.all(
                 appBlueprintRepositories.map(async (repository) => {
                     const coordinateKey = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
                     if (curatedRepoCoordinates.has(coordinateKey)) {
                         return;
                     }
-                    const discoveredRows =
-                        await this.templateRepository.findAllBuiltInByRepositoryCoordinates(
-                            'website',
-                            repository.owner,
-                            repository.name,
+                    let discoveredRows: Template[];
+                    try {
+                        discoveredRows =
+                            await this.templateRepository.findAllBuiltInByRepositoryCoordinates(
+                                'website',
+                                repository.owner,
+                                repository.name,
+                            );
+                    } catch (error) {
+                        this.logger.warn(
+                            `Could not look up discovered website templates for App Blueprint ${repository.fullName}; ` +
+                                `retrying on the next discovery: ${
+                                    error instanceof Error ? error.message : String(error)
+                                }`,
                         );
+                        return;
+                    }
                     await Promise.all(
                         discoveredRows
                             .filter(
@@ -817,14 +829,9 @@ export class TemplateCatalogService implements OnModuleInit {
                                     row.sourceType === 'built_in' &&
                                     !curatedTemplateIds.has(row.id),
                             )
-                            .map(async (row) => {
-                                await this.templateRepository.updateById(row.id, {
-                                    isActive: false,
-                                });
-                                this.logger.log(
-                                    `Deactivated discovered website template "${row.id}": ${repository.fullName} is an App Blueprint.`,
-                                );
-                            }),
+                            .map((row) =>
+                                this.retireAppBlueprintTemplateRow(row.id, repository.fullName),
+                            ),
                     );
                 }),
             );
@@ -1150,6 +1157,69 @@ export class TemplateCatalogService implements OnModuleInit {
 
     private isStandardTemplateRepository(repo: string): boolean {
         return /template$/i.test(repo.trim());
+    }
+
+    /**
+     * Deactivates a discovered website-template row whose repository is an App
+     * Blueprint, unless Works still use it.
+     *
+     * Deactivating a row in use is not harmless: the website resolver only
+     * resolves ACTIVE catalog rows and a discovered id has no static config to
+     * fall back to, so every regenerate / update / branch sync of a Work that
+     * names the id would throw "unavailable or inactive", and a Work inheriting
+     * a user default set to the row would silently switch template without the
+     * switch path's reset. These are the two guards archiving a custom template
+     * applies, counted across all users since a built-in row belongs to no one.
+     * A row in use stays in the catalog, with a warning on each discovery, until
+     * those Works are reassigned; the next discovery then retires it. Never
+     * throws: a failed check leaves the row active.
+     */
+    private async retireAppBlueprintTemplateRow(
+        templateId: string,
+        repositoryFullName: string,
+    ): Promise<void> {
+        try {
+            const usage = await this.countWorksUsingWebsiteTemplate(templateId);
+            if (usage > 0) {
+                this.logger.warn(
+                    `Kept discovered website template "${templateId}" active although ${repositoryFullName} ` +
+                        `is an App Blueprint: ${usage === 1 ? '1 work still uses' : `${usage} works still use`} ` +
+                        "it (by id or through its owner's default). Reassign them and the next discovery " +
+                        'deactivates it.',
+                );
+                return;
+            }
+            await this.templateRepository.updateById(templateId, { isActive: false });
+            this.logger.log(
+                `Deactivated discovered website template "${templateId}": ${repositoryFullName} is an App Blueprint.`,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Could not retire discovered website template "${templateId}" (${repositoryFullName} is an ` +
+                    `App Blueprint); it stays active until the next discovery: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+            );
+        }
+    }
+
+    /**
+     * Works using a website template: those naming it by id, else those that
+     * leave the template unset while their owner's default is this template.
+     */
+    private async countWorksUsingWebsiteTemplate(templateId: string): Promise<number> {
+        const explicitUsage = await this.workRepository.countByWebsiteTemplateId(templateId);
+        if (explicitUsage > 0) {
+            return explicitUsage;
+        }
+        const usersPreferringTemplate =
+            await this.userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId(
+                'website',
+                templateId,
+            );
+        return this.workRepository.countByUsersAndInheritedWebsiteTemplateSelection(
+            usersPreferringTemplate,
+        );
     }
 
     /**
