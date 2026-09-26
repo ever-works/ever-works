@@ -145,6 +145,64 @@ describe('EmailController', () => {
                 }),
             );
         });
+
+        // PLG-1 follow-up — the dispatcher must route to the address the
+        // signature was verified for, not re-derive one from `to`: the route
+        // hands it the facade's `authenticatedRecipient` as-is.
+        it('dispatches to the address the facade authenticated the webhook for', async () => {
+            const recipient = { emailAddressId: 'addr-7', userId: 'owner-7' };
+            facade.parseInbound.mockResolvedValueOnce({
+                providerMessageId: 'pmid-2',
+                from: 'sender@x.com',
+                to: ['someone-else@x.com', 'agent@x.com'],
+                subject: 'hi',
+                bodyText: 'body',
+                receivedAt: new Date('2026-06-08T00:00:00Z'),
+                authenticatedRecipient: recipient,
+            });
+
+            await controller.inboundWebhook('postmark', req, headers);
+
+            expect(inboundDispatcher.dispatch).toHaveBeenCalledWith(
+                expect.objectContaining({ pluginId: 'postmark', recipient }),
+            );
+        });
+
+        it('dispatches with no recipient when the facade bound the webhook to none', async () => {
+            facade.parseInbound.mockResolvedValueOnce({
+                providerMessageId: 'pmid-3',
+                from: 'sender@x.com',
+                to: ['agent@x.com'],
+                subject: 'hi',
+                bodyText: 'body',
+                receivedAt: new Date('2026-06-08T00:00:00Z'),
+                authenticatedRecipient: null,
+            });
+
+            await controller.inboundWebhook('postmark', req, headers);
+
+            expect(inboundDispatcher.dispatch).toHaveBeenCalledWith(
+                expect.objectContaining({ recipient: null }),
+            );
+        });
+
+        // PLG-1 — the facade fails closed (a bad signature throws; a plugin
+        // that cannot load is refused with a 503). The public route must pass
+        // that refusal through: never ack, never dispatch the message.
+        it.each([
+            ['a bad signature', new Error('Postmark inbound: signature mismatch.')],
+            [
+                'an inbound plugin that cannot load (503)',
+                Object.assign(new Error('Inbound email plugin postmark is unavailable'), {
+                    status: 503,
+                }),
+            ],
+        ])('refuses the webhook and dispatches nothing on %s', async (_case, refusal) => {
+            facade.parseInbound.mockRejectedValueOnce(refusal);
+
+            await expect(controller.inboundWebhook('postmark', req, headers)).rejects.toBe(refusal);
+            expect(inboundDispatcher.dispatch).not.toHaveBeenCalled();
+        });
     });
 
     describe('compose + held drafts (AW-05)', () => {

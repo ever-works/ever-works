@@ -115,6 +115,8 @@ The settings UI cannot do this yet; the API can. Every call below is authenticat
     - inbound mail → `POST /api/email/inbound/<pluginId>` (e.g. `/api/email/inbound/postmark`)
     - delivery events (bounces, opens, clicks) → `POST /api/email/events/<pluginId>`
 
+    Inbound mail is delivered **only to the address the signature was verified for**: the first recipient that is registered with that provider. The check uses that address owner's own webhook secret if they saved one, or the platform's secret otherwise. Other recipients the message names are recorded but never routed to, and an address registered with a different provider never receives mail through this provider's route.
+
     Both are public routes that **verify the provider's webhook signature** before doing anything, are throttled to 600 requests/minute per client (the standard per-user / per-IP limiter, not a per-plugin bucket), and always answer `202` so the provider stops retrying. The inbound ack is deliberately contentless (`{ "received": true }`) — it leaks no routing metadata to an unauthenticated caller.
 
 6. **Confirm it landed** — `GET /api/email/addresses` (optionally `?direction=inbound`), or reload `/settings/integrations/emails`, where the new row appears with its provider and verified flag.

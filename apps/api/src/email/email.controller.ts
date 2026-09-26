@@ -345,10 +345,16 @@ export class EmailController {
         // mode, persists the email_messages row, spawns a task or appends
         // to a conversation). Optional: when the token isn't bound the
         // webhook still acks so the provider stops retrying.
+        //
+        // Security: the destination is the address the signature was
+        // verified for (`authenticatedRecipient`), never one re-derived from
+        // the payload's `to` list — a tenant signing with their own per-user
+        // key could otherwise name a victim's address beside their own.
         let dispatch: { handled: boolean; agentId?: string; mode?: string } | undefined;
         if (this.inboundDispatcher) {
             dispatch = await this.inboundDispatcher.dispatch({
                 pluginId,
+                recipient: message.authenticatedRecipient ?? null,
                 providerMessageId: message.providerMessageId,
                 from: message.from,
                 to: [...message.to],

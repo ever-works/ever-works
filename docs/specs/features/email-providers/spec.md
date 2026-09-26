@@ -262,14 +262,18 @@ The descriptor's `invoke(args)` routes through `EmailFacadeService.send` with th
 
 ### 5.2 Inbound → Task
 
-A new dispatcher contract `AGENT_INBOUND_EMAIL_DISPATCHER` (mirrors the existing `AGENT_CHAT_REPLY_DISPATCHER`) gets invoked when an inbound webhook lands. The default binding:
+A new dispatcher contract `AGENT_INBOUND_EMAIL_DISPATCHER` (mirrors the existing `AGENT_CHAT_REPLY_DISPATCHER`) gets invoked when an inbound webhook lands.
 
-1. Resolves the destination Agent via `agent_email_assignments.direction='inbound'`.
+**Destination = the address the webhook was verified for.** Before verifying, `EmailFacadeService.parseInbound` binds the webhook to the first recipient (from the plugin's `extractInboundRecipients`) that is a registered inbound address of the webhook's plugin, and verifies the signature with the secret at that address owner's scope. That is the owner's own secret when they saved one — it replaces the platform secret at their scope — or the admin/env secret otherwise. The dispatcher delivers to that address (`payload.recipient`) only, and refuses it unless it is still an active inbound address of that plugin and owner. It never re-derives a destination from the payload's `to` list: any tenant can sign a webhook with their own per-user key and list a victim's address beside their own. A webhook with no such recipient is acknowledged but not dispatched.
+
+The default binding:
+
+1. Resolves the destination Agent via `agent_email_assignments.direction='inbound'` on that address.
 2. Resolves or creates a Task — either by parsing the subject for a Task slug (`[ACME-123]`) or by spawning a fresh Task with the email as its description.
 3. Persists the inbound row to `email_messages`.
 4. Enqueues `agent-task-execute` (existing Trigger.dev job) so the Agent processes the email like any other Task.
 
-Spec gap: how do we attribute multi-recipient inbound mail (e.g. one email lands on `triage@` + `manager@`)? Default v1: pick the first match (lowest priority); future work covers fan-out.
+Spec gap: how do we attribute multi-recipient inbound mail (e.g. one email lands on `triage@` + `manager@`)? Default v1: the first recipient that is a registered address of the webhook's plugin (the one the signature is verified for), then its lowest-priority assignment; future work covers fan-out, which would need each extra address's owner secret verified too.
 
 ### 5.3 Per-Agent commit identity (FU-13 closing loop)
 
