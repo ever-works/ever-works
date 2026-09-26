@@ -34,8 +34,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      Max-Age=600 + SameSite=Lax (which the sibling loop does NOT pin), the
  *      SAME-provider state ROTATION (fresh nonce per mint), and GET-only 404.
  *   B. The three-way allowlist DIVERGENCE: /api/oauth/providers = {github,vercel}
- *      (items carry `name`), /api/git-providers = {github} only (items carry NO
- *      `name`), and the social-URL mint honours a NARROWER allowlist still —
+ *      (items carry `name`), /api/git-providers = {github} only (items carry
+ *      `name` too — see the re-pin note in B), and the social-URL mint honours a
+ *      NARROWER allowlist still —
  *      github/google → 200 (distinct per-provider shaping: google adds
  *      access_type=offline+prompt=consent), vercel/unknown → 400 "Unsupported
  *      OAuth provider".
@@ -235,7 +236,7 @@ test.describe('flow: provider-allowlist divergence (oauth caps vs git providers 
         expect(byId.get('vercel')?.enabled, 'oauth vercel is enabled').toBe(true);
     });
 
-    test('the git-provider list is NARROWER: github only, and its item carries NO name key', async ({
+    test('the git-provider list is NARROWER: github only, and its item carries a name naming github', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -252,9 +253,20 @@ test.describe('flow: provider-allowlist divergence (oauth caps vs git providers 
         expect(ids, 'vercel is NOT a git provider').not.toContain('vercel');
 
         const github = (body.providers as Connection[]).find((p) => p.id === 'github')!;
-        // Contract contrast: the git-provider descriptor omits `name` (it carries
-        // description/homepage/icon instead — see flow-git-providers-deep).
-        expect('name' in github, 'git-provider github item has no name key').toBe(false);
+        // RE-PINNED (was `'name' in github` → false). The declared descriptor
+        // (`GitProviderInfo` in packages/plugin and apps/web lib/api) REQUIRES a
+        // string `name`, and GitFacadeService.getAvailableProviders always sets it.
+        // The old "no name key" shape was an artefact of the lazy-proxy defect
+        // fixed in aff0c44a5: a disk builtIn is a lazy proxy, and before that fix
+        // it answered `providerName` (not a manifest member) with an async
+        // forwarding FUNCTION even after load — JSON.stringify dropped it, so the
+        // key vanished from the response and the settings UI rendered an empty
+        // provider name. The value is matched case-insensitively because the
+        // sync list does not load the plugin: a loaded github answers its
+        // `providerName` ('github'), a still-cold proxy the manifest name ('GitHub').
+        expect('name' in github, 'git-provider github item carries a name key').toBe(true);
+        expect(typeof github.name, 'git-provider github name is a string').toBe('string');
+        expect(String(github.name), 'git-provider github name names github').toMatch(/^github$/i);
         expect(github.enabled, 'git-provider github is enabled').toBe(true);
     });
 

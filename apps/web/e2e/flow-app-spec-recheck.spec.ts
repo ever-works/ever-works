@@ -481,7 +481,7 @@ test('ACC-03-13 (control) — the same route answers 200 for a draft validation,
     // §24.1 is the program's running example, and ACC-03-01 asks it to validate with **zero
     // errors**. Measured on this lane: `valid_with_warnings`, `errorCount: 0`, one warning —
     // R11 (`secret_build_arg`) on the build argument the example itself annotates as accepted
-    // (`schema.md:571`). That verdict is exactly §6.2's *valid with warnings* state; what this lane
+    // (`schema.md:565`). That verdict is exactly §6.2's *valid with warnings* state; what this lane
     // cannot do is **store** it, which is why the banner itself is `flow-app-spec-settings.spec.ts`'s
     // blocker and not this file's.
     expect(verdict.body.status).toBe('valid_with_warnings');
@@ -490,8 +490,20 @@ test('ACC-03-13 (control) — the same route answers 200 for a draft validation,
     expect(verdict.body.truncated).toBe(false);
     const issues = (verdict.body.issues ?? []) as Array<{ code?: string; line?: number }>;
     expect(issues.map((issue) => issue.code)).toEqual(['secret_build_arg']);
+    // Line 15 of the example (`schema.md:565`, the fence opens at 550). This was 21 until
+    // 9f8625822 renamed the example's Blueprint (cal-diy → cal): prettier then collapsed the
+    // 7-line `blueprint: { … }` flow mapping onto one line, so the annotated argument moved up
+    // 6 lines. The layout cannot be restored (format:check would collapse it again), so the pin
+    // follows the document. The guard below names the drift directly if the example moves again.
+    const exampleLines = schemaExample().split('\n');
+    expect(
+        exampleLines[15 - 1],
+        'line 15 of the §24.1 example is the build argument annotated as the accepted R11 warning',
+    ).toMatch(
+        /name: CALENDSO_ENCRYPTION_KEY, fromEnv: CALENDSO_ENCRYPTION_KEY \} # R11 warning, accepted/,
+    );
     expect(issues[0]?.line, 'the warning carries the line the problems list would link to').toBe(
-        21,
+        15,
     );
 
     // And the state read is *still* the 404: a draft validation writes nothing.

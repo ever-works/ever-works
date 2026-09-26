@@ -1075,7 +1075,7 @@ describe('schema.md §24.1–§24.3 — the valid examples', () => {
     });
 
     it('§24.1 reports only its documented R11 warning', () => {
-        // schema.md:571 — "`{ name: CALENDSO_ENCRYPTION_KEY, fromEnv: … }` # R11 warning, accepted".
+        // schema.md:565 — "`{ name: CALENDSO_ENCRYPTION_KEY, fromEnv: … }` # R11 warning, accepted".
         const findings = evaluate(examples[0].yaml);
         expect(codesOf(findings)).toEqual(['secret_build_arg']);
         expect(findings[0].severity).toBe('warning');

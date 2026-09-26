@@ -38,7 +38,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from
  *       preconditions on ONE disconnected user, and that deploy is storageProvider-agnostic.
  * NEW angles: (1) the OAuth provider set is a SUPERSET of the git-provider set
  * (vercel is OAuth-only); (2) github's descriptor DIFFERS across the two surfaces
- * (oauth carries `name`, git-provider carries icon/description/homepage); (3) the
+ * (both carry `name`; git-provider ADDS icon/description/homepage); (3) the
  * fork git-gate ORDER (400→404→409); (4) storageProvider is birth-bound + immutable
  * while deployProvider is mutable; (5) the SAME disconnected user faces git-409 (github)
  * vs deploy-400 (vercel) — the two halves of publish diverge; (6) the whole walk leaves
@@ -54,7 +54,11 @@ import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from
  *  GET  /api/oauth/:p/callback/plugins  → no code → 400 'Authorization code is required';
  *                                          code+state, no cookie → 400 'OAuth state verification failed: missing state cookie'
  *  DELETE /api/oauth/:p                 → 204 (idempotent; connection stays false)
- *  GET  /api/git-providers              → { configured:true, providers:[{id:github,enabled:true,icon,description,homepage}] } (NO name)
+ *  GET  /api/git-providers              → { configured:true, providers:[{id:github,name:/^github$/i,enabled:true,icon,description,homepage}] }
+ *                                          (the 2026-07-21 probe saw NO `name`: a side effect of the lazy-proxy bug fixed
+ *                                          in aff0c44a5, where a loaded proxy read `providerName` as a function that
+ *                                          JSON.stringify dropped. `name` is 'github' once the plugin has loaded, else
+ *                                          the manifest's 'GitHub', so never pin its exact case.)
  *  GET  /api/git-providers/:p/connection→ list-entry + connected:false; unknown → {id,name:'Unknown',enabled:false,connected:false}
  *  GET  /api/git-providers/:p/{user,organizations,repositories} → 200 {success:false,<coll>:[]|null,error:'Failed to fetch ...'}
  *  POST /api/works {storageProvider,gitProvider,deployProvider} → echoes storageProvider verbatim (free-form, default user-github);
@@ -224,7 +228,7 @@ test.describe('Chain step 1 — the two connect surfaces reconcile on a disconne
         expect(oauth.providers.find((p) => p.id === 'vercel')?.name).toBe('Vercel');
     });
 
-    test("github's connection descriptor DIFFERS across surfaces (oauth carries `name`, git-provider carries icon/description/homepage) yet BOTH agree connected:false", async ({
+    test("github's connection descriptor DIFFERS across surfaces (both carry `name`, git-provider adds icon/description/homepage) yet BOTH agree connected:false", async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -252,8 +256,10 @@ test.describe('Chain step 1 — the two connect surfaces reconcile on a disconne
         expect(oauthConn.connected).toBe(false);
         expect(gitConn.connected).toBe(false);
 
-        // Divergent descriptor shape: oauth has a human name; git-provider carries
-        // rich plugin metadata (icon/description/homepage) instead.
+        // Divergent descriptor shape: both carry `name` (the git one spreads its list
+        // entry, whose `name` is 'github' or 'GitHub' depending on whether the plugin
+        // has loaded, so it is not pinned here); git-provider ADDS rich plugin
+        // metadata (icon/description/homepage) on top.
         expect(oauthConn.name).toBe('GitHub');
         expect(gitConn.description).toMatch(/GitHub/i);
         expect(gitConn.homepage).toBe('https://github.com');
