@@ -52,7 +52,10 @@ import {
     type AppDependencyProviderDescriptor,
     type IAppDependencyProvider,
 } from '@ever-works/plugin';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    PluginRegistryService,
+    loadRegisteredPlugins,
+} from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { FacadeError, BaseFacadeService } from './base.facade';
@@ -262,13 +265,24 @@ export class AppDependencyFacadeService extends BaseFacadeService {
      * deprovision must still be able to reach it. `null` means the plugin or
      * the descriptor is gone — the caller reports that, and never provisions a
      * replacement under the same row.
+     *
+     * A plugin still `loaded` is LOADED first (waiting for a first load in
+     * flight): `isAppDependencyProvider` and the descriptor lookup read the
+     * class's `dependencyProviders` and methods, which a cold lazy proxy
+     * answers as forwarding wrappers — so a builtIn such as k8s, cold in a
+     * fresh API or worker process, resolved to `null` though it was there.
+     * The entry's own plugin (the proxy) is still what is returned, so a call
+     * after a failed first load is refused by the proxy as before.
      */
-    resolve(
+    async resolve(
         providerPluginId: string,
         providerId: string,
         kind?: AppDependencyKind,
-    ): ResolvedAppDependencyProvider | null {
+    ): Promise<ResolvedAppDependencyProvider | null> {
         const registered = this.registry.get(providerPluginId);
+        if (registered?.state === 'loaded') {
+            await loadRegisteredPlugins([registered]);
+        }
         const plugin = registered?.plugin;
         if (!plugin || !isAppDependencyProvider(plugin)) return null;
 
@@ -295,33 +309,33 @@ export class AppDependencyFacadeService extends BaseFacadeService {
      * Delegation — the five provider operations the job calls
      * ---------------------------------------------------------------------- */
 
-    provision(
+    async provision(
         selection: AppDependencySelection,
         ctx: AppDependencyContext,
     ): Promise<AppDependencyProvisionOutcome> {
-        return this.require(selection).provision(selection.providerId, ctx);
+        return (await this.require(selection)).provision(selection.providerId, ctx);
     }
 
-    getOutputs(
+    async getOutputs(
         selection: AppDependencySelection,
         ctx: AppDependencyContext,
     ): Promise<Record<string, string>> {
-        return this.require(selection).getOutputs(selection.providerId, ctx);
+        return (await this.require(selection)).getOutputs(selection.providerId, ctx);
     }
 
-    deprovision(
+    async deprovision(
         selection: AppDependencySelection,
         ctx: AppDependencyContext,
         opts: AppDependencyDeprovisionOptions,
     ): Promise<AppDependencyDeprovisionOutcome> {
-        return this.require(selection).deprovision(selection.providerId, ctx, opts);
+        return (await this.require(selection)).deprovision(selection.providerId, ctx, opts);
     }
 
-    backupStatus(
+    async backupStatus(
         selection: AppDependencySelection,
         ctx: AppDependencyContext,
     ): Promise<AppDependencyBackupStatus> {
-        return this.require(selection).backupStatus(selection.providerId, ctx);
+        return (await this.require(selection)).backupStatus(selection.providerId, ctx);
     }
 
     /* ---------------------------------------------------------------------- *
@@ -379,8 +393,8 @@ export class AppDependencyFacadeService extends BaseFacadeService {
     }
 
     /** Materialise the implementation of a selection, or refuse loudly. */
-    private require(selection: AppDependencySelection): IAppDependencyProvider {
-        const resolved = this.resolve(selection.providerPluginId, selection.providerId);
+    private async require(selection: AppDependencySelection): Promise<IAppDependencyProvider> {
+        const resolved = await this.resolve(selection.providerPluginId, selection.providerId);
         if (!resolved) {
             throw new AppDependencyProviderNotFoundError(selection.providerId);
         }

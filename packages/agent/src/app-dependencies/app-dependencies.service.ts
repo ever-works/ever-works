@@ -647,7 +647,7 @@ export class AppDependenciesService {
         opts: { deleteData: boolean; stopWorkloads?: boolean },
         report: AppDependencyDeletionReport,
     ): Promise<void> {
-        const resolved = this.facade?.resolve(row.providerPluginId, row.providerId, row.kind);
+        const resolved = await this.facade?.resolve(row.providerPluginId, row.providerId, row.kind);
         const access = resolved ? await this.prepareTarget(row.workId) : null;
         const ctx =
             resolved && access && !('unavailable' in access)
@@ -718,7 +718,11 @@ export class AppDependenciesService {
 
         const entries: AppDependencyListEntry[] = [];
         for (const row of active) {
-            const resolved = this.facade?.resolve(row.providerPluginId, row.providerId, row.kind);
+            const resolved = await this.facade?.resolve(
+                row.providerPluginId,
+                row.providerId,
+                row.kind,
+            );
             const available = this.facade
                 ? await this.facade
                       .availableProviders(row.kind, target, {
@@ -1117,7 +1121,7 @@ export class AppDependenciesService {
 
         const snapshot = await this.readSnapshot(workId).catch(() => null);
         const entry = snapshot?.dependencies.find((candidate) => candidate.kind === kind);
-        const resolved = this.facade.resolve(row.providerPluginId, row.providerId, kind);
+        const resolved = await this.facade.resolve(row.providerPluginId, row.providerId, kind);
         if (!resolved) {
             return { kind, state: 'failed', reason: 'providerNotSupported', transient: false };
         }
@@ -1206,7 +1210,7 @@ export class AppDependenciesService {
         row: WorkAppDependencyMetadata,
         ctx: AppDependencyContext,
     ): Promise<AppDependencyAttemptResult> {
-        const resolved = this.facade?.resolve(row.providerPluginId, row.providerId, row.kind);
+        const resolved = await this.facade?.resolve(row.providerPluginId, row.providerId, row.kind);
         if (!this.facade || !resolved) {
             return { kind: row.kind, state: 'failed', reason: 'providerNotSupported' };
         }
