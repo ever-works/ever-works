@@ -10,7 +10,9 @@
             "name": "Lazy Built-in",
             "version": "1.0.0",
             "category": "utility",
-            "capabilities": ["lazy-fixture"],
+            "capabilities": [
+                "lazy-fixture"
+            ],
             "description": "A disk-discovered builtIn plugin; used only by the lazy builtIn bootstrap spec.",
             "author": {
                 "name": "Ever Works Team"
