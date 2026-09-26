@@ -25,6 +25,7 @@ import { GitProviderRequestError } from '@ever-works/plugin';
 import type { GitPullRequestStatus } from '@ever-works/plugin';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
+import { ownershipScopeOf, type OwnershipScope } from '../database/ownership-scope';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkMemberRepository } from '../database/repositories/work-member.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -1275,13 +1276,22 @@ export class AppUpstreamStateService {
      * The Task never carries an `allowAgentMerge`-style override and nothing here starts
      * a run: the merge policy governs whatever pull request the Task later produces
      * (`plan.md:798`).
+     *
+     * **The Task lives in the Work's own workspace** (AW-1). The lookup, the new Task and
+     * the comment are all bounded by `ownershipScopeOf(work)`, the way a system-filed Task
+     * inherits its parent's scope elsewhere (`GoalOrchestratorService` files a Goal's
+     * iteration Tasks under `ownershipScopeOf(goal)`). It cannot be left to the
+     * scope-stamping subscriber: this method is reached from the Trigger worker through
+     * the remote proxy, whose request carries no workspace, so an unscoped Task was
+     * stamped null/null — invisible on an org-scoped Work's board and behind the Upstream
+     * card's "resolve conflict" link.
      */
     async recordConflict(workId: string, input: AppConflictInput): Promise<AppConflictResult> {
         const state = await this.requireState(workId);
         const work = await this.loadWork(workId);
         const ownerUserId = work?.userId ?? null;
 
-        if (!ownerUserId) {
+        if (!work || !ownerUserId) {
             // No Work ⇒ no owner ⇒ nowhere to file a Task and nobody to tell. The event is
             // still recorded, because the conflict itself is a fact about the App Work.
             await this.emit(workId, {
@@ -1300,10 +1310,11 @@ export class AppUpstreamStateService {
 
         const paths = await this.conflictPaths(state, input);
         const label = conflictLabel(workId);
+        const scope = ownershipScopeOf(work);
 
-        const open = await this.findOpenConflictTask(ownerUserId, workId, label);
+        const open = await this.findOpenConflictTask(ownerUserId, workId, label, scope);
         if (open) {
-            await this.commentOnConflictTask(open, ownerUserId, input);
+            await this.commentOnConflictTask(open, ownerUserId, input, scope);
             if (state.conflictTaskId !== open.id) {
                 await this.states.update(workId, { conflictTaskId: open.id });
             }
@@ -1327,6 +1338,7 @@ export class AppUpstreamStateService {
             paths,
             label,
             agentId,
+            scope,
         });
 
         if (task) {
@@ -1682,21 +1694,33 @@ export class AppUpstreamStateService {
         }
     }
 
-    /** The one open labelled Task of the Work, or `null` (FR-38, §6.5 step 1). */
+    /**
+     * The one open labelled Task of the Work, or `null` (FR-38, §6.5 step 1).
+     *
+     * Bounded by the Work's scope (AW-1), so a labelled Task stamped outside it — the
+     * null/null row an org-scoped Work's conflict used to get, reachable from no
+     * workspace — is not the one a new conflict comments on; a Task the member can
+     * actually open is filed instead.
+     */
     private async findOpenConflictTask(
         ownerUserId: string,
         workId: string,
         label: string,
+        scope: OwnershipScope,
     ): Promise<Task | null> {
         if (!this.taskRepository) {
             return null;
         }
         try {
-            const { rows } = await this.taskRepository.findByUserIdFiltered(ownerUserId, {
-                workId,
-                label,
-                status: [...OPEN_CONFLICT_TASK_STATUSES],
-            });
+            const { rows } = await this.taskRepository.findByUserIdFiltered(
+                ownerUserId,
+                {
+                    workId,
+                    label,
+                    status: [...OPEN_CONFLICT_TASK_STATUSES],
+                },
+                scope,
+            );
             return rows?.[0] ?? null;
         } catch (error) {
             this.logger.warn(
@@ -1715,23 +1739,32 @@ export class AppUpstreamStateService {
      * server-side and fans out one agent-chat-reply run per resolved Agent mention — and
      * this epic starts no run: a conflict is the member's decision (spec §7, D11). The
      * body of §6.3 contains no `@` by construction, and {@link withoutMentions} keeps that
-     * true if the copy ever grows an interpolated field.
+     * true if the copy ever grows an interpolated field. No mention lookups are passed
+     * either, so nothing could resolve even if one slipped through.
+     *
+     * The Task is re-read through the Work's scope (AW-1) — the same one it was found in.
      */
     private async commentOnConflictTask(
         task: Task,
         ownerUserId: string,
         input: AppConflictInput,
+        scope: OwnershipScope,
     ): Promise<void> {
         if (!this.taskChat) {
             return;
         }
         try {
-            await this.taskChat.post(ownerUserId, {
-                taskId: task.id,
-                authorType: 'user',
-                authorId: ownerUserId,
-                body: withoutMentions(conflictComment(input)),
-            });
+            await this.taskChat.post(
+                ownerUserId,
+                {
+                    taskId: task.id,
+                    authorType: 'user',
+                    authorId: ownerUserId,
+                    body: withoutMentions(conflictComment(input)),
+                },
+                {},
+                scope,
+            );
         } catch (error) {
             this.logger.warn(
                 `App upstream: commenting on conflict Task ${task.id} failed (${errorText(error)}); the Task is unchanged.`,
@@ -1767,7 +1800,14 @@ export class AppUpstreamStateService {
         }
     }
 
-    /** The Task itself — same title, label and description whatever the Agent answer was. */
+    /**
+     * The Task itself — same title, label and description whatever the Agent answer was.
+     *
+     * Filed in the Work's scope (AW-1). `TasksService.create` checks every owner pointer
+     * against that scope, so an Agent the resolver answers must live in the Work's
+     * workspace too; one that does not is refused there (and logged below) rather than
+     * attached across workspaces.
+     */
     private async createConflictTask(input: {
         ownerUserId: string;
         workId: string;
@@ -1776,6 +1816,7 @@ export class AppUpstreamStateService {
         paths: string[];
         label: string;
         agentId: string | null;
+        scope: OwnershipScope;
     }): Promise<Task | null> {
         if (!this.tasks) {
             this.logger.warn(
@@ -1785,17 +1826,21 @@ export class AppUpstreamStateService {
         }
 
         try {
-            return await this.tasks.create(input.ownerUserId, {
-                title: conflictTitle(input.state),
-                description: conflictDescription(input.state, input.input, input.paths),
-                labels: [input.label],
-                workId: input.workId,
-                agentId: input.agentId,
-                // There is no system actor (plan §6.5 step 1): the Task is filed as the
-                // Work's owner, exactly like the comment on the open one.
-                createdByType: 'user',
-                createdById: input.ownerUserId,
-            });
+            return await this.tasks.create(
+                input.ownerUserId,
+                {
+                    title: conflictTitle(input.state),
+                    description: conflictDescription(input.state, input.input, input.paths),
+                    labels: [input.label],
+                    workId: input.workId,
+                    agentId: input.agentId,
+                    // There is no system actor (plan §6.5 step 1): the Task is filed as the
+                    // Work's owner, exactly like the comment on the open one.
+                    createdByType: 'user',
+                    createdById: input.ownerUserId,
+                },
+                input.scope,
+            );
         } catch (error) {
             this.logger.warn(
                 `App upstream: creating the conflict Task for work ${input.workId} failed (${errorText(error)}).`,
@@ -1815,6 +1860,10 @@ export class AppUpstreamStateService {
      *
      * `metadata.code` carries APW-08's copy key (`appRules.noAgentResolved`, APW-08 plan
      * §2.8) so the card can render its own translation of the same fact.
+     *
+     * No workspace scope is passed: notifications are listed per user, never filtered by
+     * workspace, so the owner sees this one wherever they are; the link is the unprefixed
+     * `/tasks/<id>` every Task notification uses.
      */
     private async notifyOwnerWithoutAgent(
         ownerUserId: string,
@@ -1862,6 +1911,10 @@ export class AppUpstreamStateService {
      * step 1) and the Activity feed is the owner's. An unbound `ActivityLogService` (a
      * module that forgot `DatabaseModule`) is logged loudly and otherwise ignored: a
      * missing feed entry must not fail the state transition it describes.
+     *
+     * The row is stamped with the Work's own tenant and Organization (AW-1), because the
+     * feed is scope-filtered and several of these transitions run from the Trigger worker,
+     * whose proxied request carries no workspace for the stamping subscriber to copy.
      */
     private async emit(
         workId: string,
@@ -1872,7 +1925,7 @@ export class AppUpstreamStateService {
     ): Promise<void> {
         const work = await this.loadWork(workId);
         const userId = work?.userId;
-        if (!userId || !this.activity) {
+        if (!work || !userId || !this.activity) {
             this.logger.warn(
                 `App upstream: ${entry.action} for work ${workId} was not recorded (no owner or no ActivityLogService).`,
             );
@@ -1880,9 +1933,12 @@ export class AppUpstreamStateService {
         }
 
         try {
+            const scope = ownershipScopeOf(work);
             await this.activity.log({
                 userId,
                 workId,
+                tenantId: scope.tenantId,
+                organizationId: scope.organizationId,
                 actionType: entry.actionType,
                 action: entry.action,
                 status: entry.status,

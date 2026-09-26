@@ -11,8 +11,8 @@ An **App Blueprint** is a ready-made [App spec](./app-works.md#the-app-spec) for
 
 App Blueprints are a separate catalog from [Work Blueprints](./work-blueprints.md). Work Blueprints come from `ever-works/works`; App Blueprints are not listed there and are never offered as Work Blueprints.
 
-:::note Known issue
-The Create-Work **Template** picker's website templates are found by taking every repository in the `ever-works` organization whose name ends in `template`. That rule currently also picks up the App Blueprint repositories, so `cal-template` and `umami-template` can appear in the picker's **Your templates** group as **Cal Template** and **Umami Template**. They are not website templates, and choosing one does not create an App Work.
+:::note App Blueprints are not website templates
+The Create-Work **Template** picker finds website templates among the `ever-works` organization's repositories whose name ends in `template`. Repositories tagged with the `ever-works-app-blueprint` topic are skipped, so `cal-template` and `umami-template` are never offered as website templates. A website template row saved for one of them before this rule existed is retired: it no longer appears in the picker and cannot be chosen for a new Work, while a Work that already uses it keeps working.
 :::
 
 :::warning Preview — off by default

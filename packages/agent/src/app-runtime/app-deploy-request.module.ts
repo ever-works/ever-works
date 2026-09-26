@@ -107,12 +107,21 @@ import { AppRuntimeEnvModule } from '../app-env/app-runtime-env.module';
  * to what this one already carries except the two APW-07 modules themselves —
  * `FacadesModule`, `DatabaseModule` and TypeORM already come with `AppSpecModule`.
  *
- * ⚠ What that turns on, and why it refuses rather than passes today:
+ * ⚠ What that turns on today, and where a Deploy is still refused:
  * `APP_DEPENDENCY_SPEC_SOURCE` (APW-07 T25, unwritten) is unbound, so
- * `ensureReadyForDeploy` answers `specUnavailable` for every Work and §5.1 step 9
- * pushes `dependency_not_ready` — a named refusal, where before this wiring step 8
- * refused every Deploy with `env_source_unavailable`. Neither pass provisions
- * anything while the spec source is unbound (`reconcile` fails closed first).
+ * `ensureReadyForDeploy` answers `specUnavailable` for every Work. §5.1 step 9
+ * refuses `dependency_not_ready` only when the App spec DECLARES a dependency (its
+ * readiness is unknown). A spec that declares none is NOT refused: it gets a
+ * `dependencies_unavailable` warning and passes step 9 (see
+ * `AppDeployPreconditionsService.checkDependencies`). Before this wiring, step 8
+ * refused every Deploy with `env_source_unavailable`. So a Deploy of a spec with no
+ * dependencies to your cluster (where `AppLicenseGate` warns rather than refuses)
+ * now passes every API precondition, creates a Deployment row and dispatches. The
+ * production worker's own §5.1 re-check still refuses it `worker_not_isolated`,
+ * because `APP_DEPLOY_DISPATCHER_AVAILABILITY` is unbound there
+ * (`trigger-app-runtime.module.ts`; build-progress C38). The managed target is still
+ * refused `license_blocks_target`. Nothing is provisioned while the spec source is
+ * unbound (`reconcile` fails closed first).
  *
  * ## Why both services, and why only these two
  *

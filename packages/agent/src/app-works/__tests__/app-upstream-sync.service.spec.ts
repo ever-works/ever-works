@@ -2106,3 +2106,99 @@ describe('AppUpstreamSyncService — the run never throws', () => {
         expect(result.licenseRequested).toBe(false);
     });
 });
+
+describe('AppUpstreamSyncService — its Activity rows carry the Work’s workspace (AW-1 sibling)', () => {
+    // The run is built for the Trigger worker, where `ActivityLogService` is a remote
+    // proxy whose request carries no workspace. The API's stamping subscriber fills a
+    // `tenantId`/`organizationId` only when it is `undefined`, and it fills it from that
+    // empty request scope — so an unstamped row lands null/null and is missing from an
+    // org-scoped App Work's scope-filtered feed. The run stamps the Work's own scope,
+    // exactly as `AppUpstreamStateService.emit` does for the rows it writes.
+    const TENANT_ID = '55555555-5555-4555-8555-555555555555';
+    const ORG_ID = '66666666-6666-4666-8666-666666666666';
+
+    const events: Array<[string, Parameters<typeof makeHarness>[0]]> = [
+        ['app.upstream.unavailable', { handlers: { getRepository: () => null } }],
+        [
+            'app.fork.missing',
+            {
+                handlers: {
+                    getRepository: (owner: string, name: string) =>
+                        owner === UPSTREAM_OWNER ? repository(owner, name) : null,
+                },
+            },
+        ],
+        [
+            'app.upstream.behind',
+            {
+                row: makeRow({ behindEventCount: 0 }),
+                handlers: {
+                    getForkDivergence: () => ({
+                        aheadBy: 1,
+                        behindBy: 3,
+                        upstreamHeadSha: SHA_B,
+                        forkHeadSha: SHA_A,
+                    }),
+                },
+            },
+        ],
+    ];
+
+    it.each(events)(
+        "stamps %s with an org-scoped Work's tenant and Organization",
+        async (action, options) => {
+            const harness = makeHarness(options);
+            harness.works.findById.mockResolvedValue({
+                userId: USER_ID,
+                tenantId: TENANT_ID,
+                organizationId: ORG_ID,
+            });
+
+            const result = await runSync(harness);
+
+            expect(result.events).toEqual([action]);
+            expect(harness.activity.log).toHaveBeenCalledTimes(1);
+            expect(harness.activity.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action,
+                    userId: USER_ID,
+                    workId: WORK_ID,
+                    tenantId: TENANT_ID,
+                    organizationId: ORG_ID,
+                }),
+            );
+        },
+    );
+
+    it("stamps a personal Work's scope explicitly, so no request scope can fill it", async () => {
+        const [, options] = events[2];
+        const harness = makeHarness(options);
+        harness.works.findById.mockResolvedValue({
+            userId: USER_ID,
+            tenantId: TENANT_ID,
+            organizationId: null,
+        });
+
+        await runSync(harness);
+
+        const entry = harness.activity.log.mock.calls[0][0] as Record<string, unknown>;
+        expect(entry).toHaveProperty('tenantId', TENANT_ID);
+        // Present and `null` — not absent, which the subscriber would overwrite.
+        expect(entry).toHaveProperty('organizationId', null);
+    });
+
+    it('takes the scope from the same Work read as the owner (the Work is read once)', async () => {
+        const [, options] = events[2];
+        const harness = makeHarness(options);
+        harness.works.findById.mockResolvedValue({
+            userId: USER_ID,
+            tenantId: TENANT_ID,
+            organizationId: ORG_ID,
+        });
+
+        await runSync(harness);
+
+        expect(harness.works.findById).toHaveBeenCalledTimes(1);
+        expect(harness.works.findById).toHaveBeenCalledWith(WORK_ID);
+    });
+});

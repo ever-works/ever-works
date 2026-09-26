@@ -16,6 +16,7 @@ import {
 } from '@ever-works/contracts';
 import { GitProviderRequestError } from '@ever-works/plugin';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ownershipScopeOf, type OwnershipScope } from '../database/ownership-scope';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import type { WorkUpstreamStatePatch } from '../database/repositories/work-upstream-state.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -586,6 +587,7 @@ export class AppUpstreamSyncService {
             budget,
             row: null,
             ownerUserId: null,
+            ownerScope: null,
             settings: result.settings,
             result,
         };
@@ -657,11 +659,13 @@ export class AppUpstreamSyncService {
         }
 
         // ── step 4: the two repository reads (FR-41, FR-42, FR-43, FR-45) ────
-        const ownerUserId = await this.readOwner(workId);
-        if (!ownerUserId) {
+        const owner = await this.readOwner(workId);
+        if (!owner) {
             return { result: 'failed', reason: 'work_not_found' };
         }
+        const ownerUserId = owner.userId;
         context.ownerUserId = ownerUserId;
+        context.ownerScope = owner.scope;
 
         const upstream = await context.budget.call(() =>
             this.git.getRepository(row.upstreamOwner as string, row.upstreamRepo as string, {
@@ -1561,10 +1565,24 @@ export class AppUpstreamSyncService {
         }
     }
 
-    /** One Activity entry of §3.5. A failure to record is logged, never thrown. */
+    /**
+     * One Activity entry of §3.5. A failure to record is logged, never thrown.
+     *
+     * The row carries the Work's own tenant and Organization, as
+     * `AppUpstreamStateService.emit` stamps the `app.upstream.*` rows it writes. The
+     * feed is scope-filtered, and this run is built for the Trigger worker, where the
+     * Activity sink is a remote proxy whose request carries no workspace: the API's
+     * stamping subscriber fills only an absent scope, and it would fill it from that
+     * empty request, so an unstamped row lands null/null and never shows in an
+     * org-scoped App Work's feed. A null scope column is passed as `null`, not left
+     * out, for the same reason.
+     */
     private async emit(context: RunContext, event: SyncEvent): Promise<boolean> {
-        const userId = context.ownerUserId ?? (await this.readOwner(context.workId));
-        if (!this.activity || !userId) {
+        const owner =
+            context.ownerUserId && context.ownerScope
+                ? { userId: context.ownerUserId, scope: context.ownerScope }
+                : await this.readOwner(context.workId);
+        if (!this.activity || !owner) {
             this.logger.warn(
                 `App upstream sync: ${event.action} for work ${context.workId} was not recorded (no Activity sink or no owner).`,
             );
@@ -1572,8 +1590,10 @@ export class AppUpstreamSyncService {
         }
 
         const entry: CreateActivityLogDto = {
-            userId,
+            userId: owner.userId,
             workId: context.workId,
+            tenantId: owner.scope.tenantId,
+            organizationId: owner.scope.organizationId,
             actionType: event.actionType,
             action: event.action,
             status: event.status,
@@ -1633,14 +1653,20 @@ export class AppUpstreamSyncService {
         }
     }
 
-    /** The Work's owner — whose credential every call is made with, and who owns the events. */
-    private async readOwner(workId: string): Promise<string | null> {
+    /**
+     * The Work's owner — whose credential every call is made with, and who owns the
+     * events — and the Work's workspace, which the events are stamped with. Both come
+     * from the one read, so a run never reads the Work twice.
+     */
+    private async readOwner(
+        workId: string,
+    ): Promise<{ userId: string; scope: OwnershipScope } | null> {
         if (!this.works) {
             return null;
         }
         try {
             const work = await this.works.findById(workId);
-            return work?.userId ?? null;
+            return work?.userId ? { userId: work.userId, scope: ownershipScopeOf(work) } : null;
         } catch (error) {
             this.logger.warn(
                 `App upstream sync: reading work ${workId} failed (${errorText(error)}).`,
@@ -1682,9 +1708,9 @@ export class AppUpstreamSyncService {
 /**
  * Everything one run threads through its steps.
  *
- * `result` is the object the caller receives, mutated as the run learns things; `row`
- * and `ownerUserId` are filled in by the steps that read them, so no later step
- * re-reads the database.
+ * `result` is the object the caller receives, mutated as the run learns things; `row`,
+ * `ownerUserId` and `ownerScope` are filled in by the steps that read them, so no later
+ * step re-reads the database.
  */
 interface RunContext {
     workId: string;
@@ -1695,6 +1721,8 @@ interface RunContext {
     budget: ProviderCallBudget;
     row: WorkUpstreamState | null;
     ownerUserId: string | null;
+    /** The Work's tenant and Organization, set with `ownerUserId` from the same read. */
+    ownerScope: OwnershipScope | null;
     settings: AppUpstreamSyncSettings;
     result: AppUpstreamSyncRunResult;
 }

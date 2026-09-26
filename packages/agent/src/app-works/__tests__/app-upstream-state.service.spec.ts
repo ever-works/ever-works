@@ -34,6 +34,7 @@ import {
     APP_UPSTREAM_SYNC_MANUAL_PER_HOUR,
 } from '@ever-works/contracts';
 import { ENTITIES } from '../../database/_entities-inventory';
+import { ownershipStamp, type OwnershipScope } from '../../database/ownership-scope';
 import { TaskRepository } from '../../database/repositories/task.repository';
 import { WorkMemberRepository } from '../../database/repositories/work-member.repository';
 import { WorkRepository } from '../../database/repositories/work.repository';
@@ -88,6 +89,9 @@ const MEMBER = '11111111-1111-4111-8111-111111111103';
 const WORK_ID = '22222222-2222-4222-8222-222222222201';
 const PLAIN_WORK_ID = '22222222-2222-4222-8222-222222222202';
 const MISSING_WORK_ID = '22222222-2222-4222-8222-2222222222ff';
+/** The Tenant and Organization an org-scoped App Work belongs to (AW-1). */
+const TENANT_ID = '33333333-3333-4333-8333-333333333301';
+const ORG_ID = '44444444-4444-4444-8444-444444444401';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2';
@@ -1383,6 +1387,10 @@ describe('AppUpstreamStateService', () => {
                     createdByType: 'user',
                     createdById: OWNER,
                 }),
+                // AW-1: this pin used to expect two arguments, which encoded the defect —
+                // the Task was filed with no ownership scope. It now carries the Work's
+                // own (here an unscoped fixture Work, so both columns are null).
+                { tenantId: null, organizationId: null },
             );
             expect(doubles.notifications.create).not.toHaveBeenCalled();
             expect(await stored()).toMatchObject({ conflictTaskId: 'created-task-1' });
@@ -1413,6 +1421,8 @@ describe('AppUpstreamStateService', () => {
                 expect(doubles.tasks.create).toHaveBeenCalledWith(
                     OWNER,
                     expect.objectContaining({ agentId: null }),
+                    // AW-1: the Work's ownership scope (was absent — the defect).
+                    { tenantId: null, organizationId: null },
                 );
                 expect(doubles.notifications.create).toHaveBeenCalledTimes(1);
                 expect(doubles.notifications.create).toHaveBeenCalledWith(
@@ -1466,11 +1476,17 @@ describe('AppUpstreamStateService', () => {
 
             await service().recordConflict(WORK_ID, conflict);
 
-            expect(spy).toHaveBeenCalledWith(OWNER, {
-                workId: WORK_ID,
-                label,
-                status: OPEN_STATUSES,
-            });
+            expect(spy).toHaveBeenCalledWith(
+                OWNER,
+                {
+                    workId: WORK_ID,
+                    label,
+                    status: OPEN_STATUSES,
+                },
+                // AW-1: this pin used to expect an unscoped lookup (two arguments), which
+                // encoded the defect. The lookup is now bounded by the Work's own scope.
+                { tenantId: null, organizationId: null },
+            );
             spy.mockRestore();
         });
 
@@ -1541,6 +1557,189 @@ describe('AppUpstreamStateService', () => {
             expect(input.description).toContain(
                 "Resolve the conflicts on ever-works/upstream-sync and push. Don't merge into main directly.",
             );
+        });
+
+        // ── AW-1: the conflict Task lives in the Work's own workspace ─────────
+        //
+        // The Task used to be filed with no ownership scope, so `TasksService.create`
+        // stamped nothing and the row was written tenantId=null / organizationId=null
+        // (the conflict runs from the worker, through the remote proxy, under an empty
+        // request scope, so the stamping subscriber had nothing to fill in either). For
+        // an App Work in an Organization that row is missing from the org board, from
+        // the Work's Tasks list, and the Upstream card's "resolve conflict" link 404s.
+        //
+        // These cases write the Task the way the real `TasksService.create` does — the
+        // stamp comes from its third argument and nowhere else (`ownershipStamp`) — and
+        // then read it back through the REAL `TaskRepository` scope predicate the board
+        // and the Task page use, so "visible in the org workspace" is asserted against
+        // the production SQL rather than against an argument list.
+        describe('ownership scope (AW-1)', () => {
+            const ORG_SCOPE: OwnershipScope = { tenantId: TENANT_ID, organizationId: ORG_ID };
+            const PERSONAL_SCOPE: OwnershipScope = { tenantId: TENANT_ID, organizationId: null };
+
+            /** `TasksService.create`, reduced to the one behaviour under test: the stamp. */
+            function persistingTasks(): { create: jest.Mock } {
+                let next = 0;
+                return {
+                    create: jest
+                        .fn()
+                        .mockImplementation(
+                            async (
+                                userId: string,
+                                input: Record<string, any>,
+                                scope?: OwnershipScope,
+                            ) => {
+                                const repository = dataSource.getRepository(Task);
+                                next += 1;
+                                return repository.save(
+                                    repository.create({
+                                        userId,
+                                        ...ownershipStamp(scope),
+                                        slug: `T-${next}`,
+                                        title: input.title,
+                                        description: input.description ?? null,
+                                        status: TaskStatus.BACKLOG,
+                                        labels: input.labels ?? null,
+                                        workId: input.workId ?? null,
+                                        agentId: input.agentId ?? null,
+                                        createdByType: input.createdByType,
+                                        createdById: input.createdById,
+                                    } as Partial<Task>),
+                                );
+                            },
+                        ),
+                };
+            }
+
+            /** The Work's Tasks as the board of one workspace lists them. */
+            async function visibleIn(scope: OwnershipScope): Promise<string[]> {
+                const { rows } = await taskRepository.findByUserIdFiltered(
+                    OWNER,
+                    { workId: WORK_ID },
+                    scope,
+                );
+                return rows.map((row) => row.id);
+            }
+
+            it("files an org-scoped App Work's conflict Task in that Organization's workspace", async () => {
+                await seedWork(WORK_ID, { tenantId: TENANT_ID, organizationId: ORG_ID });
+                await seedState();
+                const tasks = persistingTasks();
+
+                const result = await service({ tasks }).recordConflict(WORK_ID, conflict);
+
+                expect(result.created).toBe(true);
+                expect(tasks.create).toHaveBeenCalledWith(
+                    OWNER,
+                    expect.objectContaining({ workId: WORK_ID, labels: [label] }),
+                    ORG_SCOPE,
+                );
+                const row = await dataSource
+                    .getRepository(Task)
+                    .findOneByOrFail({ id: result.taskId as string });
+                expect(row).toMatchObject({ tenantId: TENANT_ID, organizationId: ORG_ID });
+                // Visible where the Work lives, and only there.
+                expect(await visibleIn(ORG_SCOPE)).toEqual([result.taskId]);
+                expect(await visibleIn(PERSONAL_SCOPE)).toEqual([]);
+                expect(await stored()).toMatchObject({ conflictTaskId: result.taskId });
+            });
+
+            it("keeps a personal App Work's conflict Task personal", async () => {
+                await seedWork(WORK_ID, { tenantId: TENANT_ID, organizationId: null });
+                await seedState();
+                const tasks = persistingTasks();
+
+                const result = await service({ tasks }).recordConflict(WORK_ID, conflict);
+
+                expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.anything(), PERSONAL_SCOPE);
+                const row = await dataSource
+                    .getRepository(Task)
+                    .findOneByOrFail({ id: result.taskId as string });
+                expect(row).toMatchObject({ tenantId: TENANT_ID, organizationId: null });
+                expect(await visibleIn(PERSONAL_SCOPE)).toEqual([result.taskId]);
+                expect(await visibleIn(ORG_SCOPE)).toEqual([]);
+            });
+
+            it('comments a repeat conflict on the same org-scoped Task, through that scope', async () => {
+                await seedWork(WORK_ID, { tenantId: TENANT_ID, organizationId: ORG_ID });
+                await seedState();
+                const tasks = persistingTasks();
+
+                const first = await service({ tasks }).recordConflict(WORK_ID, conflict);
+                const second = await service({ tasks }).recordConflict(WORK_ID, {
+                    ...conflict,
+                    commits: 4,
+                });
+
+                expect(tasks.create).toHaveBeenCalledTimes(1);
+                expect(second).toMatchObject({
+                    taskId: first.taskId,
+                    created: false,
+                    commented: true,
+                });
+                expect(doubles.taskChat.post).toHaveBeenCalledTimes(1);
+                const [authorId, posted, lookups, scope] = doubles.taskChat.post.mock.calls[0];
+                expect(authorId).toBe(OWNER);
+                expect(posted).toMatchObject({ taskId: first.taskId });
+                // No mention lookups: this path resolves no `@` and starts no run.
+                expect(lookups).toEqual({});
+                expect(scope).toEqual(ORG_SCOPE);
+                expect(await visibleIn(ORG_SCOPE)).toEqual([first.taskId]);
+            });
+
+            it('does not comment on an open labelled Task that sits outside the Work scope', async () => {
+                // The row the defect used to write: labelled, open, and stamped null/null
+                // for an org-scoped Work — reachable from no workspace. Commenting on it
+                // would keep the conflict invisible; a Task in the Work's scope is filed.
+                await seedWork(WORK_ID, { tenantId: TENANT_ID, organizationId: ORG_ID });
+                await seedState();
+                const stray = await seedTask({
+                    slug: 'unscoped-conflict',
+                    labels: [label],
+                    status: TaskStatus.BACKLOG,
+                });
+                const tasks = persistingTasks();
+
+                const result = await service({ tasks }).recordConflict(WORK_ID, conflict);
+
+                expect(doubles.taskChat.post).not.toHaveBeenCalled();
+                expect(result).toMatchObject({ created: true, commented: false });
+                expect(result.taskId).not.toBe(stray.id);
+                expect(await visibleIn(ORG_SCOPE)).toEqual([result.taskId]);
+            });
+
+            it('tells the owner, and records the conflict in the Work scope', async () => {
+                await seedWork(WORK_ID, { tenantId: TENANT_ID, organizationId: ORG_ID });
+                await seedState();
+                const tasks = persistingTasks();
+
+                const result = await service({ tasks }).recordConflict(WORK_ID, conflict);
+
+                // Notifications are per user, not per workspace (the notification list
+                // carries no scope predicate), so the owner is the right and only
+                // recipient; the Task link is the unprefixed route every Task
+                // notification uses.
+                expect(doubles.notifications.create).toHaveBeenCalledTimes(1);
+                expect(doubles.notifications.create).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        userId: OWNER,
+                        actionUrl: `/tasks/${result.taskId}`,
+                        metadata: expect.objectContaining({
+                            workId: WORK_ID,
+                            taskId: result.taskId,
+                        }),
+                    }),
+                );
+                // The Activity feed IS scope-filtered, so the event carries the Work's
+                // scope explicitly rather than the (empty) scope of the worker's request.
+                expect(events('app.upstream.conflict')).toHaveLength(1);
+                expect(events('app.upstream.conflict')[0]).toMatchObject({
+                    userId: OWNER,
+                    workId: WORK_ID,
+                    tenantId: TENANT_ID,
+                    organizationId: ORG_ID,
+                });
+            });
         });
     });
 });

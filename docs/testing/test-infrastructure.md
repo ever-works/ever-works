@@ -339,11 +339,22 @@ in a `beforeEach`.
 
 ## CI Workflows
 
-| Workflow                              | File                            | Triggers                                              | What it runs                                                                                                                                                                                                                                                 |
-| ------------------------------------- | ------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lint, build, unit + integration tests | `.github/workflows/ci.yml`      | every push + every PR to `main` / `develop` / `stage` | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**), then the App Works e2e harness unit specs (`pnpm --filter ever-works-web test:e2e-harness`) |
-| Playwright e2e                        | `.github/workflows/e2e.yml`     | push to `stage` + manual `workflow_dispatch`          | Boots a dev API + Web, then runs every spec under `apps/web/e2e/` across 32 shards; a second job, `e2e-app-works-flags-on`, runs the two App Works specs that need switches the shards keep off                                                              |
-| k8s plugin e2e                        | `.github/workflows/k8s-e2e.yml` | manual + PRs touching `packages/plugins/k8s`          | k8s-specific provider tests                                                                                                                                                                                                                                  |
+| Workflow                              | File                            | Triggers                                                                                                                          | What it runs                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint, build, unit + integration tests | `.github/workflows/ci.yml`      | push to `main` / `stage` + manual `workflow_dispatch` (no `pull_request`, no `develop`)                                           | `pnpm format:check`, `pnpm build`, `pnpm test` (turbo → all workspace `test` scripts: agent Jest, api Jest, every plugin's Vitest, **and now apps/web Vitest**), then the App Works e2e harness unit specs (`pnpm --filter ever-works-web test:e2e-harness`) |
+| Playwright e2e                        | `.github/workflows/e2e.yml`     | push to `stage` + manual `workflow_dispatch`                                                                                      | Boots a dev API + Web, then runs every spec under `apps/web/e2e/` across 32 shards; a second job, `e2e-app-works-flags-on`, runs the two App Works specs that need switches the shards keep off                                                              |
+| k8s plugin e2e                        | `.github/workflows/k8s-e2e.yml` | push to `stage` / `main` touching `packages/plugins/k8s/**` or the workflow file + manual `workflow_dispatch` (no `pull_request`) | k8s-specific provider tests                                                                                                                                                                                                                                  |
+
+`ci.yml` has had no `pull_request` trigger and no `develop` push trigger
+since 2026-09-14 (the workflow file's header gives the reason: its check
+runs starved the shared runner pool). None of the three workflows above
+checks a pull request into `develop`, so run the checks locally before
+opening one: `pnpm format:check`, `pnpm build`, `pnpm test` and
+`pnpm --filter ever-works-web test:e2e-harness`. The last one includes the
+flags-on-lane drift guard described below. To run the whole of `ci.yml`
+against an unmerged branch, use `gh workflow run ci.yml --ref <branch>`.
+The only workflow with a `pull_request` trigger is `promotion-gate.yml`,
+and it runs only on pull requests into `stage` and `main`.
 
 The Playwright workflow is deliberately gated to `stage` pushes and
 manual dispatch: it has no `pull_request` trigger and no `develop` or
@@ -370,4 +381,6 @@ fails on any other difference, so edit the two together. That spec also
 fails when the apps apex is one `config.everWorks.apps.getDomain()` refuses:
 an apex under `EVER_WORKS_DOMAIN` (`apps.e2e.local` under `e2e.local`) is
 refused, so the job uses `apps-e2e.local`. It runs in `ci.yml`'s harness
-step above.
+step above, so only on pushes to `stage` and `main` and on dispatches.
+After editing either env block, run it locally first:
+`pnpm --filter ever-works-web test:e2e-harness flags-on-lane`.
