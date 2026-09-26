@@ -890,8 +890,8 @@ describe('B · resolution is by capability, never by plugin id (R-5)', () => {
             expect(access.access.pluginId).toBe('k8s');
         }
         // The proof: the cold stub answers `typeof plugin.deployApp === 'function'` for EVERY
-        // member (lazy-plugin-proxy.ts:210-216), so a resolution that never materialised could
-        // still "find" a plugin — and the real import never happened.
+        // member (the cold branch of the `get` trap in `createLazyPluginProxy`), so a resolution
+        // that never materialised could still "find" a plugin — and the real import never happened.
         expect(journal).toContain('k8s:materialised');
     });
 
@@ -1398,9 +1398,9 @@ describe('F · the seams T58 and T60 declared', () => {
     });
 
     it('omits a member the resolved plugin does not implement, rather than forwarding into a throw', async () => {
-        // The lazy proxy turns a missing member into `TypeError: Plugin "k8s" has no method
-        // "destroyApp"` (lazy-plugin-proxy.ts:202-204) — so a facade that bound it blindly would
-        // hand T58's op a member that throws mid-removal.
+        // A cold lazy proxy turns a missing member into `TypeError: Plugin "k8s" has no method
+        // "destroyApp"` (its forwarding wrapper, in `createLazyPluginProxy`) — so a facade that
+        // bound it blindly would hand T58's op a member that throws mid-removal.
         const journal: string[] = [];
         const h = harness({
             journal,

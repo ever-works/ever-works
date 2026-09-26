@@ -105,7 +105,10 @@ export class GeneratorFormSchemaService {
             // `TypeError: pluginFields.map is not a function` and 500 the whole
             // GET /generator-form endpoint. Coerce to [] so one bad plugin can't
             // take down form-schema resolution (same resilience stance as the
-            // per-plugin try/catch in getProvidersForCapability, #1184).
+            // per-plugin try/catch in getProvidersForCapability, #1184). The
+            // agent-pipeline case was the lazy plugin proxy answering a Promise
+            // even once the plugin had loaded, which silently dropped its fields;
+            // the proxy now answers a loaded plugin's real members.
             const resolvedFields = provider.getFormFields();
             pluginFields = Array.isArray(resolvedFields) ? resolvedFields : [];
             pluginGroups = provider.getFormGroups?.();
@@ -194,7 +197,7 @@ export class GeneratorFormSchemaService {
         let config = { ...(rawConfig ?? {}) };
         const pluginConfig: Record<string, Record<string, unknown>> = {};
 
-        // Let the pipeline plugin transform first. NOTE: the lazy plugin proxy
+        // Let the pipeline plugin transform first. NOTE: a COLD lazy plugin proxy
         // returns a truthy function wrapper for EVERY property access (so
         // `if (plugin.transformFormValues)` is always true) and wraps sync methods
         // in a Promise. Invoking a method the plugin does NOT implement throws
@@ -246,7 +249,7 @@ export class GeneratorFormSchemaService {
     }
 
     /**
-     * Return the REAL materialized plugin instance, not the lazy proxy. The
+     * Return the REAL materialized plugin instance, not the lazy proxy. A COLD
      * proxy's `get` trap returns a truthy function wrapper for EVERY property
      * access (so `if (plugin.someOptionalMethod)` is always true) and wraps sync
      * methods in a Promise — so reliably probing/calling an OPTIONAL plugin
@@ -767,7 +770,13 @@ export class GeneratorFormSchemaService {
             result.push(registered);
         }
 
-        return result;
+        // Load them before their form members are read: a COLD lazy proxy
+        // answers every member it does not get from the manifest with an async
+        // forwarding wrapper, so `getFormFields()` was a Promise — spreading it
+        // into the field list threw, and a provider whose import failed left
+        // that Promise to reject unhandled. One that cannot load (or whose
+        // onLoad fails) is now in `error` and is left out.
+        return loadRegisteredPlugins(result);
     }
 
     private async resolvePipelinePlugin(

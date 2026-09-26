@@ -11,6 +11,7 @@ import type {
     Brand,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { FacadeError } from './base.facade';
@@ -132,7 +133,8 @@ export class DataSourceFacadeService implements IDataSourceFacade {
                 result.push({
                     id: plugin.id,
                     name: plugin.name,
-                    sourceName: plugin.sourceName,
+                    // Not loaded here, so possibly a cold lazy proxy (see getAvailableProviders).
+                    sourceName: readPluginString(plugin, 'sourceName') ?? plugin.name,
                 });
             }
         }
@@ -157,7 +159,9 @@ export class DataSourceFacadeService implements IDataSourceFacade {
             return {
                 id: plugin.id,
                 name: plugin.name,
-                sourceName: plugin.sourceName,
+                // Sync, so a plugin may still be a cold lazy proxy, whose
+                // `sourceName` read is its forwarding wrapper: the manifest name then.
+                sourceName: readPluginString(plugin, 'sourceName') ?? plugin.name,
                 enabled: p.state === 'loaded',
             };
         });

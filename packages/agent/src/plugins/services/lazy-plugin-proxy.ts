@@ -11,6 +11,30 @@ export type PluginInstanceLoader = () => Promise<IPlugin | null>;
  * imported yet. Exposes manifest-derived static properties synchronously so
  * callers that only need metadata pay no import cost. Any method call on the
  * proxy awaits a deduped import + onLoad of the real plugin before forwarding.
+ *
+ * ## Reading a member the manifest does not carry
+ *
+ * - **Once materialised** (`__isMaterialized`, which is already true while the
+ *   first-materialise hook — onLoad — runs), every such read answers the REAL
+ *   instance's value: a data member (`providerName`, `handledConfigFields`, a
+ *   getter) is that value, a method is the real method bound to the real
+ *   instance (a sync method stays sync), and a member the plugin lacks is
+ *   `undefined` — so `typeof`/`in`/`?.()` probes of optional members are
+ *   truthful.
+ * - **While cold**, the proxy cannot tell a data member from a method without
+ *   importing the plugin, and method calls on a cold proxy (plugin-specific
+ *   ones included) must keep working. So such a read answers an async
+ *   forwarding wrapper: calling it loads the plugin and forwards the call
+ *   (rejecting with `has no method` when the member is not a function), the
+ *   read itself imports nothing, and `in` answers `true`. A caller that needs a
+ *   data member, a sync result or a truthful probe loads the plugin first
+ *   (`__materialize`, `materializePlugin`, `loadRegisteredPlugins`).
+ *
+ * `then`/`catch`/`finally` and symbol-keyed reads answer `undefined` in both
+ * states, and `toJSON` answers `undefined` while cold (see the `get` trap).
+ * Names the stub itself carries — the manifest getters, `__isMaterialized`,
+ * `__materialize` and the `Object.prototype` members such as `constructor`
+ * and `toString` — are answered by the stub in both states.
  */
 export interface LazyPluginStub extends IPlugin {
     /** True once the underlying real plugin instance has been materialized. */
@@ -60,6 +84,21 @@ const FORWARDED_LIFECYCLE_METHODS = new Set<keyof IPlugin>([
     'validateSettings',
     'validateConnection',
 ]);
+
+/**
+ * A plugin's own string member — `providerName`, `sourceName` — for a reader
+ * that cannot await a load (a sync provider listing, an error message).
+ * Answers the value on a real or materialised plugin, and `undefined` when the
+ * member is not a string: on a COLD lazy proxy that read is the forwarding
+ * wrapper (a function — see {@link LazyPluginStub}), which a caller would
+ * otherwise hand on as the name. The read imports nothing; the caller falls
+ * back to the manifest name.
+ */
+export function readPluginString(plugin: unknown, key: string): string | undefined {
+    if (!plugin || typeof plugin !== 'object') return undefined;
+    const value = (plugin as Record<string, unknown>)[key];
+    return typeof value === 'string' ? value : undefined;
+}
 
 /**
  * Build a lazy IPlugin proxy backed by `manifest` for sync reads and `loader`
@@ -164,6 +203,21 @@ export function createLazyPluginProxy(
             options?.waitForLoad ? (importPromise ?? ensureMaterialized()) : ensureMaterialized(),
     } as unknown as LazyPluginStub;
 
+    // A materialised plugin's methods, bound to it once each, so a method read
+    // twice through the proxy is the same function (`proxy.fn === proxy.fn`).
+    const boundMethods = new WeakMap<(...args: unknown[]) => unknown, unknown>();
+    const readMaterialized = (real: IPlugin, prop: string): unknown => {
+        const value = Reflect.get(real as object, prop, real);
+        if (typeof value !== 'function') return value;
+        const method = value as (...args: unknown[]) => unknown;
+        let bound = boundMethods.get(method);
+        if (!bound) {
+            bound = method.bind(real);
+            boundMethods.set(method, bound);
+        }
+        return bound;
+    };
+
     return new Proxy(stub, {
         get(target, prop, receiver) {
             if (prop in target) {
@@ -197,9 +251,29 @@ export function createLazyPluginProxy(
                     return real.onUnload();
                 };
             }
-            // For every other method (lifecycle hooks + plugin-specific
-            // subclass methods like generate/extract/etc.), materialize then
-            // forward.
+            // Materialised: answer the real instance's member — its value, its
+            // method bound to it, or `undefined` when it has none. Answering the
+            // forwarding wrapper below here too made a data member read as a
+            // function, a sync method return a Promise (the generator form
+            // dropped agent-pipeline's fields) and every optional-member probe
+            // say yes, long after the plugin had loaded.
+            if (materialized) {
+                return readMaterialized(materialized, prop);
+            }
+            // Cold `toJSON`: `JSON.stringify` calls it when it is a function,
+            // so the wrapper below would import the plugin, serialise its
+            // Promise as `{}` and leave that Promise to reject with `has no
+            // method "toJSON"` — uncaught, as for `then` above. Answer
+            // `undefined` so a cold stub serialises its manifest fields; a
+            // plugin's own `toJSON` is honoured once it has loaded.
+            if (prop === 'toJSON') {
+                return undefined;
+            }
+            // Cold: the member's kind is unknown until the import. Answer a
+            // wrapper that materializes then forwards, which serves every
+            // method (lifecycle hooks + plugin-specific subclass methods like
+            // generate/extract/etc.). A data member cannot be read cold — see
+            // the LazyPluginStub docstring.
             const propKey = prop as keyof IPlugin;
             const isLifecycle = FORWARDED_LIFECYCLE_METHODS.has(propKey);
 
@@ -223,9 +297,12 @@ export function createLazyPluginProxy(
         },
         has(target, prop) {
             if (prop in target) return true;
-            // Optimistic: assume the real plugin has it. Callers that probe
-            // via `in` typically check for optional lifecycle methods, and
-            // we'd rather over-report than force materialization for a probe.
+            // Materialised: the real instance answers, as the `get` trap does.
+            if (materialized) return prop in (materialized as object);
+            // Cold: optimistic — assume the real plugin has it. Callers that
+            // probe via `in` typically check for optional lifecycle methods,
+            // and we'd rather over-report than force materialization for a
+            // probe.
             return true;
         },
     }) as LazyPluginStub;

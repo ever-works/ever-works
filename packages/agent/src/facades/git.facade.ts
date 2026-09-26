@@ -56,6 +56,7 @@ import type {
     GitWebhookInput,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import {
@@ -465,7 +466,9 @@ export class GitFacadeService implements IGitFacade {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
-            name: (p.plugin as IGitProviderPlugin).providerName,
+            // Sync, so a plugin may still be a cold lazy proxy, whose
+            // `providerName` read is its forwarding wrapper: the manifest name then.
+            name: readPluginString(p.plugin, 'providerName') ?? p.plugin.name,
             enabled: p.state === 'loaded',
             icon: p.manifest.icon,
             description: p.manifest.description,

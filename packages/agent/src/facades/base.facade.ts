@@ -5,6 +5,7 @@ import {
     loadRegisteredPlugins,
 } from '../plugins/services/plugin-registry.service';
 import { FacadePluginAvailabilityService } from '../plugins/services/facade-plugin-availability.service';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
@@ -203,12 +204,14 @@ export abstract class BaseFacadeService {
         });
     }
 
-    // Get the provider/display name from a plugin
+    // Get the provider/display name from a plugin. `providerName`/`sourceName`
+    // are class members: on a COLD lazy proxy they read as its forwarding
+    // wrapper (a function), so only a string counts, else the manifest name.
     protected getProviderName(plugin: IPlugin): string {
-        const providerName = (plugin as { providerName?: string }).providerName;
+        const providerName = readPluginString(plugin, 'providerName');
         if (providerName) return providerName;
 
-        const sourceName = (plugin as { sourceName?: string }).sourceName;
+        const sourceName = readPluginString(plugin, 'sourceName');
         if (sourceName) return sourceName;
 
         return plugin.name;

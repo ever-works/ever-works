@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import type { IAiProviderPlugin, IPlugin, JsonSchema } from '@ever-works/plugin';
 import type { ModelCredentialField } from '@ever-works/contracts';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 
 /** An installed AI-provider plugin, as the model-accounts surface needs it. */
@@ -75,8 +76,13 @@ export class ModelProviderCatalogService {
     providerName(providerPluginId: string): string {
         const registered = this.registry?.get(providerPluginId);
         if (!registered) return providerPluginId;
-        const plugin = registered.plugin as { providerName?: string };
-        return plugin.providerName || registered.manifest.name || providerPluginId;
+        // Sync, so the plugin may still be a cold lazy proxy, whose
+        // `providerName` read is its forwarding wrapper: the manifest name then.
+        return (
+            readPluginString(registered.plugin, 'providerName') ||
+            registered.manifest.name ||
+            providerPluginId
+        );
     }
 
     private async describe(

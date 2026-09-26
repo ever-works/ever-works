@@ -15,6 +15,7 @@ import {
     type RegisteredPlugin,
     loadRegisteredPlugins,
 } from '../plugins/services/plugin-registry.service';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
@@ -280,7 +281,9 @@ export class ContentExtractorFacadeService
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
             id: p.plugin.id,
-            name: (p.plugin as IContentExtractorPlugin).providerName,
+            // Sync, so a plugin may still be a cold lazy proxy: its manifest
+            // name then (see BaseFacadeService.getProviderName).
+            name: readPluginString(p.plugin, 'providerName') ?? p.plugin.name,
             enabled: p.state === 'loaded',
         }));
     }

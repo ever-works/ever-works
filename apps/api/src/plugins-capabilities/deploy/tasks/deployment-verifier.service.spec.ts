@@ -6,7 +6,13 @@ jest.mock('@ever-works/agent/entities', () => ({
     Work: class {},
     DeploymentEnvironment: { PRODUCTION: 'production', PREVIEW: 'preview' },
 }));
-jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
+jest.mock('@ever-works/agent/plugins', () => ({
+    PluginRegistryService: class {},
+    // The real helper: the service's provider-name read goes through it.
+    readPluginString: jest.requireActual(
+        '../../../../../../packages/agent/src/plugins/services/lazy-plugin-proxy',
+    ).readPluginString,
+}));
 jest.mock('@ever-works/agent/facades', () => ({ DeployFacadeService: class {} }));
 jest.mock('@ever-works/agent/events', () => {
     class DeploymentCompletedEvent {
@@ -26,6 +32,9 @@ import type { WorkRepository, WorkDeploymentRepository } from '@ever-works/agent
 import type { PluginRegistryService } from '@ever-works/agent/plugins';
 import { DeploymentCompletedEvent, DeploymentFailedEvent } from '@ever-works/agent/events';
 import { DeploymentVerifierService } from './deployment-verifier.service';
+// The real proxy the plugin registry hands out, straight from agent source:
+// `@ever-works/agent/plugins` is mocked above.
+import { createLazyPluginProxy } from '../../../../../../packages/agent/src/plugins/services/lazy-plugin-proxy';
 
 type DeploymentReadyState =
     | 'BUILDING'
@@ -533,6 +542,67 @@ describe('DeploymentVerifierService', () => {
                 (c) => c[0] === DeploymentCompletedEvent.EVENT_NAME,
             )![1];
             expect((completedEvent as any).payload.providerName).toBe('vercel');
+        });
+
+        /**
+         * The registry hands out lazy proxies, and nothing on the terminal
+         * path loads the plugin: a lookup that fails before any plugin method
+         * runs (`NoDeployCredentialsError` from the facade's resolve step) or
+         * a cancel before the first poll ends the run on a COLD proxy. There
+         * `providerName` reads as the proxy's async forwarding wrapper — a
+         * function, which `??` does not skip — and the activity log wrote
+         * "Deployment error for <work> via <the wrapper's source>".
+         */
+        describe('on a lazy registry proxy', () => {
+            const manifest = {
+                id: 'vercel',
+                name: 'Vercel Deploy',
+                version: '1.0.0',
+                category: 'deployment',
+                capabilities: ['deployment'],
+            };
+            const coldProxy = (loader: jest.Mock) =>
+                createLazyPluginProxy(manifest as never, loader as never);
+
+            it('falls back to the manifest name while the plugin is cold, and does not load it', async () => {
+                const loader = jest.fn();
+                deployFacade.lookupExistingDeployment.mockRejectedValueOnce(
+                    new Error('No deploy credentials for vercel'),
+                );
+                pluginRegistry.get.mockReturnValueOnce({ plugin: coldProxy(loader) } as any);
+
+                await service.startVerification(buildWork() as any, 'user-1');
+                await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+                const failedEvent = eventEmitter.emit.mock.calls.find(
+                    (c) => c[0] === DeploymentFailedEvent.EVENT_NAME,
+                )![1];
+                expect((failedEvent as any).payload).toMatchObject({
+                    terminalState: 'ERROR',
+                    providerName: 'Vercel Deploy',
+                });
+                expect(loader).not.toHaveBeenCalled();
+            });
+
+            it("uses the plugin's own providerName once it has loaded", async () => {
+                const proxy = coldProxy(
+                    jest.fn().mockResolvedValue({ ...manifest, providerName: 'Vercel' }),
+                );
+                await proxy.__materialize();
+                deployFacade.lookupExistingDeployment.mockResolvedValueOnce({
+                    found: true,
+                    deploymentState: 'READY',
+                });
+                pluginRegistry.get.mockReturnValueOnce({ plugin: proxy } as any);
+
+                await service.startVerification(buildWork() as any, 'user-1');
+                await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+                const completedEvent = eventEmitter.emit.mock.calls.find(
+                    (c) => c[0] === DeploymentCompletedEvent.EVENT_NAME,
+                )![1];
+                expect((completedEvent as any).payload.providerName).toBe('Vercel');
+            });
         });
 
         it('does NOT emit when work has no deployProvider (silent return)', async () => {

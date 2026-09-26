@@ -13,6 +13,7 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isDnsProvider } from '@ever-works/plugin';
 import type { IDnsProvider } from '@ever-works/plugin';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
@@ -1087,8 +1088,11 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         if (!token) {
+            // The plugin may still be a cold lazy proxy, whose `providerName`
+            // read is its forwarding wrapper — a function, whose source text
+            // ended up in the message. The manifest name then.
             const providerName =
-                (registered.plugin as IDeploymentPlugin).providerName || registered.plugin.name;
+                readPluginString(registered.plugin, 'providerName') || registered.plugin.name;
             throw new NoDeployCredentialsError(providerId, options.userId, providerName);
         }
 

@@ -36,13 +36,16 @@
  *
  * ## Presence is checked on the MATERIALISED plugin
  *
- * `PluginRegistryService.registerLazy` wraps every plugin in a proxy whose `get` trap returns a
- * forwarding function for **any** property it does not itself define
- * (`lazy-plugin-proxy.ts:192-208`) and whose `has` trap answers `true` for everything
- * (`:210-216`). So on a cold stub, `typeof plugin.destroyApp === 'function'` is `true` even when the
- * real plugin never declared `destroyApp` — and calling it throws `TypeError: Plugin "…" has no
- * method "…"` *mid-removal*. Every member this facade hands to a caller is therefore read off the
- * plugin that `__materialize()` returned, and every capability test is made after materialisation.
+ * `PluginRegistryService.registerLazy` wraps every plugin in a proxy (`createLazyPluginProxy`,
+ * `lazy-plugin-proxy.ts`) that, **while the plugin is cold** (not yet materialised), answers a
+ * forwarding function for **any** property it does not itself define (the cold branch of its `get`
+ * trap) and `true` from its `has` trap for any such property. So on a cold stub,
+ * `typeof plugin.destroyApp === 'function'` is `true` even when the real plugin never declared
+ * `destroyApp` — and calling it throws `TypeError: Plugin "…" has no method "…"` *mid-removal*.
+ * Once materialised the proxy answers the real instance's members, but this facade does not rely on
+ * the stub having been materialised by someone else: every member it hands to a caller is read off
+ * the plugin that `__materialize()` returned, and every capability test is made after
+ * materialisation.
  *
  * ## Worker-only, per call, never at construction (APW06-G02)
  *
@@ -407,9 +410,9 @@ function sanitiseLabel(value: unknown, maxLength: number): string {
  *
  * The binding matters as much as the check: the seams call the member detached
  * (`access.destroyApp(ref, credential, …)`), so an unbound method would lose `this` and fail inside
- * the plugin. And the check must be made here rather than at the call site, because
- * `lazy-plugin-proxy.ts` answers `typeof plugin.anything === 'function'` for a member that does not
- * exist and only throws when it is called.
+ * the plugin. And the check must be made here rather than at the call site, because a cold
+ * `lazy-plugin-proxy.ts` stub answers `typeof plugin.anything === 'function'` for a member that does
+ * not exist and only throws when it is called.
  */
 export function bindAppMember<T>(
     plugin: IDeploymentPlugin | undefined,
@@ -957,9 +960,9 @@ export class AppRuntimeFacadeService
     /**
      * The real plugin behind a possibly-lazy registry entry, or `null` when materialisation failed.
      *
-     * This is the only way to see a plugin's true shape: the lazy proxy answers a forwarding
-     * function for every property it does not define, so `isAppDeploymentPlugin` or a `typeof`
-     * probe against the stub tells you about the proxy, never about the plugin.
+     * This is the only way to see a plugin's true shape: while cold, the lazy proxy answers a
+     * forwarding function for every property it does not define, so `isAppDeploymentPlugin` or a
+     * `typeof` probe against a cold stub tells you about the proxy, never about the plugin.
      */
     private async materialise(registered: RegisteredPlugin): Promise<IDeploymentPlugin | null> {
         const plugin = registered?.plugin as
