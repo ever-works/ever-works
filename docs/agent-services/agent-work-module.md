@@ -121,7 +121,7 @@ Provides 15+ services including all lifecycle, query, generation, scheduling, ta
 ```typescript
 createWork(dto: CreateWorkDto, user: User): Promise<Work>
 updateWork(id: string, dto: UpdateWorkDto, user: User): Promise<Work>
-syncFromDataRepository(work: Work, user: User): Promise<void>
+syncFromDataRepository(workId: string, user: User): Promise<{ status: 'success'; updated: string[]; message: string }>
 deleteWork(id: string, user: User): Promise<void>
 ```
 

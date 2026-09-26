@@ -1737,6 +1737,12 @@ export class WorksController {
         // sync that changed nothing (`updated: []` — "Work already up to date."
         // or "Nothing to sync") invalidates nothing and records nothing: it
         // used to write a "Synced work data" activity row per page view.
+        // The sync the page runs when a generation finishes is such a no-op
+        // too (the generator has already written `itemsCount`); the caches are
+        // cleared for that case by `WorkCleanupService.clearWorkCache`, the
+        // `WorkGenerationCompletedEvent` listener, which every generation path
+        // fires — in-process, and from Trigger.dev over the worker's RPC
+        // `WorkOperationsService.emitGenerationCompleted`.
         if (result.updated.length === 0) {
             return result;
         }
