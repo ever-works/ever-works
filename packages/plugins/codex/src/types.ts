@@ -40,6 +40,6 @@ export const CODEX_AUTH_MODE_LABELS: Record<CodexAuthMode, string> = {
 };
 
 export const BASE_TEMP_DIR = '/tmp/codex-generator';
-export const DEFAULT_MODEL = 'gpt-5.4';
+export const DEFAULT_MODEL = 'gpt-5.6-terra';
 export const CODEX_RELEASES_URL = 'https://github.com/openai/codex/releases/download';
 export const DEFAULT_CLI_VERSION = '0.120.0';
