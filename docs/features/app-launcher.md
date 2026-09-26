@@ -11,6 +11,13 @@ The App Launcher is the row of tiles in the top bar that opens the Ever apps and
 It is a launcher, not a dashboard: every tile is a link out, and nothing on the surface holds state of its own
 beyond your own arrangement of it.
 
+:::note Where to find it
+The **App Launcher** control in the top bar opens the panel. Your pins, hides and order are also under
+**Settings → App Launcher** (`/settings/app-launcher`), and a Work's **Show in App Launcher** switch is in that
+Work's **Settings → General** and on a card on its Overview. All of them appear only while the launcher is switched
+on — see [Turning it off](#turning-it-off). The launcher ships with [App Works](./app-works.md), which are a preview.
+:::
+
 ## What appears, and why
 
 Two kinds of tile share one panel.
@@ -81,8 +88,15 @@ turning it back on returns the same tiles, in the same order, with the same pins
 configuration endpoint publishes the same switch as `features.appLauncherEnabled` so a client can hide the surface
 without guessing.
 
+`EVER_WORKS_APP_LAUNCHER_ENABLED` is off by default, and only the exact value `true` turns it on. The web app reads
+the API's answer rather than a copy of the variable, and treats "could not tell" — an unreachable API, a timeout —
+as off. Where the web app has PostHog configured, the launcher additionally needs the `app-launcher` flag to resolve
+to `true` for the person; a missing flag, an error or a timeout hides it. Without PostHog, the installation switch
+alone decides.
+
 ## Related
 
+- [App Works](./app-works.md) — the Works that appear here without a switch, once they are live (a preview).
 - [What a Work is](./creating-a-work.md) — the kinds, and where **Show in App Launcher** lives in a Work's settings.
 - [Managed hosting](./managed-hosting.md) — how a Work gets an address in the first place.
 - [Custom domains](./custom-domains.md) — bringing your own hostname to a live Work.

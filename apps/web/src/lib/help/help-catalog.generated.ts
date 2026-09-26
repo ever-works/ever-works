@@ -340,6 +340,7 @@ export const HELP_ARTICLES = [
             { id: 'from-an-idea', text: 'From an Idea', level: 2 },
             { id: 'start-a-campaign', text: 'Start a campaign', level: 2 },
             { id: 'repository-works', text: 'Repository Works', level: 2 },
+            { id: 'app-works', text: 'App Works', level: 2 },
             { id: 'common-concepts', text: 'Common Concepts', level: 2 },
             { id: 'git-provider', text: 'Git Provider', level: 3 },
             { id: 'deploy-provider', text: 'Deploy Provider', level: 3 },
@@ -1006,6 +1007,16 @@ export const HELP_ARTICLES = [
                 id: 'what-breaks-without-a-provider',
                 text: 'What breaks without a provider',
                 level: 2,
+            },
+            {
+                id: 'when-a-plugins-code-loads',
+                text: 'When a plugin\'s code loads',
+                level: 2,
+            },
+            {
+                id: 'what-an-operator-can-change',
+                text: 'What an operator can change',
+                level: 3,
             },
             {
                 id: 'dynamic-plugin-distribution',
