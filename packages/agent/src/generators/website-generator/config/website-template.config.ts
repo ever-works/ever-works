@@ -127,6 +127,25 @@ export function getDefaultWebsiteTemplateId(): WebsiteTemplateId {
     return configuredTemplate?.id || DEFAULT_WEBSITE_TEMPLATE_ID;
 }
 
+/**
+ * The website template a Work with no explicit `websiteTemplateId` and no
+ * usable saved user default resolves to: its kind's default (above) when that
+ * template ships, else the system default. This is the fall-through of
+ * `WebsiteTemplateResolverService.resolveForWork`, and its spec pins the two
+ * together.
+ *
+ * templates-catalog FR-5 f pins a NEW Work to this id when the user's saved
+ * default is a RETIRED row, so the Work gets exactly what a user with no saved
+ * default gets instead of inheriting the retired row.
+ */
+export function getWebsiteTemplateIdWithoutSavedDefault(kind?: string | null): WebsiteTemplateId {
+    const kindTemplateId = getWebsiteTemplateIdForWorkKind(kind);
+    if (kindTemplateId && findWebsiteTemplateConfig(kindTemplateId)) {
+        return kindTemplateId;
+    }
+    return getDefaultWebsiteTemplateId();
+}
+
 export function getWebsiteTemplateConfig(templateId?: string | null): WebsiteTemplateConfig {
     const resolvedTemplateId = templateId || getDefaultWebsiteTemplateId();
 

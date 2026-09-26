@@ -609,6 +609,60 @@ describe('WorkRepository', () => {
         });
     });
 
+    describe('countByWebsiteTemplateId', () => {
+        it('counts works naming a template id across ALL users (a built-in row belongs to no single user)', async () => {
+            repository.count.mockResolvedValueOnce(2);
+
+            await expect(service.countByWebsiteTemplateId('cal-template')).resolves.toBe(2);
+
+            expect(repository.count).toHaveBeenCalledWith({
+                where: { websiteTemplateId: 'cal-template' },
+            });
+        });
+    });
+
+    describe('countByUsersAndInheritedWebsiteTemplateSelection', () => {
+        it('returns 0 without querying when no user is given', async () => {
+            await expect(
+                service.countByUsersAndInheritedWebsiteTemplateSelection([]),
+            ).resolves.toBe(0);
+
+            expect(repository.count).not.toHaveBeenCalled();
+        });
+
+        it('counts inheriting works (websiteTemplateId IS NULL) owned by any of the given users', async () => {
+            repository.count.mockResolvedValueOnce(3);
+
+            await expect(
+                service.countByUsersAndInheritedWebsiteTemplateSelection(['u1', 'u2']),
+            ).resolves.toBe(3);
+
+            expect(repository.count).toHaveBeenCalledWith({
+                where: { userId: In(['u1', 'u2']), websiteTemplateId: IsNull() },
+            });
+        });
+
+        it('splits a long user list into bounded IN() chunks and sums them (SQLite caps bind parameters)', async () => {
+            const userIds = Array.from({ length: 1201 }, (_, index) => `u${index}`);
+            repository.count
+                .mockResolvedValueOnce(1)
+                .mockResolvedValueOnce(2)
+                .mockResolvedValueOnce(4);
+
+            await expect(
+                service.countByUsersAndInheritedWebsiteTemplateSelection(userIds),
+            ).resolves.toBe(7);
+
+            expect(repository.count).toHaveBeenCalledTimes(3);
+            expect(repository.count).toHaveBeenNthCalledWith(1, {
+                where: { userId: In(userIds.slice(0, 500)), websiteTemplateId: IsNull() },
+            });
+            expect(repository.count).toHaveBeenNthCalledWith(3, {
+                where: { userId: In(userIds.slice(1000)), websiteTemplateId: IsNull() },
+            });
+        });
+    });
+
     describe('findByUser', () => {
         it('queries by userId only, NO relations joined (used for high-volume listing where user data already in scope)', async () => {
             const rows = [{ id: 'w1' } as Work];
