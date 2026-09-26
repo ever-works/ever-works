@@ -31,7 +31,9 @@ import { listWorkTemplates, type WorkTemplateConfig } from '@src/works/work-temp
 import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
+import { APP_BLUEPRINT_TOPIC } from '@src/apps-catalog/app-blueprint.constants';
 import { parseGitHubRepositoryUrl } from '@ever-works/contracts';
+import type { GitRepository } from '@ever-works/plugin';
 import { hasCustomizationPromptForBaseTemplate } from './customization-prompts';
 import { inferFrameworkFromRepository } from './utils/framework-inference';
 
@@ -757,18 +759,74 @@ export class TemplateCatalogService implements OnModuleInit {
                 );
             }
 
-            const standardTemplates = repositories.filter((repository) =>
+            // An App Blueprint (e.g. ever-works/cal-template) is named like a
+            // website template but generates an App Work, never a website: its
+            // topic is what tells the two apart. A provider that does not report
+            // topics leaves `topics` undefined and the name rule alone applies,
+            // exactly as before.
+            const templateNamedRepositories = repositories.filter((repository) =>
                 this.isStandardTemplateRepository(repository.name),
+            );
+            const standardTemplates = templateNamedRepositories.filter(
+                (repository) => !this.isAppBlueprintRepository(repository),
+            );
+            const appBlueprintRepositories = templateNamedRepositories.filter((repository) =>
+                this.isAppBlueprintRepository(repository),
             );
 
             // Repos already represented by a curated WEBSITE_TEMPLATES entry —
             // skip them in discovery so we don't re-create a `<repo-name>` row
             // alongside the curated one and end up with duplicate catalog
             // cards for the same GitHub repo.
+            const curatedWebsiteTemplates = listWebsiteTemplates();
             const curatedRepoCoordinates = new Set(
-                listWebsiteTemplates().map(
+                curatedWebsiteTemplates.map(
                     (template) => `${template.owner.toLowerCase()}/${template.repo.toLowerCase()}`,
                 ),
+            );
+            const curatedTemplateIds = new Set(
+                curatedWebsiteTemplates.map((template) => template.id),
+            );
+
+            // A row an earlier discovery saved for a repository that is now an
+            // App Blueprint must stop being offered as a website template. Same
+            // deactivate path as the duplicate clean-up below and seed-time
+            // de-duplication: the row stays (works may still reference its id),
+            // it just leaves the catalog. `findAllBuiltInByRepositoryCoordinates`
+            // only returns built-in rows, so user-created templates are never
+            // touched; curated WEBSITE_TEMPLATES rows are skipped by coordinates
+            // and by id.
+            await Promise.all(
+                appBlueprintRepositories.map(async (repository) => {
+                    const coordinateKey = `${repository.owner.toLowerCase()}/${repository.name.toLowerCase()}`;
+                    if (curatedRepoCoordinates.has(coordinateKey)) {
+                        return;
+                    }
+                    const discoveredRows =
+                        await this.templateRepository.findAllBuiltInByRepositoryCoordinates(
+                            'website',
+                            repository.owner,
+                            repository.name,
+                        );
+                    await Promise.all(
+                        discoveredRows
+                            .filter(
+                                (row) =>
+                                    row.isActive &&
+                                    row.kind === 'website' &&
+                                    row.sourceType === 'built_in' &&
+                                    !curatedTemplateIds.has(row.id),
+                            )
+                            .map(async (row) => {
+                                await this.templateRepository.updateById(row.id, {
+                                    isActive: false,
+                                });
+                                this.logger.log(
+                                    `Deactivated discovered website template "${row.id}": ${repository.fullName} is an App Blueprint.`,
+                                );
+                            }),
+                    );
+                }),
             );
 
             await Promise.all(
@@ -1092,5 +1150,14 @@ export class TemplateCatalogService implements OnModuleInit {
 
     private isStandardTemplateRepository(repo: string): boolean {
         return /template$/i.test(repo.trim());
+    }
+
+    /**
+     * True only when the provider REPORTED the App Blueprint topic. `topics`
+     * undefined means "not reported" (git-provider contract), which keeps
+     * today's name-only behaviour rather than hiding the repository.
+     */
+    private isAppBlueprintRepository(repository: Pick<GitRepository, 'topics'>): boolean {
+        return Array.isArray(repository.topics) && repository.topics.includes(APP_BLUEPRINT_TOPIC);
     }
 }

@@ -73,9 +73,12 @@ import { classifyLicenseExpression } from '../app-license/license-classify';
 // metadata, and a type-only import would emit `Object` as the token.
 import { GitFacadeService } from '../facades/git.facade';
 import { validateAppSpecDocument } from '../works-config/schema/app-spec.validate';
+import { APP_BLUEPRINT_TOPIC } from './app-blueprint.constants';
 
-/** The topic every Blueprint repository carries (`catalog.md` §5, FR-43). */
-export const APP_BLUEPRINT_TOPIC = 'ever-works-app-blueprint';
+// The topic lives in a dependency-free leaf so website-template discovery can
+// recognise a Blueprint without importing this service; re-exported here so
+// every existing `APP_BLUEPRINT_TOPIC` import keeps resolving.
+export { APP_BLUEPRINT_TOPIC };
 
 /** The only owner the resolver ever reads. */
 export const APP_BLUEPRINT_OWNER = 'ever-works';

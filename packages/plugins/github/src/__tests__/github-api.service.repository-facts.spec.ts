@@ -36,6 +36,8 @@ vi.mock('libsodium-wrappers', () => ({
 
 const reposGetMock = vi.fn();
 const getBranchMock = vi.fn();
+const listForOrgMock = vi.fn();
+const listForAuthenticatedUserMock = vi.fn();
 
 vi.mock('octokit', () => {
 	class FakeRequestError extends Error {
@@ -47,7 +49,9 @@ vi.mock('octokit', () => {
 		rest = {
 			repos: {
 				get: (...args: unknown[]) => reposGetMock(...args),
-				getBranch: (...args: unknown[]) => getBranchMock(...args)
+				getBranch: (...args: unknown[]) => getBranchMock(...args),
+				listForOrg: (...args: unknown[]) => listForOrgMock(...args),
+				listForAuthenticatedUser: (...args: unknown[]) => listForAuthenticatedUserMock(...args)
 			}
 		};
 		constructor(public opts: unknown) {}
@@ -124,6 +128,8 @@ beforeEach(() => {
 	svc = new GitHubApiService();
 	reposGetMock.mockReset();
 	getBranchMock.mockReset();
+	listForOrgMock.mockReset();
+	listForAuthenticatedUserMock.mockReset();
 	reposGetMock.mockResolvedValue({ data: repositoryPayload() });
 	getBranchMock.mockRejectedValue(statusError(404, 'Branch not found'));
 });
@@ -317,6 +323,84 @@ describe('APW-03 T22 — getRepository maps the repository topics', () => {
 		const result = await svc.getRepository(OWNER, REPO, 'ghp_secret');
 
 		expect(result!.topics).toEqual(['ever-works-app-blueprint', 'y']);
+	});
+});
+
+describe('listRepositories maps the repository topics too', () => {
+	// Website-template discovery lists the catalog org and must tell an App
+	// Blueprint (topic `ever-works-app-blueprint`) from a website template whose
+	// name also ends in "template". GitHub's list endpoints return `topics` on
+	// every repository, so the list mapping reports them with exactly the
+	// getRepository semantics: absent key = not reported, `[]` = no topics.
+	const listed = (overrides: Record<string, unknown> = {}) => ({
+		...legacyRepositoryPayload(),
+		...overrides
+	});
+
+	it('maps the topics of an org listing, exactly', async () => {
+		listForOrgMock.mockResolvedValue({
+			data: [
+				listed({ name: 'cal-template', topics: ['ever-works-app-blueprint', 'ever-works'] }),
+				listed({ name: 'astro-blog-template', topics: [] })
+			]
+		});
+
+		const result = await svc.listRepositories('ghp_secret', 1, 100, undefined, {
+			owner: 'ever-works',
+			type: 'org'
+		});
+
+		expect(listForOrgMock).toHaveBeenCalledWith(expect.objectContaining({ org: 'ever-works' }));
+		expect(result[0].topics).toEqual(['ever-works-app-blueprint', 'ever-works']);
+		expect(result[1].topics).toEqual([]);
+	});
+
+	it('maps the topics of the authenticated user listing', async () => {
+		listForAuthenticatedUserMock.mockResolvedValue({
+			data: [listed({ topics: ['ever-works-app-blueprint'] })]
+		});
+
+		const result = await svc.listRepositories('ghp_secret');
+
+		expect(result[0].topics).toEqual(['ever-works-app-blueprint']);
+	});
+
+	it('leaves topics ABSENT when a listed repository does not carry the key', async () => {
+		listForOrgMock.mockResolvedValue({ data: [listed(), listed({ topics: null })] });
+
+		const result = await svc.listRepositories('ghp_secret', 1, 100, undefined, {
+			owner: 'ever-works',
+			type: 'org'
+		});
+
+		// Additive only: a payload without topics maps to the same keys as before.
+		expect('topics' in result[0]).toBe(false);
+		expect('topics' in result[1]).toBe(false);
+		expect(Object.keys(result[0]).sort()).toEqual([
+			'cloneUrl',
+			'defaultBranch',
+			'description',
+			'fullName',
+			'isFork',
+			'isPrivate',
+			'name',
+			'owner',
+			'permissions',
+			'url'
+		]);
+	});
+
+	it('drops non-string entries rather than casting them into the contract', async () => {
+		listForOrgMock.mockResolvedValue({
+			data: [listed({ topics: ['ever-works-app-blueprint', 42, null, 'y'] })]
+		});
+
+		const result = await svc.listRepositories('ghp_secret', 1, 100, undefined, {
+			owner: 'ever-works',
+			type: 'org'
+		});
+
+		expect(result[0].topics).toEqual(['ever-works-app-blueprint', 'y']);
 	});
 });
 

@@ -257,6 +257,18 @@ function labelNames(raw: unknown): readonly string[] | undefined {
 }
 
 /**
+ * A repository's topics, as GitHub reported them (APW-03 T22 — the Blueprint
+ * probe and website-template discovery read `ever-works-app-blueprint` off
+ * these). A payload without a list leaves `topics` unreported: `[]` is GitHub
+ * saying "no topics", which an absent key is not. Non-string entries are dropped
+ * rather than cast into the contract. Shared by `getRepository` and the list
+ * mapping so a single read and a listing report the same fact the same way.
+ */
+function reportedTopics(raw: unknown): string[] | undefined {
+	return Array.isArray(raw) ? raw.filter((topic): topic is string => typeof topic === 'string') : undefined;
+}
+
+/**
  * Last path segment of a workflow reference, lowercased.
  *
  * Callers name the gate as `promotion-gate.yml` while GitHub reports
@@ -821,13 +833,8 @@ export class GitHubApiService {
 					? data.visibility
 					: undefined;
 			// APW-03 T22 — the Blueprint probe reads `ever-works-app-blueprint` off
-			// these. A payload without a list leaves `topics` unreported: `[]` is
-			// GitHub saying "no topics", which an absent key is not. Non-string
-			// entries are dropped rather than cast into the contract.
-			const rawTopics: unknown = data.topics;
-			const topics = Array.isArray(rawTopics)
-				? rawTopics.filter((topic): topic is string => typeof topic === 'string')
-				: undefined;
+			// these; see `reportedTopics` for the absent-vs-empty rule.
+			const topics = reportedTopics(data.topics);
 
 			return {
 				owner: data.owner.login,
@@ -949,24 +956,33 @@ export class GitHubApiService {
 			);
 		}
 
-		return data.map((repo) => ({
-			owner: repo.owner.login,
-			name: repo.name,
-			fullName: repo.full_name,
-			description: repo.description ?? undefined,
-			defaultBranch: repo.default_branch ?? 'main',
-			isPrivate: repo.private,
-			url: repo.html_url,
-			cloneUrl: repo.clone_url ?? `https://github.com/${repo.full_name}.git`,
-			isFork: repo.fork,
-			permissions: repo.permissions
-				? {
-						admin: repo.permissions.admin ?? false,
-						push: repo.permissions.push ?? false,
-						pull: repo.permissions.pull ?? false
-					}
-				: undefined
-		}));
+		return data.map((repo) => {
+			// GitHub's list endpoints return `topics` on every repository, so a
+			// listing reports them exactly as `getRepository` does. Website-template
+			// discovery lists the catalog org and needs them to keep App Blueprints
+			// (topic `ever-works-app-blueprint`) out of the website picker. Absent
+			// key ⇒ the field stays absent (additive: the object is unchanged).
+			const topics = reportedTopics(repo.topics);
+			return {
+				owner: repo.owner.login,
+				name: repo.name,
+				fullName: repo.full_name,
+				description: repo.description ?? undefined,
+				defaultBranch: repo.default_branch ?? 'main',
+				isPrivate: repo.private,
+				url: repo.html_url,
+				cloneUrl: repo.clone_url ?? `https://github.com/${repo.full_name}.git`,
+				isFork: repo.fork,
+				permissions: repo.permissions
+					? {
+							admin: repo.permissions.admin ?? false,
+							push: repo.permissions.push ?? false,
+							pull: repo.permissions.pull ?? false
+						}
+					: undefined,
+				...(topics === undefined ? {} : { topics })
+			};
+		});
 	}
 
 	async createRepository(options: CreateRepoOptions, token: string, baseUrl?: string): Promise<GitRepository> {
