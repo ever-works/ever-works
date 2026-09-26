@@ -257,6 +257,25 @@ function realSettings(
     return { service, scopes };
 }
 
+/**
+ * How a refused webhook reads: its HTTP status, the generic answer, and the
+ * plugin's own reason (kept as the `cause`, never answered).
+ */
+function refusal(error: unknown): string {
+    const refused = error as { status?: number; message?: string; cause?: unknown };
+    const reason = refused.cause instanceof Error ? ` (${refused.cause.message})` : '';
+    return `${refused.status ?? 'no status'} ${refused.message}${reason}`;
+}
+
+/** A failed signature check: 401, a generic answer, the plugin's `reason` as cause. */
+function signatureRefused(reason: string) {
+    return {
+        status: 401,
+        message: 'Invalid webhook signature',
+        cause: expect.objectContaining({ message: reason }),
+    };
+}
+
 function addressesStub(pluginId = FIXTURE_ID): TenantEmailAddressRepository {
     return {
         findByAddress: jest.fn(async (address: string) =>
@@ -331,7 +350,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseInbound(FIXTURE_ID, body(), { authorization: basic('forged') }),
-            ).rejects.toThrow('Postmark inbound: signature mismatch.');
+            ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
         });
 
         expect(parsed).not.toHaveBeenCalled();
@@ -349,7 +368,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseInbound(FIXTURE_ID, body(), { authorization: basic('forged') }),
-            ).rejects.toThrow('Postmark inbound: signature mismatch.');
+            ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
         });
 
         expect(parsed).not.toHaveBeenCalled();
@@ -379,7 +398,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
 
         await expect(
             facade.parseInbound(FIXTURE_ID, body(), { authorization: basic('forged') }),
-        ).rejects.toThrow('Postmark inbound: signature mismatch.');
+        ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
         expect(parsed).not.toHaveBeenCalled();
     });
 
@@ -396,7 +415,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseInbound(FIXTURE_ID, body(), { authorization: basic('forged') }),
-            ).rejects.toThrow('Postmark inbound: signature mismatch.');
+            ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
         });
 
         expect(scopes).toEqual([OWNER_ID]);
@@ -435,7 +454,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
                 .parseInbound(FIXTURE_ID, body(), { authorization: basic('admin') })
                 .then(
                     () => outcomes.push('legit: accepted'),
-                    (error: Error) => outcomes.push(`legit: rejected: ${error.message}`),
+                    (error: unknown) => outcomes.push(`legit: rejected: ${refusal(error)}`),
                 );
             await settle();
             // Request B arrives once the module is imported but the first load
@@ -444,7 +463,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
                 .parseInbound(FIXTURE_ID, body(), { authorization: basic('wrong') })
                 .then(
                     () => outcomes.push('forged: accepted'),
-                    (error: Error) => outcomes.push(`forged: rejected: ${error.message}`),
+                    (error: unknown) => outcomes.push(`forged: rejected: ${refusal(error)}`),
                 );
             await settle();
             firstLoad.release();
@@ -452,7 +471,9 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         });
 
         expect(outcomes).toContain('legit: accepted');
-        expect(outcomes).toContain('forged: rejected: Postmark inbound: signature mismatch.');
+        expect(outcomes).toContain(
+            'forged: rejected: 401 Invalid webhook signature (Postmark inbound: signature mismatch.)',
+        );
         expect(parsed).toHaveBeenCalledTimes(1);
         expect(unhandled).toEqual([]);
     });
@@ -467,7 +488,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseEventWebhook(FIXTURE_ID, body(), { authorization: basic('wrong') }),
-            ).rejects.toThrow('Postmark inbound: signature mismatch.');
+            ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
             await expect(
                 facade.parseEventWebhook(FIXTURE_ID, body(), { authorization: basic('admin') }),
             ).resolves.toHaveLength(1);
@@ -539,7 +560,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         const unhandled = await collectUnhandled(async () => {
             await expect(
                 facade.parseInbound(FIXTURE_ID, body(), { authorization: basic('x') }),
-            ).rejects.toThrow('async signature mismatch');
+            ).rejects.toMatchObject(signatureRefused('async signature mismatch'));
         });
 
         expect(parsed).not.toHaveBeenCalled();
@@ -614,7 +635,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
                 const forged = postmarkWebhook('pm-forged');
                 await expect(
                     facade.parseInbound('postmark', forged.rawBody, forged.headers),
-                ).rejects.toThrow('Postmark inbound: signature mismatch.');
+                ).rejects.toMatchObject(signatureRefused('Postmark inbound: signature mismatch.'));
                 const legit = postmarkWebhook('pm-admin');
                 await expect(
                     facade.parseInbound('postmark', legit.rawBody, legit.headers),
@@ -631,7 +652,7 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
                 const forged = mailgunWebhook('mg-forged');
                 await expect(
                     facade.parseInbound('mailgun', forged.rawBody, forged.headers),
-                ).rejects.toThrow('Mailgun inbound: signature mismatch.');
+                ).rejects.toMatchObject(signatureRefused('Mailgun inbound: signature mismatch.'));
                 const legit = mailgunWebhook('mg-admin');
                 await expect(
                     facade.parseInbound('mailgun', legit.rawBody, legit.headers),
