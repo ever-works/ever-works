@@ -17,7 +17,9 @@ import {
     // APW-07 T17 — the `app-dependency-provision` dispatcher. Bound by the
     // `buildJobRuntimeProviders()` spread below like every other symbol and
     // EXPORTED here so `AppDependenciesService` (declared in the agent-side
-    // `AppDependenciesModule`, which the API imports) can inject it.
+    // `AppDependenciesModule`) can inject it. The API imports that module through
+    // `AppDeployRequestModule` since 2026-09-26; before that no API module did, so
+    // this export reached nothing.
     APP_DEPENDENCY_PROVISION_DISPATCHER,
     // APW-05 T19/T20 and APW-03 T12 — the three App dispatchers that were
     // BOUND (they are `DISPATCHER_SYMBOLS`, so `buildJobRuntimeProviders()`

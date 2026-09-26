@@ -583,6 +583,34 @@ describe('AppEnvRuntimeSource (T14, plan §4.6.1:424-449)', () => {
         expect(failing.ensureReadyForDeploy).toHaveBeenCalledTimes(1);
     });
 
+    it('hands back the readiness answer it obtained, so a caller never has to ask a second time (GAP-05)', async () => {
+        // §5.1 step 9 reads this instead of calling `ensureReadyForDeploy` again: every call
+        // runs `reconcile`, which re-dispatches each `pending` kind, so step 8 + step 9 asking
+        // separately dispatched every pending provision twice per Deploy preflight.
+        const answered = await makeSource().resolve(WORK, 'commit-1', RUNTIME_CTX);
+        expect(answered.dependencyReadiness).toEqual(
+            await ensureReadyForDeploy.mock.results[0].value,
+        );
+        expect(ensureReadyForDeploy).toHaveBeenCalledTimes(1);
+
+        // No answer is `null` — "not asked / could not ask", never a fabricated one.
+        const unbound = await makeSource({ readiness: null }).resolve(
+            WORK,
+            'commit-1',
+            RUNTIME_CTX,
+        );
+        expect(unbound.dependencyReadiness).toBeNull();
+
+        const throwing = await makeSource({
+            readiness: {
+                ensureReadyForDeploy: jest.fn(async () => {
+                    throw new Error('cluster unreachable');
+                }),
+            },
+        }).resolve(WORK, 'commit-1', RUNTIME_CTX);
+        expect(throwing.dependencyReadiness).toBeNull();
+    });
+
     it('deduplicates and sorts the not-ready kinds (pure)', () => {
         expect(
             notReadyKinds({

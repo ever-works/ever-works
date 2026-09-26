@@ -43,10 +43,22 @@ import { AppUpstreamController } from './app-upstream.controller';
  *   - `ActivityLogModule` supplies `ActivityLogService`, the one writer of the epic's
  *     eight dotted events (§3.5).
  *
+ * ⚠ Correction, 2026-09-26: the imports in THIS module do not reach the state
+ * service. `AppUpstreamStateService` is declared in `AgentAppWorksModule`, and Nest
+ * resolves a provider's dependencies in the module that declares it — so an import
+ * here serves only the providers declared here (the readiness service, its runner and
+ * this module's copy of the ready handler). Until 2026-09-26 the state service
+ * therefore had no `ActivityLogService`, `NotificationService`, `TasksService`,
+ * `TaskChatService` or `TaskRepository` in the running API, whatever this list said.
+ * The agent module now imports `ActivityLogModule`, `NotificationsModule` and
+ * `TasksDomainModule` itself (its "bound by IMPORT" section), which is what binds
+ * them; `DatabaseModule` and `FacadesModule` always were imported there too.
+ * `apps/api/src/app-works-di-reachability.spec.ts` checks this rule for the whole
+ * API graph.
+ *
  * Every one of those collaborators is `@Optional()` in the service, so this module
  * compiles either way and a *missing* import degrades a feature rather than failing
- * boot. The list above is therefore the difference between "the Upstream card works"
- * and "it 404s", and it is why each line carries its reason instead of an ordering.
+ * boot — and the import has to be in the module that DECLARES the consumer.
  *
  * `DistributedTaskLockService` is deliberately **not** imported: the state service reads
  * it only for the informational half of `syncInProgress` (the claim itself is the row's

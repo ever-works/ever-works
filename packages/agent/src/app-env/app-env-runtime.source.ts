@@ -18,7 +18,10 @@
  * 1. the **one** call to `AppDependenciesService.ensureReadyForDeploy(workId)`
  *    whose `notReady` kinds become `notReadyDependencies` — and which also
  *    dispatches provisioning for `pending` kinds (GAP-05), which is why it is
- *    called exactly once per resolution and never from the ephemeral paths;
+ *    called exactly once per resolution and never from the ephemeral paths —
+ *    and whose answer is handed back as `dependencyReadiness`, so APW-06's
+ *    Deploy preflight (which calls `resolve` in its step 8) does not make a
+ *    second call in its step 9 that would dispatch the `pending` kinds again;
  * 2. the mapping from a resolution to the port's return shape (`values` is a
  *    map here and a list inside, `unsetRequired` is names, …);
  * 3. the two ephemeral targets, each delegating to the resolver method that
@@ -132,6 +135,12 @@ export interface AppEnvRuntimeResolveResult {
     unresolved: AppEnvUnresolved[];
     /** Additive: FR-62's "left out with a warning" items. */
     warnings: AppEnvResolutionWarning[];
+    /**
+     * Additive (`ports.ts`'s `dependencyReadiness`): the `ensureReadyForDeploy` answer this
+     * resolution obtained, or `null` when it has none. A Deploy preflight reuses it rather
+     * than asking again — each call re-dispatches every `pending` kind (GAP-05).
+     */
+    dependencyReadiness: AppEnvDeployReadiness | null;
 }
 
 /** What {@link AppEnvRuntimeSource.resolveEphemeral} answers. */
@@ -198,6 +207,9 @@ export class AppEnvRuntimeSource implements AppRuntimeEnvSource {
             egress: resolution.egress,
             unresolved: resolution.unresolved,
             warnings: resolution.warnings,
+            // Handed on so the caller's own dependency row (APW-06 §5.1 step 9) reads this
+            // one answer instead of making a second dispatching call.
+            dependencyReadiness: readiness,
         };
     }
 

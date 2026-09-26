@@ -73,6 +73,19 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * **The swap when T71 lands is one line**: replace
  * `AppDependencyProvisionWorkerModule` with `TriggerAppRuntimeModule` in the
  * `withWorkerContext` call below, exactly as APW-06's T32 tasks do.
+ *
+ * ⚠ Correction, 2026-09-26: `TriggerAppRuntimeModule` IS in this tree now, and the
+ * swap is NOT one line — that module provides none of this service's collaborators
+ * either. `apps/api/src/app-works-di-reachability.spec.ts` measures what this
+ * context leaves unbound: `WorkAppDependencyRepository` and the entity's TypeORM
+ * repository (row creation goes through `@InjectRepository(WorkAppDependency)`, which
+ * a remote proxy cannot carry — the write path needs repository methods first),
+ * `APP_DEPENDENCY_CONFIG_CIPHER` (`AppEnvCrypto` and its key in the isolated worker),
+ * `APP_DEPENDENCY_CLUSTER_ACCESS` (`AppRuntimeFacadeService`, which lives in T71's
+ * module), `AppDependencyFacadeService` and `APP_DEPENDENCY_PROVISION_DISPATCHER`
+ * (the runner's re-dispatch). That composition is T71's and T17's open work; until it
+ * lands every run answers the runner's named `storeUnavailable`, and nothing is
+ * dialled.
  */
 @Module({
     imports: [TriggerWorkerModule],

@@ -1203,8 +1203,18 @@ describe('AppDeployPreconditionsService — dependency_not_ready (GAP-05, ACC-06
         expect(codes(result)).toEqual([]);
     });
 
-    it('refuses when the question could not be answered at all', async () => {
-        const { service, dependencies } = makeHarness();
+    it('refuses when the question could not be answered and the spec declares a dependency', async () => {
+        // Was run against the default spec, which declares NO dependency — so it pinned a
+        // refusal for a Work with nothing to wait on (review 2026-09-26: once the dependency
+        // service reached the API, every App Deploy was refused `dependency_not_ready
+        // (specUnavailable)` while APW-07 T25's spec source is unbound). The fail-closed
+        // refusal it meant to pin is this one: a declared kind whose readiness is unknown.
+        const { service, dependencies, specs } = makeHarness();
+        specs.snapshot = {
+            status: 'valid',
+            spec: appSpec({ dependencies: { postgres: { version: '16' } } }),
+            commitSha: 'sha-head',
+        };
         dependencies.readiness = {
             ready: false,
             notReady: [],
@@ -1215,7 +1225,55 @@ describe('AppDeployPreconditionsService — dependency_not_ready (GAP-05, ACC-06
         const result = await service.evaluate(request());
 
         expect(codes(result)).toEqual(['dependency_not_ready']);
+        expect(entryFor(result, 'dependency_not_ready').names).toEqual(['postgres']);
         expect(entryFor(result, 'dependency_not_ready').message).toContain('specUnavailable');
+    });
+
+    it('does not refuse a spec that declares no dependency when the question could not be answered — it warns', async () => {
+        const { service, dependencies } = makeHarness();
+        dependencies.readiness = {
+            ready: false,
+            notReady: [],
+            optional: [],
+            reason: 'specUnavailable',
+        };
+
+        const result = await service.evaluate(request());
+
+        expect(codes(result)).toEqual([]);
+        expect(result.warnings.map((warning) => warning.code)).toContain(
+            APP_DEPLOY_WARNING_DEPENDENCIES_UNAVAILABLE,
+        );
+    });
+
+    it('reuses the readiness the env source already obtained — one ensureReadyForDeploy per evaluation (GAP-05)', async () => {
+        // APW-07's env source makes its own `ensureReadyForDeploy` call inside step 8's
+        // `resolve` (T14), and each call runs `reconcile`, which re-dispatches every `pending`
+        // kind. Asking again in step 9 dispatched every pending provision twice per preflight.
+        const { service, dependencies, env } = makeHarness();
+        env.result = {
+            ...env.result,
+            dependencyReadiness: {
+                ready: false,
+                notReady: [{ kind: 'postgres', status: 'pending', reason: null }],
+                optional: [],
+            },
+        } as typeof env.result;
+
+        const result = await service.evaluate(request());
+
+        expect(dependencies.calls).toEqual([]);
+        expect(codes(result)).toEqual(['dependency_not_ready']);
+        expect(entryFor(result, 'dependency_not_ready').names).toEqual(['postgres']);
+    });
+
+    it('asks the dependency service itself when the env source had no readiness answer', async () => {
+        const { service, dependencies, env } = makeHarness();
+        env.result = { ...env.result, dependencyReadiness: null } as typeof env.result;
+
+        await service.evaluate(request());
+
+        expect(dependencies.calls).toEqual(['work-1']);
     });
 
     it('refuses rather than proceeding when the dependency service throws', async () => {

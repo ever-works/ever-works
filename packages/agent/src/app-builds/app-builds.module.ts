@@ -102,13 +102,16 @@ import { GitFacadeService } from '../facades/git.facade';
  *   global module binds without exporting reaches no other module
  *   (`trigger.module.ts`, guarded by `trigger.module.spec.ts`); and `EventEmitter2`,
  *   from the API root's `EventEmitterModule.forRoot()`;
- * - **resolved lazily, and absent from the API today**: the
- *   `APP_BUILD_RUNNER_RECIPE_SOURCE` factory looks `AppEnvRuntimeSource` up at call
- *   time, and only `AppRuntimeEnvModule` provides that class — a module no API
- *   module imports as of 2026-09-26. The factory then answers "no recipe and
- *   nothing missing", so a verification job runs with no env (routed as a
- *   finding: importing `AppRuntimeEnvModule` here would drag `FacadesModule` in
- *   through `AppDependenciesModule` and stop this module compiling standalone);
+ * - **resolved lazily**: the `APP_BUILD_RUNNER_RECIPE_SOURCE` factory looks
+ *   `AppEnvRuntimeSource` up NON-strictly at call time, and only
+ *   `AppRuntimeEnvModule` provides that class. Until 2026-09-26 no API module
+ *   imported it, so the factory answered "no recipe and nothing missing" and a
+ *   verification job ran with no env; the API now reaches it through
+ *   `AppDeployRequestModule`, which imports it for the deploy preconditions, and
+ *   `__tests__/app-builds.recipe-source.graph.spec.ts` composes the two side by side
+ *   as the API does. It stays lazy rather than an import here: importing
+ *   `AppRuntimeEnvModule` would drag `FacadesModule` in through
+ *   `AppDependenciesModule` and stop this module compiling standalone;
  * - **unbound everywhere**: `APP_BUILD_PLATFORM_SETTINGS_WRITER` (§4.12),
  *   `APP_BUILD_EDIT_ACCESS` and `APP_PROVISION_EVENTS_PORT` (APW-04). Binding a
  *   placeholder for any of them would make an unconfigured installation look

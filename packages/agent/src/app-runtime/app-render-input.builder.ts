@@ -95,7 +95,7 @@
  *
  * `components.<name>.internalUrl` is spelled in three places by construction: the pure helper
  * `internalUrl()` in the k8s plugin (`packages/plugins/k8s/src/app/app-names.ts:236`), T21's private
- * `internalUrlsFor` (`app-deploy-preconditions.service.ts:1481`), and {@link internalUrlsFor} here.
+ * `internalUrlsFor` (`app-deploy-preconditions.service.ts:1520`), and {@link internalUrlsFor} here.
  * The string is a **contract** (`packages/plugin/src/contracts/capabilities/app-deployment.types.ts:237-238`),
  * the agent may not import the k8s plugin (plan §6.1:933), and T21's helper is module-private — so
  * the alternative to spelling it twice is editing another task's file. The values are identical by
@@ -1196,7 +1196,7 @@ export function deploymentShortFor(deploymentId: string): string {
 /**
  * `components.<name>.internalUrl` — `http://<name>.<namespace>.svc.cluster.local` (CONTRACTS §1,
  * plan §4.3:468-471), for every component, which is the map T21's precondition pass builds from the
- * same fact (`app-deploy-preconditions.service.ts:1481-1496`). §21:440 is what refuses a *worker*
+ * same fact (`app-deploy-preconditions.service.ts:1520-1535`). §21:440 is what refuses a *worker*
  * reference at validation time; this map is not the validator, and the renderer draws a Service for a
  * `web` component only, so including a worker resolves nothing an invalid spec could use.
  *

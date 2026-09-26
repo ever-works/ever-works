@@ -75,13 +75,19 @@ import { AppRuntimeStateModule } from '../app-runtime-state.module';
  * `AppEnvResolver` and `AppEnvService` were `undefined` in the API's Builds
  * module. `AppBuildsModule` now imports it, and
  * `apps/api/src/app-builds/app-builds.module.spec.ts` pins that by composing the
- * API's real module. `AppRuntimeEnvModule` and `AppDependenciesModule` are STILL
- * imported by no API or `packages/tasks` module. Their four tokens
- * (`APP_RUNTIME_ENV_SOURCE`, `APP_ENV_DEPLOY_READINESS`,
- * `APP_DEPENDENCIES_SERVICE`, `APP_DEPENDENCY_CONFIG_CIPHER`) therefore stay in
- * BOUND here but are absent from the API. That is an open, routed APW-06 finding.
- * Whether a token is reachable is a question for a composition test, not for this
- * register.
+ * API's real module. `AppRuntimeEnvModule` and `AppDependenciesModule` were, the
+ * same day, still imported by no API or `packages/tasks` module, so their four
+ * tokens (`APP_RUNTIME_ENV_SOURCE`, `APP_ENV_DEPLOY_READINESS`,
+ * `APP_DEPENDENCIES_SERVICE`, `APP_DEPENDENCY_CONFIG_CIPHER`) sat in BOUND here
+ * while absent from the API. `AppDeployRequestModule` imports both now (for the
+ * deploy preconditions it declares), and
+ * `__tests__/app-deploy-request.graph.spec.ts` composes it. The reachability
+ * question is asked by `apps/api/src/app-works-di-reachability.spec.ts`, not by
+ * this register — within its stated scope: every class of the App Works surface,
+ * every ask FOR an App Works token anywhere in the API graph, the worker contexts
+ * the `app-*` tasks boot, and the remote proxies those contexts dial. A
+ * type-erased (`Object`) ask outside the surface is not in it; read that spec's
+ * "What the walker does not see" before treating a green run as "all wired".
  *
  * ## How to use it when a number below changes
  *
@@ -167,9 +173,10 @@ const BOUND: readonly string[] = [
     // APW-05 §4.12 — APW-07's value-free runner recipe. The TOKEN has been
     // provided by `AppBuildsModule` since 2026-09-22, as a lazy lookup of
     // `AppEnvRuntimeSource`. Only `AppRuntimeEnvModule` provides that class, and
-    // no API or `packages/tasks` module imports it (measured 2026-09-26). So in
-    // the API the lookup finds nothing, and a verification Build gets "no recipe,
-    // nothing missing". Provided here, NOT working there; see the header.
+    // until 2026-09-26 no API module imported it, so the lookup found nothing and
+    // a verification Build got "no recipe, nothing missing". The API reaches it
+    // through `AppDeployRequestModule` now
+    // (`app-builds/__tests__/app-builds.recipe-source.graph.spec.ts`).
     'APP_BUILD_RUNNER_RECIPE_SOURCE',
     'APP_BUILD_SPEC_SOURCE',
     'APP_BUILD_WATCH_RUNNER',
@@ -200,16 +207,19 @@ const BOUND: readonly string[] = [
     //                                  `env_source_unavailable`, so no
     //                                  Deployment could pass preconditions
     //
-    // ⚠ Correction, 2026-09-26: "unblocked" above means "provided by module
-    // metadata", not "works in the API". Nothing imports `AppRuntimeEnvModule`,
-    // and only that module imports `AppDependenciesModule`. So
-    // `APP_DEPENDENCIES_SERVICE`, `APP_DEPENDENCY_CONFIG_CIPHER`,
-    // `APP_ENV_DEPLOY_READINESS` and `APP_RUNTIME_ENV_SOURCE` are still absent from
-    // the API graph. There, `AppDeployPreconditionsService` still answers
-    // `env_source_unavailable` (routed APW-06 finding). `AppEnvModule`'s three
-    // (`APP_ENV_SPEC_SOURCE`, `APP_ENV_ENSURE_GENERATED`,
-    // `APP_ENV_RESOLVER_FINGERPRINTS`) do reach the API, because `AppBuildsModule`
-    // imports `AppEnvModule` since 2026-09-26.
+    // ⚠ Correction, 2026-09-26: "unblocked" above meant "provided by module
+    // metadata", not "works in the API". At the time nothing imported
+    // `AppRuntimeEnvModule`, and only that module imported `AppDependenciesModule`,
+    // so `APP_DEPENDENCIES_SERVICE`, `APP_DEPENDENCY_CONFIG_CIPHER`,
+    // `APP_ENV_DEPLOY_READINESS` and `APP_RUNTIME_ENV_SOURCE` were absent from the
+    // API graph and `AppDeployPreconditionsService` answered
+    // `env_source_unavailable`. Fixed the same day: `AppDeployRequestModule`
+    // imports both modules, so the preconditions receive the env source and the
+    // dependency service (`app-deploy-request.graph.spec.ts`). What that surfaces
+    // next is `APP_DEPENDENCY_SPEC_SOURCE` (APW-07 T25, in UNBOUND below):
+    // `ensureReadyForDeploy` answers `specUnavailable` until it is bound.
+    // `AppEnvModule`'s three (`APP_ENV_SPEC_SOURCE`, `APP_ENV_ENSURE_GENERATED`,
+    // `APP_ENV_RESOLVER_FINGERPRINTS`) reach the API through `AppBuildsModule`.
     'APP_DEPENDENCIES_SERVICE',
     'APP_DEPENDENCY_CONFIG_CIPHER',
     // APW-06 §9.2 — the deploy dispatcher and its availability probe, bound

@@ -1,7 +1,10 @@
 import { Module, type FactoryProvider } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { TasksDomainModule } from '../tasks-domain/tasks.module';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
@@ -191,6 +194,33 @@ import {
  * its docstring for that gate and T28's obligation to bind the token in this
  * graph.
  *
+ * ## The Activity, notification and Task collaborators — bound by IMPORT (2026-09-26)
+ *
+ * `AppUpstreamStateService` files the conflict Task (`TasksService`), comments on
+ * the open one (`TaskRepository` + `TaskChatService`), notifies the owner when no
+ * Agent resolved (`NotificationService`) and writes the epic's dotted Activity
+ * events (`ActivityLogService`); `AppActionsHygieneService` and this module's copy
+ * of `AppSourceInitializerService` write Activity too. All `@Optional()`, and until
+ * 2026-09-26 all `undefined` in the running API: this module imported only
+ * `DatabaseModule` and `FacadesModule`, neither of which exports them, and the
+ * imports `apps/api/src/app-works/app-works.module.ts` carries "for the state
+ * service" cannot reach a provider declared HERE (the C10 visibility rule above).
+ * So every conflict was recorded without a Task, no owner was told, and no
+ * `app.upstream.*` / `app.actions.*` Activity row was ever written.
+ *
+ * `ActivityLogModule`, `NotificationsModule` and `TasksDomainModule` are imported
+ * here now. None of them reaches this module (`tasks.module.ts` imports
+ * `app-works/` SERVICE files, never this module or the barrel), so the graph stays
+ * a DAG; in the API all three were already instantiated, so nothing new boots
+ * there. The internal CLI (`apps/internal-cli`, which imports `WorkModule`, which
+ * imports this module) DOES gain `TasksDomainModule` and, through it,
+ * `AgentsModule`, `AppSpecModule` and `SkillsModule`; this module composes against
+ * the CLI's kind of root (a non-global local emitter, a global cache, the plugins
+ * module and the full entity list), which was checked when the import landed.
+ * `__tests__/app-works.module.graph.spec.ts` composes the module for real
+ * and pins all five; the bare-graph specs of this module shell the three the way
+ * they shell `DatabaseModule` and `FacadesModule`.
+ *
  * ## APW-01 T36 — the telemetry service joins them (additive)
  *
  * `AppWorksTelemetryService` (FR-53, plan §9.1) is provided **and exported** here:
@@ -268,6 +298,16 @@ export function buildAppForkReadinessDispatcherProvider(): FactoryProvider {
         // which is what keeps `WorkModule`'s `imports: [AppWorksModule]` acyclic.
         DatabaseModule,
         FacadesModule,
+        // APW-02 §3.5 / §6.5 — the Activity writer, the owner notice and the
+        // conflict Task, for the services DECLARED here (`AppUpstreamStateService`,
+        // `AppActionsHygieneService`, this module's `AppSourceInitializerService`).
+        // They must be imported HERE: Nest resolves a provider's dependencies in the
+        // module that declares it, and until 2026-09-26 only the API's wrapper
+        // module imported them — which the services here cannot see. See the class
+        // docstring's "The Activity, notification and Task collaborators" section.
+        ActivityLogModule,
+        NotificationsModule,
+        TasksDomainModule,
     ],
     providers: [
         WorkUpstreamStateRepository,

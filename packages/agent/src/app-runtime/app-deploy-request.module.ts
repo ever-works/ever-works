@@ -15,7 +15,10 @@ import {
 } from './app-deploy-preconditions.service';
 import { buildAppDeployDispatcherProviders } from './app-deploy-dispatcher.provider';
 import { APP_DEPLOY_DEPLOYMENT_STORE, AppDeployRequestService } from './app-deploy-request.service';
+import { AppLicenseGate } from './app-license-gate';
 import { AppRuntimeStateModule } from './app-runtime-state.module';
+import { AppDependenciesModule } from '../app-dependencies/app-dependencies.module';
+import { AppRuntimeEnvModule } from '../app-env/app-runtime-env.module';
 
 /**
  * APW-06 §2.2 — the module that finally REGISTERS the deploy request path.
@@ -69,8 +72,47 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  *     not a refusal, so this one blocks nothing;
  *   - `APPS_TIER_POLICY` → APW-10, unwritten in this tree.
  *
- * Its env and dependency ports ARE bound, by APW-07's `AppRuntimeEnvModule`. The
- * dormancy register (`app-works-port-dormancy.spec.ts`) counts what is left.
+ * The dormancy register (`app-works-port-dormancy.spec.ts`) counts what is left.
+ *
+ * ## The env, dependency and license collaborators — bound by IMPORT (2026-09-26)
+ *
+ * An earlier revision of this docstring said the env and dependency ports "ARE
+ * bound, by APW-07's `AppRuntimeEnvModule`". That was false in every running
+ * process: Nest resolves a provider's dependencies in the module that DECLARES it,
+ * `AppDeployPreconditionsService` is declared HERE, and this module imported
+ * neither APW-07 module — while no other API module imported them at all. So
+ * `APP_RUNTIME_ENV_SOURCE`, `APP_DEPENDENCIES_SERVICE` and `AppLicenseGate` were
+ * all `undefined` in the API, and every Deploy past the dispatcher gate was refused
+ * `env_source_unavailable`. `apps/api/src/app-works-di-reachability.spec.ts` found
+ * it; `__tests__/app-deploy-request.graph.spec.ts` pins the fix by composition.
+ *
+ *   - `AppRuntimeEnvModule` is imported for `APP_RUNTIME_ENV_SOURCE`
+ *     (`AppEnvRuntimeSource`, §5.1's env step). This import is also what puts that
+ *     module in the API graph at all, and with it `AppEnvListener` (subscribed once:
+ *     a class module is one instance however many modules import it) and the
+ *     `AppEnvRuntimeSource` that `AppBuildsModule`'s `APP_BUILD_RUNNER_RECIPE_SOURCE`
+ *     factory looks up lazily.
+ *   - `AppDependenciesModule` is imported for `APP_DEPENDENCIES_SERVICE` (GAP-05's
+ *     `ensureReadyForDeploy`). `AppRuntimeEnvModule` imports it but does not
+ *     re-export it, so it is imported here by name. Both are one instance with the
+ *     copy `AppEnvRuntimeSource` reads through `APP_ENV_DEPLOY_READINESS`.
+ *   - `AppLicenseGate` (T21) is PROVIDED here: it is the gate "constructed wherever a
+ *     Deployment may be requested or started" (`app-license-gate.ts`), a pure class
+ *     whose only collaborator — APW-03's `APP_LICENSE_SERVICE` — is unwritten, so it
+ *     answers the documented unreadable verdict: `license_blocks_target` for the
+ *     managed target, a `license_eligibility_unavailable` warning for your cluster.
+ *
+ * Both imports are leaves with respect to this module: nothing either reaches
+ * imports `AppDeployRequestModule`, so the graph stays a DAG. They add no new module
+ * to what this one already carries except the two APW-07 modules themselves —
+ * `FacadesModule`, `DatabaseModule` and TypeORM already come with `AppSpecModule`.
+ *
+ * ⚠ What that turns on, and why it refuses rather than passes today:
+ * `APP_DEPENDENCY_SPEC_SOURCE` (APW-07 T25, unwritten) is unbound, so
+ * `ensureReadyForDeploy` answers `specUnavailable` for every Work and §5.1 step 9
+ * pushes `dependency_not_ready` — a named refusal, where before this wiring step 8
+ * refused every Deploy with `env_source_unavailable`. Neither pass provisions
+ * anything while the spec source is unbound (`reconcile` fails closed first).
  *
  * ## Why both services, and why only these two
  *
@@ -80,13 +122,14 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
  * permanently absent — the request would skip straight past every check it is
  * supposed to run. Both, or neither.
  *
- * Nothing else from `app-runtime` is registered here on purpose. The
+ * Nothing else from `app-runtime` is registered here on purpose, bar the one
+ * class the preconditions inject by class (`AppLicenseGate`, above). The
  * orchestrator, the health poller, the lifecycle ops and the deletion path each
  * carry their own unbound ports and their own unwritten tasks; adding them to a
  * module would make the graph look wired without making anything work, which is
  * the failure this branch already has 62 instances of.
  *
- * ## The one import
+ * ## The runtime-state import
  *
  * `AppRuntimeStateModule`, because both services inject
  * `WORK_APP_RUNTIME_STATES` and it is the module that binds it (APW-06 T17).
@@ -110,9 +153,17 @@ import { AppRuntimeStateModule } from './app-runtime-state.module';
         // deliberately absent from the inventory), so this module provides it
         // and needs the entity's repository token to do so.
         TypeOrmModule.forFeature([WorkBuild]),
+        // APW-07's two modules, for the preconditions service declared below:
+        // `APP_RUNTIME_ENV_SOURCE` and `APP_DEPENDENCIES_SERVICE` must be
+        // visible HERE (see the docstring's "bound by IMPORT" section).
+        AppRuntimeEnvModule,
+        AppDependenciesModule,
     ],
     providers: [
         AppDeployPreconditionsService,
+        // T21's gate, injected by class by the preconditions service. Local
+        // because it is this epic's own class with no module of its own.
+        AppLicenseGate,
         AppDeployRequestService,
         AppDeployDeploymentStoreAdapter,
         { provide: APP_DEPLOY_DEPLOYMENT_STORE, useExisting: AppDeployDeploymentStoreAdapter },

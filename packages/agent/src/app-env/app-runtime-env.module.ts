@@ -37,6 +37,16 @@
  * no module never subscribes, so before this file the event was emitted into
  * nothing.
  *
+ * ## Where the API reaches it (2026-09-26)
+ *
+ * This file closed the gap only on paper until 2026-09-26: NO module of the API
+ * imported it, so none of its bindings and not the listener existed in the running
+ * API. `AppDeployRequestModule` imports it now, because the deploy preconditions it
+ * declares inject `APP_RUNTIME_ENV_SOURCE` (and imports `AppDependenciesModule` by
+ * name for `APP_DEPENDENCIES_SERVICE`, which this module does not re-export).
+ * Anything else that needs these bindings — APW-07 T24/T25's API modules included —
+ * should import this module, not re-provide its classes: one instance, one listener.
+ *
  * ## What it deliberately does NOT bind
  *
  * `APP_PROMPTED_VALUES_PORT` (APW-01 FR-55) stays unbound. Its declared owner is

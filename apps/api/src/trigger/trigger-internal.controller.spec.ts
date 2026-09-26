@@ -13,6 +13,8 @@ jest.mock('@ever-works/agent/database', () => ({
     // DataSource. Injection tokens here; the behaviour behind them lives in the agent package.
     WorkDeploymentRepository: class WorkDeploymentRepository {},
     WorkCustomDomainRepository: class WorkCustomDomainRepository {},
+    // The worker git facade's installation reads (`trigger-facades.module.ts` proxies it).
+    GitHubAppInstallationRepository: class GitHubAppInstallationRepository {},
 }));
 // APW-02 T28 — the controller imports the App upstream trio from the app-works
 // barrel. Loading the real barrel pulls the whole epic's service graph (entities
@@ -191,6 +193,7 @@ jest.mock('@ever-works/agent/config', () => ({
 
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import superjson from 'superjson';
+import { GitHubAppInstallationRepository } from '@ever-works/agent/database';
 import { TriggerInternalController } from './trigger-internal.controller';
 
 describe('TriggerInternalController', () => {
@@ -246,6 +249,9 @@ describe('TriggerInternalController', () => {
     // EW-693 T27 (a6) — the allowlist repository behind the worker's read-only
     // `PluginAllowlistReader`.
     let pluginAllowlistRepository: any;
+    // The worker git facade's installation reads (`trigger-facades.module.ts`); unbound
+    // unless a case sets it.
+    let gitHubAppInstallationRepository: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -365,8 +371,10 @@ describe('TriggerInternalController', () => {
             appBuildSweepService,
             // APW-06 §5.1 — the worker's Build source, appended after it, same rule.
             appDeployBuildSourceAdapter,
-            // EW-693 T27 (a6) — the allowlist repository, appended LAST, same rule.
+            // EW-693 T27 (a6) — the allowlist repository, appended after it, same rule.
             pluginAllowlistRepository,
+            // The worker git facade's installation reads, appended LAST, same rule.
+            gitHubAppInstallationRepository,
         );
         c.onModuleInit();
         return c;
@@ -522,6 +530,7 @@ describe('TriggerInternalController', () => {
             update: jest.fn(),
             delete: jest.fn(),
         };
+        gitHubAppInstallationRepository = undefined;
 
         controller = buildController();
     });
@@ -1442,7 +1451,7 @@ describe('TriggerInternalController', () => {
             ).rejects.toThrow('Unknown remote target: PluginAllowlistReader');
         });
 
-        it('appends the repository LAST and @Optional()', () => {
+        it('appends the repository in the @Optional() tail', () => {
             const paramTypes: unknown[] =
                 Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
             const optionalIndices: number[] =
@@ -1451,8 +1460,124 @@ describe('TriggerInternalController', () => {
                 (type) => (type as { name?: string })?.name === 'PluginAllowlistRepository',
             );
 
-            expect(at).toBe(paramTypes.length - 1);
-            expect(optionalIndices).toContain(at);
+            // Was `expect(at).toBe(paramTypes.length - 1)` — true until the next append (the
+            // worker's `GitHubAppInstallationRepository` reader, 2026-09-26). The rule it
+            // guarded is "appended at the tail, never mid-list": it and EVERY parameter after
+            // it are `@Optional()`, so no positional construction shifts.
+            expect(at).toBeGreaterThan(0);
+            for (let index = at; index < paramTypes.length; index += 1) {
+                expect(optionalIndices).toContain(index);
+            }
+        });
+    });
+
+    // -------------------------------------------------------------------
+    // The worker GitFacadeService's installation reads
+    // -------------------------------------------------------------------
+
+    /**
+     * `packages/tasks/src/trigger/worker/modules/trigger-facades.module.ts` provides the
+     * worker's `GitHubAppInstallationRepository` as `createRemoteProxy(api,
+     * 'GitHubAppInstallationRepository')`, because the worker's `GitFacadeService` needs it for
+     * GitHub App installation tokens (`getInstallationTokenForWork` → `findByInstallationId`,
+     * `getInstallationTokenForOwner` → `findActiveByAccountLogin`) and owns no DataSource.
+     * Until 2026-09-26 no `remoteMap` entry had that name, so every such lookup in a worker —
+     * the App spec evaluation, the dependency provisioner and the App runtime worker import
+     * that module — answered "Unknown remote target"
+     * (`apps/api/src/app-works-di-reachability.spec.ts` found it). The entry is a reader with
+     * exactly those two reads: the repository's writes (`upsertFromGithub`, `markDeleted`,
+     * `markSuspended`, `claimOwnershipIfUnassigned`) and its cross-tenant `listAll` are not
+     * reachable over this hop.
+     */
+    describe('the GitHubAppInstallationRepository remote target (the worker git facade)', () => {
+        const installation = {
+            id: 'row-1',
+            installationId: '4242',
+            accountLogin: 'acme',
+            suspendedAt: null,
+            deletedAt: null,
+        };
+        let installations: any;
+
+        const buildWithInstallations = () => {
+            gitHubAppInstallationRepository = installations;
+            return buildController();
+        };
+
+        beforeEach(() => {
+            installations = {
+                findByInstallationId: jest.fn(async (id: string) =>
+                    id === installation.installationId ? installation : null,
+                ),
+                findActiveByAccountLogin: jest.fn(async (login: string) =>
+                    login === installation.accountLogin ? installation : null,
+                ),
+                findById: jest.fn(),
+                listAll: jest.fn(),
+                upsertFromGithub: jest.fn(),
+                markDeleted: jest.fn(),
+                markSuspended: jest.fn(),
+                claimOwnershipIfUnassigned: jest.fn(),
+            };
+        });
+
+        it.each([
+            ['findByInstallationId', '4242'],
+            ['findActiveByAccountLogin', 'acme'],
+        ])('reaches %s over the RPC hop', async (method, argument) => {
+            const response = await buildWithInstallations().callRemote(VALID_SECRET, {
+                name: 'GitHubAppInstallationRepository',
+                method,
+                args: superjson.serialize([argument]) as any,
+            });
+
+            expect(installations[method]).toHaveBeenCalledWith(argument);
+            expect(superjson.deserialize(response.result as any)).toMatchObject({
+                installationId: '4242',
+            });
+        });
+
+        it.each([
+            'findById',
+            'listAll',
+            'upsertFromGithub',
+            'markDeleted',
+            'markSuspended',
+            'claimOwnershipIfUnassigned',
+        ])('refuses %s — the reader exposes the two installation reads only', async (method) => {
+            await expect(
+                buildWithInstallations().callRemote(VALID_SECRET, {
+                    name: 'GitHubAppInstallationRepository',
+                    method,
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow(
+                `Method not in allow-list for GitHubAppInstallationRepository: ${method}`,
+            );
+            expect(installations[method]).not.toHaveBeenCalled();
+        });
+
+        it('answers the loud "Unknown remote target" when no installation repository is bound', async () => {
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'GitHubAppInstallationRepository',
+                    method: 'findByInstallationId',
+                    args: superjson.serialize(['4242']) as any,
+                }),
+            ).rejects.toThrow('Unknown remote target: GitHubAppInstallationRepository');
+        });
+
+        it('appends the repository LAST and @Optional()', () => {
+            const paramTypes: unknown[] =
+                Reflect.getMetadata('design:paramtypes', TriggerInternalController) ?? [];
+            const optionalIndices: number[] =
+                Reflect.getMetadata('optional:paramtypes', TriggerInternalController) ?? [];
+            const last = paramTypes.length - 1;
+
+            // The class itself, not `Object`: an `Object` here is a parameter Nest resolves
+            // to nothing, and `@Optional()` would hide that.
+            expect(paramTypes[last]).toBe(GitHubAppInstallationRepository);
+            expect(optionalIndices).toContain(last);
         });
     });
 });

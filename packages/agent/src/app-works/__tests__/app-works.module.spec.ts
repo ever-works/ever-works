@@ -12,6 +12,20 @@ jest.mock('../../database/database.module', () => ({
 jest.mock('../../facades/facades.module', () => ({
     FacadesModule: class FacadesModule {},
 }));
+// 2026-09-26 — `AppWorksModule` also imports the Activity, notification and Task
+// modules its services inject (see its "bound by IMPORT" section). They are shelled
+// for the reason the two above are: this is a bare-graph test of THIS module's own
+// wiring, and every one of those collaborators is `@Optional()`.
+// `app-works.module.graph.spec.ts` composes all of them for real.
+jest.mock('../../activity-log/activity-log.module', () => ({
+    ActivityLogModule: class ActivityLogModule {},
+}));
+jest.mock('../../notifications/notifications.module', () => ({
+    NotificationsModule: class NotificationsModule {},
+}));
+jest.mock('../../tasks-domain/tasks.module', () => ({
+    TasksDomainModule: class TasksDomainModule {},
+}));
 
 import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';

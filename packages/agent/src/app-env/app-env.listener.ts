@@ -87,6 +87,20 @@
  * (`tasks.md:362-364`, `:382`) — is where `AppEnvListener` belongs in `providers`
  * (never in `exports`: Nest scans a PROVIDER's prototypes, and a listener is
  * internal).
+ *
+ * ## Where it IS registered (2026-09-26) — once
+ *
+ * That module turned out to be `AppRuntimeEnvModule` (`app-runtime-env.module.ts`),
+ * which imports both and provides this class — and only it. It reached the API on
+ * 2026-09-26, when `AppDeployRequestModule` began importing it for the deploy
+ * preconditions; before that it was imported nowhere, so the handler was subscribed
+ * in no process. A class module is one instance however many modules import it, so
+ * the listener is subscribed exactly once
+ * (`app-runtime/__tests__/app-deploy-request.graph.spec.ts` asserts one listener on
+ * the emitter `AppSpecService` publishes on). T24/T25's API modules should IMPORT
+ * `AppRuntimeEnvModule`, never provide this class again: a second provider is a
+ * second instance and a second subscription, and every `app.spec.applied` would
+ * then generate and reconcile twice.
  */
 
 import { Injectable, Logger, Optional } from '@nestjs/common';

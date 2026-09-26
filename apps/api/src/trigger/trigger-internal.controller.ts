@@ -23,6 +23,7 @@ import {
     WorkDeploymentRepository,
     WorkCustomDomainRepository,
     AuthAccountRepository,
+    GitHubAppInstallationRepository,
     OrganizationRepository,
     TemplateRepository,
     TemplateCustomizationRepository,
@@ -604,6 +605,17 @@ export class TriggerInternalController implements OnModuleInit {
         // refuses a third-party package rather than guessing.
         @Optional()
         private readonly pluginAllowlistRepository?: PluginAllowlistRepository,
+        // The worker `GitFacadeService`'s GitHub App installation reads. The worker's
+        // `TriggerFacadesModule` has proxied `GitHubAppInstallationRepository` by that name
+        // since it was written (its docstring: `findByInstallationId` for installation-token
+        // lookups), and no `remoteMap` entry ever answered it, so every installation-token
+        // lookup in a worker failed with "Unknown remote target" — found 2026-09-26 by
+        // `apps/api/src/app-works-di-reachability.spec.ts`, whose App Works worker contexts
+        // (spec evaluation, dependency provisioning, the App runtime) import that module.
+        // NOT registered as itself: `onModuleInit` exposes a two-read reader over it, as it does
+        // `PluginAllowlistReader`. Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly gitHubAppInstallationRepository?: GitHubAppInstallationRepository,
     ) {}
 
     onModuleInit() {
@@ -791,6 +803,24 @@ export class TriggerInternalController implements OnModuleInit {
                 ? {
                       findByPackageName: (packageName: string) =>
                           this.pluginAllowlistRepository!.findByPackageName(packageName),
+                  }
+                : undefined,
+            // The worker git facade's installation-token lookups
+            // (`git.facade.ts` `getInstallationTokenForWork` / `getInstallationTokenForOwner`),
+            // under the name `trigger-facades.module.ts` proxies. A reader with the two reads
+            // and nothing else: the repository's writes and its cross-tenant `listAll` stay
+            // unreachable over this hop. Maps to `undefined` (a loud "Unknown remote target")
+            // when the repository is not bound.
+            GitHubAppInstallationRepository: this.gitHubAppInstallationRepository
+                ? {
+                      findByInstallationId: (installationId: string) =>
+                          this.gitHubAppInstallationRepository!.findByInstallationId(
+                              installationId,
+                          ),
+                      findActiveByAccountLogin: (accountLogin: string) =>
+                          this.gitHubAppInstallationRepository!.findActiveByAccountLogin(
+                              accountLogin,
+                          ),
                   }
                 : undefined,
             // C10 — and the worker half of `app-fork-readiness`. Registered

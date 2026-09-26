@@ -486,7 +486,7 @@ export class AppDeployPreconditionsService {
         const primaryUrl = primaryUrlFor(primaryHost, state?.targetSettings?.tls);
 
         // ---- 8 · the env source (APW-07) -------------------------------------
-        await this.checkEnv({
+        const envReadiness = await this.checkEnv({
             workId,
             spec,
             build,
@@ -499,7 +499,7 @@ export class AppDeployPreconditionsService {
         });
 
         // ---- 9 · dependencies (GAP-05) ---------------------------------------
-        await this.checkDependencies(workId, spec, unmet, warnings);
+        await this.checkDependencies(workId, spec, unmet, warnings, envReadiness);
 
         // ---- 10 · `domains.primary.*` with no primary host (GAP-09) ----------
         this.checkPrimaryDomainRefs(spec, primaryHost, advisory, warnings);
@@ -1195,6 +1195,9 @@ export class AppDeployPreconditionsService {
      * The resolution is the **non-ephemeral** one, with `buildCommitSha: null` under
      * `build.strategy: image` — exactly the context §5.6 step 2 and T22's builder
      * pass (ACC-06-52).
+     *
+     * Answers the dependency readiness the resolution obtained (`dependencyReadiness`,
+     * APW-07's own `ensureReadyForDeploy` call), or `null` when it has none, for step 9.
      */
     private async checkEnv(input: {
         workId: string;
@@ -1206,7 +1209,7 @@ export class AppDeployPreconditionsService {
         primaryHost: string | null;
         unmet: AppPrecondition[];
         warnings: AppDeployPreconditionWarning[];
-    }): Promise<void> {
+    }): Promise<AppDeployDependencyReadiness | null> {
         const { workId, spec, build, target, state, primaryUrl, primaryHost, unmet, warnings } =
             input;
 
@@ -1217,7 +1220,7 @@ export class AppDeployPreconditionsService {
                     'No App env source is available in this process, so no environment value could ' +
                     'be checked.',
             });
-            return;
+            return null;
         }
 
         const buildCommitSha =
@@ -1246,7 +1249,7 @@ export class AppDeployPreconditionsService {
                     'The App environment could not be resolved, so no Deployment may start. Retry ' +
                     'when the env store is reachable.',
             });
-            return;
+            return null;
         }
 
         const unsetRequired = (resolution?.unsetRequired ?? []).map((name) => String(name));
@@ -1295,6 +1298,11 @@ export class AppDeployPreconditionsService {
                     `value: ${unsetCronAuth.join(', ')}.`,
             });
         }
+
+        // An object is an answer; anything else (absent on an older source, `null` when the
+        // source's readiness seam was unbound or threw) is "no answer" — step 9 then asks.
+        const readiness = resolution?.dependencyReadiness;
+        return readiness && typeof readiness === 'object' ? readiness : null;
     }
 
     /* ---------------------------------------------------------------------- *
@@ -1304,18 +1312,39 @@ export class AppDeployPreconditionsService {
     /**
      * `AppDependenciesService.ensureReadyForDeploy(workId)` — the one call that both
      * answers "is every dependency ready" **and** "dispatches provisioning for
-     * `pending` kinds" (GAP-05, ACC-06-54). Called exactly once per evaluation, and
-     * the single `dependency_not_ready` entry names every kind it reports.
+     * `pending` kinds" (GAP-05, ACC-06-54). Asked once per evaluation, and the single
+     * `dependency_not_ready` entry names every kind it reports.
+     *
+     * "Once" counts step 8 too: APW-07's env source makes that same call inside its
+     * `resolve` (its own "exactly once", T14) and hands the answer back as
+     * `dependencyReadiness`. When it did, this step reads that answer instead of asking
+     * again — every call runs `reconcile`, which re-dispatches each `pending` kind, so
+     * asking in both steps dispatched every pending provision twice per preflight.
+     * `envReadiness` is `null` when step 8 had no answer (no env source, a throwing one,
+     * or its readiness seam unbound), and then this step asks.
+     *
+     * An answer that could not be given (`reason`, e.g. `specUnavailable` while APW-07 T25's
+     * spec source is unbound) refuses only an App spec that DECLARES a dependency — its
+     * readiness is unknown, so the Deployment may not start. A spec that declares none has
+     * nothing to wait on; it is warned (`dependencies_unavailable`), the way an unbound
+     * dependency service is, rather than refused as if one of its dependencies were not ready.
      */
     private async checkDependencies(
         workId: string,
         spec: ResolvedSpec,
         unmet: AppPrecondition[],
         warnings: AppDeployPreconditionWarning[],
+        envReadiness: AppDeployDependencyReadiness | null = null,
     ): Promise<void> {
         const declared = declaredDependencyKinds(spec.spec);
 
-        if (!this.dependencies || typeof this.dependencies.ensureReadyForDeploy !== 'function') {
+        let readiness: AppDeployDependencyReadiness;
+        if (envReadiness) {
+            readiness = envReadiness;
+        } else if (
+            !this.dependencies ||
+            typeof this.dependencies.ensureReadyForDeploy !== 'function'
+        ) {
             if (declared.length > 0) {
                 warnings.push({
                     code: APP_DEPLOY_WARNING_DEPENDENCIES_UNAVAILABLE,
@@ -1325,31 +1354,40 @@ export class AppDeployPreconditionsService {
                 });
             }
             return;
-        }
-
-        let readiness: AppDeployDependencyReadiness;
-        try {
-            readiness = await this.dependencies.ensureReadyForDeploy(workId);
-        } catch (error) {
-            this.logger.warn(
-                `Checking the dependencies of Work ${workId} failed (${
-                    error instanceof Error ? error.message : String(error)
-                }).`,
-            );
-            unmet.push({
-                code: 'dependency_not_ready',
-                names: declared.length > 0 ? declared : undefined,
-                message:
-                    'The dependencies of this App Work could not be checked, so no Deployment may ' +
-                    'start yet.',
-            });
-            return;
+        } else {
+            try {
+                readiness = await this.dependencies.ensureReadyForDeploy(workId);
+            } catch (error) {
+                this.logger.warn(
+                    `Checking the dependencies of Work ${workId} failed (${
+                        error instanceof Error ? error.message : String(error)
+                    }).`,
+                );
+                unmet.push({
+                    code: 'dependency_not_ready',
+                    names: declared.length > 0 ? declared : undefined,
+                    message:
+                        'The dependencies of this App Work could not be checked, so no Deployment ' +
+                        'may start yet.',
+                });
+                return;
+            }
         }
 
         const notReady = (readiness?.notReady ?? []).map((entry) => String(entry?.kind ?? ''));
         const names = notReady.filter((kind) => kind.length > 0);
 
         if (readiness?.ready === true && names.length === 0) {
+            return;
+        }
+
+        if (names.length === 0 && declared.length === 0 && readiness?.reason) {
+            warnings.push({
+                code: APP_DEPLOY_WARNING_DEPENDENCIES_UNAVAILABLE,
+                message: `The dependency service could not answer for this App Work (${String(
+                    readiness.reason,
+                )}). This App spec declares no dependency, so nothing is waiting on one.`,
+            });
             return;
         }
 

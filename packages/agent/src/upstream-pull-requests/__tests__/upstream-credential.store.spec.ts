@@ -7,9 +7,18 @@
 // carry the binding, and that APW-02's repository reaches this epic's store
 // across the module boundary. A handover never calls the git facade — the
 // service makes no provider call at all (FR-43) — so an empty shell is a
-// supported graph for it, and it is the only module shelled.
+// supported graph for it, and it was the only module shelled until 2026-09-26.
 jest.mock('../../facades/facades.module', () => ({
     FacadesModule: class FacadesModule {},
+}));
+// Since 2026-09-26 `AppWorksModule` also imports `TasksDomainModule` (the conflict
+// Task its upstream state service files). That module's agents graph needs the real
+// facades — `WorkflowAiDecisionAdapter` takes `AiFacadeService` non-optionally — so
+// with `FacadesModule` shelled it is shelled too. A handover files no Task, so an
+// empty shell is a supported graph for it; `ActivityLogModule` and
+// `NotificationsModule` stay real, over the real `DatabaseModule`.
+jest.mock('../../tasks-domain/tasks.module', () => ({
+    TasksDomainModule: class TasksDomainModule {},
 }));
 
 import { Test } from '@nestjs/testing';

@@ -87,8 +87,9 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         // that provides and exports it. No cycle is introduced:
         // `AppWorkCreateService` injects no provider of THIS module (its slug check
         // goes through `WorkRepository`, which `DatabaseModule` provides), and
-        // `AppWorksModule` imports only `DatabaseModule` + `FacadesModule`, neither
-        // of which imports `WorkModule`.
+        // `AppWorksModule` imports `DatabaseModule`, `FacadesModule` and (since
+        // 2026-09-26) `ActivityLogModule`, `NotificationsModule` and
+        // `TasksDomainModule`, none of which imports `WorkModule`.
         AppWorksModule,
     ],
     providers: [

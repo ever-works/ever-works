@@ -3,7 +3,10 @@ import { APP_BUILD_IMAGE_NAME, type AppBuildKind } from '@ever-works/contracts';
 import type { BuildAuth, BuildRef, IBuildPlugin, StartBuildInput } from '@ever-works/plugin';
 
 import { WorkRepository } from '../database/repositories/work.repository';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    loadRegisteredPlugins,
+    PluginRegistryService,
+} from '../plugins/services/plugin-registry.service';
 import type { AppBuildPluginBinding, AppBuildPluginResolver } from './app-builds.service';
 
 /**
@@ -86,8 +89,17 @@ export class BuildFacadeService implements AppBuildPluginResolver {
          * Absent, {@link resolve} refuses and says WHICH half was missing, so an
          * operator never sees "no build plugin" when the real answer is "the
          * plugin system was not registered".
+         *
+         * `@Inject(PluginRegistryService)` is load-bearing, not decoration: the
+         * `| undefined` makes SWC (`nest build -b swc`, what ships) emit `Object`
+         * as this parameter's `design:paramtypes` entry, while tsc (ts-jest) emits
+         * the class. Without the explicit token the running API resolved
+         * `Object`, found nothing, and — the parameter being `@Optional()` —
+         * built the facade with NO registry, while every spec saw one.
+         * `__tests__/build-facade.registry-token.spec.ts` pins it.
          */
         @Optional()
+        @Inject(PluginRegistryService)
         private readonly registry: PluginRegistryService | undefined,
         private readonly workRepository: WorkRepository,
         /**
@@ -137,7 +149,7 @@ export class BuildFacadeService implements AppBuildPluginResolver {
             return null;
         }
 
-        const candidates = this.loadedBuildPlugins();
+        const candidates = await this.loadedBuildPlugins();
         if (candidates.length === 0) {
             this.logger.warn(
                 `Build plugin resolution for work ${workId}: no loaded plugin declares the \`build\` capability.`,
@@ -245,15 +257,30 @@ export class BuildFacadeService implements AppBuildPluginResolver {
         };
     }
 
-    /** Every loaded plugin declaring the `build` capability. */
-    private loadedBuildPlugins(): IBuildPlugin[] {
+    /**
+     * Every loaded plugin declaring the `build` capability, LOADED FOR USE before anything
+     * reads it.
+     *
+     * The load is not optional: disk built-ins stay cold lazy proxies until used
+     * (`plugin-bootstrap.service.ts`), and a cold proxy answers a member its manifest does not
+     * carry — `buildKind`, `checkImageAccess` — with an async forwarding wrapper (a function).
+     * Read cold, the shape filter below would pass any plugin declaring `build`, and
+     * `buildKind` would be that function instead of the string `evaluateBuildVerdict` compares
+     * with `'apps-builder'` to decide whether a signature is required.
+     * `loadRegisteredPlugins` imports each candidate, waits for its `onLoad`, and leaves out one
+     * that cannot load — as a boot-time load failure would have been — so the count that
+     * {@link resolve} refuses on is a count of usable plugins.
+     * `__tests__/build-facade.cold-plugin.spec.ts` pins it.
+     */
+    private async loadedBuildPlugins(): Promise<IBuildPlugin[]> {
         const all = this.registry?.getAll?.() ?? [];
-        return all
-            .filter(
-                (registered) =>
-                    registered?.state === 'loaded' &&
-                    (registered.manifest?.capabilities ?? []).includes('build'),
-            )
+        const declared = all.filter(
+            (registered) =>
+                registered?.state === 'loaded' &&
+                (registered.manifest?.capabilities ?? []).includes('build'),
+        );
+        const usable = await loadRegisteredPlugins(declared);
+        return usable
             .map((registered) => registered.plugin as unknown as IBuildPlugin)
             .filter(
                 (plugin): plugin is IBuildPlugin =>

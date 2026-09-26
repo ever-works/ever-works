@@ -131,11 +131,47 @@ import { createRemoteProxy } from '../remote-proxy';
  * - `AppImageReferenceResolver` — APW-06 **T72** (`packages/agent/src/app-runtime/app-image-reference.resolver.ts`).
  * - `AppRuntimeEventRelayService` (the `APP_RUNTIME_EVENT_SINK` proxy) — APW-06 **T28**
  *   (`apps/api/src/app-runtime/app-runtime-event-relay.service.ts`).
- * - `WORK_APP_RUNTIME_STATES`' binding (`WorkAppRuntimeStateRepository`) — APW-06 **T17**; the token
- *   itself is APW-11 T5's (`packages/agent/src/app-launcher/app-launcher.service.ts:223`) and is
- *   deliberately **not** re-declared here.
  * - APW-03's `AppLicenseService` (T29/T30's `APP_LICENSE_SERVICE`). (APW-05's `WorkBuild` reads were
  *   on this list until 2026-09-25; they are proxied above.)
+ *
+ * (`WORK_APP_RUNTIME_STATES` was on this list, blamed on APW-06 T17. That was stale: T17's
+ * `WorkAppRuntimeStateRepository` has landed and the API binds the token to it. It moved to the
+ * section below.)
+ *
+ * ## Still open under T71 — the classes exist, the worker bindings do not (measured 2026-09-26)
+ *
+ * `apps/api/src/app-works-di-reachability.spec.ts` walks this module's graph and lists every
+ * `@Optional()` token nothing here provides. These have an implementation in the tree and are
+ * T71's own open composition work (`APW-06/tasks.md:1220-1234` lists the first two), each blocked
+ * on something that is not a one-line binding:
+ *
+ * - `APP_DEPLOY_DISPATCHER_AVAILABILITY` / `APP_DEPLOY_DISPATCHER` — the §5.1/§5.6 decision above
+ *   (T71 status item (a)); the dequeue dispatch is T31's.
+ * - `WORK_APP_RUNTIME_STATES` — §6.4 proxies `WorkAppRuntimeStateRepository`, which needs a new
+ *   `remoteMap` name on the API side and `TriggerInternalModule` importing `AppRuntimeStateModule`
+ *   (T71 status item (b)). Binding it turns on every runtime path here that is not behind the
+ *   dispatcher gate — the health sweep, the cluster ops, the smoke and the deletion path — so it
+ *   lands with a spec that drives them across the hop, not as a line on its own.
+ * - `APP_CUSTOM_DOMAIN_STORE`, `APP_HOSTS_WORK_STORE`, `APP_HOSTS_DEPLOYMENT_STORE`,
+ *   `APP_HOSTS_APPS_DOMAIN` — `app-hosts.service.ts` documents each swap, to providers this module
+ *   already proxies (`WorkCustomDomainRepository`, `WorkRepository`, `WorkDeploymentRepository`) or
+ *   to `config.everWorks.apps`. `AppHostsService.resolveHost` also reads the runtime-state row —
+ *   the owner's primary-domain choice, TLS mode and the pending-rebuild hosts — so bound WITHOUT
+ *   it they would render a managed-only host set that ignores the owner's settings. They land
+ *   with `WORK_APP_RUNTIME_STATES`, not before it.
+ * - `APP_DEPLOY_DEPLOYMENT_STORE` — the API binds it to `AppDeployDeploymentStoreAdapter`, which has
+ *   no `update`; the orchestrator's view of the same token needs one (§5.6 steps 4–7). Which class
+ *   carries it is a decision, not a binding.
+ * - `APP_HOSTS_DEPLOY_REQUESTER` — bound to the API's `AppDeployRequestService`; §6.4 lists no proxy
+ *   for it, so whether this worker may request a Deployment over the internal channel is open.
+ * - `APP_WORK_DELETION_COMPLETION` — deletes the Work row; its binding is owed in the API
+ *   (`app-runtime-deletion.service.ts`, APW-06 T33/T58) and, here, would be a proxy to a destructive
+ *   method. Unbound, a finished removal keeps the row (fail-closed).
+ * - `APP_DEPENDENCIES_SERVICE` — APW-07's service must run HERE (its provider calls dial the
+ *   cluster), and its row writes go through `@InjectRepository(WorkAppDependency)`, which cannot cross
+ *   the internal channel; with `app-dependency-provision.task.ts`'s module, it waits on that design.
+ * - `APP_HEALTH_EGRESS_SOURCE` — the narrow adapter `app-health.service.ts` names is unwritten, and
+ *   `APP_RUNTIME_ENV_SOURCE` here is still the fail-closed default above.
  *
  * **APW-06 T70's three classes and T27's service are provided below** (added 2026-09-18):
  * `AppClusterOpRouter` plus the `AppLifecycleOpsService` and `AppSmokeService` it and the

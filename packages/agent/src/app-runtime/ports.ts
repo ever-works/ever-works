@@ -216,6 +216,17 @@ export interface AppRuntimeEnvSource {
         unsetRequired: string[];
         notReadyDependencies: string[];
         egress: Array<{ host: string; ports: number[] }>;
+        /**
+         * The `AppDependenciesService.ensureReadyForDeploy(workId)` answer this resolution
+         * already obtained — APW-07's one call per `resolve` (GAP-05) — or `null` when it has
+         * none (its readiness seam unbound or throwing).
+         *
+         * Optional and additive, like `fingerprints`. §5.1 step 9 reuses it instead of asking
+         * again: each call runs `reconcile`, which re-dispatches every `pending` kind, so a
+         * preflight that asked in step 8 (inside this `resolve`) AND in step 9 dispatched every
+         * pending provision twice.
+         */
+        dependencyReadiness?: AppRuntimeEnvDependencyReadiness | null;
     }>;
     /** Ephemeral mode (R-10, CONTRACTS §3) — see {@link AppRuntimeEnvEphemeralContext}. */
     resolveEphemeral(
@@ -300,3 +311,16 @@ export interface AppVerificationSink {
 
 /** DI token for {@link AppVerificationSink}. */
 export const APP_VERIFICATION_SINK = Symbol('APP_VERIFICATION_SINK');
+
+/**
+ * `AppDependenciesService.ensureReadyForDeploy`'s answer as an env resolution hands it on
+ * ({@link AppRuntimeEnvSource.resolve}'s `dependencyReadiness`). `reason` is set only when the
+ * question could not be answered (`specUnavailable`). Declared last in this file so that no
+ * `ports.ts:<line>` citation elsewhere moves.
+ */
+export interface AppRuntimeEnvDependencyReadiness {
+    ready: boolean;
+    notReady: ReadonlyArray<{ kind: string; status?: string | null; reason?: string | null }>;
+    optional?: readonly string[] | null;
+    reason?: string | null;
+}

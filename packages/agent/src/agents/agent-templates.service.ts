@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { AgentScope } from '../entities/agent.entity';
 // APW-04 T2 — repo-backed templates. Imported as its own statement (rather
 // than widening the enum import above, which this additions-only slice may
@@ -18,7 +18,9 @@ import {
     RepoAgentTemplateReader,
     RepoAgentTemplateRefusedError,
 } from './repo-agent-template.reader';
-import type { GitFacadeService } from '../facades/git.facade';
+// A VALUE import, on purpose: the constructor injects it by token (see there). No file
+// cycle — nothing `facades/git.facade.ts` imports reaches this file.
+import { GitFacadeService } from '../facades/git.facade';
 
 /**
  * Optional placement overrides accepted by {@link AgentTemplatesService.createFromTemplate}.
@@ -72,7 +74,16 @@ export class AgentTemplatesService {
         // APW-04 T2 — when this deployment runs the platform GitHub App, the
         // catalog read is authenticated; without it the reader still reads
         // the public repository tokenlessly.
-        @Optional() private readonly git?: GitFacadeService,
+        //
+        // `@Inject(GitFacadeService)` is load-bearing: this file used to import
+        // the class with `import type`, so the emitted `design:paramtypes` entry
+        // was `Object` (under SWC and tsc alike), nothing provides `Object`, and
+        // — the parameter being `@Optional()` — the service was built WITHOUT
+        // the facade that `AgentsModule`'s `FacadesModule` import supplies.
+        // `__tests__/agent-templates.git-token.spec.ts` pins it.
+        @Optional()
+        @Inject(GitFacadeService)
+        private readonly git?: GitFacadeService,
     ) {}
 
     /** The full prebuilt-template catalog. */
