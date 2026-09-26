@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { isAppWorkKind } from '@ever-works/contracts';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { config } from '@ever-works/agent/config';
 import { WorkRepository } from '@ever-works/agent/database';
@@ -61,6 +62,18 @@ export class WebsiteTemplateSchedulerService {
      * Process a single work for template updates
      */
     private async processWorkUpdate(work: Work): Promise<void> {
+        // An App Work's `website` role IS its Work Repository — the member's
+        // own code — and a template update force-pushes over it. Never asked
+        // for, whatever `websiteTemplateAutoUpdate` says; checked before any
+        // write so the refusal in `updateRepository` is not recorded as this
+        // Work's `websiteTemplateLastError` every hour.
+        if (isAppWorkKind(work.kind)) {
+            this.logger.debug(
+                `Skipping App Work ${work.slug}: its Work Repository is never synced from a website template`,
+            );
+            return;
+        }
+
         try {
             // Update last checked timestamp
             await this.workRepository.update(work.id, {

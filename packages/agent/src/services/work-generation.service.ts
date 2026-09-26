@@ -50,7 +50,11 @@ import {
     RuntimeBindingStamperService,
 } from '@src/tasks';
 import { WorkScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
-import { assertNotRepositoryWork, assertRepositoryRole } from '@src/works/repository-work-guard';
+import {
+    assertNotAppWorkTemplateTarget,
+    assertNotRepositoryWork,
+    assertRepositoryRole,
+} from '@src/works/repository-work-guard';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkMemoryService } from './work-memory.service';
 import { normalizeGeneratorError } from './utils/error.utils';
@@ -1027,6 +1031,11 @@ Only include image URLs that are absolute URLs (starting with http).`;
             // Campaign) have nothing to sync the template into; the derived
             // `<slug>-website` name could even be somebody else's repo.
             assertRepositoryRole(work, 'website');
+            // An App Work passes that check — its `website` role IS its Work
+            // Repository, the member's own code — and the template sync
+            // force-pushes over it. `updateRepository` refuses it too; this
+            // answers the route (MCP `update_website`) before it is asked.
+            assertNotAppWorkTemplateTarget(work, 'website template sync');
 
             const result = await this.websiteUpdateService.updateRepository(work, user);
             const websiteOwner = work.getRepoOwner('website');

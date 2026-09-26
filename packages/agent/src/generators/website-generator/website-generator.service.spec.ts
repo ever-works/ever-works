@@ -153,6 +153,41 @@ describe('WebsiteGeneratorService', () => {
         expect(gitFacade.replaceRemote).not.toHaveBeenCalled();
         expect(gitFacade.push).not.toHaveBeenCalled();
     });
+
+    it.each([
+        WebsiteRepositoryCreationMethod.DUPLICATE,
+        WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+    ])(
+        'refuses an App Work (%s) before any repository is created, cloned or pushed',
+        async (method) => {
+            // `createRepository` hands back an EXISTING repository, so for an
+            // App Work the duplicate method force-pushed the template over the
+            // member's code, and the branch sync that follows runs with
+            // `cleanupExtraBranches = true` — it deletes every other branch.
+            const gitFacade = createGitFacadeMock();
+            const branchSyncService = createBranchSyncMock();
+            const templateResolver = createTemplateResolverMock();
+            const service = new WebsiteGeneratorService(
+                gitFacade,
+                branchSyncService,
+                templateResolver,
+            );
+            const work = { ...createWork(), kind: 'app' } as unknown as Work;
+
+            await expect(service.initialize(work, createUser(), method)).rejects.toThrow(
+                /is an App Work.*Nothing was cloned or pushed\./s,
+            );
+
+            expect(templateResolver.resolveForWork).not.toHaveBeenCalled();
+            expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+            expect(gitFacade.createRepository).not.toHaveBeenCalled();
+            expect(gitFacade.createRepositoryFromTemplate).not.toHaveBeenCalled();
+            expect(gitFacade.replaceRemote).not.toHaveBeenCalled();
+            expect(gitFacade.push).not.toHaveBeenCalled();
+            expect(branchSyncService.syncFromTemplate).not.toHaveBeenCalled();
+            expect(gitFacade.updateRepository).not.toHaveBeenCalled();
+        },
+    );
 });
 
 describe('WebsiteUpdateService', () => {

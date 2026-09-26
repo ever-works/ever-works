@@ -10,6 +10,7 @@ import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
 import { WebsiteTemplateResolverService } from './website-template-resolver.service';
+import { assertNotAppWorkTemplateTarget } from '../../works/repository-work-guard';
 
 type WebsiteGenerationOptions = {
     signal?: AbortSignal;
@@ -223,6 +224,12 @@ export class WebsiteGeneratorService {
         operation: WebsiteRepositoryCreationMethod = WebsiteRepositoryCreationMethod.DUPLICATE,
         options: WebsiteGenerationOptions = {},
     ) {
+        // An App Work's `website` role IS its Work Repository. `createRepository`
+        // hands back that EXISTING repository, so every method below would
+        // force-push the template over the member's code and the branch sync
+        // would delete its other branches. Refused before anything runs.
+        assertNotAppWorkTemplateTarget(work, 'website repository setup');
+
         let path: string | undefined;
         const workOwner = getWorkOwner(work);
 

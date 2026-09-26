@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { getWorkCapabilities, isRepositoryWorkKind } from '@ever-works/contracts';
+import { getWorkCapabilities, isAppWorkKind, isRepositoryWorkKind } from '@ever-works/contracts';
 import type { RepositoryRole } from '@ever-works/contracts/api';
 
 /**
@@ -101,4 +101,43 @@ export function assertRepositoryRole(work: WorkKindSubject, role: RepositoryRole
         ? `${REPOSITORY_WORK_REFUSAL} and provisions no ${role} repository`
         : `is a "${work.kind ?? 'default'}" Work and provisions no ${role} repository`;
     throw new BadRequestException(`${describeWork(work)} ${reason}`);
+}
+
+/** Stable prefix every App Work template refusal starts with. */
+export const APP_WORK_TEMPLATE_REFUSAL = 'is an App Work';
+
+/**
+ * Refuse laying a website template over an App Work's Work Repository.
+ *
+ * An App Work's `website` role is ON (`WORK_KIND_CAPABILITIES.app.repos`)
+ * because that role IS its Work Repository — the code the member pasted,
+ * forked or copied — so {@link assertRepositoryRole} lets it through. The
+ * website-template pipelines treat the same role as a generated site:
+ * `WebsiteUpdateService.updateRepository` force-pushes the template, force-
+ * pushes every template branch and re-points the default branch, and
+ * `WebsiteGeneratorService.initialize` does the same after `createRepository`
+ * hands back the EXISTING repository, then deletes every other branch. For an
+ * App Work that is the platform credential overwriting the member's code and
+ * `.github/workflows/**`, past the App Work change gate, the protected-branch
+ * floor and `APP_WORKS_CLOUD_PUSH_ENABLED`.
+ *
+ * Those two methods are the funnels every caller goes through — the
+ * update-website route (MCP `update_website`), the template switch, the
+ * hourly auto-update poller, `DeployService`'s dispatch fallback, generation
+ * and import — so they call this first, before any provider or git call.
+ *
+ * The message deliberately never contains "404", "not found" or "does not
+ * exist": `WorkLifecycleService.switchWebsiteTemplate` RECREATES the
+ * repository from the template when `updateRepository` fails with an error
+ * that reads as a missing repository.
+ */
+export function assertNotAppWorkTemplateTarget(work: WorkKindSubject, action: string): void {
+    if (!isAppWorkKind(work.kind)) {
+        return;
+    }
+    throw new BadRequestException(
+        `${describeWork(work)} ${APP_WORK_TEMPLATE_REFUSAL} — ${action} is not available for it: ` +
+            "its Work Repository holds the member's own code, and a website template is never " +
+            'pushed into it. Nothing was cloned or pushed.',
+    );
 }

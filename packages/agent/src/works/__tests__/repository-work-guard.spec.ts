@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+    APP_WORK_TEMPLATE_REFUSAL,
     REPOSITORY_WORK_REFUSAL,
+    assertNotAppWorkTemplateTarget,
     assertNotRepositoryWork,
     assertRepositoryRole,
     hasRepositoryRole,
@@ -94,6 +96,63 @@ describe('repository-work-guard', () => {
             expect(() => assertRepositoryRole({ kind: 'repo' }, 'data')).not.toThrow();
             expect(() => assertRepositoryRole({ kind: 'directory' }, 'website')).not.toThrow();
             expect(() => assertRepositoryRole({}, 'website')).not.toThrow();
+        });
+    });
+
+    // An App Work's `website` role IS its Work Repository — the member's own
+    // code — so `assertRepositoryRole(work, 'website')` lets it through. The
+    // website-template pipelines (`WebsiteUpdateService.updateRepository`,
+    // `WebsiteGeneratorService.initialize`) force-push a template over that
+    // role and re-point its default branch; they must refuse the kind.
+    describe('assertNotAppWorkTemplateTarget', () => {
+        const refusalOf = (fn: () => void): BadRequestException => {
+            try {
+                fn();
+            } catch (error) {
+                return error as BadRequestException;
+            }
+            throw new Error('expected a refusal');
+        };
+
+        it.each(['app', ' APP '])('refuses the App Work kind (%j) with a 400', (kind) => {
+            const error = refusalOf(() =>
+                assertNotAppWorkTemplateTarget({ kind, name: 'Acme' }, 'website template sync'),
+            );
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect(error.message).toContain('Work "Acme"');
+            expect(error.message).toContain(APP_WORK_TEMPLATE_REFUSAL);
+            expect(error.message).toContain('website template sync');
+            expect(error.message).toContain('Nothing was cloned or pushed.');
+        });
+
+        it('never reads as a missing repository', () => {
+            // `WorkLifecycleService.switchWebsiteTemplate` RECREATES the
+            // repository from the template when `updateRepository` fails with
+            // something that looks like "missing" (a NotFoundException, a 404,
+            // "not found", "does not exist"). This refusal must never match
+            // that, or the refusal itself would route the switch into
+            // `websiteGenerator.initialize` over the member's code.
+            const error = refusalOf(() =>
+                assertNotAppWorkTemplateTarget({ kind: 'app', name: 'Acme' }, 'x'),
+            );
+            expect(error.getStatus()).toBe(400);
+            expect(error.message).not.toMatch(/404|not found|does not exist/i);
+        });
+
+        it.each([
+            'default',
+            'directory',
+            'website',
+            'landing-page',
+            'blog',
+            'awesome-repo',
+            'repo',
+        ])('lets every other kind (%s) through untouched', (kind) => {
+            expect(() => assertNotAppWorkTemplateTarget({ kind }, 'anything')).not.toThrow();
+        });
+
+        it('lets a Work with no recorded kind through', () => {
+            expect(() => assertNotAppWorkTemplateTarget({}, 'anything')).not.toThrow();
         });
     });
 });
