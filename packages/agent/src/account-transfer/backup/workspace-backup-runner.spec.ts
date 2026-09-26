@@ -3,6 +3,7 @@ import type { DataSource } from 'typeorm';
 import { BACKUP_DOMAINS } from '@ever-works/contracts';
 import { referencedEntities } from './collectors/domain-specs';
 import type { WorkspaceBackupRepository } from '../../database/repositories/workspace-backup.repository';
+import { BackupArchiveWriter } from './backup-archive-writer';
 import type { BackupStorage } from './backup-storage';
 import {
     EMPTY_BACKUP_WORK_CONTENT,
@@ -48,6 +49,10 @@ interface Harness {
     storage: jest.Mocked<BackupStorage>;
     dataSource: DataSource;
     terminal: () => Record<string, unknown> | undefined;
+    /** What `requestCancel` does to the row: a compare-and-set to `cancelled`. */
+    cancel: () => void;
+    /** Another writer's compare-and-set out of `running`, e.g. the sweeper's. */
+    settleElsewhere: (status: string) => void;
 }
 
 function harness(
@@ -198,6 +203,12 @@ function harness(
         storage,
         dataSource,
         terminal: () => terminalCalls[terminalCalls.length - 1],
+        cancel: () => {
+            state.status = 'cancelled';
+        },
+        settleElsewhere: (status: string) => {
+            state.status = status;
+        },
     };
 }
 
@@ -361,6 +372,44 @@ describe('WorkspaceBackupRunner', () => {
             expect(domain(h.terminal(), 'knowledge').error).toEqual(
                 expect.objectContaining({ code: 'parent_ids_incomplete' }),
             );
+        });
+
+        it('keeps the trim reports of a domain whose other file names a shortfall', async () => {
+            // A personal workspace: `email-conversations.jsonl` hangs off the
+            // owner's `agentIds`, so an agents page that spends its retries
+            // marks it `parent_ids_incomplete`. `notifications.jsonl`, in the
+            // same domain, is still read with its 180-day cutoff — but the
+            // early return for the shortfall skipped the trim pass, so the
+            // manifest recorded neither the cutoff nor how many notifications
+            // it left out.
+            const h = harness({
+                rows: {
+                    ...ROWS,
+                    Agent: [{ id: 'a1', userId: 'u1', organizationId: null }],
+                    Notification: [
+                        {
+                            id: 'n1',
+                            userId: 'u1',
+                            organizationId: null,
+                            createdAt: '2020-01-01T00:00:00.000Z',
+                        },
+                    ],
+                },
+                failPageFor: 'Agent',
+                row: { organizationId: null },
+            });
+            await h.runner.run('b1', {
+                ...OPTIONS,
+                workspace: { id: 'u1', slug: 'owner', displayName: 'Owner', kind: 'personal' },
+            });
+
+            const communication = domain(h.terminal(), 'communication') as ReturnType<
+                typeof domain
+            > & { trims?: { field: string; cutoff: string; omittedRecords: number }[] };
+            expect(communication.error).toEqual({ code: 'parent_ids_incomplete' });
+            expect(communication.trims).toEqual([
+                expect.objectContaining({ field: 'createdAt', omittedRecords: 1 }),
+            ]);
         });
 
         it('still reports a dependent domain normally when the parent finished', async () => {
@@ -602,6 +651,22 @@ describe('WorkspaceBackupRunner', () => {
             ],
         };
 
+        /** A backend that records whether the upload ever read the zip to its end. */
+        function uploadRecorder(): {
+            putArchive: BackupStorage['putArchive'];
+            finished: () => boolean;
+        } {
+            let finished = false;
+            return {
+                putArchive: jest.fn().mockImplementation(async (source: Readable) => {
+                    for await (const chunk of source) void chunk;
+                    finished = true;
+                    return { key: 'u1/archive.zip', backend: 'fixture-backend' };
+                }) as unknown as BackupStorage['putArchive'],
+                finished: () => finished,
+            };
+        }
+
         it('heartbeats while copying attachment bytes and before the final flush', async () => {
             // The whole copy phase reported nothing. With a 2 GiB attachment
             // budget over a remote object store it can run far past the
@@ -656,6 +721,228 @@ describe('WorkspaceBackupRunner', () => {
 
             expect(result.status).toBe('failed');
             expect(result.reason).toBe('failed');
+        });
+
+        describe('the hour ceiling (spec FR-6), enforced by the run itself', () => {
+            // The ceiling used to live OUTSIDE the run. First the job runtime's
+            // `maxDuration`, which kills the process and settles nothing; then
+            // a watcher polling the row, which enforced nothing once it was
+            // gone. The runner itself had no deadline at all, so a run whose
+            // storage read (or clone, or upload) never answered stayed
+            // `running` past the hour for as long as nothing killed it.
+            let close: jest.SpyInstance;
+
+            beforeEach(() => {
+                close = jest.spyOn(BackupArchiveWriter.prototype, 'close');
+            });
+
+            afterEach(() => {
+                close.mockRestore();
+                jest.useRealTimers();
+            });
+
+            /** An attachment read that never answers — the hung await no probe can see. */
+            function hangingRead(h: Harness): void {
+                (h.storage.readObject as jest.Mock).mockImplementation(
+                    () => new Promise(() => undefined),
+                );
+            }
+
+            it('stops at the caller’s deadline even while a storage read never answers', async () => {
+                const upload = uploadRecorder();
+                const h = harness({ rows: ROWS, putArchive: upload.putArchive });
+                hangingRead(h);
+
+                const outcome = await Promise.race([
+                    h.runner.run('b1', {
+                        ...OPTIONS,
+                        deadline: new Date(Date.now() + 2_000),
+                    } as WorkspaceBackupRunOptions),
+                    new Promise((resolve) => setTimeout(() => resolve('still running'), 8_000)),
+                ]);
+
+                expect(outcome).toEqual({ status: 'failed', reason: 'timeout', backupId: 'b1' });
+                // A compare-and-set out of `running`, never a blind write.
+                expect(h.repository.markTerminal).toHaveBeenCalledWith(
+                    'b1',
+                    expect.objectContaining({ status: 'failed', failureReason: 'timeout' }),
+                    ['running'],
+                );
+                expect(close).not.toHaveBeenCalled();
+                expect(upload.finished()).toBe(false);
+            });
+
+            it('applies the hour on its own when the caller names no deadline', async () => {
+                // Only the timers are fake, so the walk itself runs for real
+                // up to the hung read and the hour passes in one step.
+                jest.useFakeTimers({
+                    doNotFake: [
+                        'nextTick',
+                        'setImmediate',
+                        'clearImmediate',
+                        'queueMicrotask',
+                        'Date',
+                        'hrtime',
+                        'performance',
+                    ],
+                });
+                const h = harness({ rows: ROWS });
+                hangingRead(h);
+
+                let outcome: unknown = 'still running';
+                void h.runner.run('b1', OPTIONS).then((value) => (outcome = value));
+                const turns = async (count: number) => {
+                    for (let i = 0; i < count; i += 1) {
+                        await new Promise((resolve) => setImmediate(resolve));
+                    }
+                };
+                for (
+                    let i = 0;
+                    i < 2_000 && !(h.storage.readObject as jest.Mock).mock.calls.length;
+                    i += 1
+                ) {
+                    await turns(1);
+                }
+                expect(h.storage.readObject).toHaveBeenCalled();
+
+                // A minute short of the hour, the run is still waiting.
+                jest.advanceTimersByTime(59 * 60 * 1000);
+                await turns(50);
+                expect(outcome).toBe('still running');
+
+                jest.advanceTimersByTime(2 * 60 * 1000);
+                await turns(200);
+                expect(outcome).toEqual({ status: 'failed', reason: 'timeout', backupId: 'b1' });
+                expect(h.terminal()).toEqual(
+                    expect.objectContaining({ status: 'failed', failureReason: 'timeout' }),
+                );
+            });
+
+            it('keeps the outcome that landed first when the archive finishes at the ceiling', async () => {
+                const h = harness({ rows: ROWS });
+                // The row is already settled by the time the ceiling's
+                // compare-and-set runs: it misses, and the archive's own
+                // outcome is what the run reports.
+                h.repository.markTerminal.mockImplementation(
+                    async (_id: string, patch: Record<string, unknown>) => {
+                        if (patch.failureReason === 'timeout') {
+                            h.settleElsewhere('ready');
+                            return false;
+                        }
+                        return true;
+                    },
+                );
+                hangingRead(h);
+
+                const outcome = await h.runner.run('b1', {
+                    ...OPTIONS,
+                    deadline: new Date(Date.now() + 1_000),
+                } as WorkspaceBackupRunOptions);
+
+                expect(outcome).toEqual({ status: 'ready', backupId: 'b1' });
+            });
+        });
+
+        describe('a cancel that lands while attachments are being copied', () => {
+            // The heartbeat in the copy loop matched no row once the backup
+            // left `running` and set the stop flag — which nothing in the copy
+            // loop read. So a cancelled backup read every remaining attachment
+            // out of storage, closed the zip, finished the whole upload, and
+            // only then found its compare-and-set missing and deleted what it
+            // had just written. In the job runtime that is up to 2 GiB read
+            // and 5 GiB written for an archive nobody will ever see, holding
+            // one of the two queue slots the whole time.
+            let close: jest.SpyInstance;
+
+            beforeEach(() => {
+                close = jest.spyOn(BackupArchiveWriter.prototype, 'close');
+            });
+
+            afterEach(() => {
+                close.mockRestore();
+            });
+
+            /** Storage that cancels the backup while the FIRST attachment is being read. */
+            function cancellingOnFirstRead(h: Harness): void {
+                (h.storage.readObject as jest.Mock).mockImplementationOnce(async () => {
+                    h.cancel();
+                    return {
+                        stream: Readable.from([Buffer.from('bytes')]),
+                        mimeType: 'application/pdf',
+                        size: 5,
+                    };
+                });
+            }
+
+            it('stops reading attachments at the next heartbeat, and never closes or uploads the zip', async () => {
+                // The heartbeat throttles itself to 25 s; advance the clock past
+                // that on every read so the copy loop's heartbeat really asks.
+                let clock = Date.now();
+                const now = jest.spyOn(Date, 'now').mockImplementation(() => {
+                    clock += 26_000;
+                    return clock;
+                });
+                try {
+                    const upload = uploadRecorder();
+                    const h = harness({ rows: ROWS, putArchive: upload.putArchive });
+                    cancellingOnFirstRead(h);
+
+                    const result = await h.runner.run('b1', OPTIONS);
+
+                    expect(result.status).toBe('cancelled');
+                    // The second attachment was never read.
+                    expect(h.storage.readObject).toHaveBeenCalledTimes(1);
+                    expect(close).not.toHaveBeenCalled();
+                    expect(upload.finished()).toBe(false);
+                    // Nothing was settled over the owner's cancel, and there is
+                    // no uploaded object left to clean up.
+                    expect(h.repository.markTerminal).not.toHaveBeenCalled();
+                    expect(h.storage.deleteArchive).not.toHaveBeenCalled();
+                } finally {
+                    now.mockRestore();
+                }
+            });
+
+            it('stops before the manifest when the cancel lands during the LAST attachment', async () => {
+                // No heartbeat follows the last file, so only a probe after the
+                // copy loop can see this one.
+                const upload = uploadRecorder();
+                const h = harness({
+                    rows: { ...ROWS, UserUpload: ROWS.UserUpload.slice(0, 1) },
+                    putArchive: upload.putArchive,
+                });
+                cancellingOnFirstRead(h);
+
+                const result = await h.runner.run('b1', OPTIONS);
+
+                expect(result.status).toBe('cancelled');
+                expect(close).not.toHaveBeenCalled();
+                expect(upload.finished()).toBe(false);
+                expect(h.repository.markTerminal).not.toHaveBeenCalled();
+            });
+
+            it('reports a row the sweeper failed as failed, so the owner is still told', async () => {
+                const upload = uploadRecorder();
+                const h = harness({
+                    rows: { ...ROWS, UserUpload: ROWS.UserUpload.slice(0, 1) },
+                    putArchive: upload.putArchive,
+                });
+                (h.storage.readObject as jest.Mock).mockImplementationOnce(async () => {
+                    // The hourly sweep's compare-and-set, not the owner's.
+                    h.settleElsewhere('failed');
+                    return {
+                        stream: Readable.from([Buffer.from('bytes')]),
+                        mimeType: 'application/pdf',
+                        size: 5,
+                    };
+                });
+
+                const result = await h.runner.run('b1', OPTIONS);
+
+                expect(result).toEqual({ status: 'failed', reason: 'failed', backupId: 'b1' });
+                expect(close).not.toHaveBeenCalled();
+                expect(upload.finished()).toBe(false);
+            });
         });
     });
 

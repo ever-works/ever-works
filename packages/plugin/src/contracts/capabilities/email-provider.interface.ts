@@ -212,12 +212,16 @@ export interface IEmailInboundPlugin extends IPlugin {
 	/**
 	 * Optional: best-effort extraction of the recipient mailbox
 	 * address(es) from the raw webhook payload, WITHOUT verifying the
-	 * signature. The facade uses this to map an inbound webhook to its
-	 * owning tenant address *before* signature verification, so a
-	 * per-user `inboundWebhookSecret` is resolved at the right scope
-	 * rather than only at admin/env scope. MUST NOT throw — return an
+	 * signature. The facade binds the webhook to the first returned
+	 * address registered to this plugin *before* signature verification:
+	 * it verifies with that address owner's secret (a per-user
+	 * `inboundWebhookSecret` rather than only the admin/env one), and the
+	 * message is dispatched to that address and no other. Return bare
+	 * mailboxes (`a@b`, no display name), the same ones
+	 * `parseInboundWebhook` reports in `to`. MUST NOT throw — return an
 	 * empty array when the recipient can't be determined. Plugins that
-	 * omit this fall back to admin/env-scoped secret resolution.
+	 * omit this are verified at admin/env scope only, and their inbound
+	 * mail is bound to no address, so it is never dispatched to an Agent.
 	 */
 	extractInboundRecipients?(rawBody: Buffer, headers: Readonly<Record<string, string>>): readonly string[];
 

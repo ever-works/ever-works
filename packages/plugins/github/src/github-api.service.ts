@@ -108,6 +108,16 @@ function labelNames(raw: unknown): readonly string[] | undefined {
 }
 
 /**
+ * A repository's topics, as GitHub reported them (website-template discovery
+ * reads `ever-works-app-blueprint` off these). A payload without a list leaves
+ * `topics` unreported: `[]` is GitHub saying "no topics", which an absent key is
+ * not. Non-string entries are dropped rather than cast into the contract.
+ */
+function reportedTopics(raw: unknown): string[] | undefined {
+	return Array.isArray(raw) ? raw.filter((topic): topic is string => typeof topic === 'string') : undefined;
+}
+
+/**
  * Last path segment of a workflow reference, lowercased.
  *
  * Callers name the gate as `promotion-gate.yml` while GitHub reports
@@ -342,24 +352,33 @@ export class GitHubApiService {
 			data = response.data;
 		}
 
-		return data.map((repo) => ({
-			owner: repo.owner.login,
-			name: repo.name,
-			fullName: repo.full_name,
-			description: repo.description ?? undefined,
-			defaultBranch: repo.default_branch ?? 'main',
-			isPrivate: repo.private,
-			url: repo.html_url,
-			cloneUrl: repo.clone_url ?? `https://github.com/${repo.full_name}.git`,
-			isFork: repo.fork,
-			permissions: repo.permissions
-				? {
-						admin: repo.permissions.admin ?? false,
-						push: repo.permissions.push ?? false,
-						pull: repo.permissions.pull ?? false
-					}
-				: undefined
-		}));
+		return data.map((repo) => {
+			// GitHub's list endpoints return `topics` on every repository.
+			// Website-template discovery lists the catalog org and needs them to
+			// keep App Blueprints (topic `ever-works-app-blueprint`) out of the
+			// website picker. Absent key ⇒ the field stays absent (additive: the
+			// object is unchanged).
+			const topics = reportedTopics(repo.topics);
+			return {
+				owner: repo.owner.login,
+				name: repo.name,
+				fullName: repo.full_name,
+				description: repo.description ?? undefined,
+				defaultBranch: repo.default_branch ?? 'main',
+				isPrivate: repo.private,
+				url: repo.html_url,
+				cloneUrl: repo.clone_url ?? `https://github.com/${repo.full_name}.git`,
+				isFork: repo.fork,
+				permissions: repo.permissions
+					? {
+							admin: repo.permissions.admin ?? false,
+							push: repo.permissions.push ?? false,
+							pull: repo.permissions.pull ?? false
+						}
+					: undefined,
+				...(topics === undefined ? {} : { topics })
+			};
+		});
 	}
 
 	async createRepository(options: CreateRepoOptions, token: string, baseUrl?: string): Promise<GitRepository> {

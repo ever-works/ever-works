@@ -55,6 +55,24 @@ function decodeBody(rawBody: Buffer): Record<string, unknown> {
 	}
 }
 
+/**
+ * Split a recipient list into bare mailboxes. `recipient` is a bare address
+ * list, but the `To` fallback is the raw RFC 2822 header (may be
+ * `"Name" <a@b>`), so the display name and angle brackets are stripped.
+ * The owner lookup (`extractInboundRecipients`) and the parsed `to` share it,
+ * so both name the same mailboxes.
+ */
+function parseAddressList(raw: string): string[] {
+	return raw
+		.split(',')
+		.map((s) => {
+			const trimmed = s.trim();
+			const match = trimmed.match(/<([^>]+)>/);
+			return (match ? match[1] : trimmed).trim();
+		})
+		.filter((s) => s.length > 0);
+}
+
 interface MailgunSignature {
 	readonly timestamp: string;
 	readonly token: string;
@@ -211,19 +229,7 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 				(typeof body['recipient'] === 'string' ? (body['recipient'] as string) : undefined) ??
 				(typeof body['To'] === 'string' ? (body['To'] as string) : undefined) ??
 				'';
-			// `recipient` is a bare address, but the `To` fallback is the raw
-			// RFC 2822 header (may be `"Name" <a@b>`), so strip the display
-			// name / angle brackets before matching.
-			return raw
-				? raw
-						.split(',')
-						.map((s) => {
-							const trimmed = s.trim();
-							const match = trimmed.match(/<([^>]+)>/);
-							return (match ? match[1] : trimmed).trim();
-						})
-						.filter((s) => s.length > 0)
-				: [];
+			return parseAddressList(raw);
 		} catch {
 			return [];
 		}
@@ -243,7 +249,7 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 			provider: this.id,
 			providerMessageId: messageId,
 			from: str('sender') ?? str('from') ?? '',
-			to: recipient ? recipient.split(',').map((s) => s.trim()) : [],
+			to: parseAddressList(recipient),
 			subject: str('subject') ?? '',
 			bodyText: str('body-plain') ?? str('stripped-text') ?? '',
 			bodyHtml: str('body-html') ?? str('stripped-html'),

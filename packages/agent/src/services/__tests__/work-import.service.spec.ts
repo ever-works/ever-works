@@ -275,7 +275,9 @@ describe('WorkImportService.analyzeRepository', () => {
 });
 
 describe('WorkImportService.initiateImport', () => {
-    function createLinkedImportService() {
+    function createLinkedImportService(templateCatalogService?: {
+        getWebsiteTemplateIdForNewWork: jest.Mock;
+    }) {
         const workRepository = {
             findByOwnerAndSlug: jest.fn().mockResolvedValue(null),
             create: jest.fn().mockImplementation(async (input) => ({
@@ -310,6 +312,9 @@ describe('WorkImportService.initiateImport', () => {
             {} as any,
             {} as any,
             { emit: jest.fn() } as any,
+            undefined,
+            undefined,
+            templateCatalogService as any,
         );
 
         (service as any).handleLinkExisting = jest.fn().mockImplementation(async (work) => ({
@@ -446,6 +451,79 @@ describe('WorkImportService.initiateImport', () => {
             }),
             expect.anything(),
         );
+    });
+
+    // templates-catalog FR-5 f. An imported Work names no website template,
+    // so it inherits the user's saved default; when that default is a
+    // RETIRED row (an App Blueprint), inheriting it would generate or update
+    // the Work's website from the Blueprint. The catalog then names the
+    // template to pin instead, and the import stores it.
+    describe('a retired saved website default', () => {
+        const user = { id: 'user-1', username: 'ever-works' } as any;
+        const importDto = {
+            sourceUrl: 'https://github.com/ever-works/ever-works-data',
+            sourceType: ImportSourceTypeEnum.DATA_REPO,
+            name: 'Ever Works',
+            owner: 'ever-works',
+            organization: true,
+            restoreWorksConfig: false,
+            sync: false,
+            gitProvider: 'github',
+        } as any;
+        const linkedInput = {
+            sourceUrl: 'https://github.com/ever-works/ever-works-website',
+            sourceOwner: 'ever-works',
+            sourceRepo: 'ever-works-website',
+            name: 'Ever Works Website',
+            gitProvider: 'github',
+            organization: true,
+        };
+
+        it('pins an imported Work to the template the catalog names', async () => {
+            const templateCatalog = {
+                getWebsiteTemplateIdForNewWork: jest.fn().mockResolvedValue('classic'),
+            };
+            const { service, workRepository } = createLinkedImportService(templateCatalog);
+
+            await service.initiateImport(importDto, user);
+
+            expect(templateCatalog.getWebsiteTemplateIdForNewWork).toHaveBeenCalledWith(
+                'user-1',
+                undefined,
+            );
+            expect(workRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ websiteTemplateId: 'classic' }),
+                expect.anything(),
+            );
+        });
+
+        it('pins a linked-repository onboarding Work the same way', async () => {
+            const templateCatalog = {
+                getWebsiteTemplateIdForNewWork: jest.fn().mockResolvedValue('classic'),
+            };
+            const { service, workRepository } = createLinkedImportService(templateCatalog);
+
+            await service.onboardLinkedRepository(linkedInput, user);
+
+            expect(workRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ websiteTemplateId: 'classic' }),
+                expect.anything(),
+            );
+        });
+
+        it('stores no template, as before, when the saved default may be inherited', async () => {
+            const templateCatalog = {
+                getWebsiteTemplateIdForNewWork: jest.fn().mockResolvedValue(null),
+            };
+            const { service, workRepository } = createLinkedImportService(templateCatalog);
+
+            await service.initiateImport(importDto, user);
+            await service.onboardLinkedRepository(linkedInput, user);
+
+            for (const [data] of workRepository.create.mock.calls) {
+                expect(data).not.toHaveProperty('websiteTemplateId');
+            }
+        });
     });
 
     it('passes updated works_config source repository data to the import dispatcher path', async () => {
