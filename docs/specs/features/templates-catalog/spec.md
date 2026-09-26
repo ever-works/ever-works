@@ -3,7 +3,7 @@
 **Feature ID**: `templates-catalog`
 **Status**: `Retrospective`
 **Created**: 2026-05-08
-**Last updated**: 2026-05-08
+**Last updated**: 2026-09-26
 **Owner**: Ever Works Team
 
 > **Indexed by**: the capability catalogue
@@ -55,7 +55,8 @@ isActive=true)` rows, sorted by `sourceType DESC` (custom first) then
   `syncDiscoveredWebsiteTemplatesIfStale(userId)` BEFORE the read; that
   walks GitHub up to 50 pages × 100 repos, filters to
   `*template`-suffixed repository names (case-insensitive trailing
-  `template`), and upserts each one with the canonical id (existing
+  `template`) that are not App Blueprints (FR-5), and upserts each one
+  with the canonical id (existing
   built-in by `(repositoryOwner, repositoryName)` wins; otherwise
   `repository.name.toLowerCase()`).
 - **Given** I add a custom template, **when** I call
@@ -158,6 +159,15 @@ is already used by <owner>/<name>.`).
   **then** any duplicate active row keyed by the discovered id that
   carries the same coordinates is deactivated (`isActive: false`) so
   the user only sees one entry.
+- **Given** a `*template` repository in the catalog org whose provider
+  reports the topic `ever-works-app-blueprint` (an App Blueprint such as
+  `ever-works/cal-template`), **when**
+  `syncDiscoveredWebsiteTemplatesForUser` runs, **then** it is not
+  upserted as a website template, and an active discovered built-in row
+  an earlier discovery saved for it is deactivated, unless Works still
+  use that row (FR-5 d), in which case it stays active and a warn line
+  (`Kept discovered website template "<id>" active although <fullName>
+is an App Blueprint: …`) asks for those Works to be reassigned.
 - **Given** the user has no `user_template_preferences` row for a
   given kind, **when** `getDefaultTemplateIdForUser('website',
 userId)` runs, **then** it falls back to
@@ -193,12 +203,46 @@ userId)` runs, **then** it falls back to
   `syncDiscoveredWebsiteTemplatesIfStale(userId)` BEFORE the read on
   `GET /api/templates?kind=website` when no built-in website template
   has an `updatedAt >= now() - 1h` AND
-  `metadata.discoveredFromOrganization = catalogOwner`.
+  `metadata.discoveredFromOrganization = catalogOwner`. Only an ACTIVE
+  discovered row satisfies this gate: curated rows are seeded with empty
+  `metadata`, and rows for App Blueprint repositories are deactivated
+  (FR-5 c). When the catalog org holds no other `*template` repository
+  the gate never passes, and a website list read re-runs discovery each
+  time the in-process 5-minute attempt cooldown
+  (`WEBSITE_DISCOVERY_ATTEMPT_COOLDOWN_MS`, per catalog org, per process)
+  has elapsed, bounded by the 8-second deadline
+  (`WEBSITE_DISCOVERY_DEADLINE_MS`).
 - **FR-4** The system MUST cap the GitHub discovery walk at 50 pages × 100
   repositories per page, logging a warn line when the cap is hit.
 - **FR-5** The system MUST filter discovered repositories to those whose
   name ends in `template` (case-insensitive trailing match), using
-  `isStandardTemplateRepository` (`/template$/i.test(name.trim())`).
+  `isStandardTemplateRepository` (`/template$/i.test(name.trim())`),
+  and then:
+  (a) MUST exclude a repository whose provider reports the App Blueprint
+  topic `ever-works-app-blueprint` (`APP_BLUEPRINT_TOPIC`): an App
+  Blueprint such as `ever-works/cal-template` generates an App Work, not
+  a website, even though its name ends in `template`;
+  (b) MUST apply the name rule alone when the provider does not report
+  `topics` (the field is absent) or reports an empty list, so a provider
+  without topic support hides nothing;
+  (c) MUST deactivate (`isActive: false`, never delete) every active
+  discovered built-in website row for an excluded repository, found by
+  `findAllBuiltInByRepositoryCoordinates('website', owner, name)`.
+  Curated `WEBSITE_TEMPLATES` rows (matched by coordinates and by id) and
+  custom (user-created) rows are never touched;
+  (d) MUST keep such a row active, and warn-log it, while Works still use
+  it — any Work (across all users) whose `websiteTemplateId` is the row
+  id, or any Work with `websiteTemplateId IS NULL` whose owner's
+  `user_template_preferences` default for `website` is the row id. These
+  are the two guards archiving a custom template applies (FR-12, FR-13),
+  counted across users because a built-in row belongs to no one.
+  Deactivating a row in use would break those Works: the website resolver
+  only resolves active catalog rows and a discovered id has no static
+  config, so regenerate / update / branch sync would throw, and inheriting
+  Works would silently switch template. The next discovery after those
+  Works are reassigned deactivates the row. A failed lookup or usage
+  check is warn-logged, leaves the row active, and does not stop the
+  website templates from being discovered.
 - **FR-6** The system MUST resolve discovered template ids by:
   (a) `findBuiltInByRepositoryCoordinates(kind, owner, name)` — if a
   canonical row exists, reuse its id; otherwise (b)

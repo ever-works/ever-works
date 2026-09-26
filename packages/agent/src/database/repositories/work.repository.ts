@@ -610,6 +610,36 @@ export class WorkRepository {
         });
     }
 
+    /**
+     * Works that name this website template explicitly, across ALL users.
+     * The per-user {@link countByUserAndWebsiteTemplateId} guards archiving a
+     * custom template; this one guards retiring a built-in catalog row, which
+     * belongs to no single user.
+     */
+    async countByWebsiteTemplateId(websiteTemplateId: string): Promise<number> {
+        return this.repository.count({ where: { websiteTemplateId } });
+    }
+
+    /**
+     * Works owned by any of `userIds` that leave `websiteTemplateId` unset and
+     * so inherit their owner's default template. The user list is queried in
+     * bounded IN() chunks (SQLite caps bind parameters); an empty list is 0
+     * without a query.
+     */
+    async countByUsersAndInheritedWebsiteTemplateSelection(userIds: string[]): Promise<number> {
+        const chunkSize = 500;
+        let total = 0;
+        for (let start = 0; start < userIds.length; start += chunkSize) {
+            total += await this.repository.count({
+                where: {
+                    userId: In(userIds.slice(start, start + chunkSize)),
+                    websiteTemplateId: IsNull(),
+                },
+            });
+        }
+        return total;
+    }
+
     async findByUser(userId: string): Promise<Work[]> {
         return await this.repository.find({ where: { userId } });
     }

@@ -3,7 +3,7 @@
 **Feature ID**: `templates-catalog`
 **Spec**: `./spec.md`
 **Status**: `Done` (Retrospective)
-**Last updated**: 2026-05-08
+**Last updated**: 2026-09-26
 
 ---
 
@@ -119,7 +119,27 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
         if pageRepos.length < 100: break
     if hit 50-page cap: warn-log
 
-    for repo in repositories where isStandardTemplateRepository(repo.name):
+    named = [repo in repositories where isStandardTemplateRepository(repo.name)]
+    # App Blueprint = the provider REPORTED topic 'ever-works-app-blueprint'
+    # (APP_BLUEPRINT_TOPIC); topics absent or [] => name rule alone (FR-5 a/b).
+    blueprints = [repo in named where isAppBlueprintRepository(repo)]
+    curated = listWebsiteTemplates()   # skipped by coordinates below and by id here
+
+    for repo in blueprints (skip curated coordinates):           # FR-5 c/d
+        rows = await templateRepository.findAllBuiltInByRepositoryCoordinates('website', repo.owner, repo.name)
+            (lookup failure: warn-log, continue)
+        for row in rows where row.isActive && row.kind === 'website'
+                            && row.sourceType === 'built_in' && row.id not in curated ids:
+            try:
+                usage = workRepository.countByWebsiteTemplateId(row.id)            # all users
+                if usage === 0:
+                    userIds = userTemplatePreferenceRepository.findUserIdsByKindAndTemplateId('website', row.id)
+                    usage = workRepository.countByUsersAndInheritedWebsiteTemplateSelection(userIds)
+                if usage > 0: warn-log(`Kept discovered website template "<id>" active …`); continue
+                await templateRepository.updateById(row.id, { isActive: false })
+            catch: warn-log(`Could not retire discovered website template "<id>" …`)   # row stays active
+
+    for repo in named where !isAppBlueprintRepository(repo) (skip curated coordinates):
         canonical = await templateRepository.findBuiltInByRepositoryCoordinates('website', repo.owner, repo.name)
         canonicalId = canonical?.id || repo.name.toLowerCase()
         if !canonical:
