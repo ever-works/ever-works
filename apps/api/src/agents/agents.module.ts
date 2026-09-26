@@ -92,6 +92,9 @@ import {
     APP_WORK_CHANGE_GATE,
     type AppWorkChangeGate,
     type AppWorkChangeGateVerdict,
+    // APW-08 FR-12 / T12 — the one cloud App Work push gate `finalizeRun` asks.
+    appWorkCloudPushAllowed,
+    appWorkCloudPushRefusal,
 } from '@ever-works/agent/tasks-domain';
 // Domain chat-tool sources (AGENT_DOMAIN_TOOL_SOURCES binding below).
 // Each module contributes the ONE service/repository its descriptor
@@ -1108,6 +1111,33 @@ async function assertRealWriteTarget(
                     throw new Error(`${tool}: ${verdict.message}${named} ${consequence}`);
                 };
 
+                /**
+                 * APW-08 FR-12 / T12 (owner decision 2026-09-25) — may this tool
+                 * publish a change to this Work at all?
+                 *
+                 * This adapter IS the cloud path: `AGENT_GIT_FACADE` is bound in
+                 * the API process only, and Agent tools run only inside the API's
+                 * `AgentRunService`. So an App Work change is refused here exactly
+                 * as `finalizeRun` refuses it — the same gate, the same words —
+                 * until `APP_WORKS_CLOUD_PUSH_ENABLED` is `true`, and only then is
+                 * it judged (`assertAppWorkChange` below). A Fleet node never
+                 * reaches this adapter: it pushes with its own credential and is
+                 * judged by `finalizeRemotePush`, so the Fleet path is untouched.
+                 *
+                 * Asked FIRST, before any provider, policy or git call and before
+                 * the change gate: with the switch off no answer from any of them
+                 * could change the outcome. Every other Work kind passes straight
+                 * through without the switch being read.
+                 */
+                const assertAppWorkCloudPushAllowed = (
+                    tool: 'commitToRepo' | 'openPullRequest',
+                    kind: string | null | undefined,
+                    consequence: string,
+                ): void => {
+                    if (appWorkCloudPushAllowed(kind)) return;
+                    throw new Error(`${tool}: ${appWorkCloudPushRefusal(consequence)}`);
+                };
+
                 /** The branch an App Work's RULES are read from: the Work's own base. */
                 const appRulesBase = async (
                     target: Awaited<ReturnType<typeof resolveWorkGitTarget>>,
@@ -1132,6 +1162,11 @@ async function assertRealWriteTarget(
                         // used to reach the old repo-directory lookup made that
                         // lookup throw, so the tool never got past its own guard.
                         const target = await resolveWorkGitTarget('commitToRepo', workId);
+                        assertAppWorkCloudPushAllowed(
+                            'commitToRepo',
+                            target.work.kind,
+                            'Nothing was written, committed or pushed.',
+                        );
                         const providerId = explicitProviderIdOf(input) || target.providerId;
 
                         // APW-08 P0 — the branch the working copy is based on, then
@@ -1167,7 +1202,8 @@ async function assertRealWriteTarget(
 
                         // APW-08 T17 (FR-8) — an App Work's change is judged BEFORE the
                         // commit slot is taken and before anything is written, so a
-                        // refusal holds no slot and leaves nothing behind.
+                        // refusal holds no slot and leaves nothing behind. Reached only
+                        // with cloud App Work pushes ON: off, the call was refused above.
                         //
                         // It is the full guard over the paths this call writes, with
                         // their new content: protected paths, `.github/workflows/**`,
@@ -1400,6 +1436,15 @@ async function assertRealWriteTarget(
                         // pull request INTO `main` is what a protected `main` is for.
                         // The push is the thing that is refused — in `commitToRepo`.
                         const target = await resolveWorkGitTarget('openPullRequest', workId);
+                        // Pushes nothing itself, but a pull request is how a change is
+                        // published too — and opening one runs the repository's
+                        // `pull_request` workflows — so the cloud gate holds it as it
+                        // holds `finalizeRun`'s pull request.
+                        assertAppWorkCloudPushAllowed(
+                            'openPullRequest',
+                            target.work.kind,
+                            'Nothing was pushed and no pull request was opened.',
+                        );
                         const providerId = explicitProviderIdOf(input) || target.providerId;
                         // APW-08 P0 — `base` defaults to the Work's base branch (its
                         // declared `taskIsolationBaseBranch`, else the repository's

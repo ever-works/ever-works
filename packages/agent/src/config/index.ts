@@ -1081,11 +1081,18 @@ export const config = {
              * BEFORE publishing exactly that commit, then judges the pushed
              * branch again with `evaluate`.
              *
+             * Asked only through `appWorkCloudPushAllowed`
+             * (`tasks-domain/app-work-cloud-push.ts`), the one gate both cloud
+             * publishers share: `finalizeRun`, and the agent git tools
+             * `commitToRepo` / `openPullRequest` in the API's `AGENT_GIT_FACADE`,
+             * which refuse an App Work with the same words while this is off.
+             *
              * Read per call (never captured at import), so tests can flip it; a
              * running API reads its environment once, at process start, so a
              * changed value takes effect when the API restarts or is redeployed.
-             * Every other Work kind, and an App Work with no change gate bound,
-             * ignores it.
+             * Every other Work kind ignores it, and so does `finalizeRun` for an
+             * App Work with no change gate bound (a partial construction; every
+             * real graph binds the gate through `TasksDomainModule`).
              */
             cloudPushEnabled() {
                 return process.env.APP_WORKS_CLOUD_PUSH_ENABLED === 'true';

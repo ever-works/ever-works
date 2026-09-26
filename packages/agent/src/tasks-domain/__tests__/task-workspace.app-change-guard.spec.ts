@@ -1,6 +1,7 @@
 import { TaskStatus } from '../../entities/task.entity';
 
 import { TaskWorkspaceService } from '../task-workspace.service';
+import { appWorkCloudPushRefusal } from '../app-work-cloud-push';
 import type {
     AppWorkChangeGate,
     AppWorkChangeGateInput,
@@ -742,6 +743,32 @@ describe('finalizeRun — cloud App Work pushes are off by default (FR-12 / T12)
         expect(m.simulateMerge).not.toHaveBeenCalled();
         expect(m.evaluate).not.toHaveBeenCalled();
         expect(m.createPullRequest).not.toHaveBeenCalled();
+    });
+
+    it('says word for word what the agent git tools say — one gate, one refusal', async () => {
+        // `commitToRepo` / `openPullRequest` (apps/api `AGENT_GIT_FACADE`) run in
+        // the same API process and refuse through the same helper; only the
+        // sentence about what did not happen is theirs.
+        const m = mocks();
+
+        await service(m).finalizeRun(runInput());
+
+        expect(bodyOf(m)).toBe(
+            appWorkCloudPushRefusal('Nothing was pushed and no pull request was opened.'),
+        );
+    });
+
+    it('leaves the Fleet finalize untouched — a node-pushed App Work branch is judged and opened', async () => {
+        // The switch holds the CLOUD path only. A Fleet node pushed with its own
+        // credential; `finalizeRemotePush` never asks the cloud gate.
+        const m = mocks();
+
+        const outcome = await service(m).finalizeRemotePush(pushInput());
+
+        expect(outcome.outcome).toBe('pr-opened');
+        expect(m.evaluate).toHaveBeenCalledTimes(1);
+        expect(m.createPullRequest).toHaveBeenCalledTimes(1);
+        expect(blockedWith(m)).toBe(false);
     });
 
     it('names an open pull request as NOT containing the change', async () => {

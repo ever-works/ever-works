@@ -85,6 +85,13 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     RUN_STEERING_PORT: 'RUN_STEERING_PORT',
     // APW-08 T17 — the App Work change gate the git tools ask.
     APP_WORK_CHANGE_GATE: 'APP_WORK_CHANGE_GATE',
+    // APW-08 FR-12 / T12 — the REAL cloud App Work push gate, loaded from its
+    // leaf file (the barrel would drag the entity graph in). A stub here could
+    // let the tools publish whatever the switch says, which is the defect the
+    // "cloud App Work pushes are OFF by default" cases below pin.
+    ...jest.requireActual<Record<string, unknown>>(
+        '../../../../packages/agent/src/tasks-domain/app-work-cloud-push',
+    ),
 }));
 jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestModule: class EventIngestModule {},
@@ -845,12 +852,45 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
     };
 
     /**
+     * APW-08 FR-12 / T12 — the owner's switch for cloud App Work pushes
+     * (`APP_WORKS_CLOUD_PUSH_ENABLED`, default OFF until T12 lands). Set per
+     * describe and always restored, exactly as the `finalizeRun` cloud-path specs
+     * in `task-workspace.app-change-guard.spec.ts` do. A nested describe that
+     * calls it again wins: its `beforeEach` runs after the outer one.
+     */
+    const CLOUD_PUSH_ENV = 'APP_WORKS_CLOUD_PUSH_ENABLED';
+    const withCloudPush = (value: string | undefined): void => {
+        let saved: string | undefined;
+        beforeEach(() => {
+            saved = process.env[CLOUD_PUSH_ENV];
+            if (value === undefined) delete process.env[CLOUD_PUSH_ENV];
+            else process.env[CLOUD_PUSH_ENV] = value;
+        });
+        afterEach(() => {
+            if (saved === undefined) delete process.env[CLOUD_PUSH_ENV];
+            else process.env[CLOUD_PUSH_ENV] = saved;
+        });
+    };
+
+    /**
      * APW-08 T17 — the agent git tools are how an agent reaches a pull request
      * WITHOUT the finalize path, so for an App Work they ask the same change
      * gate. Every other kind is untouched: the first case of each tool below is
      * the proof.
      */
     describe('App Works — the tools ask the change gate', () => {
+        // PINNED-STATE CHANGE (APW-08 FR-12 / T12, owner decision 2026-09-25).
+        // These cases used to run with the switch unset, because the tools
+        // ignored it: an App Work commit was judged by `checkPaths` and then
+        // PUSHED from the API, and a pull request was judged by `evaluate` and
+        // then OPENED, with cloud App Work pushes off. That was the defect — the
+        // tools run in the API process, the cloud path, where the owner said "not
+        // yet". With the switch off they now refuse before anything is judged
+        // (the nested describe at the end of this block). What these cases pin —
+        // the judgement itself, its inputs, its order and its refusals — is
+        // unchanged, and is what the switch turned ON still does.
+        withCloudPush('true');
+
         const fs = jest.requireActual<typeof import('node:fs')>('node:fs');
         const os = jest.requireActual<typeof import('node:os')>('node:os');
         const nodePath = jest.requireActual<typeof import('node:path')>('node:path');
@@ -1056,6 +1096,130 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 );
                 expect(git.createPullRequest).not.toHaveBeenCalled();
             });
+        });
+
+        /**
+         * Owner decision (2026-09-25): the API-side (cloud) path publishes no App
+         * Work change until APW-08 FR-12's isolated-run admission (T12) lands,
+         * unless `APP_WORKS_CLOUD_PUSH_ENABLED` is exactly `true`. `finalizeRun`
+         * was the switch's only reader, while these two tools run in the SAME API
+         * process — `AGENT_GIT_FACADE` is bound nowhere else — and pushed a
+         * feature branch or opened a pull request whatever it said.
+         *
+         * A Fleet node never reaches this adapter: it pushes with its own scoped
+         * credential and is judged by `finalizeRemotePush`, and its MCP bridge
+         * reaches REST routes only. So refusing here cannot touch the Fleet path.
+         */
+        describe('cloud App Work pushes are OFF by default (FR-12 / T12)', () => {
+            withCloudPush(undefined);
+
+            /** The refusal's text, or `null` when the tool went ahead. */
+            const refusalOf = async (call: Promise<unknown>): Promise<string | null> => {
+                try {
+                    await call;
+                    return null;
+                } catch (error) {
+                    return error instanceof Error ? error.message : String(error);
+                }
+            };
+
+            it('commitToRepo writes, commits and pushes NOTHING, and refuses naming FR-12 and T12', async () => {
+                const gate = allow();
+                const git = gitIn();
+                const { facade, mergePolicy } = build({
+                    git,
+                    work: appWork(),
+                    appChangeGate: gate,
+                });
+
+                const message = await refusalOf(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                );
+
+                expect(git.push).not.toHaveBeenCalled();
+                expect(message).toMatch(
+                    /^commitToRepo: Cloud runs do not publish App Work changes yet\./,
+                );
+                expect(message).toContain('FR-12');
+                expect(message).toContain('T12');
+                expect(message).toContain('Nothing was written, committed or pushed.');
+                expect(message).toContain('APP_WORKS_CLOUD_PUSH_ENABLED');
+                expectNoGitWork(git);
+                // Refused before any provider or policy read, and before the
+                // change is judged: the answer does not depend on either.
+                expect(git.getRepository).not.toHaveBeenCalled();
+                expect(mergePolicy.resolve).not.toHaveBeenCalled();
+                expect(gate.checkPaths).not.toHaveBeenCalled();
+                expect(fs.existsSync(nodePath.join(dir, 'infra/main.tf'))).toBe(false);
+            });
+
+            it('openPullRequest opens NOTHING, and refuses naming FR-12 and T12', async () => {
+                const gate = allow();
+                const { facade, git, prGate } = build({ work: appWork(), appChangeGate: gate });
+
+                const message = await refusalOf(facade.openPullRequest(prInput()));
+
+                expect(git.createPullRequest).not.toHaveBeenCalled();
+                expect(message).toMatch(
+                    /^openPullRequest: Cloud runs do not publish App Work changes yet\./,
+                );
+                expect(message).toContain('FR-12');
+                expect(message).toContain('T12');
+                expect(message).toContain('Nothing was pushed and no pull request was opened.');
+                expectNoGitWork(git);
+                expect(prGate.assertAllowed).not.toHaveBeenCalled();
+                expect(gate.evaluate).not.toHaveBeenCalled();
+            });
+
+            it.each([['false'], ['TRUE'], ['1'], ['yes'], ['']])(
+                'stays off for %j — only exactly `true` enables it',
+                async (value) => {
+                    process.env[CLOUD_PUSH_ENV] = value;
+                    const git = gitIn();
+                    const { facade } = build({ git, work: appWork(), appChangeGate: allow() });
+
+                    await expect(
+                        facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                    ).rejects.toThrow(/FR-12/);
+                    await expect(facade.openPullRequest(prInput())).rejects.toThrow(/FR-12/);
+                    expect(git.push).not.toHaveBeenCalled();
+                    expect(git.createPullRequest).not.toHaveBeenCalled();
+                },
+            );
+
+            it('refuses even with no gate bound — the switch is asked first', async () => {
+                const git = gitIn();
+                const { facade } = build({ git, work: appWork() });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/Cloud runs do not publish App Work changes yet/);
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it.each([['website'], ['directory'], ['repo']])(
+                'leaves a %s Work exactly as it was — committed, pushed and opened',
+                async (kind) => {
+                    const gate = allow();
+                    const git = gitIn();
+                    const { facade } = build({
+                        git,
+                        work: makeWork({ kind, taskIsolationBaseBranch: 'production' }),
+                        appChangeGate: gate,
+                    });
+
+                    const commit = await facade.commitToRepo(
+                        commitInput({ branch: 'feature/pricing', files }),
+                    );
+                    const pr = await facade.openPullRequest(prInput());
+
+                    expect(commit).toMatchObject({ sha: 'sha-1', branch: 'feature/pricing' });
+                    expect(git.push).toHaveBeenCalledTimes(1);
+                    expect(pr.number).toBe(7);
+                    expect(gate.checkPaths).not.toHaveBeenCalled();
+                    expect(gate.evaluate).not.toHaveBeenCalled();
+                },
+            );
         });
     });
 

@@ -29,7 +29,9 @@ import {
     type AppWorkChangeGate,
     type AppWorkChangeGateVerdict,
 } from './app-work-change-gate.port';
-import { config } from '../config';
+// APW-08 FR-12 / T12 — the one cloud App Work push gate (and its refusal text),
+// shared with the agent git tools. It owns the only read of the switch.
+import { appWorkCloudPushAllowed, appWorkCloudPushRefusal } from './app-work-cloud-push';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -1593,9 +1595,10 @@ export class TaskWorkspaceService {
      * App Works with the change gate bound (APW-08 T17) never push first. The
      * run is committed locally (`push: false`); with cloud App Work pushes OFF
      * (the default until FR-12's admission, T12, lands — see
-     * `config.everWorks.apps.cloudPushEnabled`) the Task is then blocked and
-     * nothing leaves the runtime. With them ON, `judgeBeforePush` asks the
-     * gate's `checkPaths` about that exact commit, and only an allowed commit
+     * `appWorkCloudPushAllowed`, the gate the agent git tools ask too) the Task
+     * is then blocked and nothing leaves the runtime. With them ON,
+     * `judgeBeforePush` asks the gate's `checkPaths` about that exact commit,
+     * and only an allowed commit
      * is published — by its sha, so nothing the tree gained afterwards rides
      * along. Every other kind, and an App Work with no gate bound, pushes in
      * one step exactly as before.
@@ -1690,7 +1693,9 @@ export class TaskWorkspaceService {
         if (judgeFirst) {
             // Owner decision: no cloud App Work push at all until APW-08 FR-12's
             // isolated-run admission (T12) lands, unless an operator opts in.
-            const judged = config.everWorks.apps.cloudPushEnabled()
+            // The shared gate the agent git tools ask too (`app-work-cloud-push.ts`);
+            // `judgeFirst` already established that this is an App Work.
+            const judged = appWorkCloudPushAllowed(work.kind)
                 ? await this.judgeBeforePush({
                       input,
                       work,
@@ -3219,16 +3224,9 @@ export class TaskWorkspaceService {
         return this.refuseChange(
             input,
             task,
-            [
-                'Cloud runs do not publish App Work changes yet. APW-08 FR-12 lets an App Work run only on ' +
-                    'an enrolled Fleet node or in an isolated environment that holds no platform secret, and ' +
-                    `the admission that enforces it (APW-08 T12) has not landed. ${nothingPushedConsequence(
-                        existingPullRequest,
-                    )}`,
-                '',
-                'Run this Task on an enrolled Fleet node, or ask an operator to allow cloud App Work ' +
-                    'pushes (`APP_WORKS_CLOUD_PUSH_ENABLED`).',
-            ].join('\n'),
+            // Word for word the refusal the agent git tools give (`commitToRepo`,
+            // `openPullRequest`); only what did not happen differs.
+            appWorkCloudPushRefusal(nothingPushedConsequence(existingPullRequest)),
             existingPullRequest,
             { reachedRemote: false },
         );
