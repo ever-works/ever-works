@@ -219,8 +219,9 @@ describe('WorkLifecycleService', () => {
                 expect(work.getDataRepo).not.toHaveBeenCalled();
                 expect(workRepository.update).not.toHaveBeenCalled();
                 // Same shape the controller already returns for "nothing to
-                // sync" (`status` / `updated` / `message`), so its activity
-                // log and the web action need no new branch.
+                // sync" (`status` / `updated` / `message`), so the controller
+                // (which records nothing for `updated: []`) and the web action
+                // need no new branch.
                 expect(result).toEqual({
                     status: 'success',
                     updated: [],
@@ -252,6 +253,169 @@ describe('WorkLifecycleService', () => {
                 expect(result).toMatchObject({ status: 'success' });
             },
         );
+    });
+
+    describe('syncFromDataRepository — an unchanged snapshot writes nothing', () => {
+        // Every page mount of a website/directory Work calls this (web
+        // `WorkLayoutClient` → `POST /api/works/:id/sync-data`). It used to put
+        // `readmeConfig` into `updates` unconditionally, so EVERY call wrote the
+        // Work row — bumping `updatedAt`, which also reorders `GET /api/works` —
+        // and reported a change, on which the controller invalidated the Work's
+        // caches and wrote a "Synced work data" activity row per page view. The
+        // "Work already up to date." answer was unreachable.
+
+        const UP_TO_DATE = {
+            status: 'success',
+            updated: [],
+            message: 'Work already up to date.',
+        };
+
+        /**
+         * A persisted Work row: `update` merges into it through a JSON round
+         * trip (the `simple-json` column type of `readmeConfig` and
+         * `lastPullRequest`), and `ensureCanEdit` hands out a FRESH load of it
+         * per call — the way two page mounts see the database.
+         */
+        function persistedWork(initial: Record<string, unknown>) {
+            let row = JSON.parse(JSON.stringify(initial));
+            workRepository.update.mockImplementation(
+                async (_id: string, updates: Record<string, unknown>) => {
+                    row = JSON.parse(JSON.stringify({ ...row, ...updates }));
+                },
+            );
+            ownershipService.ensureCanEdit.mockImplementation(async () => ({
+                work: JSON.parse(JSON.stringify(row)),
+            }));
+            return { row: () => row };
+        }
+
+        it('the second call with an unchanged snapshot reports no updates and writes nothing', async () => {
+            const stored = persistedWork({
+                id: 'dir-1',
+                kind: 'directory',
+                itemsCount: 3,
+                lastPullRequest: null,
+                readmeConfig: null,
+            });
+            dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                itemsCount: 5,
+                prUpdate: { title: 'Update items' },
+                readmeTemplate: { header: '# Awesome', footer: 'Made with love' },
+            });
+
+            // First mount: the snapshot really differs, so it is adopted once.
+            const first = await service.syncFromDataRepository('dir-1', user);
+            expect(first).toEqual({
+                status: 'success',
+                updated: expect.arrayContaining(['itemsCount', 'lastPullRequest', 'readmeConfig']),
+                message: 'Work synced from data repository.',
+            });
+            expect(workRepository.update).toHaveBeenCalledTimes(1);
+            expect(stored.row().readmeConfig).toEqual({
+                header: '# Awesome',
+                overwriteDefaultHeader: true,
+                footer: 'Made with love',
+                overwriteDefaultFooter: true,
+            });
+
+            // Second mount, same snapshot: nothing to adopt, nothing written.
+            const second = await service.syncFromDataRepository('dir-1', user);
+            expect(second).toEqual(UP_TO_DATE);
+            expect(workRepository.update).toHaveBeenCalledTimes(1);
+        });
+
+        it.each<
+            [string, Record<string, unknown> | null | undefined, Record<string, string> | null]
+        >([
+            ['an empty object', {}, null],
+            // `readmeConfig` is a nullable column: a Work created without one
+            // must not have `{}` written over its `null` on every page mount.
+            ['null', null, null],
+            ['absent', undefined, null],
+            [
+                'a header and footer the Work already carries (they win over the template)',
+                {
+                    header: 'Mine',
+                    overwriteDefaultHeader: false,
+                    footer: 'Also mine',
+                    overwriteDefaultFooter: true,
+                },
+                { header: 'Template header', footer: 'Template footer' },
+            ],
+            [
+                'the adopted template in a different key order',
+                {
+                    overwriteDefaultFooter: true,
+                    footer: 'F',
+                    overwriteDefaultHeader: true,
+                    header: 'H',
+                },
+                { header: 'H', footer: 'F' },
+            ],
+            [
+                'an explicitly undefined key (same as a missing one)',
+                { header: 'H', overwriteDefaultHeader: true, footer: undefined },
+                { header: 'H' },
+            ],
+        ])(
+            'readmeConfig stored as %s and an unchanged snapshot: "Work already up to date.", no write',
+            async (_label, readmeConfig, readmeTemplate) => {
+                const work = {
+                    id: 'dir-1',
+                    kind: 'directory',
+                    itemsCount: 7,
+                    lastPullRequest: { data: { title: 'Already recorded' } },
+                    ...(readmeConfig === undefined ? {} : { readmeConfig }),
+                } as any;
+                ownershipService.ensureCanEdit.mockResolvedValue({ work });
+                dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                    itemsCount: 7,
+                    // Recorded once already (`lastPullRequest.data`), never re-adopted.
+                    prUpdate: { title: 'Newer PR text' },
+                    readmeTemplate,
+                });
+
+                const result = await service.syncFromDataRepository(work.id, user);
+
+                expect(result).toEqual(UP_TO_DATE);
+                expect(workRepository.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it('still writes readmeConfig when the template brings a header the Work lacks, without mutating the loaded entity', async () => {
+            const loadedReadmeConfig = { footer: 'Kept' };
+            const work = {
+                id: 'dir-1',
+                kind: 'directory',
+                itemsCount: 2,
+                lastPullRequest: null,
+                readmeConfig: loadedReadmeConfig,
+            } as any;
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                itemsCount: 2,
+                prUpdate: null,
+                readmeTemplate: { header: '# From template', footer: 'Ignored: the Work has one' },
+            });
+
+            const result = await service.syncFromDataRepository(work.id, user);
+
+            expect(result).toEqual({
+                status: 'success',
+                updated: ['readmeConfig'],
+                message: 'Work synced from data repository.',
+            });
+            expect(workRepository.update).toHaveBeenCalledWith('dir-1', {
+                readmeConfig: {
+                    footer: 'Kept',
+                    header: '# From template',
+                    overwriteDefaultHeader: true,
+                },
+            });
+            // The comparison needs the stored value as a baseline, so the
+            // candidate is a copy — the loaded entity is left as it was read.
+            expect(loadedReadmeConfig).toEqual({ footer: 'Kept' });
+        });
     });
 
     describe('updateWork — organizationId (EW-639 Phase 2/e)', () => {

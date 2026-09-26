@@ -275,7 +275,7 @@ Two operational notes: registration is rate-limited to 10 requests per minute pe
 | **Generate or extend**  | `/works/:id/generator`          | Run the pipeline over the imported Work — useful after a copy import to enrich thin descriptions.                                                                    |
 | **Deploy**              | `/works/:id/deploy`             | Ship the website repository. See [Custom Domains and Deploy Targets](./custom-domains-and-deploy-targets.md).                                                        |
 | **Keep it fresh**       | `/works/:id/generator/schedule` | Set or change the cadence. Awesome-list imports that opted into sync already have a weekly, pull-request-only schedule here.                                         |
-| **Check what happened** | `/works/:id/activity`           | Import start, sync outcomes and generation runs are all recorded.                                                                                                    |
+| **Check what happened** | `/works/:id/activity`           | Import start, syncs that changed the Work and generation runs are all recorded.                                                                                      |
 
 ## Troubleshooting
 

@@ -98,10 +98,10 @@ The `syncFromDataRepository` method pulls a snapshot from the data generator and
 1. Calls `dataGenerator.getDataSyncSnapshot()` to get the current state.
 2. Updates `itemsCount` if it has changed. If items count drops to zero, `generateStatus` is cleared.
 3. Syncs pull request metadata from the snapshot if the work lacks it.
-4. Syncs `readmeConfig` (header/footer) from markdown templates when not already configured.
-5. Persists all accumulated updates in a single `workRepository.update()` call.
+4. Syncs `readmeConfig` (header/footer) from markdown templates when not already configured. The field is written only when the resulting config differs from the stored one (compared canonically: key order, `undefined` keys and `null` vs `{}` do not count).
+5. Persists all accumulated updates in a single `workRepository.update()` call — or, when nothing differs, writes nothing and answers `updated: []` with "Work already up to date.". A kind without a data repository (the App Work) gets the same empty answer without a snapshot.
 
-This method is typically invoked after external changes to the data repository (e.g., manual Git commits).
+This method is typically invoked after external changes to the data repository (e.g., manual Git commits), and on every page mount of a Work whose kind has a data repository. `POST /api/works/:id/sync-data` therefore invalidates the Work's caches and records the `work.synced_from_data_repo` activity only when `updated` is non-empty, so an unchanged Work leaves no trace per page view.
 
 ## Deleting a Work
 
