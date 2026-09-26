@@ -75,7 +75,7 @@ Returns `WorkPluginListResponseDto` with `plugins`, `total`, and a `capabilityPr
 
 ### POST `/api/works/:workId/plugins/:pluginId/enable`
 
-Enable a plugin for a specific work. Requires edit permission. The plugin must already be installed at the user level. Accepts optional `settings`, `activeCapability`, and `priority`.
+Enable a plugin for a specific work. Requires edit permission. The plugin must already be installed at the user level. Accepts optional `settings`, `activeCapability`, and `priority`. Returns `400` if `activeCapability` is given for a supplementary plugin (a URL-pattern specialist such as `notion-extractor`, `pdf-extractor` or `officecli-extractor`): it runs for the URLs it matches alongside the Work's provider and is never that provider. Enabling it without `activeCapability` succeeds.
 
 ### POST `/api/works/:workId/plugins/:pluginId/disable`
 
@@ -87,7 +87,7 @@ Update work-specific settings for a plugin. Accepts `settings`, `secretSettings`
 
 ### POST `/api/works/:workId/plugins/:pluginId/capability`
 
-Set this plugin as the active provider for a given capability in the work. The request body contains a `capability` string validated against `ALL_PLUGIN_CAPABILITIES`. Returns `400` if the plugin does not support the requested capability.
+Set this plugin as the active provider for a given capability in the work. The request body contains a `capability` string validated against `ALL_PLUGIN_CAPABILITIES`. Returns `400` if the plugin does not support the requested capability, or if it is a supplementary plugin, which cannot be named as a Work's provider.
 
 ## Response DTOs
 

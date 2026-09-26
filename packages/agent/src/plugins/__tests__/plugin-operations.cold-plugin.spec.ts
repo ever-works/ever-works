@@ -238,6 +238,56 @@ describe('PluginOperationsService — cold lazy plugins', () => {
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    // The other path that names a Work's provider: enabling a plugin for the
+    // Work WITH `activeCapability`. It used to accept a supplementary plugin
+    // and record the capability on its binding, which the Work's provider map
+    // (listWorkPlugins) never honours — flow-plugin-content-extractor got 200
+    // for notion-extractor, then no provider. A supplementary extractor runs
+    // for its URLs on top of the Work's provider, never as it.
+    it('refuses to bind a cold supplementary plugin as the active provider when enabling it for a Work', async () => {
+        const cold = registerColdPlugin(registry, {
+            id: 'cold-supplementary-enable',
+            capabilities: ['content-extractor'],
+            settingsSchema: requiredSecretSchema(),
+            manifest: { autoEnable: true },
+            runtimeManifest: { supplementary: true },
+        });
+
+        const error = await service
+            .enablePluginForWork('work-1', 'cold-supplementary-enable', 'user-1', {
+                activeCapability: 'content-extractor',
+            })
+            .catch((caught: unknown) => caught);
+
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as Error).message).toBe(
+            'Plugin "cold-supplementary-enable" is a supplementary plugin and cannot be set as an active capability provider',
+        );
+        expect(cold.loads()).toBe(1);
+        expect(workPluginRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('still enables a cold supplementary plugin for a Work when no active capability is asked for', async () => {
+        registerColdPlugin(registry, {
+            id: 'cold-supplementary-plain-enable',
+            capabilities: ['content-extractor'],
+            settingsSchema: requiredSecretSchema(),
+            manifest: { autoEnable: true },
+            runtimeManifest: { supplementary: true },
+        });
+
+        await service.enablePluginForWork('work-1', 'cold-supplementary-plain-enable', 'user-1');
+
+        expect(workPluginRepository.save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                workId: 'work-1',
+                pluginId: 'cold-supplementary-plain-enable',
+                enabled: true,
+                activeCapabilities: [],
+            }),
+        );
+    });
+
     it('reports the onboarding connection status of a cold plugin', async () => {
         registerColdPlugin(registry, {
             id: 'cold-onboarding',

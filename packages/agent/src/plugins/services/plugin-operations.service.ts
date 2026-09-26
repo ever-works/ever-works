@@ -1142,6 +1142,11 @@ export class PluginOperationsService {
         }
         await loadPluginSchema(registered.plugin, registered);
 
+        // Naming the Work's provider here obeys setActiveCapability's rule.
+        if (options?.activeCapability) {
+            this.refuseSupplementaryProvider(registered, pluginId);
+        }
+
         // Enforce configurationMode — admin-only plugins cannot have work settings
         if (options?.settings) {
             this.enforceConfigurationMode(registered, 'work');
@@ -1453,11 +1458,7 @@ export class PluginOperationsService {
         // `supplementary` may come from the class's getManifest() only, which
         // a cold lazy proxy's entry does not carry yet.
         await loadPluginSchema(registered.plugin, registered);
-        if (registered.manifest.supplementary) {
-            throw new BadRequestException(
-                `Plugin "${pluginId}" is a supplementary plugin and cannot be set as an active capability provider`,
-            );
-        }
+        this.refuseSupplementaryProvider(registered, pluginId);
 
         const userPlugin = await this.userPluginRepository.findOne({
             where: { userId, pluginId },
@@ -1501,6 +1502,35 @@ export class PluginOperationsService {
             userId,
             workId,
         });
+    }
+
+    /**
+     * A supplementary plugin (notion-extractor, pdf-extractor,
+     * officecli-extractor) is a URL-pattern specialist: the content-extractor
+     * facade runs it for the URLs it claims, on top of the Work's provider,
+     * never as that provider, and listWorkPlugins leaves it out of
+     * `capabilityProviders`. So neither of this service's paths that name a
+     * Work's provider — setActiveCapability, and enablePluginForWork with
+     * `activeCapability` — may record it as one: the binding would be
+     * accepted and never honoured, and `findActiveByCapability` could answer
+     * it ahead of the real provider.
+     *
+     * This guards those two paths only. Account import
+     * (account-import.service.ts) upserts an export's `activeCapabilities`
+     * straight into the repository, so it can still store such a binding, as
+     * can any row saved before this guard. Only `findActiveByCapability` (or
+     * the facade reading it) skipping supplementary rows would cover every
+     * write path.
+     *
+     * The caller loads the plugin first: `supplementary` may be declared in
+     * getManifest() only.
+     */
+    private refuseSupplementaryProvider(registered: RegisteredPlugin, pluginId: string): void {
+        if (registered.manifest.supplementary) {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" is a supplementary plugin and cannot be set as an active capability provider`,
+            );
+        }
     }
 
     private requestWorksConfigSync(
