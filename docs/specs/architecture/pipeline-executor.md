@@ -346,5 +346,5 @@ runner with stubbed steps — see `__tests__/mock-pipeline-plugin.ts`.
     - [`plugin-sdk`](./plugin-sdk.md)
     - [`features/generation-cancellation/spec`](../features/generation-cancellation/spec.md)
     - [`decisions/001-pipeline-checkpointing`](../decisions/001-pipeline-checkpointing.md)
-- User docs: [`docs/ai-agents/`](../../ai-agents/),
+- User docs: [`docs/ai-agents/`](../../ai-agents/index.md),
   [`docs/plugin-system/pipeline-plugins.md`](../../plugin-system/pipeline-plugins.md)

@@ -145,4 +145,4 @@ Revoked keys are immediately invalid. Any requests using a revoked key will retu
 ## Related
 
 - [Authentication](/api/authentication) — JWT login flow and token management
-- [MCP Server](./mcp-server) — Uses API keys for authentication
+- [MCP Server](./mcp-server.md) — Uses API keys for authentication

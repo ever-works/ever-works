@@ -150,7 +150,7 @@ Examples:
 - "Emphasize open-source vs proprietary trade-offs"
 
 :::note
-This is separate from the [Advanced Prompts](./advanced-prompts) that customize the main generation pipeline. The comparison custom prompt only affects comparison generation.
+This is separate from the [Advanced Prompts](./advanced-prompts.md) that customize the main generation pipeline. The comparison custom prompt only affects comparison generation.
 :::
 
 ## API
@@ -272,7 +272,7 @@ metadata:
 
 ## Related
 
-- [Scheduled Updates](./scheduled-updates) — comparisons can follow the work schedule
-- [Advanced Prompts](./advanced-prompts) — customize AI behavior for pipeline steps
+- [Scheduled Updates](./scheduled-updates.md) — comparisons can follow the work schedule
+- [Advanced Prompts](./advanced-prompts.md) — customize AI behavior for pipeline steps
 - [Built-in Plugins](/plugin-system/built-in-plugins#comparison-generator) — Comparison Generator plugin settings
 - [AI & Generation](/ai-agents/) — pipeline overview

@@ -267,6 +267,6 @@ recovery hints.
     - [`plugin-sdk`](./plugin-sdk.md)
     - [`settings-system`](./settings-system.md)
     - [`pipeline-overview`](./pipeline-overview.md)
-- User docs: [`docs/ai-agents/`](../../ai-agents/)
+- User docs: [`docs/ai-agents/`](../../ai-agents/index.md)
 - AI provider plugin docs:
   [`docs/plugin-system/built-in-plugins#ai-providers`](../../plugin-system/built-in-plugins.md#ai-providers)

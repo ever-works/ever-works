@@ -148,6 +148,6 @@ const results = await firecrawlPlugin.extractBatch(['https://example.com/page1',
 
 ## Related Plugins
 
-- [Exa Plugin Deep Dive](./exa-plugin-deep-dive) -- alternative search and content extraction provider with neural search.
-- [Brave Plugin Deep Dive](./brave-plugin-deep-dive) -- alternative privacy-focused search provider.
-- [Firecrawl Plugin](./firecrawl-plugin) -- overview documentation for the Firecrawl plugin.
+- [Exa Plugin Deep Dive](./exa-plugin-deep-dive.md) -- alternative search and content extraction provider with neural search.
+- [Brave Plugin Deep Dive](./brave-plugin-deep-dive.md) -- alternative privacy-focused search provider.
+- [Firecrawl Plugin](./firecrawl-plugin.md) -- overview documentation for the Firecrawl plugin.

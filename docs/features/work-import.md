@@ -339,7 +339,7 @@ Browse your git repositories to find one to import.
 
 ## Related
 
-- [Scheduled Updates](./scheduled-updates) — Awesome README imports auto-create a weekly sync schedule
+- [Scheduled Updates](./scheduled-updates.md) — Awesome README imports auto-create a weekly sync schedule
 - [Pipeline Plugins](/plugin-system/pipeline-plugins) — How the Agent Pipeline processes awesome list imports
 - [GitHub Plugin](/plugin-system/github-plugin) — GitHub plugin configuration for git operations
 - [Import System Deep Dive](/agent-services/import-system) — Technical internals of the import module

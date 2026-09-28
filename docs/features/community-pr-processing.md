@@ -113,5 +113,5 @@ Contributors open a pull request against the work's main GitHub repository. The 
 ## Related
 
 - [Works API](/api/works) — Full endpoint reference including Community PR Processing
-- [Collections](./collections) — Another way to organize items into curated groups
+- [Collections](./collections.md) — Another way to organize items into curated groups
 - [Plugin System — GitHub](/plugin-system/built-in-plugins#github) — GitHub plugin configuration

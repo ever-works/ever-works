@@ -392,7 +392,7 @@ When a facade receives a request, it resolves which plugin to use:
 3. **Default for capability** — Use the plugin marked as `defaultForCapabilities` in its manifest
 4. **First enabled** — Fall back to any enabled plugin for the capability
 
-The facade then resolves settings for the selected plugin (following the [settings hierarchy](./settings)) and calls the plugin method with those settings.
+The facade then resolves settings for the selected plugin (following the [settings hierarchy](./settings.md)) and calls the plugin method with those settings.
 
 ## Database Entities
 

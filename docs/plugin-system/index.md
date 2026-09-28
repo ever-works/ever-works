@@ -48,7 +48,7 @@ The table below lists every category that ships with a concrete plugin today, gr
 | Prompt Management     | Langfuse                                                                                                                                                                                       | `prompt-provider`                                                                                                            |
 | Utility               | Comparison Generator, Agent Memory, Agent Memory Hooks, Browser Automation, Ever Works Skills, Ever Works Task Tracker, Local Workspace, Sandbox Workspace, Local PTY Terminal Host            | `agent-memory`, `pipeline-modifier`, `browser-automation`, `skills-provider`, `task-tracker`, `workspace`, `terminal-stream` |
 
-See [Built-in Plugins](./built-in-plugins) for details on each plugin and its configuration.
+See [Built-in Plugins](./built-in-plugins.md) for details on each plugin and its configuration.
 
 ### How each category is populated
 
@@ -93,7 +93,7 @@ The Plugin SDK (`@ever-works/plugin`) is a **standalone TypeScript package** wit
 - **Settings types** — JSON Schema with extensions for secrets, environment variables, and scoping
 - **Plugin context** — Logger, cache, HTTP client, events, and settings access
 
-See [Architecture](./architecture) for the full technical breakdown.
+See [Architecture](./architecture.md) for the full technical breakdown.
 
 ## Key Concepts
 
@@ -156,7 +156,7 @@ Each work can use a different plugin per capability. For example:
 - Work A uses **OpenAI** for AI and **Brave** for search
 - Work B uses **Anthropic** for AI and **Tavily** for search
 
-This is managed through the [Settings System](./settings) and the work-level plugin management UI.
+This is managed through the [Settings System](./settings.md) and the work-level plugin management UI.
 
 ### Instance-level selectors
 
@@ -194,21 +194,21 @@ ever-works plugins install-status <pluginId>
 ever-works plugins uninstall <pluginId>
 ```
 
-The same data is available over REST: `GET /api/plugins` (optionally `?category=`), `GET /api/plugins/:pluginId` for the settings schema, and `GET /api/plugins/settings-menu` for the category-grouped navigation. See [API Reference](./api-reference) for the full endpoint list.
+The same data is available over REST: `GET /api/plugins` (optionally `?category=`), `GET /api/plugins/:pluginId` for the settings schema, and `GET /api/plugins/settings-menu` for the category-grouped navigation. See [API Reference](./api-reference.md) for the full endpoint list.
 
 ## Bundled vs. distributable
 
-Every plugin manifest carries a `distribution` field. **Core** plugins are always baked into the platform image; **distributable** plugins are published to npm as `@ever-works/<id>-plugin` and installed on first enable when `PLUGIN_DISTRIBUTION_MODE=dynamic`. The split today is 27 core and 75 distributable — see [Built-in Plugins](./built-in-plugins) for the exact list and the classification rule.
+Every plugin manifest carries a `distribution` field. **Core** plugins are always baked into the platform image; **distributable** plugins are published to npm as `@ever-works/<id>-plugin` and installed on first enable when `PLUGIN_DISTRIBUTION_MODE=dynamic`. The split today is 27 core and 75 distributable — see [Built-in Plugins](./built-in-plugins.md) for the exact list and the classification rule.
 
 ## Documentation
 
-| Page                                     | Description                                             |
-| ---------------------------------------- | ------------------------------------------------------- |
-| [Architecture](./architecture)           | Plugin SDK, interfaces, lifecycle, bootstrap, facades   |
-| [Settings](./settings)                   | Three-tier settings, JSON Schema extensions, resolution |
-| [Creating a Plugin](./creating-a-plugin) | Step-by-step guide for building a new plugin            |
-| [Built-in Plugins](./built-in-plugins)   | Built-in plugins with configuration details             |
-| [API Reference](./api-reference)         | REST endpoints for plugin management                    |
+| Page                                        | Description                                             |
+| ------------------------------------------- | ------------------------------------------------------- |
+| [Architecture](./architecture.md)           | Plugin SDK, interfaces, lifecycle, bootstrap, facades   |
+| [Settings](./settings.md)                   | Three-tier settings, JSON Schema extensions, resolution |
+| [Creating a Plugin](./creating-a-plugin.md) | Step-by-step guide for building a new plugin            |
+| [Built-in Plugins](./built-in-plugins.md)   | Built-in plugins with configuration details             |
+| [API Reference](./api-reference.md)         | REST endpoints for plugin management                    |
 
 ## Related
 

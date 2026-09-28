@@ -167,6 +167,6 @@ const page2 = await bravePlugin.search({
 
 ## Related Plugins
 
-- [Exa Plugin Deep Dive](./exa-plugin-deep-dive) -- AI-native search with neural and keyword modes.
-- [Firecrawl Plugin Deep Dive](./firecrawl-plugin-deep-dive) -- search with integrated content extraction.
-- [Brave Search Plugin](./brave-search-plugin) -- overview documentation for the Brave Search plugin.
+- [Exa Plugin Deep Dive](./exa-plugin-deep-dive.md) -- AI-native search with neural and keyword modes.
+- [Firecrawl Plugin Deep Dive](./firecrawl-plugin-deep-dive.md) -- search with integrated content extraction.
+- [Brave Search Plugin](./brave-search-plugin.md) -- overview documentation for the Brave Search plugin.

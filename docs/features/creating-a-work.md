@@ -204,7 +204,7 @@ Manual creation is useful when you want full control over the work structure, wh
 
 Import bootstraps a work from an existing git repository. It supports three source types, each with a different workflow.
 
-For a detailed explanation of the import system — including under-the-hood mechanics, the analysis phase, ecosystem detection, and background processing — see [Work Import](./work-import).
+For a detailed explanation of the import system — including under-the-hood mechanics, the analysis phase, ecosystem detection, and background processing — see [Work Import](./work-import.md).
 
 ### Source Selection
 
@@ -370,9 +370,9 @@ If you don't explicitly select providers, the platform uses the defaults. The fo
 
 ## Related
 
-- [Work Import](./work-import) — Detailed import system documentation
+- [Work Import](./work-import.md) — Detailed import system documentation
 - [Pipeline Plugins](/plugin-system/pipeline-plugins) — How pipeline plugins orchestrate generation
-- [Scheduled Updates](./scheduled-updates) — Automatic periodic regeneration
+- [Scheduled Updates](./scheduled-updates.md) — Automatic periodic regeneration
 - [Plugin System](/plugin-system/) — Overview of the plugin architecture
 - [The + New page](./new-page.md) — The prompt-and-chips surface every create button funnels into
 - [Work Kinds & Capabilities](./work-kinds.md) — What each kind changes about the Work you get

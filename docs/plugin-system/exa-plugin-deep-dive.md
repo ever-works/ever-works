@@ -227,6 +227,6 @@ const batchResults = await exaPlugin.extractBatch(['https://example.com/page1', 
 
 ## Related Plugins
 
-- [Firecrawl Plugin Deep Dive](./firecrawl-plugin-deep-dive) -- alternative search and content extraction with JavaScript rendering support.
-- [Brave Plugin Deep Dive](./brave-plugin-deep-dive) -- privacy-focused keyword search provider.
-- [Exa Plugin](./exa-search-plugin) -- overview documentation for the Exa plugin.
+- [Firecrawl Plugin Deep Dive](./firecrawl-plugin-deep-dive.md) -- alternative search and content extraction with JavaScript rendering support.
+- [Brave Plugin Deep Dive](./brave-plugin-deep-dive.md) -- privacy-focused keyword search provider.
+- [Exa Plugin](./exa-search-plugin.md) -- overview documentation for the Exa plugin.

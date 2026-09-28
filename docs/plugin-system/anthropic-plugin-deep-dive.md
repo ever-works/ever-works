@@ -157,6 +157,6 @@ const available = await anthropicPlugin.isAvailable({ apiKey: userApiKey });
 
 ## Related Plugins
 
-- [OpenAI Plugin Deep Dive](./openai-plugin-deep-dive) -- alternative AI provider with embedding support.
-- [Ollama Plugin Deep Dive](./ollama-plugin-deep-dive) -- self-hosted AI provider for private inference.
-- [Anthropic Plugin](./anthropic-plugin) -- overview documentation for the Anthropic plugin.
+- [OpenAI Plugin Deep Dive](./openai-plugin-deep-dive.md) -- alternative AI provider with embedding support.
+- [Ollama Plugin Deep Dive](./ollama-plugin-deep-dive.md) -- self-hosted AI provider for private inference.
+- [Anthropic Plugin](./anthropic-plugin.md) -- overview documentation for the Anthropic plugin.

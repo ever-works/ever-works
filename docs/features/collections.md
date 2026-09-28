@@ -147,5 +147,5 @@ Collections are stored as a `collections.yml` file in the work's data repository
 ## Related
 
 - [Works API](/api/works) — Full endpoint reference including collection CRUD
-- [Community PR Processing](./community-pr-processing) — Automatically extract items from community contributions
+- [Community PR Processing](./community-pr-processing.md) — Automatically extract items from community contributions
 - [AI & Generation](/ai-agents) — AI pipeline that assigns collections during generation

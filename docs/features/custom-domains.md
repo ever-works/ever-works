@@ -371,7 +371,7 @@ A Work cannot hold the same domain twice — the row is unique per work and doma
 ## Related
 
 - [Deployment](/api/deployment) — Work deployment and provider configuration
-- [API Keys](./api-keys) — Programmatic authentication for domain management
+- [API Keys](./api-keys.md) — Programmatic authentication for domain management
 - [Plugin System](/plugin-system/) — Deploy provider plugins (Vercel, etc.)
 - [Managed Hosting](./managed-hosting.md) — the managed `*.ever.works` subdomain, the Ever Works DB, and the Cloudflare DNS plugin in full
 - [Kubernetes Deployment](./k8s-deployment.md) — clusters, ingress, registries and TLS for the `k8s` provider

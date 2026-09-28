@@ -793,4 +793,4 @@ card that used it.
 - Program: [../README.md](../README.md) · Tracker: [../TRACKER.md](../TRACKER.md)
 - Constitution: [../../../../../.specify/memory/constitution.md](../../../../../.specify/memory/constitution.md)
 - Existing specs this extends: [activity-log](../../activity-log/), [schedules](../../schedules/),
-  [notifications](../../notifications/), [event-subscriptions](../../event-subscriptions/)
+  [notifications](../../notifications/), [event-subscriptions](../../event-subscriptions/README.md)

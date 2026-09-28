@@ -117,7 +117,7 @@ quietly — a renamed skill is a different skill to anything that references it.
 The Ever Works MCP server is itself published as a package descriptor, so any
 conforming client can install it rather than being configured by hand. It
 contains **no credentials** — your client supplies its own. See
-[MCP Server](./mcp-server) for details.
+[MCP Server](./mcp-server.md) for details.
 
 ## What Ever Works does and does not implement
 
@@ -129,6 +129,6 @@ drift from what the code does.
 
 ## Related
 
-- [Skills Catalog](./skills-catalog) — where package skills appear
-- [MCP Server](./mcp-server) — the Ever Works MCP server, and its package descriptor
+- [Skills Catalog](./skills-catalog.md) — where package skills appear
+- [MCP Server](./mcp-server.md) — the Ever Works MCP server, and its package descriptor
 - [Plugin System](/plugin-system/) — the existing plugin system, unchanged

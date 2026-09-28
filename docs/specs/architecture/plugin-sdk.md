@@ -396,7 +396,7 @@ links. CI builds every plugin with strict tsconfig — drift from
 ## 15. References
 
 - Source: `packages/plugin/src/`
-- User-facing plugin docs: [`docs/plugin-system/`](../../plugin-system/)
+- User-facing plugin docs: [`docs/plugin-system/`](../../plugin-system/index.md)
 - Per-feature retrospective specs that build on this:
     - [`features/plugin-system/spec`](../features/plugin-system/spec.md)
     - [`features/git-operations/spec`](../features/git-operations/spec.md)

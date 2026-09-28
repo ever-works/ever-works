@@ -10,14 +10,14 @@ An **Idea** is a proposed Work — a title + description + suggested categories 
 
 You'll see Ideas at `/ideas`. They show up from three sources:
 
-| Source           | Where it comes from                                                               |
-| ---------------- | --------------------------------------------------------------------------------- |
-| **auto-signup**  | Generated automatically when you sign up, based on your onboarding answers.       |
-| **user-refresh** | You hit **Suggest more** on `/ideas`.                                             |
-| **discover**     | Surfaced from the platform's discovery feeds (curated catalogs, trending topics). |
-| **scheduled**    | A scheduled refresh job (account-level cadence).                                  |
-| **user-manual**  | You typed one directly via the `+ Add` button or `/new` → Idea chip.              |
-| **mission**      | Spawned by a [Mission](./missions) tick — carries a `missionId` back-reference.   |
+| Source           | Where it comes from                                                                |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| **auto-signup**  | Generated automatically when you sign up, based on your onboarding answers.        |
+| **user-refresh** | You hit **Suggest more** on `/ideas`.                                              |
+| **discover**     | Surfaced from the platform's discovery feeds (curated catalogs, trending topics).  |
+| **scheduled**    | A scheduled refresh job (account-level cadence).                                   |
+| **user-manual**  | You typed one directly via the `+ Add` button or `/new` → Idea chip.               |
+| **mission**      | Spawned by a [Mission](./missions.md) tick — carries a `missionId` back-reference. |
 
 All sources produce the same Idea shape; only the `source` field on the Idea distinguishes them.
 
@@ -83,7 +83,7 @@ When a build fails, the Idea moves to `FAILED` and carries diagnostic info:
 
 ## Mission-spawned Ideas
 
-Ideas spawned by a [Mission](./missions) carry a `missionId` back-reference and show up both:
+Ideas spawned by a [Mission](./missions.md) carry a `missionId` back-reference and show up both:
 
 - On the global `/ideas` page (alongside non-Mission Ideas).
 - On the Mission's detail page, filtered to just that Mission's Ideas.
@@ -94,7 +94,7 @@ If that Mission has [auto-build Works](./missions.md#auto-build-works) on, its I
 
 ## Cost & budget
 
-Every build costs AI credits. Per-Idea spend rolls up against the Mission (if Mission-spawned) and your account-wide cap. See [Budgets & Usage](./budgets-and-usage) for how to set caps and what happens when one is hit.
+Every build costs AI credits. Per-Idea spend rolls up against the Mission (if Mission-spawned) and your account-wide cap. See [Budgets & Usage](./budgets-and-usage.md) for how to set caps and what happens when one is hit.
 
 ## API
 
@@ -112,4 +112,4 @@ The same verbs are reachable via the API + MCP server:
 | Accept             | `POST /api/me/work-proposals/:id/accept`          |
 | Per-Idea budget    | `GET  /api/me/work-proposals/:id/budget`          |
 
-Same routes are exposed as MCP tools (`list_ideas`, `build_idea`, etc.) for external MCP clients — see the [MCP Server](./mcp-server) docs.
+Same routes are exposed as MCP tools (`list_ideas`, `build_idea`, etc.) for external MCP clients — see the [MCP Server](./mcp-server.md) docs.

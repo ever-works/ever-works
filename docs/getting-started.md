@@ -260,7 +260,7 @@ Once the API is running:
 | `http://localhost:3100/api/openapi.json` | OpenAPI JSON spec    |
 
 :::warning Development only
-All three surfaces are mounted only when `NODE_ENV !== 'production'`. A production API serves no Swagger UI, no Scalar reference and no `openapi.json`, deliberately — the document is a full inventory of every endpoint and DTO shape. Use the published [API Reference](./api/) instead.
+All three surfaces are mounted only when `NODE_ENV !== 'production'`. A production API serves no Swagger UI, no Scalar reference and no `openapi.json`, deliberately — the document is a full inventory of every endpoint and DTO shape. Use the published [API Reference](./api/index.md) instead.
 :::
 
 ## Next Steps
@@ -282,8 +282,8 @@ Then go deeper:
 - [Environment Variables](./environment-variables.md) — Complete variable reference (80+ vars)
 - [Creating a Work](./features/creating-a-work.md) — The creation methods, providers, and pipeline plugins
 - [Architecture](./architecture.md) — Monorepo structure, modules, and data flow
-- [Plugin System](./plugin-system/) — Plugin architecture and creating custom plugins
-- [API Reference](./api/) — REST API endpoints
+- [Plugin System](./plugin-system/index.md) — Plugin architecture and creating custom plugins
+- [API Reference](./api/index.md) — REST API endpoints
 
 ## Related
 
