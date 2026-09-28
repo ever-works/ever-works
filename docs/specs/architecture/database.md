@@ -452,4 +452,4 @@ Knowledge Base is the per-Work institutional-context subsystem (see [feature spe
     - [`auth`](./auth.md) (token storage)
     - [`agent-services/distributed-task-lock`](../../agent-services/distributed-task-lock.md)
     - [`features/knowledge-base`](../features/knowledge-base/spec.md)
-- User docs: [`docs/database/`](../../database/)
+- User docs: [`docs/database/`](../../database.md)
