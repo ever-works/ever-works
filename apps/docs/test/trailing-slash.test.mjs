@@ -13,6 +13,9 @@
  *      page `docs/a/b.md` lives at `/a/b/` instead of `/a/b`, so the extension-less `[x](./c)` now
  *      resolves to `/a/b/c/` (a 404) instead of `/a/c`, and `[x](../c)` to `/a/c/` instead of `/c`.
  *      File links (`./c.md`, `./dir/index.md`) resolve by FILE and are immune - use those.
+ *   4. ...except to a doc a locale translates (`apps/docs/i18n/<locale>/.../current/<path>`): that
+ *      locale builds its own copy instead of the English file, so a file link to it from a page the
+ *      locale does not translate cannot be resolved there. Link those by URL.
  *
  * Run: `pnpm --filter ever-works-docs test` (node's built-in runner, no dependencies).
  */
@@ -108,6 +111,20 @@ function isPageRelativeLink(target) {
 	if (!pathPart) return false;
 	const lastSegment = pathPart.replace(/\/+$/, '').split('/').pop();
 	return !/\.[a-z0-9]+$/i.test(lastSegment) || pathPart.endsWith('/');
+}
+
+/** The absolute file a relative FILE link (`./x.md`, `../y/index.mdx#a`) names, else `undefined`. */
+function fileLinkTarget(target, fromFile) {
+	if (/^(\/|#|[a-z][a-z0-9+.-]*:)/i.test(target)) return undefined;
+	const pathPart = target.split(/[?#]/)[0];
+	if (!/\.mdx?$/i.test(pathPart)) return undefined;
+	let decoded = pathPart;
+	try {
+		decoded = decodeURIComponent(pathPart);
+	} catch {
+		// keep the raw path
+	}
+	return path.resolve(path.dirname(fromFile), decoded);
 }
 
 /** Route a relative `target` lands on from `pageUrl` (browser URL resolution). */
@@ -235,5 +252,46 @@ describe('relative doc links keep their destination under trailingSlash', () => 
 			}
 		}
 		assert.deepEqual(offenders, [], `link the FILE instead:\n${offenders.join('\n')}`);
+	});
+
+	it('resolves relative FILE links to the file they name', () => {
+		const from = path.join(docsRoot, 'specs', 'README.md');
+		assert.equal(fileLinkTarget('../index.md', from), path.join(docsRoot, 'index.md'));
+		assert.equal(fileLinkTarget('./x/y.mdx#a', from), path.join(docsRoot, 'specs', 'x', 'y.mdx'));
+		for (const notFile of ['../', './page', '/faq', 'https://ever.works/x.md', '#x']) {
+			assert.equal(fileLinkTarget(notFile, from), undefined, `${notFile} is not a relative file link`);
+		}
+	});
+
+	it('links no translated doc by FILE from a page the locale does not translate', () => {
+		// A locale builds its translated copy of a doc INSTEAD of the English file, so from an
+		// English page it falls back to, `./faq.md` names a source that locale's build does not
+		// have: Docusaurus cannot resolve it and emits a broken `faq.md/` URL. Link such a page
+		// by URL instead - `../` from an index page, or an absolute `/faq` (Docusaurus prefixes the
+		// locale and applies trailingSlash to both).
+		const offenders = [];
+		let translatedDocs = 0;
+		for (const root of localeRoots) {
+			let translated;
+			try {
+				translated = new Set(listDocFiles(root).map((file) => path.relative(root, file)));
+			} catch {
+				continue;
+			}
+			translatedDocs += translated.size;
+			const locale = path.basename(path.resolve(root, '../..'));
+			for (const { file, markdown } of docs) {
+				if (translated.has(path.relative(docsRoot, file))) continue; // the locale renders its own copy
+				for (const target of linkTargets(markdown)) {
+					const resolved = fileLinkTarget(target, file);
+					if (resolved && translated.has(path.relative(docsRoot, resolved))) {
+						const source = path.relative(repoRoot, file).split(path.sep).join('/');
+						offenders.push(`${source}: ${target} (translated in ${locale})`);
+					}
+				}
+			}
+		}
+		assert.ok(translatedDocs > 0, 'expected at least one translated doc under apps/docs/i18n');
+		assert.deepEqual(offenders, [], `link these by URL instead:\n${offenders.join('\n')}`);
 	});
 });

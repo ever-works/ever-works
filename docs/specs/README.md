@@ -3,7 +3,7 @@
 This work holds **internal architectural specs and ADRs** for the Ever
 Works Platform. It is _not_ user-facing documentation — those live in
 [`../features/`](../features/index.md), [`../api/`](../api/index.md), and the rest of
-[`../`](../index.md). These specs target AI agents and humans who need to understand
+[`../`](../). These specs target AI agents and humans who need to understand
 how features work architecturally and reason about changes to them.
 
 The specs follow the
