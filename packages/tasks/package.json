@@ -53,6 +53,6 @@
         "@types/ws": "^8.18.0",
         "trigger.dev": "4.5.11",
         "typescript": "^5.9.3",
-        "vitest": "^4.1.0"
+        "vitest": "^5.0.2"
     }
 }
