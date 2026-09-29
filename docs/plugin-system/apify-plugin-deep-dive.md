@@ -192,5 +192,5 @@ const validation = apifyPlugin.validateFormInput({
 
 ## Related Plugins
 
-- [Notion Extractor Plugin Deep Dive](./notion-plugin-deep-dive) -- another supplementary data source for Notion content.
-- [Apify Plugin](./apify-plugin) -- overview documentation for the Apify plugin.
+- [Notion Extractor Plugin Deep Dive](./notion-plugin-deep-dive.md) -- another supplementary data source for Notion content.
+- [Apify Plugin](./apify-plugin.md) -- overview documentation for the Apify plugin.

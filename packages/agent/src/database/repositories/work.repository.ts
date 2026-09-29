@@ -610,6 +610,43 @@ export class WorkRepository {
         });
     }
 
+    /**
+     * Works that name this website template explicitly, across ALL users
+     * (the per-user {@link countByUserAndWebsiteTemplateId} guards archiving a
+     * custom template).
+     *
+     * No production caller: website-template discovery used this to decide
+     * whether an App Blueprint's row could be deactivated, and now RETIRES the
+     * row instead (templates-catalog FR-5 c), which leaves it resolvable and
+     * needs no usage count.
+     */
+    async countByWebsiteTemplateId(websiteTemplateId: string): Promise<number> {
+        return this.repository.count({ where: { websiteTemplateId } });
+    }
+
+    /**
+     * Works owned by any of `userIds` that leave `websiteTemplateId` unset and
+     * so inherit their owner's default template. The user list is queried in
+     * bounded IN() chunks (SQLite caps bind parameters); an empty list is 0
+     * without a query.
+     *
+     * No production caller, for the reason given on
+     * {@link countByWebsiteTemplateId}.
+     */
+    async countByUsersAndInheritedWebsiteTemplateSelection(userIds: string[]): Promise<number> {
+        const chunkSize = 500;
+        let total = 0;
+        for (let start = 0; start < userIds.length; start += chunkSize) {
+            total += await this.repository.count({
+                where: {
+                    userId: In(userIds.slice(start, start + chunkSize)),
+                    websiteTemplateId: IsNull(),
+                },
+            });
+        }
+        return total;
+    }
+
     async findByUser(userId: string): Promise<Work[]> {
         return await this.repository.find({ where: { userId } });
     }

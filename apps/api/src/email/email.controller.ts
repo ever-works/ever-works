@@ -345,10 +345,16 @@ export class EmailController {
         // mode, persists the email_messages row, spawns a task or appends
         // to a conversation). Optional: when the token isn't bound the
         // webhook still acks so the provider stops retrying.
+        //
+        // Security: the destination is the address the signature was
+        // verified for (`authenticatedRecipient`), never one re-derived from
+        // the payload's `to` list — a tenant signing with their own per-user
+        // key could otherwise name a victim's address beside their own.
         let dispatch: { handled: boolean; agentId?: string; mode?: string } | undefined;
         if (this.inboundDispatcher) {
             dispatch = await this.inboundDispatcher.dispatch({
                 pluginId,
+                recipient: message.authenticatedRecipient ?? null,
                 providerMessageId: message.providerMessageId,
                 from: message.from,
                 to: [...message.to],
@@ -389,8 +395,8 @@ export class EmailController {
         // Verify + decode the provider delivery-event payload, then fold
         // each event's outcome onto the matching email_messages row
         // (latest-status-wins). Always 202s so the provider stops
-        // retrying; a signature failure throws (mapped to 401 by the
-        // plugin's verifyWebhookSignature).
+        // retrying; a signature failure throws — the facade answers it 401
+        // with a generic body, and a plugin that cannot load 503.
         const events = await this.emailFacade.parseEventWebhook(pluginId, rawBody, headers);
         const recorded = await this.emailFacade.recordDeliveryEvents(pluginId, events);
         return { received: true, pluginId, events: events.length, recorded };

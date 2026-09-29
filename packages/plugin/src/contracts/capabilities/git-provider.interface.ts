@@ -25,6 +25,13 @@ export interface GitRepository {
 		readonly name: string;
 		readonly fullName: string;
 	};
+	/**
+	 * The repository's topics, as the provider reports them (website-template
+	 * discovery checks for `ever-works-app-blueprint` to keep App Blueprints out
+	 * of the website picker). `undefined` means "not reported", never "no
+	 * topics". Optional and additive.
+	 */
+	readonly topics?: readonly string[];
 }
 
 export interface GitBranch {

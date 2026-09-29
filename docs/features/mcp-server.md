@@ -16,7 +16,7 @@ Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible cli
 ## Prerequisites
 
 - A running Ever Works API instance
-- An [API key](./api-keys) for authentication
+- An [API key](./api-keys.md) for authentication
 - Node.js 20 or later
 
 ## Architecture
@@ -389,7 +389,7 @@ what Ever Works implements of the standard, including what it does not.
 
 ## Related
 
-- [API Keys](./api-keys) — Generate API keys for MCP server authentication
+- [API Keys](./api-keys.md) — Generate API keys for MCP server authentication
 - [Authentication](/api/authentication) — Full API authentication reference
 - [Plugin System](/plugin-system/) — Plugins that power generation, search, and deployment
 - [Agent Plugins conformance](/specs/features/agent-plugins/conformance) — What Ever Works implements of the open Agent Plugins v1.0.0 standard

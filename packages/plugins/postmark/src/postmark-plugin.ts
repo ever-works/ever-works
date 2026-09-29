@@ -223,7 +223,9 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		_options: EmailOptions
 	): Promise<EmailInboundMessage> {
 		const payload = JSON.parse(rawBody.toString('utf8')) as PostmarkInboundPayload;
-		const to = payload.ToFull?.map((t) => t.Email) ?? (payload.To ? [payload.To] : []);
+		// The same bare mailboxes `extractInboundRecipients` names (the raw
+		// `To` fallback may carry a display name).
+		const to = payload.ToFull?.map((t) => t.Email) ?? (payload.To ? [parseEmailAddress(payload.To)] : []);
 		const attachments: EmailAttachment[] =
 			payload.Attachments?.map((a) => ({
 				filename: a.Name,

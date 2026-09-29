@@ -770,7 +770,7 @@ Accessibility requirements that are part of this spec, not decoration:
 - Implementation plan: [plan.md](./plan.md) · Task list: [tasks.md](./tasks.md)
 - Constitution: [../../../../../.specify/memory/constitution.md](../../../../../.specify/memory/constitution.md)
 - Adjacent existing specs: [activity-log](../../activity-log/), [notifications](../../notifications/),
-  [event-subscriptions](../../event-subscriptions/), [schedules](../../schedules/)
+  [event-subscriptions](../../event-subscriptions/README.md), [schedules](../../schedules/)
 - Consuming epics: [AW-13](../AW-13-attention-controls/), [AW-19](../AW-19-home/)
 - Linked-to epics: [AW-03](../AW-03-decision-queue/), [AW-09](../AW-09-runs-receipts/),
   [AW-18](../AW-18-shared-dashboards/)

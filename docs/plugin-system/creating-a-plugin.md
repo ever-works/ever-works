@@ -13,15 +13,15 @@ This guide walks through creating a new plugin from scratch. We'll build a searc
 
 For detailed, category-specific instructions, see these dedicated guides:
 
-| Category          | Guide                                                                      | What It Covers                                                      |
-| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| AI Provider       | [Creating an AI Provider Plugin](./creating-ai-provider-plugin)            | `BaseAiProvider`, `AiOperations`, model tiers, embeddings           |
-| Search            | [Creating a Search Plugin](./creating-search-plugin)                       | `ISearchPlugin`, filtering, pagination, dual-capability             |
-| Screenshot        | [Creating a Screenshot Plugin](./creating-screenshot-plugin)               | `IScreenshotPlugin`, capture, signed URLs, viewport config          |
-| Content Extractor | [Creating a Content Extractor Plugin](./creating-content-extractor-plugin) | `IContentExtractorPlugin`, general vs additive, batch extraction    |
-| Pipeline          | [Creating a Pipeline Plugin](./creating-pipeline-plugin)                   | `IPipelinePlugin`, self-managed vs engine-orchestratable, modifiers |
-| Deployment & Git  | [Creating a Deployment Plugin](./creating-deployment-plugin)               | `BaseGitProvider`, `IDeploymentPlugin`, OAuth                       |
-| Data Source       | [Creating a Data Source Plugin](./creating-data-source-plugin)             | `IDataSourcePlugin`, field mapping, form schema                     |
+| Category          | Guide                                                                         | What It Covers                                                      |
+| ----------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| AI Provider       | [Creating an AI Provider Plugin](./creating-ai-provider-plugin.md)            | `BaseAiProvider`, `AiOperations`, model tiers, embeddings           |
+| Search            | [Creating a Search Plugin](./creating-search-plugin.md)                       | `ISearchPlugin`, filtering, pagination, dual-capability             |
+| Screenshot        | [Creating a Screenshot Plugin](./creating-screenshot-plugin.md)               | `IScreenshotPlugin`, capture, signed URLs, viewport config          |
+| Content Extractor | [Creating a Content Extractor Plugin](./creating-content-extractor-plugin.md) | `IContentExtractorPlugin`, general vs additive, batch extraction    |
+| Pipeline          | [Creating a Pipeline Plugin](./creating-pipeline-plugin.md)                   | `IPipelinePlugin`, self-managed vs engine-orchestratable, modifiers |
+| Deployment & Git  | [Creating a Deployment Plugin](./creating-deployment-plugin.md)               | `BaseGitProvider`, `IDeploymentPlugin`, OAuth                       |
+| Data Source       | [Creating a Data Source Plugin](./creating-data-source-plugin.md)             | `IDataSourcePlugin`, field mapping, form schema                     |
 
 The rest of this page covers the **common patterns** shared by all plugin categories.
 
@@ -109,7 +109,7 @@ Key fields in `everworks.plugin`:
 | Field          | Description                                                                  |
 | -------------- | ---------------------------------------------------------------------------- |
 | `id`           | Unique plugin identifier. Must match the `id` in your plugin class.          |
-| `category`     | Primary category (see [Architecture](./architecture#plugin-categories))      |
+| `category`     | Primary category (see [Architecture](./architecture.md#plugin-categories))   |
 | `capabilities` | Array of capabilities this plugin provides                                   |
 | `builtIn`      | Set to `true` for plugins shipped with the platform                          |
 | `autoEnable`   | If `true`, the plugin is enabled by default for new users                    |

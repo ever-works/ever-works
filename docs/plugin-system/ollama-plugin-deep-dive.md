@@ -177,6 +177,6 @@ const available = await ollamaPlugin.isAvailable({
 
 ## Related Plugins
 
-- [OpenAI Plugin Deep Dive](./openai-plugin-deep-dive) -- cloud-hosted AI provider with native embedding support.
-- [Anthropic Plugin Deep Dive](./anthropic-plugin-deep-dive) -- cloud-hosted AI provider with large context windows.
-- [Ollama Plugin](./ollama-plugin) -- overview documentation for the Ollama plugin.
+- [OpenAI Plugin Deep Dive](./openai-plugin-deep-dive.md) -- cloud-hosted AI provider with native embedding support.
+- [Anthropic Plugin Deep Dive](./anthropic-plugin-deep-dive.md) -- cloud-hosted AI provider with large context windows.
+- [Ollama Plugin](./ollama-plugin.md) -- overview documentation for the Ollama plugin.

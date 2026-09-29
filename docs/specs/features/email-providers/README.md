@@ -6,4 +6,4 @@ Tenant-managed inbound/outbound email + per-Agent assignment + multi-provider pl
 - [plan.md](./plan.md) — implementation plan
 - [tasks.md](./tasks.md) — task breakdown
 
-Sibling specs in the notifications-v2 umbrella: [`notification-channels`](../notification-channels/), [`event-subscriptions`](../event-subscriptions/), [`agent-inbox-ui`](../agent-inbox-ui/).
+Sibling specs in the notifications-v2 umbrella: [`notification-channels`](../notification-channels/README.md), [`event-subscriptions`](../event-subscriptions/README.md), [`agent-inbox-ui`](../agent-inbox-ui/README.md).

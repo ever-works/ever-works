@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import {
+    Inject,
+    Injectable,
+    Logger,
+    Optional,
+    ServiceUnavailableException,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { PLUGIN_CAPABILITIES, type FacadeOptions, type IPlugin } from '@ever-works/plugin';
 import {
     isEmailOutboundPlugin,
@@ -15,6 +22,9 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { TenantEmailAddressRepository } from '../database/repositories/tenant-email-address.repository';
+import type { TenantEmailAddress } from '../entities/tenant-email-address.entity';
+// Leaf contract file — types only, no runtime graph.
+import type { AgentInboundEmailRecipient } from '../notifications/agent-inbound-email-dispatcher';
 import { AgentEmailAssignmentRepository } from '../database/repositories/agent-email-assignment.repository';
 import { EmailMessageRepository } from '../database/repositories/email-message.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
@@ -35,6 +45,14 @@ import { BaseFacadeService, FacadeError, NoProviderError } from './base.facade';
  * sends, or by the address's provider when the send fails first.
  */
 export const EMAIL_SEND_RESERVATION_PENDING_PLUGIN_ID = 'pending';
+
+/**
+ * The whole answer (401) to a webhook whose signature check failed. The
+ * plugin's own reason can say WHICH check failed (a missing header, a stale
+ * timestamp, a mismatch against the configured secret): it is logged, never
+ * answered to the unauthenticated caller.
+ */
+const WEBHOOK_SIGNATURE_REJECTED = 'Invalid webhook signature';
 
 export class EmailFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -60,6 +78,24 @@ export interface EmailFacadeSendInput extends Omit<EmailSendInput, 'bodyText' | 
     readonly bodyText?: string;
     readonly bodyHtml?: string;
     readonly template?: EmailFacadeTemplate;
+}
+
+/**
+ * What {@link EmailFacadeService.parseInbound} answers: the plugin's parsed
+ * message, plus the tenant address the webhook was authenticated for.
+ */
+export interface AuthenticatedInboundEmail extends EmailInboundMessage {
+    /**
+     * The registered inbound address of THIS plugin whose owner's secret (the
+     * owner's own, or the admin/env one the owner inherits) verified the
+     * signature — the only address the message may be dispatched to.
+     *
+     * `null` when no recipient is a registered inbound address of this plugin,
+     * when the plugin cannot name its recipients (`extractInboundRecipients`),
+     * or when the caller supplied the verification scope itself: the webhook
+     * is then authenticated at that scope only, and bound to no address.
+     */
+    readonly authenticatedRecipient: AgentInboundEmailRecipient | null;
 }
 
 export interface EmailFacadeSendOptions extends FacadeOptions {
@@ -319,30 +355,55 @@ export class EmailFacadeService extends BaseFacadeService {
     }
 
     /**
-     * Dispatch an inbound webhook payload to the matching email-inbound
-     * plugin. Called from `apps/api/src/email/email.controller.ts`.
+     * Authenticate and decode an inbound-email webhook, and name the tenant
+     * address it was authenticated for. Called from
+     * `apps/api/src/email/email.controller.ts`, which dispatches the message
+     * to that address ({@link AuthenticatedInboundEmail.authenticatedRecipient})
+     * and to no other.
+     *
+     * The route is public: this signature check is its ONLY authentication.
+     *
+     * 1. The recipient is bound FIRST: the first address the plugin extracts
+     *    from the payload that is a registered inbound address of this plugin
+     *    ({@link resolveInboundRecipient}).
+     * 2. The signature is verified with the secret at that address owner's
+     *    scope — the owner's own, which REPLACES the admin/env one there, or
+     *    the admin/env one when the owner has none. With no bound address it
+     *    is verified at admin/env scope (or the scope the caller supplied).
+     * 3. The message is parsed at the same scope.
+     *
+     * A verified webhook therefore proves knowledge of exactly the secret that
+     * guards {@link AuthenticatedInboundEmail.authenticatedRecipient}. It says
+     * nothing about any OTHER recipient the payload names: another tenant can
+     * sign with their own per-user key and list a victim's address beside
+     * theirs, so a destination must never be re-derived from `to`.
+     *
+     * Fails closed: every plugin method below is called on the plugin's REAL,
+     * loaded instance ({@link getUsableInboundPlugin} — 503 when it cannot
+     * load), never through the registry's lazy proxy, and the verification is
+     * awaited ({@link verifyWebhookSignature} — 401 with a generic body when
+     * it fails). Note that a plugin with NO secret at the resolved scope
+     * accepts unsigned webhooks (an operator opt-in in the shipped postmark
+     * and mailgun plugins).
      */
     async parseInbound(
         pluginId: string,
         rawBody: Buffer,
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
-    ): Promise<EmailInboundMessage> {
-        const plugin = this.getInboundPluginById(pluginId);
+    ): Promise<AuthenticatedInboundEmail> {
+        const plugin = await this.getUsableInboundPlugin(pluginId, 'parseInbound');
 
-        // EW-670 follow-up — resolve the recipient address's OWNER before
-        // verifying the signature. The inbound webhook controller can't
-        // know the owning user up front (the recipient lives in the
-        // payload), so without this the secret resolves at admin/env
-        // scope only and a per-user `inboundWebhookSecret` is never
-        // loaded — meaning a Postmark/Mailgun `if (!expected) return`
-        // accept-all path silently skips verification for user-scoped
-        // secrets. Map recipient → owning tenant address → userId, then
-        // resolve settings (and therefore the secret) at that scope.
-        // Best-effort and additive: when the caller already supplies a
-        // userId, the plugin omits `extractInboundRecipients`, or no
-        // owner matches, this falls back to the previous behaviour.
-        const scope = await this.resolveInboundScope(plugin, rawBody, headers, options);
+        // EW-670 follow-up — the inbound webhook controller can't know the
+        // owning user up front (the recipient lives in the payload), so
+        // without this the secret resolves at admin/env scope only and a
+        // per-user `inboundWebhookSecret` is never loaded — meaning a
+        // Postmark/Mailgun `if (!expected) return` accept-all path silently
+        // skips verification for user-scoped secrets.
+        const recipient = await this.resolveInboundRecipient(plugin, rawBody, headers, options);
+        const scope: FacadeOptions = recipient
+            ? { ...options, userId: recipient.userId }
+            : { ...options };
 
         const settings = await this.resolveSettings(pluginId, scope);
         const emailOpts: EmailOptions = {
@@ -352,8 +413,14 @@ export class EmailFacadeService extends BaseFacadeService {
             taskId: scope.taskId,
             settings,
         };
-        plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
-        return plugin.parseInboundWebhook(rawBody, headers, emailOpts);
+        await this.verifyWebhookSignature(plugin, pluginId, rawBody, headers, emailOpts);
+        const message = await plugin.parseInboundWebhook(rawBody, headers, emailOpts);
+        return {
+            ...message,
+            authenticatedRecipient: recipient?.id
+                ? { emailAddressId: recipient.id, userId: recipient.userId }
+                : null,
+        };
     }
 
     /**
@@ -369,8 +436,12 @@ export class EmailFacadeService extends BaseFacadeService {
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
     ): Promise<readonly EmailDeliveryEvent[]> {
-        const plugin = this.getInboundPluginById(pluginId);
-        if (!plugin.parseEventWebhook) return [];
+        // The loaded instance, as for `parseInbound`: its optional
+        // `parseEventWebhook` is then truthfully present or absent (the lazy
+        // proxy answers a forwarding wrapper for ANY name), and the signature
+        // check below is the plugin's real, synchronous one.
+        const plugin = await this.getUsableInboundPlugin(pluginId, 'parseEventWebhook');
+        if (typeof plugin.parseEventWebhook !== 'function') return [];
         const settings = await this.resolveSettings(pluginId, options);
         const emailOpts: EmailOptions = {
             userId: options?.userId,
@@ -379,7 +450,7 @@ export class EmailFacadeService extends BaseFacadeService {
             taskId: options?.taskId,
             settings,
         };
-        plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+        await this.verifyWebhookSignature(plugin, pluginId, rawBody, headers, emailOpts);
         return plugin.parseEventWebhook(rawBody, headers, emailOpts);
     }
 
@@ -418,40 +489,58 @@ export class EmailFacadeService extends BaseFacadeService {
     }
 
     /**
-     * Best-effort: widen the inbound FacadeOptions with the owning user
-     * resolved from the payload's recipient address, so signature
-     * verification reads the owner's per-user secret. Never throws —
-     * returns the original options on any failure.
+     * The tenant address an inbound webhook is bound to: the first recipient
+     * the plugin extracts from the (not yet verified) payload that is a
+     * registered inbound address of THIS plugin. Its owner's secret is the one
+     * the webhook must then prove.
+     *
+     * An address registered with another provider is skipped: a webhook to
+     * this plugin's endpoint proves only a secret of this plugin, never the
+     * one the other provider's owner configured. Skipping it is safe only
+     * because the message is then dispatched to the bound address alone —
+     * never to one re-derived from the payload (see `parseInbound`).
+     *
+     * `null` — so admin/env-scope verification, bound to no address — when
+     * the caller supplied a userId (its scope is used as given), the plugin
+     * cannot extract recipients, or none matches. Never throws.
      */
-    private async resolveInboundScope(
+    private async resolveInboundRecipient(
         plugin: IEmailInboundPlugin,
         rawBody: Buffer,
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
-    ): Promise<FacadeOptions> {
-        const base: FacadeOptions = { ...options };
-        if (base.userId || !plugin.extractInboundRecipients || !this.emailAddresses) {
-            return base;
+    ): Promise<TenantEmailAddress | null> {
+        if (
+            options?.userId ||
+            typeof plugin.extractInboundRecipients !== 'function' ||
+            !this.emailAddresses
+        ) {
+            return null;
         }
         try {
-            const recipients = plugin.extractInboundRecipients(rawBody, headers);
+            // `plugin` is the loaded instance, so this sync method answers its
+            // array. `Promise.resolve` still tolerates an implementation that
+            // returns a Promise, and anything but an array names nobody.
+            const extracted: unknown = await Promise.resolve(
+                plugin.extractInboundRecipients(rawBody, headers),
+            );
+            const recipients: readonly unknown[] = Array.isArray(extracted) ? extracted : [];
             for (const recipient of recipients) {
-                if (!recipient) continue;
+                if (typeof recipient !== 'string' || !recipient) continue;
                 const owner = await this.emailAddresses.findByAddress(recipient);
-                // Only adopt the resolved owner when the matched address is
-                // registered to THIS plugin — a mailbox can be registered by
-                // multiple tenants/providers, so an address-only match could
-                // otherwise attribute the verification scope to the wrong
-                // owner (Codex/Greptile on PR #1115). When it doesn't match we
-                // fall back to the base (admin/env) scope below.
+                // Only an address registered to THIS plugin (Codex/Greptile on
+                // PR #1115): a mailbox can be registered by several tenants /
+                // providers, and an address-only match would verify with the
+                // wrong owner's secret.
                 //
-                // Note: widening the scope to the owner's userId never
-                // *weakens* verification — `getSettings({ userId })` resolves
-                // the admin→user hierarchy, so an admin-level
-                // `inboundWebhookSecret` is still present (and enforced) at
-                // owner scope; the user's own secret only layers on top.
+                // Scoping to the owner can REPLACE the secret, not only add
+                // one: `getSettings({ userId })` layers the user's settings
+                // over the admin ones, so a user who saved their own
+                // `inboundWebhookSecret` / `webhookSigningKey` is verified with
+                // THAT key alone. Whoever holds it is authenticated for this
+                // owner's address — and for nothing else.
                 if (owner?.userId && owner.pluginId === plugin.id) {
-                    return { ...base, userId: owner.userId };
+                    return owner;
                 }
             }
         } catch (err) {
@@ -461,7 +550,7 @@ export class EmailFacadeService extends BaseFacadeService {
                 }`,
             );
         }
-        return base;
+        return null;
     }
 
     /**
@@ -512,18 +601,128 @@ export class EmailFacadeService extends BaseFacadeService {
         return isEmailOutboundPlugin(registered.plugin) ? registered.plugin : undefined;
     }
 
-    private getInboundPluginById(pluginId: string): IEmailInboundPlugin {
+    /**
+     * The REAL, loaded instance of the inbound plugin `pluginId`, for a
+     * webhook about to be verified with it.
+     *
+     * The registry holds a disk-discovered plugin (mailgun, postmark) as a
+     * lazy proxy, and the proxy answers EVERY non-manifest member with an
+     * async forwarding wrapper, cold or loaded. Called through it, a SYNC
+     * method answers a Promise: a failing `verifyWebhookSignature` became a
+     * discarded rejected Promise (the forged message was parsed and
+     * dispatched, and the rejection went unhandled),
+     * `extractInboundRecipients` named no owner (so a per-user secret was
+     * never resolved), and `parseEventWebhook` was always "present". While
+     * the proxy is cold its `settingsSchema` also reads as `{}`, so settings
+     * resolved before the load missed every secret. `__materialize()` loads
+     * the plugin (import + onLoad, deduped across concurrent callers) and
+     * answers the instance itself, whose methods are the plugin's own; it runs
+     * before any settings are resolved. A caller that arrives after the import
+     * while another request's onLoad is still running gets the instance at
+     * once: its signature check is still the plugin's own synchronous one.
+     *
+     * A plugin that cannot load is refused with a 503, never accepted
+     * unverified: its import fails, or its onLoad fails. `callOnLoad` catches
+     * an onLoad failure and records `error` on the registry entry while
+     * `__materialize()` still resolves, so the entry is checked again after
+     * the load (the registry mutates its entries in place).
+     */
+    private async getUsableInboundPlugin(
+        pluginId: string,
+        operation: string,
+    ): Promise<IEmailInboundPlugin> {
         const registered = this.registry
             .getByCapability(PLUGIN_CAPABILITIES.EMAIL_INBOUND)
             .find((p) => p.plugin.id === pluginId && p.state === 'loaded');
         if (!registered || !isEmailInboundPlugin(registered.plugin)) {
             throw new EmailFacadeError(
                 `Inbound email plugin not found or disabled: ${pluginId}`,
-                'parseInbound',
+                operation,
                 pluginId,
             );
         }
-        return registered.plugin;
+        const refuse = (reason: string): never => {
+            this.logger.warn(`${operation}: refusing the webhook for ${pluginId} — ${reason}`);
+            throw new ServiceUnavailableException(
+                `Inbound email plugin ${pluginId} is unavailable`,
+            );
+        };
+        let real: unknown = registered.plugin;
+        const lazy = registered.plugin as { __materialize?: () => Promise<IPlugin> };
+        if (typeof lazy.__materialize === 'function') {
+            try {
+                real = await lazy.__materialize();
+            } catch (error) {
+                refuse(
+                    `it could not be loaded: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        // Re-read the entry: an onLoad failure is recorded on it, in place.
+        const state: string = registered.state;
+        if (state !== 'loaded') {
+            const cause = registered.error;
+            refuse(
+                `it is in the "${state}" state${
+                    cause ? `: ${cause instanceof Error ? cause.message : String(cause)}` : ''
+                }`,
+            );
+        }
+        return (real ?? registered.plugin) as IEmailInboundPlugin;
+    }
+
+    /**
+     * Run the plugin's signature check and FAIL CLOSED.
+     *
+     * The contract is synchronous: throw on a mismatch. An implementation
+     * that returns a Promise instead is a bug, but a rejection it carries
+     * must still refuse the webhook — never be left unawaited (a discarded
+     * verification Promise both skips the check and surfaces as an unhandled
+     * rejection, which terminates a Node process that has no
+     * `unhandledRejection` listener) — so a thenable is awaited. A plugin with
+     * no `verifyWebhookSignature` at all cannot authenticate anything and is
+     * refused.
+     *
+     * A failed check — a throw, or a rejection of that thenable — is answered
+     * 401 with a generic body (email-providers spec §7). The plugin throws a
+     * plain `Error`, which the API would otherwise answer 500: the provider
+     * would retry a forged delivery as if we had failed, and the plugin's
+     * reason could say which check failed. That reason is logged instead, and
+     * kept as the exception's `cause`.
+     */
+    private async verifyWebhookSignature(
+        plugin: IEmailInboundPlugin,
+        pluginId: string,
+        rawBody: Buffer,
+        headers: Readonly<Record<string, string>>,
+        emailOpts: EmailOptions,
+    ): Promise<void> {
+        if (typeof plugin.verifyWebhookSignature !== 'function') {
+            throw new EmailFacadeError(
+                `Inbound email plugin ${pluginId} cannot verify webhook signatures`,
+                'verifyWebhookSignature',
+                pluginId,
+            );
+        }
+        try {
+            const outcome: unknown = plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+            if (isThenable(outcome)) {
+                this.logger.error(
+                    `verifyWebhookSignature of ${pluginId} returned a Promise; the contract is ` +
+                        'synchronous (throw on mismatch). Awaiting it so the check still gates the webhook.',
+                );
+                await outcome;
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Refusing a ${pluginId} webhook (401): signature verification failed — ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            throw new UnauthorizedException(WEBHOOK_SIGNATURE_REJECTED, { cause: error });
+        }
     }
 
     private async resolveSettings(
@@ -631,4 +830,13 @@ export class EmailFacadeService extends BaseFacadeService {
             this.logger.warn(`PluginUsageEvent emission failed for ${pluginId}: ${String(err)}`);
         }
     }
+}
+
+/** Whether `value` is a Promise or any other thenable. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+    return (
+        (typeof value === 'object' || typeof value === 'function') &&
+        value !== null &&
+        typeof (value as { then?: unknown }).then === 'function'
+    );
 }
