@@ -842,7 +842,7 @@ jobs:
   # dispatches), not in this workflow; after editing either env block run it
   # locally first: `pnpm --filter ever-works-web test:e2e-harness flags-on-lane`.
   e2e-app-works-flags-on:
-    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     # One shard of ~12 tests, but the same cold `pnpm build` + dev-stack boot
     # as every matrix shard and the prod-build job — the same 90-minute cap.
     timeout-minutes: 90
