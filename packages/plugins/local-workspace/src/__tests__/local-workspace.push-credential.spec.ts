@@ -321,6 +321,17 @@ describe('scoped push credential (real git)', () => {
 describe('how the credential reaches git (execFile seam)', () => {
 	type Invocation = { args: string[]; env: NodeJS.ProcessEnv };
 
+	/**
+	 * The command the fakes answer, past git's GLOBAL options: the commit
+	 * check a `publishSha` push makes runs as
+	 * `git --no-replace-objects -c core.commitGraph=false rev-parse …`.
+	 */
+	const subcommandOf = (args: string[]): string => {
+		let at = 0;
+		while (at < args.length && args[at].startsWith('-')) at += args[at] === '-c' ? 2 : 1;
+		return args.slice(at).join(' ');
+	};
+
 	const TOKEN = 'ghs_0123456789abcdefghijklmnopqrstuvwxyz';
 	const REMOTE = 'https://github.com/ever-works/ever-works.git';
 
@@ -332,7 +343,7 @@ describe('how the credential reaches git (execFile seam)', () => {
 			callback: (error: Error | null, stdout: string, stderr: string) => void
 		) => {
 			invocations.push({ args: [...args], env: { ...(options.env ?? {}) } });
-			const joined = args.join(' ');
+			const joined = subcommandOf(args);
 			let stdout = '';
 			let stderr = '';
 			let error: Error | null = null;
@@ -583,7 +594,7 @@ describe('how the credential reaches git (execFile seam)', () => {
 				callback: (error: Error | null, stdout: string, stderr: string) => void
 			) => {
 				invocations.push({ args: [...args], env: { ...(options.env ?? {}) } });
-				const joined = args.join(' ');
+				const joined = subcommandOf(args);
 				let stdout = '';
 				let stderr = '';
 				let error: Error | null = null;
@@ -684,6 +695,57 @@ describe('how the credential reaches git (execFile seam)', () => {
 				expect(error.message).not.toContain(basic);
 				expect(error.message).toContain('***');
 			});
+	});
+
+	// APW-08 T17 — publishing an already-judged commit (`publishSha`) is the
+	// same side effect as any other push, so it must carry every control the
+	// credentialed push carries: no hooks, the credential in the environment
+	// only, the persisted-credential probes, and the origin check.
+	describe('a publishSha push (judge-before-push)', () => {
+		// The fake answers every `rev-parse` with this id, so it is the one
+		// commit `rev-parse --verify <sha>^{commit}` can confirm here.
+		const PUBLISH = 'a'.repeat(40);
+
+		it('pushes exactly that sha with --no-verify and the credential in the environment, staging nothing', async () => {
+			const invocations: Invocation[] = [];
+			const seamed = new LocalWorkspacePlugin({ execFile: fakeGit(invocations) });
+
+			const result = await seamed.finalize(handle, {
+				commitMessage: 'ignored',
+				push: true,
+				publishSha: PUBLISH,
+				pushCredential: credential
+			});
+
+			expect(result).toMatchObject({ pushed: true, headSha: PUBLISH, empty: false });
+			// Nothing is staged or committed: the judged commit is what leaves.
+			expect(invocations.some((entry) => entry.args[0] === 'add')).toBe(false);
+			expect(invocations.some((entry) => entry.args.includes('commit'))).toBe(false);
+			const push = invocations.find((entry) => entry.args[0] === 'push');
+			expect(push?.args).toEqual(['push', '--no-verify', REMOTE, `${PUBLISH}:refs/heads/${handle.branch}`]);
+			expect(push?.env.GIT_CONFIG_KEY_2).toBe('core.hooksPath');
+			expect(push?.env.GIT_CONFIG_KEY_3).toBe(`http.${REMOTE}.extraheader`);
+			for (const entry of invocations) {
+				expect(entry.args.join('\u0000')).not.toContain(TOKEN);
+			}
+			// The persisted-credential probe ran before AND after the push.
+			expect(invocations.filter((entry) => entry.args.includes('--get-regexp'))).toHaveLength(2);
+		});
+
+		it('REFUSES when origin is not the remote the credential was issued for', async () => {
+			const invocations: Invocation[] = [];
+			const seamed = new LocalWorkspacePlugin({ execFile: fakeGit(invocations) });
+
+			await expect(
+				seamed.finalize(handle, {
+					commitMessage: 'ignored',
+					push: true,
+					publishSha: PUBLISH,
+					pushCredential: { ...credential, remoteUrl: 'https://github.com/someone-else/private-repo.git' }
+				})
+			).rejects.toThrow(/does not cover this checkout/);
+			expect(invocations.some((entry) => entry.args[0] === 'push')).toBe(false);
+		});
 	});
 
 	it('does not install anything when the caller supplied no credential', async () => {

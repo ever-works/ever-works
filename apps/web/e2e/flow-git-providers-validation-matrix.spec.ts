@@ -88,7 +88,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   DELETE /api/oauth/:p                               (authed) → 204 (idempotent no-op)
  *   DELETE /api/oauth/:p/connection                    → 404 (NOT a route)
  *   POST   /api/oauth/providers | :p/callback/plugins | :p/connect/url → 404 (GET-only routes)
- *   GET    /api/git-providers                          (authed) → github only, item has NO name key
+ *   GET    /api/git-providers                          (authed) → github only, item carries name + description
  *
  * ISOLATION: every test uses FRESH registerUserViaAPI() users — NEVER the shared
  * seeded user. All calls are read-only or idempotent (disconnect of a
@@ -474,7 +474,7 @@ test.describe('flow: connect/url message matrix + the always-minted state cookie
 // F. oauth providers list + connection descriptor shape (distinct from git list)
 // ---------------------------------------------------------------------------
 test.describe('flow: oauth providers list + connection descriptor shape', () => {
-    test('the authed oauth list reports configured:true and advertises github AND vercel, each item a {id,name,enabled} triple — the item CARRIES a name key (unlike the git-providers list item)', async ({
+    test('the authed oauth list reports configured:true and advertises github AND vercel, each item a {id,name,enabled} triple — narrower in shape than the git-providers list item, which adds the manifest metadata', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -509,18 +509,40 @@ test.describe('flow: oauth providers list + connection descriptor shape', () => 
             'vercel oauth name is "Vercel"',
         ).toBe('Vercel');
 
-        // The git-providers list is NARROWER and its item has NO name key — the two
-        // controllers intentionally diverge in both roster AND item shape.
+        // The git-providers list is NARROWER in roster, and the two controllers
+        // diverge in item shape: the oauth item is the {id,name,enabled} triple,
+        // the git item is the richer GitProviderInfo descriptor (adds the manifest
+        // description/homepage/icon). BOTH carry `name`.
+        //
+        // RE-PINNED (was `'name' in gitGithub` → false). GitProviderInfo REQUIRES
+        // `name`; the old "no name key" shape was an artefact of the lazy-proxy
+        // defect fixed in aff0c44a5 — the disk-builtIn github proxy answered
+        // `providerName` with an async forwarding FUNCTION even after load, and
+        // JSON.stringify dropped the key. The value is matched case-insensitively:
+        // the sync list does not load the plugin, so a loaded github answers its
+        // `providerName` ('github') and a still-cold proxy the manifest name ('GitHub').
         const gitRes = await request.get(`${API_BASE}/api/git-providers`, { headers: h });
-        const gitProviders = ((await gitRes.json()).providers ?? []) as OAuthProviderItem[];
+        const gitProviders = ((await gitRes.json()).providers ?? []) as Array<
+            OAuthProviderItem & { description?: unknown }
+        >;
         expect(
             gitProviders.map((p) => p.id),
             'git list is github-only (no vercel)',
         ).not.toContain('vercel');
         const gitGithub = gitProviders.find((p) => p.id === 'github');
-        expect(gitGithub && 'name' in gitGithub, 'git-list github item has NO name key').toBe(
-            false,
-        );
+        expect(
+            String(gitGithub?.name),
+            'git-list github item carries a name naming github',
+        ).toMatch(/^github$/i);
+        expect(
+            typeof gitGithub?.description,
+            'git-list github item carries the manifest description',
+        ).toBe('string');
+        const oauthGithub = providers.find((p) => p.id === 'github');
+        expect(
+            oauthGithub && 'description' in oauthGithub,
+            'oauth github item has NO description (it is the {id,name,enabled} triple)',
+        ).toBe(false);
     });
 
     test('the connection descriptor for an enabled provider is a lean {id,name,enabled:true,connected:false} (no icon/description) for both github and vercel', async ({

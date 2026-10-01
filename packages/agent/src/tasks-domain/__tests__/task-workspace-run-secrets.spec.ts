@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { Task } from '../../entities/task.entity';
 import { TaskWorkspaceService } from '../task-workspace.service';
 
@@ -169,6 +170,102 @@ describe('TaskWorkspaceService — run secrets by reference', () => {
         ).rejects.toThrow(/disable or remove all but one/);
     });
 
+    it('spellings that differ only by .git/, a trailing slash or case name ONE repository and are refused', async () => {
+        // `repositoryIdFromCloneUrl` used to read `…/ever-works.git/` as
+        // `ever-works/ever-works.git`, so row b was invisible and row a's
+        // `.env` was used. Both rows name the same repository; the refusal
+        // has to say WHY two different-looking URLs collide, and must name
+        // rows only (a registry URL may carry userinfo).
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'a',
+                name: 'platform',
+                url: 'https://github.com/ever-works/ever-works',
+                envFiles: { '.env': SENTINEL },
+            }),
+            connection({
+                id: 'b',
+                name: 'platform-slash',
+                url: 'https://github.com/Ever-Works/ever-works.git/',
+            }),
+        ]);
+        const attempt = build().describeFleetWorkspace({ task: makeTask(), userId: 'user-1' });
+        await expect(attempt).rejects.toThrow(/disable or remove all but one/);
+        await expect(attempt).rejects.toThrow(/platform, platform-slash/);
+        await expect(attempt).rejects.toThrow(/differ only by \.git/);
+        await expect(attempt).rejects.not.toThrow(/https:\/\//);
+    });
+
+    it('does not take a registry row on ANOTHER HOST as the Task primary', async () => {
+        // Same `owner/repo` path, different repository: a mirror's `.env`
+        // must not land in the primary checkout. The log line names HOSTS,
+        // never the row URL (it may carry userinfo).
+        const logged = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'gitlab-row',
+                name: 'platform-mirror',
+                url: 'https://mirror:sekret-7f@gitlab.example.com/ever-works/ever-works.git',
+                envFiles: { '.env': SENTINEL },
+            }),
+        ]);
+        try {
+            const spec = await build().describeFleetWorkspace({
+                task: makeTask(),
+                userId: 'user-1',
+            });
+            expect(spec).not.toHaveProperty('envFilesRef');
+            const lines = logged.mock.calls.map((call) => String(call[0]));
+            const line = lines.find((text) => text.includes('platform-mirror'));
+            expect(line).toMatch(/gitlab\.example\.com/);
+            expect(line).toMatch(/github\.com/);
+            expect(lines.join('\n')).not.toContain('sekret-7f');
+        } finally {
+            logged.mockRestore();
+        }
+    });
+
+    it('a same-named row on another host does not make the primary ambiguous', async () => {
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'conn-primary',
+                name: 'platform',
+                url: 'https://github.com/ever-works/ever-works.git',
+                envFiles: { '.env': SENTINEL },
+            }),
+            connection({
+                id: 'gitlab-row',
+                name: 'platform-mirror',
+                url: 'https://gitlab.example.com/ever-works/ever-works.git',
+                envFiles: { '.env': SENTINEL },
+            }),
+        ]);
+        const spec = await build().describeFleetWorkspace({ task: makeTask(), userId: 'user-1' });
+        expect(spec?.envFilesRef).toEqual([{ repoConnectionId: 'conn-primary', paths: ['.env'] }]);
+    });
+
+    it('an SSH spelling on the primary host is still the primary (control)', async () => {
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'conn-primary',
+                name: 'platform',
+                url: 'git@github.com:ever-works/ever-works.git',
+                envFiles: { '.env': SENTINEL },
+            }),
+        ]);
+        const spec = await build().describeFleetWorkspace({ task: makeTask(), userId: 'user-1' });
+        expect(spec?.envFilesRef).toEqual([{ repoConnectionId: 'conn-primary', paths: ['.env'] }]);
+    });
+
+    it('refuses, naming the repository, when the git provider does not find the primary', async () => {
+        // `getRepository` answers null for a repository the provider does not
+        // find; reading `.defaultBranch` off it was a bare TypeError.
+        gitFacade.getRepository.mockResolvedValue(null);
+        await expect(
+            build().describeFleetWorkspace({ task: makeTask(), userId: 'user-1' }),
+        ).rejects.toThrow(/ever-works\/ever-works .*git provider does not find it/);
+    });
+
     it('fails the plan when the registry cannot be READ, rather than delivering nothing', async () => {
         repoConnections.listByUser.mockRejectedValue(new Error('db down'));
         await expect(
@@ -219,6 +316,16 @@ describe('TaskWorkspaceService.resolveFleetRunEnvGrants', () => {
         };
     });
 
+    /**
+     * The workspace the planner already described. Grants resolve the
+     * primary against ITS identity and host, the same one the env files
+     * were resolved against, never a second read of the Work.
+     */
+    const workspace = {
+        repositoryId: 'ever-works/ever-works',
+        repoUrl: 'https://github.com/ever-works/ever-works.git',
+    };
+
     it('grants nothing by default, which is the pre-slice refusal', async () => {
         await expect(
             build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1' }),
@@ -247,6 +354,7 @@ describe('TaskWorkspaceService.resolveFleetRunEnvGrants', () => {
                 task: makeTask(),
                 userId: 'user-1',
                 agentId: 'agent-1',
+                workspace,
             }),
         ).resolves.toEqual(['GH_TOKEN', 'DATABASE_URL']);
     });
@@ -260,7 +368,7 @@ describe('TaskWorkspaceService.resolveFleetRunEnvGrants', () => {
             }),
         ]);
         await expect(
-            build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1' }),
+            build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1', workspace }),
         ).resolves.toEqual(['DATABASE_URL']);
     });
 
@@ -274,7 +382,7 @@ describe('TaskWorkspaceService.resolveFleetRunEnvGrants', () => {
         ]);
         const service = build();
         await expect(
-            service.resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1' }),
+            service.resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1', workspace }),
         ).resolves.toEqual(['DATABASE_URL']);
 
         // The operator clears the grant; grants are read when the job is
@@ -288,7 +396,78 @@ describe('TaskWorkspaceService.resolveFleetRunEnvGrants', () => {
             }),
         ]);
         await expect(
-            service.resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1' }),
+            service.resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1', workspace }),
+        ).resolves.toEqual([]);
+    });
+    it('does not union grants from a registry row on ANOTHER HOST with the same owner/repo', async () => {
+        // A mirror is a different repository: a grant bound to it is not
+        // justified by the Task's primary (docs: bind a grant to the
+        // repository that justifies it).
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'gitlab-row',
+                name: 'platform-mirror',
+                url: 'https://gitlab.example.com/ever-works/ever-works.git',
+                envGrants: ['GITLAB_ONLY'],
+            }),
+        ]);
+        await expect(
+            build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1', workspace }),
+        ).resolves.toEqual([]);
+    });
+
+    it('takes the primary grant from the row on the primary host when a mirror row also exists', async () => {
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'conn-primary',
+                url: 'git@github.com:ever-works/ever-works.git',
+                envGrants: ['DATABASE_URL'],
+            }),
+            connection({
+                id: 'gitlab-row',
+                name: 'platform-mirror',
+                url: 'https://gitlab.example.com/ever-works/ever-works.git',
+                envGrants: ['GITLAB_ONLY'],
+            }),
+        ]);
+        await expect(
+            build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1', workspace }),
+        ).resolves.toEqual(['DATABASE_URL']);
+    });
+
+    it('no described workspace, no primary grants (LESS access, never more)', async () => {
+        // The primary is whatever `describeFleetWorkspace` described; a
+        // caller that did not describe one does not get a second, looser
+        // resolution from the Work.
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'conn-primary',
+                url: 'https://github.com/ever-works/ever-works.git',
+                envGrants: ['DATABASE_URL'],
+            }),
+        ]);
+        await expect(
+            build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1' }),
+        ).resolves.toEqual([]);
+    });
+
+    it('two enabled rows for the primary (ambiguous) contribute no primary grants', async () => {
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'a',
+                name: 'platform',
+                url: 'https://github.com/ever-works/ever-works.git',
+                envGrants: ['DATABASE_URL'],
+            }),
+            connection({
+                id: 'b',
+                name: 'platform-copy',
+                url: 'git@github.com:ever-works/ever-works.git',
+                envGrants: ['GH_TOKEN'],
+            }),
+        ]);
+        await expect(
+            build().resolveFleetRunEnvGrants({ task: makeTask(), userId: 'user-1', workspace }),
         ).resolves.toEqual([]);
     });
 });

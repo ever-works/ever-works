@@ -148,6 +148,11 @@ export type RunBatchItemResult =
     | { taskId: string; ok: true; run: RunTaskResult }
     | { taskId: string; ok: false; error: { code: string; message: string } };
 
+/**
+ * Hand mirror of `TaskLinkedPullRequest` in `@ever-works/agent`
+ * (`entities/task.entity.ts`), which apps/web cannot import: the API returns
+ * the Task entity as-is, so keep the two in step.
+ */
 export interface TaskLinkedPullRequest {
     repositoryId: string;
     branch: string;
@@ -157,6 +162,13 @@ export interface TaskLinkedPullRequest {
     prUrl: string | null;
     state: 'pushed' | 'pr-open' | 'failed';
     error?: string | null;
+    /**
+     * APW-08 — `failed` because an App Work's change rules refused the pushed
+     * branch (`error` holds the reason, naming the rule and the paths), with
+     * the pull request (when there is one) STILL OPEN and now carrying the
+     * refused change. The next run the rules allow clears it.
+     */
+    refusedByGuard?: boolean;
     updatedAt: string;
 }
 
@@ -225,6 +237,17 @@ export interface Task {
     /** Multi-repo: repositories this Task spans besides its Work's (registry connections). */
     extraRepos?: TaskExtraRepo[] | null;
     conflictPaths: string[] | null;
+    /**
+     * APW-08 — why an App Work's change guard blocked the PRIMARY branch: its
+     * rules refused a change that reached it, or a run reported pushing a
+     * branch that is not the Task's (the Task thread's refusal message,
+     * capped). The refusal leaves `branchState` as it was, so this is what
+     * tells the branch panel and the board's pull-request pill that a
+     * `pr-open` pull request is not a healthy one (`activeGuardRefusal`).
+     * Absent or null = nothing refused; cleared by a later allowed push or a
+     * discard.
+     */
+    branchGuardRefusal?: string | null;
     // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the
     // `task-pr-status-sync` cron. All null until the Task opens a PR.
     prState?: TaskPrState | null;

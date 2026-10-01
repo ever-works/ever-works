@@ -1287,6 +1287,34 @@ describe('GitFacadeService', () => {
             expect(gitPlugin.forkRepository).toHaveBeenCalled();
         });
 
+        // APW-02 P0 — the non-blocking fork request must reach the provider untouched: the
+        // facade is not allowed to add, drop or reinterpret the option.
+        it('should forward the whole fork options object, including waitForReady', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.forkRepository(
+                'owner',
+                'repo',
+                { organization: 'acme-org', waitForReady: false },
+                {
+                    providerId: 'github',
+                    token: 'test-token',
+                },
+            );
+
+            expect(gitPlugin.forkRepository).toHaveBeenCalledWith(
+                'owner',
+                'repo',
+                { organization: 'acme-org', waitForReady: false },
+                'test-token',
+            );
+        });
+
         it('should throw GitFacadeError when not supported', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             gitPlugin.forkRepository = undefined as any;
@@ -1703,6 +1731,102 @@ describe('GitFacadeService', () => {
 
             expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(2);
         });
+
+        // APW-02 P0 — a checkout key selects a DIFFERENT working copy, so two calls that differ
+        // only in the key must not share one git operation. Coalescing them would hand both
+        // callers the same directory: exactly the sharing this key exists to prevent.
+        it('should NOT coalesce calls that use different checkout keys for one repository', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            gitPlugin.cloneOrPull = jest.fn().mockImplementation(
+                (options: { checkoutKey?: string }) =>
+                    new Promise<string>((resolve) => {
+                        setTimeout(() => resolve(`/tmp/${options.checkoutKey}`), 0);
+                    }),
+            );
+
+            const [dataDir, workDir] = await Promise.all([
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo', checkoutKey: 'work:work-1:data' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo', checkoutKey: 'work:work-1:work' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+            ]);
+
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(2);
+            expect(dataDir).not.toBe(workDir);
+        });
+
+        it('should still coalesce calls that share one checkout key', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            let release: (dir: string) => void = () => undefined;
+            gitPlugin.cloneOrPull = jest.fn().mockReturnValue(
+                new Promise<string>((resolve) => {
+                    release = resolve;
+                }),
+            );
+
+            const calls = [
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo', checkoutKey: 'work:work-1:data' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo', checkoutKey: 'work:work-1:data' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+            ];
+
+            await Promise.resolve();
+            await Promise.resolve();
+            release('/tmp/repo');
+
+            await expect(Promise.all(calls)).resolves.toEqual(['/tmp/repo', '/tmp/repo']);
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(1);
+        });
+
+        it('should forward checkoutKey and expectExisting to the plugin', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.cloneOrPull(
+                {
+                    owner: 'testuser',
+                    repo: 'test-repo',
+                    checkoutKey: 'work:work-1:data',
+                    expectExisting: true,
+                },
+                { providerId: 'github', token: 'test-token' },
+            );
+
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    owner: 'testuser',
+                    repo: 'test-repo',
+                    token: 'test-token',
+                    checkoutKey: 'work:work-1:data',
+                    expectExisting: true,
+                }),
+            );
+        });
     });
 
     describe('add', () => {
@@ -1770,61 +1894,116 @@ describe('GitFacadeService', () => {
     });
 
     describe('getCloneUrl', () => {
-        it('should return clone URL from plugin', () => {
+        it('should return clone URL from plugin', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getCloneUrl('github', 'owner', 'repo');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getCloneUrl('github', 'owner', 'repo');
 
             expect(result).toBe('https://github.com/owner/repo.git');
         });
     });
 
     describe('getWebUrl', () => {
-        it('should return web URL from plugin', () => {
+        it('should return web URL from plugin', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getWebUrl('github', 'owner', 'repo');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getWebUrl('github', 'owner', 'repo');
 
             expect(result).toBe('https://github.com/owner/repo');
         });
     });
 
     describe('getLocalDir', () => {
-        it('should return local work path', () => {
+        it('should return local work path', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getLocalDir('github', 'owner', 'repo');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getLocalDir('github', 'owner', 'repo');
 
             expect(result).toBe('/tmp/owner/repo');
+        });
+
+        // APW-02 P0 — per-caller checkout keys must reach the provider, otherwise two
+        // callers of one repository silently share a working copy again.
+        it('should forward the optional checkout key to the plugin', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            await service.getLocalDir('github', 'owner', 'repo', 'work:work-1:data');
+
+            expect(gitPlugin.getLocalDir).toHaveBeenCalledWith('owner', 'repo', 'work:work-1:data');
+        });
+    });
+
+    describe('removeLocalDir', () => {
+        it('should forward the optional checkout key to the plugin', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.removeLocalDir('github', 'owner', 'repo', 'work:work-1:data');
+
+            expect(gitPlugin.removeLocalDir).toHaveBeenCalledWith(
+                'owner',
+                'repo',
+                'work:work-1:data',
+            );
+        });
+
+        it('should still work without a checkout key', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.removeLocalDir('github', 'owner', 'repo');
+
+            expect(gitPlugin.removeLocalDir).toHaveBeenCalledTimes(1);
         });
     });
 
     describe('getRawFileUrl', () => {
-        it('should return raw file URL when supported', () => {
+        it('should return raw file URL when supported', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(gitPlugin, {
                 capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getRawFileUrl('github', 'owner', 'repo', 'main', 'file.txt');
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getRawFileUrl(
+                'github',
+                'owner',
+                'repo',
+                'main',
+                'file.txt',
+            );
 
             expect(result).toBe('https://raw.githubusercontent.com/owner/repo/main/file.txt');
         });
 
-        it('should throw when not supported', () => {
+        it('should throw when not supported', async () => {
             const gitPlugin = createMockGitPlugin('github', 'GitHub');
             gitPlugin.getRawFileUrl = undefined as any;
             const registered = createRegisteredPlugin(gitPlugin, {
@@ -1832,9 +2011,10 @@ describe('GitFacadeService', () => {
             });
             registry.getByCapability.mockReturnValue([registered]);
 
-            expect(() =>
+            // Rejects rather than throws: async since the provider is loaded first.
+            await expect(
                 service.getRawFileUrl('github', 'owner', 'repo', 'main', 'file.txt'),
-            ).toThrow(GitFacadeError);
+            ).rejects.toThrow(GitFacadeError);
         });
     });
 

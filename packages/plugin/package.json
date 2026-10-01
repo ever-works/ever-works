@@ -107,7 +107,7 @@
 		"build": "tsup",
 		"dev": "tsup --watch",
 		"clean": "rm -rf dist",
-		"type-check": "tsc --noEmit",
+		"type-check": "tsc --noEmit && tsc -p tsconfig.specs.json --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},

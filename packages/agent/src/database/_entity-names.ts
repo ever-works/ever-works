@@ -67,6 +67,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentRunLog',
     // ───────────────────────────────
     'ApiKey',
+    // APW-11 App Launcher — one person's arrangement of one launcher item.
+    'AppLauncherPreference',
     'AuthAccount',
     'AuthSession',
     'AuthVerification',
@@ -239,8 +241,24 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkAgentPreference',
     'WorkAgentRun',
     'WorkAgentRunLog',
+    // APW-07 App env & dependencies — one encrypted value per (Work, name),
+    // and one row per (Work, kind) recording what a provider provisioned.
+    'WorkAppDependency',
+    'WorkAppEnvValue',
+    // APW-03 App spec & catalog — the per-App-Work spec state row.
+    'WorkAppSpecState',
+    // APW-04 App Provisioner — one row per provisioning attempt of an App Work.
+    'WorkAppProvisioning',
+    // APW-06 T17 — one per App Work: target, namespace, cluster fingerprint,
+    // the atomic deploy lock and its queue of one, health counters and the
+    // deletion claim.
+    'WorkAppRuntimeState',
     'WorkBudget',
     'WorkBudgetAlertState',
+    // APW-05 Builds — one row per Build of an App Work (per-Work numbering),
+    // and the per-App-Work preparation state that is derived, never API-written.
+    'WorkBuild',
+    'WorkBuildPreparation',
     'WorkBuildRequest',
     'WorkCustomDomain',
     'WorkDeployment',
@@ -258,6 +276,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkProposal',
     'WorkProposalAttachment',
     'WorkSchedule',
+    // APW-02 Fork lifecycle — one per App Work; readiness through sync.
+    'WorkUpstreamState',
     'Workflow',
     'WorkflowRun',
     'WorkspaceBackup',

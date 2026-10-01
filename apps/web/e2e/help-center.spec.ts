@@ -49,9 +49,13 @@ async function signedIn(
  * `position: fixed`, so its own box is zero-height and Playwright never calls
  * it visible even while the drawer is open. The tabs live in the drawer header,
  * outside the panel, so tab lookups stay scoped to the dialog.
+ *
+ * The dialog is keyed on its accessible name (the DialogTitle, via
+ * aria-labelledby), which is the same on every tab. Keying it on the Manual
+ * panel stopped matching as soon as another tab replaced that panel.
  */
 const helpDialog = (page: Page) =>
-    page.getByRole('dialog').filter({ has: page.getByTestId('help-center-panel') });
+    page.getByRole('dialog', { name: 'Help & Resources', exact: true });
 
 /** The manual panel inside the Help dialog — what "the drawer is open" is asserted on. */
 const helpPanel = (page: Page) => helpDialog(page).getByTestId('help-center-panel');

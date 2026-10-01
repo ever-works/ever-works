@@ -34,9 +34,12 @@ export interface IOAuthFacade extends IBaseFacade {
 	 * @param providerId - OAuth provider ID
 	 * @param state - CSRF protection state parameter
 	 * @param config - Optional OAuth configuration override
-	 * @returns Authorization URL to redirect user to
+	 * @returns Authorization URL to redirect user to. Async although the
+	 *   provider's own method is sync: the facade loads the provider first (the
+	 *   host registers it as a lazy proxy that stays cold until first use), so
+	 *   the answer is always the URL string itself.
 	 */
-	getAuthorizationUrl(providerId: string, state: string, config?: Partial<OAuthConfig>): string;
+	getAuthorizationUrl(providerId: string, state: string, config?: Partial<OAuthConfig>): Promise<string>;
 
 	/**
 	 * Exchange an authorization code for an access token.

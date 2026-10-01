@@ -21,6 +21,10 @@ import { WorkDeployment } from '../work-deployment.entity';
 import { WorkKnowledgeDocument } from '../work-knowledge-document.entity';
 import { WorkProposal } from '../work-proposal.entity';
 import { WorkSchedule } from '../work-schedule.entity';
+import { WorkUpstreamState } from '../work-upstream-state.entity';
+import { WorkAppSpecState } from '../work-app-spec-state.entity';
+import { WorkBuild } from '../work-build.entity';
+import { WorkBuildPreparation } from '../work-build-preparation.entity';
 
 /**
  * EW-655 (Tenants & Organizations Phase 3) — Tier A scope-column
@@ -68,6 +72,16 @@ describe('Tier A entities — Phase 3 scope columns', () => {
         { name: 'InboundTrigger', target: InboundTrigger },
         { name: 'Work', target: Work },
         { name: 'WorkKnowledgeDocument', target: WorkKnowledgeDocument },
+        // The App Works entities declare the same two nullable uuid columns, so they
+        // belong in this guard rather than in a per-entity spec alone: this file is
+        // the drift detector plan §3.4:578 leans on for `scope-stamping.subscriber.ts`.
+        // Until 2026-09-18 it listed none of them, and a perturbation that deleted both
+        // scope columns from `WorkBuild` left it GREEN — a guard that did not cover the
+        // entities added after it was written.
+        { name: 'WorkUpstreamState', target: WorkUpstreamState },
+        { name: 'WorkAppSpecState', target: WorkAppSpecState },
+        { name: 'WorkBuild', target: WorkBuild },
+        { name: 'WorkBuildPreparation', target: WorkBuildPreparation },
     ];
 
     for (const { name, target } of tierA) {

@@ -25,9 +25,30 @@ import { EventIngestModule } from '@ever-works/agent/ingest';
 // Campaign activation (roadmap 14.1) — composition module over Works,
 // Goals, Agent templates and Tasks; provides CampaignActivationService.
 import { CampaignsModule } from '@ever-works/agent/campaigns';
+// APW-01 T17 — the App source inspection route. `AppWorksModule` is the only
+// module that provides and exports `AppSourceInspectorService` (T12), so this
+// import is what makes the controller's constructor resolvable at boot. It is
+// the same module `WorkModule` already imports for the create path, and Nest
+// instantiates a module once per graph, so the API still has exactly one
+// inspector — the same instance the create path's step 6 calls.
+import { AppWorksModule as AgentAppWorksModule } from '@ever-works/agent/app-works';
+// APW-03 T15 — the two App-spec routes. `AppSpecModule` (T12) provides and
+// exports `AppSpecService` and `WorkAppSpecStateRepository`, so this import is
+// what makes `WorkAppSpecController`'s constructor resolvable at boot: the
+// controller does not re-provide either, so the route, APW-01's create path and
+// the evaluation job all read and write ONE state row through ONE service.
+import { AppSpecModule as AgentAppSpecModule } from '@ever-works/agent/app-spec';
+import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
 
 // Controllers
 import { WorksController } from './works.controller';
+import { AppSourceController } from './app-source.controller';
+// APW-03 T15 — `GET /api/works/:id/app-spec` and
+// `POST /api/works/:id/app-spec/validate`, the two App-spec routes of plan
+// §4.1. Both are four segments deep under `api/works`, so no `works/:id/...`
+// handler can shadow them.
+import { WorkAppDeployController } from './work-app-deploy.controller';
+import { WorkAppSpecController } from './work-app-spec.controller';
 import { WorkRunsController } from './work-runs.controller';
 import { WorkPullRequestsController } from './work-pull-requests.controller';
 import { MembersController } from './members.controller';
@@ -85,6 +106,34 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // Campaign activation (roadmap 14.1) — CampaignActivationService
         // for POST /api/works/from-campaign-template.
         CampaignsModule,
+        // APW-01 T17 — `AppSourceInspectorService` for
+        // `POST /api/works/app-source/inspect`. The inspector's own
+        // collaborators (`GitFacadeService`, `WorkRepository`,
+        // `DeployFacadeService`, the two unbound ports) come with it: this
+        // module does not re-provide them, so the route and the create path
+        // read the same inspection.
+        AgentAppWorksModule,
+        // APW-03 T15 — `AppSpecService` for `GET /api/works/:id/app-spec` and
+        // `POST /api/works/:id/app-spec/validate`. It brings its own
+        // collaborators (`WorkAppSpecStateRepository`, `GitFacadeService`,
+        // `DistributedTaskLockService`, `ActivityLogModule`), so this module
+        // re-provides none of them — the routes and the evaluation job therefore
+        // share one service instance and one repository.
+        AgentAppSpecModule,
+        // APW-06 §2.2 — `AppDeployRequestService` for
+        // `POST /api/works/:id/deploy`. It brings its own collaborators (the
+        // preconditions pass, the runtime-state store, the Deployment store,
+        // the Build source and the dispatcher gate), so this module re-provides
+        // none of them: the route, `DeployService` and the worker's dequeue all
+        // go through one instance and one deploy lock.
+        //
+        // It also imports `AppSpecModule` for `APP_DEPLOY_SPEC_SOURCE`. That is
+        // the SAME module instance `AgentAppSpecModule` above resolves to — Nest
+        // caches a static module per class — so the deploy preconditions and
+        // `GET /api/works/:id/app-spec` read one `AppSpecService`, which is what
+        // keeps "your spec is invalid" on the Deploy tab and the App spec tab
+        // from ever disagreeing.
+        AppDeployRequestModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -134,6 +183,13 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
     ],
     controllers: [
         WorksController,
+        // APW-01 T17 — `POST /api/works/app-source/inspect`, the App source
+        // preview the create form and the create path both depend on. Static
+        // and three segments deep, so no `works/:id/...` handler can shadow it.
+        AppSourceController,
+        // APW-03 T15 — the App spec tab's two routes.
+        WorkAppDeployController,
+        WorkAppSpecController,
         // Wave 4 M3 — per-Work AgentRun summary counts.
         WorkRunsController,
         // Wave 7 feature h (v1) — open PRs across the Work's repos.

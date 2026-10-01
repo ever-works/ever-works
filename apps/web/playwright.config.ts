@@ -12,6 +12,29 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
     testDir: './e2e',
     outputDir: './e2e/test-results',
+    // App Works acceptance lanes (APW-13 P0, plan §8.1) and the harness's own
+    // unit specs must never enter the sharded PR suite, and the projects below
+    // cannot say so with `testIgnore` alone:
+    //
+    //  - `chromium-no-auth` and `setup` each declare their own `testMatch`, which
+    //    overrides this one — and both already exclude the two App Works
+    //    prefixes, because those `testMatch`es are allow-lists.
+    //  - `chromium` is the only project that selects "everything not ignored",
+    //    so it is the only one that would collect them.
+    //
+    // So the exclusion for `chromium` is expressed here, as a *restriction*, and
+    // nothing existing is rewritten: every test-shaped file under `e2e/` is a
+    // `*.spec.ts` (verified over the whole tree), so `\.spec\.ts$` selects
+    // exactly what the previous default selected.
+    //
+    //  - `__tests__/` — the harness unit specs (`e2e/helpers/__tests__/`,
+    //    `e2e/fakes/**/__tests__/`) run under `vitest.e2e-harness.config.ts`
+    //    (P0 task T4, plan §11). Playwright's default `testMatch` matches
+    //    `*.unit.spec.ts`, so without this the sharded suite would try to import
+    //    them and fail on `import { expect } from 'vitest'`.
+    //  - `flow-app-works-(live|kind)-` — T12: the 45-minute live and kind lanes
+    //    run only under `playwright.app-works.config.ts`.
+    testMatch: /^(?!.*(?:__tests__[\\/]|flow-app-works-(?:live|kind)-)).*\.spec\.ts$/,
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,

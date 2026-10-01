@@ -10,7 +10,13 @@ import {
     type WebsiteTemplateOption,
 } from '@/lib/api';
 import { redirect } from 'next/navigation';
-import NewWorkClient, { ALL_WORK_KIND_CHIP_VALUES, type CreationMode } from './new-work-client';
+import NewWorkClient, { type CreationMode } from './new-work-client';
+// Imported from `@/lib/work-kinds/chip-values` (no `'use client'`) rather than
+// from `./new-work-client` (a client module): a server component that imports a
+// plain value across a client boundary receives a client reference, not the
+// array, which threw `TypeError: a.filter is not a function` in the server
+// render of this page.
+import { ALL_WORK_KIND_CHIP_VALUES } from '@/lib/work-kinds/chip-values';
 import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 import { fetchWorkTemplateCatalog } from '@/lib/api/work-templates.server';
 import type { WorkBlueprintEntry } from '@/lib/api/work-templates';

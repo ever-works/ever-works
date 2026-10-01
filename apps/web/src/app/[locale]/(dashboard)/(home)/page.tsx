@@ -28,7 +28,18 @@ import { healthAPI } from '@/lib/api/health';
 // Owner 2026-09-18 — the Dashboard composer is the `/new` prompt + kind chips,
 // so it resolves the same `works-<value>` PostHog flags the `/new` page does
 // (fail-open: no PostHog config ⇒ every kind enabled).
-import { ALL_NEW_CHIP_VALUES } from '@/components/new';
+//
+// From `@/lib/work-kinds/chip-values`, NOT from `@/components/new`. This is a
+// SERVER component, and that barrel re-exports the array from `NewPageClient`,
+// which opens with `'use client'`. A server component that imports a plain
+// VALUE across a client boundary does not receive the value — it receives a
+// client reference, an opaque bundler placeholder — so `getDisabledWorkKinds`'s
+// first act, `values.filter(…)`, threw `TypeError: a.filter is not a function`
+// during the server render. That is the 500 `chip-values.ts` was extracted to
+// end for `/new` and `/works/new`; this page had the same import and the same
+// bug. Caught by `pnpm run boundary:barrels` (apps/web), which follows a value
+// through up to three barrel re-exports.
+import { ALL_NEW_CHIP_VALUES } from '@/lib/work-kinds/chip-values';
 import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 
 export async function generateMetadata(): Promise<Metadata> {

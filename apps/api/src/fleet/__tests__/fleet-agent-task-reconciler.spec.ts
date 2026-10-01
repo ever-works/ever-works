@@ -89,6 +89,8 @@ describe('FleetAgentTaskReconcilerService', () => {
         finalizeRemotePush: jest.Mock;
         finalizeMountPush: jest.Mock;
         recordRemotePush: jest.Mock;
+        judgeAppWorkBranch: jest.Mock;
+        judgeMountedPullRequests: jest.Mock;
     };
     let taskChat: { post: jest.Mock };
     let dispatchGate: { drainForWork: jest.Mock };
@@ -160,6 +162,10 @@ describe('FleetAgentTaskReconcilerService', () => {
                 prUrl: `https://github.com/${input.repositoryId}/pull/7`,
             })),
             recordRemotePush: jest.fn().mockResolvedValue(undefined),
+            // APW-08 T17 — answers `null` (nothing to judge) unless a case says otherwise.
+            judgeAppWorkBranch: jest.fn().mockResolvedValue(null),
+            // APW-08 — answers "nothing re-judged" unless a case says otherwise.
+            judgeMountedPullRequests: jest.fn().mockResolvedValue([]),
         };
         taskChat = { post: jest.fn().mockResolvedValue({}) };
         dispatchGate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: false }) };
@@ -508,6 +514,261 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(body).toContain('Pull request #42');
         expect(body).toContain('$0.42');
         expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+    });
+
+    /**
+     * APW-08 T17 — the second adversarial review found three fleet paths that
+     * pushed an App Work's branch and never judged it: a run that ends with a
+     * question, a run that fails, and a run whose node reports nothing pushed.
+     * Every path that does not reach `finalizeRemotePush` now asks
+     * `judgeAppWorkBranch`, which judges an open pull request at the head the
+     * PLATFORM recorded whatever the node says.
+     */
+    describe('App Work branches are judged on every path that skips finalize', () => {
+        const done = (result: Record<string, unknown>, status: FleetJobView['status'] = 'done') =>
+            build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job({ status }),
+                    USER,
+                    'node-report',
+                    NODE,
+                    result as unknown as Record<string, unknown>,
+                ),
+            );
+
+        it('the QUESTION path judges what the run pushed', async () => {
+            await done({
+                ...successResult,
+                question: { text: 'Which plan?', context: null, truncated: false, mountDir: null },
+            });
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+        });
+
+        it('the FAILURE path judges what the run pushed', async () => {
+            await done(
+                {
+                    ...successResult,
+                    status: 'failed',
+                    failureReason: 'a required check did not pass',
+                },
+                'failed',
+            );
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+        });
+
+        it('a run reporting NOTHING pushed still has its open pull request judged', async () => {
+            // "pushed: false" is only what the node says.
+            await done({
+                ...successResult,
+                git: { ...(successResult.git as object), pushed: false },
+            });
+
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: null }),
+            );
+        });
+
+        it('a pushed success is judged by finalizeRemotePush, not twice', async () => {
+            await done(successResult);
+
+            expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.judgeAppWorkBranch).not.toHaveBeenCalled();
+        });
+
+        // ── third adversarial review ─────────────────────────────────────
+        const REFUSED = {
+            outcome: 'blocked-by-guard',
+            prNumber: 42,
+            prUrl: 'https://github.com/acme/repo/pull/42',
+        };
+        const QUESTION = { text: 'Which plan?', context: null, truncated: false, mountDir: null };
+        const chat = () =>
+            taskChat.post.mock.calls.map((call) => String(call[1]?.body ?? '')).join('\n');
+
+        it('a finalize that THROWS before judging still has the push judged, and a refusal replaces the note', async () => {
+            // An empty reported branch, or a database error while recording,
+            // throws before `finalizeRemotePush` reaches its judgement.
+            taskWorkspace.finalizeRemotePush.mockRejectedValue(
+                new Error('remote finalize has no branch to open a pull request from'),
+            );
+            taskWorkspace.judgeAppWorkBranch.mockResolvedValue(REFUSED);
+
+            await done(successResult);
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+            expect(chat()).toContain('change rules refused');
+            expect(chat()).not.toContain('opening the pull request failed');
+        });
+
+        it('a refusal on the nothing-pushed path is what the member is told', async () => {
+            taskWorkspace.judgeAppWorkBranch.mockResolvedValue(REFUSED);
+
+            await done({
+                ...successResult,
+                git: { ...(successResult.git as object), pushed: false },
+            });
+
+            expect(chat()).toContain('change rules refused');
+            expect(chat()).not.toContain('but not pushed');
+        });
+
+        it('the QUESTION path does not record a push its judgement refused', async () => {
+            // The refusal may be a reported branch that is not the Task's;
+            // recording it would overwrite `branchRef` with the node's name.
+            taskWorkspace.judgeAppWorkBranch.mockResolvedValue({ outcome: 'blocked-by-guard' });
+
+            await done({ ...successResult, question: QUESTION });
+
+            expect(taskWorkspace.recordRemotePush).not.toHaveBeenCalled();
+        });
+
+        it('the QUESTION path still records an allowed push', async () => {
+            await done({ ...successResult, question: QUESTION });
+
+            expect(taskWorkspace.recordRemotePush).toHaveBeenCalledWith(
+                expect.objectContaining({ branch: 'task/tsk-1-task1' }),
+            );
+        });
+
+        it('a question for a run that is already settled still has its push judged', async () => {
+            // "Already settled" can be the stuck-run sweeper failing a run whose
+            // node was still alive — which then pushed, and asked.
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'failed',
+            });
+
+            await done({ ...successResult, question: QUESTION });
+
+            expect(runs.tryMarkCompleted).not.toHaveBeenCalled();
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: 'task/tsk-1-task1' }),
+            );
+        });
+
+        /**
+         * Third adversarial review: open MOUNT pull requests pick up a push on the
+         * same paths the primary does, and nothing re-judged them there.
+         */
+        it('re-judges every open mount pull request on a CANCELLED run', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'cancelled',
+            });
+
+            await done(successResult);
+
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ except: new Set() }),
+            );
+        });
+
+        it('re-judges every open mount pull request on a question for a SETTLED run', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'failed',
+            });
+
+            await done({ ...successResult, question: QUESTION });
+
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ except: new Set() }),
+            );
+        });
+
+        it('re-judges open mount pull requests on the FAILURE and QUESTION paths', async () => {
+            await done(
+                { ...successResult, status: 'failed', failureReason: 'red check' },
+                'failed',
+            );
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledTimes(1);
+
+            taskWorkspace.judgeMountedPullRequests.mockClear();
+            await done({ ...successResult, question: QUESTION });
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledTimes(1);
+        });
+
+        it('a CANCELLED run has its open pull request judged — and nothing is opened or announced', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'cancelled',
+            });
+
+            await done(successResult);
+
+            expect(taskWorkspace.judgeAppWorkBranch).toHaveBeenCalledWith(
+                expect.objectContaining({ reportedBranch: null }),
+            );
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(taskChat.post).not.toHaveBeenCalled();
+        });
+    });
+
+    it('tells the member a push the App Work gate REFUSED was refused, not that it succeeded', async () => {
+        // APW-08 T17. `blocked-by-guard` was added to the finalize outcome and
+        // this reconciler's message switch had a `default` of "Branch X was
+        // pushed." — so a refused push reached the member reading as a
+        // success. The switch is exhaustive now; this pins the copy.
+        taskWorkspace.finalizeRemotePush.mockResolvedValue({ outcome: 'blocked-by-guard' });
+
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job(),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('refused');
+        expect(body).toContain('no pull request was opened');
+        expect(body).not.toContain('Pull request #');
+    });
+
+    it('says an OPEN pull request now holds a refused change when the gate blocks a later push', async () => {
+        taskWorkspace.finalizeRemotePush.mockResolvedValue({
+            outcome: 'blocked-by-guard',
+            prNumber: 42,
+            prUrl: 'https://github.com/acme/repo/pull/42',
+        });
+
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job(),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('pull request #42 now contains that change');
+        expect(body).toContain('must not be merged');
     });
 
     it('honours the agent PR permission and a no-changes run', async () => {
@@ -1002,6 +1263,51 @@ describe('FleetAgentTaskReconcilerService', () => {
             expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
         });
 
+        it('re-judges open mount pull requests the node reported as unpushed or empty — not the ones it finalised', async () => {
+            // `acme/template` was pushed and finalised; `acme/docs` is reported
+            // empty, and "empty" is only what the node says.
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+
+            expect(taskWorkspace.judgeMountedPullRequests).toHaveBeenCalledWith(
+                expect.objectContaining({ except: new Set(['acme/template']) }),
+            );
+        });
+
+        it('tells the member when an open mount pull request was refused on re-judgement', async () => {
+            taskWorkspace.judgeMountedPullRequests.mockResolvedValue([
+                {
+                    repositoryId: 'acme/docs',
+                    outcome: 'blocked-by-guard',
+                    prNumber: 9,
+                    prUrl: 'https://github.com/acme/docs/pull/9',
+                    error: 'refused',
+                },
+            ]);
+
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+
+            const body: string = taskChat.post.mock.calls[0][1].body;
+            expect(body).toContain(
+                "`acme/docs`: its open pull request #9 now carries a change that App Work's change rules refused",
+            );
+        });
+
         it('keeps going when one mount pull request fails and reports it', async () => {
             taskWorkspace.finalizeMountPush.mockResolvedValue({
                 repositoryId: 'acme/template',
@@ -1023,6 +1329,36 @@ describe('FleetAgentTaskReconcilerService', () => {
             );
             expect(runs.markCompleted).toHaveBeenCalledTimes(1);
             expect(inbox!.notice.mock.calls[0][1].body).toContain('Pull requests to review (1):');
+        });
+
+        it('says a mount an App Work’s rules REFUSED was refused, and does not list its pull request for review', async () => {
+            // APW-08: the mounted repository is another App Work's code repository
+            // and its change rules refused the push. The pull request that already
+            // existed now carries that change — it must not appear under "Pull
+            // requests to review", and the note must not read "opening failed".
+            taskWorkspace.finalizeMountPush.mockResolvedValue({
+                repositoryId: 'acme/template',
+                outcome: 'blocked-by-guard',
+                prNumber: 7,
+                prUrl: 'https://github.com/acme/template/pull/7',
+                error: 'refused',
+            });
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+            const body: string = taskChat.post.mock.calls[0][1].body;
+            expect(body).toContain("that App Work's change rules refused it");
+            expect(body).toContain('pull request #7 now contains that change');
+            expect(body).not.toContain('opening the pull request failed');
+            const noticeBody: string = inbox!.notice.mock.calls[0][1].body;
+            expect(noticeBody).toContain('Pull requests to review (1):');
+            expect(noticeBody).not.toContain('- https://github.com/acme/template/pull/7');
         });
 
         it('still completes the run when recording a mount pull request throws, and says so', async () => {

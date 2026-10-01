@@ -1,0 +1,18 @@
+# NEGATIVE FIXTURE neg-05 — error class: `from:` that does not match the reference grammar.
+# Expected: JSON Schema FAIL (`pattern` on /spec/env/0/from) · rule layer `reference_syntax`.
+# schema.md §21: `DepKind := "postgres" | "redis" | "objectStorage" | "smtp"` — `deps.mysql.url` is not a
+# Reference at all, so it is a syntax error, not merely an unresolved one.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    dependencies:
+        postgres: { version: '16' }
+    env:
+        - { name: DATABASE_URL, secret: true, from: deps.mysql.url }

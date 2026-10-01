@@ -34,7 +34,18 @@ export interface AgentCommitToRepoInput {
      * tools, not arbitrary unstaged changes.
      */
     files?: { path: string; body: string }[];
-    /** Branch name to commit against. Defaults to the Work's main branch. */
+    /**
+     * Branch name to commit against.
+     *
+     * **Pass a feature branch.** When omitted, the target is the Work's Task base
+     * branch (`taskIsolationBaseBranch` when the Work declares one, else the
+     * repository's own default branch) and the adapter then REFUSES the commit,
+     * because that branch is protected — `main`, `master` and `stage` are a
+     * non-configurable floor (APW-08 P0), and the Work's effective merge policy
+     * can protect more at any scope, never fewer. An Agent push straight to a
+     * release branch is the thing the refusal exists to make impossible; commit
+     * to a feature branch and open a pull request instead.
+     */
     branch?: string;
 }
 
@@ -55,9 +66,18 @@ export interface AgentOpenPullRequestInput {
     workId: string;
     title: string;
     body: string;
-    /** Head branch (the branch the Agent committed to). */
+    /**
+     * Head branch (the branch the Agent committed to). It must EXIST in the Work
+     * Repository: the adapter asks the provider for its branch list and refuses
+     * with FR-5's copy — naming the missing branch and the repository — when it
+     * does not, before any pull request is opened (APW-08 P0).
+     */
     head: string;
-    /** Base branch. Defaults to the Work's default branch. */
+    /**
+     * Base branch. Defaults to the Work's Task base branch
+     * (`taskIsolationBaseBranch` when the Work declares one, else the
+     * repository's own default branch) — never a literal `main`.
+     */
     base?: string;
     draft?: boolean;
 }

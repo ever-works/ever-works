@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { getAuthFromCookie } from '@/lib/auth';
 import { DashboardLayoutClient } from './layout-client';
+import { isAppLauncherEnabled } from '@/lib/feature-flags/app-launcher';
 import { authAPI, versionAPI } from '@/lib/api';
 import { healthAPI } from '@/lib/api/health';
 import { getWorkStats } from '@/app/actions/dashboard/works';
@@ -55,6 +56,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
         apiVersion,
         jobRuntimeConfigured,
         changelogUnreadCount,
+        // APW-11 — the App Launcher's switch, computed ONCE for the whole
+        // dashboard shell: the API's `features.appLauncherEnabled` AND, when
+        // PostHog is configured, the `app-launcher` flag for this person.
+        // Fail-closed (a slow or unreachable config endpoint means OFF), so the
+        // panel, the palette entry and the settings tab all get the same answer
+        // instead of each asking again.
+        appLauncherEnabled,
     ] = await Promise.all([
         authAPI.getFreshProfile().catch(() => null),
         getWorkStats().catch(() => ({
@@ -76,6 +84,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         // top-bar badge. Fetched once per shell render; null on any failure
         // so the control renders with no badge and the shell never degrades.
         changelogAPI.unreadCount().catch(() => null),
+        isAppLauncherEnabled(user.id),
     ]);
 
     const hasGithubConnected =
@@ -122,6 +131,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             apiVersion={apiVersion}
             jobRuntimeConfigured={jobRuntimeConfigured}
             changelogUnreadCount={changelogUnreadCount}
+            appLauncherEnabled={appLauncherEnabled}
         >
             {children}
         </DashboardLayoutClient>

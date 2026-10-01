@@ -122,21 +122,23 @@ describe('OAuthFacadeService', () => {
     });
 
     describe('getAuthorizationUrl', () => {
-        it('should return OAuth URL from plugin', () => {
+        it('should return OAuth URL from plugin', async () => {
             const oauthPlugin = createMockOAuthPlugin('github', 'GitHub');
             const registered = createRegisteredPlugin(oauthPlugin);
             registry.getByCapability.mockReturnValue([registered]);
 
-            const result = service.getAuthorizationUrl('github', 'test-state', {});
+            // Awaited: async since the provider is loaded first (it may be a cold lazy proxy).
+            const result = await service.getAuthorizationUrl('github', 'test-state', {});
 
             expect(result).toContain('provider.com/oauth');
             expect(oauthPlugin.getAuthorizationUrl).toHaveBeenCalledWith('test-state', {});
         });
 
-        it('should throw NoOAuthProviderError when no providers available', () => {
+        it('should throw NoOAuthProviderError when no providers available', async () => {
             registry.getByCapability.mockReturnValue([]);
 
-            expect(() => service.getAuthorizationUrl('github', 'test-state', {})).toThrow(
+            // Rejects rather than throws: async since the provider is loaded first.
+            await expect(service.getAuthorizationUrl('github', 'test-state', {})).rejects.toThrow(
                 NoOAuthProviderError,
             );
         });

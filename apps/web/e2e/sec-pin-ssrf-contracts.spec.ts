@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { armDeadTokenRefusal, assertDeadTokenRefusalProven } from './helpers/github-fake-control';
 
 /**
  * SSRF / URL-GUARD CONTRACTS — pins the platform's server-side defenses against
@@ -82,6 +83,24 @@ const REGISTER_REPO_REJECT_MSG = 'repo must be a https://github.com/<owner>/<rep
 const REGISTER_WEBHOOK_REJECT_MSG = 'webhookUrl must be an http(s) URL';
 const WEBHOOK_URL_REJECT_MSG = 'url must be a URL address';
 
+/**
+ * The deliberately-bogus GitHub token every `register-work` probe below sends,
+ * so the DTO guards — not the token — are what the rejections are about. Named
+ * because the credential case arms a refusal for exactly this token (C14).
+ */
+const DUMMY_GITHUB_TOKEN = 'gho_e2e_dummy_probe_token';
+
+/**
+ * The lane's fake GitHub (the PR lane starts it; `plan.md` §9.1, CONTRACTS §7).
+ * Unset outside the fake lanes, where it falls back to the fake's documented
+ * default port — `armDeadTokenRefusal` shape-probes the origin before arming, so
+ * a live lane that happens to have something else on 3900 arms nothing.
+ */
+const FAKE_GITHUB_URL = (process.env.APW_E2E_GITHUB_FAKE_URL ?? 'http://127.0.0.1:3900').replace(
+    /\/+$/,
+    '',
+);
+
 /** Register a brand-new isolated user and return its bearer token. */
 async function freshToken(request: APIRequestContext, tag: string): Promise<string> {
     const u = await registerUserViaAPI(request, {
@@ -129,7 +148,7 @@ async function registerWork(
     body: Record<string, unknown>,
 ): Promise<ProbeResult> {
     const res = await request.post(`${API_BASE}/api/register-work`, {
-        headers: { 'X-GitHub-Token': 'gho_e2e_dummy_probe_token' },
+        headers: { 'X-GitHub-Token': DUMMY_GITHUB_TOKEN },
         data: body,
     });
     return {
@@ -356,6 +375,14 @@ test.describe('SSRF / URL-guard contracts — API boundary', () => {
         // which fails for the dummy token with a stable typed 403 envelope. This is
         // the positive control: it proves the 400s above are specifically about the
         // URL shapes, not a request the endpoint rejects wholesale.
+        //
+        // C14: the dummy token is ARMED for this case, because the fake GitHub
+        // answers `GET /user` 200 for every token. Unarmed, the identity RESOLVES
+        // and the request runs on to `assertRepoAccess`, which answers
+        // `gh_repo_access_denied` for the unseeded `octocat/awesome-mcp` — still a
+        // typed post-DTO gate, but not the one the regex below (and the PROBED
+        // CONTRACTS note above it) names.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, DUMMY_GITHUB_TOKEN);
         const res = await registerWork(request, {
             repo: 'https://github.com/octocat/awesome-mcp',
             webhookUrl: 'https://my-agent.example.com/webhooks/ever-works',
@@ -377,6 +404,7 @@ test.describe('SSRF / URL-guard contracts — API boundary', () => {
             res.body.code,
             'the response carries a typed onboarding error code, not a validation_error',
         ).toMatch(/gh_credential_invalid|feature_disabled/);
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
     });
 
     test('Webhook subscription DTO rejects every non-http(s) scheme (javascript / file / data / ftp) — env-stable scheme allowlist', async ({

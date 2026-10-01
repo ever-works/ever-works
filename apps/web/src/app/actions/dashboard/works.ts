@@ -21,6 +21,7 @@ import type {
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    AppDeployTargetChoice,
 } from '@ever-works/contracts';
 import {
     INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
@@ -696,6 +697,42 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
         return {
             success: false,
             error: error instanceof Error ? error.message : t('updateFailed'),
+        };
+    }
+}
+
+/**
+ * APW-01 T39 (FR-34, plan §7 `:952-953`) — the App Work's deploy target, as the
+ * delete dialog needs it.
+ *
+ * `GET /api/works/:id/app-target` belongs to **APW-06**, which is not merged: the
+ * route answers `404` today. That is a documented non-answer, not a fault, so it is
+ * reported as `none` — which HIDES the **Also delete stored data** checkbox, because
+ * a Work that deploys nowhere has no stored data to delete (FR-40a). Any other
+ * failure (a `403`, a `500`, an unreachable API) is a real fault and answers
+ * `success: false`, so the dialog never mistakes a broken read for "no target".
+ *
+ * A Server Action rather than a client fetch: `DeleteComponent` is a client
+ * component and the API client is `server-only`.
+ */
+export async function getAppDeleteTarget(workId: string): Promise<{
+    success: boolean;
+    target?: AppDeployTargetChoice;
+    error?: string;
+}> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const { target } = await workAPI.getAppTarget(workId);
+        return { success: true, target };
+    } catch (error) {
+        console.error('Failed to read the App Work deploy target:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to read the deploy target',
         };
     }
 }
@@ -1822,4 +1859,204 @@ export async function createCampaignWork(input: {
             error: error instanceof Error ? error.message : 'Failed to start campaign',
         };
     }
+}
+
+/** What one exposure save tells the caller (plan §8's `Saved` / save-failed copy). */
+export interface SetWorkAppLauncherExposureResult {
+    success: boolean;
+    /** The value the API was asked to store — `null` = back to the kind default. */
+    appLauncherExposed?: boolean | null;
+    error?: string;
+}
+
+/**
+ * APW-11 T17 (plan §4.4 + §7, spec FR-19/FR-60) — the **only** writer of a
+ * Work's App Launcher exposure.
+ *
+ * ## Why this action exists instead of the General form (APW11-G02)
+ *
+ * `useSettings().handleUpdate` submits the whole General form to
+ * {@link updateWork}, whose zod object declares `name`, `description`, `owner`,
+ * `organization`, `websiteTemplateId` and `readmeConfig` — and **zod strips what
+ * it does not declare**. `appLauncherExposed` would therefore never reach the
+ * API, and every save would additionally call `workAPI.updateReadme`, rewriting
+ * the Work's README for a toggle that did nothing. So the toggle gets its own
+ * action, and this action sends **exactly one field**:
+ * `PUT /api/works/:id { appLauncherExposed }`.
+ *
+ * ## The three states, and who may send them
+ *
+ * `true` shows the Work in members' App Launcher, `false` hides it, and `null`
+ * clears the explicit choice so the Work follows its kind default (`app` on,
+ * everything else off). The API validates the field with
+ * `@IsOptional() @IsBoolean()` on `UpdateWorkDto.appLauncherExposed` and grants
+ * the change to EDITOR or higher (`ensureCanEdit`) — the same rank the surfaces
+ * use to decide whether the control is interactive, so the client never offers a
+ * control the API would refuse.
+ *
+ * It deliberately does **not** revalidate the README, call `updateReadme`, or
+ * touch any other Work field: a failure here changes nothing but this one
+ * setting. Both surfaces (`AppLauncherExposureSetting`, `AppLauncherExposureCard`)
+ * call it and render `Saved` / `Couldn't save. Try again.` from its answer.
+ */
+export async function setWorkAppLauncherExposureAction(
+    workId: string,
+    value: boolean | null,
+): Promise<SetWorkAppLauncherExposureResult> {
+    // Security: verify authentication at the server-action boundary — server
+    // actions are reachable as POST endpoints via the `Next-Action` header.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const t = await getTranslations('actions.works');
+
+    const schema = z.object({
+        workId: z.string().uuid(t('invalidId')),
+        appLauncherExposed: z.boolean().nullable(),
+    });
+
+    try {
+        const validation = schema.safeParse({ workId, appLauncherExposed: value });
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        // Exactly one field. `null` is meaningful (reset to the kind default),
+        // so the value is sent as-is rather than omitted when falsy.
+        const body: UpdateWorkDto = {
+            appLauncherExposed: validation.data.appLauncherExposed,
+        };
+
+        await workAPI.update(validation.data.workId, body);
+
+        // Both surfaces live on different routes and both read the Work from the
+        // server on a refresh, so both are revalidated — the settings page and
+        // the Overview card that stands in for it outside MANAGER+.
+        revalidatePath(ROUTES.DASHBOARD_WORK_SETTINGS(validation.data.workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK(validation.data.workId));
+
+        return {
+            success: true,
+            appLauncherExposed: validation.data.appLauncherExposed,
+        };
+    } catch (error) {
+        console.error('Failed to update App Launcher exposure:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : t('updateFailed'),
+        };
+    }
+}
+
+// ── Upstream (APW-02 T29, Resolution R-8) ────────────────────────────────────
+
+/**
+ * What both Upstream mutations answer the card.
+ *
+ * The refusal's **`code` is passed through unchanged** — `no_upstream`,
+ * `not_ready`, `sync_in_progress`, `sync_paused`, `sync_limit_reached`,
+ * `not_retryable`, `retry_limit_reached`, `not_found`
+ * (`apps/api/src/app-works/app-upstream.controller.ts:124-132`). The card maps
+ * the code to spec §6.1's copy (`sync_in_progress` → "A sync is already
+ * running.", `sync_limit_reached` → "You've synced 6 times this hour…"), so a
+ * second vocabulary here would be a second answer to the same question. The
+ * `details` bag travels with it (`retryAt` for the limit, `reason` for the
+ * pause).
+ */
+export interface AppUpstreamActionResult {
+    success: boolean;
+    /** Set on success: the job was queued (`202 { queued: true, runId }`). */
+    queued?: boolean;
+    /** Set on success: the provider run id, or `null` when the queue had none. */
+    runId?: string | null;
+    /** Set on a refusal: the API's own code, never re-mapped. */
+    code?: string;
+    /** Set on a refusal: the HTTP status the code came with. */
+    statusCode?: number;
+    /** Human-readable text for a log line or a fallback message. */
+    message?: string;
+    /** The API's `details` bag, e.g. `{ retryAt }` or `{ reason }`. */
+    details?: Record<string, unknown>;
+}
+
+/**
+ * **Sync now** (FR-33, ACC-02-14). Returns as soon as the job is queued; the
+ * card then shows **Syncing…** and polls the read route (plan §5.2).
+ *
+ * Both Upstream routes live inside the Work, so both Work routes are
+ * revalidated — a person who lands back on the Overview must not read a cached
+ * card that predates their own click.
+ */
+export async function syncUpstreamAction(workId: string): Promise<AppUpstreamActionResult> {
+    // Security: verify authentication at the server-action boundary before
+    // proxying a mutation — UI gating alone is not a security boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await workAPI.syncUpstream(workId);
+
+        revalidatePath(ROUTES.DASHBOARD_WORK(workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_UPSTREAM(workId));
+
+        return { success: true, queued: true, runId: result?.runId ?? null };
+    } catch (error) {
+        return upstreamActionFailure('sync upstream', error);
+    }
+}
+
+/**
+ * **Try again** for a readiness that timed out or failed (FR-19, ACC-02-05,
+ * ACC-02-06). It requests no new fork; it puts the Work back to `preparing` and
+ * re-queues the readiness job. APW-01's **Try again** calls the same action.
+ */
+export async function retryUpstreamReadinessAction(
+    workId: string,
+): Promise<AppUpstreamActionResult> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await workAPI.retryUpstreamReadiness(workId);
+
+        revalidatePath(ROUTES.DASHBOARD_WORK(workId));
+        revalidatePath(ROUTES.DASHBOARD_WORK_UPSTREAM(workId));
+
+        return { success: true, queued: true, runId: result?.runId ?? null };
+    } catch (error) {
+        return upstreamActionFailure('retry upstream readiness', error);
+    }
+}
+
+/**
+ * The one failure projection both actions use: an `ApiResponseError` keeps its
+ * status, its code and its `details` (a refusal is an answer, not a bug), and
+ * anything else is logged and reported without a code.
+ */
+function upstreamActionFailure(context: string, error: unknown): AppUpstreamActionResult {
+    if (error instanceof ApiResponseError) {
+        return {
+            success: false,
+            code: error.code,
+            statusCode: error.statusCode,
+            message: error.message,
+            details: error.details,
+        };
+    }
+
+    console.error(`Failed to ${context}:`, error);
+
+    return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+    };
 }

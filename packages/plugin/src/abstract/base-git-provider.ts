@@ -112,8 +112,8 @@ export abstract class BaseGitProvider extends BasePlugin implements IGitOperatio
 	abstract getMainBranch(dir: string): Promise<string | null>;
 	abstract switchBranch(dir: string, branch: string, create?: boolean): Promise<string>;
 	abstract getStatus(dir: string): Promise<GitFileChange[]>;
-	abstract getLocalDir(owner: string, repo: string): string;
-	abstract removeLocalDir(owner: string, repo: string): Promise<void>;
+	abstract getLocalDir(owner: string, repo: string, checkoutKey?: string): string;
+	abstract removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void>;
 	abstract replaceRemote(dir: string, remote: string, url: string): Promise<void>;
 	abstract renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
 

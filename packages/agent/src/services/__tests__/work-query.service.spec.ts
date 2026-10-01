@@ -5,7 +5,9 @@ jest.mock('@src/generators/data-generator/data-generator.service', () => ({
 import { WorkQueryService } from '../work-query.service';
 import { WorkMemberRole, GenerateStatusType } from '@src/entities/types';
 import type { WorkDeploymentRepository } from '@src/database/repositories/work-deployment.repository';
-import { WorkDeployment } from '@src/entities/work-deployment.entity';
+import type { WorkCustomDomainRepository } from '@src/database/repositories/work-custom-domain.repository';
+import { WorkDeployment, DeploymentEnvironment } from '@src/entities/work-deployment.entity';
+import { WorkCustomDomain } from '@src/entities/work-custom-domain.entity';
 
 describe('WorkQueryService', () => {
     const user = { id: 'user-1' } as any;
@@ -15,7 +17,13 @@ describe('WorkQueryService', () => {
     let dataGenerator: any;
     let generationHistoryRepository: any;
     let workDeploymentRepository: jest.Mocked<
-        Pick<WorkDeploymentRepository, 'findLatestForWorks' | 'findLatest'>
+        Pick<
+            WorkDeploymentRepository,
+            'findLatestForWorks' | 'findLatest' | 'findLatestReadyForWorks'
+        >
+    >;
+    let workCustomDomainRepository: jest.Mocked<
+        Pick<WorkCustomDomainRepository, 'findVerifiedProductionForWorks'>
     >;
     let ownershipService: any;
     let websiteRepositoryState: any;
@@ -38,6 +46,10 @@ describe('WorkQueryService', () => {
         workDeploymentRepository = {
             findLatestForWorks: jest.fn().mockResolvedValue(new Map()),
             findLatest: jest.fn().mockResolvedValue(null),
+            findLatestReadyForWorks: jest.fn().mockResolvedValue(new Map()),
+        };
+        workCustomDomainRepository = {
+            findVerifiedProductionForWorks: jest.fn().mockResolvedValue(new Map()),
         };
         ownershipService = {};
         websiteRepositoryState = {
@@ -52,6 +64,7 @@ describe('WorkQueryService', () => {
             ownershipService as any,
             websiteRepositoryState,
             workDeploymentRepository as unknown as WorkDeploymentRepository,
+            workCustomDomainRepository as unknown as WorkCustomDomainRepository,
         );
     });
 
@@ -344,5 +357,245 @@ describe('WorkQueryService', () => {
                 websiteRepositoryInitialized: true,
             }),
         );
+    });
+
+    /**
+     * APW-11 T7 (plan §4.4, spec FR-15/FR-19/FR-23) — the Work detail payload
+     * gains `appLauncher: { exposed, effectiveExposed, live }` so the exposure
+     * toggle renders without a second call. `exposed` is the stored choice
+     * (`null` = follow the kind), `effectiveExposed` is what the Work does
+     * today (`null ?? (kind === 'app')`), and `live` follows FR-15: an address
+     * candidate AND a succeeded production deployment.
+     */
+    describe('appLauncher exposure projection', () => {
+        function buildDeployment(state: string, website?: string): WorkDeployment {
+            return Object.assign(new WorkDeployment(), { state, website });
+        }
+
+        function buildDomain(domain: string): WorkCustomDomain {
+            return Object.assign(new WorkCustomDomain(), {
+                domain,
+                createdAt: new Date('2026-05-01T00:00:00.000Z'),
+            });
+        }
+
+        function grantAccess(work: Record<string, unknown>): void {
+            ownershipService.ensureAccess = jest.fn().mockResolvedValue({
+                work: { getRepoOwner: jest.fn().mockReturnValue('ever-works'), ...work },
+                role: WorkMemberRole.EDITOR,
+            });
+        }
+
+        it('answers the stored choice, the app kind default and liveness in one payload', async () => {
+            grantAccess({
+                id: 'app-1',
+                userId: user.id,
+                name: 'Rockets',
+                kind: 'app',
+                status: 'active',
+                managedSubdomain: 'rockets',
+                appLauncherExposed: null,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['app-1', buildDeployment('READY', 'https://rockets.ever.works/')]]),
+            );
+
+            const result = await service.getWork('app-1', user);
+
+            expect(result.work.appLauncher).toEqual({
+                exposed: null,
+                effectiveExposed: true,
+                live: true,
+            });
+            // One batched read each, scoped to this Work and to production.
+            expect(workDeploymentRepository.findLatestReadyForWorks).toHaveBeenCalledWith(
+                ['app-1'],
+                DeploymentEnvironment.PRODUCTION,
+            );
+            expect(workCustomDomainRepository.findVerifiedProductionForWorks).toHaveBeenCalledWith([
+                'app-1',
+            ]);
+        });
+
+        it('defaults every other kind to off and lets an explicit choice win', async () => {
+            grantAccess({
+                id: 'dir-1',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: 'directory',
+                appLauncherExposed: null,
+            });
+
+            const unset = await service.getWork('dir-1', user);
+            expect(unset.work.appLauncher).toEqual({
+                exposed: null,
+                effectiveExposed: false,
+                live: false,
+            });
+
+            grantAccess({
+                id: 'dir-1',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: 'directory',
+                appLauncherExposed: true,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['dir-1', buildDeployment('READY')]]),
+            );
+
+            const explicit = await service.getWork('dir-1', user);
+            expect(explicit.work.appLauncher).toEqual({
+                exposed: true,
+                effectiveExposed: true,
+                live: true,
+            });
+        });
+
+        it('is live off a verified production domain alone (FR-16 first preference)', async () => {
+            grantAccess({
+                id: 'dir-2',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: null,
+                appLauncherExposed: true,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['dir-2', buildDeployment('READY')]]),
+            );
+            workCustomDomainRepository.findVerifiedProductionForWorks.mockResolvedValue(
+                new Map([['dir-2', [buildDomain('rockets.example.test')]]]),
+            );
+
+            const result = await service.getWork('dir-2', user);
+
+            expect(result.work.appLauncher?.live).toBe(true);
+        });
+
+        it('is live off the address the latest READY deployment reported (FR-16 last)', async () => {
+            grantAccess({
+                id: 'dir-3',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: null,
+                appLauncherExposed: null,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['dir-3', buildDeployment('READY', 'https://deployed.example.test/')]]),
+            );
+
+            const result = await service.getWork('dir-3', user);
+
+            expect(result.work.appLauncher?.live).toBe(true);
+        });
+
+        it('is NOT live without a succeeded production deployment, even with an address (FR-15)', async () => {
+            grantAccess({
+                id: 'dir-4',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: 'directory',
+                appLauncherExposed: true,
+            });
+            // A preview-only / never-ready history leaves the READY read empty.
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(new Map());
+            workCustomDomainRepository.findVerifiedProductionForWorks.mockResolvedValue(
+                new Map([['dir-4', [buildDomain('rockets.example.test')]]]),
+            );
+
+            const result = await service.getWork('dir-4', user);
+
+            expect(result.work.appLauncher).toEqual({
+                exposed: true,
+                effectiveExposed: true,
+                live: false,
+            });
+        });
+
+        it('is NOT live when a READY deployment exists but no address candidate does', async () => {
+            grantAccess({
+                id: 'dir-5',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: '   ',
+                appLauncherExposed: null,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['dir-5', buildDeployment('READY', '')]]),
+            );
+
+            const result = await service.getWork('dir-5', user);
+
+            expect(result.work.appLauncher?.live).toBe(false);
+        });
+
+        it('is NOT live for an archived Work, whatever else is true (FR-56, Work-level half)', async () => {
+            grantAccess({
+                id: 'dir-6',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'archived',
+                managedSubdomain: 'directory',
+                appLauncherExposed: true,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['dir-6', buildDeployment('READY', 'https://directory.ever.works/')]]),
+            );
+            workCustomDomainRepository.findVerifiedProductionForWorks.mockResolvedValue(
+                new Map([['dir-6', [buildDomain('rockets.example.test')]]]),
+            );
+
+            const result = await service.getWork('dir-6', user);
+
+            expect(result.work.appLauncher?.live).toBe(false);
+        });
+
+        it('still answers the payload when the custom-domain repository is not bound', async () => {
+            // An existing positional construction that stops before the new
+            // (optional) slot must keep working — it simply cannot see a
+            // verified domain.
+            const legacy = new WorkQueryService(
+                workRepository,
+                workMemberRepository,
+                dataGenerator as any,
+                generationHistoryRepository,
+                ownershipService as any,
+                websiteRepositoryState,
+                workDeploymentRepository as unknown as WorkDeploymentRepository,
+            );
+            grantAccess({
+                id: 'dir-7',
+                userId: user.id,
+                name: 'Directory',
+                kind: 'directory',
+                status: 'active',
+                managedSubdomain: 'directory',
+                appLauncherExposed: null,
+            });
+            workDeploymentRepository.findLatestReadyForWorks.mockResolvedValue(
+                new Map([['dir-7', buildDeployment('READY', 'https://directory.ever.works/')]]),
+            );
+
+            const result = await legacy.getWork('dir-7', user);
+
+            expect(result.work.appLauncher).toEqual({
+                exposed: null,
+                effectiveExposed: false,
+                live: true,
+            });
+        });
     });
 });

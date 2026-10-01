@@ -28,6 +28,7 @@ import {
 } from '@/lib/workspace-navigation';
 import { parseWorkspacePath, serializeWorkspaceScope } from '@/lib/workspace-scope';
 import { useCommandPalette } from './CommandPaletteProvider';
+import { useAppLauncher } from '@/components/app-launcher/AppLauncherProvider';
 import { PaletteFooter, type PaletteBanner } from './PaletteFooter';
 import { PaletteRow } from './PaletteRow';
 import { useIsMac } from './hooks/use-is-mac';
@@ -101,6 +102,7 @@ export function CommandPalette({
     onChatOpenChange,
 }: CommandPaletteProps) {
     const palette = useCommandPalette();
+    const { openAppLauncher } = useAppLauncher();
     const open = palette?.open ?? false;
     const closePalette = palette?.closePalette;
     const t = useTranslations() as unknown as PaletteTranslator;
@@ -201,6 +203,14 @@ export function CommandPalette({
                 label: org.displayName ?? org.slug,
             })),
             activeOrganizationSlug,
+            /**
+             * APW-11 T15 — the launcher's opener, from the provider that mounts
+             * the element. `undefined` when the launcher is off for this
+             * installation OR when the header's control is not mounted, and the
+             * command's `available` gate reads exactly that, so the palette never
+             * offers a command that opens nothing.
+             */
+            openAppLauncher,
         }),
         [
             t,
@@ -216,6 +226,7 @@ export function CommandPalette({
             copyLink,
             organizations,
             activeOrganizationSlug,
+            openAppLauncher,
         ],
     );
 

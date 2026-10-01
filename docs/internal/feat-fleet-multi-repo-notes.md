@@ -87,6 +87,16 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
 - `Task.linkedPullRequests` on the web type; the Task branch section lists the linked repositories with
   their PR link (or "pushed" / "failed" state). Keys `dashboard.tasksPage.branch.linkedPullRequests`,
   `linkedPrPushed`, `linkedPrFailed` in all locales.
+- APW-08: the web type mirrors `refusedByGuard`. A row the agent flagged (an App Work's change rules
+  refused the pushed branch) shows a red "refused" pill, the guard's reason verbatim below the row (it
+  names the rule and the paths, as ACC-NEG-04 asks of the Task page) and, when a pull request is still
+  open, a "do not merge it as it stands" line. The PR link is kept, as the agent keeps it. Any other
+  `failed` row that kept its link (a discard survivor, or a refused discard survivor, whose flag the
+  agent sets `false`) shows a red "needs attention" pill and its error, so no `failed` entry reads as a
+  healthy pull request. The pills clear when the agent rewrites the entry on the next allowed run; the
+  UI keeps no state of its own. Keys `linkedPrRefused`, `linkedPrRefusedDoNotMerge`,
+  `linkedPrNeedsAttention` in all locales (English placeholders); guarded by
+  `task-branch-messages.unit.spec.ts`.
 - The agent settings Repositories card says what attaching a repository now means for fleet runs
   (`dashboard.settings.repositories.agentCard.fleetHint`, all locales).
 

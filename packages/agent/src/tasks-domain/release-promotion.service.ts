@@ -32,6 +32,7 @@ import type {
 } from '../policy/promotion-merge-guard.port';
 import { ReleaseVerificationService } from './release-verification.service';
 import { TasksService } from './tasks.service';
+import { resolveTaskRepository, taskRepositoryFullName } from './task-repository';
 
 /** Why a promotion could not be opened. All of them leave nothing behind. */
 export type PromotionOpenRefusal =
@@ -1125,8 +1126,8 @@ export class ReleasePromotionService implements PromotionMergeGuard {
         userId: string,
     ): { owner: string; repo: string; gitOptions: GitFacadeOptions } {
         return {
-            owner: work.getRepoOwner(),
-            repo: work.getDataRepo(),
+            owner: resolveTaskRepository(work).owner,
+            repo: resolveTaskRepository(work).repo,
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
         };
     }
@@ -1220,7 +1221,7 @@ function promotionTaskDescription(work: Work, head: string, base: string): strin
     // confirmed head is reported into the Task thread instead, where it can
     // be re-stated when it moves.
     return [
-        `Promote \`${head}\` → \`${base}\` in ${work.getRepoOwner()}/${work.getDataRepo()}.`,
+        `Promote \`${head}\` → \`${base}\` in ${taskRepositoryFullName(work)}.`,
         '',
         'This Task opens the pull request and reports what ' +
             `\`${PROMOTION_GATE_WORKFLOW_FILE}\` says about it. It does not merge it.`,

@@ -23,7 +23,13 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, substituteVariables } from '@ever-works/plugin';
 import { jsonrepair } from '@ever-works/plugin/ai';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    PluginRegistryService,
+    loadPluginsForListing,
+    staysColdForListing,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializeUsablePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
@@ -954,6 +960,14 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
      * `isActive` marks the plugin the scope would resolve to on its own,
      * which is what the client should preselect when the user has never
      * chosen explicitly.
+     *
+     * The probe is made on each provider's LOADED instance: a cold lazy
+     * proxy answers `typeof proxy.transcribe === 'function'` for every
+     * provider. As for any list, the builtIn providers and the ones the
+     * scope uses are loaded (`loadPluginsForListing`; resolving the active
+     * provider above loads the scope's enabled ones); a non-builtIn provider
+     * nobody uses stays cold and unlisted rather than be imported for a
+     * listing. One whose first load fails is left out.
      */
     async listTranscriptionProviders(
         facadeOptions: FacadeOptions,
@@ -966,15 +980,38 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             .then((p) => p.id)
             .catch(() => null);
 
-        return this.registry
+        const entries = this.registry
             .getByCapability(this.CAPABILITY)
-            .map((registered) => registered.plugin as unknown as IAiProviderPlugin)
-            .filter((plugin) => typeof plugin.transcribe === 'function')
-            .map((plugin) => ({
+            .filter((registered) => registered.state === 'loaded');
+        await loadPluginsForListing(entries);
+
+        const providers: Array<{ id: string; name: string; isActive: boolean }> = [];
+        for (const registered of entries) {
+            if (staysColdForListing(registered)) continue;
+            const plugin = await this.loadedTranscriptionCandidate(registered);
+            if (!plugin || typeof plugin.transcribe !== 'function') continue;
+            providers.push({
                 id: plugin.id,
                 name: (plugin as unknown as { name?: string }).name ?? plugin.id,
                 isActive: plugin.id === activeId,
-            }));
+            });
+        }
+        return providers;
+    }
+
+    /**
+     * `registered`'s real instance once its first load has settled, or
+     * `null` when it is not usable (not `loaded`, or its import or onLoad
+     * fails) — so an optional-member probe such as `transcribe` is truthful.
+     */
+    private async loadedTranscriptionCandidate(
+        registered: RegisteredPlugin,
+    ): Promise<IAiProviderPlugin | null> {
+        if (registered.state !== 'loaded') return null;
+        const pluginId = registered.plugin.id;
+        return materializeUsablePlugin<IAiProviderPlugin>(registered, pluginId, (reason) =>
+            this.logger.warn(`Skipping ${pluginId} as a transcription provider: ${reason}`),
+        );
     }
 
     private async resolveTranscribePlugin(
@@ -1030,10 +1067,18 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         // on `.plugin`. Forgetting to unwrap is how the slice 2 CI run
         // tripped the "first registry provider whose transcribe is
         // defined" test on PR #1217.
+        //
+        // Each candidate is probed on its LOADED instance, in registry
+        // order, stopping at the first that transcribes: a cold lazy proxy
+        // answers `typeof proxy.transcribe === 'function'` for every
+        // provider, which picked the first cold one (anthropic, before
+        // openai) and failed the call. One that cannot load is skipped, as
+        // a boot-time load failure was.
         const candidates = this.registry.getByCapability(this.CAPABILITY);
         for (const candidate of candidates) {
-            const inst = candidate.plugin as unknown as IAiProviderPlugin;
-            if (typeof inst.transcribe === 'function' && inst.id !== active.id) {
+            if (candidate.plugin.id === active.id) continue;
+            const inst = await this.loadedTranscriptionCandidate(candidate);
+            if (inst && typeof inst.transcribe === 'function') {
                 return inst;
             }
         }

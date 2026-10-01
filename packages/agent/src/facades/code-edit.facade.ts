@@ -7,7 +7,10 @@ import {
     type CodeEditResult,
     type PluginIcon,
 } from '@ever-works/plugin';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    PluginRegistryService,
+    loadRegisteredPlugins,
+} from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { AiFacadeService } from './ai.facade';
@@ -71,6 +74,13 @@ export class CodeEditFacadeService extends BaseFacadeService {
         }
         const enabled = await this.registry.isPluginEnabledForScope(providerId, workId, userId);
         if (!enabled) return null;
+        // Load before reading what only the plugin class declares: claude-code,
+        // codex, gemini and opencode set `selectableProviderCategories` (and
+        // their icons) only in getManifest(), which a cold lazy proxy's
+        // registry entry does not carry until it loads. One that cannot load
+        // is now in `error` and is not available.
+        if ((await loadRegisteredPlugins([registered])).length === 0) return null;
+        if (registered.manifest.supplementary) return null;
         return {
             id: registered.plugin.id,
             name: registered.manifest.name ?? registered.plugin.id,

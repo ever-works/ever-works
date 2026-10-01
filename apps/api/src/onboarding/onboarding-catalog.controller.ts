@@ -17,7 +17,7 @@ export class OnboardingCatalogController {
     @Get('catalog')
     @ApiOperation({ summary: 'Get the onboarding wizard catalog (cards + plugins)' })
     @ApiResponse({ status: 200, type: OnboardingCatalogResponseDto })
-    getCatalog(): OnboardingCatalogResponseDto {
+    getCatalog(): Promise<OnboardingCatalogResponseDto> {
         return this.catalogService.getCatalog();
     }
 }

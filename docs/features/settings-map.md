@@ -32,6 +32,7 @@ pinned at the bottom.
 | **Connections**     | External MCP servers your Agents may call as tools. Auth header values are stored encrypted and never shown again. See [MCP Connections](./mcp-connections.md).                                                                                        |
 | **Digest**          | Scheduled activity briefings and their cadence. The personal digest and the organization digest are separate settings — turning one on never changes the other.                                                                                        |
 | **Notifications**   | The event × channel preference grid, plus the optional Novu inbox embed. The grid renders read-only in this version — the write path is the REST API. See [Notifications](./notifications.md).                                                         |
+| **App Launcher**    | Your arrangement of the top-bar [App Launcher](./app-launcher.md) — which tiles are shown, pinned and in what order. Listed only while an operator has the launcher switched on (`EVER_WORKS_APP_LAUNCHER_ENABLED`, off by default).                   |
 | **Channels**        | Where a notification goes once it leaves the bell — Discord, Slack, Telegram, WhatsApp and Novu — with **Test** and **Remove** on every row. Lives at `/settings/integrations/channels`.                                                               |
 | **Email Addresses** | Tenant-managed inbound and outbound addresses for Agents, at `/settings/integrations/emails`. A v0 shell in this version — see [below](#email-addresses-is-a-v0-shell). The feature itself: [Agent Email & Inboxes](./agent-email.md).                 |
 | **Billing**         | Your plan, balance, invoices and the credits ledger. See [Credits & Billing](./credits-and-billing.md).                                                                                                                                                |
@@ -43,6 +44,12 @@ is _how_ it gets dispatched.
 
 **Environments** sits directly below it for the same reason: Job Runtime decides _how_ a run is
 dispatched, an Environment decides _what is installed_ inside it and _which hosts it may reach_.
+
+**App Launcher** (`/settings/app-launcher`) sits directly after **Notifications**. Like **Fleet**, which
+disappears when `FLEET_ENABLED` is off, it depends on the deployment: with the launcher switched off there is no
+entry, and the page answers not found. The per-Work switch that puts a Work on the launcher, **Show in App
+Launcher**, is not here but in that Work's **Settings → General**. An [App Work](./app-works.md) (a preview) also
+has an **App spec** tab in its own settings.
 
 **Channels** and **Email Addresses** point at `/settings/integrations/...` rather than a top-level
 path, and there is deliberately **no Integrations entry** between them: `/settings/integrations` has

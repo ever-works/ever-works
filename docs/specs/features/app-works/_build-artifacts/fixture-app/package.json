@@ -1,0 +1,24 @@
+{
+	"name": "app-fixture-hello",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Acceptance fixture for Ever Works App Works: the smallest application that makes every App spec feature observable over HTTP (APW-13).",
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=20.10"
+	},
+	"scripts": {
+		"start": "node src/server.mjs",
+		"worker": "node src/worker.mjs",
+		"migrate": "node src/migrate.mjs",
+		"bootstrap": "node src/bootstrap.mjs",
+		"test": "node --test --test-timeout=30000 --test-force-exit --test-reporter=spec \"test/*.test.mjs\"",
+		"format:check": "node tools/format-check.mjs",
+		"format:write": "node tools/format-check.mjs --write",
+		"dev:postgres": "node tools/dev-postgres.mjs",
+		"smoke": "node tools/smoke.mjs"
+	},
+	"dependencies": {},
+	"devDependencies": {}
+}

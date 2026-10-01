@@ -114,3 +114,48 @@ export * from './repositories/agent-repo-attachment.repository';
 // AW-22 Workspace backup — the record of one archive attempt, and the
 // compare-and-set transitions the runner, the sweeper and the owner race on.
 export * from './repositories/workspace-backup.repository';
+// APW-11 App Launcher — the personal arrangement (visible / pinned / order)
+// behind `GET /api/me/apps` and `PUT /api/me/apps/preferences`. Provided by the
+// feature's own `app-launcher.module.ts`, so it is exported here rather than
+// listed in `_repository-inventory.ts` — that file is only for the repositories
+// `DatabaseModule` itself wires, and its drift check fails on an entry that is
+// not a provider there.
+export * from './repositories/app-launcher-preference.repository';
+// APW-02 Fork lifecycle — the Upstream state of one App Work (readiness,
+// Actions hygiene, schedule, divergence, manual-sync allowance). Also
+// feature-owned and wired by the App Works module (T15), for the same reason.
+export * from './repositories/work-upstream-state.repository';
+// APW-06 T17 — the per-App-Work runtime state store behind WORK_APP_RUNTIME_STATES.
+export * from './repositories/work-app-runtime-state.repository';
+// APW-07 App env & dependencies — the stored Environment values of one App Work
+// (T8), and the dependency rows a provider provisions, releases and reports on.
+// Both are feature-owned and wired by their own modules (T13 / T16), so neither
+// is listed in `_repository-inventory.ts` — that file is only for the
+// repositories `DatabaseModule` itself wires, and its drift check fails on an
+// entry that is not a provider there.
+export * from './repositories/work-app-env-value.repository';
+export * from './repositories/work-app-dependency.repository';
+// APW-03 App spec & catalog — the App spec state of one App Work, and the
+// coalescing arithmetic (`requestedSeq` / `startedSeq` / `evaluatedSeq` and the
+// licence pair) that only this repository may touch. Feature-owned and wired by
+// the App spec module, so it is exported here rather than listed in
+// `_repository-inventory.ts` — that file is only for the repositories
+// `DatabaseModule` itself wires, and its drift check fails on an entry that is
+// not a provider there.
+export * from './repositories/work-app-spec-state.repository';
+// APW-05 Builds — the Builds of one App Work (the per-Work number sequence, the
+// run-identity upsert, the sweep's silent and orphaned-secret scans) and the
+// per-App-Work preparation row the consumer stamps a Build from. Both are
+// feature-owned and wired by the App Works module, so they are exported here
+// rather than listed in `_repository-inventory.ts` — that file is only for the
+// repositories `DatabaseModule` itself wires, and its drift check fails on an
+// entry that is not a provider there.
+export * from './repositories/app-build.repository';
+export * from './repositories/app-build-preparation.repository';
+// APW-04 App Provisioner — the provisioning rows of one App Work (the active
+// lookup the start path dedupes on, the four lease/attempt compare-and-sets and
+// the four sweep scans). Feature-owned and wired by the provisioning module, so
+// it is exported here rather than listed in `_repository-inventory.ts` — that
+// file is only for the repositories `DatabaseModule` itself wires, and its drift
+// check fails on an entry that is not a provider there.
+export * from './repositories/work-app-provisioning.repository';

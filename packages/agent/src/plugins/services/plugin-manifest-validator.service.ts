@@ -6,6 +6,7 @@ import type {
     ValidationError,
 } from '@ever-works/plugin';
 import { PLUGIN_CATEGORIES, isPluginCategory } from '@ever-works/plugin';
+import { validateOperationDeclarations } from './plugin-operation.util';
 
 /**
  * Plugin ID pattern: lowercase letters, numbers, and hyphens
@@ -281,6 +282,11 @@ export class PluginManifestValidatorService {
                     expected: validProfiles.join(' | '),
                 });
             }
+        }
+
+        // EW-693 — the operations the execution router may call by name.
+        if (m.operations !== undefined) {
+            errors.push(...validateOperationDeclarations(m.operations));
         }
 
         return {

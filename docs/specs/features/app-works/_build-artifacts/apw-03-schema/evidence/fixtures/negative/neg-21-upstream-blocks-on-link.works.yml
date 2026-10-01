@@ -1,0 +1,21 @@
+# NEGATIVE FIXTURE neg-21 — error class: fork-only blocks on a `link` App Work.
+# Expected: JSON Schema PASS · rule layer FAIL `upstream_sync_requires_upstream` AND
+#           `upstream_prs_require_fork`.
+# schema.md R13 / §19: "Forbidden when `source.relation` is `link`"; §20: "`enabled: true` requires
+# `source.relation: fork`". Both are sibling-block rules, so no schema keyword reaches them; note that
+# `source.upstream` itself is correctly absent here, which the schema DOES enforce (R13's first half).
+version: 2
+kind: app
+spec:
+    source:
+        relation: link
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    upstreamSync:
+        schedule: '0 6 * * 1'
+        mode: merge
+    upstreamPullRequests:
+        enabled: true
+        requireApproval: true

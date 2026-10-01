@@ -1,0 +1,30 @@
+# GOLDEN RENDERED OUTPUT — cal-diy. LimitRange `ew-defaults` (APW-06 plan §4.2, §4.1 names table).
+# Two flavours in this directory:
+#   * this file = target "Your cluster"  → max per container 8 CPU / 64Gi
+#   * managed-overlay.yaml  = target "Ever Works Apps" → max per container 2 CPU / 4Gi
+# The LimitRange is what gives the app's own containers a request/limit when the App spec declares none, and
+# what covers objects the platform starts (jobs, probes) — APW-06 spec FR-15.
+# On "Your cluster" a 403 while applying this object is a warning (`limitrange_forbidden`), not a failure.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ew-defaults
+  namespace: ew-cal-diy-11111111
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: cal-diy
+    ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+    ever-works.io/kind: app
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: "1"
+        memory: 512Mi
+        ephemeral-storage: 1Gi
+      max:
+        cpu: "8"
+        memory: 64Gi

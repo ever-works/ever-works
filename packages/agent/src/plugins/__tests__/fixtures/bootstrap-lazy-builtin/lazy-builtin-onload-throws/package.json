@@ -1,0 +1,22 @@
+{
+    "name": "@ever-works/fixture-lazy-builtin-onload-throws-plugin",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Test fixture for plugin-bootstrap.lazy-builtin.spec.ts — a disk-discovered builtIn plugin whose onLoad throws.",
+    "main": "./index.cjs",
+    "everworks": {
+        "plugin": {
+            "id": "lazy-builtin-onload-throws",
+            "name": "Lazy Built-in onLoad Throws",
+            "version": "1.0.0",
+            "category": "utility",
+            "capabilities": [],
+            "description": "A disk-discovered builtIn plugin whose onLoad throws; used only by the lazy builtIn bootstrap spec.",
+            "author": {
+                "name": "Ever Works Team"
+            },
+            "license": "AGPL-3.0",
+            "builtIn": true
+        }
+    }
+}

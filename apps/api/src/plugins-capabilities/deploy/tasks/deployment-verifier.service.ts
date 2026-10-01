@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 import { WorkRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
-import { PluginRegistryService } from '@ever-works/agent/plugins';
+import { PluginRegistryService, readPluginString } from '@ever-works/agent/plugins';
 import { Work, DeploymentEnvironment } from '@ever-works/agent/entities';
 import { DeploymentCompletedEvent, DeploymentFailedEvent } from '@ever-works/agent/events';
 import type { IDeploymentPlugin } from '@ever-works/plugin';
@@ -251,7 +251,11 @@ export class DeploymentVerifierService {
 
         const registered = this.pluginRegistry.get(resolveDeployProviderId(providerId));
         const plugin = registered?.plugin as IDeploymentPlugin | undefined;
-        const providerName = plugin?.providerName ?? plugin?.name ?? providerId;
+        // Nothing on this path loads the plugin (a lookup can fail before any
+        // plugin method runs), so it may be a cold lazy proxy, whose
+        // `providerName` read is its forwarding wrapper — a function `??`
+        // would keep. Only a string counts; else the manifest name.
+        const providerName = readPluginString(plugin, 'providerName') ?? plugin?.name ?? providerId;
 
         const payload = { work, userId, providerId, providerName };
 

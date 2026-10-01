@@ -231,6 +231,301 @@ describe('gc', () => {
 	});
 });
 
+/**
+ * APW-08 T17 — the cloud path's judge-before-push: `finalize(push: false)`
+ * commits, `branchChanges` reads EXACTLY that commit from git, and
+ * `finalize({ push: true, publishSha })` publishes exactly the judged commit
+ * and nothing the tree gained afterwards.
+ */
+describe('judge before push (branchChanges + publishSha)', () => {
+	const SPEC = '.works/works.yml';
+
+	/** Commit several files (creating their directories) onto origin/main. */
+	const seedFiles = (files: Record<string, string>, message: string): string => {
+		for (const [file, content] of Object.entries(files)) {
+			mkdirSync(join(seedDir, file, '..'), { recursive: true });
+			writeFileSync(join(seedDir, file), content);
+		}
+		git(seedDir, 'add', '-A');
+		git(seedDir, '-c', 'user.name=Seed', '-c', 'user.email=seed@test.local', 'commit', '-m', message);
+		git(seedDir, 'push', originUrl, 'HEAD:refs/heads/main');
+		return git(seedDir, 'rev-parse', 'HEAD');
+	};
+
+	const write = (dir: string, file: string, content: string): void => {
+		mkdirSync(join(dir, file, '..'), { recursive: true });
+		writeFileSync(join(dir, file), content);
+	};
+
+	const remoteHas = (branch: string): boolean => git(seedDir, 'ls-remote', originUrl, `refs/heads/${branch}`) !== '';
+
+	const provision = (branch: string, bindingKey: string) =>
+		plugin.provision({ repoUrl: originUrl, baseRef: 'main', branch, bindingKey, settings: settings() });
+
+	it('reads the committed paths (both sides of a rename) and the COMMITTED spec, with nothing pushed', async () => {
+		seedFiles(
+			{ 'bc/rename-me.txt': 'old name\n', 'bc/delete-me.txt': 'doomed\n', [SPEC]: 'spec: base\n' },
+			'seed: judge-before-push fixtures'
+		);
+		const branch = 'task/judge-fresh-1a2b3c4d';
+		const handle = await provision(branch, 'task-judge-fresh');
+
+		await fs.rename(join(handle.path, 'bc/rename-me.txt'), join(handle.path, 'bc/renamed.txt'));
+		await fs.rm(join(handle.path, 'bc/delete-me.txt'));
+		write(handle.path, '.github/workflows/x.yml', 'on: push\n');
+		write(handle.path, SPEC, 'spec: committed\n');
+		const fin = await plugin.finalize(handle, { commitMessage: 'agent: judged', push: false });
+		expect(fin.pushed).toBe(false);
+		const head = fin.headSha as string;
+
+		// The tree moves on after the commit: what is judged must be the commit.
+		write(handle.path, SPEC, 'spec: tampered on disk\n');
+
+		const changes = await plugin.branchChanges(handle, {
+			headSha: head,
+			readPaths: [SPEC, 'bc/delete-me.txt']
+		});
+
+		expect([...changes.paths].sort()).toEqual(
+			['.github/workflows/x.yml', SPEC, 'bc/delete-me.txt', 'bc/rename-me.txt', 'bc/renamed.txt'].sort()
+		);
+		expect(changes.contents).toEqual({ [SPEC]: 'spec: committed\n', 'bc/delete-me.txt': null });
+		// Nothing left the sandbox.
+		expect(remoteHas(branch)).toBe(false);
+
+		// A LATER local commit is not part of what `head` changes.
+		write(handle.path, 'bc/later.txt', 'later\n');
+		git(handle.path, 'add', '-A');
+		git(handle.path, '-c', 'user.name=T', '-c', 'user.email=t@test.local', 'commit', '-m', 'later');
+		const again = await plugin.branchChanges(handle, { headSha: head });
+		expect(again.paths).not.toContain('bc/later.txt');
+		expect(again.contents).toEqual({});
+		await plugin.teardown(handle);
+	});
+
+	it('judges a REUSED branch by its own changes, not a human edit on the base since (shallow history)', async () => {
+		const branch = 'task/judge-reuse-5e6f7a8b';
+		const first = await provision(branch, 'task-judge-reuse');
+		write(first.path, 'bc/own-first.txt', 'first run\n');
+		expect((await plugin.finalize(first, { commitMessage: 'agent: first', push: true })).pushed).toBe(true);
+		await plugin.teardown(first);
+
+		// A person edits a workflow on the base branch in the meantime.
+		seedFiles({ '.github/workflows/human.yml': 'on: [push]\n' }, 'seed: human workflow edit');
+
+		const second = await provision(branch, 'task-judge-reuse');
+		expect(second.reused).toBe(true);
+		write(second.path, 'bc/own-second.txt', 'second run\n');
+		const fin = await plugin.finalize(second, { commitMessage: 'agent: second', push: false });
+		const head = fin.headSha as string;
+		// The depth-1 base fetch left no merge base: a two-dot diff would name the
+		// human's file, and a three-dot one fails until the history is deepened.
+		expect(() => git(second.path, 'merge-base', second.baseSha, head)).toThrow();
+
+		const changes = await plugin.branchChanges(second, { headSha: head });
+
+		expect(changes.paths).toContain('bc/own-first.txt');
+		expect(changes.paths).toContain('bc/own-second.txt');
+		expect(changes.paths).not.toContain('.github/workflows/human.yml');
+		await plugin.teardown(second);
+	});
+
+	it('publishes EXACTLY the judged commit — never a file the tree gained after it', async () => {
+		const branch = 'task/judge-publish-9c0d1e2f';
+		const handle = await provision(branch, 'task-judge-publish');
+		write(handle.path, 'bc/judged.txt', 'judged\n');
+		const fin = await plugin.finalize(handle, { commitMessage: 'agent: judged', push: false });
+		const head = fin.headSha as string;
+
+		// Something the run started keeps writing after the judgement.
+		write(handle.path, '.github/workflows/evil.yml', 'on: push\n');
+
+		const published = await plugin.finalize(handle, {
+			commitMessage: 'ignored',
+			push: true,
+			publishSha: head
+		});
+
+		expect(published).toMatchObject({ pushed: true, headSha: head, empty: false });
+		expect(git(originDir, 'rev-parse', `refs/heads/${branch}`)).toBe(head);
+		expect(git(originDir, 'ls-tree', '-r', '--name-only', `refs/heads/${branch}`)).not.toContain('evil.yml');
+		// Nothing was staged or committed by the publish.
+		expect(git(handle.path, 'rev-parse', 'HEAD')).toBe(head);
+		expect(git(handle.path, 'status', '--porcelain')).toContain('.github/');
+		await plugin.teardown(handle);
+	});
+
+	it.each([
+		['a symbolic ref', 'HEAD'],
+		['a branch name', 'main'],
+		['a refspec', ':refs/heads/main'],
+		['an abbreviated sha', 'abc1234'],
+		['an upper-case sha', 'A'.repeat(40)],
+		['a well-formed sha that is not in the repository', 'd'.repeat(40)]
+	])('refuses to publish %s, pushing nothing', async (_label, publishSha) => {
+		const branch = `task/judge-refuse-${Buffer.from(publishSha).toString('hex').slice(0, 8)}`;
+		const handle = await provision(branch, `task-judge-refuse-${publishSha.length}-${publishSha.charCodeAt(0)}`);
+		write(handle.path, 'bc/any.txt', 'any\n');
+		await plugin.finalize(handle, { commitMessage: 'agent: any', push: false });
+
+		await expect(plugin.finalize(handle, { commitMessage: 'x', push: true, publishSha })).rejects.toThrow(
+			/publishSha/
+		);
+		expect(remoteHas(branch)).toBe(false);
+		await plugin.teardown(handle);
+	});
+
+	it('refuses publishSha without push: true', async () => {
+		const handle = await provision('task/judge-nopush-3a4b5c6d', 'task-judge-nopush');
+		write(handle.path, 'bc/nopush.txt', 'x\n');
+		const fin = await plugin.finalize(handle, { commitMessage: 'agent: x', push: false });
+
+		await expect(
+			plugin.finalize(handle, { commitMessage: 'x', push: false, publishSha: fin.headSha as string })
+		).rejects.toThrow(/publishSha/);
+		await plugin.teardown(handle);
+	});
+
+	/*
+	 * The model can write the checkout's git dir. `git push` ignores replace refs
+	 * and grafts and sends the REAL objects, so a judge that honours them judges
+	 * something other than what is published.
+	 */
+	const ident = ['-c', 'user.name=T', '-c', 'user.email=t@test.local'];
+	const gitIn = (cwd: string, input: string, ...args: string[]): string =>
+		execFileSync('git', args, { cwd, input, encoding: 'utf8', windowsHide: true }).trim();
+
+	/** A harmless commit on the base: the base's tree plus `decoy.txt`. */
+	const decoyCommit = (dir: string, base: string): string => {
+		const blob = gitIn(dir, 'decoy\n', 'hash-object', '-w', '--stdin');
+		const tree = gitIn(dir, `${git(dir, 'ls-tree', base)}\n100644 blob ${blob}\tdecoy.txt\n`, 'mktree');
+		return git(dir, ...ident, 'commit-tree', tree, '-p', base, '-m', 'decoy');
+	};
+
+	/** A parentless commit whose whole tree is `head`'s `.github` directory. */
+	const orphanCommit = (dir: string, head: string): string => {
+		const github = git(dir, 'rev-parse', `${head}:.github`);
+		const tree = gitIn(dir, `040000 tree ${github}\t.github\n`, 'mktree');
+		return git(dir, ...ident, 'commit-tree', tree, '-m', 'orphan');
+	};
+
+	it('judges the REAL commit when a replace ref swaps a decoy in for it — the commit a push sends', async () => {
+		const branch = 'task/judge-replace-4d5e6f70';
+		const handle = await provision(branch, 'task-judge-replace');
+		try {
+			write(handle.path, '.github/workflows/x.yml', 'on: push\n');
+			write(handle.path, SPEC, 'spec: real\n');
+			const head = (await plugin.finalize(handle, { commitMessage: 'agent: real', push: false }))
+				.headSha as string;
+			git(handle.path, 'replace', head, decoyCommit(handle.path, handle.baseSha));
+			// Armed: plain git now reads the decoy wherever it reads `head`.
+			expect(git(handle.path, 'diff', '--name-only', `${handle.baseSha}...${head}`)).toBe('decoy.txt');
+
+			const changes = await plugin.branchChanges(handle, { headSha: head, readPaths: [SPEC] });
+
+			expect(changes.paths).toContain('.github/workflows/x.yml');
+			expect(changes.paths).not.toContain('decoy.txt');
+			expect(changes.contents).toEqual({ [SPEC]: 'spec: real\n' });
+			// And that is what a publish delivers: the real objects, replace ref or not.
+			await plugin.finalize(handle, { commitMessage: 'ignored', push: true, publishSha: head });
+			expect(git(originDir, 'ls-tree', '-r', '--name-only', `refs/heads/${branch}`)).toContain(
+				'.github/workflows/x.yml'
+			);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	it.each([
+		[
+			'a replace graft',
+			(dir: string, base: string, orphan: string) => git(dir, 'replace', '--graft', base, orphan)
+		],
+		[
+			'an info/grafts line',
+			(dir: string, base: string, orphan: string) => {
+				const common = git(dir, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+				mkdirSync(join(common, 'info'), { recursive: true });
+				writeFileSync(join(common, 'info', 'grafts'), `${base} ${orphan}\n`);
+			}
+		]
+	])('never answers an empty change list for an orphan grafted under the base (%s)', async (label, plant) => {
+		const handle = await provision(`task/judge-graft-${label.length}a1b2c3`, `task-judge-graft-${label.length}`);
+		try {
+			write(handle.path, '.github/workflows/x.yml', 'on: push\n');
+			const head = (await plugin.finalize(handle, { commitMessage: 'agent: workflow', push: false }))
+				.headSha as string;
+			const orphan = orphanCommit(handle.path, head);
+			// A depth-1 base is parentless, which would hide the graft; the model
+			// (or the judge's own `--unshallow` retry) deepens it first.
+			git(handle.path, 'fetch', '--unshallow', 'origin');
+			plant(handle.path, handle.baseSha, orphan);
+			// Armed: plain git calls the orphan an ANCESTOR of the base, so its
+			// workflow is "no change" and a gate handed `[]` allows it.
+			expect(
+				git(
+					handle.path,
+					'-c',
+					'advice.graftFileDeprecated=false',
+					'diff',
+					'--name-only',
+					`${handle.baseSha}...${orphan}`
+				)
+			).toBe('');
+
+			await expect(plugin.branchChanges(handle, { headSha: orphan })).rejects.toThrow(/could not be read/);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	it.each([
+		['a committed .gitmodules entry that says ignore = all', '\tignore = all\n', false],
+		['the checkout config diff.ignoreSubmodules = all', '', true]
+	])('names a submodule change at a protected path hidden by %s', async (label, ignoreLine, viaConfig) => {
+		const handle = await provision(`task/judge-submodule-${label.length}d4e5`, `task-judge-sub-${label.length}`);
+		try {
+			write(
+				handle.path,
+				'.gitmodules',
+				`[submodule "infra/sub"]\n\tpath = infra/sub\n\turl = https://example.invalid/sub.git\n${ignoreLine}`
+			);
+			if (viaConfig) git(handle.path, 'config', 'diff.ignoreSubmodules', 'all');
+			git(handle.path, 'update-index', '--add', '--cacheinfo', `160000,${handle.baseSha},infra/sub`);
+			git(handle.path, 'add', '.gitmodules');
+			git(handle.path, ...ident, 'commit', '-m', 'agent: submodule');
+			const head = git(handle.path, 'rev-parse', 'HEAD');
+			// Armed: a plain diff lists `.gitmodules` and hides the gitlink.
+			expect(git(handle.path, 'diff', '--name-only', `${handle.baseSha}...${head}`).split('\n')).not.toContain(
+				'infra/sub'
+			);
+
+			const changes = await plugin.branchChanges(handle, { headSha: head });
+
+			expect(changes.paths).toContain('infra/sub');
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+
+	it.each([
+		['a symbolic head', (_head: string) => ({ headSha: 'HEAD' })],
+		['a sha that is not in the repository', (_head: string) => ({ headSha: 'e'.repeat(40) })],
+		['a parent-relative path', (head: string) => ({ headSha: head, readPaths: ['../outside.txt'] })],
+		['an absolute path', (head: string) => ({ headSha: head, readPaths: ['/etc/passwd'] })],
+		['a path with a NUL', (head: string) => ({ headSha: head, readPaths: ['a\u0000b'] })]
+	])('branchChanges refuses %s', async (_label, opts) => {
+		const handle = await provision('task/judge-invalid-7e8f9a0b', 'task-judge-invalid');
+		try {
+			write(handle.path, 'bc/invalid.txt', 'x\n');
+			const fin = await plugin.finalize(handle, { commitMessage: 'agent: x', push: false });
+			await expect(plugin.branchChanges(handle, opts(fin.headSha as string))).rejects.toThrow(/headSha|readPath/);
+		} finally {
+			await plugin.teardown(handle);
+		}
+	});
+});
+
 describe('clone URL refusal', () => {
 	// These reach `git` as an ARGUMENT, and on a Fleet node that machine is
 	// somebody's PC. A repository connection is tenant-configurable and can

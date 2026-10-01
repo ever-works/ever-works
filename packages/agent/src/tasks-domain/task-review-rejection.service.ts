@@ -3,7 +3,7 @@ import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
 import { TaskReviewerRepository } from '../database/repositories/task-side.repositories';
 import { WorkRepository } from '../database/repositories/work.repository';
-import { matchWorkByRepo } from '../works/work-repo-match';
+import { findTaskForPullRequest } from './task-repository';
 import type {
     TaskReviewRejection,
     TaskReviewRejectionReviewerKind,
@@ -38,8 +38,9 @@ import type {
  *     advisory signal and the new durable one can never disagree.
  *  2. **Pull-request state** — {@link recordPullRequestRejection}, called
  *     from the GitHub webhook bridge on a `changes_requested` review. The
- *     PR is resolved to a Work through the SAME `matchWorkByRepo` matcher
- *     the PR reviewer uses, then to a Task by `(workId, prNumber)`.
+ *     PR is resolved to its Task by `findTaskForPullRequest`: only Works whose
+ *     TASK repository this is, every one of them — the same rule the resume
+ *     path (`TaskGitLinkService`, `isTaskRepo`) reads it back with.
  */
 @Injectable()
 export class TaskReviewRejectionService {
@@ -127,10 +128,15 @@ export class TaskReviewRejectionService {
         if (trimmed.length === 0) return null;
         try {
             const candidates = await this.works.findByUser(input.userId);
-            const work = matchWorkByRepo(candidates ?? [], input.owner, input.repo);
-            if (!work) return null;
-            const task = await this.tasks.findByWorkAndPrNumber(work.id, input.prNumber);
-            if (!task) return null;
+            const found = await findTaskForPullRequest(
+                candidates ?? [],
+                input.owner,
+                input.repo,
+                input.prNumber,
+                (workId, prNumber) => this.tasks.findByWorkAndPrNumber(workId, prNumber),
+            );
+            if (!found) return null;
+            const { work, task } = found;
             const row = await this.rejections.record({
                 taskId: task.id,
                 source: 'pull-request',

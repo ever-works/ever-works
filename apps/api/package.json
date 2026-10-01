@@ -18,6 +18,7 @@
         "build": "nest build -b swc",
         "generate:openapi": "node dist/openapi/generate-openapi.js",
         "type-check": "tsc -p tsconfig.build.json --noEmit",
+        "type-check:clean": "tsc -p tsconfig.build.json --noEmit --incremental false",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
         "test": "node --max-old-space-size=12288 node_modules/jest/bin/jest.js --maxWorkers=1",
         "test:watch": "jest --watch",

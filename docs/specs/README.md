@@ -93,6 +93,7 @@ which now live folded into `tasks.md`).
 | ----------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
 | [`advanced-prompts`](features/advanced-prompts/spec.md)                       | Retrospective | Per-work prompt overrides per pipeline step                                                   |
 | [`api-keys`](features/api-keys/spec.md)                                       | Retrospective | Long-lived auth tokens for CI / CLI / MCP                                                     |
+| [`app-works`](features/app-works/README.md) (program, 13 epics)               | Draft         | Any GitHub repository as a Work: link/fork, build, run, evolve with agents, upstream sync/PRs |
 | [`collections`](features/collections/spec.md)                                 | Retrospective | Editorial groupings cutting across categories                                                 |
 | [`community-pr-processing`](features/community-pr-processing/spec.md)         | Retrospective | AI-driven processing of community-contributed PRs                                             |
 | [`comparisons`](features/comparisons/spec.md)                                 | Retrospective | A vs B comparison page generator                                                              |

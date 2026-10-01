@@ -1,0 +1,88 @@
+# DRAFT — `ever-works/agents` → `eval/app-provisioner.yml`
+
+# The eight fixture cases of APW-04 plan §11.4, each naming its fixture repository (owned by APW-13, drafted under
+# `fixtures/<case>/` in this folder) and the structured expectation file the monorepo test reads
+# (`expectations.json`). This repository's `eval.schema.json` is a conversation format, so the fixture repository and
+# the structured expectation ride in the case `metadata`; the runnable assertions live in
+# `packages/agent/src/app-provisioning/__tests__/app-provisioner.eval.spec.ts` (APW-04 T32).
+
+schemaVersion: 1
+slug: app-provisioner
+title: App Provisioner — detection, env inference, jobs, cron and probes
+description: >
+  Runs the provision-app Skill against eight fixture repositories and checks the App spec it proposes: which detection
+  source won, which dependencies were inferred and from which file, how each env variable was classified, which jobs,
+  cron entries and probes were declared, and whether an overlay Dockerfile was written.
+cases:
+  - id: app-spec
+    fixture: fixtures/app-spec
+    expected: expectations.json#/cases/app-spec
+    turns:
+      - role: user
+        content: Provision this repository. Its App spec already exists on the branch.
+    expect:
+      - The detection source is app-spec and the report names the file.
+  - id: compose
+    fixture: fixtures/compose
+    expected: expectations.json#/cases/compose
+    turns:
+      - role: user
+        content: Provision this repository.
+    expect:
+      - The detection source is compose and the web service is the one declared.
+  - id: dockerfile
+    fixture: fixtures/dockerfile
+    expected: expectations.json#/cases/dockerfile
+    turns:
+      - role: user
+        content: Provision this repository.
+    expect:
+      - The detection source is dockerfile and no overlay Dockerfile is written.
+  - id: helm
+    fixture: fixtures/helm
+    expected: expectations.json#/cases/helm
+    turns:
+      - role: user
+        content: Provision this repository.
+    expect:
+      - The detection source is helm; image, port and probes come from the chart.
+  - id: descriptor-hint
+    fixture: fixtures/descriptor-hint
+    expected: expectations.json#/cases/descriptor-hint
+    turns:
+      - role: user
+        content: Provision this repository.
+    expect:
+      - The detection source is descriptor-hint, and the port/command come from code rather than the descriptor.
+  - id: zero-config-with-auto
+    fixture: fixtures/zero-config
+    expected: expectations.json#/cases/zero-config-with-auto
+    turns:
+      - role: user
+        content: Provision this repository. The App Work supports the auto build strategy.
+    expect:
+      - The detection source is auto, the build strategy is auto, and no overlay Dockerfile is written.
+  - id: zero-config-without-auto
+    fixture: fixtures/zero-config
+    expected: expectations.json#/cases/zero-config-without-auto
+    turns:
+      - role: user
+        content: Provision this repository. The App Work does not support the auto build strategy.
+    expect:
+      - The detection source is auto and an overlay Dockerfile is written instead.
+  - id: bootstrap-risk
+    fixture: fixtures/bootstrap-risk
+    expected: expectations.json#/cases/bootstrap-risk
+    turns:
+      - role: user
+        content: Provision this repository.
+    expect:
+      - A first-deploy job and a negative smoke test exist, and migrations are a pre-deploy job.
+  - id: cron-key
+    fixture: fixtures/cron-key
+    expected: expectations.json#/cases/cron-key
+    turns:
+      - role: user
+        content: Provision this repository.
+    expect:
+      - The cron entry has an auth secret and a negative smoke test; the fixed-length key has a matching generator and rule.

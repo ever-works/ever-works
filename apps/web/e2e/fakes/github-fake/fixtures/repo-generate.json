@@ -1,0 +1,43 @@
+{
+    "id": 5180001,
+    "name": "templates-copy",
+    "full_name": "apw-e2e-org/templates-copy",
+    "private": false,
+    "owner": {
+        "login": "apw-e2e-org",
+        "id": 40401,
+        "type": "Organization",
+        "site_admin": false
+    },
+    "html_url": "https://github.com/apw-e2e-org/templates-copy",
+    "description": "A generated copy (APW-13 fixture)",
+    "fork": false,
+    "url": "https://api.github.com/repos/apw-e2e-org/templates-copy",
+    "forks_url": "https://api.github.com/repos/apw-e2e-org/templates-copy/forks",
+    "clone_url": "https://github.com/apw-e2e-org/templates-copy.git",
+    "default_branch": "main",
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "allow_forking": true,
+    "size": 108,
+    "topics": ["ever-works", "app-template"],
+    "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit"
+    },
+    "permissions": {
+        "admin": false,
+        "maintain": false,
+        "push": true,
+        "triage": false,
+        "pull": true
+    },
+    "parent": null,
+    "source": null,
+    "created_at": "2026-09-18T09:12:04Z",
+    "updated_at": "2026-09-18T09:31:47Z",
+    "pushed_at": "2026-09-18T09:31:47Z"
+}

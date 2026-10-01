@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE } from './helpers/api';
+import { armDeadTokenRefusal, assertDeadTokenRefusalProven } from './helpers/github-fake-control';
 
 /**
  * flow-register-work-deep.spec.ts — DEEP register-work DTO/contract matrix:
@@ -88,6 +89,31 @@ import { API_BASE } from './helpers/api';
  * drains the bucket. POST tests therefore run SERIAL through a retry-on-429 helper
  * and are kept lean; a second 429 surfaces a `throttled` marker so the test SKIPS
  * rather than redding the run on shared-bucket contention.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * AMENDED 2026-09-19 — C14: the "dead token" these cases name is armed, not assumed
+ *
+ * The probe notes above were taken in a **keyless** stack: no fake GitHub, so
+ * `resolveGitHubIdentity`'s call to the real service failed for any bogus token
+ * and the 403 `gh_credential_invalid` below was reachable by default. In the
+ * fake-armed lane that is no longer true — `GET /user` is a static fixture route
+ * that answers **200 for every token**
+ * (`fakes/github-fake/routes/repos.mjs`, asserted 200 by
+ * `fakes/github-fake/__tests__/contract.unit.spec.ts`), so the identity
+ * RESOLVES and the request runs on to the *next* gate, `assertRepoAccess`
+ * (`apps/api/src/onboarding/onboarding.service.ts:312-341`), which answers
+ * **403 `gh_repo_access_denied` / 'token cannot read the named repository'** —
+ * a different refusal, produced for a different reason.
+ *
+ * Both codes are 403, so the status assertion alone cannot tell them apart; the
+ * `code` assertion is what names the gate, and it is unchanged. What changed is
+ * the SETUP: every case below whose subject is the dead credential calls
+ * `armDeadTokenRefusal` first (C14, `helpers/github-fake-control.ts`), which
+ * plants the fake's one-shot per-token `auth-refused` `401` and then proves from
+ * `/_control/calls` that the refusal the platform hit was the fake's. No
+ * assertion was weakened: the intended gate is `gh_credential_invalid`, the
+ * spec always asserted `gh_credential_invalid`, and with the fault armed that is
+ * what the platform answers.
  */
 
 const VALID_REPO = 'https://github.com/octocat/awesome-mcp';
@@ -95,6 +121,17 @@ const VALID_REPO = 'https://github.com/octocat/awesome-mcp';
 // which the keyless / fake-GitHub-App env always rejects → a deterministic 403.
 const UNRESOLVABLE_GH_TOKEN = 'ghp_e2e_deep_unresolvable_token_000';
 const PARAM_UUID_UNKNOWN = 'cccccccc-dddd-eeee-ffff-000000000000';
+
+/**
+ * The lane's fake GitHub (the PR lane starts it; `plan.md` §9.1, CONTRACTS §7).
+ * Unset outside the fake lanes, where it falls back to the fake's documented
+ * default port — `armDeadTokenRefusal` shape-probes the origin before arming, so
+ * a live lane that happens to have something else on 3900 arms nothing.
+ */
+const FAKE_GITHUB_URL = (process.env.APW_E2E_GITHUB_FAKE_URL ?? 'http://127.0.0.1:3900').replace(
+    /\/+$/,
+    '',
+);
 
 interface TypedError {
     statusCode?: number;
@@ -210,6 +247,11 @@ test.describe('register-work — DTO validation gradient (per-field bounds, POST
         // the request is NOT a 400 URL rejection; it passes validation and reaches
         // resolveGitHubIdentity, which 403s the dead token. Proves the DTO normalises
         // the canonical form rather than rejecting it.
+        //
+        // The dead token is ARMED for this case (C14): the fake's permissive
+        // `GET /user` default would otherwise resolve it and red the `code` below
+        // on `gh_repo_access_denied` from the NEXT gate.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, UNRESOLVABLE_GH_TOKEN);
         const { status, body, throttled } = await postRegisterWork(
             request,
             { repo: 'https://github.com/octocat/awesome-mcp/' },
@@ -220,6 +262,7 @@ test.describe('register-work — DTO validation gradient (per-field bounds, POST
         expect(body.code, 'it reached the credential gate, not the validation gate').toBe(
             'gh_credential_invalid',
         );
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
     });
 
     test('repo with an extra path segment (deep link /tree/main) is rejected — the regex pins exactly owner/repo', async ({
@@ -244,6 +287,10 @@ test.describe('register-work — DTO validation gradient (per-field bounds, POST
         // canonical form; the GITHUB_HTTPS_REPO regex carries the `i` flag so the
         // DTO accepts it and the request reaches the credential gate (403). Proves
         // the host pin is case-insensitive, not a literal lowercase match.
+        //
+        // The dead token is ARMED for this case (C14) — same reason as the
+        // trailing-slash case above.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, UNRESOLVABLE_GH_TOKEN);
         const { status, body, throttled } = await postRegisterWork(
             request,
             { repo: 'https://GitHub.com/Octocat/Awesome-MCP' },
@@ -254,6 +301,7 @@ test.describe('register-work — DTO validation gradient (per-field bounds, POST
         expect(body.code, 'it reached the credential gate, not the validation gate').toBe(
             'gh_credential_invalid',
         );
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
     });
 
     test('agentId @Length(1,256) UPPER bound — a 257-char id is rejected by length (distinct from the printable-ASCII regex)', async ({
@@ -374,6 +422,11 @@ test.describe('register-work — whitelist posture, error aggregation & the regi
         // typed 403, never the 202 that would mint an OnboardingRequest + Work. The
         // 403 (not 404) also proves config.features.zeroFrictionOnboarding() is ON:
         // the feature-flag short-circuit (404 feature_disabled) did not fire.
+        // The dead token is ARMED for this case (C14). Without the arm the fake
+        // answers `GET /user` 200, the identity resolves, and the 403 this case
+        // reads is `gh_repo_access_denied` from `assertRepoAccess` — the same
+        // status, a different gate, and no evidence at all about the credential.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, UNRESOLVABLE_GH_TOKEN);
         const { status, body, headers, throttled } = await postRegisterWork(
             request,
             { repo: VALID_REPO, email: 'agent@example.com', agentId: 'deep-probe-agent' },
@@ -393,6 +446,7 @@ test.describe('register-work — whitelist posture, error aggregation & the regi
             headers['x-ratelimit-limit-long'],
             'the 10/min/IP account-creation budget is exposed on the response',
         ).toBe('10');
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
     });
 
     test('GET status happy-path (200 + resulting-entity shape) is UNREACHABLE keyless — the closest reachable contract is the typed not-found/owner envelope', async ({

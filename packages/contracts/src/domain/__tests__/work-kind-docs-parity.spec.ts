@@ -88,6 +88,7 @@ describe('work-kinds.md documents the shipped vocabulary', () => {
 					'directory',
 					'awesome-repo',
 					'repo',
+					'app',
 					'company',
 					'campaign',
 					'default'

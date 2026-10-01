@@ -467,6 +467,42 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
         'A digest of a knowledge document’s whitespace-normalized body, used to tell a substantive edit from a reformat. Derived from content the archive already carries in full.',
     includeSecrets:
         'A boolean toggle on the legacy config-repo sync — whether that path was asked to carry masked secrets. Not itself a secret.',
+    // APW-03 T9 — the App spec state table's three digests. The guard fired on
+    // them the moment `WorkAppSpecState` landed (2026-09-18), which is exactly
+    // what it is for: a new `*Hash` column has to be decided, not inherited.
+    headSpecHash:
+        'A sha256 of the App spec at the repository head, used to tell one evaluation from the next. The spec is a file in the member’s own repository, which the archive does not carry — the digest gives nothing away that the repository does not already publish to anyone who can read it.',
+    effectiveSpecHash:
+        'A sha256 of the spec the Work is actually running under (head, or a pinned earlier commit). A content digest for change detection, not a credential.',
+    licenseRegistryHash:
+        'A sha256 of the license registry the App spec resolved against, used to notice a registry change between evaluations. The registry is public template metadata.',
+    // APW-04 T7 / APW-05 T4 — the provisioning and build tables. The guard fired on
+    // these the moment those entities landed (2026-09-18, caught by APW-09 T43's
+    // full-suite run rather than by the slice that added them), which is precisely
+    // its job: a new secret-shaped column has to be *decided*, not inherited. Each
+    // reason below is read off the column's own docstring and the contract it holds,
+    // not inferred from the name.
+    tokenCap:
+        'A numeric CEILING on how many model tokens a provisioning run may spend (default 3,000,000). A budget, not a credential — the sibling `tokensUsed` is already benign for the same reason.',
+    appSpecHash:
+        'A digest of the App spec the Build ran under, for change detection. The spec is a file in the member’s own repository, which the archive does not carry.',
+    buildInputsHash:
+        'sha256 over (name, fingerprint) of the build values a preparation synced (plan §4.7) — a digest of NAMES and fingerprints, never of a value.',
+    secretsSyncedAt:
+        'A timestamp — when the secret sync finished. The deployable verdict’s freshness clock (§5.1).',
+    buildSecretNames:
+        'The `EW_` secret NAMES a preparation wrote (≤ 50). The entity docstring is explicit: "Names only, never values" — the values are sealed in the platform’s secret store and never reach this table.',
+    verifySecretNames:
+        'The names of the per-run prompted values a verification created (§4.10), kept so the cleanup can find and remove them. Names only; the values live in the secret store and are removed at the end of the run.',
+    secretCheck:
+        'The closed three-value verdict `passed | failed | not_needed` (`APP_BUILD_SECRET_CHECK_RESULTS`). The name matched the guard’s pattern; the value is an enum, not a secret.',
+    // APW-09 T43 (FR-43, XC-18) — `WorkUpstreamState.credentialMemberUserId`. The
+    // guard fired on it the moment that column landed (commit `8eced931d`), which is
+    // exactly its job: a new `*credential*`-shaped column has to be decided, not
+    // inherited. The reason below is read off the column's own docstring
+    // (`work-upstream-state.entity.ts:307-322`), not inferred from the name.
+    credentialMemberUserId:
+        'A USER ID, not a credential: the member whose connection is the credential of record for this App Work’s background jobs once a handover has been recorded (NULL = no handover, and the creator `Work.userId` is used instead). It addresses a member the archive already carries in full; the connection it points at is stored elsewhere and is dropped or redacted there by its own rule.',
 });
 
 /**
@@ -502,6 +538,18 @@ export const BACKUP_BENIGN_ENTITY_COLUMNS: Readonly<
     WorkKnowledgeDocument: Object.freeze({
         metadata:
             'Not an extension dict despite its docstring: this column IS the knowledge document\u2019s body, plus `archivedFrom*`/`transcribed*` stamps our own code writes. No DTO declares the field and the global pipe runs `forbidNonWhitelisted`, so no HTTP caller can name a key. Redacting it would delete the document text from the archive \u2014 text the owner already has mirrored in plaintext in their own data repo. A credential an owner types INTO a runbook body ships with it; that is the residual, and it is the same one the body itself carries.',
+    }),
+    // APW-06 T16 \u2014 the three `simple-json` columns added to `work_deployments`
+    // on 2026-09-22. All three are written ONLY by the App deploy orchestrator on
+    // the isolated cluster worker; no DTO declares any of them, and the global
+    // pipe runs `forbidNonWhitelisted`, so no HTTP caller can widen one.
+    WorkDeployment: Object.freeze({
+        componentStatuses:
+            'One writer, one shape: the orchestrator maps Kubernetes\u2019 own pod status onto `{ name, role, desired, ready, restarts, lastTerminationReason?, oomKilledAt? }` at the terminal state. Every value is ours or the cluster\u2019s \u2014 a component name from the App spec, three integers, a timestamp, and `lastTerminationReason`, which is the kubelet\u2019s closed reason enum (`OOMKilled`, `Error`, `Completed`) and never the container\u2019s own output. Nothing here is authored by the member\u2019s application.',
+        smokeResult:
+            'The \u00a75.5 check results: `{ inCluster: CheckResult[], public: CheckResult[], hairpin?, classification?, observedAt }`. `CheckResult` has seven fields and six of them are ours, the App spec\u2019s or the transport\u2019s \u2014 a check name and a `failedExpectation` that both come from the spec the member wrote, a pass/fail/skip enum, an HTTP status, a latency, and a closed classification enum. **The residual is `found`**: it is a substring of the member\u2019s OWN application\u2019s HTTP response, capped at 200 characters and secret-scrubbed by the plugin that produced it (`app-deployment.types.ts:427`). The cap and the scrub are the guarantee, and the scrub is best-effort code we do not run ourselves \u2014 an application that prints an env value into an error page could put 200 characters of it here. Reviewed and accepted 2026-09-22 on the basis that the member owns both the application and the archive; re-challenge this entry if `found` ever grows past 200 characters or a plugin outside this repo starts producing it.',
+        appRender:
+            'The render facts: `{ phase, namespace, specCommitSha, envChecksum, jobResults[], warnings[], preconditions[], rollback?, cancelledBy?, supersededBy? }`. Plan \u00a77.1 states the rule at the column \u2014 *\u201cNever values or log text\u201d* \u2014 and every member is a platform-authored fact rather than an app-authored one: a phase enum, a namespace we compute, a commit sha, a checksum OF the env rather than the env, our own refusal codes, and row ids. `jobResults[]` carries a job\u2019s name, status and timestamps; the job\u2019s OUTPUT is deliberately not in it, which is the same line \u00a74.9\u2019s failure excerpts draw.',
     }),
 });
 

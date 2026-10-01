@@ -1,0 +1,26 @@
+# POSITIVE FIXTURE pos-01 — `x-` extension keys at three depths.
+# Expected: JSON Schema PASS · rule layer PASS.
+# schema.md §2.3 / CONTRACTS.md C1: "Any key starting with `x-` is allowed at any depth inside `spec`,
+# preserved, and ignored." The schema expresses this as `patternProperties: { "^x-": {} }` next to every
+# `additionalProperties: false` — the same two keywords plan.md §2.2 says the emitter must post-process in.
+# The `x-` keys carry values of several types on purpose: the exemption must not constrain what they hold.
+version: 2
+kind: app
+spec:
+    appSpecVersion: 1
+    x-platform-note: 'extension keys are preserved, never stripped'
+    x-owner: { team: platform, reviewedAt: 2026-09-17 }
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        x-branch-note: 'the Work Repository branch'
+    build: { strategy: dockerfile }
+    components:
+        - name: web
+          role: web
+          port: 3000
+          x-resource-profile: [small, burstable]
+    env:
+        - name: TELEMETRY_DISABLED
+          value: '1'
+          x-source: { from: platform-template, version: 3 }

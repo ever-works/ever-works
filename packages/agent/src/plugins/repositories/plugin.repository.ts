@@ -5,6 +5,35 @@ import { PluginEntity, type PluginInstallState } from '../entities/plugin.entity
 import type { PluginCategory, PluginState } from '@ever-works/plugin';
 
 /**
+ * The columns a lazy plugin registration writes (see
+ * {@link PluginRepository.mergeLazyRegistration}); the manifest is passed apart.
+ */
+export type LazyRegistrationRow = Omit<Partial<PluginEntity>, 'manifest'> & {
+    pluginId: string;
+    version: string;
+};
+
+/**
+ * The manifest a lazy registration writes to a plugin row that currently holds
+ * `existing` (`null` when there is none): see
+ * {@link PluginRepository.mergeLazyRegistration}. Pure, so the Trigger worker's
+ * in-memory `LocalPluginStore` writes exactly what the database does.
+ */
+export function lazyRegistrationManifest(
+    existing: Pick<PluginEntity, 'version' | 'manifest'> | null | undefined,
+    version: string,
+    packageJsonManifest: Record<string, unknown>,
+): Record<string, unknown> {
+    if (!existing || existing.version !== version) return packageJsonManifest;
+    const existingManifest = existing.manifest;
+    if (!existingManifest || typeof existingManifest !== 'object') return packageJsonManifest;
+    const defined = Object.fromEntries(
+        Object.entries(packageJsonManifest).filter(([, value]) => value !== undefined),
+    );
+    return { ...existingManifest, ...defined };
+}
+
+/**
  * Repository for managing PluginEntity persistence.
  * Handles CRUD operations and queries for plugin metadata and state.
  */
@@ -179,6 +208,52 @@ export class PluginRepository {
             return this.findByPluginId(data.pluginId);
         }
         return this.create(data);
+    }
+
+    /**
+     * Write the row for a lazy plugin registration (`PluginLoaderService.registerLazy`),
+     * reading, merging and writing in ONE call.
+     *
+     * Every process boot registers each disk plugin lazily — with builtIns lazy that
+     * is every API boot and every Trigger run — and writing package.json's manifest
+     * alone replaced the richer one another process had written on the plugin's
+     * first load (icon, homepage, readme, uiHints: what only the class's
+     * `getManifest()` adds). So a row written for the SAME version keeps its
+     * manifest keys, with package.json's defined values on top (package.json wins
+     * where both have a key). A row written for another version gets package.json's
+     * manifest as it is: a key that version's class declared and this one dropped
+     * (`supplementary`, `systemPlugin`, `deprecated`, …) must not outlive the
+     * upgrade in a row that readers trust — the works-config projection, the plugin
+     * catalog, the installer. Within one version, a key the class dropped lingers
+     * until the plugin's next first load rewrites the whole manifest. With no row
+     * yet, or one without a manifest, package.json's manifest is written as it is.
+     * The other `row` columns are written as given; the columns it leaves out
+     * (settings, install state, …) are left alone.
+     *
+     * One method, not a read here and a write there, because in a Trigger worker
+     * `PluginRepository` is a remote proxy whose reads go to the API while its
+     * writes stay in the worker's in-memory `LocalPluginStore` — which implements
+     * this method too (see `lazyRegistrationManifest`), so a run's registrations
+     * dial nothing. The API refuses it over that hop (`TriggerInternalController`).
+     *
+     * A failed read is not a failed registration on its own: the write reads the
+     * row again and reports a failure that persists.
+     */
+    async mergeLazyRegistration(
+        row: LazyRegistrationRow,
+        packageJsonManifest: Record<string, unknown>,
+    ): Promise<PluginEntity | null> {
+        let existing: PluginEntity | null;
+        try {
+            existing = await this.findByPluginId(row.pluginId);
+        } catch {
+            return this.upsert({ ...row, manifest: packageJsonManifest });
+        }
+        const manifest = lazyRegistrationManifest(existing, row.version, packageJsonManifest);
+        if (existing) {
+            return this.updateByPluginId(row.pluginId, { ...row, manifest });
+        }
+        return this.create({ ...row, manifest });
     }
 
     /**

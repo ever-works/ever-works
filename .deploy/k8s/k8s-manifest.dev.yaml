@@ -294,6 +294,36 @@ spec:
               value: "$DEPLOY_EVER_WORKS_ENABLED"
             - name: EVER_WORKS_DOMAIN
               value: "$EVER_WORKS_DOMAIN"
+            # APW-01 — the App Works instance switch: whether this installation
+            # offers Work kinds built from an arbitrary GitHub repository. The API
+            # reads it through config.everWorks.apps.worksEnabled().
+            - name: EVER_WORKS_APP_WORKS_ENABLED
+              value: "false"
+
+
+            # APW-11 (XC-10, spec FR-65) - the App Launcher's operator switches.
+            # The flag is a LIVE switch: the guard reads it per request and answers
+            # 404 unless it is exactly 'true', so flipping the line below is the
+            # whole operation - no code change, no new image, a restart only. It
+            # ships OFF here and in every other environment: unset, empty and any
+            # unrecognised value are all the OFF state, so it cannot fail open.
+            - name: EVER_WORKS_APP_LAUNCHER_ENABLED
+              value: "false"
+            # The platform catalog (ever-works/platforms). REPO, REF and SELF_ID
+            # fall back to the service's own defaults (ever-works/platforms, main,
+            # ever-works) when the deploy environment does not define them, because
+            # envsubst renders an unset variable as an EMPTY STRING rather than
+            # leaving it undefined. _ENV is a literal on purpose: its default is
+            # 'production', so an installation that never set it would show
+            # production addresses on stage and dev (spec FR-10, APW11-G19).
+            - name: EVER_WORKS_PLATFORM_CATALOG_REPO
+              value: "$EVER_WORKS_PLATFORM_CATALOG_REPO"
+            - name: EVER_WORKS_PLATFORM_CATALOG_REF
+              value: "$EVER_WORKS_PLATFORM_CATALOG_REF"
+            - name: EVER_WORKS_PLATFORM_CATALOG_ENV
+              value: "develop"
+            - name: EVER_WORKS_PLATFORM_CATALOG_SELF_ID
+              value: "$EVER_WORKS_PLATFORM_CATALOG_SELF_ID"
             - name: EVER_WORKS_DEPLOY_LB_HOSTNAME
               value: "$EVER_WORKS_DEPLOY_LB_HOSTNAME"
             - name: CLOUDFLARE_API_TOKEN
@@ -394,6 +424,13 @@ spec:
           image: registry.digitalocean.com/ever/ever-works-web-dev:latest
           imagePullPolicy: Always
           env:
+            # APW-01 — the SAME variable on the web side, and that is deliberate:
+            # the chip's gate reads it at request time rather than asking the API, so
+            # an install that set it on one deployment only would show a chip the API
+            # refuses (or hide one it would build). Keep the two values in step.
+            - name: EVER_WORKS_APP_WORKS_ENABLED
+              value: "false"
+
             - name: AUTH_SECRET
               value: "$AUTH_SECRET"
             - name: WEB_URL

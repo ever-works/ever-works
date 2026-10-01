@@ -14,6 +14,7 @@ import {
     type WorksConfigSyncReason,
 } from './works-config-sync-requested.event';
 import { WorksConfigSyncFailedEvent } from './works-config-sync-failed.event';
+import { AppSpecAppliedEvent } from './app-spec-applied.event';
 
 /**
  * Mirrors the existing `apps/api/src/events/index.spec.ts` style: every
@@ -43,6 +44,11 @@ describe('agent/events submodule', () => {
             expect(DeploymentDispatchedEvent.EVENT_NAME).toBe('deployment.dispatched');
             expect(DeploymentCompletedEvent.EVENT_NAME).toBe('deployment.completed');
             expect(DeploymentFailedEvent.EVENT_NAME).toBe('deployment.failed');
+            // APW-03 T12/T13 — the canonical App spec applied event
+            // (tasks.md:101, CONTRACTS.md:327). APW-07 T15 subscribes to this
+            // exact string through its own provisional constant, so a change
+            // here silently disconnects the emitter from its subscriber.
+            expect(AppSpecAppliedEvent.EVENT_NAME).toBe('app.spec.applied');
         });
 
         it('every event-name string is unique', () => {
@@ -54,6 +60,7 @@ describe('agent/events submodule', () => {
                 DeploymentDispatchedEvent.EVENT_NAME,
                 DeploymentCompletedEvent.EVENT_NAME,
                 DeploymentFailedEvent.EVENT_NAME,
+                AppSpecAppliedEvent.EVENT_NAME,
             ];
             expect(new Set(names).size).toBe(names.length);
         });
@@ -67,6 +74,7 @@ describe('agent/events submodule', () => {
                 DeploymentDispatchedEvent.EVENT_NAME,
                 DeploymentCompletedEvent.EVENT_NAME,
                 DeploymentFailedEvent.EVENT_NAME,
+                AppSpecAppliedEvent.EVENT_NAME,
             ];
             for (const name of names) {
                 expect(name).toMatch(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/);
@@ -104,6 +112,20 @@ describe('agent/events submodule', () => {
             expect(new DeploymentCompletedEvent(payload)).toBeInstanceOf(BaseEvent);
             expect(
                 new DeploymentFailedEvent({ ...payload, terminalState: 'ERROR' }),
+            ).toBeInstanceOf(BaseEvent);
+            // APW-03 T12/T13 — the App spec applied event carries its payload as
+            // named fields, so APW-07's `@OnEvent` handler reads `event.workId`
+            // exactly as its provisional stand-in type declares.
+            expect(
+                new AppSpecAppliedEvent({
+                    workId: 'w1',
+                    commitSha: 'a'.repeat(40),
+                    previousCommitSha: null,
+                    specHash: 'b'.repeat(64),
+                    addedDependencies: ['postgres'],
+                    changedEnvNames: ['DATABASE_URL'],
+                    changedBlocks: ['build'],
+                }),
             ).toBeInstanceOf(BaseEvent);
         });
     });
@@ -291,6 +313,20 @@ describe('agent/events submodule', () => {
             const runtimeKeys = Object.keys(eventsBarrel).sort();
             expect(runtimeKeys).toEqual(
                 [
+                    // APW-03 T12/T13 — the App spec applied event, subscribed to by
+                    // APW-05, 06, 07 and 08 (CONTRACTS.md:327).
+                    'AppSpecAppliedEvent',
+                    // APW-05 T17 — the five `app.build.*` events and their explicit
+                    // status → event map (plan §7.8, `APW05-G05`). `blocked` maps to
+                    // `null` on purpose: it is not a CONTRACTS §6 name, so a blocked
+                    // Build publishes nothing. `__tests__/events.spec.ts` owns the
+                    // family's own assertions; this list is the barrel's pin.
+                    'AppBuildCancelledEvent',
+                    'AppBuildFailedEvent',
+                    'AppBuildQueuedEvent',
+                    'AppBuildStartedEvent',
+                    'AppBuildSucceededEvent',
+                    'APP_BUILD_EVENT_CLASSES',
                     'BaseEvent',
                     'DeploymentCompletedEvent',
                     'DeploymentDispatchedEvent',

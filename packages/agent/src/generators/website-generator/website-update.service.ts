@@ -8,7 +8,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { getWorkOwner } from '../../utils/work.utils';
 import { WebsiteTemplateResolverService } from './website-template-resolver.service';
-import { assertRepositoryRole } from '../../works/repository-work-guard';
+import {
+    assertNotAppWorkTemplateTarget,
+    assertRepositoryRole,
+} from '../../works/repository-work-guard';
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -75,6 +78,10 @@ export class WebsiteUpdateService {
         // `getWebsiteRepo()` derives `<slug>-website` under an owner that
         // may not be ours and `repositoryExists` goes looking for it.
         assertRepositoryRole(work, 'website');
+        // An App Work passes the role check — its `website` role IS its Work
+        // Repository, the member's own code — and everything below force-
+        // pushes a template over it. Refused here, before any provider call.
+        assertNotAppWorkTemplateTarget(work, 'website template sync');
 
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');

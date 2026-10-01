@@ -1,12 +1,12 @@
 /**
- * App Blueprint facts that other modules need to RECOGNISE a Blueprint
- * repository. Dependency-free on purpose, so website-template discovery can
- * import it without pulling anything else in.
+ * App Blueprint facts that other modules need without depending on the
+ * resolver (and, through it, on the git facade, the licence classifier and the
+ * works-config validator).
  *
- * App Blueprints (e.g. ever-works/cal-template, ever-works/umami-template) are
- * public repositories in the catalog org whose names end in "template" like the
- * website templates do, but they generate App Works, never websites.
+ * `AppBlueprintResolverService` re-exports these, so existing imports keep
+ * working; a module that only needs to RECOGNISE a Blueprint (website-template
+ * discovery, for one) imports this leaf file instead.
  */
 
-/** The topic every Blueprint repository carries. */
+/** The topic every Blueprint repository carries (`catalog.md` §5, FR-43). */
 export const APP_BLUEPRINT_TOPIC = 'ever-works-app-blueprint';

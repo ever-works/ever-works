@@ -73,11 +73,15 @@ test.describe('Schedules workspace — list', () => {
             .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
             .toMatch(/^\/(en\/)?activity$/);
         expect(new URL(page.url()).searchParams.get('view')).toBe('schedules');
-        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
+        // Scoped to the layout's main region: a hard load server-renders the list
+        // (233c219ea), and a streamed copy can sit briefly in a hidden container
+        // outside #main-content, which made the unscoped locator ambiguous.
+        const workspace = page.locator('#main-content').getByTestId('schedules-workspace');
+        await expect(workspace).toBeVisible({ timeout: 30_000 });
 
         // The deep link addresses the same list directly.
         await page.goto(SCHEDULES_VIEW_URL, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('schedules-workspace')).toBeVisible({ timeout: 30_000 });
+        await expect(workspace).toBeVisible({ timeout: 30_000 });
     });
 
     test('the retired /schedules path forwards the filter set it was given', async ({ page }) => {
@@ -185,12 +189,14 @@ test.describe('Schedules workspace — list', () => {
             timeout: 30_000,
         });
         await expect(page.getByTestId(rowTestId('data_sync', workId))).toHaveCount(0);
-        await expect(page.getByTestId('schedules-filter-source')).toHaveValue('recurring_task');
+        // The source <select> is gone since 233c219ea: the source chips are the
+        // control now, writing the same `source` parameter.
+        const sourceChip = page.getByTestId('schedules-source-chip-recurring_task');
+        await expect(sourceChip).toHaveAttribute('aria-pressed', 'true');
+        await expect(page).toHaveURL(/[?&]source=recurring_task/);
 
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('schedules-filter-source')).toHaveValue('recurring_task', {
-            timeout: 30_000,
-        });
+        await expect(sourceChip).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 });
         await expect(page.getByTestId(rowTestId('data_sync', workId))).toHaveCount(0);
     });
 

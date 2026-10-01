@@ -1,0 +1,103 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. CronJob `cron-tick` (APW-06 plan §4.9).
+#
+#   spec.cron[0] = { name: tick, schedule: '*/2 * * * *',
+#                    http: { method: POST, path: /cron/tick, authEnv: FIXTURE_CRON_TOKEN, authScheme: bearer } }
+#
+# ACC-E2E-05 asserts this object by name and schedule: "CronJob cron-tick with schedule */2 * * * *"
+# (ACCEPTANCE.md:335). ACC-13-10's sibling on cal-diy asserts all seven of that Blueprint's CronJobs.
+#
+# `authEnv` must name a `secret: true` entry (APW-03 schema.md:314 R15 `auth_env_not_secret`), which
+# `FIXTURE_CRON_TOKEN` is (works.yml:88-90). The value is delivered by `secretKeyRef` into the RUNNER pod,
+# never into the app pod's env as a literal, and an unset value is a precondition failure
+# (`cron_auth_env_unset`) rather than a rendered call with no credential.
+#
+# 🛑 On the managed target this CronJob is REFUSED: `*/2 * * * *` fires more often than every five minutes,
+# which APW-06 plan §4.9 rejects with `cron_too_frequent` (APW-10 plan.md:245, refusal code
+# `CRON_TOO_FREQUENT` at plan.md:268). The managed rendering therefore carries NO CronJob at all — see
+# managed-overlay.yaml and ../golden-test-plan.md §5.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-tick
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/cron: tick
+spec:
+  schedule: "*/2 * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+        ever-works.io/cron: tick
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 330
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/managed-by: ever-works-k8s-plugin
+            app.kubernetes.io/part-of: app-fixture-hello
+            ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+            ever-works.io/kind: app
+            ever-works.io/cron: tick
+        spec:
+          restartPolicy: Never
+          serviceAccountName: app
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: runner
+              image: node:22-bookworm-slim@sha256:0000000000000000000000000000000000000000000000000000000000000004
+              imagePullPolicy: IfNotPresent
+              command:
+                - node
+                - /ew/runner.mjs
+                - cron/tick
+              env:
+                - name: FIXTURE_CRON_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-env-fa90df132e
+                      key: FIXTURE_CRON_TOKEN
+              volumeMounts:
+                - name: runner
+                  mountPath: /ew
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 128Mi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 10001
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: runner
+              configMap:
+                name: ew-runner-918eaf204a
+                defaultMode: 0555

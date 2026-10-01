@@ -1,0 +1,29 @@
+{
+    "url": "https://api.github.com/repos/ever-works/cal-diy-template/branches/main/protection",
+    "required_status_checks": {
+        "url": "https://api.github.com/repos/ever-works/cal-diy-template/branches/main/protection/required_status_checks",
+        "strict": true,
+        "contexts": ["build"],
+        "checks": [
+            {
+                "context": "build",
+                "app_id": null
+            }
+        ]
+    },
+    "enforce_admins": {
+        "url": "https://api.github.com/repos/ever-works/cal-diy-template/branches/main/protection/enforce_admins",
+        "enabled": true
+    },
+    "required_pull_request_reviews": null,
+    "restrictions": null,
+    "required_linear_history": {
+        "enabled": false
+    },
+    "allow_force_pushes": {
+        "enabled": false
+    },
+    "allow_deletions": {
+        "enabled": false
+    }
+}

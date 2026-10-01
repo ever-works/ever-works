@@ -153,6 +153,59 @@ export interface PluginsModuleOptions {
      * refuses to start in `dynamic` mode if this directory is read-only.
      */
     installDir?: string;
+
+    /**
+     * EW-693 T27 — the most time the boot warmup (`warmupFromDb`, awaited
+     * before the API serves) gives ONE plugin's fetch, in milliseconds. The
+     * plugins are warmed in parallel, so this also bounds the whole warmup. A
+     * plugin that runs past it counts as failed; its fetch continues in the
+     * background, and the first use waits for it. `0` = no bound. Default
+     * 60000. Dynamic mode only. Wired by `apps/api/src/api.module.ts` from
+     * `config.plugins.warmupTimeoutMs()` (`PLUGIN_WARMUP_TIMEOUT_MS`).
+     */
+    warmupTimeoutMs?: number;
+
+    /**
+     * EW-693 T26 / FR-15 — install-on-use for facades. When `true` AND
+     * `distributionMode` is `dynamic`, a facade that resolves a plugin this
+     * process has not registered — an explicit provider override, or the
+     * Work's active plugin — first asks the installer for it
+     * (`FacadePluginAvailabilityService`), then reads the registry again and
+     * uses that entry. Only a plugin the platform already installed and pinned
+     * (a `registry`-sourced row in state `installed` with its `registrySpec`
+     * and `installedVersion`) is asked for; a facade call never performs a
+     * first-ever install.
+     *
+     * The installer places the pinned version (and its integrity) on THIS
+     * replica with `ensureLocalInstall` — never writing the shared row — and
+     * `loader.registerFromPath` registers it (EW-693 T27; until then the
+     * switch was inert: the shared row was trusted and nothing registered
+     * the plugin).
+     *
+     * Default `false`: facades resolve only what is registered, exactly as
+     * before. Ignored in `bundled` mode (FR-22). Wired by
+     * `apps/api/src/api.module.ts` from `config.plugins.facadeInstallOnUse()`
+     * (`PLUGIN_FACADE_INSTALL_ON_USE`).
+     */
+    facadeInstallOnUse?: boolean;
+
+    /**
+     * EW-693 T26 / FR-16 — where `ManagedAgentSandboxRunnerService` runs a
+     * restricted-network sandbox session (`runSandboxSession`) on the pipeline
+     * plugin its caller selected.
+     *
+     * - `false` (default): in this process, through the plugin — the session
+     *   is stopped by the caller's `AbortSignal`.
+     * - `true`: through the job runtime (`run-plugin-operation` worker task)
+     *   via the execution router's `startLongRunning` / `pollLongRunning` /
+     *   `cancelLongRunning`, with the Work's tenant.
+     *
+     * Honoured in bundled AND dynamic mode (an explicit per-call profile).
+     * Wired by `apps/api/src/api.module.ts` from
+     * `config.plugins.sandboxSessionsViaJobRuntime()`
+     * (`PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME`).
+     */
+    sandboxSessionsViaJobRuntime?: boolean;
 }
 
 /**

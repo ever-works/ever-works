@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils/cn';
 import type { Task, TaskCiState, TaskPrState } from '@/lib/api/tasks';
+import { activeGuardRefusal } from './task-guard-refusal';
 
 /**
  * PR insights (kanban run cockpit M5) — the review pill.
@@ -10,6 +11,16 @@ import type { Task, TaskCiState, TaskPrState } from '@/lib/api/tasks';
  * The data is the cached `prState` / `ciState` written by the
  * `task-pr-status-sync` cron, so rendering costs nothing and never
  * touches a provider from the browser.
+ *
+ * APW-08: a primary pull request an App Work's change guard blocked
+ * (`branchGuardRefusal`, still in force per `activeGuardRefusal`) keeps its
+ * `open` state — the branch really is pushed — so the pill turns red and
+ * says "refused" instead of reading as a healthy open pull request. The link
+ * stays: it is the operator's route to that pull request. The stored reason
+ * is not shown here; the Task's branch panel carries it. A CLOSED (unmerged)
+ * pull request stays refused — it can be reopened as it stands — and because
+ * the red tone replaces the slate "closed" one, the body names the state
+ * ("closed"), the way it names "draft" and "merged".
  *
  * Two safety rules, both from plan 04 §7.3:
  *
@@ -46,6 +57,9 @@ const PR_TONES: Record<TaskPrState, string> = {
 
 const FALLBACK_TONE = 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300';
 
+/** A pull request the change guard blocked — the branch panel's conflict/refused red. */
+const GUARD_REFUSED_TONE = 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300';
+
 /**
  * Returns the URL only when it is safe to render as a board link:
  * absolute `https:`, no userinfo (the `https://github.com@evil.test/`
@@ -80,9 +94,12 @@ export function TaskPrPill({ task }: { task: Task }) {
 
     const prState = (task.prState ?? 'open') as TaskPrState;
     const ciState = (task.ciState ?? 'unknown') as TaskCiState;
-    const tone = PR_TONES[prState] ?? FALLBACK_TONE;
+    const guardRefused = activeGuardRefusal(task) !== null;
+    const tone = guardRefused ? GUARD_REFUSED_TONE : (PR_TONES[prState] ?? FALLBACK_TONE);
     const href = safePrUrl(task.prUrl);
-    const title = `Pull request #${task.prNumber} — ${prState} · ${describeChecks(task)}`;
+    const title = `Pull request #${task.prNumber} — ${prState}${
+        guardRefused ? " · blocked by an App Work's change guard, do not merge it as it stands" : ''
+    } · ${describeChecks(task)}`;
 
     const body = (
         <>
@@ -95,6 +112,8 @@ export function TaskPrPill({ task }: { task: Task }) {
             <span className="truncate">#{task.prNumber}</span>
             {prState === 'draft' && <span className="shrink-0 opacity-70">draft</span>}
             {prState === 'merged' && <span className="shrink-0 opacity-70">merged</span>}
+            {prState === 'closed' && <span className="shrink-0 opacity-70">closed</span>}
+            {guardRefused && <span className="shrink-0 font-semibold">refused</span>}
         </>
     );
 
@@ -108,6 +127,7 @@ export function TaskPrPill({ task }: { task: Task }) {
             <span
                 data-testid="task-pr-pill"
                 data-pr-state={prState}
+                data-guard-refused={guardRefused ? 'true' : undefined}
                 title={title}
                 className={className}
             >
@@ -120,6 +140,7 @@ export function TaskPrPill({ task }: { task: Task }) {
         <a
             data-testid="task-pr-pill"
             data-pr-state={prState}
+            data-guard-refused={guardRefused ? 'true' : undefined}
             href={href}
             target="_blank"
             rel="noopener noreferrer"

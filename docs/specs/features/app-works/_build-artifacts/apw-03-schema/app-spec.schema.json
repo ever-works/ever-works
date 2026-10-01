@@ -1,0 +1,2090 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://api.ever.works/api/schema/app-spec.schema.json",
+    "title": "Ever Works — App spec (.works/works.yml, kind: app)",
+    "description": "appSpecVersion 1 inside the works.yml envelope. Conventions follow packages/agent/src/works-config/schema/emit-json-schema.ts (draft 2020-12, published under $id https://api.ever.works/api/schema/…, byte-reproducible serialization). Unlike the envelope, every object INSIDE `spec` is strict: a key this schema does not define is error `unknown_field`, except keys starting with `x-`, which are allowed at any depth and preserved. The platform never deletes a key it does not recognise (CONTRACTS.md C1); strictness changes the validation result only. JSON Schema cannot express the reference grammar's resolution, secrecy/phase propagation, cycle detection or the server-only rules — see docs/specs/features/app-works/_build-artifacts/apw-03-schema/validator-rules.md for the rule-to-layer map.",
+    "type": "object",
+    "properties": {
+        "version": {
+            "description": "Envelope schema version. Advisory, never gating: a newer value is a warning, not an error (works-config.schema.ts:21-25).",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+        },
+        "kind": {
+            "description": "`app`. When absent, `spec.kind: app` selects this schema; when both are present they must be equal, else error `kind_mismatch`.",
+            "type": "string",
+            "const": "app"
+        },
+        "name": {
+            "description": "v1 root key, unchanged. `display.name` wins when both are present.",
+            "type": "string"
+        },
+        "title": {
+            "type": "string"
+        },
+        "initial_prompt": {
+            "type": "string",
+            "maxLength": 8000
+        },
+        "model": {
+            "type": "string"
+        },
+        "website_repo": {
+            "type": "string",
+            "maxLength": 400
+        },
+        "schedule_cadence": {
+            "type": "string",
+            "enum": [
+                "hourly",
+                "daily",
+                "weekly",
+                "monthly"
+            ]
+        },
+        "deploy_provider": {
+            "type": "string"
+        },
+        "deployProvider": {
+            "type": "string"
+        },
+        "activity_sync": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "pull",
+                        "push",
+                        "disabled"
+                    ]
+                }
+            },
+            "additionalProperties": {}
+        },
+        "providers": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+        },
+        "spec": {
+            "description": "The App spec (schema.md §4-§22). Validated strictly: unknown keys are errors, `x-` keys are allowed at any depth. `source` is required here — that is the data-repository reading of schema.md §4; a Blueprint validates against #/$defs/appSpec directly, because §3 forbids `source` in `blueprint` mode.",
+            "allOf": [
+                {
+                    "$ref": "#/$defs/appSpec"
+                },
+                {
+                    "required": [
+                        "source"
+                    ]
+                }
+            ]
+        }
+    },
+    "required": [
+        "spec"
+    ],
+    "additionalProperties": {},
+    "$defs": {
+        "extensionKeys": {
+            "description": "Extension keys: any key starting with `x-` is allowed at any depth inside `spec`, preserved and ignored (schema.md §2.3 / CONTRACTS.md C1).",
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "name": {
+            "description": "DNS label, 1-32 characters (schema.md §0).",
+            "type": "string",
+            "pattern": "^[a-z]([-a-z0-9]{0,30}[a-z0-9])?$"
+        },
+        "envName": {
+            "description": "Environment variable name `^[A-Z_][A-Z0-9_]{0,127}$` (schema.md §0).",
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+        },
+        "envEntryName": {
+            "description": "`env[].name`: an EnvName that is not in the reserved `EVER_WORKS_` prefix (schema.md R23, error `reserved_env_name`). The prefix is reserved for platform-injected values.",
+            "allOf": [
+                {
+                    "$ref": "#/$defs/envName"
+                },
+                {
+                    "not": {
+                        "pattern": "^EVER_WORKS_"
+                    }
+                }
+            ]
+        },
+        "relPath": {
+            "description": "Repository-relative path, 1-255 characters: no leading `/`, no backslash, no `..` segment, not under `.git/` (schema.md §0, rule R22 / error `path_outside_repository`).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "allOf": [
+                {
+                    "not": {
+                        "pattern": "^/"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "\\\\"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "(^|/)\\.\\.(/|$)"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "(^|/)\\.git(/|$)"
+                    }
+                }
+            ]
+        },
+        "glob": {
+            "description": "A RelPath that may contain `*`, `**` or `?`, 1-200 characters (schema.md §0).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "allOf": [
+                {
+                    "not": {
+                        "pattern": "^/"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "\\\\"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "(^|/)\\.\\.(/|$)"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "(^|/)\\.git(/|$)"
+                    }
+                }
+            ]
+        },
+        "gitRef": {
+            "description": "Git ref name, 1-255 characters, not ending `.lock`, containing `..` or `//` (schema.md §5).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "allOf": [
+                {
+                    "not": {
+                        "pattern": "\\.\\."
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "//"
+                    }
+                },
+                {
+                    "not": {
+                        "pattern": "\\.lock$"
+                    }
+                }
+            ]
+        },
+        "httpPath": {
+            "description": "`^/[^\\s]{0,511}$` (schema.md §0).",
+            "type": "string",
+            "pattern": "^/[^\\s]{0,511}$"
+        },
+        "cronExpression": {
+            "description": "Five-field cron: minute hour day-of-month month day-of-week, UTC (schema.md §0). This pattern fixes the FIELD COUNT only; whether each field parses is rule `cron_invalid` (validator-rules.md §2).",
+            "type": "string",
+            "pattern": "^\\S+(\\s+\\S+){4}$"
+        },
+        "cpuQuantity": {
+            "description": "Millicores (`250m`) or cores (`2`, `0.5`) (schema.md §0). The 10m-64000m / 0.01-64 range is rule `out_of_range` (validator-rules.md §2): JSON Schema cannot compare a magnitude across unit spellings.",
+            "type": "string",
+            "pattern": "^(?:[0-9]+m|[0-9]+(?:\\.[0-9]+)?)$"
+        },
+        "memQuantity": {
+            "description": "Integer followed by `Mi` or `Gi` (schema.md §0). The per-field range is rule `out_of_range` (validator-rules.md §2).",
+            "type": "string",
+            "pattern": "^[0-9]+(?:Mi|Gi)$"
+        },
+        "storageQuantity": {
+            "description": "Integer followed by `Mi` or `Gi`, range 100Mi-500Gi (schema.md §0). The range is rule `out_of_range` (validator-rules.md §2).",
+            "type": "string",
+            "pattern": "^[0-9]+(?:Mi|Gi)$"
+        },
+        "imageRef": {
+            "description": "`registry/path[:tag][@sha256:<64 hex>]`, at most 512 characters (schema.md §0). A tag-only reference is warning `image_not_pinned` (R19), not an error.",
+            "type": "string",
+            "maxLength": 512,
+            "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::[0-9]{1,5})?/)?[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]{0,127})?(?:@sha256:[0-9a-f]{64})?$"
+        },
+        "reference": {
+            "description": "A `from:` reference (schema.md §21): domains.primary.url|host, build.commitSha, components.<name>.internalUrl, deps.<postgres|redis|objectStorage|smtp>.<output> (including deps.objectStorage.bucket.<name>), platform.smtp.<host|port|user|password|from|secure>. Whether the reference RESOLVES is rule `reference_unresolved` (validator-rules.md §2).",
+            "type": "string",
+            "pattern": "^(?:domains\\.primary\\.(?:url|host)|build\\.commitSha|components\\.[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?\\.internalUrl|deps\\.(?:postgres|redis|smtp)\\.[A-Za-z0-9_]+|deps\\.objectStorage\\.(?:[A-Za-z0-9_]+|bucket\\.[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?)|platform\\.smtp\\.(?:host|port|user|password|from|secure))$"
+        },
+        "appSpec": {
+            "description": "The `spec` block of a `.works/works.yml` whose kind is `app` (schema.md §4). Every object inside is strict; `x-` keys are allowed at any depth (CONTRACTS.md C1). This definition deliberately does NOT require `source`: the data-repository reading requires it (the root schema applies that), while schema.md §3 forbids `source` in `blueprint` mode and a Blueprint validates against this definition alone.",
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "description": "Optional; repeats the root kind. Must equal the root `kind` when both are present (error `kind_mismatch`; JSON Schema rejects a non-`app` value here, the equality check itself is rule `kind_mismatch`).",
+                    "type": "string",
+                    "const": "app",
+                    "maxLength": 32
+                },
+                "appSpecVersion": {
+                    "description": "App spec version, 1-1000, default 1 (schema.md §1, CONTRACTS.md C1). A value newer than the build understands turns `unknown_field` errors into warnings `unknown_field_newer_version`; every other rule still applies.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                },
+                "source": {
+                    "$ref": "#/$defs/source"
+                },
+                "blueprint": {
+                    "$ref": "#/$defs/blueprint"
+                },
+                "license": {
+                    "$ref": "#/$defs/license"
+                },
+                "display": {
+                    "$ref": "#/$defs/display"
+                },
+                "build": {
+                    "$ref": "#/$defs/build"
+                },
+                "components": {
+                    "description": "At most 10, at least 1 when build.strategy is not `none` (R2 / `strategy_requires_components`).",
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "$ref": "#/$defs/component"
+                    }
+                },
+                "dependencies": {
+                    "$ref": "#/$defs/dependencies"
+                },
+                "env": {
+                    "description": "Every variable the app reads. At most 200 entries; names unique, counting the implicit `<NAME>_PUBLIC` of a keypair entry (R4 / `duplicate_name`).",
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                        "$ref": "#/$defs/envEntry"
+                    }
+                },
+                "jobs": {
+                    "description": "Run as cluster Jobs. At most 10; names unique (R4).",
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "$ref": "#/$defs/job"
+                    }
+                },
+                "cron": {
+                    "description": "The app's own recurring calls, rendered as cluster CronJobs. At most 20; names unique (R4).",
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "$ref": "#/$defs/cron"
+                    }
+                },
+                "domains": {
+                    "$ref": "#/$defs/domains"
+                },
+                "smoke": {
+                    "description": "Run after every Deployment. At most 20; names unique (R4).",
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "$ref": "#/$defs/smoke"
+                    }
+                },
+                "checks": {
+                    "description": "Quality gates for Tasks on this App Work. At most 20; names unique (R4).",
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "$ref": "#/$defs/check"
+                    }
+                },
+                "agents": {
+                    "$ref": "#/$defs/agents"
+                },
+                "upstreamSync": {
+                    "$ref": "#/$defs/upstreamSync"
+                },
+                "upstreamPullRequests": {
+                    "$ref": "#/$defs/upstreamPullRequests"
+                },
+                "provisioning": {
+                    "$ref": "#/$defs/provisioning"
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "R2 — `build.strategy` other than `none` requires at least one component (`strategy_requires_components`).",
+                    "if": {
+                        "required": [
+                            "build"
+                        ],
+                        "properties": {
+                            "build": {
+                                "required": [
+                                    "strategy"
+                                ],
+                                "properties": {
+                                    "strategy": {
+                                        "enum": [
+                                            "dockerfile",
+                                            "image",
+                                            "auto"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "components"
+                        ],
+                        "properties": {
+                            "components": {
+                                "minItems": 1
+                            }
+                        }
+                    }
+                },
+                {
+                    "description": "R2 — components require `build.strategy` to be declared (`components_require_strategy`).",
+                    "if": {
+                        "required": [
+                            "components"
+                        ],
+                        "properties": {
+                            "components": {
+                                "minItems": 1
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "build"
+                        ],
+                        "properties": {
+                            "build": {
+                                "required": [
+                                    "strategy"
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "source": {
+            "description": "§5 — how the Work Repository relates to the upstream. Written by APW-01 at creation; on the Blueprint path by APW-03's apply job (R-4).",
+            "type": "object",
+            "properties": {
+                "relation": {
+                    "description": "Required (schema.md §5). `link` forbids `upstream` (`upstream_forbidden_for_link`) and `upstreamSync` (`upstream_sync_requires_upstream`).",
+                    "type": "string",
+                    "enum": [
+                        "fork",
+                        "private-copy",
+                        "link"
+                    ]
+                },
+                "upstream": {
+                    "description": "Absent when relation is `link`; required otherwise.",
+                    "type": "object",
+                    "properties": {
+                        "repo": {
+                            "description": "`^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$`.",
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$"
+                        },
+                        "defaultBranch": {
+                            "$ref": "#/$defs/gitRef"
+                        }
+                    },
+                    "required": [
+                        "repo"
+                    ],
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "branch": {
+                    "description": "The Work Repository branch that is built and deployed. Git ref name.",
+                    "allOf": [
+                        {
+                            "$ref": "#/$defs/gitRef"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "relation"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "§5 — `upstream` is required unless the relation is `link`, and forbidden when it is (`upstream_forbidden_for_link`).",
+                    "if": {
+                        "required": [
+                            "relation"
+                        ],
+                        "properties": {
+                            "relation": {
+                                "const": "link"
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "required": [
+                                "upstream"
+                            ]
+                        }
+                    },
+                    "else": {
+                        "required": [
+                            "upstream"
+                        ]
+                    }
+                }
+            ]
+        },
+        "blueprint": {
+            "description": "§6 — written by the platform when an App Blueprint is applied; informational afterwards.",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "`^[a-z0-9][a-z0-9-]{0,63}$`. An id the Apps catalog does not list is warning `blueprint_unknown` (server-only).",
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                },
+                "version": {
+                    "description": "Semantic version MAJOR.MINOR.PATCH (schema.md §6). Whether a pre-release suffix is allowed is an open question — see gaps-and-contradictions.md.",
+                    "type": "string",
+                    "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+                },
+                "repo": {
+                    "description": "`^ever-works/[a-z0-9-]+$` (error `blueprint_repo_outside_org`).",
+                    "type": "string",
+                    "pattern": "^ever-works/[a-z0-9-]+$"
+                },
+                "sha": {
+                    "description": "`^[0-9a-f]{40}$`.",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                }
+            },
+            "required": [
+                "id",
+                "version",
+                "repo",
+                "sha"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "license": {
+            "description": "§7 — informational. The license gate classifies from DETECTION, never from this block; a declared value that differs from detection is warning `license_declared_mismatch` (server-only).",
+            "type": "object",
+            "properties": {
+                "spdx": {
+                    "description": "SPDX expression, at most 200 characters (`MIT`, `AGPL-3.0-only`, `MIT OR Apache-2.0`, `LicenseRef-<id>`). Expression validity is checked by the platform's SPDX parser, not by JSON Schema.",
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "class": {
+                    "type": "string",
+                    "enum": [
+                        "green",
+                        "amber",
+                        "red",
+                        "unknown"
+                    ]
+                },
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "detected",
+                        "blueprint",
+                        "user"
+                    ]
+                },
+                "notice": {
+                    "description": "Trademark / attribution notice shown with the app, at most 500 characters.",
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "sourceOfferUrl": {
+                    "description": "Where network users obtain the source when the Work Repository is private (CONTRACTS.md C2). `https://` URL, at most 500 characters.",
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "^https://"
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "display": {
+            "description": "§8.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "1-80 characters; the Work name when absent.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                },
+                "protectedPaths": {
+                    "description": "At most 50 globs. Agents may not change matching files (D13; enforced by APW-08).",
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                        "$ref": "#/$defs/glob"
+                    }
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "build": {
+            "description": "§9 — APW-05. Required when `components` is non-empty (R2).",
+            "type": "object",
+            "properties": {
+                "strategy": {
+                    "description": "`dockerfile` builds the named Dockerfile; `image` deploys a prebuilt image and runs no Build; `none` builds and runs nothing; `auto` is a zero-config build (R-13). Default `none` when `components` is empty.",
+                    "type": "string",
+                    "enum": [
+                        "dockerfile",
+                        "image",
+                        "auto",
+                        "none"
+                    ]
+                },
+                "dockerfile": {
+                    "description": "Only with `strategy: dockerfile` (error `unknown_field`-adjacent: this schema reports it as a failed `not`; the platform reports it as a misplaced key — see validator-rules.md §3).",
+                    "$ref": "#/$defs/relPath"
+                },
+                "context": {
+                    "description": "Only with `strategy: dockerfile` or `auto`.",
+                    "$ref": "#/$defs/relPath"
+                },
+                "target": {
+                    "description": "Dockerfile stage. Only with `strategy: dockerfile`. `^[A-Za-z0-9._-]{1,64}$`.",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "image": {
+                    "description": "Required with `strategy: image`; a tag-only reference is warning `image_not_pinned` (R19).",
+                    "$ref": "#/$defs/imageRef"
+                },
+                "args": {
+                    "description": "Build-time values; at most 50. Each entry names exactly one of `value` / `fromEnv` (error `env_source_count`-style count rule; code `env_source_count` is for `env[]`, build args report the same shape). Reference env names, never literal secrets (R10 / `literal_secret_in_build_args`; R11 warning `secret_build_arg`).",
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                        "$ref": "#/$defs/buildArg"
+                    }
+                },
+                "services": {
+                    "description": "Ephemeral services reachable only during the build; at most 5.",
+                    "type": "array",
+                    "maxItems": 5,
+                    "items": {
+                        "$ref": "#/$defs/buildService"
+                    }
+                },
+                "resources": {
+                    "description": "Build runner resources. CPU is a plain number of cores here, unlike component resources.",
+                    "type": "object",
+                    "properties": {
+                        "cpu": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 16
+                        },
+                        "memory": {
+                            "description": "1Gi-64Gi.",
+                            "allOf": [
+                                {
+                                    "$ref": "#/$defs/memQuantity"
+                                }
+                            ]
+                        },
+                        "timeoutMinutes": {
+                            "type": "integer",
+                            "minimum": 5,
+                            "maximum": 180
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "§9 — `image` is required with `strategy: image`.",
+                    "if": {
+                        "required": [
+                            "strategy"
+                        ],
+                        "properties": {
+                            "strategy": {
+                                "const": "image"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "image"
+                        ]
+                    }
+                },
+                {
+                    "description": "§9 — `dockerfile` and `target` are only meaningful with `strategy: dockerfile`; `context` only with `dockerfile` or `auto`.",
+                    "if": {
+                        "required": [
+                            "strategy"
+                        ],
+                        "properties": {
+                            "strategy": {
+                                "not": {
+                                    "const": "dockerfile"
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "anyOf": [
+                                {
+                                    "required": [
+                                        "dockerfile"
+                                    ]
+                                },
+                                {
+                                    "required": [
+                                        "target"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "required": [
+                            "strategy"
+                        ],
+                        "properties": {
+                            "strategy": {
+                                "not": {
+                                    "enum": [
+                                        "dockerfile",
+                                        "auto"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "required": [
+                                "context"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "buildArg": {
+            "description": "§9 — `{ name, value }` or `{ name, fromEnv }`, exactly one of the two.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/envName"
+                },
+                "value": {
+                    "type": "string",
+                    "maxLength": 1000
+                },
+                "fromEnv": {
+                    "description": "Names an entry of `env` with phase `build` or `both` (errors `reference_unresolved` / `phase_mismatch`). Naming a secret entry is warning `secret_build_arg` (R11).",
+                    "$ref": "#/$defs/envName"
+                }
+            },
+            "required": [
+                "name"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {
+                    "required": [
+                        "value"
+                    ]
+                },
+                {
+                    "required": [
+                        "fromEnv"
+                    ]
+                }
+            ]
+        },
+        "buildService": {
+            "description": "§9 — an ephemeral build-only service.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/name"
+                },
+                "image": {
+                    "$ref": "#/$defs/imageRef"
+                },
+                "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                },
+                "env": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "$ref": "#/$defs/envName"
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ],
+                        "patternProperties": {
+                            "^x-": {}
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "image"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "component": {
+            "description": "§10 — APW-06. A `web` component gets a Service and an Ingress; a `worker` gets neither.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "Unique among components (R4).",
+                    "$ref": "#/$defs/name"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "web",
+                        "worker"
+                    ]
+                },
+                "command": {
+                    "description": "At most 20 items, each at most 1000 characters. Image entrypoint when absent.",
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string",
+                        "maxLength": 1000
+                    }
+                },
+                "args": {
+                    "description": "At most 50 items, each at most 1000 characters. Image cmd when absent.",
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                        "type": "string",
+                        "maxLength": 1000
+                    }
+                },
+                "target": {
+                    "description": "Dockerfile stage override for this component.",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "port": {
+                    "description": "Required for `web` (R1 / `web_component_needs_port`), forbidden for `worker` (`worker_port_forbidden`).",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                },
+                "replicas": {
+                    "description": "0-10, default 1. A component with `volumes` may not have more than one replica (R18 / `volume_replicas`).",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
+                },
+                "writableRootFilesystem": {
+                    "type": "boolean"
+                },
+                "probes": {
+                    "type": "object",
+                    "properties": {
+                        "startup": {
+                            "$ref": "#/$defs/probe"
+                        },
+                        "readiness": {
+                            "$ref": "#/$defs/probe"
+                        },
+                        "liveness": {
+                            "$ref": "#/$defs/probe"
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "resources": {
+                    "type": "object",
+                    "properties": {
+                        "cpu": {
+                            "$ref": "#/$defs/cpuQuantity"
+                        },
+                        "memory": {
+                            "description": "Request, 64Mi-256Gi.",
+                            "$ref": "#/$defs/memQuantity"
+                        },
+                        "cpuLimit": {
+                            "description": "Must be at least `cpu` (R17 / `limit_below_request`).",
+                            "$ref": "#/$defs/cpuQuantity"
+                        },
+                        "memoryLimit": {
+                            "description": "Must be at least `memory` (R17 / `limit_below_request`); defaults to twice `memory`.",
+                            "$ref": "#/$defs/memQuantity"
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "volumes": {
+                    "description": "At most 5; names and paths unique (R4 / `duplicate_name`).",
+                    "type": "array",
+                    "maxItems": 5,
+                    "items": {
+                        "$ref": "#/$defs/volume"
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "role"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "R1 — a `web` component declares `port` (`web_component_needs_port`).",
+                    "if": {
+                        "required": [
+                            "role"
+                        ],
+                        "properties": {
+                            "role": {
+                                "const": "web"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "port"
+                        ]
+                    }
+                },
+                {
+                    "description": "§10 — `port` is forbidden for a `worker` (`worker_port_forbidden`).",
+                    "if": {
+                        "required": [
+                            "role"
+                        ],
+                        "properties": {
+                            "role": {
+                                "const": "worker"
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "required": [
+                                "port"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "R18 — a component with `volumes` and `replicas > 1` (`volume_replicas`): a volume cannot attach to two pods.",
+                    "if": {
+                        "required": [
+                            "volumes"
+                        ],
+                        "properties": {
+                            "volumes": {
+                                "minItems": 1
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "replicas": {
+                                "maximum": 1
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "probe": {
+            "description": "§10 — exactly one of `http: HttpPath` or `tcp: true`.",
+            "type": "object",
+            "properties": {
+                "http": {
+                    "$ref": "#/$defs/httpPath"
+                },
+                "tcp": {
+                    "const": true
+                },
+                "periodSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 300
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                },
+                "initialDelaySeconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 600
+                },
+                "failureThreshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {
+                    "required": [
+                        "http"
+                    ]
+                },
+                {
+                    "required": [
+                        "tcp"
+                    ]
+                }
+            ]
+        },
+        "volume": {
+            "description": "§10 — `{ name, path, size, backup }`; `backup` defaults to true.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/name"
+                },
+                "path": {
+                    "description": "Absolute in-container path, at most 255 characters.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "pattern": "^/"
+                },
+                "size": {
+                    "$ref": "#/$defs/storageQuantity"
+                },
+                "backup": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "name",
+                "path",
+                "size"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "dependencies": {
+            "description": "§11 — APW-07. Outputs a `from:` may reference are in schema.md §11; the normative list is APW-07's APP_DEPENDENCY_OUTPUTS.",
+            "type": "object",
+            "properties": {
+                "postgres": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "enum": [
+                                "14",
+                                "15",
+                                "16",
+                                "17"
+                            ]
+                        },
+                        "directUrl": {
+                            "description": "Also provide a non-pooled URL. `deps.postgres.directUrl` resolves only when this is true.",
+                            "type": "boolean"
+                        },
+                        "extensions": {
+                            "description": "At most 10; availability is provider-specific (warning `extension_unavailable`).",
+                            "type": "array",
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9_]{1,63}$"
+                            }
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "redis": {
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "type": "string",
+                            "enum": [
+                                "7"
+                            ]
+                        },
+                        "maxmemoryPolicy": {
+                            "type": "string",
+                            "enum": [
+                                "noeviction",
+                                "allkeys-lru",
+                                "volatile-lru",
+                                "allkeys-lfu",
+                                "volatile-lfu"
+                            ]
+                        },
+                        "persistence": {
+                            "type": "boolean"
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "objectStorage": {
+                    "type": "object",
+                    "properties": {
+                        "buckets": {
+                            "description": "Required, 1-10, unique. Each name is a `deps.objectStorage.bucket.<name>` reference target (CONTRACTS.md C2).",
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "uniqueItems": true,
+                            "items": {
+                                "$ref": "#/$defs/name"
+                            }
+                        },
+                        "publicBuckets": {
+                            "description": "Must be a subset of `buckets` (error `public_bucket_undeclared`) — a subset check over a dynamic list, so rule-level (validator-rules.md §2).",
+                            "type": "array",
+                            "maxItems": 10,
+                            "uniqueItems": true,
+                            "items": {
+                                "$ref": "#/$defs/name"
+                            }
+                        }
+                    },
+                    "required": [
+                        "buckets"
+                    ],
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "smtp": {
+                    "type": "object",
+                    "properties": {
+                        "required": {
+                            "description": "`true` blocks the deploy until SMTP is configured (APW-07).",
+                            "type": "boolean"
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "envEntry": {
+            "description": "§12 — APW-07. Exactly one value source (R7 / `env_source_count`); a `secret: true` entry may not carry `value` (R8 / `literal_secret_value`); `generate` implies `secret: true` (`generated_not_secret`).",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/envEntryName"
+                },
+                "secret": {
+                    "description": "Stored encrypted, never logged or returned (Constitution VII).",
+                    "type": "boolean"
+                },
+                "phase": {
+                    "type": "string",
+                    "enum": [
+                        "runtime",
+                        "build",
+                        "both"
+                    ]
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 300
+                },
+                "value": {
+                    "description": "Forbidden when `secret: true` (R8 / `literal_secret_value`).",
+                    "type": "string",
+                    "maxLength": 4096
+                },
+                "from": {
+                    "$ref": "#/$defs/reference"
+                },
+                "template": {
+                    "description": "At most 2048 characters. `{{…}}` placeholders over the §21 references plus `env.<NAME>`; placeholder syntax is rule `reference_syntax` (validator-rules.md §2).",
+                    "type": "string",
+                    "maxLength": 2048
+                },
+                "generate": {
+                    "$ref": "#/$defs/generate"
+                },
+                "validate": {
+                    "$ref": "#/$defs/envValidate"
+                },
+                "prompt": {
+                    "$ref": "#/$defs/envPrompt"
+                }
+            },
+            "required": [
+                "name"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {
+                    "description": "`value`",
+                    "required": [
+                        "value"
+                    ]
+                },
+                {
+                    "description": "`from`",
+                    "required": [
+                        "from"
+                    ]
+                },
+                {
+                    "description": "`template`",
+                    "required": [
+                        "template"
+                    ]
+                },
+                {
+                    "description": "`generate`",
+                    "required": [
+                        "generate"
+                    ]
+                },
+                {
+                    "description": "`prompt`",
+                    "required": [
+                        "prompt"
+                    ]
+                }
+            ],
+            "allOf": [
+                {
+                    "description": "R8 — `secret: true` forbids `value` (`literal_secret_value`).",
+                    "if": {
+                        "required": [
+                            "secret"
+                        ],
+                        "properties": {
+                            "secret": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "required": [
+                                "value"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "§12 — `generate` implies `secret: true` (`generated_not_secret`).",
+                    "if": {
+                        "required": [
+                            "generate"
+                        ]
+                    },
+                    "then": {
+                        "required": [
+                            "secret"
+                        ],
+                        "properties": {
+                            "secret": {
+                                "const": true
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "generate": {
+            "description": "§12 — generated values are produced once per App Work and never regenerated unless the user explicitly rotates them.",
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "base64",
+                        "hex",
+                        "chars",
+                        "uuid",
+                        "keypair"
+                    ]
+                },
+                "bytes": {
+                    "description": "16-128. `base64` and `hex` only.",
+                    "type": "integer",
+                    "minimum": 16,
+                    "maximum": 128
+                },
+                "length": {
+                    "description": "16-256. `chars` only.",
+                    "type": "integer",
+                    "minimum": 16,
+                    "maximum": 256
+                },
+                "alphabet": {
+                    "description": "`chars` only.",
+                    "type": "string",
+                    "enum": [
+                        "alnum",
+                        "alnum-symbols",
+                        "hex-lower",
+                        "base64url"
+                    ]
+                },
+                "keypair": {
+                    "description": "`keypair` only. See R-11 and schema.md §12.",
+                    "$ref": "#/$defs/keypair"
+                },
+                "rotate": {
+                    "description": "`never` is the only value in `appSpecVersion: 1`.",
+                    "type": "string",
+                    "enum": [
+                        "never"
+                    ]
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "§12 — `bytes` only with `base64` / `hex`.",
+                    "if": {
+                        "required": [
+                            "kind"
+                        ],
+                        "properties": {
+                            "kind": {
+                                "not": {
+                                    "enum": [
+                                        "base64",
+                                        "hex"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "required": [
+                                "bytes"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "§12 — `length` and `alphabet` only with `chars`.",
+                    "if": {
+                        "required": [
+                            "kind"
+                        ],
+                        "properties": {
+                            "kind": {
+                                "not": {
+                                    "const": "chars"
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "anyOf": [
+                                {
+                                    "required": [
+                                        "length"
+                                    ]
+                                },
+                                {
+                                    "required": [
+                                        "alphabet"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "description": "§12 — `keypair` only with `kind: keypair`.",
+                    "if": {
+                        "required": [
+                            "kind"
+                        ],
+                        "properties": {
+                            "kind": {
+                                "not": {
+                                    "const": "keypair"
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "not": {
+                            "required": [
+                                "keypair"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "keypair": {
+            "description": "§12 / R-11 — the private half is stored in the entry itself, the public half is exposed as `<NAME>_PUBLIC` only.",
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "ed25519",
+                        "ec-p256",
+                        "rsa-2048",
+                        "rsa-4096"
+                    ]
+                },
+                "format": {
+                    "type": "string",
+                    "enum": [
+                        "pem",
+                        "base64url-raw",
+                        "pkcs12"
+                    ]
+                },
+                "passwordEnv": {
+                    "description": "Names another `env` entry that is `secret: true` and generated with `kind` `base64`, `hex` or `chars` (R26 / `keypair_password_invalid`).",
+                    "$ref": "#/$defs/envName"
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "R25 — `format: base64url-raw` only with `type` `ed25519` or `ec-p256` (`keypair_format_unsupported`).",
+                    "if": {
+                        "required": [
+                            "format"
+                        ],
+                        "properties": {
+                            "format": {
+                                "const": "base64url-raw"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "type": {
+                                "enum": [
+                                    "ed25519",
+                                    "ec-p256"
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "description": "R26 — `passwordEnv` is present exactly when `format: pkcs12` (`keypair_password_invalid`).",
+                    "if": {
+                        "required": [
+                            "format"
+                        ],
+                        "properties": {
+                            "format": {
+                                "const": "pkcs12"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "passwordEnv"
+                        ]
+                    },
+                    "else": {
+                        "not": {
+                            "required": [
+                                "passwordEnv"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "envValidate": {
+            "description": "§12 — what a supplied value must satisfy. `minLength <= maxLength` and agreement with `generate` are rules R9 / `generate_validate_conflict` (validator-rules.md §2).",
+            "type": "object",
+            "properties": {
+                "length": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65536
+                },
+                "minLength": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65536
+                },
+                "maxLength": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65536
+                },
+                "pattern": {
+                    "description": "At most 500 characters. RE2 syntax: no back-references and no look-around, else error `pattern_unsupported`. JSON Schema cannot check RE2 compatibility, so this is rule-level.",
+                    "type": "string",
+                    "maxLength": 500
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "envPrompt": {
+            "description": "§12 — asked at creation when the entry has no other source.",
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Required, 1-300 characters.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "example": {
+                    "description": "At most 200 characters; secret-scanned (error `prompt_example_secret`).",
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "group": {
+                    "type": "string",
+                    "maxLength": 40
+                }
+            },
+            "required": [
+                "description"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "job": {
+            "description": "§13 — APW-06. Exactly one of `command` / `http`.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/name"
+                },
+                "when": {
+                    "description": "`first-deploy` jobs run before the app is exposed publicly.",
+                    "type": "string",
+                    "enum": [
+                        "pre-deploy",
+                        "first-deploy",
+                        "post-deploy"
+                    ]
+                },
+                "component": {
+                    "description": "Must name a component (`component_ref_unknown`); defaults to `domains.primaryComponent`. An `http` job needs a `web` component (`http_job_requires_web_component`).",
+                    "$ref": "#/$defs/name"
+                },
+                "command": {
+                    "description": "At most 20 items, each at most 1000 characters.",
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string",
+                        "maxLength": 1000
+                    }
+                },
+                "http": {
+                    "$ref": "#/$defs/jobHttp"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 3600
+                },
+                "retries": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                }
+            },
+            "required": [
+                "name",
+                "when"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {
+                    "description": "`command`",
+                    "required": [
+                        "command"
+                    ]
+                },
+                {
+                    "description": "`http`",
+                    "required": [
+                        "http"
+                    ]
+                }
+            ]
+        },
+        "jobHttp": {
+            "description": "§13 — sent to the component's port inside the cluster, never through the public URL.",
+            "type": "object",
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "enum": [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE"
+                    ]
+                },
+                "path": {
+                    "$ref": "#/$defs/httpPath"
+                },
+                "body": {
+                    "description": "JSON, at most 16 KiB serialized. String leaves may contain `{{…}}` placeholders (§21); the outline's `generatedCredential: admin` is a placeholder — write `{{env.ADMIN_PASSWORD}}` over a generated env entry (CONTRACTS.md C2). The 16 KiB cap is rule-level.",
+                    "type": [
+                        "object",
+                        "array",
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "authEnv": {
+                    "description": "Must name a `secret: true` entry (R15 / `auth_env_not_secret`).",
+                    "$ref": "#/$defs/envName"
+                },
+                "authScheme": {
+                    "description": "`bearer` (default) sends `Authorization: Bearer <value>`; `raw` sends `Authorization: <value>`. Only with `authEnv` (CONTRACTS.md C2, APW-13 addition). Applies to jobs and cron alike.",
+                    "type": "string",
+                    "enum": [
+                        "bearer",
+                        "raw"
+                    ]
+                },
+                "expect": {
+                    "type": "object",
+                    "properties": {
+                        "status": {
+                            "description": "1-10 codes, 100-599. Default [200, 201, 204]. Smoke requests never follow redirects, so this sees the first response.",
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "integer",
+                                "minimum": 100,
+                                "maximum": 599
+                            }
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "required": [
+                "path"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "§13 — `authScheme` only with `authEnv`.",
+                    "if": {
+                        "required": [
+                            "authScheme"
+                        ]
+                    },
+                    "then": {
+                        "required": [
+                            "authEnv"
+                        ]
+                    }
+                }
+            ]
+        },
+        "cron": {
+            "description": "§14 — the app's own recurring calls, rendered as cluster CronJobs; not platform Schedules. `http` is as in §13, including `authEnv` and `authScheme`.",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/name"
+                },
+                "schedule": {
+                    "$ref": "#/$defs/cronExpression"
+                },
+                "component": {
+                    "description": "Defaults to `domains.primaryComponent`; must name a component (`component_ref_unknown`).",
+                    "$ref": "#/$defs/name"
+                },
+                "command": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string",
+                        "maxLength": 1000
+                    }
+                },
+                "http": {
+                    "$ref": "#/$defs/jobHttp"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 3600
+                },
+                "concurrency": {
+                    "type": "string",
+                    "enum": [
+                        "forbid",
+                        "allow"
+                    ]
+                }
+            },
+            "required": [
+                "name",
+                "schedule"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {
+                    "description": "`command`",
+                    "required": [
+                        "command"
+                    ]
+                },
+                {
+                    "description": "`http`",
+                    "required": [
+                        "http"
+                    ]
+                }
+            ]
+        },
+        "domains": {
+            "description": "§15 — APW-06.",
+            "type": "object",
+            "properties": {
+                "primaryComponent": {
+                    "description": "Must name a `web` component (R3 / `primary_component_invalid`); required with two or more `web` components.",
+                    "$ref": "#/$defs/name"
+                },
+                "publicUrlEnv": {
+                    "description": "At most 10; each names an `env` entry (R16 / `reference_unresolved`).",
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "$ref": "#/$defs/envName"
+                    }
+                },
+                "onChange": {
+                    "type": "string",
+                    "enum": [
+                        "restart",
+                        "rebuild"
+                    ]
+                },
+                "needsHairpin": {
+                    "description": "The app calls its own public URL from the server side.",
+                    "type": "boolean"
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "smoke": {
+            "description": "§16 — APW-06. Smoke requests never follow redirects, so `expect.status` judges the first response (CONTRACTS.md §1).",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/name"
+                },
+                "http": {
+                    "$ref": "#/$defs/smokeHttp"
+                },
+                "component": {
+                    "description": "Defaults to `domains.primaryComponent`; must be `web` (`component_ref_unknown`).",
+                    "$ref": "#/$defs/name"
+                },
+                "expect": {
+                    "type": "object",
+                    "properties": {
+                        "status": {
+                            "description": "1-10 codes. Default [200].",
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "integer",
+                                "minimum": 100,
+                                "maximum": 599
+                            }
+                        },
+                        "bodyContains": {
+                            "type": "array",
+                            "maxItems": 5,
+                            "items": {
+                                "type": "string",
+                                "maxLength": 200
+                            }
+                        },
+                        "bodyNotContains": {
+                            "type": "array",
+                            "maxItems": 5,
+                            "items": {
+                                "type": "string",
+                                "maxLength": 200
+                            }
+                        },
+                        "maxLatencyMs": {
+                            "type": "integer",
+                            "minimum": 100,
+                            "maximum": 60000
+                        }
+                    },
+                    "patternProperties": {
+                        "^x-": {}
+                    },
+                    "additionalProperties": false
+                },
+                "when": {
+                    "type": "string",
+                    "enum": [
+                        "always",
+                        "first-deploy"
+                    ]
+                }
+            },
+            "required": [
+                "name",
+                "http"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "smokeHttp": {
+            "description": "§16 — `GET`, `HEAD` or `POST`; `body` only with `POST`.",
+            "type": "object",
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "enum": [
+                        "GET",
+                        "HEAD",
+                        "POST"
+                    ]
+                },
+                "path": {
+                    "$ref": "#/$defs/httpPath"
+                },
+                "body": {
+                    "description": "JSON, at most 16 KiB, `POST` only. The cap and the method pairing are rule-level.",
+                    "type": [
+                        "object",
+                        "array",
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "path"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "description": "§16 — `body` only with `method: POST`.",
+                    "if": {
+                        "required": [
+                            "body"
+                        ]
+                    },
+                    "then": {
+                        "properties": {
+                            "method": {
+                                "const": "POST"
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "check": {
+            "description": "§17 — APW-08. Quality gates for Tasks on this App Work; run sandboxed. `name` is the provider check name suffix `Ever Works check: {name}` in the repository's CI (R-9).",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "$ref": "#/$defs/name"
+                },
+                "command": {
+                    "description": "1-500 characters, at least one non-whitespace character, no control characters.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "pattern": "\\S",
+                    "not": {
+                        "pattern": "[\\u0000-\\u001F\\u007F]"
+                    }
+                },
+                "required": {
+                    "description": "`false` is warning `advisory_check` — an advisory check verifies nothing (R20).",
+                    "type": "boolean"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 7200
+                }
+            },
+            "required": [
+                "name",
+                "command"
+            ],
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "agents": {
+            "description": "§18 — APW-08.",
+            "type": "object",
+            "properties": {
+                "instructionFiles": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "$ref": "#/$defs/relPath"
+                    }
+                },
+                "maxPullRequestChangedLines": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 5000
+                },
+                "maxPullRequestChangedFiles": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                },
+                "requireHumanMergePaths": {
+                    "description": "At most 50 globs — paths whose changes only a person may merge, whatever the merge policy says (CONTRACTS.md §1, APW-08 addition; schema owned by APW-03).",
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                        "$ref": "#/$defs/glob"
+                    }
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "upstreamSync": {
+            "description": "§19 — APW-02. Forbidden when `source.relation` is `link` (`upstream_sync_requires_upstream`).",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "schedule": {
+                    "description": "Default `0 6 * * 1`. Consecutive fires at least 60 minutes apart (R21 / `schedule_too_frequent`) — rule-level.",
+                    "$ref": "#/$defs/cronExpression"
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "merge"
+                    ]
+                },
+                "branch": {
+                    "description": "Defaults to `upstream.defaultBranch`.",
+                    "$ref": "#/$defs/gitRef"
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "upstreamPullRequests": {
+            "description": "§20 — APW-09. `enabled: true` requires `source.relation: fork` (`upstream_prs_require_fork`).",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "requireApproval": {
+                    "description": "Only `true` is valid (R12 / `upstream_pr_approval_required`) — cannot be set false.",
+                    "const": true
+                },
+                "maxOpen": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        },
+        "provisioning": {
+            "description": "§20 — APW-04 addition (CONTRACTS.md §1). The App Provisioner never writes it and always preserves it.",
+            "type": "object",
+            "properties": {
+                "autoReprovision": {
+                    "description": "Default false. The owner's opt-in to automatic re-provisioning when an upstream sync breaks the smoke tests.",
+                    "type": "boolean"
+                }
+            },
+            "patternProperties": {
+                "^x-": {}
+            },
+            "additionalProperties": false
+        }
+    }
+}

@@ -47,18 +47,18 @@ activity_sync:
 spec: {} # kind-specific, see below
 ```
 
-| Field              | Type   | Notes                                                                              |
-| ------------------ | ------ | ---------------------------------------------------------------------------------- |
-| `version`          | int    | Advisory only. Absent means v1. See [Versioning](#versioning).                     |
-| `kind`             | string | `website`, `landing-page`, `blog`, `directory`, `awesome-repo`, `repo`, `company`. |
-| `name` / `title`   | string | Display name of the Work.                                                          |
-| `initial_prompt`   | string | Seeds generation. Capped at 8000 characters.                                       |
-| `model`            | string | Preferred model id.                                                                |
-| `website_repo`     | string | `owner/repo` of the Work Repository.                                               |
-| `schedule_cadence` | enum   | How often scheduled generation runs.                                               |
-| `deploy_provider`  | string | Deployment plugin id. `deployProvider` is accepted as an alias.                    |
-| `activity_sync`    | object | Activity Feed transport. See ADR-004.                                              |
-| `spec`             | object | Kind-specific configuration.                                                       |
+| Field              | Type   | Notes                                                                                     |
+| ------------------ | ------ | ----------------------------------------------------------------------------------------- |
+| `version`          | int    | Advisory only. Absent means v1. See [Versioning](#versioning).                            |
+| `kind`             | string | `website`, `landing-page`, `blog`, `directory`, `awesome-repo`, `repo`, `company`, `app`. |
+| `name` / `title`   | string | Display name of the Work.                                                                 |
+| `initial_prompt`   | string | Seeds generation. Capped at 8000 characters.                                              |
+| `model`            | string | Preferred model id.                                                                       |
+| `website_repo`     | string | `owner/repo` of the Work Repository.                                                      |
+| `schedule_cadence` | enum   | How often scheduled generation runs.                                                      |
+| `deploy_provider`  | string | Deployment plugin id. `deployProvider` is accepted as an alias.                           |
+| `activity_sync`    | object | Activity Feed transport. See ADR-004.                                                     |
+| `spec`             | object | Kind-specific configuration.                                                              |
 
 ## Versioning
 
@@ -327,6 +327,64 @@ spec:
     staffing:
         - { role: Tech writer, agent: docs-bot }
 ```
+
+### `app`
+
+An [App Work](../features/app-works.md) — a preview, off by default — keeps its **App spec** here: how the app is
+built, what runs, what it depends on, its environment, and the rules agents must follow when they change it. It is
+the one `spec` with a schema of its own, published at
+`https://api.ever.works/api/schema/app-spec.schema.json`; `works.yml.schema.json` embeds the same object for
+`kind: app`.
+
+```yaml
+version: 2
+kind: app
+name: Scheduler
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example/scheduler, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile, dockerfile: Dockerfile }
+    components:
+        - name: web
+          role: web
+          port: 3000
+          probes: { readiness: { http: /healthz } }
+    dependencies:
+        postgres: { version: '16' }
+    env:
+        - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+        - { name: APP_URL, from: domains.primary.url }
+        - { name: SESSION_SECRET, secret: true, generate: { kind: hex, bytes: 32, rotate: never } }
+    smoke:
+        - { name: home, http: { method: GET, path: / }, expect: { status: [200] } }
+    checks:
+        - { name: unit, command: 'npm test', required: true }
+    display:
+        protectedPaths: [LICENSE, 'public/logo*']
+```
+
+| Block                                  | What it holds                                                                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source`                               | Where the repository came from: `relation` (`link`, `fork` or `private-copy`), the `upstream` it follows (not for a link) and the `branch` built and deployed. The platform writes it when the App Work's repository is ready. |
+| `blueprint`                            | The [App Blueprint](../features/app-blueprints.md) that was applied: `id`, `version`, `repo` and the pinned `sha`.                                                                                                             |
+| `license`                              | A declaration: `spdx`, `class`, `source` (`detected`, `blueprint` or `user`), an optional `notice` and `sourceOfferUrl`. The platform computes the class it acts on itself.                                                    |
+| `display`                              | The app's display `name`, and `protectedPaths` — up to 50 globs agents may not change.                                                                                                                                         |
+| `build`                                | `strategy` — `dockerfile`, `image`, `auto` or `none` — and its options. Required when there are components.                                                                                                                    |
+| `components`                           | Up to 10 processes, each a `web` (Service and Ingress) or a `worker`, with its port, replicas, probes, resources and volumes.                                                                                                  |
+| `dependencies`                         | The services the app needs: `postgres`, `redis`, `objectStorage`, `smtp`.                                                                                                                                                      |
+| `env`                                  | Up to 200 variables. Each value is generated, derived (`from`), templated, prompted or a fixed `value`, and may be marked `secret`.                                                                                            |
+| `jobs` / `cron`                        | Up to 10 jobs that run `pre-deploy`, `first-deploy` or `post-deploy` (a migration, for example), and up to 20 scheduled calls (UTC).                                                                                           |
+| `domains`                              | The public surface: the component that serves the public URL, the variables that carry it, and whether a domain change needs a `restart` or a `rebuild`.                                                                       |
+| `smoke` / `checks`                     | Up to 20 HTTP smoke checks for a running deployment, and up to 20 commands an agent's change must pass.                                                                                                                        |
+| `agents`                               | Instruction files, the pull-request size guidance (`maxPullRequestChangedLines`, default 500) and `requireHumanMergePaths`.                                                                                                    |
+| `upstreamSync`                         | `enabled` (default `true`), `schedule` (default `0 6 * * 1`, at least an hour apart), `mode` (`merge` only) and `branch`.                                                                                                      |
+| `upstreamPullRequests`, `provisioning` | Settings for proposing changes upstream and for automatic re-provisioning — features that are not built yet.                                                                                                                   |
+
+Keys starting with `x-` are allowed at any depth and ignored. An App spec is judged more strictly than the rest of
+this file: the Work's **Settings → App spec** page lists every problem, and a spec with errors is never put in
+effect — the last valid one stays in use. See [App Works](../features/app-works.md#the-app-spec).
 
 ## Validation behaviour
 

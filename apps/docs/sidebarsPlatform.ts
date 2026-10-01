@@ -62,6 +62,20 @@ const sidebars: SidebarsConfig = {
 				// kinds minted by their own flows). Sits with the creation
 				// pages because kind is chosen at creation and never after.
 				'features/work-kinds',
+				// App Works (preview, off by default) — the `app` kind in depth.
+				// Directly after Work Kinds, where DOCS-PLAN §4 of the App Works
+				// spec tree puts the block, in its task order: the overview, how
+				// an App is built and run, the Blueprints that describe known
+				// apps, and the launcher where live App Works appear. The
+				// launcher also lists Ever apps and any live Work, but it ships
+				// with this programme (APW-11) and has its own off-by-default
+				// switch.
+				{
+					type: 'category',
+					label: 'App Works',
+					link: { type: 'doc', id: 'features/app-works' },
+					items: ['features/app-runtime', 'features/app-blueprints', 'features/app-launcher']
+				},
 				'features/onboarding',
 				'features/settings-map',
 				// The three screens every session passes through: the home
@@ -218,6 +232,8 @@ const sidebars: SidebarsConfig = {
 				'features/work-blueprints',
 				'features/k8s-deployment',
 				'features/managed-hosting',
+				// `features/app-launcher` moved into the App Works category
+				// (after `features/work-kinds`), beside the pages it belongs with.
 				// Where uploaded bytes land (local-fs / S3 / MinIO / GitHub
 				// + LFS). An operator-level STORAGE_BACKEND choice, so it
 				// reads with the deployment pages rather than with the

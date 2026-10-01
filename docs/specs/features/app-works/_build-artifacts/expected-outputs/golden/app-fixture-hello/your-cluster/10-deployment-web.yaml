@@ -1,0 +1,132 @@
+# GOLDEN — app-fixture-hello · target your-cluster · Deployment `web`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.3 (replicas, `revisionHistoryLimit: 5`, `progressDeadlineSeconds` = the
+# Spec      : component deadline, Recreate when the component has volumes else RollingUpdate,
+# Spec      : `minReadySeconds: 30` for a worker without probes, pod annotations, `envFrom` NOT optional,
+# Spec      : `enableServiceLinks: false`, soft topology spread, `imagePullPolicy: IfNotPresent`)
+# Spec      : APW-06 plan.md §4.4 (security context), §4.5 (probes and resources from the App spec)
+# Spec      : APW-06 plan.md §5.3 (deadline clamp 300…2400 s)
+# Spec      : APW-06 spec.md FR-11, FR-14, FR-15, FR-28
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: web
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+        ever-works.io/component: web
+spec:
+    replicas: 1
+    revisionHistoryLimit: 5
+    progressDeadlineSeconds: 300
+    minReadySeconds: 0
+    strategy:
+        type: Recreate
+    selector:
+        matchLabels:
+            ever-works.io/component: web
+    template:
+        metadata:
+            labels:
+                ever-works.io/component: web
+                app.kubernetes.io/managed-by: ever-works-k8s-plugin
+                app.kubernetes.io/part-of: app-fixture-hello
+                ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+                ever-works.io/kind: app
+            annotations:
+                ever-works.io/env-checksum: c35b103be8b582cf
+                ever-works.io/build-commit: b1c2d3e4f5061728394a5b5c6d7e8f9012345678
+                ever-works.io/deployment-id: 77777777-7777-4777-8777-777777777777
+        spec:
+            serviceAccountName: app
+            automountServiceAccountToken: false
+            enableServiceLinks: false
+            securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                    type: RuntimeDefault
+                fsGroup: 10001
+                fsGroupChangePolicy: OnRootMismatch
+            imagePullSecrets:
+                - name: app-pull
+            topologySpreadConstraints:
+                - maxSkew: 1
+                  topologyKey: kubernetes.io/hostname
+                  whenUnsatisfiable: ScheduleAnyway
+                  labelSelector:
+                      matchLabels:
+                          ever-works.io/component: web
+            containers:
+                - name: web
+                  image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00
+                  imagePullPolicy: IfNotPresent
+                  command:
+                      - node
+                      - src/server.mjs
+                  ports:
+                      - name: http
+                        containerPort: 8080
+                        protocol: TCP
+                  envFrom:
+                      - secretRef:
+                            name: app-env-c35b103be8
+                            optional: false
+                      - configMapRef:
+                            name: app-platform-c35b103be8
+                            optional: false
+                  startupProbe:
+                      httpGet:
+                          path: /healthz
+                          port: http
+                      initialDelaySeconds: 0
+                      timeoutSeconds: 5
+                      periodSeconds: 2
+                      failureThreshold: 30
+                  readinessProbe:
+                      httpGet:
+                          path: /readyz
+                          port: http
+                      initialDelaySeconds: 0
+                      timeoutSeconds: 5
+                      periodSeconds: 10
+                      failureThreshold: 3
+                  livenessProbe:
+                      httpGet:
+                          path: /healthz
+                          port: http
+                      initialDelaySeconds: 0
+                      timeoutSeconds: 5
+                      periodSeconds: 20
+                      failureThreshold: 3
+                  resources:
+                      requests:
+                          cpu: 50m
+                          memory: 64Mi
+                      limits:
+                          memory: 128Mi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                          drop:
+                              - ALL
+                  volumeMounts:
+                      - name: uploads
+                        mountPath: /data
+                      - name: tmp
+                        mountPath: /tmp
+            volumes:
+                - name: uploads
+                  persistentVolumeClaim:
+                      claimName: web-uploads
+                - name: tmp
+                  emptyDir:
+                      sizeLimit: 256Mi

@@ -1,0 +1,47 @@
+{
+	"name": "@ever-works/app-launcher",
+	"version": "1.0.0",
+	"description": "Framework-neutral App Launcher web component (Lit) — the cross-platform Ever apps and Your apps panel",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit && tsc -p tsconfig.specs.json --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run && node scripts/check-size.mjs",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"lit": "^3.3.3"
+	},
+	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@types/node": "^22.19.11",
+		"@vitest/coverage-v8": "^4.1.0",
+		"happy-dom": "^20.14.5",
+		"tsup": "^8.4.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	}
+}

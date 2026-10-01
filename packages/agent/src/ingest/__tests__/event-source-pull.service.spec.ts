@@ -415,5 +415,70 @@ describe('EventSourcePullService', () => {
             const result = await service.backfillSource('user-1', 'zoom-connector', WINDOW);
             expect(result).toMatchObject({ supported: false, pages: 0, complete: false });
         });
+
+        it('does not backfill through a lazy connector whose onLoad fails on this first use', async () => {
+            const real = {
+                id: 'failing-connector',
+                capabilities: ['event-source'],
+                pullEvents: jest.fn(),
+                backfill: jest.fn().mockResolvedValue({ events: [], complete: true }),
+            };
+            const entry = {
+                plugin: {} as FakePlugin,
+                state: 'loaded',
+                error: undefined as unknown,
+            };
+            entry.plugin = {
+                id: 'failing-connector',
+                capabilities: ['event-source'],
+                // The first load resolves; its onLoad failure shows on the entry.
+                __materialize: jest.fn(async () => {
+                    entry.state = 'error';
+                    entry.error = 'onLoad failed';
+                    return real;
+                }),
+            } as unknown as FakePlugin;
+            registered.push(entry);
+
+            const result = await makeService().backfillSource(
+                'user-1',
+                'failing-connector',
+                WINDOW,
+            );
+
+            expect(real.backfill).not.toHaveBeenCalled();
+            expect(result.supported).toBe(false);
+        });
+    });
+
+    /**
+     * F6 — a cold connector loads on its first pull. When its onLoad fails
+     * there, the load resolves and the registry entry turns `error`; the eager
+     * boot used to find that at boot and skip it. The pull must skip it too.
+     */
+    it('does not pull through a lazy connector whose onLoad fails on this first use', async () => {
+        const real = {
+            id: 'failing-puller',
+            capabilities: ['event-source'],
+            pullEvents: jest.fn().mockResolvedValue({ events: [] }),
+        };
+        const entry = { plugin: {} as FakePlugin, state: 'loaded', error: undefined as unknown };
+        entry.plugin = {
+            id: 'failing-puller',
+            capabilities: ['event-source'],
+            __materialize: jest.fn(async () => {
+                entry.state = 'error';
+                entry.error = 'onLoad failed';
+                return real;
+            }),
+        } as unknown as FakePlugin;
+        registered.push(entry);
+        userRows['failing-puller'] = [{ userId: 'user-1', enabled: true }];
+
+        const result = await makeService().pullSources();
+
+        expect(real.pullEvents).not.toHaveBeenCalled();
+        expect(result.pulled).toBe(0);
+        expect(result.errors).toBe(0);
     });
 });

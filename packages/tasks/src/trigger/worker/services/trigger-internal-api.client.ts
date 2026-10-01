@@ -42,6 +42,15 @@ const RETRY_SAFE_REMOTE_METHODS: ReadonlySet<string> = new Set<string>([
     'AgentRunService.checkBudget',
     'TasksService.getOne',
     'WorkRepository.findById',
+    // APW-06 §5.1 / T71 — the isolated App runtime worker's spec and Build
+    // reads (`APP_DEPLOY_SPEC_SOURCE`, `APP_DEPLOY_BUILD_SOURCE`). `getEffectiveSpec`
+    // answers the stored spec or reads `.works/works.yml` at a commit in memory
+    // and never writes (its own docstring); `getBuild` is one `findOne` and
+    // `listDeployableBuilds` one paged read (`AppBuildRepository.findPage`: a page
+    // SELECT plus its COUNT, no writes).
+    'AppSpecService.getEffectiveSpec',
+    'AppDeployBuildSourceAdapter.getBuild',
+    'AppDeployBuildSourceAdapter.listDeployableBuilds',
 
     // ── Writers whose idempotency is structural. ────────────────────
     // CAS on a non-terminal status: a second call matches zero rows.

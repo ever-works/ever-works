@@ -1,13 +1,36 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { PluginContext } from '@ever-works/plugin';
+import { isAppDeploymentPlugin } from '@ever-works/plugin';
+import type {
+	AppClusterCheckRequest,
+	AppDeployHooks,
+	AppDeployResult,
+	AppDestroyResult,
+	AppJobResult,
+	AppJobRunRequest,
+	AppLimitRangeInput,
+	AppLogRequest,
+	AppLogTail,
+	AppScaleResult,
+	AppStatusSnapshot,
+	AppStatusSpec,
+	AppTargetRef,
+	PluginContext
+} from '@ever-works/plugin';
 import { KubernetesPlugin } from '../k8s.plugin';
 import { KubernetesApiService } from '../k8s-api.service';
 import { K8sPluginError } from '../errors';
 import type { IngressClassDescriptor, KubernetesClusterInfo } from '../types';
+import { AppDeployer } from '../app/app-deployer';
+import { AppStatusReader } from '../app/app-status.reader';
+import { AppLifecycle, minimalRenderInput } from '../app/app-lifecycle';
+import { AppClusterChecker } from '../app/app-cluster-check';
+import type { AppClusterCheckReport } from '../app/app-cluster-check';
+import type { KubeconfigDnsResolver } from '../app/app-kubeconfig.guard';
 
 const VALID = readFileSync(resolve(__dirname, 'fixtures/kubeconfig-valid.yml'), 'utf-8');
+const UNSUPPORTED = readFileSync(resolve(__dirname, 'fixtures/kubeconfig-exec.yml'), 'utf-8');
 
 function createMockContext(settings: Record<string, unknown> = {}): PluginContext {
 	return {
@@ -988,5 +1011,695 @@ describe('KubernetesPlugin Work-scoped domain context', () => {
 describe('KubernetesPlugin.getTeams', () => {
 	it('returns an empty list (k8s has no team concept)', async () => {
 		expect(await new KubernetesPlugin().getTeams('whatever')).toEqual([]);
+	});
+});
+
+/* ------------------------------------------------------------------------- *
+ * APW-06 T14 — the App members: `supportsApps` and the nine delegating
+ * methods, each of which runs §6.1's guard over the credential it is given.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The address the injected §6.1 resolver answers with. Public, so the guard's
+ * `resolvePublicAddresses` step succeeds without touching the network — the same
+ * reason T11's own spec injects a resolver (every spec in this repo stays offline).
+ */
+let clusterAddress = '93.184.216.34';
+
+/** The §6.1 step-2/3 seam the plugin exposes as `clusterAddressResolver`. */
+const clusterAddressResolver: KubeconfigDnsResolver = async (hostname) => {
+	if (hostname !== 'kind.example.com') {
+		throw new Error(`no answer for '${hostname}'`);
+	}
+	return [{ address: clusterAddress, family: 4 }];
+};
+
+function appPlugin(overrides: Partial<KubernetesApiService> = {}): KubernetesPlugin {
+	return new KubernetesPlugin({ api: makeMockApi(overrides), clusterAddressResolver });
+}
+
+const APP_REF: AppTargetRef = {
+	workId: 'work_1',
+	namespace: 'ew-timetrack-1a2b3c4d',
+	target: 'your-cluster',
+	kubeContext: 'kind-dev'
+};
+
+const APP_STATUS_SPEC: AppStatusSpec = {
+	components: [{ name: 'web', role: 'web', replicas: 1, primary: true }],
+	jobs: ['migrate'],
+	cron: ['tick']
+};
+
+const APP_CLUSTER_CHECK_REQUEST: AppClusterCheckRequest = {
+	namespace: APP_REF.namespace,
+	needsCreateNamespace: false
+};
+
+const APP_JOB_RUN: AppJobRunRequest = {
+	name: 'migrate',
+	image: `ghcr.io/acme/timetrack@sha256:${'a'.repeat(64)}`
+};
+
+const APP_LOG_REQUEST: AppLogRequest = { component: 'web', lines: 200, secretValues: {} };
+
+const APP_NAMESPACE_OPTS = {
+	isolation: true,
+	limitRange: {
+		defaultRequest: { cpu: '100m', memory: '128Mi' },
+		defaultLimit: { cpu: '1', memory: '512Mi', ephemeralStorage: '1Gi' },
+		max: { cpu: '8', memory: '64Gi' }
+	}
+} satisfies { isolation: boolean; limitRange: AppLimitRangeInput };
+
+const APP_PUBLISH_HOSTS = {
+	primary: 'timetrack.example.com',
+	extra: ['www.timetrack.example.com'],
+	previous: [],
+	tls: 'cert-manager',
+	issuer: 'letsencrypt-prod'
+};
+
+const APP_HOOKS: AppDeployHooks = {
+	onPhase: vi.fn(async () => undefined),
+	verifyPublic: vi.fn(async () => ({ checks: [], passed: true })),
+	isCancelled: vi.fn(async () => false)
+};
+
+/*
+ * The collaborators' answers. T12/T13 are the subject of their own specs; here
+ * each value only has to arrive back at the caller untouched.
+ */
+const APP_DEPLOY_RESULT = {
+	outcome: 'succeeded',
+	warnings: [],
+	components: [],
+	jobs: [],
+	smoke: { inCluster: [], public: [], observedAt: '2026-09-17T00:00:00.000Z' },
+	ingressAddress: { hostname: 'lb.cluster.example.com' },
+	isolationEnforced: null,
+	firstDeployJobsCompleted: true
+} satisfies AppDeployResult;
+
+const APP_STATUS_SNAPSHOT = {
+	observedAt: '2026-09-17T00:00:00.000Z',
+	components: [{ name: 'web', role: 'web', desired: 1, ready: 1, restarts: 0 }],
+	jobs: [],
+	cron: [],
+	isolationEnforced: null,
+	ingressAddress: { hostname: 'lb.cluster.example.com' }
+} satisfies AppStatusSnapshot;
+
+const APP_JOB_RESULT = {
+	name: 'migrate',
+	when: 'pre-deploy',
+	runName: 'migrate-1a2b3c4d',
+	status: 'succeeded',
+	startedAt: '2026-09-17T00:00:00.000Z'
+} satisfies AppJobResult;
+
+const APP_DESTROY_RESULT = {
+	deleted: [],
+	kept: [{ kind: 'PersistentVolumeClaim', name: 'data' }],
+	namespaceDeleted: false
+} satisfies AppDestroyResult;
+
+const APP_SCALE_RESULT = {
+	components: [{ name: 'web', role: 'web', desired: 1, ready: 1, restarts: 0 }],
+	smoke: null
+} satisfies AppScaleResult;
+
+const APP_LOG_TAIL = {
+	containers: [{ pod: 'web-abc', container: 'web', lines: ['listening'], truncated: false }],
+	redactedNames: [],
+	fetchedAt: '2026-09-17T00:00:00.000Z'
+} satisfies AppLogTail;
+
+const APP_PREPARE_WARNINGS = { warnings: [{ code: 'limitrange_forbidden', message: 'skipped' }] };
+
+const APP_PUBLISH_RESULT = { ingressAddress: { hostname: 'lb.cluster.example.com' } };
+
+const APP_CLUSTER_CHECK_REPORT = {
+	ok: true,
+	serverVersion: 'v1.30.4',
+	fingerprint: 'abc123def4567890',
+	missingPermissions: [],
+	optionalMissing: [],
+	ingressClasses: [{ name: 'nginx', isDefault: true }],
+	controllerNamespace: 'ingress-nginx',
+	clusterIssuers: ['letsencrypt-prod'],
+	storageClasses: [{ name: 'standard', isDefault: true }],
+	ingressAddress: { hostname: 'lb.cluster.example.com' }
+} satisfies AppClusterCheckReport;
+
+/** One App method, ready to be called with the credential its case supplies. */
+interface AppCall {
+	label: string;
+	run(): Promise<unknown>;
+}
+
+function refAppCalls(plugin: KubernetesPlugin, ref: AppTargetRef, credential: string): AppCall[] {
+	return [
+		{ label: 'deployApp', run: () => plugin.deployApp(minimalRenderInput(ref), credential, APP_HOOKS) },
+		{ label: 'getAppStatus', run: () => plugin.getAppStatus(ref, credential, APP_STATUS_SPEC) },
+		{ label: 'runAppJob', run: () => plugin.runAppJob(ref, credential, APP_JOB_RUN) },
+		{ label: 'destroyApp', run: () => plugin.destroyApp(ref, credential, { deleteVolumes: false }) },
+		{ label: 'scaleApp', run: () => plugin.scaleApp(ref, credential, 'pause', { web: 0 }) },
+		{ label: 'getAppLogs', run: () => plugin.getAppLogs(ref, credential, APP_LOG_REQUEST) },
+		{ label: 'prepareAppNamespace', run: () => plugin.prepareAppNamespace(ref, credential, APP_NAMESPACE_OPTS) },
+		{ label: 'publishAppHosts', run: () => plugin.publishAppHosts(ref, credential, APP_PUBLISH_HOSTS) }
+	];
+}
+
+/** Every App method — the nine of the contract (`checkAppCluster` takes no ref). */
+function appCalls(plugin: KubernetesPlugin, ref: AppTargetRef, credential: string): AppCall[] {
+	return [
+		...refAppCalls(plugin, ref, credential),
+		{ label: 'checkAppCluster', run: () => plugin.checkAppCluster(credential, APP_CLUSTER_CHECK_REQUEST) }
+	];
+}
+
+/**
+ * Every collaborator, spied. Spying on the module's own prototype is what makes
+ * "the plugin delegates, and the module is what does the work" assertable without
+ * a second implementation: the plugin's own body is the only thing under test.
+ */
+function spyOnAppCollaborators() {
+	return [
+		vi.spyOn(AppDeployer.prototype, 'deployApp').mockResolvedValue(APP_DEPLOY_RESULT),
+		vi.spyOn(AppStatusReader.prototype, 'getAppStatus').mockResolvedValue(APP_STATUS_SNAPSHOT),
+		vi.spyOn(AppLifecycle.prototype, 'runAppJob').mockResolvedValue(APP_JOB_RESULT),
+		vi.spyOn(AppLifecycle.prototype, 'destroyApp').mockResolvedValue(APP_DESTROY_RESULT),
+		vi.spyOn(AppLifecycle.prototype, 'scaleApp').mockResolvedValue(APP_SCALE_RESULT),
+		vi.spyOn(AppLifecycle.prototype, 'getAppLogs').mockResolvedValue(APP_LOG_TAIL),
+		vi.spyOn(AppLifecycle.prototype, 'prepareAppNamespace').mockResolvedValue(APP_PREPARE_WARNINGS),
+		vi.spyOn(AppLifecycle.prototype, 'publishAppHosts').mockResolvedValue(APP_PUBLISH_RESULT),
+		vi.spyOn(AppClusterChecker.prototype, 'checkAppCluster').mockResolvedValue(APP_CLUSTER_CHECK_REPORT)
+	];
+}
+
+function expectNoCollaboratorRan(spies: ReturnType<typeof spyOnAppCollaborators>): void {
+	for (const spy of spies) {
+		expect(spy).not.toHaveBeenCalled();
+	}
+}
+
+/**
+ * §6.1 step 4: what a collaborator receives is the **pinned rewrite**, not the
+ * kubeconfig the caller handed in — `kind.example.com` is gone from `server:`,
+ * so the client cannot re-resolve between the check and the call.
+ */
+function expectPinnedCredential(credential: string): void {
+	expect(credential).toContain('server: https://93.184.216.34:6443');
+	expect(credential).toContain('tls-server-name: kind.example.com');
+}
+
+describe('KubernetesPlugin App members (APW-06 T14)', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		clusterAddress = '93.184.216.34';
+	});
+
+	it('declares supportsApps so isAppDeploymentPlugin narrows it to an App provider', () => {
+		const plugin = new KubernetesPlugin();
+
+		expect(plugin.supportsApps).toBe(true);
+		expect(isAppDeploymentPlugin(plugin)).toBe(true);
+	});
+
+	it('delegates deployApp to AppDeployer with the pinned credential and the hooks', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppDeployer.prototype, 'deployApp').mockResolvedValue(APP_DEPLOY_RESULT);
+		const input = minimalRenderInput(APP_REF);
+
+		const result = await plugin.deployApp(input, VALID, APP_HOOKS);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotInput, gotCredential, gotHooks] = spy.mock.calls[0];
+		expect(gotInput).toBe(input);
+		expect(gotHooks).toBe(APP_HOOKS);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_DEPLOY_RESULT);
+	});
+
+	it('delegates getAppStatus to AppStatusReader with the pinned credential and the spec', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppStatusReader.prototype, 'getAppStatus').mockResolvedValue(APP_STATUS_SNAPSHOT);
+
+		const result = await plugin.getAppStatus(APP_REF, VALID, APP_STATUS_SPEC);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotSpec] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotSpec).toBe(APP_STATUS_SPEC);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_STATUS_SNAPSHOT);
+	});
+
+	it('delegates runAppJob to AppLifecycle with the pinned credential and the request', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppLifecycle.prototype, 'runAppJob').mockResolvedValue(APP_JOB_RESULT);
+
+		const result = await plugin.runAppJob(APP_REF, VALID, APP_JOB_RUN);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotJob] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotJob).toBe(APP_JOB_RUN);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_JOB_RESULT);
+	});
+
+	it('delegates destroyApp to AppLifecycle with the pinned credential and deleteVolumes', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppLifecycle.prototype, 'destroyApp').mockResolvedValue(APP_DESTROY_RESULT);
+
+		const result = await plugin.destroyApp(APP_REF, VALID, { deleteVolumes: false });
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotOpts] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotOpts).toEqual({ deleteVolumes: false });
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_DESTROY_RESULT);
+	});
+
+	it('delegates scaleApp to AppLifecycle with the mode, the replicas and the resume checks', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppLifecycle.prototype, 'scaleApp').mockResolvedValue(APP_SCALE_RESULT);
+		const resumeChecks = { smoke: [], deadlines: { web: 300 } };
+
+		const result = await plugin.scaleApp(APP_REF, VALID, 'resume', { web: 2 }, resumeChecks);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotMode, gotReplicas, gotChecks] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotMode).toBe('resume');
+		expect(gotReplicas).toEqual({ web: 2 });
+		expect(gotChecks).toBe(resumeChecks);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_SCALE_RESULT);
+	});
+
+	it('delegates getAppLogs to AppLifecycle with the pinned credential and the request', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppLifecycle.prototype, 'getAppLogs').mockResolvedValue(APP_LOG_TAIL);
+
+		const result = await plugin.getAppLogs(APP_REF, VALID, APP_LOG_REQUEST);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotRequest] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotRequest).toBe(APP_LOG_REQUEST);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_LOG_TAIL);
+	});
+
+	it('delegates prepareAppNamespace to AppLifecycle with the pinned credential and the options', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppLifecycle.prototype, 'prepareAppNamespace').mockResolvedValue(APP_PREPARE_WARNINGS);
+
+		const result = await plugin.prepareAppNamespace(APP_REF, VALID, APP_NAMESPACE_OPTS);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotOpts] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotOpts).toBe(APP_NAMESPACE_OPTS);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_PREPARE_WARNINGS);
+	});
+
+	it('delegates publishAppHosts to AppLifecycle with the pinned credential and the hosts', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppLifecycle.prototype, 'publishAppHosts').mockResolvedValue(APP_PUBLISH_RESULT);
+
+		const result = await plugin.publishAppHosts(APP_REF, VALID, APP_PUBLISH_HOSTS);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotRef, gotCredential, gotHosts] = spy.mock.calls[0];
+		expect(gotRef).toBe(APP_REF);
+		expect(gotHosts).toBe(APP_PUBLISH_HOSTS);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_PUBLISH_RESULT);
+	});
+
+	it('delegates checkAppCluster to AppClusterChecker and returns its ingressAddress (GAP-09)', async () => {
+		const plugin = appPlugin();
+		const spy = vi
+			.spyOn(AppClusterChecker.prototype, 'checkAppCluster')
+			.mockResolvedValue(APP_CLUSTER_CHECK_REPORT);
+
+		const result = await plugin.checkAppCluster(VALID, APP_CLUSTER_CHECK_REQUEST);
+
+		expect(spy).toHaveBeenCalledTimes(1);
+		const [gotCredential, gotRequest] = spy.mock.calls[0];
+		expect(gotRequest).toBe(APP_CLUSTER_CHECK_REQUEST);
+		expectPinnedCredential(gotCredential);
+		expect(result).toBe(APP_CLUSTER_CHECK_REPORT);
+		// The report T13 returns is a superset of the frozen `AppClusterCheck`; the address
+		// survives the plugin boundary rather than being narrowed away.
+		expect(result.ingressAddress).toEqual({ hostname: 'lb.cluster.example.com' });
+	});
+
+	it('runs assertSupportedKubeconfig on every App method: an unsupported credential is refused', async () => {
+		const plugin = appPlugin();
+		const spies = spyOnAppCollaborators();
+
+		for (const { label, run } of appCalls(plugin, APP_REF, UNSUPPORTED)) {
+			await expect(run(), label).rejects.toMatchObject({ code: 'KUBECONFIG_UNSUPPORTED' });
+		}
+
+		expectNoCollaboratorRan(spies);
+	});
+
+	it('runs pinKubeconfigServer on every App method: a private address is refused (FR-4)', async () => {
+		const plugin = appPlugin();
+		const spies = spyOnAppCollaborators();
+		clusterAddress = '10.0.0.1';
+
+		for (const { label, run } of appCalls(plugin, APP_REF, VALID)) {
+			await expect(run(), label).rejects.toMatchObject({ code: 'CLUSTER_ADDRESS_NOT_PUBLIC' });
+		}
+
+		expectNoCollaboratorRan(spies);
+	});
+
+	it('refuses an AppTargetRef whose target is ever-works-apps on every ref-taking method (R-5)', async () => {
+		const plugin = appPlugin();
+		const spies = spyOnAppCollaborators();
+		const ref: AppTargetRef = { ...APP_REF, target: 'ever-works-apps' };
+
+		for (const { label, run } of refAppCalls(plugin, ref, VALID)) {
+			await expect(run(), label).rejects.toMatchObject({ code: 'NOT_CONFIGURED' });
+		}
+
+		expectNoCollaboratorRan(spies);
+	});
+
+	it('names the managed target and the plugin that does serve it', async () => {
+		const plugin = appPlugin();
+
+		await expect(
+			plugin.getAppStatus({ ...APP_REF, target: 'ever-works-apps' }, VALID, APP_STATUS_SPEC)
+		).rejects.toThrow(/'ever-works-apps'.*apps-tier/s);
+	});
+
+	it('refuses target none too — this plugin serves your-cluster only', async () => {
+		const plugin = appPlugin();
+
+		await expect(plugin.getAppLogs({ ...APP_REF, target: 'none' }, VALID, APP_LOG_REQUEST)).rejects.toMatchObject({
+			code: 'NOT_CONFIGURED'
+		});
+	});
+
+	it('keeps serving your-cluster (the ref the deploy orchestrator actually routes here)', async () => {
+		const plugin = appPlugin();
+		const spy = vi.spyOn(AppStatusReader.prototype, 'getAppStatus').mockResolvedValue(APP_STATUS_SNAPSHOT);
+
+		await expect(plugin.getAppStatus(APP_REF, VALID, APP_STATUS_SPEC)).resolves.toBe(APP_STATUS_SNAPSHOT);
+		expect(spy).toHaveBeenCalledTimes(1);
+	});
+
+	/**
+	 * The verification expiry (added 2026-09-18 with the contract member). §4.12:646-647 puts
+	 * `ever-works.io/expires-at` on a verification namespace, and §4.12:659-660 says APW-04's
+	 * sweep reads it to clean up leftovers — so the read must answer the ANNOTATION, and must
+	 * answer `null` rather than guessing when there is none or when the namespace is unreadable.
+	 */
+	it('reads the verification expiry annotation from the namespace, verbatim', async () => {
+		const readObject = vi.fn(async () => ({
+			metadata: { annotations: { 'ever-works.io/expires-at': '2026-09-19T10:00:00Z' } }
+		}));
+		const plugin = appPlugin({ readObject } as Partial<KubernetesApiService>);
+
+		await expect(plugin.readNamespaceExpiry(APP_REF, VALID)).resolves.toBe('2026-09-19T10:00:00Z');
+		expect(readObject).toHaveBeenCalledTimes(1);
+		// The read is the cluster-scoped one (`''` namespace argument), the same call shape the
+		// status reader uses, and it is handed the PINNED credential — not the raw one.
+		const [credential, apiVersion, kind, namespaceArg, name] = readObject.mock.calls[0] as unknown as string[];
+		expect(credential).toContain('server: https://93.184.216.34:6443');
+		expect(apiVersion).toBe('v1');
+		expect(kind).toBe('Namespace');
+		expect(namespaceArg).toBe('');
+		expect(name).toBe(APP_REF.namespace);
+	});
+
+	it('answers null — never a computed instant — when the namespace declares no expiry', async () => {
+		const plugin = appPlugin({
+			readObject: vi.fn(async () => ({ metadata: { annotations: {} } }))
+		} as Partial<KubernetesApiService>);
+
+		await expect(plugin.readNamespaceExpiry(APP_REF, VALID)).resolves.toBeNull();
+	});
+
+	it('answers null rather than throwing when the namespace cannot be read', async () => {
+		// A status report is not the place to fail a sweep: the caller's documented answer for
+		// "no expiry known" is a warning plus an empty value, so an unreadable namespace must not
+		// turn a verification-status call into an exception.
+		const plugin = appPlugin({
+			readObject: vi.fn(async () => {
+				throw new Error('namespace read failed');
+			})
+		} as Partial<KubernetesApiService>);
+
+		await expect(plugin.readNamespaceExpiry(APP_REF, VALID)).resolves.toBeNull();
+	});
+
+	it('refuses an ever-works-apps ref for the expiry read too (R-5, every App method)', async () => {
+		const plugin = appPlugin();
+		const readObject = vi.fn();
+
+		await expect(
+			plugin.readNamespaceExpiry({ ...APP_REF, target: 'ever-works-apps' }, VALID)
+		).rejects.toMatchObject({ code: 'NOT_CONFIGURED' });
+		expect(readObject).not.toHaveBeenCalled();
+	});
+});
+
+describe('KubernetesPlugin.deploy() manifest snapshot (ACC-06-43)', () => {
+	it('renders the same Deployment, Service and Ingress for the existing fixture', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(
+			createMockContext({
+				kubeconfig: VALID,
+				namespace: 'ever-works',
+				ingressHost: 'work-1.example.com',
+				ingressClass: 'nginx',
+				tlsIssuer: 'letsencrypt-prod',
+				registry: { kind: 'github', visibility: 'auto' }
+			})
+		);
+
+		const result = await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					gitSha: 'abc1234',
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					// The pod annotation is otherwise `t<Date.now()>`; pinning it keeps this
+					// snapshot a statement about what `deploy()` renders, not about the clock.
+					revision: 'rev-abc1234'
+				}
+			},
+			VALID
+		);
+
+		expect(result.status).toBe('deploying');
+		expect({
+			deployment: vi.mocked(api.applyDeployment).mock.calls[0]?.[1],
+			service: vi.mocked(api.applyService).mock.calls[0]?.[1],
+			ingress: vi.mocked(api.applyIngress).mock.calls[0]?.[1]
+		}).toMatchInlineSnapshot(`
+			{
+			  "deployment": {
+			    "apiVersion": "apps/v1",
+			    "kind": "Deployment",
+			    "metadata": {
+			      "labels": {
+			        "app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+			        "app.kubernetes.io/name": "work-1",
+			        "ever-works.io/managed": "true",
+			        "ever-works.io/work-id": "work-1",
+			      },
+			      "name": "work-1",
+			      "namespace": "ever-works",
+			    },
+			    "spec": {
+			      "replicas": 1,
+			      "selector": {
+			        "matchLabels": {
+			          "app.kubernetes.io/name": "work-1",
+			        },
+			      },
+			      "strategy": {
+			        "rollingUpdate": {
+			          "maxSurge": 0,
+			          "maxUnavailable": 1,
+			        },
+			        "type": "RollingUpdate",
+			      },
+			      "template": {
+			        "metadata": {
+			          "annotations": {
+			            "ever-works.io/revision": "rev-abc1234",
+			          },
+			          "labels": {
+			            "app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+			            "app.kubernetes.io/name": "work-1",
+			            "ever-works.io/managed": "true",
+			            "ever-works.io/work-id": "work-1",
+			          },
+			        },
+			        "spec": {
+			          "containers": [
+			            {
+			              "image": "ghcr.io/acme/work-1:abc1234",
+			              "imagePullPolicy": "Always",
+			              "livenessProbe": {
+			                "failureThreshold": 6,
+			                "httpGet": {
+			                  "path": "/api/health",
+			                  "port": "http",
+			                },
+			                "periodSeconds": 20,
+			                "timeoutSeconds": 10,
+			              },
+			              "name": "app",
+			              "ports": [
+			                {
+			                  "containerPort": 3000,
+			                  "name": "http",
+			                },
+			              ],
+			              "readinessProbe": {
+			                "failureThreshold": 3,
+			                "httpGet": {
+			                  "path": "/api/health",
+			                  "port": "http",
+			                },
+			                "periodSeconds": 10,
+			                "timeoutSeconds": 5,
+			              },
+			              "resources": {
+			                "limits": {
+			                  "cpu": "2",
+			                  "memory": "2Gi",
+			                },
+			                "requests": {
+			                  "cpu": "100m",
+			                  "memory": "256Mi",
+			                },
+			              },
+			              "startupProbe": {
+			                "failureThreshold": 30,
+			                "httpGet": {
+			                  "path": "/",
+			                  "port": "http",
+			                },
+			                "periodSeconds": 10,
+			                "timeoutSeconds": 10,
+			              },
+			            },
+			          ],
+			          "topologySpreadConstraints": [
+			            {
+			              "labelSelector": {
+			                "matchLabels": {
+			                  "app.kubernetes.io/name": "work-1",
+			                },
+			              },
+			              "maxSkew": 1,
+			              "topologyKey": "kubernetes.io/hostname",
+			              "whenUnsatisfiable": "ScheduleAnyway",
+			            },
+			          ],
+			        },
+			      },
+			    },
+			  },
+			  "ingress": {
+			    "apiVersion": "networking.k8s.io/v1",
+			    "kind": "Ingress",
+			    "metadata": {
+			      "annotations": {
+			        "cert-manager.io/cluster-issuer": "letsencrypt-prod",
+			        "nginx.ingress.kubernetes.io/proxy-body-size": "10m",
+			        "nginx.ingress.kubernetes.io/ssl-redirect": "true",
+			      },
+			      "labels": {
+			        "app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+			        "app.kubernetes.io/name": "work-1",
+			        "ever-works.io/managed": "true",
+			        "ever-works.io/work-id": "work-1",
+			      },
+			      "name": "work-1",
+			      "namespace": "ever-works",
+			    },
+			    "spec": {
+			      "ingressClassName": "nginx",
+			      "rules": [
+			        {
+			          "host": "work-1.example.com",
+			          "http": {
+			            "paths": [
+			              {
+			                "backend": {
+			                  "service": {
+			                    "name": "work-1",
+			                    "port": {
+			                      "number": 80,
+			                    },
+			                  },
+			                },
+			                "path": "/",
+			                "pathType": "Prefix",
+			              },
+			            ],
+			          },
+			        },
+			      ],
+			      "tls": [
+			        {
+			          "hosts": [
+			            "work-1.example.com",
+			          ],
+			          "secretName": "work-1-example-com-tls",
+			        },
+			      ],
+			    },
+			  },
+			  "service": {
+			    "apiVersion": "v1",
+			    "kind": "Service",
+			    "metadata": {
+			      "labels": {
+			        "app.kubernetes.io/managed-by": "ever-works-k8s-plugin",
+			        "app.kubernetes.io/name": "work-1",
+			        "ever-works.io/managed": "true",
+			        "ever-works.io/work-id": "work-1",
+			      },
+			      "name": "work-1",
+			      "namespace": "ever-works",
+			    },
+			    "spec": {
+			      "ports": [
+			        {
+			          "name": "http",
+			          "port": 80,
+			          "protocol": "TCP",
+			          "targetPort": 3000,
+			        },
+			      ],
+			      "selector": {
+			        "app.kubernetes.io/name": "work-1",
+			      },
+			      "type": "ClusterIP",
+			    },
+			  },
+			}
+		`);
 	});
 });

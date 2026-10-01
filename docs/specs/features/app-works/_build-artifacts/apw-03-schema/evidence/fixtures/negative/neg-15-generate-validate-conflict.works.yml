@@ -1,0 +1,20 @@
+# NEGATIVE FIXTURE neg-15 — error class: `generate` and `validate` disagree.
+# Expected: JSON Schema PASS · rule layer FAIL `generate_validate_conflict`.
+# schema.md R9 and CONTRACTS.md C2, which uses this very pair as its example: "a `base64` generator of 32
+# bytes yields 44 characters; `generate` and `validate` must agree". Each field is individually in range,
+# so the schema has nothing to reject — the conflict is arithmetic across two objects.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - name: APP_SECRET
+          secret: true
+          generate: { kind: base64, bytes: 32 }
+          validate: { length: 32 }

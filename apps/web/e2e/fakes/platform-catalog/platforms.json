@@ -1,0 +1,45 @@
+{
+    "$comment": "The PR lane's platform catalog fixture, served by ./server.mjs to the API of the e2e-app-works-flags-on job (.github/workflows/e2e.yml) through EVER_WORKS_PLATFORM_CATALOG_BASE_URL — ACC-E2E-12's 'Ever platforms from the versioned catalog'. Shape: the published schema (docs/specs/features/app-works/APW-11-app-launcher/catalog-draft/schema/platforms.schema.json) as the API reader enforces it (apps/api/src/app-launcher/platform-catalog.schema.ts); __tests__/server.unit.spec.ts feeds this file to that reader and requires it to be accepted whole. Addresses are RFC 2606 example.com hosts: nothing here resolves to a real service, and ever-teams deliberately has no develop address (FR-10).",
+    "schemaVersion": 1,
+    "catalogVersion": "0.1.0",
+    "platforms": [
+        {
+            "id": "ever-works",
+            "name": "Ever Works",
+            "description": "Build, run and evolve apps with agents.",
+            "icon": "icons/ever-works.svg",
+            "order": 10,
+            "status": "available",
+            "urls": {
+                "production": "https://ever-works.example.com",
+                "stage": "https://ever-works.stage.example.com",
+                "develop": "https://ever-works.dev.example.com"
+            }
+        },
+        {
+            "id": "ever-gauzy",
+            "name": "Ever Gauzy",
+            "description": "Work and time management for teams.",
+            "icon": "icons/ever-gauzy.svg",
+            "order": 20,
+            "status": "available",
+            "urls": {
+                "production": "https://gauzy.example.com",
+                "stage": "https://gauzy.stage.example.com",
+                "develop": "https://gauzy.dev.example.com"
+            }
+        },
+        {
+            "id": "ever-teams",
+            "name": "Ever Teams",
+            "description": "Plan, track and ship together.",
+            "icon": "icons/ever-teams.svg",
+            "order": 30,
+            "status": "beta",
+            "urls": {
+                "production": "https://teams.example.com",
+                "stage": "https://teams.stage.example.com"
+            }
+        }
+    ]
+}
