@@ -6,7 +6,8 @@
  *      platforms into one preference row (APW-11 plan §3.2, §4.2);
  *   2. every icon is a real file in `icons/` and at most 16,384 bytes (APP_LAUNCHER_ICON_MAX_BYTES);
  *   3. every address is `https` (the schema also says so; this is the defence-in-depth repeat that
- *      also covers a future edit to the schema);
+ *      also covers a future edit to the schema) — except the literal `TBD`, the marker for an address
+ *      that has not been provided yet, which is reported as a warning and never fails the run;
  *   4. no SVG carries `<script`, an `on…=` handler, `javascript:` or `<foreignObject` (plan §5.2);
  *   5. at most 24 entries (APP_LAUNCHER_CATALOG_MAX_ENTRIES) — the 25th is refused here rather than
  *      silently dropped by the reader (APW-11 FR-11).
@@ -43,6 +44,10 @@ for (const entry of platforms) {
 	}
 
 	for (const [environment, url] of Object.entries(entry.urls ?? {})) {
+		if (url === 'TBD') {
+			console.warn(`warning: ${entry.id}/${environment} is still TBD (no tile for that environment until it is provided)`);
+			continue;
+		}
 		if (!String(url).startsWith('https://')) {
 			problems.push(`${entry.id}/${environment}: "${url}" is not https`);
 		}
