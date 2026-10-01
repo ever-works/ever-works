@@ -134,6 +134,12 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.USER_SIGNUP]: 'system',
     [ActivityActionType.PROVIDER_CONNECTED]: 'system',
     [ActivityActionType.PASSWORD_CHANGED]: 'system',
+    // APW-12 (Ever ID) — account-security rows, the same family as sign-in.
+    [ActivityActionType.IDENTITY_LINKED]: 'system',
+    [ActivityActionType.IDENTITY_UNLINKED]: 'system',
+    [ActivityActionType.USER_LOGOUT]: 'system',
+    [ActivityActionType.DELEGATED_ACCESS]: 'system',
+    [ActivityActionType.IDENTITY_PROVIDER_CONFIG_CHANGED]: 'system',
 
     // Chat / community
     [ActivityActionType.CHAT_CONVERSATION]: 'work',

@@ -58,6 +58,14 @@ export enum ActivityActionType {
     USER_SIGNUP = 'user_signup',
     PROVIDER_CONNECTED = 'provider_connected',
     PASSWORD_CHANGED = 'password_changed',
+    // APW-12 (Ever ID) — the connected-identity lifecycle and its sign-out,
+    // delegated-read and configuration rows (spec FR-49, plan §5.6). Rows carry
+    // the identity's display name and never a token, code, subject or state.
+    IDENTITY_LINKED = 'identity_linked',
+    IDENTITY_UNLINKED = 'identity_unlinked',
+    USER_LOGOUT = 'user_logout',
+    DELEGATED_ACCESS = 'delegated_access',
+    IDENTITY_PROVIDER_CONFIG_CHANGED = 'identity_provider_config_changed',
 
     // Chat / AI
     CHAT_CONVERSATION = 'chat_conversation',

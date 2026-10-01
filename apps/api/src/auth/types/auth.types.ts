@@ -60,8 +60,14 @@ export interface AuthenticatedUser {
      * OPTIONAL, so every existing reader is unaffected. A MISSING value is
      * treated as NOT human by `HumanActorGuard`: an older token path that
      * predates the stamp must fail closed, not sneak through.
+     *
+     * APW-12 (Ever ID) appends exactly one value, `'ever-id-delegated'`: an Ever
+     * ID access token carrying a delegated scope (FR-44), admitted ONLY on
+     * handlers marked `@DelegatedRead(scope)`. It never opens a session, and both
+     * `HumanActorGuard` and `SessionOnlyGuard` refuse it (they admit only
+     * `'session'`).
      */
-    authMethod?: 'session' | 'api-key';
+    authMethod?: 'session' | 'api-key' | 'ever-id-delegated';
 }
 
 export interface TokenResponse {
@@ -95,4 +101,18 @@ export interface FleetRunCredentialBinding {
     runId: string | null;
     /** Organization the token is pinned to; `null` = the owner's personal scope. */
     organizationId: string | null;
+}
+
+/**
+ * APW-12 (Ever ID, plan §5.3) — what `AuthSessionGuard` stashes on the request
+ * when a delegated Ever ID access token authenticated it (FR-44..FR-47).
+ * `request.user` is still the person; this block is the extra fact that the
+ * caller is another app acting for them with a narrow scope. No token is kept.
+ */
+export interface EverIdDelegationBinding {
+    /** The connected identity the token's subject resolved to. */
+    identityId: string;
+    /** The token's authorised party (`azp`), when it carried one. */
+    clientId: string | null;
+    scopes: string[];
 }

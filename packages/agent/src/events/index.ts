@@ -18,4 +18,7 @@ export * from './app-spec-applied.event';
 // deliberately NOT a sixth event: it is a stored status and publishes nothing
 // (plan.md:1560).
 export * from './app-build.events';
+// APW-12 (Ever ID) — `ever_id.identity_linked` / `ever_id.identity_unlinked`, ids only,
+// additive and without a listener in this repository.
+export * from './ever-id.events';
 export * from './base';

@@ -291,6 +291,13 @@ export const ROUTES = {
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',
     DASHBOARD_SETTINGS_SECURITY: '/settings/security',
+    // APW-12 (Ever ID) — the "Connect Ever ID to this account?" confirmation
+    // (spec §6.4), reached from the provider round trip while signed in.
+    DASHBOARD_SETTINGS_SECURITY_CONNECT_EVER_ID: '/settings/security/connect-ever-id',
+    // APW-12 — the Ever ID administrator surface (spec §6.7). Platform
+    // administrators only: the page answers 404 to everyone else, the way the
+    // `/admin/*` pages do.
+    DASHBOARD_SETTINGS_ADMIN_EVER_ID: '/settings/admin/ever-id',
     DASHBOARD_SETTINGS_API_KEYS: '/settings/api-keys',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     DASHBOARD_SETTINGS_DATA: '/settings/data',
@@ -359,6 +366,13 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     AUTH_FORGOT_PASSWORD: '/forgot-password',
+    // APW-12 (Ever ID) — the two confirmation screens a first Ever ID sign-in
+    // can lead to: "Create your Ever Works account" (S2) and "You already have
+    // an Ever Works account" (S3). Both are reached SIGNED OUT, straight from
+    // the provider round trip, so both MUST be in PUBLIC_ROUTES — otherwise the
+    // proxy auth gate bounces them to /login and the pending confirmation is lost.
+    AUTH_EVER_ID_CREATE_ACCOUNT: '/auth/ever-id/create-account',
+    AUTH_EVER_ID_ACCOUNT_EXISTS: '/auth/ever-id/account-exists',
     // EW-070 — the signed-out way back in for a user whose verification email
     // never arrived. Reached while UNAUTHENTICATED and unverifiable (login
     // answers 403 for an unverified address), so it MUST be in PUBLIC_ROUTES.
@@ -388,6 +402,10 @@ export const ROUTES = {
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
+    // APW-12 (Ever ID) — the redirect URI registered at the provider (FR-10)
+    // and the return address of "Also sign out of Ever ID" (S7).
+    API_AUTH_EVER_ID_CALLBACK: '/api/auth/ever-id/callback',
+    API_AUTH_EVER_ID_LOGOUT_RETURN: '/api/auth/ever-id/logout-return',
     API_AUTH_PROVIDER_CALLBACK: '/api/auth/provider/callback/:providerId',
     API_CHAT: '/api/chat',
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
@@ -451,6 +469,11 @@ export const PUBLIC_ROUTES = [
     // EW-617 zero-friction onboarding landing page — public so anonymous
     // visitors from the marketing site can mint a guest session client-side.
     ROUTES.ONBOARDING,
+    // APW-12 (Ever ID) — signed-out confirmation screens of a first Ever ID
+    // sign-in. They grant nothing by themselves: each reads its encrypted
+    // pending cookie and confirms through the API.
+    ROUTES.AUTH_EVER_ID_CREATE_ACCOUNT,
+    ROUTES.AUTH_EVER_ID_ACCOUNT_EXISTS,
     '/about',
     '/contact',
     '/privacy',

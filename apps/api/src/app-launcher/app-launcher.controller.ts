@@ -46,6 +46,7 @@ import {
     type AppLauncherPlatformInput,
 } from '@ever-works/agent/app-launcher';
 import { Public } from '../auth/decorators/public.decorator';
+import { DelegatedRead } from '../auth/decorators/delegated-read.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { config } from '../config/constants';
@@ -274,6 +275,10 @@ export class AppLauncherController {
      */
     @Get()
     @Throttle({ long: { limit: APP_LAUNCHER_READS_PER_MINUTE, ttl: 60_000 } })
+    // APW-12 (Ever ID, FR-44..FR-47) — the ONE handler another Ever app may read
+    // with a delegated `apps:read` token for the person; every other route
+    // answers such a token like an invalid credential.
+    @DelegatedRead('apps:read')
     @ApiOperation({
         summary: 'List the App Launcher items for the signed-in person',
         description:

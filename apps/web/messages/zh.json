@@ -44,6 +44,26 @@
             "links": {
                 "help": "帮助中心",
                 "systemStatus": "系统状态"
+            },
+            "everId": {
+                "everIdDisabled": "此处无法使用 Ever ID 登录。",
+                "providerUnavailable": "Ever ID 没有响应。请一分钟后重试，或使用其他方式登录。",
+                "transactionInvalid": "此次登录已过期或已被使用。请重新开始。",
+                "emailNotVerified": "请先在 Ever ID 中验证您的电子邮件地址，然后重试。",
+                "emailInUse": "已有 Ever Works 帐户使用此电子邮件地址。请按平常的方式登录该帐户，然后在 设置 → 安全 中关联 Ever ID。",
+                "signUpNotAllowed": "此处无法使用 Ever ID 创建新帐户。请向管理员申请邀请。",
+                "subjectLinked": "此 Ever ID 已关联到另一个 Ever Works 帐户。请先在那里解除关联。",
+                "userHasIssuer": "此帐户已关联了一个 Ever ID。请先解除关联。",
+                "reauthRequired": "为了您的安全，关联 Ever ID 前请重新登录。",
+                "sessionRequired": "请使用密码登录后再执行此操作。",
+                "lastSignInMethod": "请先添加另一种登录方式——Ever ID 是此帐户唯一的登录方式。",
+                "notConnected": "请先在 设置 → 安全 中关联 Ever ID。",
+                "accountDisabled": "此帐户已被停用。请联系管理员。",
+                "everIdSignedOut": "您已从 Ever ID 退出登录。",
+                "tokenInQuery": "该链接无效。请从应用中重新开始。",
+                "insufficientScope": "该应用无权查看此内容。",
+                "signedOutByProvider": "您已从 Ever ID 退出登录。",
+                "rateLimited": "尝试次数过多。请在 {seconds} 秒后重试。"
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "使用 Ever ID 登录",
+            "signUp": "使用 Ever ID 注册",
+            "redirecting": "正在打开 Ever ID…",
+            "consentRequired": "请接受上方的条款以继续。",
+            "createAccount": {
+                "title": "创建您的 Ever Works 帐户",
+                "signedInAs": "已以 {name} · {email} 身份登录 Ever ID",
+                "signedInAsEmail": "已以 {email} 身份登录 Ever ID",
+                "submit": "创建帐户",
+                "cancel": "取消"
+            },
+            "accountExists": {
+                "title": "您已有 Ever Works 帐户",
+                "body": "已有 Ever Works 帐户使用 {email}。请按平常的方式登录该帐户，然后在 设置 → 安全 中关联 Ever ID。",
+                "forgotPassword": "忘记密码？",
+                "goToSignIn": "前往登录"
+            },
+            "signedOutByProvider": "您已从 Ever ID 退出登录。",
+            "signedOutBoth": "您已退出 Ever Works 和 Ever ID。",
+            "alsoSignOut": "同时退出 Ever ID",
+            "termsCheckbox": "我同意<terms>服务条款</terms>和<privacy>隐私政策</privacy>",
+            "termsChanged": "条款已更新。请刷新页面，然后接受条款以继续。",
+            "termsUnavailable": {
+                "title": "无法加载条款",
+                "message": "我们无法加载您需要接受的服务条款和隐私政策，因此帐户创建已暂停。请稍后重试。",
+                "retry": "重试"
+            },
+            "pendingExpired": "耗时过长。请重新开始。"
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "导入",
                     "login": "登录",
                     "signup": "注册",
-                    "passwordChanged": "密码已更改"
+                    "passwordChanged": "密码已更改",
+                    "identityLinked": "已关联身份",
+                    "identityUnlinked": "已解除关联身份",
+                    "logout": "退出登录",
+                    "delegatedAccess": "委托访问",
+                    "identityProviderConfigChanged": "已配置身份提供方"
                 },
                 "statuses": {
                     "allStatuses": "所有状态",
@@ -2931,6 +2986,36 @@
                     "title": "活动会话",
                     "subtitle": "管理跨设备的活动会话",
                     "action": "查看会话（即将推出）"
+                },
+                "connectedIdentities": {
+                    "title": "已关联的身份",
+                    "subtitle": "使用您已有的身份登录 Ever Works。",
+                    "connectedLine": "{email} · 关联于 {date}",
+                    "lastUsed": "上次用于登录：{ago}",
+                    "notConnected": "未关联",
+                    "connect": "关联 Ever ID",
+                    "disconnect": "解除关联",
+                    "cannotDisconnect": "请先添加另一种登录方式——Ever ID 是此帐户唯一的登录方式。",
+                    "setPassword": "设置密码",
+                    "turnedOff": "此安装已关闭 Ever ID 登录。",
+                    "appsTitle": "可以查看您的应用作品的应用",
+                    "appLastUsed": "{app} — 上次使用：{ago}",
+                    "manageInEverId": "在 Ever ID 中管理",
+                    "opensInNewTab": "（在新标签页中打开）",
+                    "confirmTitle": "将 Ever ID 关联到此帐户？",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "这两个电子邮件地址不同。仅当两者都属于您时才进行关联。",
+                    "confirmBody": "之后您可以使用 Ever ID 登录此帐户。",
+                    "confirm": "关联",
+                    "cancel": "取消",
+                    "backToSecurity": "返回安全设置",
+                    "disconnectBody": "解除关联 Ever ID？您将无法再使用它登录，通过 Ever ID 登录的其他设备也将退出登录。此设备将保持登录状态。",
+                    "keep": "保留",
+                    "disconnectFailed": "无法解除关联 Ever ID。请刷新页面后重试。",
+                    "signInAgain": "重新登录",
+                    "connectedToast": "已关联 Ever ID。",
+                    "disconnectedToast": "已解除关联 Ever ID。"
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "清单",
                     "skills": "技能",
                     "mcp": "MCP 服务器"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "允许用户使用 Ever ID 登录 Ever Works。以下值来自环境变量或插件设置。",
+                    "status": {
+                        "title": "状态",
+                        "state": "Ever ID 登录",
+                        "on": "已开启",
+                        "off": "已关闭",
+                        "configuration": "配置",
+                        "configured": "完整",
+                        "notConfigured": "不完整",
+                        "missing": "缺少的设置",
+                        "newAccounts": "新帐户",
+                        "signUpAllowed": "可以使用 Ever ID 创建",
+                        "signUpNotAllowed": "无法使用 Ever ID 创建",
+                        "localClients": "终端客户端",
+                        "unavailableSince": "Ever ID 自 {date} 起没有响应。"
+                    },
+                    "fields": {
+                        "issuer": "颁发者地址",
+                        "clientId": "客户端 ID",
+                        "clientSecret": "客户端密钥",
+                        "allowedIssuers": "允许的颁发者",
+                        "apiAudience": "API 受众",
+                        "localClientIds": "终端客户端 ID",
+                        "signUpAllowed": "新帐户",
+                        "clockSkewSeconds": "时钟偏差容差",
+                        "displayName": "显示名称",
+                        "localClients": "终端客户端",
+                        "delegatedClientNames": "应用名称",
+                        "accountManagementUrl": "账户管理地址"
+                    },
+                    "set": "已设置",
+                    "notSet": "未设置",
+                    "secretSet": "••••••（已设置）",
+                    "sources": {
+                        "title": "各值的来源",
+                        "admin": "插件设置",
+                        "env": "环境变量",
+                        "default": "默认值",
+                        "unset": "未设置"
+                    },
+                    "testConnection": "测试连接",
+                    "testing": "正在测试…",
+                    "testFailed": "连接测试未能运行。请重试。",
+                    "check": {
+                        "discovery": "发现文档",
+                        "issuerMatch": "颁发者匹配",
+                        "endpoints": "端点可访问",
+                        "pkceS256": "支持 S256 代码质询",
+                        "signingAlg": "签名算法",
+                        "backchannelLogout": "后端通道注销",
+                        "deviceAuthorization": "设备授权"
+                    },
+                    "checkOk": "正常",
+                    "checkFailed": "不支持",
+                    "health": {
+                        "title": "运行状况",
+                        "discovery": "上次刷新发现文档：{ago}",
+                        "jwks": "上次刷新密钥：{ago}",
+                        "logoutNotice": "上次退出登录通知：{ago}",
+                        "discoveryNever": "尚未读取发现文档",
+                        "jwksNever": "尚未读取签名密钥",
+                        "logoutNoticeNever": "尚未收到退出登录通知",
+                        "unavailable": "目前无法获取运行状况信息。"
+                    },
+                    "enable": "开启",
+                    "disable": "关闭",
+                    "enableBlocked": "Ever ID 保持关闭：一项必需的检查未通过。",
+                    "actionFailed": "操作未成功。请重试。",
+                    "enabledToast": "Ever ID 已开启。",
+                    "disabledToast": "Ever ID 已关闭。",
+                    "settings": {
+                        "title": "设置",
+                        "description": "这些值可以在此处修改。颁发者、客户端 ID 和客户端密钥来自环境变量，无法在此页面修改。",
+                        "displayName": {
+                            "label": "显示名称",
+                            "help": "Ever Works 为此登录方式使用的名称。最多 {max} 个字符。"
+                        },
+                        "accountManagementUrl": {
+                            "label": "账户管理地址",
+                            "help": "可选。用户管理其 Ever ID 账户的地址。必须以 https:// 开头。"
+                        },
+                        "localClients": {
+                            "legend": "终端客户端",
+                            "help": "允许使用 Ever ID 登录的 Ever Works CLI 和 Ever Works Node 客户端。最多 {max} 个。",
+                            "empty": "还没有终端客户端。",
+                            "row": "终端客户端 {number}",
+                            "kind": "类型",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "客户端 ID",
+                            "add": "添加终端客户端",
+                            "remove": "移除终端客户端 {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "应用名称",
+                            "help": "对于经用户许可读取其数据的应用，用户在设置中看到的名称。最多 {max} 个。",
+                            "empty": "还没有应用名称。",
+                            "row": "应用名称 {number}",
+                            "clientId": "客户端 ID",
+                            "displayName": "名称",
+                            "add": "添加应用名称",
+                            "remove": "移除应用名称 {number}"
+                        },
+                        "remove": "移除",
+                        "save": "保存设置",
+                        "saving": "正在保存…",
+                        "saved": "Ever ID 设置已保存。",
+                        "unchanged": "没有任何更改。",
+                        "invalid": "部分值未被接受。请检查后重试。",
+                        "failed": "无法保存设置。请重试。"
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "无法打开该页面。请重试。",
             "signInPrompt": "使用 Ever ID 登录以在此查看你的应用。",
             "signIn": "登录"
+        },
+        "signOut": {
+            "title": "退出 Ever Works？",
+            "alsoSignOutEverId": "同时退出 Ever ID",
+            "cancel": "取消",
+            "confirm": "退出登录"
         }
     },
     "layout": {

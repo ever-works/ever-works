@@ -205,6 +205,23 @@ jobs:
           echo "fake GitHub ready."
           echo "::endgroup::"
 
+          echo "::group::Starting the Ever ID fixture provider on :3950 (APW-12 T48)"
+          # The `oidc-identity` package's fake OpenID Connect provider, started
+          # HERE, before the API, on a fixed port so the issuer the API is
+          # configured with (EVER_ID_ISSUER_URL, env block below) is stable for
+          # the whole shard and its key cache never sees a second key set. Ever
+          # ID stays OFF at boot: only the `ever-id-*` suites turn it on through
+          # the administrator route, and they turn it off again afterwards. An
+          # http issuer is accepted only because this API runs with
+          # NODE_ENV=development; production refuses it.
+          nohup node e2e/fakes/ever-id/server.mjs > /tmp/ever-id-fake.log 2>&1 &
+          EVER_ID_FAKE_PID=$!
+          disown $EVER_ID_FAKE_PID
+          echo "Ever ID fixture provider pid=$EVER_ID_FAKE_PID"
+          timeout 30 bash -c 'until curl -sSf http://127.0.0.1:3951/_control/health > /dev/null; do sleep 1; done'             || { echo "Ever ID fixture provider never came up — last 80 lines:"; tail -n 80 /tmp/ever-id-fake.log || true; exit 1; }
+          echo "Ever ID fixture provider ready."
+          echo "::endgroup::"
+
           echo "::group::Starting the App runtime worker (APW-13 FR-55, plan §9.1)"
           # `EVER_WORKS_APPS_LOCAL_WORKER=true` is APW-06's hook: outside
           # production it switches App cluster dispatch to a local worker
@@ -445,6 +462,16 @@ jobs:
           # flag service.
           EVER_WORKS_E2E_FAKES: '1'
           APW_E2E_GITHUB_FAKE_URL: http://127.0.0.1:3900
+          # APW-12 T48 — the Ever ID fixture provider started above. These only
+          # CONFIGURE the `oidc-identity` plugin: Ever ID stays off (every sign-in
+          # route 404, no provider request) until the `ever-id-*` suites turn it on
+          # through the administrator route. The secret is CI-only and fake; the
+          # suites reach the provider's control routes through EVER_ID_E2E_FAKE_URL.
+          EVER_ID_ISSUER_URL: http://localhost:3950
+          EVER_ID_CLIENT_ID: ever-works-web
+          EVER_ID_CLIENT_SECRET: e2e-ever-id-client-secret-not-real
+          EVER_ID_API_AUDIENCE: ever-works
+          EVER_ID_E2E_FAKE_URL: http://127.0.0.1:3951
           # Resolution R-6: the API-side twin of the `works-app` chip flag.
           # The web reads the SAME variable at request time
           # (apps/web/src/lib/feature-flags/work-kinds.ts, `readAppWorksInstanceSetting`)
@@ -1002,6 +1029,13 @@ jobs:
           E2E_APP_LAUNCHER_SEED: 'true'
           EVER_WORKS_E2E_FAKES: '1'
           APW_E2E_GITHUB_FAKE_URL: http://127.0.0.1:3900
+          # Inert here: Ever ID stays off in this job (no `ever-id-*` file runs), so
+          # the API never contacts the issuer and no fixture provider is started.
+          EVER_ID_ISSUER_URL: http://localhost:3950
+          EVER_ID_CLIENT_ID: ever-works-web
+          EVER_ID_CLIENT_SECRET: e2e-ever-id-client-secret-not-real
+          EVER_ID_API_AUDIENCE: ever-works
+          EVER_ID_E2E_FAKE_URL: http://127.0.0.1:3951
           EVER_WORKS_APP_WORKS_ENABLED: 'true'
           EVER_WORKS_APP_FORK_READINESS_TIMEOUT_MS: '15000'
           TRIGGER_INTERNAL_API_URL: http://127.0.0.1:3100/internal/trigger

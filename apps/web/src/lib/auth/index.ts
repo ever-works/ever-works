@@ -1,10 +1,37 @@
 import { cache } from 'react';
+import type { EverIdWireErrorCode } from '@ever-works/contracts';
 import { authAPI } from '../api';
 import { ApiResponseError } from '../api/server-api';
 import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
 import type { AuthUser, JwtPayload } from './middleware';
 import { removeAuthAccessCookies } from './cookies';
+import { rememberEverIdSignOut } from './ever-id-signed-out';
+
+/**
+ * APW-12 (Ever ID) S6 — the API answers `401 { code: 'ever_id_signed_out' }`
+ * for a session that an Ever ID sign-out notice ended, instead of the plain
+ * `401` an expired session gets. A type-only import keeps the literal checked
+ * against the contract without adding a runtime dependency to this module,
+ * which the proxy also loads.
+ */
+const EVER_ID_SIGNED_OUT_CODE: EverIdWireErrorCode = 'ever_id_signed_out';
+
+/**
+ * Per-request record of that answer. `cache()` scopes the object to one server
+ * request, so the sign-in page — which validates the stale cookie through
+ * {@link getAuthFromCookie} before rendering — can tell "you were signed out of
+ * Ever ID" apart from an ordinary expiry and show the notice on that load.
+ * Where the cookie could be removed (a Server Action or route handler) the
+ * sign-in page has nothing left to validate, so a short-lived marker carries
+ * the notice instead (`./ever-id-signed-out.ts`).
+ */
+const everIdSignOutNotice = cache((): { seen: boolean } => ({ seen: false }));
+
+/** Whether this request saw the API end the session because of an Ever ID sign-out (S6). */
+export function wasSignedOutByEverId(): boolean {
+    return everIdSignOutNotice().seen;
+}
 
 function normalizeJwtUser(user: JwtPayload): AuthUser {
     return {
@@ -30,6 +57,10 @@ function normalizeProfileUser(user: UserProfile): AuthUser {
 
 async function clearAuthCookieOnUnauthorized(error: unknown): Promise<boolean> {
     if (error instanceof ApiResponseError && error.statusCode === 401) {
+        const endedByEverId = error.code === EVER_ID_SIGNED_OUT_CODE;
+        if (endedByEverId) {
+            everIdSignOutNotice().seen = true;
+        }
         console.warn(
             'Auth session rejected by API; clearing auth cookie. Verify web/API AUTH_SECRET values and session storage if this happens after login.',
         );
@@ -50,6 +81,9 @@ async function clearAuthCookieOnUnauthorized(error: unknown): Promise<boolean> {
                 'Could not clear the auth cookie from this context (expected during a Server Component render); treating the session as unauthenticated anyway.',
                 clearError,
             );
+        }
+        if (endedByEverId) {
+            await rememberEverIdSignOut();
         }
         return true;
     }

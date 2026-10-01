@@ -67,6 +67,21 @@ export {
     type FacadePushOptions,
 } from './git.facade';
 
+// Identity Provider Facade (APW-12 Ever ID)
+export {
+    IdentityProviderFacadeService,
+    IdentityProviderUnavailableError,
+    normalizeIdentityProviderError,
+    IDENTITY_PROVIDER_REQUIRED_CHECKS,
+    IDENTITY_PROVIDER_STATE_CACHE_MS,
+    type IdentityProviderUnavailableReason,
+    type IdentityProviderState,
+    type IdentityProviderAvailabilityRecord,
+    type IdentityProviderConfigurationStatus,
+    type IdentityProviderSettingSource,
+    type IdentityProviderHealth,
+} from './identity-provider.facade';
+
 // OAuth Facade
 export {
     OAuthFacadeService,

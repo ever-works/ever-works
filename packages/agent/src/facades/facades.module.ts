@@ -32,6 +32,7 @@ import { PlaybookCatalogFacadeService } from './playbook-catalog.facade';
 import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 import { AppRuntimeFacadeService } from './app-runtime.facade';
 import { AppDependencyFacadeService } from './app-dependency.facade';
+import { IdentityProviderFacadeService } from './identity-provider.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -83,6 +84,11 @@ const FACADES = [
     // @Optional() injections, so it resolves in this module; it is what
     // `AppDependenciesService` selects a provider through (plan §4.8:543-546).
     AppDependencyFacadeService,
+    // APW-12 (Ever ID) — the identity provider facade: resolves the
+    // `identity-provider` capability at the platform tier only and holds the
+    // administrator's on/off switch. Depends on the global PluginRegistryService,
+    // PluginRepository and PluginSettingsService, so it resolves in this module.
+    IdentityProviderFacadeService,
 ];
 
 /**

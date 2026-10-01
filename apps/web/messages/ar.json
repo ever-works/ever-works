@@ -44,6 +44,26 @@
             "links": {
                 "help": "مركز المساعدة",
                 "systemStatus": "حالة النظام"
+            },
+            "everId": {
+                "everIdDisabled": "تسجيل الدخول باستخدام Ever ID غير متاح هنا.",
+                "providerUnavailable": "لا يستجيب Ever ID. حاول مرة أخرى بعد دقيقة، أو سجّل الدخول بطريقة أخرى.",
+                "transactionInvalid": "انتهت صلاحية عملية تسجيل الدخول هذه أو سبق استخدامها. ابدأ من جديد.",
+                "emailNotVerified": "تحقّق من عنوان بريدك الإلكتروني لدى Ever ID أولاً، ثم حاول مرة أخرى.",
+                "emailInUse": "هناك حساب Ever Works يستخدم عنوان البريد الإلكتروني هذا بالفعل. سجّل الدخول إليه بالطريقة المعتادة، ثم اربط Ever ID من الإعدادات ← الأمان.",
+                "signUpNotAllowed": "لا يمكن إنشاء حسابات جديدة باستخدام Ever ID هنا. اطلب دعوة من أحد المسؤولين.",
+                "subjectLinked": "هذا الـ Ever ID مرتبط بالفعل بحساب Ever Works آخر. ألغِ ربطه هناك أولاً.",
+                "userHasIssuer": "يرتبط بهذا الحساب Ever ID بالفعل. ألغِ ربطه أولاً.",
+                "reauthRequired": "حفاظاً على أمانك، سجّل الدخول مرة أخرى قبل ربط Ever ID.",
+                "sessionRequired": "سجّل الدخول بكلمة المرور للقيام بذلك.",
+                "lastSignInMethod": "أضف طريقة أخرى لتسجيل الدخول أولاً — Ever ID هي الطريقة الوحيدة لدى هذا الحساب.",
+                "notConnected": "اربط Ever ID من الإعدادات ← الأمان أولاً.",
+                "accountDisabled": "هذا الحساب معطّل. تواصل مع أحد المسؤولين.",
+                "everIdSignedOut": "تم تسجيل خروجك من Ever ID.",
+                "tokenInQuery": "هذا الرابط غير صالح. ابدأ من جديد من التطبيق.",
+                "insufficientScope": "ليس لدى هذا التطبيق إذن لعرض هذا.",
+                "signedOutByProvider": "تم تسجيل خروجك من Ever ID.",
+                "rateLimited": "محاولات كثيرة جداً. حاول مرة أخرى بعد {seconds} ثانية."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "تسجيل الدخول باستخدام Ever ID",
+            "signUp": "التسجيل باستخدام Ever ID",
+            "redirecting": "جارٍ فتح Ever ID…",
+            "consentRequired": "اقبل الشروط أعلاه للمتابعة.",
+            "createAccount": {
+                "title": "أنشئ حسابك في Ever Works",
+                "signedInAs": "تم تسجيل الدخول إلى Ever ID باسم {name} · {email}",
+                "signedInAsEmail": "تم تسجيل الدخول إلى Ever ID باسم {email}",
+                "submit": "إنشاء الحساب",
+                "cancel": "إلغاء"
+            },
+            "accountExists": {
+                "title": "لديك حساب Ever Works بالفعل",
+                "body": "هناك حساب Ever Works يستخدم {email} بالفعل. سجّل الدخول إليه بالطريقة المعتادة، ثم اربط Ever ID من الإعدادات ← الأمان.",
+                "forgotPassword": "نسيت كلمة المرور؟",
+                "goToSignIn": "الانتقال إلى تسجيل الدخول"
+            },
+            "signedOutByProvider": "تم تسجيل خروجك من Ever ID.",
+            "signedOutBoth": "تم تسجيل خروجك من Ever Works ومن Ever ID.",
+            "alsoSignOut": "تسجيل الخروج من Ever ID أيضاً",
+            "termsCheckbox": "أوافق على <terms>شروط الخدمة</terms> و<privacy>سياسة الخصوصية</privacy>",
+            "termsChanged": "تغيّرت الشروط. أعد تحميل الصفحة، ثم اقبلها للمتابعة.",
+            "termsUnavailable": {
+                "title": "تعذّر تحميل الشروط",
+                "message": "تعذّر علينا تحميل شروط الخدمة وسياسة الخصوصية اللتين يجب عليك قبولهما، لذا تم إيقاف إنشاء حسابك مؤقتاً. حاول مرة أخرى بعد قليل.",
+                "retry": "حاول مرة أخرى"
+            },
+            "pendingExpired": "استغرق ذلك وقتاً طويلاً جداً. ابدأ من جديد."
         }
     },
     "onboarding": {
@@ -2516,7 +2566,12 @@
                     "import": "الاستيراد",
                     "login": "تسجيل الدخول",
                     "signup": "إنشاء حساب",
-                    "passwordChanged": "تم تغيير كلمة المرور"
+                    "passwordChanged": "تم تغيير كلمة المرور",
+                    "identityLinked": "تم ربط الهوية",
+                    "identityUnlinked": "تم إلغاء ربط الهوية",
+                    "logout": "تسجيل الخروج",
+                    "delegatedAccess": "وصول مفوَّض",
+                    "identityProviderConfigChanged": "تم تكوين موفّر الهوية"
                 },
                 "statuses": {
                     "allStatuses": "جميع الحالات",
@@ -2999,6 +3054,36 @@
                     "title": "الجلسات النشطة",
                     "subtitle": "إدارة جلساتك النشطة عبر الأجهزة",
                     "action": "عرض الجلسات (قريبًا)"
+                },
+                "connectedIdentities": {
+                    "title": "الهويات المرتبطة",
+                    "subtitle": "سجّل الدخول إلى Ever Works بهوية تستخدمها بالفعل.",
+                    "connectedLine": "{email} · مرتبطة منذ {date}",
+                    "lastUsed": "آخر استخدام لتسجيل الدخول {ago}",
+                    "notConnected": "غير مرتبطة",
+                    "connect": "ربط Ever ID",
+                    "disconnect": "إلغاء الربط",
+                    "cannotDisconnect": "أضف طريقة أخرى لتسجيل الدخول أولاً — Ever ID هي الطريقة الوحيدة لدى هذا الحساب.",
+                    "setPassword": "تعيين كلمة مرور",
+                    "turnedOff": "تسجيل الدخول باستخدام Ever ID متوقف في هذا التثبيت.",
+                    "appsTitle": "التطبيقات التي يمكنها رؤية أعمال التطبيقات الخاصة بك",
+                    "appLastUsed": "{app} — آخر استخدام {ago}",
+                    "manageInEverId": "الإدارة في Ever ID",
+                    "opensInNewTab": "(يُفتح في علامة تبويب جديدة)",
+                    "confirmTitle": "هل تريد ربط Ever ID بهذا الحساب؟",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "عنوانا البريد الإلكتروني هذان مختلفان. لا تربط إلا إذا كان كلاهما لك.",
+                    "confirmBody": "ستتمكن من تسجيل الدخول إلى هذا الحساب باستخدام Ever ID.",
+                    "confirm": "ربط",
+                    "cancel": "إلغاء",
+                    "backToSecurity": "العودة إلى الأمان",
+                    "disconnectBody": "هل تريد إلغاء ربط Ever ID؟ لن تتمكن من تسجيل الدخول به بعد الآن، وسيتم تسجيل خروج الأجهزة الأخرى التي سجّلت الدخول باستخدام Ever ID. سيبقى هذا الجهاز مسجّلاً الدخول.",
+                    "keep": "الإبقاء عليه",
+                    "disconnectFailed": "تعذّر إلغاء ربط Ever ID. أعد تحميل الصفحة وحاول مرة أخرى.",
+                    "signInAgain": "تسجيل الدخول مرة أخرى",
+                    "connectedToast": "تم ربط Ever ID.",
+                    "disconnectedToast": "تم إلغاء ربط Ever ID."
                 }
             },
             "oauth": {
@@ -3997,6 +4082,122 @@
                     "manifest": "البيان",
                     "skills": "المهارات",
                     "mcp": "خوادم MCP"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "يتيح تسجيل الدخول إلى Ever Works باستخدام Ever ID. تأتي القيم أدناه من البيئة أو من إعدادات الإضافة.",
+                    "status": {
+                        "title": "الحالة",
+                        "state": "تسجيل الدخول باستخدام Ever ID",
+                        "on": "مُفعّل",
+                        "off": "متوقف",
+                        "configuration": "التكوين",
+                        "configured": "مكتمل",
+                        "notConfigured": "غير مكتمل",
+                        "missing": "إعدادات مفقودة",
+                        "newAccounts": "الحسابات الجديدة",
+                        "signUpAllowed": "يمكن إنشاؤها باستخدام Ever ID",
+                        "signUpNotAllowed": "لا يمكن إنشاؤها باستخدام Ever ID",
+                        "localClients": "عملاء الطرفية",
+                        "unavailableSince": "لم يستجب Ever ID منذ {date}."
+                    },
+                    "fields": {
+                        "issuer": "عنوان المُصدِر",
+                        "clientId": "معرّف العميل",
+                        "clientSecret": "سرّ العميل",
+                        "allowedIssuers": "المُصدِرون المسموح بهم",
+                        "apiAudience": "جمهور الواجهة البرمجية",
+                        "localClientIds": "معرّفات عملاء الطرفية",
+                        "signUpAllowed": "الحسابات الجديدة",
+                        "clockSkewSeconds": "هامش تفاوت الساعة",
+                        "displayName": "الاسم المعروض",
+                        "localClients": "عملاء الطرفية",
+                        "delegatedClientNames": "أسماء التطبيقات",
+                        "accountManagementUrl": "عنوان إدارة الحساب"
+                    },
+                    "set": "مُعيّن",
+                    "notSet": "غير مُعيّن",
+                    "secretSet": "•••••• (مُعيّن)",
+                    "sources": {
+                        "title": "مصدر كل قيمة",
+                        "admin": "إعدادات الإضافة",
+                        "env": "البيئة",
+                        "default": "افتراضي",
+                        "unset": "غير مُعيّن"
+                    },
+                    "testConnection": "اختبار الاتصال",
+                    "testing": "جارٍ الاختبار…",
+                    "testFailed": "لم يُنفَّذ اختبار الاتصال. حاول مرة أخرى.",
+                    "check": {
+                        "discovery": "مستند الاكتشاف",
+                        "issuerMatch": "المُصدِر مطابق",
+                        "endpoints": "نقاط النهاية قابلة للوصول",
+                        "pkceS256": "تحدّي الرمز S256 مدعوم",
+                        "signingAlg": "خوارزمية التوقيع",
+                        "backchannelLogout": "تسجيل الخروج عبر القناة الخلفية",
+                        "deviceAuthorization": "تفويض الجهاز"
+                    },
+                    "checkOk": "يعمل",
+                    "checkFailed": "غير مدعوم",
+                    "health": {
+                        "title": "السلامة",
+                        "discovery": "آخر تحديث لمستند الاكتشاف {ago}",
+                        "jwks": "آخر تحديث للمفاتيح {ago}",
+                        "logoutNotice": "آخر إشعار بتسجيل الخروج {ago}",
+                        "discoveryNever": "لم تتم قراءة مستند الاكتشاف بعد",
+                        "jwksNever": "لم تتم قراءة مفاتيح التوقيع بعد",
+                        "logoutNoticeNever": "لم يُستلم أي إشعار بتسجيل الخروج بعد",
+                        "unavailable": "معلومات السلامة غير متاحة حالياً."
+                    },
+                    "enable": "تشغيل",
+                    "disable": "إيقاف",
+                    "enableBlocked": "يبقى Ever ID متوقفاً: فشل فحص مطلوب.",
+                    "actionFailed": "لم ينجح ذلك. حاول مرة أخرى.",
+                    "enabledToast": "Ever ID قيد التشغيل.",
+                    "disabledToast": "Ever ID متوقف.",
+                    "settings": {
+                        "title": "الإعدادات",
+                        "description": "يمكنك تغيير هذه القيم هنا. يأتي المُصدِر ومعرّف العميل وسرّ العميل من البيئة، ولا يمكن تغييرها في هذه الصفحة.",
+                        "displayName": {
+                            "label": "الاسم المعروض",
+                            "help": "الاسم الذي يستخدمه Ever Works لخيار تسجيل الدخول هذا. بحد أقصى {max} حرفًا."
+                        },
+                        "accountManagementUrl": {
+                            "label": "عنوان إدارة الحساب",
+                            "help": "اختياري. المكان الذي يدير فيه الأشخاص حساب Ever ID الخاص بهم. يجب أن يبدأ بـ https://."
+                        },
+                        "localClients": {
+                            "legend": "عملاء الطرفية",
+                            "help": "عملاء Ever Works CLI وEver Works Node المسموح لهم بتسجيل الدخول باستخدام Ever ID. بحد أقصى {max}.",
+                            "empty": "لا يوجد عملاء طرفية بعد.",
+                            "row": "عميل الطرفية {number}",
+                            "kind": "النوع",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "معرّف العميل",
+                            "add": "إضافة عميل طرفية",
+                            "remove": "إزالة عميل الطرفية {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "أسماء التطبيقات",
+                            "help": "الأسماء التي يراها الأشخاص في الإعدادات للتطبيقات التي تقرأ بياناتهم بإذنهم. بحد أقصى {max}.",
+                            "empty": "لا توجد أسماء تطبيقات بعد.",
+                            "row": "اسم التطبيق {number}",
+                            "clientId": "معرّف العميل",
+                            "displayName": "الاسم",
+                            "add": "إضافة اسم تطبيق",
+                            "remove": "إزالة اسم التطبيق {number}"
+                        },
+                        "remove": "إزالة",
+                        "save": "حفظ الإعدادات",
+                        "saving": "جارٍ الحفظ…",
+                        "saved": "تم حفظ إعدادات Ever ID.",
+                        "unchanged": "لم يتغير شيء.",
+                        "invalid": "لم تُقبل بعض القيم. تحقق منها وحاول مرة أخرى.",
+                        "failed": "تعذّر حفظ الإعدادات. حاول مرة أخرى."
+                    }
                 }
             }
         },
@@ -8777,6 +8978,12 @@
             "emptyActionFailed": "تعذر فتح هذه الصفحة. حاول مرة أخرى.",
             "signInPrompt": "سجّل الدخول باستخدام Ever ID لرؤية تطبيقاتك هنا.",
             "signIn": "تسجيل الدخول"
+        },
+        "signOut": {
+            "title": "هل تريد تسجيل الخروج من Ever Works؟",
+            "alsoSignOutEverId": "تسجيل الخروج من Ever ID أيضاً",
+            "cancel": "إلغاء",
+            "confirm": "تسجيل الخروج"
         }
     },
     "layout": {

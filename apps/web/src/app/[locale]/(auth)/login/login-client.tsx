@@ -6,16 +6,38 @@ import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { login as loginAction, issueMagicLink } from '@/app/actions/auth';
+import { EverIdButton } from '@/components/auth/ever-id-button';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { REDIRECT_SEARCH_PARAM, ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { OAuthProvider } from '@/lib/api/enums';
+import { EVER_ID_SIGNED_OUT_PARAM, EVER_ID_SIGNED_OUT_VALUE } from '@/lib/auth/ever-id';
 
 interface LoginClientProps {
     availableSocialProviders: OAuthProvider[];
     magicLinkEnabled: boolean;
+    /**
+     * APW-12 — show "Sign in with Ever ID": an administrator enabled it AND the
+     * `ever-id` flag is on. Defaults to false, so the page is unchanged without it.
+     */
+    everIdEnabled?: boolean;
+    /** APW-12 S6 — the session this visitor arrived with was ended by Ever ID. */
+    signedOutByEverId?: boolean;
+}
+
+/** APW-12 — S6 / S7 notices: informational, announced politely, never colour alone. */
+function EverIdSignedOutNotice({ message }: { message: string }) {
+    return (
+        <div
+            role="status"
+            data-testid="ever-id-signed-out-notice"
+            className="bg-surface-secondary dark:bg-surface-secondary-dark border border-border dark:border-border-dark px-4 py-3 rounded-lg text-sm text-text dark:text-text-dark mb-4"
+        >
+            {message}
+        </div>
+    );
 }
 
 type LoginTab = 'password' | 'magic-link';
@@ -77,10 +99,25 @@ function MagicLinkSuccessMessage({ email, onResend }: { email: string; onResend:
     );
 }
 
-export function LoginClient({ availableSocialProviders, magicLinkEnabled }: LoginClientProps) {
+export function LoginClient({
+    availableSocialProviders,
+    magicLinkEnabled,
+    everIdEnabled = false,
+    signedOutByEverId = false,
+}: LoginClientProps) {
     const searchParams = useSearchParams();
     const t = useTranslations('auth.login');
+    const tEverId = useTranslations('auth.everId');
     const [isPending, startTransition] = useTransition();
+
+    // APW-12 — S7 ("Also sign out of Ever ID" came back) takes precedence over S6.
+    const everIdNotice =
+        searchParams.get(EVER_ID_SIGNED_OUT_PARAM) === EVER_ID_SIGNED_OUT_VALUE
+            ? tEverId('signedOutBoth')
+            : signedOutByEverId
+              ? tEverId('signedOutByProvider')
+              : null;
+    const showAlternativeSignIn = availableSocialProviders.length > 0 || everIdEnabled;
 
     const isPasswordReset = searchParams.get('reset') === 'true';
     const redirectUrl = searchParams.get(REDIRECT_SEARCH_PARAM);
@@ -149,6 +186,8 @@ export function LoginClient({ availableSocialProviders, magicLinkEnabled }: Logi
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <ThemeToggle variant="fixed" />
+
+            {everIdNotice && <EverIdSignedOutNotice message={everIdNotice} />}
 
             {magicLinkEnabled && (
                 <div
@@ -243,7 +282,7 @@ export function LoginClient({ availableSocialProviders, magicLinkEnabled }: Logi
                         {isPending ? t('form.submitting') : t('form.submit')}
                     </Button>
 
-                    {availableSocialProviders.length > 0 && (
+                    {showAlternativeSignIn && (
                         <>
                             <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
@@ -255,6 +294,8 @@ export function LoginClient({ availableSocialProviders, magicLinkEnabled }: Logi
                                     </span>
                                 </div>
                             </div>
+
+                            {everIdEnabled && <EverIdButton mode="signIn" returnTo={redirectUrl} />}
 
                             <SocialLoginButtons providers={availableSocialProviders} />
                         </>
@@ -338,7 +379,7 @@ export function LoginClient({ availableSocialProviders, magicLinkEnabled }: Logi
                         </>
                     )}
 
-                    {availableSocialProviders.length > 0 && (
+                    {showAlternativeSignIn && (
                         <>
                             <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
@@ -350,6 +391,8 @@ export function LoginClient({ availableSocialProviders, magicLinkEnabled }: Logi
                                     </span>
                                 </div>
                             </div>
+
+                            {everIdEnabled && <EverIdButton mode="signIn" returnTo={redirectUrl} />}
 
                             <SocialLoginButtons providers={availableSocialProviders} />
                         </>

@@ -33,6 +33,8 @@ import { ConnectionScopesFacadeService } from '../connection-scopes.facade';
 import { AppRuntimeFacadeService } from '../app-runtime.facade';
 // APW-07 T16 — the App-dependency provider facade (capability `app-dependency`).
 import { AppDependencyFacadeService } from '../app-dependency.facade';
+// APW-12 (Ever ID) — the identity provider facade (capability `identity-provider`).
+import { IdentityProviderFacadeService } from '../identity-provider.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -82,6 +84,9 @@ describe('FacadesModule + barrel re-exports', () => {
         // APW-07 T16 — App dependency providers (PostgreSQL, Redis, object storage, SMTP).
         // The provider is selected by capability and preference, never by id (R-5).
         AppDependencyFacadeService,
+        // APW-12 — the identity provider facade: platform tier only, and the
+        // administrator's on/off switch for sign-in with it.
+        IdentityProviderFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -161,6 +166,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.ConnectionScopesFacadeService).toBe(ConnectionScopesFacadeService);
             expect(facadesBarrel.AppRuntimeFacadeService).toBe(AppRuntimeFacadeService);
             expect(facadesBarrel.AppDependencyFacadeService).toBe(AppDependencyFacadeService);
+            expect(facadesBarrel.IdentityProviderFacadeService).toBe(IdentityProviderFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -245,6 +251,13 @@ describe('FacadesModule + barrel re-exports', () => {
                     'GitFacadeError',
                     'GitFacadeService',
                     'GitProviderNotFoundError',
+                    // APW-12 — the identity provider facade, its unavailable error, the
+                    // error normaliser and its two constants.
+                    'IDENTITY_PROVIDER_REQUIRED_CHECKS',
+                    'IDENTITY_PROVIDER_STATE_CACHE_MS',
+                    'IdentityProviderFacadeService',
+                    'IdentityProviderUnavailableError',
+                    'normalizeIdentityProviderError',
                     'NoAppDependencyProviderError',
                     'NoContentExtractorProviderError',
                     'NoDeployCredentialsError',

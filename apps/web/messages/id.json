@@ -44,6 +44,26 @@
             "links": {
                 "help": "Pusat Bantuan",
                 "systemStatus": "Status Sistem"
+            },
+            "everId": {
+                "everIdDisabled": "Masuk dengan Ever ID tidak tersedia di sini.",
+                "providerUnavailable": "Ever ID tidak merespons. Coba lagi dalam satu menit, atau masuk dengan cara lain.",
+                "transactionInvalid": "Proses masuk itu sudah kedaluwarsa atau sudah digunakan. Mulai lagi.",
+                "emailNotVerified": "Verifikasi dulu alamat email Anda di Ever ID, lalu coba lagi.",
+                "emailInUse": "Alamat email ini sudah digunakan oleh akun Ever Works. Masuk ke akun tersebut seperti biasa, lalu hubungkan Ever ID di Pengaturan → Keamanan.",
+                "signUpNotAllowed": "Akun baru tidak dapat dibuat dengan Ever ID di sini. Minta undangan kepada administrator.",
+                "subjectLinked": "Ever ID ini sudah terhubung ke akun Ever Works lain. Putuskan dulu di sana.",
+                "userHasIssuer": "Akun ini sudah memiliki Ever ID yang terhubung. Putuskan dulu.",
+                "reauthRequired": "Demi keamanan Anda, masuk lagi sebelum menghubungkan Ever ID.",
+                "sessionRequired": "Masuk dengan kata sandi Anda untuk melakukannya.",
+                "lastSignInMethod": "Tambahkan dulu cara masuk lain — Ever ID adalah satu-satunya cara yang dimiliki akun ini.",
+                "notConnected": "Hubungkan dulu Ever ID di Pengaturan → Keamanan.",
+                "accountDisabled": "Akun ini dinonaktifkan. Hubungi administrator.",
+                "everIdSignedOut": "Anda telah dikeluarkan dari Ever ID.",
+                "tokenInQuery": "Tautan itu tidak valid. Mulai lagi dari aplikasi.",
+                "insufficientScope": "Aplikasi itu tidak memiliki izin untuk melihat ini.",
+                "signedOutByProvider": "Anda telah dikeluarkan dari Ever ID.",
+                "rateLimited": "Terlalu banyak percobaan. Coba lagi dalam {seconds} detik."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Masuk dengan Ever ID",
+            "signUp": "Daftar dengan Ever ID",
+            "redirecting": "Membuka Ever ID…",
+            "consentRequired": "Setujui ketentuan di atas untuk melanjutkan.",
+            "createAccount": {
+                "title": "Buat akun Ever Works Anda",
+                "signedInAs": "Masuk ke Ever ID sebagai {name} · {email}",
+                "signedInAsEmail": "Masuk ke Ever ID sebagai {email}",
+                "submit": "Buat akun",
+                "cancel": "Batal"
+            },
+            "accountExists": {
+                "title": "Anda sudah memiliki akun Ever Works",
+                "body": "Akun Ever Works sudah menggunakan {email}. Masuk ke akun tersebut seperti biasa, lalu hubungkan Ever ID di Pengaturan → Keamanan.",
+                "forgotPassword": "Lupa kata sandi?",
+                "goToSignIn": "Ke halaman masuk"
+            },
+            "signedOutByProvider": "Anda telah dikeluarkan dari Ever ID.",
+            "signedOutBoth": "Anda telah keluar dari Ever Works dan Ever ID.",
+            "alsoSignOut": "Keluar juga dari Ever ID",
+            "termsCheckbox": "Saya setuju dengan <terms>Syarat Layanan</terms> dan <privacy>Kebijakan Privasi</privacy>",
+            "termsChanged": "Ketentuannya telah berubah. Muat ulang halaman, lalu setujui ketentuan tersebut untuk melanjutkan.",
+            "termsUnavailable": {
+                "title": "Ketentuan tidak dapat dimuat",
+                "message": "Kami tidak dapat memuat Syarat Layanan dan Kebijakan Privasi yang perlu Anda setujui, jadi pembuatan akun Anda dijeda. Coba lagi sebentar lagi.",
+                "retry": "Coba lagi"
+            },
+            "pendingExpired": "Itu terlalu lama. Mulai lagi."
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "Impor",
                     "login": "Masuk",
                     "signup": "Daftar",
-                    "passwordChanged": "Kata Sandi Diubah"
+                    "passwordChanged": "Kata Sandi Diubah",
+                    "identityLinked": "Identitas Terhubung",
+                    "identityUnlinked": "Identitas Diputus",
+                    "logout": "Keluar",
+                    "delegatedAccess": "Akses yang Didelegasikan",
+                    "identityProviderConfigChanged": "Penyedia Identitas Dikonfigurasi"
                 },
                 "statuses": {
                     "allStatuses": "Semua Status",
@@ -2931,6 +2986,36 @@
                     "title": "Sesi Aktif",
                     "subtitle": "Kelola sesi aktif Anda di berbagai perangkat",
                     "action": "Lihat Sesi (Segera Hadir)"
+                },
+                "connectedIdentities": {
+                    "title": "Identitas terhubung",
+                    "subtitle": "Masuk ke Ever Works dengan identitas yang sudah Anda gunakan.",
+                    "connectedLine": "{email} · terhubung {date}",
+                    "lastUsed": "Terakhir dipakai untuk masuk {ago}",
+                    "notConnected": "Tidak terhubung",
+                    "connect": "Hubungkan Ever ID",
+                    "disconnect": "Putuskan",
+                    "cannotDisconnect": "Tambahkan dulu cara masuk lain — Ever ID adalah satu-satunya cara yang dimiliki akun ini.",
+                    "setPassword": "Atur kata sandi",
+                    "turnedOff": "Masuk dengan Ever ID dinonaktifkan di instalasi ini.",
+                    "appsTitle": "Aplikasi yang dapat melihat Karya Aplikasi Anda",
+                    "appLastUsed": "{app} — terakhir dipakai {ago}",
+                    "manageInEverId": "Kelola di Ever ID",
+                    "opensInNewTab": "(terbuka di tab baru)",
+                    "confirmTitle": "Hubungkan Ever ID ke akun ini?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "Alamat email ini berbeda. Hubungkan hanya jika keduanya milik Anda.",
+                    "confirmBody": "Anda akan dapat masuk ke akun ini dengan Ever ID.",
+                    "confirm": "Hubungkan",
+                    "cancel": "Batal",
+                    "backToSecurity": "Kembali ke Keamanan",
+                    "disconnectBody": "Putuskan Ever ID? Anda tidak akan bisa masuk dengannya lagi, dan perangkat lain yang masuk dengan Ever ID akan dikeluarkan. Perangkat ini tetap masuk.",
+                    "keep": "Pertahankan",
+                    "disconnectFailed": "Ever ID tidak dapat diputus. Muat ulang halaman dan coba lagi.",
+                    "signInAgain": "Masuk lagi",
+                    "connectedToast": "Ever ID terhubung.",
+                    "disconnectedToast": "Ever ID diputus."
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "Manifes",
                     "skills": "Keterampilan",
                     "mcp": "Server MCP"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Memungkinkan orang masuk ke Ever Works dengan Ever ID. Nilai di bawah berasal dari lingkungan atau pengaturan plugin.",
+                    "status": {
+                        "title": "Keadaan",
+                        "state": "Masuk dengan Ever ID",
+                        "on": "Aktif",
+                        "off": "Nonaktif",
+                        "configuration": "Konfigurasi",
+                        "configured": "Lengkap",
+                        "notConfigured": "Belum lengkap",
+                        "missing": "Pengaturan yang belum ada",
+                        "newAccounts": "Akun baru",
+                        "signUpAllowed": "Dapat dibuat dengan Ever ID",
+                        "signUpNotAllowed": "Tidak dapat dibuat dengan Ever ID",
+                        "localClients": "Klien terminal",
+                        "unavailableSince": "Ever ID tidak merespons sejak {date}."
+                    },
+                    "fields": {
+                        "issuer": "Alamat penerbit",
+                        "clientId": "ID klien",
+                        "clientSecret": "Rahasia klien",
+                        "allowedIssuers": "Penerbit yang diizinkan",
+                        "apiAudience": "Audiens API",
+                        "localClientIds": "ID klien terminal",
+                        "signUpAllowed": "Akun baru",
+                        "clockSkewSeconds": "Toleransi selisih jam",
+                        "displayName": "Nama tampilan",
+                        "localClients": "Klien terminal",
+                        "delegatedClientNames": "Nama aplikasi",
+                        "accountManagementUrl": "Alamat pengelolaan akun"
+                    },
+                    "set": "Sudah diatur",
+                    "notSet": "Belum diatur",
+                    "secretSet": "•••••• (sudah diatur)",
+                    "sources": {
+                        "title": "Asal setiap nilai",
+                        "admin": "Pengaturan plugin",
+                        "env": "Lingkungan",
+                        "default": "Bawaan",
+                        "unset": "Belum diatur"
+                    },
+                    "testConnection": "Uji koneksi",
+                    "testing": "Menguji…",
+                    "testFailed": "Uji koneksi tidak berjalan. Coba lagi.",
+                    "check": {
+                        "discovery": "Dokumen discovery",
+                        "issuerMatch": "Penerbit cocok",
+                        "endpoints": "Endpoint dapat dijangkau",
+                        "pkceS256": "Code challenge S256 didukung",
+                        "signingAlg": "Algoritme penandatanganan",
+                        "backchannelLogout": "Logout back-channel",
+                        "deviceAuthorization": "Otorisasi perangkat"
+                    },
+                    "checkOk": "Berfungsi",
+                    "checkFailed": "Tidak didukung",
+                    "health": {
+                        "title": "Kesehatan",
+                        "discovery": "Penyegaran dokumen discovery terakhir {ago}",
+                        "jwks": "Penyegaran kunci terakhir {ago}",
+                        "logoutNotice": "Pemberitahuan keluar terakhir {ago}",
+                        "discoveryNever": "Dokumen discovery belum dibaca",
+                        "jwksNever": "Kunci penandatanganan belum dibaca",
+                        "logoutNoticeNever": "Belum ada pemberitahuan keluar yang diterima",
+                        "unavailable": "Informasi kesehatan tidak tersedia saat ini."
+                    },
+                    "enable": "Aktifkan",
+                    "disable": "Nonaktifkan",
+                    "enableBlocked": "Ever ID tetap nonaktif: pemeriksaan wajib gagal.",
+                    "actionFailed": "Itu tidak berhasil. Coba lagi.",
+                    "enabledToast": "Ever ID aktif.",
+                    "disabledToast": "Ever ID nonaktif.",
+                    "settings": {
+                        "title": "Pengaturan",
+                        "description": "Anda dapat mengubah nilai ini di sini. Penerbit, ID klien, dan rahasia klien berasal dari lingkungan dan tidak dapat diubah di halaman ini.",
+                        "displayName": {
+                            "label": "Nama tampilan",
+                            "help": "Nama yang digunakan Ever Works untuk opsi masuk ini. Maksimal {max} karakter."
+                        },
+                        "accountManagementUrl": {
+                            "label": "Alamat pengelolaan akun",
+                            "help": "Opsional. Tempat orang mengelola akun Ever ID mereka. Harus diawali dengan https://."
+                        },
+                        "localClients": {
+                            "legend": "Klien terminal",
+                            "help": "Klien Ever Works CLI dan Ever Works Node yang boleh masuk dengan Ever ID. Maksimal {max}.",
+                            "empty": "Belum ada klien terminal.",
+                            "row": "Klien terminal {number}",
+                            "kind": "Jenis",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "ID klien",
+                            "add": "Tambahkan klien terminal",
+                            "remove": "Hapus klien terminal {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "Nama aplikasi",
+                            "help": "Nama yang dilihat orang di Pengaturan untuk aplikasi yang membaca data mereka dengan izin mereka. Maksimal {max}.",
+                            "empty": "Belum ada nama aplikasi.",
+                            "row": "Nama aplikasi {number}",
+                            "clientId": "ID klien",
+                            "displayName": "Nama",
+                            "add": "Tambahkan nama aplikasi",
+                            "remove": "Hapus nama aplikasi {number}"
+                        },
+                        "remove": "Hapus",
+                        "save": "Simpan pengaturan",
+                        "saving": "Menyimpan…",
+                        "saved": "Pengaturan Ever ID disimpan.",
+                        "unchanged": "Tidak ada yang berubah.",
+                        "invalid": "Beberapa nilai tidak diterima. Periksa lalu coba lagi.",
+                        "failed": "Pengaturan tidak dapat disimpan. Coba lagi."
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "Tidak dapat membuka halaman itu. Coba lagi.",
             "signInPrompt": "Masuk dengan Ever ID untuk melihat aplikasi Anda di sini.",
             "signIn": "Masuk"
+        },
+        "signOut": {
+            "title": "Keluar dari Ever Works?",
+            "alsoSignOutEverId": "Keluar juga dari Ever ID",
+            "cancel": "Batal",
+            "confirm": "Keluar"
         }
     },
     "layout": {

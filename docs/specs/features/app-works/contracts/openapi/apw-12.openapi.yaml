@@ -141,25 +141,43 @@ paths:
                     application/json:
                         schema:
                             type: object
-                            required: [pending, acceptedTerms]
+                            required: [pending, terms]
                             additionalProperties: false
                             properties:
                                 pending:
                                     type: string
                                     maxLength: 4096
-                                acceptedTerms:
+                                terms:
                                     type: array
                                     maxItems: 10
+                                    description: >-
+                                        The terms claims the register route already takes (plan section 5.1:
+                                        "terms at sign-up use the existing contract, not a new one"); every
+                                        currently required document must be present.
                                     items:
-                                        type: string
+                                        type: object
+                                        required: [documentId, version, sha256, locale]
+                                        properties:
+                                            documentId:
+                                                type: string
+                                            version:
+                                                type: string
+                                            sha256:
+                                                type: string
+                                            locale:
+                                                type: string
             responses:
                 '200':
-                    description: A token response.
+                    description: A token response, plus the sealed `returnTo`.
                     content:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/TokenResponse'
+                '400':
+                    $ref: '#/components/responses/EverIdError'
                 '403':
+                    $ref: '#/components/responses/EverIdError'
+                '409':
                     $ref: '#/components/responses/EverIdError'
                 '422':
                     $ref: '#/components/responses/EverIdError'
@@ -235,6 +253,9 @@ paths:
                                         type: boolean
                                     disconnectBlockedReason:
                                         type: string
+                                    manageUrl:
+                                        type: string
+                                        description: The configured Manage in Ever ID address (FR-48), when set.
                 '403':
                     $ref: '#/components/responses/EverIdError'
 
@@ -281,6 +302,9 @@ paths:
                                 properties:
                                     url:
                                         type: string
+                                    state:
+                                        type: string
+                                        description: The `state` the provider echoes back to the logout return route.
                 '404':
                     $ref: '#/components/responses/EverIdError'
 
@@ -417,6 +441,89 @@ paths:
                 '404':
                     $ref: '#/components/responses/EverIdError'
 
+    /api/auth/ever-id/admin/status:
+        get:
+            operationId: everIdAdminStatus
+            summary: Whether Ever ID is turned on and configured, and where each setting comes from
+            description: Platform admin only; a non-admin answers `404`. Never returns a secret value.
+            x-source: apps/api/src/auth/controllers/ever-id.controller.ts (the FR-5 kill switch)
+            x-mcp: not-exposed (T4 — platform admin)
+            responses:
+                '200':
+                    description: The status.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EverIdAdminStatus'
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/admin/enable:
+        post:
+            operationId: everIdAdminEnable
+            summary: Turn sign-in with Ever ID on (runs Test connection first)
+            description: Platform admin only. `409 connection_test_failed` unless every required check passes.
+            x-source: apps/api/src/auth/controllers/ever-id.controller.ts (the FR-5 kill switch)
+            x-mcp: not-exposed (T4 — platform admin)
+            x-throttle: 10 / 60 s per user
+            responses:
+                '200':
+                    description: The new status.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EverIdAdminStatus'
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+                '409':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/admin/disable:
+        post:
+            operationId: everIdAdminDisable
+            summary: Turn sign-in with Ever ID off
+            description: Platform admin only. Listing, disconnect and sign-out notices keep working (FR-5).
+            x-source: apps/api/src/auth/controllers/ever-id.controller.ts (the FR-5 kill switch)
+            x-mcp: not-exposed (T4 — platform admin)
+            x-throttle: 10 / 60 s per user
+            responses:
+                '200':
+                    description: The new status.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EverIdAdminStatus'
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+
+    /api/auth/ever-id/admin/settings:
+        patch:
+            operationId: everIdAdminSettings
+            summary: Change the administrator-managed settings
+            description: >-
+                Platform admin only. Local clients, delegated client names, the account management address
+                and the display name; the issuer, the client and its secret are operator configuration.
+            x-source: apps/api/src/auth/controllers/ever-id.controller.ts (FR-2, FR-4)
+            x-mcp: not-exposed (T4 — platform admin)
+            x-throttle: 10 / 60 s per user
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EverIdAdminSettings'
+            responses:
+                '200':
+                    description: The new status.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EverIdAdminStatus'
+                '400':
+                    $ref: '#/components/responses/EverIdError'
+                '404':
+                    $ref: '#/components/responses/EverIdError'
+
 components:
     securitySchemes:
         JWT-auth:
@@ -427,12 +534,14 @@ components:
     responses:
         EverIdError:
             description: >-
-                The shared Ever ID error body: `{ code }` from the epic's closed set —
-                `everIdDisabled` (404), `providerUnavailable` (503), `transactionInvalid` (400/401),
-                `emailNotVerified` (422), `signUpNotAllowed` (403), `subjectLinked`/`userHasIssuer`
-                (409), `reauthRequired` (403), `sessionRequired` (403), `lastSignInMethod` (409),
-                `notConnected` (403), `accountDisabled` (403), `tokenInQuery` (400),
-                `insufficientScope` (403).
+                The shared Ever ID error body: `{ status: 'error', code, message }` from the epic's closed set.
+                On the wire the code is the snake_case value of `EVER_ID_ERROR_CODE_WIRE_VALUES`
+                (CONTRACTS section 12); the camelCase member is the web i18n leaf —
+                `ever_id_disabled` (404), `provider_unavailable` (503), `transaction_invalid` (400/401),
+                `email_not_verified` (422), `sign_up_not_allowed` (403), `subject_linked`/`user_has_issuer`
+                (409), `reauth_required` (403), `session_required` (403), `last_sign_in_method` (409),
+                `not_connected` (403), `account_disabled` (403), `ever_id_signed_out` (401),
+                `token_in_query` (400), `insufficient_scope` (403).
             x-source: docs/specs/features/app-works/APW-12-ever-id/plan.md section 5.2
             content:
                 application/json:
@@ -445,6 +554,135 @@ components:
                                 type: string
 
     schemas:
+        EverIdAdminSettings:
+            type: object
+            additionalProperties: false
+            description: Any subset; an unknown field (the issuer, the client, its secret) answers `400`.
+            x-source: apps/api/src/auth/dto/ever-id.dto.ts (EverIdAdminSettingsDto)
+            properties:
+                localClients:
+                    type: array
+                    maxItems: 5
+                    items:
+                        type: object
+                        required: [kind, clientId]
+                        additionalProperties: false
+                        properties:
+                            kind:
+                                type: string
+                                enum: [cli, node]
+                            clientId:
+                                type: string
+                                maxLength: 255
+                delegatedClientNames:
+                    type: array
+                    maxItems: 10
+                    items:
+                        type: object
+                        required: [clientId, displayName]
+                        additionalProperties: false
+                        properties:
+                            clientId:
+                                type: string
+                                maxLength: 255
+                            displayName:
+                                type: string
+                                maxLength: 60
+                accountManagementUrl:
+                    type: string
+                    maxLength: 2048
+                    pattern: '^https://'
+                displayName:
+                    type: string
+                    minLength: 1
+                    maxLength: 40
+
+        EverIdAdminStatus:
+            type: object
+            additionalProperties: false
+            description: State and provenance for the administration page — never a secret value.
+            x-source: apps/api/src/auth/controllers/ever-id.controller.ts (EverIdAdminStatus)
+            required:
+                - enabled
+                - configured
+                - missing
+                - issuer
+                - clientIdSet
+                - clientSecretSet
+                - displayName
+                - signUpAllowed
+                - localClients
+                - unavailableSince
+                - settingSources
+                - settings
+            properties:
+                enabled:
+                    type: boolean
+                configured:
+                    type: boolean
+                missing:
+                    type: array
+                    description: Required settings with no value from any source (names only).
+                    items:
+                        type: string
+                issuer:
+                    type: string
+                    nullable: true
+                clientIdSet:
+                    type: boolean
+                clientSecretSet:
+                    type: boolean
+                displayName:
+                    type: string
+                signUpAllowed:
+                    type: boolean
+                localClients:
+                    type: integer
+                    description: How many terminal clients are configured.
+                unavailableSince:
+                    type: string
+                    nullable: true
+                settingSources:
+                    type: object
+                    description: Where each setting's value comes from.
+                    additionalProperties:
+                        type: string
+                        enum: [admin, env, default, unset]
+                settings:
+                    type: object
+                    description: The administrator-managed values, for the administration page's form.
+                    required: [displayName, accountManagementUrl, localClients, delegatedClientNames]
+                    additionalProperties: false
+                    properties:
+                        displayName:
+                            type: string
+                        accountManagementUrl:
+                            type: string
+                            nullable: true
+                        localClients:
+                            type: array
+                            items:
+                                type: object
+                                required: [kind, clientId]
+                                additionalProperties: false
+                                properties:
+                                    kind:
+                                        type: string
+                                        enum: [cli, node]
+                                    clientId:
+                                        type: string
+                        delegatedClientNames:
+                            type: array
+                            items:
+                                type: object
+                                required: [clientId, displayName]
+                                additionalProperties: false
+                                properties:
+                                    clientId:
+                                        type: string
+                                    displayName:
+                                        type: string
+
         AuthorizationStart:
             type: object
             required: [authorizationUrl, transaction]
@@ -513,6 +751,8 @@ components:
                         additionalProperties: false
                         properties:
                             clientId:
+                                type: string
+                            displayName:
                                 type: string
                             lastSeenAt:
                                 type: string

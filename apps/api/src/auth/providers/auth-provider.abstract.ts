@@ -1,4 +1,5 @@
 import type { AuthenticatedUser, TokenResponse } from '../types/auth.types';
+import type { SessionOrigin } from './auth-provider.types';
 
 /**
  * Pluggable abstraction for the API's authentication backend.
@@ -25,7 +26,9 @@ import type { AuthenticatedUser, TokenResponse } from '../types/auth.types';
  *   for an already-identified user, used by the OAuth callback paths
  *   that bypass password verification. `clientFingerprint` (IP +
  *   user-agent) is stored on the session row so an operator can
- *   later attribute / revoke sessions per device.
+ *   later attribute / revoke sessions per device. The optional `origin`
+ *   (APW-12) records which Ever ID identity — and which provider session —
+ *   opened it, so a sign-out notice or a disconnect can end exactly those.
  *
  * - **`changePassword` (requires current)** vs **`setPassword`
  *   (skips current)**. The latter is for admin overrides and the
@@ -54,6 +57,7 @@ export abstract class AuthProvider {
     abstract issueSession(
         userId: string,
         clientFingerprint?: { ipAddress?: string | null; userAgent?: string | null },
+        origin?: SessionOrigin,
     ): Promise<TokenResponse>;
 
     abstract changePassword(

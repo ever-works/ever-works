@@ -93,6 +93,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes (packages + networking) assigned per-Agent.
     'Environment',
+    // APW-12 Ever ID — one connected (issuer, subject) identity per account.
+    'ExternalIdentity',
     // Event-ingest spine — external tracker issue → platform Task mapping
     'ExternalIssueLink',
     'FleetAgentNodeAffinity',

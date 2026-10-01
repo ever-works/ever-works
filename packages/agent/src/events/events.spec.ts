@@ -15,6 +15,7 @@ import {
 } from './works-config-sync-requested.event';
 import { WorksConfigSyncFailedEvent } from './works-config-sync-failed.event';
 import { AppSpecAppliedEvent } from './app-spec-applied.event';
+import { EverIdIdentityLinkedEvent, EverIdIdentityUnlinkedEvent } from './ever-id.events';
 
 /**
  * Mirrors the existing `apps/api/src/events/index.spec.ts` style: every
@@ -34,6 +35,29 @@ const fakeWork = { id: 'w1', name: 'Demo Work', slug: 'demo-work' } as any;
 
 describe('agent/events submodule', () => {
     describe('event-name registry (wire-format stability — do not change without spec bump)', () => {
+        it('pins the Ever ID identity event names (APW-12)', () => {
+            expect(EverIdIdentityLinkedEvent.EVENT_NAME).toBe('ever_id.identity_linked');
+            expect(EverIdIdentityUnlinkedEvent.EVENT_NAME).toBe('ever_id.identity_unlinked');
+            const linked = new EverIdIdentityLinkedEvent({
+                identityId: 'i1',
+                userId: 'u1',
+                linkedVia: 'settings',
+            });
+            expect(linked).toBeInstanceOf(BaseEvent);
+            expect({ ...linked }).toEqual({
+                identityId: 'i1',
+                userId: 'u1',
+                linkedVia: 'settings',
+            });
+            expect(
+                new EverIdIdentityUnlinkedEvent({
+                    identityId: 'i1',
+                    userId: 'u1',
+                    sessionsEnded: 2,
+                }).sessionsEnded,
+            ).toBe(2);
+        });
+
         it('pins each event-name string to the documented value', () => {
             expect(WorkCreatedEvent.EVENT_NAME).toBe('work.created');
             expect(WorkGenerationCompletedEvent.EVENT_NAME).toBe('work.generation.completed');
@@ -331,6 +355,10 @@ describe('agent/events submodule', () => {
                     'DeploymentCompletedEvent',
                     'DeploymentDispatchedEvent',
                     'DeploymentFailedEvent',
+                    // APW-12 Ever ID — the connected-identity lifecycle, ids only,
+                    // no listener in this repository.
+                    'EverIdIdentityLinkedEvent',
+                    'EverIdIdentityUnlinkedEvent',
                     // Agent execution v2 (slice B) — fleet job lifecycle.
                     'FleetJobCompletedEvent',
                     'FleetJobLeasedEvent',

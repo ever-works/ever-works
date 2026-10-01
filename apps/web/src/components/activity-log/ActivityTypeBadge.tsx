@@ -36,6 +36,18 @@ const TYPE_COLORS: Record<string, string> = {
     user_signup: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
     user_login: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
     password_changed: 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300',
+    // APW-12 (Ever ID, T49) — the connected-identity lifecycle, the sign-out a
+    // provider notice causes, delegated reads and configuration changes (FR-49).
+    // Sign-out sits with the sign-in family (emerald); the configuration change
+    // with the plugin configuration it is (indigo); the rest use palettes the
+    // table had not used, so each row is distinguishable at a glance — and the
+    // label, not the colour, carries the meaning.
+    identity_linked: 'bg-lime-50 text-lime-700 dark:bg-lime-900/20 dark:text-lime-300',
+    identity_unlinked: 'bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300',
+    user_logout: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
+    delegated_access: 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-900/20 dark:text-fuchsia-300',
+    identity_provider_config_changed:
+        'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300',
 };
 
 const DEFAULT_COLOR = 'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
@@ -70,6 +82,13 @@ const TYPE_TO_I18N: Record<string, string> = {
     user_signup: 'signup',
     user_login: 'login',
     password_changed: 'passwordChanged',
+    // APW-12 (Ever ID, T49). The row's summary still comes from the API as it is
+    // written; these name the type in the badge and the filter.
+    identity_linked: 'identityLinked',
+    identity_unlinked: 'identityUnlinked',
+    user_logout: 'logout',
+    delegated_access: 'delegatedAccess',
+    identity_provider_config_changed: 'identityProviderConfigChanged',
 };
 
 export function ActivityTypeBadge({ actionType }: { actionType: string }) {

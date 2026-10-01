@@ -1,6 +1,6 @@
 import 'server-only';
-import { PostHog } from 'posthog-node';
 import { HIDDEN_WHEN_DISABLED_WORK_KINDS } from '@/lib/work-kinds/flag-gated-kinds';
+import { getPostHogClient } from './posthog-client';
 
 /**
  * Server-side gating for the dashboard "work kind" chips.
@@ -95,26 +95,11 @@ function readAppWorksInstanceSetting(): boolean {
  */
 const FLAG_EVAL_TIMEOUT_MS = 1500;
 
-// Module-level singleton — never construct a client per request.
-// `null` once we've determined there's no key (so we don't re-check
-// the env on every call). `undefined` means "not yet initialised".
-let cachedClient: PostHog | null | undefined;
-
-function getClient(): PostHog | null {
-    if (cachedClient !== undefined) {
-        return cachedClient;
-    }
-
-    const apiKey = process.env.POSTHOG_API_KEY;
-    if (!apiKey) {
-        cachedClient = null;
-        return cachedClient;
-    }
-
-    const host = process.env.POSTHOG_HOST || 'https://app.posthog.com';
-    cachedClient = new PostHog(apiKey, { host });
-    return cachedClient;
-}
+// Module-level singleton — never construct a client per request. It lives in
+// `./posthog-client` (shared with the Ever ID flag, APW-12 T21) with exactly the
+// semantics it had here: `null` once there is known to be no key, `undefined`
+// until first use.
+const getClient = getPostHogClient;
 
 /**
  * Returns the set of work-kind values whose feature flag is explicitly

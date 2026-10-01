@@ -51,6 +51,22 @@ export class AuthSession {
     @Column({ type: 'uuid', nullable: true })
     tenantId?: string | null;
 
+    // APW-12 (Ever ID) — which connected identity opened this session, so a
+    // disconnect or a `sub`-only sign-out notice can find "the sessions Ever ID
+    // opened" (FR-29, FR-34). Deliberately NO foreign key: a session row must
+    // never block deleting an identity, and disconnect deletes the sessions
+    // explicitly first. NULL for every other sign-in method (FR-35).
+    @Index('idx_session_external_identity')
+    @Column({ type: 'uuid', nullable: true })
+    externalIdentityId?: string | null;
+
+    // APW-12 (Ever ID) — the provider's session id (`sid`) when it sent one, so a
+    // back-channel sign-out notice ends exactly the session it names (FR-32,
+    // FR-34). NULL when the provider sent none and for every other method.
+    @Index('idx_session_external_sid')
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    externalSid?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 
