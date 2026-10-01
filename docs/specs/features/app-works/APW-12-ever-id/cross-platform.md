@@ -242,14 +242,16 @@ EVER_ID_CLIENT_SECRET, checks: ['pkce', 'state'], idToken: true }`, filtered lik
 
 - **The same plugin, its sign-in routes** (`packages/plugins/auth-zitadel`, all under `/api/auth/zitadel`,
   `Cache-Control: no-store`, `@Public()` unless noted; existing routes are not wrapped, decorated or re-exported):
-  | Route | Behaviour |
-  | ----- | --------- |
-  | `GET /config` | `{ enabled, issuer, link_modes, signup }` — the web shows the button only when `enabled` |
-  | `GET /` | 302 to the provider's authorize endpoint with PKCE, `state` and `nonce` kept in a signed, HttpOnly cookie; the return path is checked against `CLIENT_BASE_URL`; no e-mail is ever forwarded as `login_hint` |
-  | `GET /callback` | exchange and validate; require `email_verified`; then 302 to `#/auth/ever-id?handoff=<key>` (linked), `#/auth/ever-id/confirm?handoff=<key>` (`confirmed` mode) or the sign-up confirmation (sign-up enabled) — a one-time key, never a token or a user id |
-  | `POST /handoff` | redeems the key once (60 s): returns `IUserSigninWorkspaceResponse` for linked users only; the existing workspace selection and `POST /auth/signin.workspace` finish the sign-in |
-  | `POST /confirm`, `POST /signup` | the confirmed link and the explicit sign-up of §2 rule 2 |
-  | `POST /link` _(signed in)_, `GET /link/callback`, `POST /link/confirm` _(signed in)_, `DELETE /link` _(signed in)_, `GET /identities` _(signed in)_ | explicit linking from Settings (fresh authentication, both e-mails shown, per-row proof for other workspaces), unlinking with `409` when it would leave no sign-in method, and the list of connected identities |
+
+    | Route                                                                                                                                               | Behaviour                                                                                                                                                                                                                                                  |
+    | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `GET /config`                                                                                                                                       | `{ enabled, issuer, link_modes, signup }` — the web shows the button only when `enabled`                                                                                                                                                                   |
+    | `GET /`                                                                                                                                             | 302 to the provider's authorize endpoint with PKCE, `state` and `nonce` kept in a signed, HttpOnly cookie; the return path is checked against `CLIENT_BASE_URL`; no e-mail is ever forwarded as `login_hint`                                               |
+    | `GET /callback`                                                                                                                                     | exchange and validate; require `email_verified`; then 302 to `#/auth/ever-id?handoff=<key>` (linked), `#/auth/ever-id/confirm?handoff=<key>` (`confirmed` mode) or the sign-up confirmation (sign-up enabled) — a one-time key, never a token or a user id |
+    | `POST /handoff`                                                                                                                                     | redeems the key once (60 s): returns `IUserSigninWorkspaceResponse` for linked users only; the existing workspace selection and `POST /auth/signin.workspace` finish the sign-in                                                                           |
+    | `POST /confirm`, `POST /signup`                                                                                                                     | the confirmed link and the explicit sign-up of §2 rule 2                                                                                                                                                                                                   |
+    | `POST /link` _(signed in)_, `GET /link/callback`, `POST /link/confirm` _(signed in)_, `DELETE /link` _(signed in)_, `GET /identities` _(signed in)_ | explicit linking from Settings (fresh authentication, both e-mails shown, per-row proof for other workspaces), unlinking with `409` when it would leave no sign-in method, and the list of connected identities                                            |
+
 - **Hand-off without tokens in the address.** The one-time key is 32 random bytes, kept 60 s in the Nest cache (Redis on
   multi-replica installs) and deleted on read; a second read answers 410. `routeRedirect` is **not** used.
 - **Nothing changes in Gauzy's session model.** The plugin issues only the existing `WORKSPACE_SIGNIN` purpose tokens;
@@ -264,8 +266,10 @@ EVER_ID_CLIENT_SECRET, checks: ['pkce', 'state'], idToken: true }`, filtered lik
       them sees no route and no button, exactly as today (blast radius in [`idp-options.md`](./idp-options.md) §7.3).
     - `supertokens` (new, requested by the owner "not to replace anything") and the `auth0` move into the same shape are
       later, separate changes; Auth0 keeps working from `packages/auth/src/lib/auth0/` meanwhile.
-      Each plugin is independent, enabled by its own configuration, and **fails closed when unconfigured**. None of them is a
-      dependency of Ever ID, and Ever ID is not a dependency of any of them; they share only the OpenID Connect library of §4.1.
+
+    Each plugin is independent, enabled by its own configuration, and **fails closed when unconfigured**. None of them is a
+    dependency of Ever ID, and Ever ID is not a dependency of any of them; they share only the OpenID Connect library of
+    §4.1.
 
 ### 5.2 Gauzy web UI
 
