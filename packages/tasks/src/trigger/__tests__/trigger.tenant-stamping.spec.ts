@@ -87,6 +87,10 @@ vi.mock('@ever-works/agent/tasks', () => ({
     WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
     TEMPLATE_CUSTOMIZATION_DISPATCHER: Symbol('TEMPLATE_CUSTOMIZATION_DISPATCHER'),
     KB_ORG_OVERLAY_FANOUT_DISPATCHER: Symbol('KB_ORG_OVERLAY_FANOUT_DISPATCHER'),
+    // APW-03 T13's worker graph imports `app-spec-evaluate.task`, which reads
+    // this constant at module scope — a full-module mock must carry every
+    // runtime export the graph touches, not only the ones an assertion uses.
+    APP_SPEC_EVALUATE_JOB_ID: 'app-spec-evaluate',
     // The worker graph imports CredentialVersionService (an @Optional() dep
     // on TenantRuntimeBindingResolverService). The full-module mock must
     // provide it or vitest 400s the whole file on the missing export.

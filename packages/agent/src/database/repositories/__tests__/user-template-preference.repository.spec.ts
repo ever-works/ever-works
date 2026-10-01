@@ -4,7 +4,10 @@ import { UserTemplatePreference } from '../../../entities/user-template-preferen
 import type { TemplateKind } from '../../../entities/template.entity';
 
 type Mocked = jest.Mocked<
-    Pick<Repository<UserTemplatePreference>, 'findOne' | 'findOneOrFail' | 'upsert' | 'delete'>
+    Pick<
+        Repository<UserTemplatePreference>,
+        'findOne' | 'findOneOrFail' | 'upsert' | 'delete' | 'find'
+    >
 >;
 
 describe('UserTemplatePreferenceRepository', () => {
@@ -17,6 +20,7 @@ describe('UserTemplatePreferenceRepository', () => {
             findOneOrFail: jest.fn(),
             upsert: jest.fn(),
             delete: jest.fn(),
+            find: jest.fn(),
         };
         service = new UserTemplatePreferenceRepository(
             repository as unknown as Repository<UserTemplatePreference>,
@@ -71,6 +75,32 @@ describe('UserTemplatePreferenceRepository', () => {
             await expect(service.upsertDefault('u1', 'work' as TemplateKind, 't2')).rejects.toBe(
                 boom,
             );
+        });
+    });
+
+    describe('findUserIdsByKindAndTemplateId', () => {
+        it('returns the ids of every user whose default for the kind is that template', async () => {
+            repository.find.mockResolvedValueOnce([
+                { userId: 'u1' } as UserTemplatePreference,
+                { userId: 'u2' } as UserTemplatePreference,
+            ]);
+
+            await expect(
+                service.findUserIdsByKindAndTemplateId('website' as TemplateKind, 'cal-template'),
+            ).resolves.toEqual(['u1', 'u2']);
+
+            expect(repository.find).toHaveBeenCalledWith({
+                where: { kind: 'website', templateId: 'cal-template' },
+                select: { userId: true },
+            });
+        });
+
+        it('returns an empty list when nobody prefers the template', async () => {
+            repository.find.mockResolvedValueOnce([]);
+
+            await expect(
+                service.findUserIdsByKindAndTemplateId('website' as TemplateKind, 'cal-template'),
+            ).resolves.toEqual([]);
         });
     });
 

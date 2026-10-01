@@ -109,7 +109,7 @@ export class OAuthService {
         const finalState = state || randomBytes(16).toString('hex');
 
         const config = await this.getOAuthConfig(providerId, redirectUri);
-        const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
+        const url = await this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
             ...config,
             forceConsent,
         });
@@ -205,7 +205,7 @@ export class OAuthService {
         const finalState = state || randomBytes(16).toString('hex');
 
         const config = await this.getOAuthConfig(providerId, redirectUri);
-        const url = this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
+        const url = await this.oauthFacade.getAuthorizationUrl(providerId, finalState, {
             ...config,
             scopes: ['read:packages', 'write:packages'],
             forceConsent,

@@ -17,6 +17,14 @@ export * from './run-steering-port';
 export * from './task-isolation';
 export * from './task-run-denorm.service';
 export * from './task-workspace.service';
+// APW-08 T17 — the App Work change gate's port, so the agent git tools can ask
+// the same gate before they open a pull request.
+export * from './app-work-change-gate.port';
+// APW-08 FR-12 / T12 — the one cloud App Work push gate: `finalizeRun` and the
+// agent git tools ask it; the Fleet path never does.
+export * from './app-work-cloud-push';
+// The repository a Task acts on — the per-kind rule every Task path uses.
+export * from './task-repository';
 // PR insights (kanban run cockpit M5/M6) — PR status cache + capped diff.
 export * from './task-pr-status.service';
 export * from './agent-task-tools';

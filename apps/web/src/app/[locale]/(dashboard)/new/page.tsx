@@ -1,6 +1,12 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { NewPageClient, ALL_NEW_CHIP_VALUES, type ChipType } from '@/components/new';
+import { NewPageClient } from '@/components/new';
+// `ALL_NEW_CHIP_VALUES` is imported from `@/lib/work-kinds/chip-values` — a
+// module WITHOUT `'use client'` — and NOT from `@/components/new`. This page is
+// a server component, and a server component that imports a plain value from a
+// client module receives a client reference rather than the array, which threw
+// `TypeError: a.filter is not a function` out of the server render.
+import { ALL_NEW_CHIP_VALUES, type ChipType } from '@/lib/work-kinds/chip-values';
 import { templatesAPI } from '@/lib/api/templates';
 import { missionsAPI } from '@/lib/api/missions';
 import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';

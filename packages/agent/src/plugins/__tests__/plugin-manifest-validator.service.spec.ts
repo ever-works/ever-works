@@ -475,4 +475,79 @@ describe('PluginManifestValidatorService', () => {
             expect(result.errors?.some((e) => e.path === 'executionProfile')).toBe(true);
         });
     });
+
+    // EW-693 — `operations`: the allowlist of methods the execution router may
+    // call by name, each with an optional per-operation executionProfile.
+    describe('EW-693: operations', () => {
+        const baseManifest = {
+            id: 'test-plugin',
+            name: 'Test Plugin',
+            version: '1.0.0',
+            category: 'utility',
+        };
+
+        it('accepts a manifest without operations (nothing callable by name)', () => {
+            expect(service.validate(baseManifest).valid).toBe(true);
+        });
+
+        it('accepts declared operations, dotted names and per-operation profiles', () => {
+            const result = service.validate({
+                ...baseManifest,
+                operations: [
+                    { name: 'runSandboxSession', executionProfile: 'long-running' },
+                    { name: 'listModels', executionProfile: 'sync' },
+                    { name: 'pipeline.run' },
+                ],
+            });
+            expect(result.errors).toBeUndefined();
+            expect(result.valid).toBe(true);
+        });
+
+        it('rejects operations that is not an array', () => {
+            const result = service.validate({ ...baseManifest, operations: { run: true } });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'operations')).toBe(true);
+        });
+
+        it('rejects an entry that is not an object', () => {
+            const result = service.validate({ ...baseManifest, operations: ['run'] });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'operations[0]')).toBe(true);
+        });
+
+        it.each([
+            '_secret',
+            '$internal',
+            'onLoad',
+            'constructor',
+            'getManifest',
+            'a b',
+            '',
+            'x..y',
+        ])('rejects the name %j — never an operation', (name) => {
+            const result = service.validate({ ...baseManifest, operations: [{ name }] });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'operations[0].name')).toBe(true);
+        });
+
+        it('rejects a name declared twice', () => {
+            const result = service.validate({
+                ...baseManifest,
+                operations: [{ name: 'run' }, { name: 'run' }],
+            });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'operations[1].name')).toBe(true);
+        });
+
+        it('rejects an unknown per-operation executionProfile', () => {
+            const result = service.validate({
+                ...baseManifest,
+                operations: [{ name: 'run', executionProfile: 'async' }],
+            });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'operations[0].executionProfile')).toBe(
+                true,
+            );
+        });
+    });
 });

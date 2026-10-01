@@ -14,27 +14,35 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * tests never touch the network and never need real env vars.
  */
 
-const { configureMock, runsCancelMock, runsRetrieveMock, triggerConfig, subscriptionsConfig } =
-    vi.hoisted(() => {
-        return {
-            configureMock: vi.fn(),
-            runsCancelMock: vi.fn(),
-            runsRetrieveMock: vi.fn(),
-            triggerConfig: {
-                shouldUseTrigger: vi.fn(),
-                getSecretKey: vi.fn(),
-                getApiUrl: vi.fn(),
-                getMachine: vi.fn(),
-                getInternalBaseUrl: vi.fn(),
-                getInternalSecret: vi.fn(),
-            },
-            subscriptionsConfig: { getDispatchIntervalMinutes: vi.fn(() => 5) },
-        };
-    });
+const {
+    configureMock,
+    runsCancelMock,
+    runsRetrieveMock,
+    tasksTriggerMock,
+    triggerConfig,
+    subscriptionsConfig,
+} = vi.hoisted(() => {
+    return {
+        configureMock: vi.fn(),
+        runsCancelMock: vi.fn(),
+        runsRetrieveMock: vi.fn(),
+        tasksTriggerMock: vi.fn(),
+        triggerConfig: {
+            shouldUseTrigger: vi.fn(),
+            getSecretKey: vi.fn(),
+            getApiUrl: vi.fn(),
+            getMachine: vi.fn(),
+            getInternalBaseUrl: vi.fn(),
+            getInternalSecret: vi.fn(),
+        },
+        subscriptionsConfig: { getDispatchIntervalMinutes: vi.fn(() => 5) },
+    };
+});
 
 vi.mock('@trigger.dev/sdk', () => ({
     configure: configureMock,
     runs: { cancel: runsCancelMock, retrieve: runsRetrieveMock },
+    tasks: { trigger: tasksTriggerMock },
     task: vi.fn().mockImplementation(() => ({ id: 'mock-task' })),
     schedules: { task: vi.fn().mockImplementation(() => ({ id: 'mock-schedule-task' })) },
     logger: { log: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -52,10 +60,17 @@ vi.mock('@ever-works/agent/tasks', () => ({
     WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
     TEMPLATE_CUSTOMIZATION_DISPATCHER: Symbol('TEMPLATE_CUSTOMIZATION_DISPATCHER'),
     KB_ORG_OVERLAY_FANOUT_DISPATCHER: Symbol('KB_ORG_OVERLAY_FANOUT_DISPATCHER'),
+    // APW-03 T13's worker graph imports `app-spec-evaluate.task`, which reads
+    // this constant at module scope — a full-module mock must carry every
+    // runtime export the graph touches, not only the ones an assertion uses.
+    APP_SPEC_EVALUATE_JOB_ID: 'app-spec-evaluate',
     // The worker graph imports CredentialVersionService (an @Optional() dep
     // on TenantRuntimeBindingResolverService). The full-module mock must
     // provide it or vitest 400s the whole file on the missing export.
     CredentialVersionService: class {},
+    // EW-693 / T27 — the long-running plugin operation job id.
+    PLUGIN_OPERATION_TASK_ID: 'run-plugin-operation',
+    PLUGIN_OPERATION_QUEUE_TTL_SECONDS: 15 * 60,
 }));
 
 // Per-task module mocks — the service imports these eagerly; the runtime
@@ -99,6 +114,7 @@ vi.mock('../../tasks/trigger/notification-channel-delivery.task', () => ({
 }));
 
 import { TriggerService } from '../trigger.service';
+import { TriggerJobRuntimeProvider } from '../trigger-job-runtime.provider';
 
 describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 P1)', () => {
     let service: TriggerService;
@@ -201,6 +217,197 @@ describe('TriggerService — IJobRuntimeProvider structural conformance (EW-686 
             runsRetrieveMock.mockResolvedValue({ status: triggerStatus });
             await expect(service.getRunStatus('run_x')).resolves.toBe(expected);
             expect(runsRetrieveMock).toHaveBeenCalledWith('run_x');
+        });
+    });
+
+    /**
+     * EW-693 / T27 — the contract's optional `getRunResult`: status AND output,
+     * the one request/response read `PluginExecutionRouterService` makes to
+     * wait for a long-running plugin operation.
+     */
+    describe('getRunResult()', () => {
+        it("answers { status: 'unknown' } when the runtime is disabled, without a call", async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+            expect(runsRetrieveMock).not.toHaveBeenCalled();
+        });
+
+        it('answers the output of a COMPLETED run', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'COMPLETED',
+                output: { ok: true, result: { n: 1 } },
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'completed',
+                output: { ok: true, result: { n: 1 } },
+            });
+            expect(runsRetrieveMock).toHaveBeenCalledWith('run_x');
+        });
+
+        it('carries no output until the run completes', async () => {
+            runsRetrieveMock.mockResolvedValue({ status: 'EXECUTING', output: 'partial' });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'running' });
+        });
+
+        it('answers the error message of a FAILED run', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'CRASHED',
+                error: { message: 'worker OOM', name: 'Error' },
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'failed',
+                error: { message: 'worker OOM' },
+            });
+        });
+
+        it("answers { status: 'unknown' } when runs.retrieve throws", async () => {
+            runsRetrieveMock.mockRejectedValue(new Error('network'));
+            await expect(service.getRunResult('run_x')).resolves.toEqual({ status: 'unknown' });
+        });
+
+        /**
+         * An output over the SDK's inline limit sits behind `outputPresignedUrl`;
+         * `runs.retrieve` downloads it but SWALLOWS a failed download, leaving
+         * `output` undefined. Answered as a plain completed run, the router
+         * reported a run that succeeded — side effects done — as failed.
+         */
+        it('answers completed + outputUnavailable — done, read it again — for a COMPLETED run whose offloaded output did not download', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'COMPLETED',
+                output: undefined,
+                outputPresignedUrl: 'https://packets.example/out.json',
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'completed',
+                outputUnavailable: true,
+            });
+        });
+
+        it('keeps a downloaded offloaded output', async () => {
+            runsRetrieveMock.mockResolvedValue({
+                status: 'COMPLETED',
+                output: { ok: true, result: 'big' },
+                outputPresignedUrl: 'https://packets.example/out.json',
+            });
+            await expect(service.getRunResult('run_x')).resolves.toEqual({
+                status: 'completed',
+                output: { ok: true, result: 'big' },
+            });
+        });
+    });
+
+    describe('dispatchPluginOperation()', () => {
+        const payload = { pluginId: 'acme-gen', operation: 'generate', args: { n: 1 } };
+
+        it('answers null when the runtime is disabled, without a call', async () => {
+            triggerConfig.shouldUseTrigger.mockReturnValue(false);
+            await expect(service.dispatchPluginOperation(payload)).resolves.toBeNull();
+            expect(tasksTriggerMock).not.toHaveBeenCalled();
+        });
+
+        it('triggers run-plugin-operation with the payload, tags and a queue ttl, and answers the run id', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_42' });
+
+            await expect(service.dispatchPluginOperation(payload)).resolves.toBe('run_42');
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'run-plugin-operation',
+                { pluginId: 'acme-gen', operation: 'generate', args: { n: 1 } },
+                expect.objectContaining({
+                    tags: ['plugin-operation', 'plugin:acme-gen'],
+                    // maxDuration does not count queue time; the ttl bounds it.
+                    ttl: '15m',
+                }),
+            );
+        });
+
+        it('answers null when the enqueue fails', async () => {
+            tasksTriggerMock.mockRejectedValue(new Error('rate limited'));
+            await expect(service.dispatchPluginOperation(payload)).resolves.toBeNull();
+        });
+
+        // T26 / EW-742 P3 FR-5 — the router puts the tenant and the stamper's
+        // (providerId, credentialVersion) on a tenant call's payload; this
+        // method rebuilds the payload object, so it must carry them over.
+        it('forwards the tenant stamp fields the router put on the payload', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_43' });
+
+            await service.dispatchPluginOperation({
+                ...payload,
+                tenantId: 't-1',
+                providerId: 'trigger',
+                credentialVersion: 2,
+            });
+
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'run-plugin-operation',
+                {
+                    pluginId: 'acme-gen',
+                    operation: 'generate',
+                    args: { n: 1 },
+                    tenantId: 't-1',
+                    providerId: 'trigger',
+                    credentialVersion: 2,
+                },
+                expect.anything(),
+            );
+        });
+
+        it('forwards a null stamp (no active overlay) as null, and adds no key a payload lacks', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_44' });
+
+            await service.dispatchPluginOperation({
+                ...payload,
+                tenantId: 't-1',
+                providerId: null,
+                credentialVersion: null,
+            });
+            await service.dispatchPluginOperation(payload);
+
+            expect(tasksTriggerMock.mock.calls[0][1]).toEqual({
+                ...payload,
+                tenantId: 't-1',
+                providerId: null,
+                credentialVersion: null,
+            });
+            expect(Object.keys(tasksTriggerMock.mock.calls[1][1] as object)).toEqual([
+                'pluginId',
+                'operation',
+                'args',
+            ]);
+        });
+
+        it('through an inherit tenant view, the run carries the tenant tag and concurrency key', async () => {
+            tasksTriggerMock.mockResolvedValue({ id: 'run_45' });
+            const view = new TriggerJobRuntimeProvider(service).bindToTenant({
+                tenantId: 't-inherit',
+                providerId: 'trigger',
+                credentialVersion: 1,
+                credentials: {},
+            });
+
+            await expect(
+                (
+                    view.dispatchers as unknown as {
+                        dispatchPluginOperation: (p: unknown) => Promise<string | null>;
+                    }
+                ).dispatchPluginOperation(payload),
+            ).resolves.toBe('run_45');
+            expect(tasksTriggerMock).toHaveBeenCalledWith(
+                'run-plugin-operation',
+                payload,
+                expect.objectContaining({
+                    tags: ['tenant:t-inherit', 'plugin-operation', 'plugin:acme-gen'],
+                    concurrencyKey: 't-inherit',
+                    ttl: '15m',
+                }),
+            );
+        });
+
+        it('is reachable through the dispatchers bag, by the name the router looks up', () => {
+            expect(
+                typeof (service.dispatchers as unknown as Record<string, unknown>)
+                    .dispatchPluginOperation,
+            ).toBe('function');
         });
     });
 

@@ -345,6 +345,33 @@ describe('FleetService', () => {
             expect(views.filter((view) => view.kind === 'k8s')).toHaveLength(0);
         });
 
+        it('does not list through a lazy k8s plugin whose onLoad fails on this first use', async () => {
+            const listClusterNodes = jest.fn(async () => [{ name: 'worker-1', ready: true }]);
+            const entry: { plugin: unknown; state: string; error?: unknown } = {
+                plugin: undefined,
+                state: 'loaded',
+            };
+            entry.plugin = {
+                // The first load resolves; its onLoad failure shows on the entry.
+                __materialize: jest.fn(async () => {
+                    entry.state = 'error';
+                    entry.error = 'onLoad failed';
+                    return { listClusterNodes };
+                }),
+            };
+            registry.get.mockReturnValue(entry);
+            settings.getResolvedSettings.mockResolvedValue({
+                clusterSource: { value: 'custom-kubeconfig' },
+                kubeconfig: { value: 'apiVersion: v1\nkind: Config' },
+            });
+            const service = build({ withPlugins: true });
+
+            const views = await service.listForUser('user-1');
+
+            expect(listClusterNodes).not.toHaveBeenCalled();
+            expect(views.filter((view) => view.kind === 'k8s')).toHaveLength(0);
+        });
+
         it('degrades to enrolled rows when the cluster listing throws (best-effort)', async () => {
             repository.findByUser.mockResolvedValue([node({ status: 'online' })]);
             registry.get.mockReturnValue({

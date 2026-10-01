@@ -1,0 +1,44 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. Ingress `web` (APW-06 plan §4.11).
+# Rendered for `domains.primaryComponent: web` only.
+#
+# Execution-order contract asserted against these objects (ACC-E2E-05, ACCEPTANCE.md:340-341): "the bootstrap
+# Job's completionTime and the Deployment's in-cluster smoke result both precede the Ingress
+# creationTimestamp (APW-06 FR-26 rows 4–6, S6)" — i.e. the Ingress is applied in phase 6, after
+# first-deploy jobs (phase 4) and in-cluster smoke (phase 5). ACC-13-05 asserts the same for Umami.
+#
+# Hosts: primary = app-fixture-hello.apps.example.com, extra = [], previous = [].
+# TLS: `cert-manager` mode → TLS block lists every published host, issuer annotation from `ingress.issuer`.
+# ACC-06-47 and ACC-13-20 assert the managed subdomain form `<slug>.<apps-domain>` and that it is never an
+# address under the platform's own parent domain (R-16).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/component: web
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app-fixture-hello.apps.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - app-fixture-hello.apps.example.com
+      secretName: app-fixture-hello-apps-example-com-tls

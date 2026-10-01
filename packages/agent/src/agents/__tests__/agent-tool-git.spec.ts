@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { AgentToolService } from '../agent-tool.service';
 import {
     AgentScope,
@@ -18,6 +21,9 @@ import type { AgentGitFacade } from '../agent-git-facade';
  *   - happy invoke path forwards to the AgentGitFacade
  *   - required-field validation
  *   - adapter exceptions are caught and returned as `{ error }`
+ *   - the tool CONTRACT wording (APW-08 P0 T5): the protected-branch
+ *     refusal and the Work's Task base branch, on the tool descriptors
+ *     and on the facade's own documented inputs
  */
 
 function makePerms(over: Partial<AgentPermissions> = {}): AgentPermissions {
@@ -252,5 +258,131 @@ describe('AgentToolService git tools (Phase 16.6 + 16.7)', () => {
             head: 'h',
         } as any);
         expect(result).toEqual({ error: expect.stringContaining('not Work-scoped') });
+    });
+
+    /**
+     * APW-08 P0 (T5) — the tool CONTRACT is what the model reads before it calls
+     * anything: the protected-branch refusal and the Work's Task base branch have
+     * to be in the descriptors, or the model learns both rules by failing. The
+     * descriptions are asserted, not the implementation — the implementation is
+     * pinned by `agents.module.spec.ts` on the api side.
+     */
+    describe('the contract wording (APW-08 P0 T5)', () => {
+        const toolNamed = (name: string) => {
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: makePerms({ canCommitToRepo: true, canOpenPullRequests: true }),
+                }),
+            );
+            return tools.find((t) => t.name === name)!;
+        };
+
+        it('commitToRepo names the protected-branch refusal', () => {
+            const tool = toolNamed('commitToRepo');
+
+            expect(tool).toBeDefined();
+            expect(tool.description).toMatch(/protected branch/i);
+            expect(tool.description).toMatch(/feature branch/i);
+            // …and it names the branch the commit is based on, which is the
+            // Work's Task base branch — not "the repository default".
+            expect(tool.description).toMatch(/base branch/i);
+        });
+
+        it("commitToRepo's `branch` parameter carries the same rule as the facade doc", () => {
+            const branch = toolNamed('commitToRepo').parameters.properties.branch.description;
+
+            expect(branch).toMatch(/Task base branch/);
+            expect(branch).toMatch(/taskIsolationBaseBranch/);
+            expect(branch).toMatch(/refus/i);
+            expect(branch).toMatch(/protected/);
+            expect(branch).toMatch(/merge policy/);
+            // The stale claim — that the tool resolves "the Work's own default
+            // branch" — is gone, because the target is the Task base branch.
+            expect(branch).not.toMatch(/resolves the Work's own default branch/);
+        });
+
+        it('openPullRequest names the missing-head refusal (FR-5)', () => {
+            const tool = toolNamed('openPullRequest');
+
+            expect(tool).toBeDefined();
+            expect(tool.description).toMatch(/must already exist/i);
+            expect(tool.parameters.properties.head.description).toMatch(/does not exist/i);
+            expect(tool.parameters.properties.head.description).toMatch(/must already exist/i);
+        });
+
+        it("openPullRequest's `base` parameter names the Work's Task base branch", () => {
+            const base = toolNamed('openPullRequest').parameters.properties.base.description;
+
+            expect(base).toMatch(/Task base branch/);
+            expect(base).toMatch(/taskIsolationBaseBranch/);
+            expect(base).not.toMatch(/Defaults to the Work's default branch/);
+        });
+
+        it('forwards every argument to the facade unchanged — the wording adds no behaviour', async () => {
+            const tool = toolNamed('commitToRepo');
+            // The `branch` parameter is still optional and still forwarded
+            // verbatim: the wording describes the adapter's rule, it does not
+            // move it into the tool.
+            await tool.invoke({ message: 'feat: fizz', branch: 'feat/fizz' } as any);
+
+            expect(git.commitToRepo).toHaveBeenCalledWith({
+                userId: 'u1',
+                agentId: 'a1',
+                workId: 'w1',
+                message: 'feat: fizz',
+                files: undefined,
+                branch: 'feat/fizz',
+            });
+        });
+    });
+});
+
+/**
+ * The facade's INPUT DOCS are part of the same contract, and TypeScript erases
+ * them — no runtime assertion can see a doc comment. So the source is read, the
+ * same way `agents.module.spec.ts` reads its own adapter and
+ * `agent-plugins.module.spec.ts` reads its module.
+ */
+describe('AgentGitFacade input docs (APW-08 P0 T5)', () => {
+    const FACADE_PATH = join(__dirname, '..', 'agent-git-facade.ts');
+    const source = (): string => readFileSync(FACADE_PATH, 'utf8');
+
+    /** The doc block immediately preceding `needle`, flattened to one line. */
+    const docBefore = (needle: string): string => {
+        const text = source();
+        const end = text.lastIndexOf('*/', text.indexOf(needle));
+        const start = text.lastIndexOf('/**', end);
+        expect(start).toBeGreaterThan(-1);
+        expect(end).toBeGreaterThan(start);
+        // The doc is WRAPPED in the source, so the block is unwrapped before it
+        // is matched: asserting on the raw line breaks would test the column
+        // width rather than the contract. Only the line-leading `*` markers are
+        // stripped, so a deliberate `**bold**` sentence survives intact.
+        return text
+            .slice(start, end + 2)
+            .split('\n')
+            .map((line) => line.replace(/^\s*\*\s?/, ''))
+            .join(' ')
+            .replace(/\s+/g, ' ');
+    };
+
+    it("documents `branch` as defaulting to the Work's Task base branch, refused when protected", () => {
+        const doc = docBefore('branch?: string;');
+
+        expect(doc).toMatch(/Task base branch/);
+        expect(doc).toMatch(/taskIsolationBaseBranch/);
+        expect(doc).toMatch(/protected/);
+        expect(doc).toMatch(/merge policy/);
+        // The stale claim: the default target used to be described as "the
+        // Work's own default branch".
+        expect(doc).not.toMatch(/resolves the Work's own default branch/);
+    });
+
+    it("documents `base` as the Work's Task base branch — never 'the Work's default branch'", () => {
+        const doc = docBefore('base?: string;');
+
+        expect(doc).toMatch(/Task base branch/);
+        expect(doc).toMatch(/taskIsolationBaseBranch/);
+        expect(doc).not.toMatch(/Defaults to the Work's default branch/);
     });
 });

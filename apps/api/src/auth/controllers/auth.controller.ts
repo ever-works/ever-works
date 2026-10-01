@@ -13,6 +13,7 @@ import {
     Logger,
     BadRequestException,
     ForbiddenException,
+    UseInterceptors,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -50,6 +51,7 @@ import { toHeaders } from '../providers/request-headers';
 import { SocialAuthService } from '../services/social-auth.service';
 import { TermsAcceptanceService } from '../../terms/terms-acceptance.service';
 import type { AuthenticatedUser } from '../types/auth.types';
+import { EverIdProvidersInterceptor } from '../interceptors/ever-id-providers.interceptor';
 
 @ApiTags('Auth')
 @Controller('api/auth')
@@ -88,11 +90,33 @@ export class AuthController {
 
     @Public()
     @Get('providers')
+    // APW-12 (Ever ID, FR-6) — appends the one additive `everId` field on the
+    // wire; this handler and every field it returns are unchanged.
+    @UseInterceptors(EverIdProvidersInterceptor)
     @ApiOperation({
         summary: 'Get configured auth providers',
         description: 'Returns the currently configured authentication providers',
     })
-    @ApiResponse({ status: 200, description: 'Configured auth providers' })
+    @ApiResponse({
+        status: 200,
+        description: 'Configured auth providers',
+        schema: {
+            type: 'object',
+            properties: {
+                emailPassword: { type: 'boolean' },
+                magicLink: { type: 'boolean' },
+                socialProviders: { type: 'array', items: { type: 'string' } },
+                everId: {
+                    type: 'object',
+                    required: ['enabled', 'displayName'],
+                    properties: {
+                        enabled: { type: 'boolean' },
+                        displayName: { type: 'string', maxLength: 40 },
+                    },
+                },
+            },
+        },
+    })
     getConfiguredProviders() {
         return {
             emailPassword: true,

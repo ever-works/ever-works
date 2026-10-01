@@ -1,0 +1,23 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello, target "Your cluster".
+# Source spec: docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml
+#              (sha256 of that file's LF-normalised bytes: d5cff638ec9ef0cd0b8d6e75a4327e8f2cbc43f09af2c8bf2fc3ed6986320be7)
+# Renderer:    packages/plugins/k8s/src/app/app-manifest.renderer.ts  (APW-06 T6)
+# Inputs pinned for this directory: namespace ew-app-fixture-hello-22222222 (slug `app-fixture-hello`,
+#              workId first 8 hex `22222222`), deploymentId 44444444-4444-4444-8444-444444444444,
+#              specCommitSha b1c2d3e4f5061728394a5b6c7d8e9f0112345678, env checksum fa90df132e185345,
+#              hosts.primary app-fixture-hello.apps.example.com, ingress.tls cert-manager,
+#              image.pull NOT set (public image → no `app-pull`, no imagePullSecrets).
+# Placeholders: `example.com`/`example-owner`/`0000…` digests are documentation placeholders (RFC 2606, RFC 9562).
+#              No secret value, real hostname or cluster address appears in this file.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

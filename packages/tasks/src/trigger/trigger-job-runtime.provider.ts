@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IJobRuntimeProvider,
+    JobRunResult,
     JobRunStatus,
     JobRuntimeDispatchers,
     JobRuntimeId,
@@ -16,7 +17,7 @@ import {
     type TriggerClient,
     type TriggerTenantCredentials,
 } from '@ever-works/job-runtime-trigger-plugin';
-import { TriggerService, triggerTenantStampStorage } from './trigger.service';
+import { TriggerService, triggerRunResult, triggerTenantStampStorage } from './trigger.service';
 import {
     createTenantTriggerClient,
     dispatchersFromTenantClient,
@@ -207,6 +208,14 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
     }
 
     /**
+     * EW-693 / T27 — delegates to {@link TriggerService.getRunResult}: the
+     * run's status and output, for the long-running plugin operation path.
+     */
+    async getRunResult(runId: string): Promise<JobRunResult> {
+        return this.triggerService.getRunResult(runId);
+    }
+
+    /**
      * Delegates to {@link TriggerService.isEnabled} — true when
      * Trigger.dev is configured and reachable (`shouldUseTrigger()`
      * AND `TRIGGER_SECRET_KEY` present).
@@ -255,33 +264,30 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
     private readonly tenantViews = new Map<string, IJobRuntimeProvider>();
 
     /**
-     * EW-742 P3.2 T21.1 — minimal `bindToTenant` impl.
+     * EW-742 P3.2 — `bindToTenant` (T21.1 view, T22 BYO client + stamp).
      *
-     * Returns a per-tenant frozen view of THIS provider with the
-     * snapshot captured. Trigger.dev's underlying SDK client is a
-     * push-model singleton (their cloud invokes our tasks), so no
-     * runtime per-tenant rebinding of the actual Trigger.dev access
-     * token happens in this PR — the view's dispatchers still
-     * delegate to the singleton `TriggerService`.
+     * Returns a per-tenant frozen view of THIS provider with the snapshot
+     * captured, memoised per `(tenantId, credentialVersion)` so callers get
+     * a stable instance identity (a new version replaces the old entry).
+     * The snapshot is exposed as `view.tenantSnapshot`.
      *
-     * What this PR DOES wire up:
-     *   - Returns a fresh wrapper per `credentialVersion` so callers
-     *     get a stable instance identity to memoise on.
-     *   - Exposes the snapshot via `(view as any).tenantSnapshot` so
-     *     T22 per-dispatcher wiring can stamp `(providerId,
-     *     credentialVersion)` onto run records without needing a
-     *     separate stamper service.
+     * The view has two shapes, decided by the snapshot's credentials:
+     *   - BYO (the snapshot carries the full {@link TriggerTenantCredentials}
+     *     bag and the per-tenant client builds): `dispatchers`, `cancel`,
+     *     `getRunStatus` and `getRunResult` go to the TENANT's own
+     *     Trigger.dev project through that client. Known gap: a BYO run
+     *     carries NO `tenant:<id>` tag and no tenant concurrency key —
+     *     the stamp Proxy below puts the stamp on the stack, but only
+     *     `TriggerService.stampTenantOptions` reads it, and the BYO map
+     *     (`dispatchersFromTenantClient`) never calls it.
+     *   - Inherit-shaped (empty bag, legacy `projectAccessToken` only, or a
+     *     BYO snapshot whose client failed to build — fail-open): every
+     *     member delegates to the singleton `TriggerService` (the
+     *     platform project), and the stamp Proxy makes its `dispatchXxx`
+     *     methods add the `tenant:<id>` tag and tenant concurrency key.
      *
-     * What this PR DOES NOT do (TODO for the next PR):
-     *   - Per-tenant Trigger.dev project switching. Today every
-     *     tenant ships through the same Trigger.dev project the API
-     *     boots against; the platform overlay is "BYO with inherit"
-     *     and the inherit path is the only one wired. BYO Trigger.dev
-     *     project per tenant requires the dispatcher layer to swap
-     *     the underlying `TriggerService` SDK client per call — that's
-     *     the T22 PR.
-     *   - Dispatcher stamping. That's the T22 per-dispatcher PoC
-     *     (KB-embed first).
+     * Everything else (`registerSchedules`, `startWorkerHost`, lifecycle)
+     * delegates to this provider in both shapes.
      */
     bindToTenant(snapshot: TenantCredentialSnapshot): IJobRuntimeProvider {
         const cacheKey = `${snapshot.tenantId}:${snapshot.credentialVersion}`;
@@ -337,15 +343,34 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
                 return stampedDispatchersCache;
             }
             // BYO branch — wrap the BYO dispatchers in the SAME stamp
-            // Proxy so tenant tags / concurrencyKey still get prefixed
-            // at the binding layer (the BYO dispatchers themselves
-            // intentionally don't stamp — stamping at both layers
-            // would double-prefix).
+            // Proxy, so the tenant stamp is on the stack for them too.
+            // NOTE: nothing on the BYO path reads it. Only
+            // `TriggerService.dispatchXxx` consumes the stamp (through
+            // `stampTenantOptions`); the BYO map
+            // (`dispatchersFromTenantClient`) deliberately does not stamp
+            // on its own and calls the tenant client directly. So a BYO
+            // run carries NO `tenant:<id>` tag and no tenant-prefixed
+            // concurrencyKey — a known gap (wave-2 review, T26); only
+            // an inherit-shaped view (the singleton TriggerService as
+            // the target) gets them.
             const dispatchersSource: Record<string, unknown> = tenantClient
                 ? (base.dispatchersFromClient(tenantClient) as Record<string, unknown>)
                 : (base.dispatchers as Record<string, unknown>);
-            stampedDispatchersCache = new Proxy(dispatchersSource, {
-                get(t, prop, receiver) {
+            // A Proxy may not answer a different value for a read-only,
+            // non-configurable own property of its TARGET, and the production
+            // BYO map is frozen (`dispatchersFromTenantClient`): with that map
+            // as the target, every wrapped `dispatchXxx` read threw a
+            // TypeError, so no BYO dispatch ever reached the tenant's project.
+            // A BYO target is therefore an empty object inheriting from the
+            // map (no own properties, no invariant); reads and `this` still go
+            // to the map itself. The singleton path keeps the service as its
+            // target, unchanged.
+            const proxyTarget: Record<string, unknown> = tenantClient
+                ? (Object.create(dispatchersSource) as Record<string, unknown>)
+                : dispatchersSource;
+            stampedDispatchersCache = new Proxy(proxyTarget, {
+                get(_target, prop, receiver) {
+                    const t = dispatchersSource;
                     const value = Reflect.get(t, prop, receiver);
                     if (typeof value !== 'function') {
                         return value;
@@ -369,9 +394,11 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             }) as unknown as JobRuntimeDispatchers;
             return stampedDispatchersCache;
         };
-        // Build a frozen tenant view. Every method delegates back to
-        // the singleton `TriggerService` (via `base`), but the view
-        // carries the snapshot for downstream stamping.
+        // Build a frozen tenant view. With a BYO `tenantClient`, the
+        // dispatchers and the run reads/cancel go to the tenant's own
+        // project; every other member (and all of them for an
+        // inherit-shaped view) delegates back to this provider (`base`).
+        // The view carries the snapshot for downstream stampers.
         const view: IJobRuntimeProvider & {
             readonly tenantSnapshot: TenantCredentialSnapshot;
             readonly tenantClient: TriggerClient | null;
@@ -415,6 +442,25 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
                       }
                   }
                 : (runId: string) => base.getRunStatus(runId),
+            // EW-693 / T27 — read a BYO tenant's run from THEIR project; the
+            // platform credentials would 404 on it.
+            getRunResult: tenantClient
+                ? async (runId: string): Promise<JobRunResult> => {
+                      try {
+                          const run = await tenantClient.runs.retrieve(runId);
+                          return triggerRunResult(
+                              mapTriggerStatusLocal(run.status),
+                              run as {
+                                  output?: unknown;
+                                  error?: unknown;
+                                  outputPresignedUrl?: unknown;
+                              },
+                          );
+                      } catch {
+                          return { status: 'unknown' };
+                      }
+                  }
+                : (runId: string) => base.getRunResult(runId),
             isEnabled(): boolean {
                 return base.isEnabled();
             },

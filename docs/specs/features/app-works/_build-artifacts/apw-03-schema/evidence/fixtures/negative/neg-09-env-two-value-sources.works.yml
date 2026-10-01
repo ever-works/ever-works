@@ -1,0 +1,15 @@
+# NEGATIVE FIXTURE neg-09 — error class: an `env` entry with TWO value sources.
+# Expected: JSON Schema FAIL (`oneOf`: /spec/env/0 matches more than one branch) · rule layer `env_source_count`.
+# schema.md §12 / R7: "Each entry has exactly one value source (error `env_source_count`)".
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    env:
+        - { name: APP_URL, value: 'https://example.test', from: domains.primary.url }

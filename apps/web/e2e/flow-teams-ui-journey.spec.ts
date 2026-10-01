@@ -177,18 +177,20 @@ test.describe('Teams UI — list page', () => {
         await expect(chartLink).toHaveAttribute('href', /\/teams\/org-chart$/);
     });
 
-    test('the hub tab strip renders Teams | Agents | Sessions | Archived with Teams active', async ({
+    test('the hub tab strip renders Teams | Agents | Archived with Teams active', async ({
         page,
     }) => {
         await page.goto('/en/teams', { waitUntil: 'domcontentloaded' });
 
         await expect(page.getByTestId('agents-page-tabs')).toBeVisible({ timeout: 30_000 });
         const tabs = page.getByTestId('agents-page-tabs').getByRole('link');
-        await expect(tabs).toHaveCount(4);
+        // Since 7772f01b1 the strip is Teams | Agents | Archived: Sessions moved into
+        // Activity (/agents/activity).
+        await expect(tabs).toHaveCount(3);
         await expect(tabs.nth(0)).toHaveAttribute('href', /\/teams$/);
         await expect(tabs.nth(1)).toHaveAttribute('href', /\/agents$/);
-        await expect(tabs.nth(2)).toHaveAttribute('href', /\/agents\/sessions$/);
-        await expect(tabs.nth(3)).toHaveAttribute('href', /\/agents\/archived$/);
+        await expect(tabs.nth(2)).toHaveAttribute('href', /\/agents\/archived$/);
+        await expect(page.getByTestId('agents-page-tab-sessions')).toHaveCount(0);
         // Active = the `border-primary` underline. Asserted on Teams AND
         // negated on Agents so a class-name drift can't pass silently.
         await expect(page.getByTestId('agents-page-tab-teams')).toHaveClass(/border-primary/);

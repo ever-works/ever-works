@@ -1,0 +1,14 @@
+# The build context is the repository root (`.works/works.yml`: `context: .`). Keep it to what the
+# image copies: package.json, package-lock.json, src/, migrations/, public/.
+.git
+.github
+.gitignore
+.dockerignore
+node_modules
+npm-debug.log*
+*.md
+evidence
+profiles
+test
+tools
+variants

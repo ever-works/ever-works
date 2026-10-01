@@ -85,6 +85,16 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 // stranger's. See `BackupFileSpec.personalScope`.
                 personalScope: { by: 'workspace' as const, userColumn: 'accountId' },
             },
+            // APW-11 (T30) — the App Launcher's per-person arrangement. `by: 'user'` because a row
+            // is keyed by `userId` + `scopeKey` (`'global' | 'personal' | <organizationId>`), so an
+            // organisation-scoped preference travels with the *person*: the launcher is a personal
+            // panel and a restored account must come back with the same pinned tiles and order.
+            // Nothing in the row is secret — item keys, order positions, a visible flag, a pin flag.
+            {
+                file: 'app-launcher-preferences.jsonl',
+                entity: 'AppLauncherPreference',
+                scope: { by: 'user' as const },
+            },
         ]),
     },
 

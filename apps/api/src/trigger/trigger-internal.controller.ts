@@ -20,7 +20,10 @@ import { Public } from '../auth/decorators/public.decorator';
 import { config } from '@ever-works/agent/config';
 import {
     WorkRepository,
+    WorkDeploymentRepository,
+    WorkCustomDomainRepository,
     AuthAccountRepository,
+    GitHubAppInstallationRepository,
     OrganizationRepository,
     TemplateRepository,
     TemplateCustomizationRepository,
@@ -28,9 +31,10 @@ import {
     UserRepository,
     WebhookSubscriptionRepository,
     WorkKnowledgeDocumentRepository,
+    WorkUpstreamStateRepository,
 } from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
-import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
+import { CACHE_MANAGER, Cache, DistributedTaskLockService } from '@ever-works/agent/cache';
 import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import { WorkContextResponse } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -75,6 +79,7 @@ import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService, NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { RemoteCallDto } from './dto/remote-call.dto';
 import {
+    PluginAllowlistRepository,
     PluginRepository,
     UserPluginRepository,
     WorkPluginRepository,
@@ -94,6 +99,28 @@ import {
     CreditsSweepService,
     PaygService,
 } from '@ever-works/agent/subscriptions';
+import {
+    AppForkReadinessRunner,
+    AppSourceInitializerService,
+    AppUpstreamStateService,
+    AppUpstreamSyncDispatcherService,
+} from '@ever-works/agent/app-works';
+import { AppSpecService } from '@ever-works/agent/app-spec';
+// APW-05 T19 + C7 — the `app-build-prepare` runner the worker proxies. The class,
+// not the port of the same name on `./app-builds.service`: the port is T17's
+// provisional seam (`run(payload)`) and is deliberately NOT what the RPC channel
+// publishes, so a worker cannot reach the service's internals through it.
+// APW-05 T20 + C17 adds its `app-build-watch` sibling from the same barrel, and
+// T21 the `app-build-sweep` task's service.
+import {
+    AppBuildPrepareRunner,
+    AppBuildSweepService,
+    AppBuildWatchRunner,
+} from '@ever-works/agent/app-builds';
+// APW-06 §5.1 — the Build source the isolated App runtime worker's
+// `APP_DEPLOY_BUILD_SOURCE` proxies (it owns no DataSource). The adapter CLASS, as
+// `AppDeployRequestModule` exports it, so the allow-list is its two reads.
+import { AppDeployBuildSourceAdapter } from '@ever-works/agent/app-runtime';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -122,6 +149,20 @@ const DANGEROUS_METHOD_NAMES = new Set<string>([
 ]);
 
 const METHOD_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+/**
+ * Methods of a registered target that the Trigger.dev worker answers LOCALLY and
+ * must never call over this hop, left out of the target's derived allow-list.
+ *
+ * `PluginRepository.mergeLazyRegistration` is every lazy plugin registration's
+ * row write, and a worker run registers every plugin it discovers: the worker's
+ * `LocalPluginStore` (`trigger-plugins.module.ts`) answers it in memory. A worker
+ * that dialled it instead would pay a round trip per plugin per run; refusing it
+ * here makes that a loud failure rather than a quiet cost.
+ */
+const WORKER_LOCAL_METHODS: Readonly<Record<string, readonly string[]>> = {
+    PluginRepository: ['mergeLazyRegistration'],
+};
 
 /**
  * Security (deserialization): the legitimate Trigger.dev worker always sends
@@ -437,18 +478,158 @@ export class TriggerInternalController implements OnModuleInit {
         // AW-22 Workspace backup — backs the `workspace-backup` task
         // (`startFromPayload`, then `observeRun` until the row settles, then
         // `notifyFinished` on it — every call short, so none outlives the
-        // RPC deadline) and the `workspace-backup-sweeper` cron
-        // (`runSweep`). The archive is
-        // produced HERE and not in the worker because the runner needs the
-        // DataSource, the active storage backend and each Work's data-repo
-        // walk, none of which exist in worker scope. Appended LAST +
-        // @Optional() per the arity rule above.
+        // RPC deadline) and the `workspace-backup-sweeper` cron (`runSweep`).
+        // The archive is produced HERE and not in the worker because the runner
+        // needs the DataSource, the active storage backend and each Work's
+        // data-repo walk, none of which exist in worker scope.
+        //
+        // ⚠ These three arrived on `develop` appended LAST, and the App Works
+        // block below arrived on this branch appended LAST. Both cannot be last.
+        // They are ordered this way round because
+        // `app-source-initializer.service.spec.ts` asserted, against the SOURCE,
+        // that `appSourceInitializerService` was the final `@Optional()` — APW-01
+        // T15's own guard against a mid-list insertion, and the stricter of the
+        // two. Since APW-05 T21 and APW-06 §5.1 appended after the handler, that
+        // pin asserts the rule itself instead: the handler and EVERY parameter
+        // declared after it are `@Optional()`. `trigger-internal.controller.spec.ts`'s
+        // arity assertion is positional (the last three indices must be
+        // `@Optional()`), which holds either way. The positional construction in
+        // that spec passes `undefined` for these three at exactly this offset.
         @Optional()
         private readonly workspaceBackupRunner?: WorkspaceBackupRunner,
         @Optional()
         private readonly workspaceBackupService?: WorkspaceBackupService,
         @Optional()
         private readonly workspaceBackupRepository?: WorkspaceBackupRepository,
+        // APW-02 T28 — the App upstream trio the Trigger.dev worker reaches over
+        // the internal RPC channel. All three are appended LAST + `@Optional()`
+        // per the arity rule above (every positional
+        // `new TriggerInternalController(...)` in the specs keeps compiling), and
+        // all three come from the API's `AppWorksModule`, which
+        // `TriggerInternalModule` now imports:
+        //   - `AppUpstreamStateService` — the two upstream jobs' claim
+        //     (`beginSync`/`finishSync`), the readiness probes and the conflict
+        //     Task all live API-side (plan §2.4);
+        //   - `AppUpstreamSyncDispatcherService` — the `app-upstream-sync-dispatcher`
+        //     cron's `dispatchDue()` (plan §6.6);
+        //   - `WorkUpstreamStateRepository` — `AppUpstreamSyncService` reads the
+        //     Work's coordinates and the two counters §6.3 steps 3 and 9 need from
+        //     the epic's own row, and that service runs in the worker, which owns
+        //     no DataSource. T26 reported this binding by name
+        //     (`app-upstream-sync.service.ts:86-92`); this is it.
+        @Optional()
+        private readonly appUpstreamStateService?: AppUpstreamStateService,
+        @Optional()
+        private readonly appUpstreamSyncDispatcherService?: AppUpstreamSyncDispatcherService,
+        @Optional()
+        private readonly workUpstreamStateRepository?: WorkUpstreamStateRepository,
+        // APW-03 T12/T13 — `AppSpecService`, so the worker-side `app.spec.*` calls
+        // land on the API process where the state row, the git facade and the
+        // Activity log are wired. Without this entry the worker's proxy answers
+        // `Unknown remote target: AppSpecService` (a named failure, but a failure
+        // nonetheless) and the per-tenant dispatcher's whole point is lost. The
+        // API-side path already falls back to running the evaluation in-process
+        // (`app-spec.module.ts` docstring, plan §6.1:661-662); this is the worker
+        // half of the same job. Appended LAST + `@Optional()` per the arity rule
+        // above, exactly as its siblings are.
+        @Optional()
+        private readonly appSpecService?: AppSpecService,
+        // APW-06 T71 — the three names the isolated App runtime worker
+        // (`packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts`) proxies, because
+        // it owns no `DataSource`. All three are appended LAST + `@Optional()` per the arity rule
+        // above, so every positional `new TriggerInternalController(...)` in the specs keeps
+        // compiling:
+        //   - `WorkDeploymentRepository` — T32's `app-deploy` `onFailure` marks the row
+        //     `ERROR (worker_failed)` through it;
+        //   - `WorkCustomDomainRepository` — `DeployFacadeService`, which the worker constructs
+        //     locally (§6.4:979), takes it NON-optionally;
+        //   - `DistributedTaskLockService` — `app-health-poll`'s guard (§9.2:1248). It injects
+        //     `@InjectRepository(CacheEntry)` non-optionally, so it can only be a proxy in the
+        //     worker; `TriggerInternalModule` provides it and registers `CacheEntry` for it, the
+        //     wiring `DataSyncModule`'s docstring documents as the canonical pattern.
+        @Optional()
+        private readonly workDeploymentRepository?: WorkDeploymentRepository,
+        @Optional()
+        private readonly workCustomDomainRepository?: WorkCustomDomainRepository,
+        @Optional()
+        private readonly distributedTaskLockService?: DistributedTaskLockService,
+        // APW-05 T19 + C7 — the `app-build-prepare` job's runner, so the worker's
+        // RPC call lands here, where the `DataSource` and the Activity writer are.
+        // Appended LAST + `@Optional()` per the arity rule above, exactly as its
+        // siblings are: an unconfigured installation answers the loud
+        // `Unknown remote target: AppBuildPrepareRunner` rather than pretending,
+        // and every positional `new TriggerInternalController(...)` in the specs
+        // keeps compiling.
+        @Optional()
+        private readonly appBuildPrepareRunner?: AppBuildPrepareRunner,
+        // APW-05 T20 + C17 — the `app-build-watch` job's runner, the second half of the
+        // same pair. Appended LAST + `@Optional()` per the arity rule above: with the name
+        // absent the worker's proxy answers the loud `Unknown remote target:
+        // AppBuildWatchRunner` rather than pretending an observation happened.
+        @Optional()
+        private readonly appBuildWatchRunner?: AppBuildWatchRunner,
+        // C10 — the `app-fork-readiness` job's runner, so the worker's RPC call lands
+        // where the `DataSource` and the state row are. This is the half C10 measured as
+        // missing: the job did not exist at all, so with the name absent the worker's
+        // proxy would answer the loud `Unknown remote target: AppForkReadinessRunner`
+        // rather than pretending a readiness run happened. Appended LAST + `@Optional()`
+        // per the arity rule above, exactly as its siblings are.
+        @Optional()
+        private readonly appForkReadinessRunner?: AppForkReadinessRunner,
+        // APW-01 T15 — the ready handler. The `app-fork-readiness` run calls
+        // `onDataRepositoryReady` over this hop when the worker hosts the run, so the
+        // hand-off lands where the `DataSource`, the Activity writer and APW-03's
+        // `AppSpecService` are (its `initialize` call is the one C32 measured as missing
+        // everywhere). Appended LAST + `@Optional()` per the arity rule above, exactly as
+        // its siblings are: with the name absent the worker's proxy answers the loud
+        // `Unknown remote target: AppSourceInitializerService` rather than pretending the
+        // source was recorded.
+        //
+        // `onDataRepositoryReady` is deliberately NOT added to `RETRY_SAFE_REMOTE_METHODS`:
+        // a transport failure fails the readiness run, the task's retry calls the handler
+        // again, and the handler's own content compare makes that safe (plan §6).
+        @Optional()
+        private readonly appSourceInitializerService?: AppSourceInitializerService,
+        // APW-05 T21 (first slice) — the `app-build-sweep` task's service. Its passes
+        // write `work_builds`, take the `app-builds:sweep` lock (inside `runSweep`,
+        // because a lock callback cannot cross this hop) and finalise a lost Build
+        // through the Activity writer, so the worker proxies it by name. Appended
+        // LAST + `@Optional()` per the arity rule above: with the name absent the
+        // worker's proxy answers the loud `Unknown remote target:
+        // AppBuildSweepService` rather than pretending a tick ran.
+        @Optional()
+        private readonly appBuildSweepService?: AppBuildSweepService,
+        // APW-06 §5.1 / plan §6.4 — the Build source behind the isolated App runtime
+        // worker's `APP_DEPLOY_BUILD_SOURCE`. The worker re-runs §5.1 and assembles the
+        // render input locally but owns no DataSource, so `getBuild` /
+        // `listDeployableBuilds` land here, on the same adapter the API's own §5.1 pass
+        // uses. Its sibling `APP_DEPLOY_SPEC_SOURCE` dials the `AppSpecService` entry
+        // above. Appended LAST + `@Optional()` per the arity rule above: with the name
+        // absent the worker's proxy answers the loud `Unknown remote target:
+        // AppDeployBuildSourceAdapter` rather than pretending there is no Build.
+        @Optional()
+        private readonly appDeployBuildSourceAdapter?: AppDeployBuildSourceAdapter,
+        // EW-693 T27 (a6) — the plugin allowlist, for the Trigger.dev worker's
+        // runtime installer: it checks the allowlist BEFORE any download (FR-11)
+        // but owns no DataSource. NOT registered as a remote target itself (its
+        // other methods write); `onModuleInit` exposes a read-only
+        // `PluginAllowlistReader` over it. Appended LAST + `@Optional()` per the
+        // arity rule above: with it absent the worker's proxy answers the loud
+        // `Unknown remote target: PluginAllowlistReader`, and its installer then
+        // refuses a third-party package rather than guessing.
+        @Optional()
+        private readonly pluginAllowlistRepository?: PluginAllowlistRepository,
+        // The worker `GitFacadeService`'s GitHub App installation reads. The worker's
+        // `TriggerFacadesModule` has proxied `GitHubAppInstallationRepository` by that name
+        // since it was written (its docstring: `findByInstallationId` for installation-token
+        // lookups), and no `remoteMap` entry ever answered it, so every installation-token
+        // lookup in a worker failed with "Unknown remote target" — found 2026-09-26 by
+        // `apps/api/src/app-works-di-reachability.spec.ts`, whose App Works worker contexts
+        // (spec evaluation, dependency provisioning, the App runtime) import that module.
+        // NOT registered as itself: `onModuleInit` exposes a two-read reader over it, as it does
+        // `PluginAllowlistReader`. Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly gitHubAppInstallationRepository?: GitHubAppInstallationRepository,
     ) {}
 
     onModuleInit() {
@@ -578,6 +759,97 @@ export class TriggerInternalController implements OnModuleInit {
             // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
             // here (allow-list auto-derived).
             SkillReadinessService: this.skillReadinessService,
+            // APW-02 T28 — the App upstream trio. `AppUpstreamStateService` backs
+            // the `app-fork-readiness` / `app-upstream-sync` jobs' claim and
+            // probes, `AppUpstreamSyncDispatcherService` backs the
+            // `app-upstream-sync-dispatcher` cron's `dispatchDue()`, and
+            // `WorkUpstreamStateRepository` backs the sync run's read of the
+            // epic's own row. Registered unconditionally as their sibling
+            // services are: the controller's `callRemote` answers
+            // "Unknown remote target" for a name that maps to `undefined`, which
+            // is the loud answer a missing binding must have.
+            AppUpstreamStateService: this.appUpstreamStateService,
+            AppUpstreamSyncDispatcherService: this.appUpstreamSyncDispatcherService,
+            WorkUpstreamStateRepository: this.workUpstreamStateRepository,
+            // APW-03 T12/T13 — the worker side of `app-spec-evaluate`'s service
+            // calls (`AppSpecService.evaluate` / `getEffectiveSpec` /
+            // `validateDraft`), registered unconditionally for the same reason the
+            // trio above is: a name that maps to nothing answers a loud
+            // "Unknown remote target" instead of pretending.
+            AppSpecService: this.appSpecService,
+            // APW-06 T71 — the three names the isolated App runtime worker proxies. Registered
+            // unconditionally, exactly as the App entries above are: a name that maps to `undefined`
+            // answers a loud "Unknown remote target" rather than pretending, which is what an
+            // operator needs when a provider is missing from the module graph.
+            WorkDeploymentRepository: this.workDeploymentRepository,
+            WorkCustomDomainRepository: this.workCustomDomainRepository,
+            DistributedTaskLockService: this.distributedTaskLockService,
+            // APW-05 T19 + C7 — the worker half of `app-build-prepare`. Registered
+            // unconditionally for the same reason every App entry above is: a name
+            // that maps to `undefined` answers a loud "Unknown remote target"
+            // instead of pretending the prepare ran.
+            AppBuildPrepareRunner: this.appBuildPrepareRunner,
+            // APW-05 T20 + C17 — and the worker half of `app-build-watch`, same rule.
+            AppBuildWatchRunner: this.appBuildWatchRunner,
+            // APW-05 T21 — and the `app-build-sweep` schedule's `runSweep()`, and ONLY
+            // that: a one-member facade (the `PluginAllowlistReader` precedent below),
+            // so the derived allow-list is exactly `runSweep`. The service's prototype
+            // also carries the lock-free `sweep(nowMs)` and its TS-private passes, and
+            // `runSweep(nowMs)` keeps a clock seam for the specs — over this hop a
+            // far-future `nowMs` would fail every open never-adopted requested Build as
+            // `lost`. The facade calls `runSweep()` with no argument whatever arrives,
+            // so the API reads its own clock. Maps to `undefined` (a loud "Unknown
+            // remote target") when the service is not bound, same rule as above.
+            AppBuildSweepService: this.appBuildSweepService
+                ? { runSweep: () => this.appBuildSweepService!.runSweep() }
+                : undefined,
+            // APW-06 §5.1 — the isolated App runtime worker's Build reads (`getBuild`,
+            // `listDeployableBuilds`; allow-list auto-derived), same rule: a name that
+            // maps to `undefined` answers a loud "Unknown remote target".
+            AppDeployBuildSourceAdapter: this.appDeployBuildSourceAdapter,
+            // EW-693 T27 (a6) — the worker's allowlist reads (third-party
+            // packages may run in the worker; owner decision). A reader with ONE
+            // own-property method, so the allow-list is exactly
+            // `findByPackageName` — the repository's writes stay unreachable.
+            // Maps to `undefined` (a loud "Unknown remote target") when the
+            // repository is not bound.
+            PluginAllowlistReader: this.pluginAllowlistRepository
+                ? {
+                      findByPackageName: (packageName: string) =>
+                          this.pluginAllowlistRepository!.findByPackageName(packageName),
+                  }
+                : undefined,
+            // The worker git facade's installation-token lookups
+            // (`git.facade.ts` `getInstallationTokenForWork` / `getInstallationTokenForOwner`),
+            // under the name `trigger-facades.module.ts` proxies. A reader with the two reads
+            // and nothing else: the repository's writes and its cross-tenant `listAll` stay
+            // unreachable over this hop. Maps to `undefined` (a loud "Unknown remote target")
+            // when the repository is not bound.
+            GitHubAppInstallationRepository: this.gitHubAppInstallationRepository
+                ? {
+                      findByInstallationId: (installationId: string) =>
+                          this.gitHubAppInstallationRepository!.findByInstallationId(
+                              installationId,
+                          ),
+                      findActiveByAccountLogin: (accountLogin: string) =>
+                          this.gitHubAppInstallationRepository!.findActiveByAccountLogin(
+                              accountLogin,
+                          ),
+                  }
+                : undefined,
+            // C10 — and the worker half of `app-fork-readiness`. Registered
+            // unconditionally for the same reason every App entry above is: a name that
+            // maps to `undefined` answers a loud "Unknown remote target" instead of
+            // pretending the readiness run happened. The run is resolved here because a
+            // Trigger worker owns no `DataSource` and the readiness poll writes the state
+            // row (FR-17…FR-24a) — the service's own `deps.sleep` cannot cross this hop,
+            // which is what `AppForkReadinessRunner` exists to bridge.
+            AppForkReadinessRunner: this.appForkReadinessRunner,
+            // APW-01 T15 — the worker half of the ready hand-off. Registered
+            // unconditionally for the same reason every App entry above is: a name that
+            // maps to `undefined` answers a loud "Unknown remote target" instead of
+            // pretending the source was recorded in the member's repository.
+            AppSourceInitializerService: this.appSourceInitializerService,
             // AW-22 — `workspace-backup` calls `startFromPayload()` on the
             // runner, then `observeRun()` and `notifyFinished()` on the
             // service; the
@@ -595,11 +867,13 @@ export class TriggerInternalController implements OnModuleInit {
         // Only methods declared directly on the service class (or one of its
         // parents in the chain, excluding Object.prototype) are callable
         // via /internal/trigger/remote/call.
+        // Minus the methods the worker must answer locally (WORKER_LOCAL_METHODS).
         this.allowedMethods = Object.fromEntries(
-            Object.entries(this.remoteMap).map(([name, instance]) => [
-                name,
-                buildMethodAllowList(instance),
-            ]),
+            Object.entries(this.remoteMap).map(([name, instance]) => {
+                const allowed = buildMethodAllowList(instance);
+                for (const method of WORKER_LOCAL_METHODS[name] ?? []) allowed.delete(method);
+                return [name, allowed];
+            }),
         );
     }
 

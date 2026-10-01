@@ -6,4 +6,4 @@ Generic `INotificationChannelPlugin` contract covering Discord, Slack, Telegram,
 - [plan.md](./plan.md) — implementation plan
 - [tasks.md](./tasks.md) — task breakdown
 
-Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/), [`event-subscriptions`](../event-subscriptions/), [`agent-inbox-ui`](../agent-inbox-ui/).
+Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/README.md), [`event-subscriptions`](../event-subscriptions/README.md), [`agent-inbox-ui`](../agent-inbox-ui/README.md).

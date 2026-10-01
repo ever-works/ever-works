@@ -19,16 +19,17 @@ The thing Ever Works builds, ships and keeps maintained — one website, landing
 
 The `kind` stamped on a Work when it is created, from one shared vocabulary the API, the agent runtime and the dashboard all read (`packages/contracts/src/domain/work-kind.ts`):
 
-| Kind           | How it is created                                      | What it is                                                                 |
-| -------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- |
-| `website`      | **Website** chip on `/new` or `/works/new`             | A multi-page site for a business, service, or brand.                       |
-| `landing-page` | **Landing Page** chip on `/new` or `/works/new`        | A focused one-pager — waitlist, launch, lead capture.                      |
-| `blog`         | **Blog** chip on `/new` or `/works/new`                | A blog; its items are called **posts**.                                    |
-| `directory`    | **Directory** chip on `/new` or `/works/new`           | A curated directory site with search, filters and structured item data.    |
-| `awesome-repo` | **Awesome Repo** chip on `/new` or `/works/new`        | An awesome-list repository — markdown index plus refreshable metadata.     |
-| `company`      | The Register-Company flow (**Company** chip on `/new`) | An organizational shell that backs an Organization. Never the create path. |
-| `campaign`     | Campaign activation (`/works/new/campaign`)            | The artifact home for a go-to-market run. Never the create path.           |
-| `default`      | Any Work created without a `kind`                      | The column default — behaves **exactly like `directory`**.                 |
+| Kind           | How it is created                                       | What it is                                                                 |
+| -------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `website`      | **Website** chip on `/new` or `/works/new`              | A multi-page site for a business, service, or brand.                       |
+| `landing-page` | **Landing Page** chip on `/new` or `/works/new`         | A focused one-pager — waitlist, launch, lead capture.                      |
+| `blog`         | **Blog** chip on `/new` or `/works/new`                 | A blog; its items are called **posts**.                                    |
+| `directory`    | **Directory** chip on `/new` or `/works/new`            | A curated directory site with search, filters and structured item data.    |
+| `awesome-repo` | **Awesome Repo** chip on `/new` or `/works/new`         | An awesome-list repository — markdown index plus refreshable metadata.     |
+| `company`      | The Register-Company flow (**Company** chip on `/new`)  | An organizational shell that backs an Organization. Never the create path. |
+| `campaign`     | Campaign activation (`/works/new/campaign`)             | The artifact home for a go-to-market run. Never the create path.           |
+| `app`          | The API (`POST /api/works`) — a preview, off by default | An existing GitHub repository run as a Work: linked, forked or copied.     |
+| `default`      | Any Work created without a `kind`                       | The column default — behaves **exactly like `directory`**.                 |
 
 `landing` is accepted as an alias for `landing-page`, and any value the build does not recognize normalizes to `default`, so a newer server can ship a kind an older dashboard has never heard of without breaking it. Kind is create-only: `PUT /api/works/:id` carrying a `kind` is rejected. See [Work Kinds & Capabilities](./features/work-kinds.md).
 
@@ -123,6 +124,32 @@ A ready-made definition of a Work, published **outside** the platform in the pub
 ### Custom Template
 
 A template you own rather than one of the built-ins. Add any GitHub repository by URL from the Templates page, or **fork** a built-in into your own account so you can edit it freely; either can be set as your default, and a fork can later be re-synced against the base it came from. See [Work Templates](./features/work-templates.md) and [Website Templates](./features/website-templates.md).
+
+### App Blueprint
+
+A ready-made [App spec](#app-spec) for a known open-source app, kept in its own public `ever-works/<name>-template` repository and listed in [`ever-works/templates`](https://github.com/ever-works/templates). It describes how to build and run the app; every Blueprint that exists today holds none of the app's source. Not the same thing as a [Work Blueprint](#work-blueprint). In the App Works preview a matching Blueprint is recognised but not yet applied. See [App Blueprints](./features/app-blueprints.md).
+
+## App Works (preview)
+
+### App Work
+
+A Work of kind `app`: an existing GitHub repository — yours or an open-source project — linked, forked or privately copied into your own GitHub account, run as a Work, and changed by your agents through Tasks. A preview that is off until an operator sets `EVER_WORKS_APP_WORKS_ENABLED=true`. See [App Works](./features/app-works.md).
+
+### App spec
+
+The `spec` block of an App Work's `.works/works.yml`: how the app is built, which components run, what it depends on, its environment variables, its jobs, scheduled calls, smoke tests and checks, and the rules agents must follow. A spec with errors is never put in effect. See [works.yml schema](./agent-services/works-yml-schema.md#app).
+
+### Deploy target
+
+Where an App Work runs: **None** (nothing runs — the default), **Your cluster** (a Kubernetes cluster you control, through your own kubeconfig) or **Ever Works Apps** (managed hosting, not available yet). See [App Builds & Deployments](./features/app-runtime.md).
+
+### Upstream sync
+
+Bringing changes from the original project into an App Work that is a fork or a private copy, as one pull request from the `ever-works/upstream-sync` branch; a conflict becomes a Task. The sync job is not running yet in the preview. See [App Works](./features/app-works.md#staying-in-sync-with-the-original-project).
+
+### App Launcher
+
+The row of tiles in the top bar that opens the Ever apps and your live Works. Off by default per installation (`EVER_WORKS_APP_LAUNCHER_ENABLED`); it never signs you in anywhere. See [App Launcher](./features/app-launcher.md).
 
 ## Organizations, Teams & People
 

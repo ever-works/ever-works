@@ -2,7 +2,7 @@
 
 This work holds **internal architectural specs and ADRs** for the Ever
 Works Platform. It is _not_ user-facing documentation — those live in
-[`../features/`](../features/), [`../api/`](../api/), and the rest of
+[`../features/`](../features/index.md), [`../api/`](../api/index.md), and the rest of
 [`../`](../). These specs target AI agents and humans who need to understand
 how features work architecturally and reason about changes to them.
 
@@ -89,33 +89,34 @@ full Spec Kit format and retain their deeper architectural `spec.md`
 (see also their `acceptance.md` for the original acceptance criteria
 which now live folded into `tasks.md`).
 
-| Feature                                                                    | Status        | Description                                                                                   |
-| -------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
-| [`advanced-prompts`](features/advanced-prompts/spec)                       | Retrospective | Per-work prompt overrides per pipeline step                                                   |
-| [`api-keys`](features/api-keys/spec)                                       | Retrospective | Long-lived auth tokens for CI / CLI / MCP                                                     |
-| [`collections`](features/collections/spec)                                 | Retrospective | Editorial groupings cutting across categories                                                 |
-| [`community-pr-processing`](features/community-pr-processing/spec)         | Retrospective | AI-driven processing of community-contributed PRs                                             |
-| [`comparisons`](features/comparisons/spec)                                 | Retrospective | A vs B comparison page generator                                                              |
-| [`creating-a-work`](features/creating-a-work/spec)                         | Retrospective | Three creation methods: AI / Manual / Import                                                  |
-| [`custom-domains`](features/custom-domains/spec)                           | Retrospective | Branded domain assignment with provider sync                                                  |
-| [`data-generator`](features/data-generator/spec)                           | Retrospective | Data repository management and item persistence                                               |
-| [`data-management`](features/data-management/spec)                         | Retrospective | Export / Import / GitHub Sync with secret hygiene                                             |
-| [`dynamic-plugin-distribution`](features/dynamic-plugin-distribution/spec) | Draft         | Dual-mode plugins: bundle all, or core-only + runtime npm install                             |
-| [`work-changelog`](features/work-changelog/spec)                           | Retrospective | Audit trail of all work mutations                                                             |
-| [`work-import`](features/work-import/spec)                                 | Retrospective | Bootstrap from existing repo or Awesome List                                                  |
-| [`work-members`](features/work-members/spec)                               | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)                                  |
-| [`generation-cancellation`](features/generation-cancellation/spec)         | Retrospective | Mid-flight generation cancel with four mode paths                                             |
-| [`git-operations`](features/git-operations/spec)                           | Retrospective | `GitFacadeService` and provider plugin contract                                               |
-| [`job-runtime-providers`](features/job-runtime-providers/spec)             | Draft         | Pluggable background-job runtime (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest) |
-| [`item-source-validation`](features/item-source-validation/spec)           | Retrospective | Reachability + AI accuracy checks per item                                                    |
-| [`markdown-generator`](features/markdown-generator/spec)                   | Retrospective | Markdown rendering pipeline                                                                   |
-| [`mcp-server`](features/mcp-server/spec)                                   | Retrospective | OpenAPI-derived MCP tool surface                                                              |
-| [`plugin-system`](features/plugin-system/spec)                             | Retrospective | Capability-driven plugin architecture (39 first-party plugins)                                |
-| [`policy-matrices`](features/policy-matrices/spec)                         | Retrospective | Merge-policy + tool-grant governance matrices resolved across four scopes                     |
-| [`scheduled-updates`](features/scheduled-updates/spec)                     | Retrospective | Cron-driven generation with CAS claim and drift correction                                    |
-| [`taxonomy-system`](features/taxonomy-system/spec)                         | Retrospective | Categories, tags, and collections in the data repo                                            |
-| [`website-generator`](features/website-generator/spec)                     | Retrospective | Static site generation pipeline                                                               |
-| [`works-config`](features/works-config/spec)                               | Retrospective | `.works/works.yml` source-controlled work configuration                                       |
+| Feature                                                                       | Status        | Description                                                                                   |
+| ----------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| [`advanced-prompts`](features/advanced-prompts/spec.md)                       | Retrospective | Per-work prompt overrides per pipeline step                                                   |
+| [`api-keys`](features/api-keys/spec.md)                                       | Retrospective | Long-lived auth tokens for CI / CLI / MCP                                                     |
+| [`app-works`](features/app-works/README.md) (program, 13 epics)               | Draft         | Any GitHub repository as a Work: link/fork, build, run, evolve with agents, upstream sync/PRs |
+| [`collections`](features/collections/spec.md)                                 | Retrospective | Editorial groupings cutting across categories                                                 |
+| [`community-pr-processing`](features/community-pr-processing/spec.md)         | Retrospective | AI-driven processing of community-contributed PRs                                             |
+| [`comparisons`](features/comparisons/spec.md)                                 | Retrospective | A vs B comparison page generator                                                              |
+| [`creating-a-work`](features/creating-a-work/spec.md)                         | Retrospective | Three creation methods: AI / Manual / Import                                                  |
+| [`custom-domains`](features/custom-domains/spec.md)                           | Retrospective | Branded domain assignment with provider sync                                                  |
+| [`data-generator`](features/data-generator/spec.md)                           | Retrospective | Data repository management and item persistence                                               |
+| [`data-management`](features/data-management/spec.md)                         | Retrospective | Export / Import / GitHub Sync with secret hygiene                                             |
+| [`dynamic-plugin-distribution`](features/dynamic-plugin-distribution/spec.md) | Draft         | Dual-mode plugins: bundle all, or core-only + runtime npm install                             |
+| [`work-changelog`](features/work-changelog/spec.md)                           | Retrospective | Audit trail of all work mutations                                                             |
+| [`work-import`](features/work-import/spec.md)                                 | Retrospective | Bootstrap from existing repo or Awesome List                                                  |
+| [`work-members`](features/work-members/spec.md)                               | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)                                  |
+| [`generation-cancellation`](features/generation-cancellation/spec.md)         | Retrospective | Mid-flight generation cancel with four mode paths                                             |
+| [`git-operations`](features/git-operations/spec.md)                           | Retrospective | `GitFacadeService` and provider plugin contract                                               |
+| [`job-runtime-providers`](features/job-runtime-providers/spec.md)             | Draft         | Pluggable background-job runtime (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest) |
+| [`item-source-validation`](features/item-source-validation/spec.md)           | Retrospective | Reachability + AI accuracy checks per item                                                    |
+| [`markdown-generator`](features/markdown-generator/spec.md)                   | Retrospective | Markdown rendering pipeline                                                                   |
+| [`mcp-server`](features/mcp-server/spec.md)                                   | Retrospective | OpenAPI-derived MCP tool surface                                                              |
+| [`plugin-system`](features/plugin-system/spec.md)                             | Retrospective | Capability-driven plugin architecture (39 first-party plugins)                                |
+| [`policy-matrices`](features/policy-matrices/spec.md)                         | Retrospective | Merge-policy + tool-grant governance matrices resolved across four scopes                     |
+| [`scheduled-updates`](features/scheduled-updates/spec.md)                     | Retrospective | Cron-driven generation with CAS claim and drift correction                                    |
+| [`taxonomy-system`](features/taxonomy-system/spec.md)                         | Retrospective | Categories, tags, and collections in the data repo                                            |
+| [`website-generator`](features/website-generator/spec.md)                     | Retrospective | Static site generation pipeline                                                               |
+| [`works-config`](features/works-config/spec.md)                               | Retrospective | `.works/works.yml` source-controlled work configuration                                       |
 
 ## Reading order for new contributors
 
@@ -123,8 +124,8 @@ which now live folded into `tasks.md`).
    the non-negotiable engineering principles every spec reconciles with
    (lives in `.specify/memory/constitution.md` at the monorepo root).
 2. **Architecture overviews** —
-   [pipeline overview](architecture/pipeline-overview),
-   [trigger integration](architecture/trigger-integration). Read these
+   [pipeline overview](architecture/pipeline-overview.md),
+   [trigger integration](architecture/trigger-integration.md). Read these
    before diving into a feature spec.
 3. **A specific feature** under `features/` — start with `spec.md`
    (behaviour), then `plan.md` (implementation), then `tasks.md`
@@ -215,7 +216,7 @@ When changing a feature:
 
 ## Related Documentation
 
-- **User-facing docs**: [`../features/`](../features/), [`../api/`](../api/)
+- **User-facing docs**: [`../features/`](../features/index.md), [`../api/`](../api/index.md)
 - **API documentation**: Generated from NestJS decorators (Swagger)
-- **Plugin SDK reference**: [`../plugin-system/`](../plugin-system/)
+- **Plugin SDK reference**: [`../plugin-system/`](../plugin-system/index.md)
 - **Architecture overview**: [`../architecture.md`](../architecture.md)

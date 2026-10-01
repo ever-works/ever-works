@@ -85,6 +85,26 @@ export type JobRuntimeId = 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'innge
 export type JobRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 
 /**
+ * A run's lifecycle AND its outcome, as `getRunResult(runId)` reports it —
+ * for the few callers that need a run's return value rather than only its
+ * status (EW-693: a long-running plugin operation's result).
+ */
+export interface JobRunResult {
+	readonly status: JobRunStatus;
+	/** The run's return value. Present only once `status` is `'completed'`. */
+	readonly output?: unknown;
+	/** Why a `'failed'` / `'cancelled'` run ended, when the provider exposes it. */
+	readonly error?: { readonly message: string } | null;
+	/**
+	 * `true` when `status` is `'completed'` but the output could not be read
+	 * this time (e.g. it is stored behind a URL the download of which failed).
+	 * The run's work is DONE — never dispatch it again; reading it again may
+	 * return the output.
+	 */
+	readonly outputUnavailable?: boolean;
+}
+
+/**
  * One recurring job. The provider's `registerSchedules` translates each
  * spec into its native cron mechanism (Trigger.dev `schedules.task`,
  * Temporal Schedules API, BullMQ repeatable jobs, pg-boss `schedule()`,
@@ -266,6 +286,16 @@ export interface IJobRuntimeProvider extends IPlugin {
 	 * throwing — callers treat unknown as "stale, try DB instead".
 	 */
 	getRunStatus(runId: string): Promise<JobRunStatus>;
+
+	/**
+	 * Optional: {@link getRunStatus} plus the run's OUTPUT — the only way a
+	 * caller can read what a run returned (EW-693 long-running plugin
+	 * operations; FR-16's "existing job-dispatch and result channel").
+	 * Never throws: an unresolvable run answers `{ status: 'unknown' }`.
+	 * Absent on providers that keep no results; callers treat absence as
+	 * "this runtime cannot answer request/response work".
+	 */
+	getRunResult?(runId: string): Promise<JobRunResult>;
 
 	/**
 	 * True when this provider is configured and reachable in the

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "nc-01-port",
+    "title": "a component port that contradicts the App spec",
+    "file": "your-cluster/10-deployment-web.yaml",
+    "from": "containerPort: 8080",
+    "to": "containerPort: 8081",
+    "why": "App spec port is 8080 (works.yml components[0].port); 8081 is a different port that no component declares.",
+    "dir": "__negative-control__/nc-01-port"
+  },
+  {
+    "id": "nc-02-latest-tag",
+    "title": "an image that is tagged `latest` instead of pinned by digest",
+    "file": "your-cluster/10-deployment-web.yaml",
+    "from": "image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00",
+    "to": "image: ghcr.io/example-owner/app-fixture-hello/ever-works-app:latest",
+    "why": "CONTRACTS §9 — the image is never `latest` and a Deployment uses the digest.",
+    "dir": "__negative-control__/nc-02-latest-tag"
+  },
+  {
+    "id": "nc-03-literal-secret",
+    "title": "a literal value where a generated secret belongs",
+    "file": "your-cluster/04-secret-env.yaml",
+    "from": "FIXTURE_SESSION_SECRET: <generated:chars:32>",
+    "to": "FIXTURE_SESSION_SECRET: hunter2-not-a-placeholder",
+    "why": "The env entry is `secret: true` with `generate: { kind: chars, length: 32 }`; only a reference or a generated placeholder may appear.",
+    "dir": "__negative-control__/nc-03-literal-secret"
+  }
+]

@@ -16,30 +16,33 @@ const sentryMock = {
         fatal: jest.fn(),
     },
 };
-// `virtual: true` on all three: these packages are dependencies of
-// `packages/monitoring`, NOT of `apps/api`, and pnpm's strict layout means
-// they cannot be resolved from a spec that lives here. Without the flag jest
-// refuses the mock with "Cannot find module" and the whole suite fails to
-// RUN -- which is how this reached `stage` red while every other suite passed.
-// The real module still resolves where it is actually imported, from inside
-// `packages/monitoring`; this file only ever needs the stub.
-jest.mock('@sentry/nestjs', () => sentryMock, { virtual: true });
-jest.mock('@sentry/profiling-node', () => ({ nodeProfilingIntegration: jest.fn(() => ({})) }), {
-    virtual: true,
-});
+// `@sentry/nestjs`, `@sentry/profiling-node` and `posthog-node` are dependencies of
+// `packages/monitoring`, NOT of `apps/api`: pnpm's strict layout means they cannot be
+// resolved from a spec that lives here. They used to be mocked `virtual: true` under
+// their bare names -- a DIFFERENT module from the one monitoring's interceptors load,
+// so the mocks never reached them. `initPostHog({ apiKey: 'test-key' })` below then
+// built a REAL PostHog client that flushed to the network (a CI red whenever that
+// timed out after the suite: "Cannot log after tests are done"), and the secret-
+// hygiene check in `afterEach` saw no Sentry or PostHog call at all. Each mock is
+// now registered at the path monitoring itself resolves the package to.
+function monitoringDependency(name: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { dirname } = require('path') as typeof import('path');
+    return require.resolve(name, { paths: [dirname(require.resolve('@ever-works/monitoring'))] });
+}
+jest.mock(monitoringDependency('@sentry/nestjs'), () => sentryMock);
+jest.mock(monitoringDependency('@sentry/profiling-node'), () => ({
+    nodeProfilingIntegration: jest.fn(() => ({})),
+}));
 
 const posthogCapture = jest.fn();
-jest.mock(
-    'posthog-node',
-    () => ({
-        PostHog: jest.fn().mockImplementation(() => ({
-            capture: posthogCapture,
-            identify: jest.fn(),
-            shutdown: jest.fn().mockResolvedValue(undefined),
-        })),
-    }),
-    { virtual: true },
-);
+jest.mock(monitoringDependency('posthog-node'), () => ({
+    PostHog: jest.fn().mockImplementation(() => ({
+        capture: posthogCapture,
+        identify: jest.fn(),
+        shutdown: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
 
 jest.mock('@ever-works/agent/shared-views', () => ({
     SharedViewService: class SharedViewService {},
@@ -347,5 +350,12 @@ describe('Shared view public API over HTTP', () => {
         const again = await exchange(TOKEN, '198.51.100.250');
         expect(again.status).toBe(429);
         expect(views.recordView.mock.calls.length).toBe(countedBefore);
+    });
+
+    // Last, on purpose: the stubs above must be the modules monitoring's interceptors
+    // actually call, or the secret-hygiene check in `afterEach` is vacuous for PostHog
+    // (and a real client flushes to the network after the suite).
+    it('saw the interceptors through the stubs: PostHog captures reached the mock', () => {
+        expect(posthogCapture).toHaveBeenCalled();
     });
 });

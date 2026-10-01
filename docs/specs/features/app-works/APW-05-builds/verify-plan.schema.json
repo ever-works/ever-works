@@ -1,0 +1,229 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/app-verification-plan.v1.json",
+	"title": "Ever Works verification plan v1",
+	"description": "Draft (APW-05, plan §4.10). The value-free plan APW-04 hands to AppBuildsService.startVerification; it travels base64url-encoded in the workflow_dispatch input ew_verify_plan (<= 60,000 characters) and is validated with ajv before dispatch. It never carries a resolved value: generated entries describe what to generate, prompted entries name the value only.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["version", "components", "dependencies", "jobs", "smoke", "env"],
+	"properties": {
+		"version": { "const": 1 },
+		"components": {
+			"type": "array",
+			"minItems": 1,
+			"maxItems": 10,
+			"items": { "$ref": "#/$defs/component" }
+		},
+		"dependencies": {
+			"type": "array",
+			"maxItems": 3,
+			"items": { "$ref": "#/$defs/dependency" }
+		},
+		"jobs": {
+			"type": "array",
+			"maxItems": 10,
+			"items": { "$ref": "#/$defs/job" }
+		},
+		"smoke": {
+			"type": "array",
+			"maxItems": 20,
+			"items": { "$ref": "#/$defs/smoke" }
+		},
+		"env": {
+			"type": "array",
+			"maxItems": 100,
+			"items": { "$ref": "#/$defs/envEntry" }
+		},
+		"build": {
+			"type": "object",
+			"description": "The App spec's build block. Present when the runner must build the image instead of reusing a confirmed digest.",
+			"additionalProperties": false,
+			"required": ["strategy"],
+			"properties": {
+				"strategy": { "enum": ["dockerfile", "image"] },
+				"dockerfile": { "type": "string", "maxLength": 255 },
+				"context": { "type": "string", "maxLength": 255 },
+				"target": { "type": "string", "maxLength": 255 },
+				"image": { "type": "string", "maxLength": 512 },
+				"args": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/buildArg" } },
+				"services": {
+					"type": "array",
+					"maxItems": 5,
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["name", "image"],
+						"properties": {
+							"name": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$" },
+							"image": { "type": "string", "maxLength": 512 },
+							"port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+							"env": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/nameValue" } }
+						}
+					}
+				}
+			}
+		}
+	},
+	"$defs": {
+		"nameValue": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name", "value"],
+			"properties": {
+				"name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" },
+				"value": { "type": "string", "maxLength": 8192 }
+			}
+		},
+		"buildArg": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name"],
+			"properties": {
+				"name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" },
+				"value": { "type": "string", "maxLength": 8192 },
+				"fromEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" }
+			},
+			"oneOf": [{ "required": ["value"] }, { "required": ["fromEnv"] }, { "maxProperties": 1 }]
+		},
+		"probe": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["kind"],
+			"properties": {
+				"kind": { "enum": ["http", "tcp"] },
+				"path": { "type": "string", "maxLength": 512 },
+				"port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+				"failureThreshold": { "type": "integer", "minimum": 1, "maximum": 120 },
+				"periodSeconds": { "type": "integer", "minimum": 1, "maximum": 120 }
+			}
+		},
+		"component": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name", "role", "port"],
+			"properties": {
+				"name": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$" },
+				"role": { "enum": ["web", "worker"] },
+				"port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+				"command": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 512 } },
+				"args": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 512 } },
+				"memoryMiB": { "type": "integer", "minimum": 64, "maximum": 12288 },
+				"writableRootFilesystem": { "type": "boolean" },
+				"probes": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"startup": { "$ref": "#/$defs/probe" },
+						"readiness": { "$ref": "#/$defs/probe" },
+						"liveness": { "$ref": "#/$defs/probe" }
+					}
+				}
+			}
+		},
+		"dependency": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["kind"],
+			"properties": {
+				"kind": { "enum": ["postgres", "redis", "objectStorage"] },
+				"version": { "type": "string", "maxLength": 32 },
+				"buckets": {
+					"type": "array",
+					"maxItems": 10,
+					"items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$" }
+				}
+			}
+		},
+		"job": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["when", "name"],
+			"properties": {
+				"when": { "enum": ["pre-deploy", "first-deploy"] },
+				"name": { "type": "string", "maxLength": 128 },
+				"component": { "type": "string", "maxLength": 64 },
+				"command": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 512 } },
+				"http": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["method", "path"],
+					"properties": {
+						"method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+						"path": { "type": "string", "maxLength": 512 },
+						"body": { "type": "string", "maxLength": 8192 },
+						"authEnv": { "type": "string", "maxLength": 128 },
+						"authScheme": { "enum": ["bearer", "raw"] },
+						"expectStatus": { "type": "array", "maxItems": 10, "items": { "type": "integer" } }
+					}
+				},
+				"timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 1800 },
+				"retries": { "type": "integer", "minimum": 0, "maximum": 5 }
+			},
+			"oneOf": [{ "required": ["command"] }, { "required": ["http"] }]
+		},
+		"smoke": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name", "method", "path"],
+			"properties": {
+				"name": { "type": "string", "maxLength": 128 },
+				"component": { "type": "string", "maxLength": 64 },
+				"method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"] },
+				"path": { "type": "string", "maxLength": 512 },
+				"body": { "type": "string", "maxLength": 8192 },
+				"when": { "enum": ["after-deploy", "after-jobs"] },
+				"expect": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"status": { "type": "array", "maxItems": 10, "items": { "type": "integer" } },
+						"bodyContains": {
+							"type": "array",
+							"maxItems": 20,
+							"items": { "type": "string", "maxLength": 200 }
+						},
+						"bodyNotContains": {
+							"type": "array",
+							"maxItems": 20,
+							"items": { "type": "string", "maxLength": 200 }
+						},
+						"maxLatencyMs": { "type": "integer", "minimum": 1, "maximum": 60000 }
+					}
+				}
+			}
+		},
+		"envEntry": {
+			"type": "object",
+			"description": "APW-07's runner recipe: one of generate / literal / template / prompted / derived, and never a stored value.",
+			"additionalProperties": false,
+			"required": ["name", "source"],
+			"properties": {
+				"name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" },
+				"source": { "enum": ["generate", "literal", "template", "prompted", "derived"] },
+				"secret": { "type": "boolean" },
+				"generate": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["kind"],
+					"properties": {
+						"kind": { "enum": ["base64", "hex", "chars", "uuid", "keypair"] },
+						"bytes": { "type": "integer", "minimum": 1, "maximum": 4096 },
+						"length": { "type": "integer", "minimum": 1, "maximum": 4096 },
+						"keypair": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"type": { "enum": ["ed25519", "rsa"] },
+								"format": { "enum": ["pem", "base64url-raw", "pkcs12"] },
+								"passwordEnv": { "type": "string", "maxLength": 128 }
+							}
+						}
+					}
+				},
+				"value": { "type": "string", "maxLength": 8192 },
+				"template": { "type": "string", "maxLength": 8192 },
+				"reference": { "type": "string", "maxLength": 256 }
+			}
+		}
+	}
+}

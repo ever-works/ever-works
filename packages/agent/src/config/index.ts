@@ -1,3 +1,6 @@
+import { Logger } from '@nestjs/common';
+import { isIP } from 'node:net';
+
 import {
     clampQueuedMaxAgeSec,
     DEFAULT_FLEET_AGENT_EXECUTION_MODE,
@@ -1042,6 +1045,313 @@ export const config = {
     // Ever Works platform-default providers used by the onboarding wizard.
     // Each is env-gated until the underlying external resource is provisioned.
     everWorks: {
+        /**
+         * APW-01 T7 — the App Work instance setting (spec FR-3, plan §12).
+         *
+         * `EVER_WORKS_APP_WORKS_ENABLED` is the API-side twin of the web's gate
+         * (`apps/web/src/lib/feature-flags/work-kinds.ts`), and the reason both
+         * read the SAME variable name rather than two: a chip that offers `app`
+         * while the API refuses to build one is a dead end, and an API that
+         * accepts `app` while the picker hides it is a missing feature. The web
+         * half reads its own deployment's copy at request time; when the API
+         * starts publishing this on `/api/config`, callers pass that answer and
+         * the environment read becomes the fallback.
+         *
+         * Exactly `'true'` is on, defaulting to OFF, beside the other
+         * `*_ENABLED` getters — the same posture as `config.appLauncher`.
+         */
+        apps: {
+            worksEnabled() {
+                return process.env.EVER_WORKS_APP_WORKS_ENABLED === 'true';
+            },
+
+            /**
+             * APW-08 T17 — may the API-side (cloud) isolated-Task path PUSH an
+             * App Work branch? (`APP_WORKS_CLOUD_PUSH_ENABLED`, owner decision
+             * 2026-09-25.)
+             *
+             * OFF by default, and on only for exactly `'true'`: APW-08 FR-12
+             * says an App Work run executes only on an enrolled Fleet node or in
+             * an isolated environment with no platform secret, and the admission
+             * that enforces it (T12) has not landed. Until it does, a cloud run
+             * on an App Work commits locally and `finalizeRun` refuses to publish
+             * — the Task is blocked with a message naming FR-12, nothing is
+             * pushed and no pull request is opened. Turned on, the cloud path
+             * judges the exact local commit with the change gate's `checkPaths`
+             * BEFORE publishing exactly that commit, then judges the pushed
+             * branch again with `evaluate`.
+             *
+             * Asked only through `appWorkCloudPushAllowed`
+             * (`tasks-domain/app-work-cloud-push.ts`), the one gate both cloud
+             * publishers share: `finalizeRun`, and the agent git tools
+             * `commitToRepo` / `openPullRequest` in the API's `AGENT_GIT_FACADE`,
+             * which refuse an App Work with the same words while this is off.
+             *
+             * Read per call (never captured at import), so tests can flip it; a
+             * running API reads its environment once, at process start, so a
+             * changed value takes effect when the API restarts or is redeployed.
+             * Every other Work kind ignores it, and so does `finalizeRun` for an
+             * App Work with no change gate bound (a partial construction; every
+             * real graph binds the gate through `TasksDomainModule`).
+             */
+            cloudPushEnabled() {
+                return process.env.APP_WORKS_CLOUD_PUSH_ENABLED === 'true';
+            },
+
+            /**
+             * APW-06 T19 — the apex an App Work's managed subdomain lives under
+             * (`EVER_WORKS_APPS_DOMAIN`, plan §8.3, spec FR-40, Resolution R-16).
+             *
+             * ## Two branches, exactly as plan §8.3 states them
+             *
+             * ⚠️ **A disagreement between the task text and the plan, resolved for the
+             * plan and recorded here rather than left implicit** (the plan is the spec
+             * of record for APW-06). T19's own line reads: "apps domain equal to /
+             * under / parent of `EVER_WORKS_DOMAIN` ⇒ `getDomain() === null`
+             * (ACC-06-27)" — with no branch qualifier, which read literally would also
+             * refuse the *unset* case. Plan §8.3 scopes those three relations to the
+             * dedicated-apex branch and keeps the shared default enabled
+             * ("**Shared-default branch** (apex resolves to `EVER_WORKS_DOMAIN`): the
+             * equality check is satisfied by definition and recorded as such"), and
+             * ACC-06-27 itself says "a subdomain of the platform's own `ever.works` IS
+             * allowed — owner decision 2026-09-17". Following the task text literally
+             * would disable the managed subdomain out of the box and contradict D10's
+             * headline promise, so the plan wins: the three relations refuse an
+             * **explicitly configured** apex (the tests pin exactly that), and the
+             * unset case returns the platform domain.
+             *
+             * - **Shared-default branch** (the variable is unset or blank): the apex
+             *   *is* the installation's platform domain, so the equality check is
+             *   "satisfied by definition and recorded as such" (plan §8.3:1135-1138).
+             *   The value returned is `EVER_WORKS_DOMAIN`, defaulting to the
+             *   documented `ever.works` — the same default
+             *   `managed-subdomain.service.ts:298`, `cloudflare-dns.provider.ts:430`
+             *   and `subdomain-allocator.service.ts:192` already read, restated here
+             *   so the config module and those callers cannot disagree. This is the
+             *   branch that makes "installing Gauzy from a template should just work
+             *   at `<slug>.EVER_WORKS_DOMAIN>`" true (program README §2 D10:213-218).
+             *   The platform-domain safeguards of R-16 apply instead of the strict
+             *   validation below: host-only `__Host-` Secure cookies on platform
+             *   routes, no platform session cookie on app hosts, app hosts that
+             *   never serve platform pages.
+             * - **Dedicated-apex branch** (the operator set the variable explicitly):
+             *   "the apex must not equal, end with `.` + `EVER_WORKS_DOMAIN`, or be a
+             *   suffix of `EVER_WORKS_DOMAIN` or the host of the platform web/API URL
+             *   — this is what keeps the cookie-isolating configuration honest"
+             *   (plan §8.3:1133-1135). Equality is refused **here** and only here:
+             *   an operator who sets the variable to the platform domain itself is
+             *   asking for a dedicated apex and handing us the shared one, which is
+             *   the configuration the strict branch exists to catch. The refusal is
+             *   logged with the way out (unset the variable).
+             *
+             * ## What "unusable" means, and what it costs
+             *
+             * A malformed apex (not a plain dotted DNS name: a scheme, a port, a
+             * path, a wildcard, an IP literal, a single label, an empty or
+             * over-long label, an underscore) and a relation clash both make this
+             * getter **log an error and return `null`** — "a malformed or unusable
+             * apex makes the feature log an error and `getDomain()` return `null`,
+             * which disables the managed subdomain only — custom domains keep
+             * working" (plan §8.3:1138-1140). `null` never means "no address": it
+             * means "no *managed* address", and the caller (`AppHostsService`,
+             * plan §8.1:1099-1101) then offers custom domains alone. The same
+             * answer, for the same reason, is given when `EVER_WORKS_DOMAIN` itself
+             * is set to something unusable: the shared default would otherwise be
+             * "repaired" into a domain the operator never wrote.
+             *
+             * ## What this getter deliberately does NOT do
+             *
+             * - **No Public Suffix List check.** The PSL probe is APW-10's launch-gate
+             *   item LG-15 (`APEX_NOT_ON_PSL` / `PSL_UNREACHABLE`) and it "stays
+             *   exactly as it is … simply not exercised by an installation that does
+             *   not [configure a dedicated apex]" (program README §2 D10:222-227).
+             *   Making this getter reach the network would put a PSL round-trip on
+             *   every config read; keeping it out is what leaves LG-15 the single
+             *   place that decides it.
+             * - **No DNS-zone check.** `getDnsZoneId()` unset means no record is ever
+             *   written (CONTRACTS §7), which withdraws the managed *address* without
+             *   this getter having to pretend the apex is invalid.
+             * - **Nothing is ever removed here.** Every address shape R-16 and D10
+             *   allow keeps working; this getter only answers which apex applies.
+             */
+            getDomain(): string | null {
+                const raw = process.env.EVER_WORKS_APPS_DOMAIN;
+                const configured = typeof raw === 'string' ? raw.trim() : '';
+                const platform = platformManagedDomain();
+
+                if (platform === null) {
+                    appsDomainLogger.error(
+                        `EVER_WORKS_DOMAIN="${String(process.env.EVER_WORKS_DOMAIN ?? '')}" is not a ` +
+                            `usable apex domain, so no managed App Work subdomain can be addressed. ` +
+                            `Set it to the installation's platform domain (for example ever.works).`,
+                    );
+                    return null;
+                }
+
+                if (configured.length === 0) {
+                    // Shared-default branch — see the docstring: the apex resolves to
+                    // the platform domain and the R-16 cookie controls carry isolation.
+                    recordAppsDomainSharedDefault(platform);
+                    return platform;
+                }
+
+                const apex = normalizeApexDomain(configured);
+                if (apex === null) {
+                    appsDomainLogger.error(
+                        `EVER_WORKS_APPS_DOMAIN="${configured}" is not a usable apex domain, so no managed ` +
+                            `subdomain is offered. Set it to a dotted DNS name (for example ` +
+                            `apps.example.com), or unset it to use EVER_WORKS_DOMAIN.`,
+                    );
+                    return null;
+                }
+
+                const clash = appsDomainClash(apex);
+                if (clash !== null) {
+                    appsDomainLogger.error(
+                        `EVER_WORKS_APPS_DOMAIN="${apex}" is ${clash} the platform domain ` +
+                            `"${platform}", so it cannot be a dedicated cookie-isolating apex and no ` +
+                            `managed subdomain is offered. Unset EVER_WORKS_APPS_DOMAIN to serve ` +
+                            `<slug>.${platform} instead.`,
+                    );
+                    return null;
+                }
+
+                return apex;
+            },
+
+            /**
+             * APW-06 T19 — how many App Works one owner may run on **Ever Works
+             * Apps** (`EVER_WORKS_APPS_MAX_PER_USER`, plan §5.1/§9.5; default 3,
+             * CONTRACTS §7).
+             *
+             * APW-10's own plan (§5.5:715) fixes the relationship: the per-owner
+             * limit is APW-06's cap, `capReached` is "a presentation of APW-06's
+             * cap, not a second cap", and this value is read through APW-06's quota
+             * service rather than through a constant or table in that epic. This
+             * getter is therefore the **only** reading of the variable, and the
+             * default lives here beside it.
+             *
+             * Unset, blank, non-numeric or non-positive keeps the documented 3 —
+             * the same posture as `everWorks.deploy.getMaxWorksPerUser()` next to
+             * it: a deploy-manifest typo must degrade to the documented default,
+             * never to `NaN` (which would refuse every managed Deployment) and
+             * never to `0` (which would silently close the tier).
+             */
+            getMaxPerUser(): number {
+                const raw = parseInt(process.env.EVER_WORKS_APPS_MAX_PER_USER || '3', 10);
+                return Number.isFinite(raw) && raw > 0 ? raw : 3;
+            },
+
+            /**
+             * APW-06 T19 — the DNS zone the managed records are written into
+             * (`EVER_WORKS_APPS_DNS_ZONE_ID`, plan §8.3:1130; **not a secret**).
+             *
+             * `undefined` is the documented default and it is load-bearing:
+             * CONTRACTS §7 says "unset — no managed subdomains without it", so the
+             * managed address is withdrawn by the absence of a zone rather than by
+             * `getDomain()` pretending the apex is invalid. On the shared default
+             * this is the platform domain's own zone.
+             *
+             * On the shared default the apps DNS configuration is the **only** DNS
+             * configuration the App path reads (plan §8.3:1141-1143): the platform's
+             * `EverWorksDnsService` and this pair stay separate, and a follow-up
+             * moves both behind the `dns` capability (EW-738).
+             */
+            getDnsZoneId(): string | undefined {
+                const value = process.env.EVER_WORKS_APPS_DNS_ZONE_ID?.trim();
+                return value ? value : undefined;
+            },
+
+            /**
+             * APW-06 T19 — the DNS API token the managed records are written with
+             * (`EVER_WORKS_APPS_DNS_API_TOKEN`, plan §8.3:1131; **secret**,
+             * CONTRACTS §7).
+             *
+             * Unset/blank → `undefined`, the documented default. This getter is
+             * read by `AppsDomainDnsService` (plan §8.3:1141) and by nothing that
+             * logs: the value never enters a message, an Activity payload or a
+             * `WorkDeployment` row, which is the same rule the Cloudflare provider
+             * already follows for its own token.
+             */
+            getDnsApiToken(): string | undefined {
+                const value = process.env.EVER_WORKS_APPS_DNS_API_TOKEN?.trim();
+                return value ? value : undefined;
+            },
+
+            /**
+             * APW-06 T19 — the operator's attestation that the App cluster worker
+             * has no route to internal networks
+             * (`EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED`, plan §6.2:950-952,
+             * CONTRACTS §7; default `false`).
+             *
+             * "Production (`NODE_ENV=production`) refuses to dispatch any `app-*`
+             * cluster job unless `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED=true` — an
+             * operator attestation that the worker for this queue has no route to
+             * internal networks" (plan §6.2). The network design behind the
+             * attestation lives in the private operations repository; this getter
+             * only reports what the operator declared.
+             *
+             * Fails closed: exactly `'true'` is on, so an unset, blank, `'1'` or
+             * `'TRUE'` value refuses App cluster jobs in production rather than
+             * assuming an isolation nobody attested. It is a **read**, never a
+             * substitute for the process-level worker-context flag
+             * (`app-runtime/worker-context.ts`, plan §6.2:943-949) — the flag says
+             * *where the code is running*, this says *what the operator promised
+             * about that place*.
+             */
+            isClusterWorkerIsolated(): boolean {
+                return process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED === 'true';
+            },
+
+            /**
+             * APW-06 T19 — the CIDRs exempt from the public-address rule
+             * (`EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`, plan §6.1:922-934, §8.3;
+             * default empty).
+             *
+             * Plan §6.1's own words for this accessor: "§8.3's
+             * `getClusterPrivateAllowlist()` returns `parsePrivateAllowlist(env).cidrs`,
+             * and `AppHostsService` uses `resolvePublicAddresses` before any DNS
+             * record write and on re-validation". So the contract is: comma- or
+             * whitespace-separated CIDRs (a bare address reads as `/32` or `/128`),
+             * entries that do not parse are **dropped with a warning** and never
+             * widen the policy (plan §6.1:929-930), and the surviving entries are
+             * returned **verbatim** — the same strings the operator typed, exactly
+             * as the `k8s` plugin's own `parsePrivateAllowlist` returns them
+             * (`packages/plugins/k8s/src/app/app-kubeconfig.guard.ts:184-201`), so
+             * one environment value cannot mean two different lists on the two
+             * sides of the worker boundary.
+             *
+             * ⚠️ **Provisional, reported (APW06-G20 / plan:923-934).** The parser is
+             * supposed to live in the plugin SDK as
+             * `@ever-works/plugin/helpers/cluster-address-policy` (`parsePrivateAllowlist`)
+             * and this accessor is supposed to call it. That module does not exist on
+             * this branch — the `k8s` plugin kept the classifier local for the same
+             * reason and exported it (`app-kubeconfig.guard.ts:27-39`) — so the
+             * narrowest local seam is kept here, and when the SDK module lands this
+             * getter delegates to it in one line. Nothing is removed either way: the
+             * local filter is what makes the behaviour testable today, and the swap is
+             * an import.
+             *
+             * The allow-list is an **operator decision with a name**, never a silent
+             * default: an empty value means every private address stays refused
+             * (THREAT-MODEL T-13, residual accepted in Wave 1).
+             */
+            getClusterPrivateAllowlist(): string[] {
+                const parsed = parseClusterPrivateAllowlist(
+                    process.env.EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST,
+                );
+
+                for (const entry of parsed.invalid) {
+                    appsDomainLogger.warn(
+                        `Ignoring unparseable ${APPS_CLUSTER_PRIVATE_ALLOWLIST_ENV} entry "${entry}": ` +
+                            `it is not an IP address or CIDR, so it does not widen the cluster address policy.`,
+                    );
+                }
+
+                return parsed.cidrs;
+            },
+        },
+
         // "Ever Works Git" storage option — push customer repos to a
         // platform-owned GitHub org using a server-held PAT, so users can
         // ship without bringing their own GitHub account.
@@ -2062,6 +2372,47 @@ export const config = {
             return raw === 'draft-review' ? 'draft-review' : 'auto-send';
         },
     },
+
+    /**
+     * APW-11 (App Launcher) — the installation switch of FR-54/FR-65, read by
+     * **both** the API guard and the public feature list, so the web UI and the
+     * API can never disagree about whether the launcher exists (APW11-G12,
+     * plan §7).
+     *
+     * ## Why exactly `'true'`, and not the platform's `truthy()` set
+     *
+     * T9's task text asks for the accessor on one line to accept the
+     * `'true' | '1' | 'yes'` set that `apps/api/src/api.controller.ts` uses for
+     * the other public flags, while the line above it specifies the guard as
+     * "404 unless `EVER_WORKS_APP_LAUNCHER_ENABLED === 'true'`". Those two
+     * cannot both hold, and this is the resolution — taken deliberately, and
+     * recorded here rather than left for the next reader to discover:
+     *
+     *   - The guard's contract is the explicit one, and it is what the
+     *     launcher's own controller spec pins today: `'1'`, `'yes'`, `'TRUE'`,
+     *     `''` and `'true '` are all **OFF** (`app-launcher.controller.spec.ts`,
+     *     "treats %p as OFF — only the exact string 'true' switches it on").
+     *   - The rationale offered for the wider set — "no installation that works
+     *     today stops working" — cannot apply to a variable this epic
+     *     introduces: nothing reads `EVER_WORKS_APP_LAUNCHER_ENABLED` outside
+     *     the launcher, and all three deploy manifests ship `'false'` (T31,
+     *     `apps/api/src/app-launcher/__tests__/launcher-deploy-switches.spec.ts`).
+     *   - A surface-wide feature gate fails **closed**: a stray `1` in an
+     *     environment file is far more likely to be a mistake than an
+     *     intentional launch, and this switch is what keeps an unfinished
+     *     feature invisible (404, never 403).
+     *
+     * If the wider set is ever wanted, it is this one function that changes —
+     * the guard, the controller and the public config all read it through here,
+     * which is the whole reason the accessor exists.
+     *
+     * An unset, empty or unrecognised value is OFF.
+     */
+    appLauncher: {
+        isEnabled(): boolean {
+            return process.env.EVER_WORKS_APP_LAUNCHER_ENABLED === 'true';
+        },
+    },
 };
 
 /** AW-05 — the operator env var that turns on each send ceiling platform-wide. */
@@ -2093,4 +2444,252 @@ function parseCsvList(raw: string | undefined): string[] {
         if (value.length > 0) seen.add(value);
     }
     return [...seen];
+}
+
+/* -------------------------------------------------------------------------- *
+ * APW-06 T19 — the apps-domain and cluster-allowlist helpers (plan §8.3, §6.1)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * APW-06 T19 / plan §8.3 — the environment variable whose parse result
+ * `config.everWorks.apps.getClusterPrivateAllowlist()` answers.
+ *
+ * Spelled once, here, and interpolated into the warning so an operator who typos
+ * the name reads the name the platform actually reads. The `k8s` plugin has its
+ * own copy of the same literal (`app-kubeconfig.guard.ts:48`) on purpose: the
+ * plugin never imports this module (plan §6.1:929-930), so the two strings are
+ * the contract rather than a shared constant.
+ */
+const APPS_CLUSTER_PRIVATE_ALLOWLIST_ENV = 'EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST';
+
+/**
+ * The apex the platform's own managed subdomains live under when
+ * `EVER_WORKS_DOMAIN` is unset — the documented default of
+ * `managed-subdomain.service.ts:298`, `cloudflare-dns.provider.ts:430` and
+ * `subdomain-allocator.service.ts:192`, restated so this module cannot disagree
+ * with them about where the platform's addresses are.
+ */
+const PLATFORM_MANAGED_DOMAIN_DEFAULT = 'ever.works';
+
+/**
+ * The logger the two APW-06 accessors of this module report through.
+ *
+ * A module-level Nest `Logger`, not `console`: the same reasoning
+ * `git.facade.ts:347-349` records for its own logger — log output travels through
+ * the standard pipeline and log-level controls apply to it. Nothing logged here
+ * ever carries a secret: the messages name the *variable* and the offending apex
+ * or allow-list entry, never the DNS API token beside them.
+ */
+const appsDomainLogger = new Logger('AppWorksConfig');
+
+/**
+ * Whether the shared-default branch has been recorded in this process (plan
+ * §8.3: "the equality check is satisfied by definition and **recorded as such**").
+ *
+ * Recorded once rather than on every read: the getter is called per request, and
+ * a line per call would turn a configuration decision into log noise — which is
+ * exactly how a real warning gets ignored later.
+ */
+let appsDomainSharedDefaultRecorded = false;
+
+/**
+ * The platform's own apex: `EVER_WORKS_DOMAIN`, defaulting to the documented
+ * `ever.works` when unset — and `null` when it is set to something that is not a
+ * plain dotted DNS name.
+ *
+ * The distinction matters: an **unset** variable is the documented default and is
+ * answered with it, while a **malformed** one is a misconfiguration that must not
+ * be silently repaired into a domain the operator never wrote. `getDomain()`
+ * reports the latter as its own refusal.
+ */
+function platformManagedDomain(): string | null {
+    const raw = process.env.EVER_WORKS_DOMAIN;
+    const text = typeof raw === 'string' ? raw.trim() : '';
+    if (text.length === 0) return PLATFORM_MANAGED_DOMAIN_DEFAULT;
+    return normalizeApexDomain(text);
+}
+
+/**
+ * Every host the platform itself is served from, for the §8.3 relation check:
+ * its apex plus the hosts of the two URLs this tree already reads for the
+ * platform's own API and web app (`PLATFORM_API_URL`, read by
+ * `deploy.service.ts:895`; `NEXT_PUBLIC_APP_URL`, read at
+ * `deploy.service.ts:1344`).
+ *
+ * A URL that is malformed, unset or relative contributes no host — it is not a
+ * platform host to guard against, and inventing one would refuse a legitimate
+ * apex. Deduped, because the API and the web app usually share the apex.
+ */
+function platformManagedDomainHosts(): string[] {
+    const hosts = new Set<string>();
+
+    const platform = platformManagedDomain();
+    if (platform) hosts.add(platform);
+
+    for (const value of [process.env.PLATFORM_API_URL, process.env.NEXT_PUBLIC_APP_URL]) {
+        const host = hostOfUrl(value);
+        if (host) hosts.add(host);
+    }
+
+    return [...hosts];
+}
+
+/** The apex a configured URL is served from, or `null` when it is not a usable absolute URL. */
+function hostOfUrl(raw: string | undefined): string | null {
+    const text = typeof raw === 'string' ? raw.trim() : '';
+    if (text.length === 0) return null;
+
+    try {
+        return normalizeApexDomain(new URL(text).hostname);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * A configured apex, normalized (lowercased, root dot stripped), or `null` when
+ * it is not a plain dotted DNS name.
+ *
+ * Refused shapes, each one a way a person could describe an apex that is not one:
+ * a scheme or a path (`https://apps.example.com/x`), a port
+ * (`apps.example.com:8443`), a wildcard (`*.example.com`), an underscore (not a
+ * hostname, though DNS will carry it), an IP literal (a literal cannot take a
+ * subdomain), a single label (`localhost`, and every internal name — a managed
+ * address must be publicly resolvable), an empty label (`a..b`) and a label over
+ * 63 characters (`apps.example.com` itself is capped at 253).
+ *
+ * Rejecting here rather than trimming to fit is deliberate: a "repaired" apex
+ * would publish app addresses under a host the operator never configured, and the
+ * plan's answer for an unusable apex is to disable the managed subdomain only
+ * (plan §8.3:1138-1140).
+ */
+function normalizeApexDomain(raw: string | undefined): string | null {
+    const text = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    if (text.length === 0) return null;
+
+    const apex = text.endsWith('.') ? text.slice(0, -1) : text;
+    if (apex.length === 0 || apex.length > 253) return null;
+    if (!/^[a-z0-9.-]+$/.test(apex)) return null;
+    if (isIP(apex) !== 0) return null;
+
+    const labels = apex.split('.');
+    if (labels.length < 2) return null;
+
+    for (const label of labels) {
+        if (label.length === 0 || label.length > 63) return null;
+        if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return null;
+    }
+
+    return apex;
+}
+
+/**
+ * Which forbidden relation an explicitly configured apex has to the platform's own
+ * domains — `null` when it has none and the apex is therefore usable (plan
+ * §8.3:1133-1135).
+ *
+ * The three relations are the plan's own list, and each is a cookie boundary being
+ * crossed: an apex **equal to** the platform domain is not dedicated at all; one
+ * **under** it can set a cookie for a domain the platform's session uses; one that
+ * is a **parent** of it can do the same from above. A managed address under
+ * *another Ever product's* domain (`ever.team`, `gauzy.co`) is forbidden too, but
+ * that is a product rule rather than a relation to this installation's domain —
+ * it is enforced where the address is built, from this getter's answer plus the
+ * operator's own configuration.
+ */
+function appsDomainClash(apex: string): string | null {
+    for (const platformHost of platformManagedDomainHosts()) {
+        if (apex === platformHost) return 'equal to';
+        if (apex.endsWith(`.${platformHost}`)) return 'under';
+        if (platformHost.endsWith(`.${apex}`)) return 'a parent of';
+    }
+
+    return null;
+}
+
+/**
+ * Record the shared-default branch once per process (plan §8.3:1135-1138).
+ *
+ * This is the branch that makes `<slug>.ever.works` work out of the box, and the
+ * line says so — plus which safeguards carry the isolation the dedicated-apex
+ * branch would have provided structurally, so an operator reading logs knows what
+ * they have rather than only what they do not.
+ */
+function recordAppsDomainSharedDefault(platform: string): void {
+    if (appsDomainSharedDefaultRecorded) return;
+    appsDomainSharedDefaultRecorded = true;
+
+    appsDomainLogger.log(
+        `EVER_WORKS_APPS_DOMAIN is unset, so the shared default applies: an App Work's managed ` +
+            `subdomain is served as <slug>.${platform} (plan §8.3, Resolution R-16). Cookie ` +
+            `isolation is carried by the platform-domain safeguards — host-only __Host- Secure ` +
+            `cookies on platform routes, no platform session cookie on app hosts — rather than by ` +
+            `a dedicated apex.`,
+    );
+}
+
+/** The parse result of the cluster private allow-list: what survives, and what did not. */
+interface ClusterPrivateAllowlistParse {
+    /** The entries that parse, **verbatim** — exactly the strings the operator typed. */
+    cidrs: string[];
+    /** The entries that do not, so the caller can warn about each one before dropping it. */
+    invalid: string[];
+}
+
+/**
+ * APW-06 T19 / plan §6.1:922-934 — parse `EVER_WORKS_APPS_CLUSTER_PRIVATE_ALLOWLIST`.
+ *
+ * The semantics are copied from the `k8s` plugin's `parsePrivateAllowlist`
+ * (`app-kubeconfig.guard.ts:184-201`) on purpose, down to "the entry is returned
+ * verbatim": one environment value must mean one list on both sides of the worker
+ * boundary, and the plugin's copy is the one the guard actually classifies
+ * addresses with. Comma- or whitespace-separated, a bare address reading as `/32`
+ * or `/128`, blank tokens skipped, everything else reported as `invalid` and
+ * dropped (it never widens the policy).
+ *
+ * ⚠️ Provisional: the plugin SDK's `parsePrivateAllowlist` (APW06-G20,
+ * `@ever-works/plugin/helpers/cluster-address-policy`) does not exist on this
+ * branch, so this is the narrowest local seam; the swap is one import and one
+ * delegation, and nothing here is removed when it lands.
+ */
+function parseClusterPrivateAllowlist(
+    raw: string | undefined | null,
+): ClusterPrivateAllowlistParse {
+    const cidrs: string[] = [];
+    const invalid: string[] = [];
+
+    for (const token of String(raw ?? '').split(/[\s,]+/)) {
+        const entry = token.trim();
+        if (entry.length === 0) continue;
+
+        if (isCidrEntry(entry)) {
+            cidrs.push(entry);
+        } else {
+            invalid.push(entry);
+        }
+    }
+
+    return { cidrs, invalid };
+}
+
+/** Whether one allow-list entry is an IP address or an address/prefix pair of a sane width. */
+function isCidrEntry(entry: string): boolean {
+    const slash = entry.lastIndexOf('/');
+    const addressPart = stripBrackets(slash === -1 ? entry : entry.slice(0, slash));
+    const prefixPart = slash === -1 ? null : entry.slice(slash + 1).trim();
+
+    const family = isIP(addressPart);
+    if (family !== 4 && family !== 6) return false;
+
+    if (prefixPart === null) return true;
+    if (!/^\d+$/.test(prefixPart)) return false;
+
+    const prefix = Number(prefixPart);
+    return Number.isSafeInteger(prefix) && prefix >= 0 && prefix <= (family === 4 ? 32 : 128);
+}
+
+/** `[::1]` → `::1`; anything else unchanged. Bracketed IPv6 is what a URL spells, not a CIDR. */
+function stripBrackets(value: string): string {
+    const text = value.trim();
+    return text.startsWith('[') && text.endsWith(']') ? text.slice(1, -1) : text;
 }

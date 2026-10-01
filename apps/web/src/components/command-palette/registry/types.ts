@@ -38,6 +38,17 @@ export interface PaletteCommandContext {
     switchOrganization: (slug: string) => void;
     organizations: ReadonlyArray<{ slug: string; label: string }>;
     activeOrganizationSlug: string | null;
+    /**
+     * APW-11 T15 — open the App Launcher, supplied by the provider that mounts it
+     * (`components/app-launcher/AppLauncherProvider.tsx`).
+     *
+     * Optional, and the command's `available` gate reads exactly this: an
+     * installation without the launcher — or one where the provider failed to
+     * load its element — must not offer a command that opens nothing. That is the
+     * same convention `setSidebarCollapsed`/`setChatOpen` already use, and it is
+     * why the gate is `!== undefined` rather than a truthiness check on a flag.
+     */
+    openAppLauncher?: () => void;
 }
 
 /** An action the palette can run. Commands are code, not data. */

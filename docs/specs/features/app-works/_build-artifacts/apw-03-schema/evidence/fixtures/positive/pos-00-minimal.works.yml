@@ -1,0 +1,10 @@
+# POSITIVE FIXTURE pos-00 — the smallest valid App spec.
+# Expected: JSON Schema PASS · rule layer PASS.
+# CONTRACTS.md §1: "Every field is optional unless marked **required**" — inside the App spec only
+# `source` (schema.md §4) and `source.relation` (§5) are required, so this document must be accepted.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }

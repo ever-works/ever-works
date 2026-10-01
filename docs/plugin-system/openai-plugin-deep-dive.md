@@ -157,6 +157,6 @@ const available = await openaiPlugin.isAvailable({ apiKey: userApiKey });
 
 ## Related Plugins
 
-- [Anthropic Plugin Deep Dive](./anthropic-plugin-deep-dive) -- alternative AI provider using Claude models.
-- [Ollama Plugin Deep Dive](./ollama-plugin-deep-dive) -- self-hosted AI provider for local inference.
-- [OpenAI Plugin](./openai-plugin) -- overview documentation for the OpenAI plugin.
+- [Anthropic Plugin Deep Dive](./anthropic-plugin-deep-dive.md) -- alternative AI provider using Claude models.
+- [Ollama Plugin Deep Dive](./ollama-plugin-deep-dive.md) -- self-hosted AI provider for local inference.
+- [OpenAI Plugin](./openai-plugin.md) -- overview documentation for the OpenAI plugin.

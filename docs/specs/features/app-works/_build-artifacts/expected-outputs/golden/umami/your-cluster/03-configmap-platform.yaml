@@ -1,0 +1,28 @@
+# GOLDEN — umami · target your-cluster · ConfigMap `app-platform-3289ab9d92`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.7 (the platform ConfigMap holds the non-secret `EVER_WORKS_*` variables;
+# Spec      : `checksum` = first 16 hex of sha256 over `name=value` lines of both maps sorted by name)
+# Spec      : APW-06 spec.md FR-18 (read-only variables prefixed `EVER_WORKS_`, added by the platform)
+# Spec      : `EVER_WORKS_SOURCE_URL` is absent: FR-44 needs a licence class that requires offering source,
+# Spec      : and all three Blueprints classify MIT / green (works.yml licence block).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: app-platform-3289ab9d92
+    namespace: ew-umami-33333333
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: umami
+        ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+        ever-works.io/kind: app
+immutable: true
+data:
+    EVER_WORKS_APP_HOST: umami.ever.works
+    EVER_WORKS_APP_URL: https://umami.ever.works
+    EVER_WORKS_APP_COMMIT: c3d4e5f60718293a4b5c6d7e8f9012345678b1c2
+    EVER_WORKS_DEPLOYMENT_ID: 99999999-9999-4999-8999-999999999999

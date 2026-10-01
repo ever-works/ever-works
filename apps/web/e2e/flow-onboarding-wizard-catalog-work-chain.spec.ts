@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
+import { armDeadTokenRefusal, assertDeadTokenRefusalProven } from './helpers/github-fake-control';
 
 /**
  * ONBOARDING → CATALOG → (register-work agent plane) → FIRST WORK, end-to-end.
@@ -73,6 +74,27 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
+
+/**
+ * The deliberately-bogus GitHub token the register-work probes below send.
+ * Named because the credential-gate case arms a refusal for exactly this token
+ * (C14): the fake GitHub answers `GET /user` 200 for *every* token, so an
+ * unarmed "unresolvable token" resolves and the request is refused by the NEXT
+ * gate (`gh_repo_access_denied`) instead — the PROBED CONTRACTS note above names
+ * `gh_credential_invalid`, and that is the gate the case asserts.
+ */
+const UNRESOLVABLE_GH_TOKEN = 'ghp_fake_abcdef';
+
+/**
+ * The lane's fake GitHub (the PR lane starts it; `plan.md` §9.1, CONTRACTS §7).
+ * Unset outside the fake lanes, where it falls back to the fake's documented
+ * default port — `armDeadTokenRefusal` shape-probes the origin before arming, so
+ * a live lane that happens to have something else on 3900 arms nothing.
+ */
+const FAKE_GITHUB_URL = (process.env.APW_E2E_GITHUB_FAKE_URL ?? 'http://127.0.0.1:3900').replace(
+    /\/+$/,
+    '',
+);
 
 const AI_CHOICES = ['ever-works', 'openrouter', 'claude-code', 'codex', 'gemini', 'grok'] as const;
 const STORAGE_CHOICES = ['ever-works-git', 'user-github', 'user-gitlab', 'user-git'] as const;
@@ -663,7 +685,7 @@ test.describe('Onboarding chain — authenticated wizard plane vs public agent p
         // A bad repo (Bearer present, GH token present) → class-validator array 400,
         // and the feature is ON (never the 404 feature_disabled envelope).
         const badRepo = await request.post(`${API_BASE}/api/register-work`, {
-            headers: { ...authedHeaders(token), 'X-GitHub-Token': 'ghp_fake_abcdef' },
+            headers: { ...authedHeaders(token), 'X-GitHub-Token': UNRESOLVABLE_GH_TOKEN },
             data: { repo: 'not-a-github-url' },
         });
         expect(badRepo.status()).toBe(400);
@@ -684,12 +706,18 @@ test.describe('Onboarding chain — authenticated wizard plane vs public agent p
         });
 
         // An unresolvable token on the agent plane → 403 gh_credential_invalid.
+        // C14: ARMED for this case. The fake GitHub answers `GET /user` 200 for
+        // every token, so unarmed the identity resolves and the 403 below is
+        // `gh_repo_access_denied` from the NEXT gate — the same status, a
+        // different refusal, and no evidence about the credential at all.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, UNRESOLVABLE_GH_TOKEN);
         const attempt = await request.post(`${API_BASE}/api/register-work`, {
-            headers: { ...authedHeaders(token), 'X-GitHub-Token': 'ghp_fake_abcdef' },
+            headers: { ...authedHeaders(token), 'X-GitHub-Token': UNRESOLVABLE_GH_TOKEN },
             data: { repo: 'https://github.com/octocat/hello-world' },
         });
         expect(attempt.status()).toBe(403);
         expect((await attempt.json()).code).toBe('gh_credential_invalid');
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
 
         // A token shorter than 4 chars trips the malformed pre-check → 401.
         const shortTok = await request.post(`${API_BASE}/api/register-work`, {

@@ -690,6 +690,56 @@ route whose true contract (curl + node fetch) is 401; concurrent cascading
 team DELETEs can hit a sqlite transaction-serialization 500 (driver
 artifact — the no-resurrection invariant still holds).
 
+## APW-13 P0 — regression pack (T14–T19, added 2026-09-18)
+
+Five specs for ACCEPTANCE §5's regression rows, one per row, all request-level
+(`@playwright/test`'s `request` fixture against the API) so they need no browser
+and no `storageState`. They run in the **default** config's `chromium` project
+beside the rest of the sharded PR suite — the App Works live/kind lanes own
+`playwright.app-works.config.ts` and never collect these.
+
+`[~]` marks a spec whose connection-free half runs for real while some half carries a `test.fixme`
+marker naming the surface it waits for, or — for the managed subdomain — the DNS-provider marker the
+task names. A `fixme`'d test is visible in `--list`, counts as skipped, and is un-fixme'd by the task
+that lands its surface. **The shared `test.fixme('APW-13 T63: no supported GitHub connection surface')`
+marker is GONE as of T63** (`978f67ca4`): the connection surface landed, **all three marker occurrences**
+were removed (the two remaining `APW-13 T63` mentions in this tree are prose attributions inside
+`helpers/github-connection.ts` and its unit spec, not markers — checked), and the markers that remain
+name different blockers (T14's D1 guard, T16's readiness/deploy/upstream-PR rows, T18's DNS fake) —
+none of them the connection. **T15's marker is gone too (2026-09-25)**: APW-01 T12 + T13 (`5b838cb97`)
+made an `app` create fork, so the fork-success spec's success halves run and its old "no fork call"
+test — which e2e run 35455975352 measured failing with `400 target_owner_unavailable` — was replaced by
+the refusal it now meets.
+
+| Spec (under `apps/web/e2e/`)                 | Status | Covers                 | Runs for real                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Carries                                                                                                                                                                               |
+| -------------------------------------------- | ------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow-repo-work-kind-regression.spec.ts`     | [~]    | ACC-REG-01, ACC-NEG-15 | the 400 refusals a fresh account gets (no URL / non-GitHub URL / no connected account), the 401, the zero-GitHub-call proof via the fake, the same refusals with the works-app chip on, **and — since T63 — a connected account's create (200) plus the 409 for a second account wrapping the same repository**                                                                                                                                                                                                                                                                                                                                                          | `test.fixme('APW-13 T14: … the D1 guard on all three routes')` — the generate/deploy/write refusals, which reach `assertNotRepositoryWork` on only 1 of the 3 routes the task names   |
+| `flow-template-fork-success.spec.ts`         | [x]    | ACC-REG-02             | with a connected account and a per-run seeded upstream: **a fork into an account that is not the caller's → `400 target_owner_unavailable` and no fork request** (the inspect beside it proves the owner, not the repository, is refused); **a fork into the caller's login and one into `apw-e2e-org` → `200`, `appSource.relation: "fork"`, and exactly one `POST /repos/<upstream>/forks` carrying the caller's token identity**                                                                                                                                                                                                                                      | — (no marker since 2026-09-25; the three cases have not yet run on a lane — the next `e2e.yml` dispatch is their first run)                                                           |
+| `flow-activity-deploy-and-pr-events.spec.ts` | [~]    | ACC-REG-07             | the Activity read surface every step lands on: a Work step appears as a named row (`actionType` / `action` / `status` / `summary`, no payload), 401 unauthenticated, owner-scoped                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `test.fixme('APW-13 T16: forks happen since APW-01 T13, but the rows this case reads do not …')` — `app.fork.ready` (readiness run), `app.deploy.succeeded`, `app.upstream_pr.opened` |
+| `flow-github-intake-signed-delivery.spec.ts` | [x]    | ACC-REG-12             | a delivery signed with the CI webhook secret is accepted and dispatched on both receiver routes, and unsigned / wrong-secret / tampered / header-less deliveries are refused                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | — (needs no connection: the spec signs its own payload)                                                                                                                               |
+| `flow-managed-subdomain-allocation.spec.ts`  | [~]    | ACC-REG-05             | on `e2e.yml`'s 32-shard matrix: the unallocated read and the six `PUT` refusals. The per-user cap of 3 on the `ever-works` deploy provider and the DNS-provider boundary a successful allocation stops at need `DEPLOY_EVER_WORKS_ENABLED=true`, which the matrix leaves off on purpose, so there both read the switch from the API and are **skipped by name**. They run on the `e2e-app-works-flags-on` job (`a0428d0ac`), which turns the switch on and sets `APW_E2E_FLAGS_ON_LANE=1`, so a switch reading off fails there instead of skipping (before that job, run 35455975352, job 105940305867, measured both red with `deployProvider` persisted as `"vercel"`) | `test.fixme('APW-13 T18: needs a DNS provider fake')` — a successful allocation and the CNAME it writes                                                                               |
+
+Lane switches these specs read (`plan §8.3` / `tasks.md:201-204` name them for
+**both** the API and Playwright): `EVER_WORKS_E2E_FAKES=1` +
+`APW_E2E_GITHUB_FAKE_URL` (the fake GitHub), `EVER_WORKS_APP_WORKS_ENABLED=true`
+(the works-app chip), `DEPLOY_EVER_WORKS_ENABLED=true` and
+`EVER_WORKS_DEPLOY_MAX_WORKS_PER_USER` (the deploy cap — without the first, the
+platform rewrites `deployProvider: 'ever-works'` to `'vercel'` and the cap is
+unreachable), and `GITHUB_APP_WEBHOOK_SECRET` (the secret the intake spec signs
+with, the same variable the API reads). **Measured against `e2e.yml` (2026-09-25):
+it sets the fake GitHub pair, `EVER_WORKS_APP_WORKS_ENABLED` and
+`GITHUB_APP_WEBHOOK_SECRET`, but neither `DEPLOY_EVER_WORKS_ENABLED` nor the cap
+variable** — which is why the managed-subdomain row above had two red cases in that
+workflow. **Settled 2026-09-25 (owner decision, `a0428d0ac`):** the 32-shard matrix
+leaves `DEPLOY_EVER_WORKS_ENABLED` and `EVER_WORKS_APP_LAUNCHER_ENABLED` unset (off),
+and a second job, `e2e-app-works-flags-on`, sets both to `true` (the cap
+variable stays unset, so its default of 3 applies) and runs only
+`flow-managed-subdomain-allocation.spec.ts` (ACC-REG-05's cap and allocation boundary)
+and `flow-app-launcher-apps.spec.ts` (ACC-E2E-12). On the matrix those cases are
+skipped by name; on that job `APW_E2E_FLAGS_ON_LANE=1` turns a switch that reads off
+into a failure. `e2e.yml` has no `pull_request` trigger, so the job runs wherever the
+workflow runs (stage pushes and dispatches).
+
 ## Pass 15+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions

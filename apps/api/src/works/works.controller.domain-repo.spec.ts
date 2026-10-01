@@ -502,6 +502,35 @@ describe('WorksController — domain + repository endpoints', () => {
             expect(result).toBe(fake);
         });
 
+        // Every page mount of a website/directory Work calls this endpoint, and
+        // App Works (no data repository) get the service's no-op answer. A sync
+        // that changed nothing must leave no trace: no cache invalidation and
+        // no "Synced work data" activity row per page view.
+        it.each([
+            ['an unchanged Work', 'Work already up to date.'],
+            [
+                'a kind without a data repository',
+                'Nothing to sync: a "app" Work has no data repository.',
+            ],
+        ])(
+            '%s (updated: []): returns the result without invalidating caches or logging',
+            async (_label, message) => {
+                const fake: any = { status: 'success', updated: [], message };
+                s.workLifecycleService.syncFromDataRepository.mockResolvedValue(fake);
+
+                const result = await controller.syncWorkData(auth, 'w-1');
+
+                expect(s.workLifecycleService.syncFromDataRepository).toHaveBeenCalledWith('w-1', {
+                    id: 'user-1',
+                });
+                expect(
+                    s.cacheEntryRepository.typeormAdapter.deleteUnscopedEntriesLike,
+                ).not.toHaveBeenCalled();
+                expect(s.activityLogService.log).not.toHaveBeenCalled();
+                expect(result).toBe(fake);
+            },
+        );
+
         it('does not invalidate caches or log when syncFromDataRepository rejects', async () => {
             s.workLifecycleService.syncFromDataRepository.mockRejectedValue(new Error('git'));
 

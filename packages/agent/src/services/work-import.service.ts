@@ -57,6 +57,7 @@ import { slugifyText } from '@src/utils/text.utils';
 import { GenerationMethod } from '@src/items-generator/dto';
 import { WorkGenerationHistory } from '@src/entities/work-generation-history.entity';
 import { GeneratorFormSchemaService } from './generator-form-schema.service';
+import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
 
 import { OperationTriggerContext, DEFAULT_TRIGGER_CONTEXT } from './types/trigger-context.types';
 
@@ -108,7 +109,29 @@ export class WorkImportService {
         // the worker falls back to the instance default.
         @Optional()
         private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
+        // templates-catalog FR-5 f — keeps an imported Work off a RETIRED
+        // saved website default (see `getWebsiteTemplateIdForNewWork`).
+        // `WorkModule` imports `TemplateCatalogModule`, so Nest always injects
+        // it; optional only so isolated unit tests keep constructing, like the
+        // two above. Without it an import stores no template, as before.
+        @Optional()
+        private readonly templateCatalogService?: TemplateCatalogService,
     ) {}
+
+    /**
+     * The website template a Work this service creates must be pinned to, or
+     * `null` to store none and inherit the user's saved default as always.
+     * An imported Work names no template, so when the saved default is a
+     * RETIRED row (an App Blueprint) it would otherwise generate or update its
+     * website from the Blueprint (templates-catalog FR-5 f).
+     */
+    private async getWebsiteTemplateIdForNewWork(userId: string): Promise<string | null> {
+        if (!this.templateCatalogService) {
+            return null;
+        }
+        // Imported Works take the column's default kind.
+        return this.templateCatalogService.getWebsiteTemplateIdForNewWork(userId, undefined);
+    }
 
     /**
      * Analyze a repository to detect its type and structure
@@ -353,19 +376,21 @@ export class WorkImportService {
             // the description field to prevent stored XSS if the description is later
             // rendered without encoding. Legitimate git URLs never contain < > " ' `.
             const safeSourceUrl = dto.sourceUrl.replace(/[<>"'`\\]/g, '');
-            const work = await this.workRepository.create(
-                {
-                    slug,
-                    name: workName,
-                    description: `Imported from ${safeSourceUrl}`,
-                    userId: user.id,
-                    owner: workOwner,
-                    organization: dto.organization || false,
-                    gitProvider: dto.gitProvider,
-                    deployProvider: dto.deployProvider,
-                },
-                user,
-            );
+            const workData: Partial<Work> = {
+                slug,
+                name: workName,
+                description: `Imported from ${safeSourceUrl}`,
+                userId: user.id,
+                owner: workOwner,
+                organization: dto.organization || false,
+                gitProvider: dto.gitProvider,
+                deployProvider: dto.deployProvider,
+            };
+            const pinnedWebsiteTemplateId = await this.getWebsiteTemplateIdForNewWork(user.id);
+            if (pinnedWebsiteTemplateId) {
+                workData.websiteTemplateId = pinnedWebsiteTemplateId;
+            }
+            const work = await this.workRepository.create(workData, user);
 
             if (dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING) {
                 return this.handleLinkExisting(work, dto, parsed, user);
@@ -523,19 +548,21 @@ export class WorkImportService {
         // the description field to prevent stored XSS if the description is later
         // rendered without encoding. Legitimate git URLs never contain < > " ' `.
         const safeInputSourceUrl = input.sourceUrl.replace(/[<>"'`\\]/g, '');
-        const work = await this.workRepository.create(
-            {
-                slug,
-                name: normalizedName,
-                description: `Imported from ${safeInputSourceUrl}`,
-                userId: user.id,
-                owner: input.sourceOwner,
-                organization: input.organization || false,
-                gitProvider: input.gitProvider,
-                deployProvider: undefined,
-            },
-            user,
-        );
+        const workData: Partial<Work> = {
+            slug,
+            name: normalizedName,
+            description: `Imported from ${safeInputSourceUrl}`,
+            userId: user.id,
+            owner: input.sourceOwner,
+            organization: input.organization || false,
+            gitProvider: input.gitProvider,
+            deployProvider: undefined,
+        };
+        const pinnedWebsiteTemplateId = await this.getWebsiteTemplateIdForNewWork(user.id);
+        if (pinnedWebsiteTemplateId) {
+            workData.websiteTemplateId = pinnedWebsiteTemplateId;
+        }
+        const work = await this.workRepository.create(workData, user);
 
         return this.handleLinkExisting(
             work,
@@ -866,7 +893,7 @@ export class WorkImportService {
             const worksConfig = await this.loadAndApplySourceWorksConfig(work, user, {
                 owner: source.owner,
                 repo: source.repo,
-                url: this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
+                url: await this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
                 type: ImportSourceTypeEnum.DATA_REPO as ImportSourceType,
                 role: 'data',
             });
@@ -978,7 +1005,7 @@ export class WorkImportService {
         const previousSourceRepository =
             work.sourceRepository ||
             ({
-                url: this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
+                url: await this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
                 owner: source.owner,
                 repo: source.repo,
                 type: ImportSourceTypeEnum.WORKS_CONFIG as ImportSourceType,

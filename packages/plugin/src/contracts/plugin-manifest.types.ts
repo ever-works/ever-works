@@ -95,7 +95,36 @@ export const PLUGIN_CATEGORIES = [
 	// `metrics-provider`). First-party plugins: `custom-http` + `stripe`
 	// (PostHog + Google Analytics follow in PR-9). See
 	// `capabilities/metrics-provider.interface.ts`.
-	'metrics'
+	'metrics',
+	// APW-07 T3 — App dependency providers (PostgreSQL, Redis, object storage,
+	// SMTP). Category of `IAppDependencyProvider`; see
+	// `capabilities/app-dependency.interface.ts`. Added by the coordinator on
+	// 2026-09-18, together with the `CATEGORY_ICONS` / `CATEGORY_LABELS` entries
+	// in `apps/web/src/lib/utils/plugin-category-icons.ts` that this tuple feeds:
+	// those maps are `Record<PluginCategory, …>`, so a category appended here
+	// without them is a **build break in apps/web**, not a cosmetic gap. That is
+	// why the capability landed in the previous round and this line did not.
+	'app-dependency',
+	// APW-05 T2 — build providers: the plugin that turns a commit into an image.
+	// Category of `IBuildPlugin` (plan §4.1); `github-actions-build` is the P1
+	// plugin and P3 adds `apps-builder` under the same category (plan §4.3,
+	// §4.13). Appended last, and — like the line above — landed together with its
+	// `CATEGORY_ICONS` / `CATEGORY_LABELS` entries in
+	// `apps/web/src/lib/utils/plugin-category-icons.ts`, because those two maps
+	// are `Record<PluginCategory, …>` and a category without them breaks the
+	// apps/web type-check.
+	'build',
+	// APW-12 T4 — the Ever ID relying party: identity providers (plan §4.1,
+	// `capabilities/identity-provider.interface.ts`). First-party plugin:
+	// `oidc-identity` (APW-12 T5/T6). Appended **last**, and — like the two lines
+	// above — landed in the same change as its `CATEGORY_ICONS` / `CATEGORY_LABELS`
+	// entries in `apps/web/src/lib/utils/plugin-category-icons.ts`, because those
+	// two maps are `Record<PluginCategory, …>` and a category without them breaks
+	// the apps/web type-check. The append-only property this tuple is held to is
+	// pinned by `__tests__/app-dependency-capability.spec.ts` (the pre-APW-07 slice
+	// and its order) and by `__tests__/identity-provider.interface.spec.ts` (where
+	// this member sits); a mid-tuple insertion still fails both.
+	'identity'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
@@ -389,6 +418,38 @@ export interface PluginManifest {
 	 * router. Omit to let the router fall back to its category-based
 	 * defaults (search/ai/extractor → `sync`, pipeline/deployment →
 	 * `long-running`).
+	 */
+	readonly executionProfile?: PluginExecutionProfile;
+	/**
+	 * Dynamic plugin distribution (EW-693) — the methods the platform may
+	 * call BY NAME through its execution router (in-process, or in the
+	 * `run-plugin-operation` worker task).
+	 *
+	 * An allowlist: an operation this list does not declare is refused,
+	 * whatever the plugin class defines. TypeScript `private`/`protected`
+	 * markers are erased at runtime, so without a declaration a request could
+	 * reach any helper method a plugin class or its base classes carry.
+	 * Omitted or empty = no operation can be called by name.
+	 *
+	 * Declare it (and `executionProfile`) in package.json: a lazily loaded
+	 * plugin is routed BEFORE it loads, so the loader never takes either field
+	 * from the runtime `getManifest()`. A reserved name (a lifecycle hook) or
+	 * an otherwise malformed list fails manifest validation, and the plugin is
+	 * not loaded.
+	 */
+	readonly operations?: readonly PluginOperationDeclaration[];
+}
+
+/**
+ * Dynamic plugin distribution (EW-693) — one operation a plugin lets the
+ * platform call by name (see {@link PluginManifest.operations}).
+ */
+export interface PluginOperationDeclaration {
+	/** The method name on the plugin class, e.g. `runSandboxSession`. */
+	readonly name: string;
+	/**
+	 * Where this operation runs. Overrides the manifest-level
+	 * {@link PluginManifest.executionProfile} for this operation only.
 	 */
 	readonly executionProfile?: PluginExecutionProfile;
 }

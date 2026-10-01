@@ -1,0 +1,28 @@
+# GOLDEN — app-fixture-hello · target your-cluster · ConfigMap `app-platform-c35b103be8`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml (sha256 afd38c6e24f3f8e49894845107a49b36b054d9546bf83795e0f339140a67cdf4)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.7 (the platform ConfigMap holds the non-secret `EVER_WORKS_*` variables;
+# Spec      : `checksum` = first 16 hex of sha256 over `name=value` lines of both maps sorted by name)
+# Spec      : APW-06 spec.md FR-18 (read-only variables prefixed `EVER_WORKS_`, added by the platform)
+# Spec      : `EVER_WORKS_SOURCE_URL` is absent: FR-44 needs a licence class that requires offering source,
+# Spec      : and all three Blueprints classify MIT / green (works.yml licence block).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: app-platform-c35b103be8
+    namespace: ew-app-fixture-hello-22222222
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+immutable: true
+data:
+    EVER_WORKS_APP_HOST: app-fixture-hello.ever.works
+    EVER_WORKS_APP_URL: https://app-fixture-hello.ever.works
+    EVER_WORKS_APP_COMMIT: b1c2d3e4f5061728394a5b5c6d7e8f9012345678
+    EVER_WORKS_DEPLOYMENT_ID: 77777777-7777-4777-8777-777777777777

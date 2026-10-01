@@ -1,0 +1,132 @@
+{
+	"_comment": "APW-06 T6 golden input, built from APW-03 schema.md §24.3 (web + worker with Redis) plus the volume of §10. The worker is 1 replica because a volume and more than one replica is refused at deploy time (§4.6, FR-16, ACC-06-18) — the refusal itself is exercised by mutating this input to replicas: 2 in the spec. Every host is RFC 2606 (example.com) and the digest is a synthetic 64-hex value — no real digest, token or hostname.",
+	"ref": {
+		"workId": "1a2b3c4d-1111-4222-8333-444455556666",
+		"namespace": "ew-helpdesk-1a2b3c4d",
+		"target": "your-cluster"
+	},
+	"purpose": "deploy",
+	"workSlug": "helpdesk",
+	"deploymentId": "5e6f7a8b-3333-4444-8555-666677778888",
+	"deploymentShort": "5e6f7a8b",
+	"specCommitSha": "fedcba9876543210fedcba9876543210fedcba98",
+	"isFirstDeploymentOnCluster": false,
+	"skipPreDeployJobs": false,
+	"image": {
+		"reference": "registry.example.com/example-org/helpdesk@sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+	},
+	"components": [
+		{
+			"name": "web",
+			"role": "web",
+			"command": ["node", "dist/server.js"],
+			"port": 8080,
+			"replicas": 1,
+			"writableRootFilesystem": false,
+			"probes": {
+				"readiness": {
+					"http": "/healthz",
+					"periodSeconds": 10,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 3
+				},
+				"liveness": {
+					"http": "/healthz",
+					"periodSeconds": 30,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 3
+				}
+			},
+			"resources": { "cpu": "500m", "memory": "768Mi", "memoryLimit": "1536Mi" },
+			"volumes": [],
+			"primary": true,
+			"deadlineSeconds": 750,
+			"internalUrl": "http://web.ew-helpdesk-1a2b3c4d.svc.cluster.local"
+		},
+		{
+			"name": "worker",
+			"role": "worker",
+			"command": ["node", "dist/worker.js"],
+			"replicas": 1,
+			"writableRootFilesystem": false,
+			"probes": {},
+			"resources": { "cpu": "250m", "memory": "512Mi", "cpuLimit": "1", "memoryLimit": "1Gi" },
+			"volumes": [{ "name": "uploads", "path": "/data/uploads", "size": "5Gi", "backup": true }],
+			"primary": false,
+			"deadlineSeconds": 300,
+			"internalUrl": "http://worker.ew-helpdesk-1a2b3c4d.svc.cluster.local"
+		}
+	],
+	"jobs": [
+		{
+			"name": "migrate",
+			"when": "pre-deploy",
+			"component": "web",
+			"command": ["node", "dist/migrate.js"],
+			"timeoutSeconds": 900,
+			"retries": 1
+		}
+	],
+	"cron": [
+		{
+			"name": "purge-trash",
+			"schedule": "30 3 * * *",
+			"component": "worker",
+			"command": ["node", "dist/purge.js"],
+			"timeoutSeconds": 300,
+			"concurrency": "forbid"
+		}
+	],
+	"smoke": [
+		{
+			"name": "health",
+			"component": "web",
+			"http": { "method": "GET", "path": "/healthz" },
+			"expect": { "status": [200] },
+			"when": "always"
+		}
+	],
+	"env": {
+		"values": {
+			"DATABASE_URL": "postgres://app:fixture-placeholder-password@db.example.com:5432/helpdesk",
+			"REDIS_URL": "redis://:fixture-placeholder-password@cache.example.com:6379",
+			"S3_ENDPOINT": "http://objects.example.com:9000",
+			"SESSION_SECRET": "fixture-placeholder-session-secret",
+			"SIGNUP_ENABLED": "false"
+		},
+		"checksum": "b41d7e6c0a93f285",
+		"secretNames": ["DATABASE_URL", "REDIS_URL", "SESSION_SECRET"]
+	},
+	"hosts": {
+		"primary": "helpdesk.example.com",
+		"extra": ["support.example.com"],
+		"previous": ["old-helpdesk.example.com"]
+	},
+	"ingress": {
+		"className": "traefik",
+		"controllerNamespace": "traefik",
+		"tls": "cert-manager",
+		"issuer": "letsencrypt"
+	},
+	"network": {
+		"isolation": true,
+		"extraEgress": [{ "cidr": "192.0.2.0/24", "ports": [5432, 6379] }],
+		"needsHairpin": true
+	},
+	"policy": {
+		"podSecurity": "baseline",
+		"allowRoot": false,
+		"runtimeClassName": null,
+		"quota": null,
+		"limitRange": {
+			"defaultRequest": { "cpu": "100m", "memory": "128Mi" },
+			"defaultLimit": { "cpu": "1", "memory": "512Mi", "ephemeralStorage": "1Gi" },
+			"max": { "cpu": "8", "memory": "64Gi" }
+		},
+		"cronMinIntervalMinutes": 5,
+		"scaleFailedFirstDeployToZero": true,
+		"requireIsolationEnforced": true
+	}
+}

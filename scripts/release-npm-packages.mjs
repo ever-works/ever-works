@@ -559,6 +559,19 @@ async function readRegistry(registry, name, token) {
 		const authed = await get(true);
 		if (authed.ok) return { readable: true, ...parsePackument(await authed.json()), restricted: true };
 		if (authed.status === 404) return { readable: true, ...empty, restricted: false };
+		// 402 "You need a paid account to perform this action": the org's plan
+		// lapsed, so npm will not SHOW us a private package. It exists — the
+		// anonymous 404 above means private, not absent — we simply cannot see
+		// its versions. Refusing to publish here is the worst answer available:
+		// publishing is still allowed, every npm publish carries --access public,
+		// and that publish is the ONE thing that makes the package public again
+		// (npm refuses `npm access set` from any CI token). So treat it as
+		// "private, contents unknown" and let the publish decide: if the version
+		// really is taken, npm answers with a publish conflict, which is handled
+		// at the publish site. This is how the 54 packages stranded by a lapsed
+		// plan get out — 2026-09-21, run 35541665509 failed all of them here.
+		if (authed.status === 402)
+			return { readable: true, ...empty, restricted: true, unreadable: true, error: 'HTTP 402 (plan lapsed)' };
 		return { readable: false, ...empty, error: `HTTP ${authed.status} (NPM_TOKEN rejected?)` };
 	}
 
@@ -825,6 +838,14 @@ async function main() {
 							`${r.id}: not visible anonymously and ${r.tokenEnv} is unset — cannot tell restricted from absent`
 						);
 					}
+					if (states[r.id].unreadable) {
+						// Not an error: the publish below still runs, and it is the
+						// only thing that can un-private the package.
+						row.actions.push(`⚠ ${r.id} versions unknown (402)`);
+						console.log(
+							`::warning::${pkg.name}: npm answered 402 to the authenticated read — the @ever-works plan has lapsed, so a private package's versions cannot be listed. Publishing anyway, with --access public, which is what makes it public again.`
+						);
+					}
 				}
 				if (!readable.length) throw new Error('no selected registry is readable');
 
@@ -869,7 +890,11 @@ async function main() {
 				const restrictedOnNpm = states.npm?.restricted === true;
 				if (restrictedOnNpm && chosen) {
 					restrictedOnNpmList.push(pkg.name);
-					row.actions.push('⚠ still private on npm');
+					// State BEFORE this run, not after: the publish below carries
+					// --access public, which is what flips it. A row that ends in
+					// `published → npm` is public now; one that ends in `⚠ published
+					// without --access`, or in an error, is not.
+					row.actions.push('was private on npm');
 				}
 
 				if (!chosen) {
@@ -941,7 +966,19 @@ async function main() {
 								run('npm', args, { cwd: tmp, env: { ...env, NPM_CONFIG_USERCONFIG: userconfigs[r.id] } });
 							} catch (err) {
 								const first = describeExecError(err);
-								if (!fallback || !/EOTP|one-time pass|E403|forbidden|access/i.test(first)) throw err;
+								// A VERSION CONFLICT must never land here. npm answers
+								// "cannot publish over the previously published versions"
+								// with `E403 Forbidden`, which the access pattern below
+								// matches — retrying without --access would publish the
+								// same tarball a second time for a guaranteed second
+								// E403, and log an access/2FA problem that does not
+								// exist. Conflicts belong to the outer catch, which
+								// checks whether the registry really holds this content.
+								const conflict = /previously published|cannot publish over|EPUBLISHCONFLICT|E409/i.test(
+									first
+								);
+								if (!fallback || conflict || !/EOTP|one-time pass|E403|forbidden|access/i.test(first))
+									throw err;
 								console.log(
 									`::warning::${pkg.name}: npm refused the access change on publish; publishing without it, so the package stays PRIVATE. npm said:
 ${lastLines(first, 5)}`

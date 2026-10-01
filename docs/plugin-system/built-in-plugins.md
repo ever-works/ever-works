@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 103 plugins under `packages/plugins/`, spanning **19 of the 24 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, and utility. (`form`, `integration`, `theme`, `memory`, and `rag` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
+The platform ships with 105 plugins under `packages/plugins/`, spanning **21 of the 27 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, utility, build, and identity. (`form`, `integration`, `theme`, `memory`, `rag`, and `app-dependency` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
 
 ## Plugin count by category
 
@@ -34,6 +34,8 @@ Counted from each package's `everworks.plugin.category` field.
 | `database`              | 1     | `postgres-db`                                                                                                                                                                                                                           |
 | `data-source`           | 1     | `apify`                                                                                                                                                                                                                                 |
 | `dns`                   | 1     | `cloudflare-dns`                                                                                                                                                                                                                        |
+| `build`                 | 1     | `github-actions-build`                                                                                                                                                                                                                  |
+| `identity`              | 1     | `oidc-identity`                                                                                                                                                                                                                         |
 
 A plugin's **capabilities** are independent of its category: `scrapfly` sits in `content-extractor` but also advertises `screenshot`, and every `search` plugin except `brave`, `perplexity` and `serpapi` also advertises `content-extractor`.
 
@@ -59,7 +61,7 @@ are bundled in every image. `local-fs` is the default boot-storage so
 the API can serve without any distributable storage plugin enabled
 (FR-4).
 
-**Distributable (76):** every other plugin under `packages/plugins/*`.
+**Distributable (78):** every other plugin under `packages/plugins/*`.
 In `bundled` mode these still ship in the image (so a fresh deploy
 behaves byte-for-byte the same as pre-EW-693); in `dynamic` mode they
 are stripped from the image and pulled from `@ever-works/<id>-plugin`
@@ -68,7 +70,7 @@ generated from each plugin's `package.json` `everworks.plugin`
 manifest — see `scripts/strip-non-core-plugins.js` for the runtime
 classification rule.
 
-27 core plus 76 distributable accounts for all 103 plugins. Sixteen
+27 core plus 78 distributable accounts for all 105 plugins. Sixteen
 plugins state `distribution: 'core'` explicitly (the six job runtimes,
 the seven secret stores, `local-fs`, `pgvector`, `postgres-db`); the
 other eleven inherit `core` from `systemPlugin: true`. Everything added
@@ -1577,6 +1579,43 @@ Create the token at <https://dash.cloudflare.com/profile/api-tokens> with `DNS:E
 | `dns-root-domain`   | `rootDomain()`                                   | Returns the zone's root domain                                           |
 
 See [Custom Domains](../features/custom-domains.md) and [Managed Hosting](../features/managed-hosting.md).
+
+## Identity
+
+### OpenID Connect identity (Ever ID)
+
+Adds **Sign in with Ever ID** as an additional sign-in method, next to every existing one: e-mail and password, magic link, GitHub and Google keep working exactly as before. It is an OpenID Connect relying party (authorization code flow with PKCE S256), works with any standards-compliant provider, and never stores a provider token. See [Ever ID](../features/ever-id.md) for what people see.
+
+| Field        | Value                                               |
+| ------------ | --------------------------------------------------- |
+| Plugin ID    | `oidc-identity`                                     |
+| Category     | `identity`                                          |
+| Auto Enable  | No — off until a platform administrator turns it on |
+| Configured   | Platform-wide only (`admin-only`)                   |
+| Distribution | `registry`                                          |
+| Capabilities | `identity-provider`                                 |
+
+**Off by default, and quiet while off.** Configuring the plugin does not turn anything on. Until a platform administrator runs **Test connection** and turns Ever ID on (on the administration page, `/settings/admin/ever-id`), the sign-in button is not shown, every sign-in route answers 404 and the API makes no request to the provider. Turning it off again takes effect within seconds on every API replica; people can still list and disconnect connected identities, and sign-out notices from the provider are still honoured.
+
+**Settings** (required: `issuerUrl`, `clientId`, `clientSecret`):
+
+| Setting                | Type    | Default      | Environment variable         | Description                                                                                |
+| ---------------------- | ------- | ------------ | ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `issuerUrl`            | string  | —            | `EVER_ID_ISSUER_URL`         | The provider's issuer (`https`; `http://localhost` only outside production)                |
+| `clientId`             | string  | —            | `EVER_ID_CLIENT_ID`          | The client this installation is registered as                                              |
+| `clientSecret`         | string  | —            | `EVER_ID_CLIENT_SECRET`      | Client secret (`client_secret_basic`); write-only, never returned                          |
+| `allowedIssuers`       | array   | `[issuer]`   | `EVER_ID_ALLOWED_ISSUERS`    | 1–3 exact issuer strings accepted at once                                                  |
+| `apiAudience`          | string  | `ever-works` | `EVER_ID_API_AUDIENCE`       | The audience delegated and terminal access tokens must carry                               |
+| `signUpAllowed`        | boolean | `true`       | `EVER_ID_SIGN_UP_ALLOWED`    | Whether an unknown, verified identity may create an account after confirming               |
+| `clockSkewSeconds`     | integer | `60`         | `EVER_ID_CLOCK_SKEW_SECONDS` | Tolerance for token time checks (0–120)                                                    |
+| `localClients`         | array   | `[]`         | —                            | Up to 5 public clients (`cli` / `node`) allowed to exchange a device sign-in for a session |
+| `delegatedClientNames` | array   | `[]`         | —                            | Names shown for apps that read a person's App Works with a delegated permission            |
+| `accountManagementUrl` | string  | —            | —                            | Target of the **Manage in Ever ID** link on the Connected identities card                  |
+| `displayName`          | string  | `Ever ID`    | —                            | The button and heading label                                                               |
+
+The last four are managed on the administration page (or `PATCH /api/auth/ever-id/admin/settings`); the environment-bound settings are operator configuration.
+
+**Register at the provider:** one redirect address, `<WEB_URL>/api/auth/ever-id/callback`; the sign-out return address `<WEB_URL>/api/auth/ever-id/logout-return`; and, for sign-out notices, the back-channel logout address `<API_URL>/api/auth/ever-id/backchannel-logout`.
 
 ## Job Runtimes
 

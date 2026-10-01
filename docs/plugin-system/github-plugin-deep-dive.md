@@ -187,5 +187,5 @@ await githubPlugin.dispatchWorkflow(
 
 ## Related Plugins
 
-- [Vercel Plugin Deep Dive](./vercel-plugin-deep-dive) -- deployment target triggered via GitHub Actions workflows managed by this plugin.
-- [GitHub Plugin](./github-plugin) -- overview documentation for the GitHub plugin.
+- [Vercel Plugin Deep Dive](./vercel-plugin-deep-dive.md) -- deployment target triggered via GitHub Actions workflows managed by this plugin.
+- [GitHub Plugin](./github-plugin.md) -- overview documentation for the GitHub plugin.

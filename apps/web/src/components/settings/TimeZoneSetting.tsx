@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useSyncExternalStore, useTransition } from 'react';
 import { Globe } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { setProfileTimezone } from '@/app/actions/notification-preferences';
@@ -32,6 +32,9 @@ interface TimeZoneSettingProps {
 
 type Mode = 'local' | 'utc';
 
+/** The browser's zone never changes under a mounted component, so nothing to subscribe to. */
+const subscribeNever = () => () => {};
+
 function modeOf(timezone: string | null): Mode | null {
     if (timezone === null) return null;
     return FIXED_ZONES.has(timezone) ? 'utc' : 'local';
@@ -60,10 +63,15 @@ export function TimeZoneSetting({ timezone }: TimeZoneSettingProps) {
     const [pending, startTransition] = useTransition();
 
     const mode = modeOf(stored);
-    const localZone = browserTimeZone();
+    // Read the browser's zone ONLY on the client: the server renders in its own
+    // zone (UTC in production), so rendering it during SSR made the hint's text
+    // differ from the client's and React threw a hydration error (#418) on
+    // /settings for everyone not on UTC, then re-rendered the page from scratch.
+    // `null` on the server and during hydration; the real zone right after.
+    const localZone = useSyncExternalStore(subscribeNever, browserTimeZone, () => null);
 
     const choose = (next: Mode) => {
-        const zone = next === 'utc' ? 'UTC' : localZone;
+        const zone = next === 'utc' ? 'UTC' : (localZone ?? browserTimeZone());
         if (zone === stored) return;
         setError(null);
         startTransition(async () => {

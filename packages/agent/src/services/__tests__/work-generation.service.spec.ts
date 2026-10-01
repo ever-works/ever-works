@@ -561,6 +561,24 @@ describe('WorkGenerationService', () => {
             await expect(service.updateWebsiteRepository('work-1', buildUser())).rejects.toBe(err);
         });
 
+        it('refuses an App Work with a 400 before the template sync is asked for', async () => {
+            // An App Work's `website` role IS its Work Repository (the member's
+            // own code), so the role check lets it through; the template sync
+            // behind this entry point force-pushes a website template over it.
+            // Reached from `POST /api/works/:id/update-website`, which is on the
+            // MCP surface (`update_website`) and the fleet run-token surface.
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork({ kind: 'app', name: 'Acme' } as Partial<Work>),
+            } as any);
+
+            const service = buildService();
+            const refusal = service.updateWebsiteRepository('work-1', buildUser());
+            await expect(refusal).rejects.toBeInstanceOf(BadRequestException);
+            await expect(refusal).rejects.toThrow(/Work "Acme" is an App Work/);
+
+            expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+        });
+
         it('wraps generic Error w/ workId in BadRequestException payload', async () => {
             ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork() } as any);
             websiteUpdateService.updateRepository.mockRejectedValue(new Error('clone failed'));

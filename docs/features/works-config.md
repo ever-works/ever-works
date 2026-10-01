@@ -126,6 +126,6 @@ For day-to-day tweaks (changing the prompt, swapping providers), prefer the Web 
 
 ## Related
 
-- [Work Import](./work-import) — bootstrapping a work from an existing repo
-- [Scheduled Updates](./scheduled-updates) — full cadence + billing reference
+- [Work Import](./work-import.md) — bootstrapping a work from an existing repo
+- [Scheduled Updates](./scheduled-updates.md) — full cadence + billing reference
 - [Plugin System](/plugin-system) — the plugin ids referenced under `providers`

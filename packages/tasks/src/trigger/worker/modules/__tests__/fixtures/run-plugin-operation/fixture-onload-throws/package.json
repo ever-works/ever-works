@@ -1,0 +1,27 @@
+{
+    "name": "@ever-works/fixture-onload-throws-plugin",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Test fixture for trigger-run-plugin-operation.module.spec.ts — a lazily registered plugin whose onLoad throws when it materialises.",
+    "main": "./index.cjs",
+    "everworks": {
+        "plugin": {
+            "id": "fixture-onload-throws",
+            "name": "Fixture onLoad Throws",
+            "version": "1.0.0",
+            "category": "utility",
+            "capabilities": [],
+            "description": "Its onLoad throws; used only by the run-plugin-operation boot spec.",
+            "author": {
+                "name": "Ever Works Team"
+            },
+            "license": "AGPL-3.0",
+            "builtIn": false,
+            "operations": [
+                {
+                    "name": "touch"
+                }
+            ]
+        }
+    }
+}

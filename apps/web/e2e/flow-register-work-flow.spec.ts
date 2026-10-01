@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE } from './helpers/api';
+import { armDeadTokenRefusal, assertDeadTokenRefusalProven } from './helpers/github-fake-control';
 
 /**
  * flow-register-work-flow.spec.ts — DEEP, register-work-specific contract matrix
@@ -72,6 +73,26 @@ import { API_BASE } from './helpers/api';
  *   - Throttle asymmetry: POST exhausts at 10/min/IP → 429
  *       { statusCode:429, message:'ThrottlerException: Too Many Requests' }; the GET
  *       status route does NOT (5 rapid GETs all answer 404, none 429).
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * AMENDED 2026-09-19 — C14: the "unresolvable token" below is armed, not assumed
+ *
+ * The probe notes above were taken in a **keyless** stack — no fake GitHub, so
+ * `resolveGitHubIdentity`'s call to the real service failed for any bogus token
+ * and the 403 `gh_credential_invalid` was reachable by default. In the
+ * fake-armed lane that is no longer true: `GET /user` is a static fixture route
+ * answering **200 for every token** (`fakes/github-fake/routes/repos.mjs`), so
+ * the identity RESOLVES and the request runs on to `assertRepoAccess`
+ * (`apps/api/src/onboarding/onboarding.service.ts:312-341`), which answers
+ * **403 `gh_repo_access_denied` / 'token cannot read the named repository'**.
+ *
+ * Both are 403, so only the `code` names the gate — and the `code` assertion is
+ * unchanged at `gh_credential_invalid`, which is the gate these cases exist to
+ * prove. What changed is the SETUP: the two POST cases whose subject is the dead
+ * credential call `armDeadTokenRefusal` first (C14,
+ * `helpers/github-fake-control.ts`), planting the fake's one-shot per-token
+ * `auth-refused` `401`, and then prove from `/_control/calls` that the refusal
+ * the platform hit was the fake's. No assertion was weakened.
  */
 
 const PARAM_UUID_UNKNOWN = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -79,6 +100,17 @@ const VALID_REPO = 'https://github.com/octocat/awesome-mcp';
 // Length>=4 so it passes the malformed pre-check and reaches the GitHub call →
 // guaranteed to be REJECTED by GitHub in this keyless env (never a real token).
 const UNRESOLVABLE_GH_TOKEN = 'ghp_e2e_fake_unresolvable_token_000';
+
+/**
+ * The lane's fake GitHub (the PR lane starts it; `plan.md` §9.1, CONTRACTS §7).
+ * Unset outside the fake lanes, where it falls back to the fake's documented
+ * default port — `armDeadTokenRefusal` shape-probes the origin before arming, so
+ * a live lane that happens to have something else on 3900 arms nothing.
+ */
+const FAKE_GITHUB_URL = (process.env.APW_E2E_GITHUB_FAKE_URL ?? 'http://127.0.0.1:3900').replace(
+    /\/+$/,
+    '',
+);
 
 interface TypedError {
     statusCode?: number;
@@ -305,6 +337,11 @@ test.describe('register-work — credential resolution gate (POST, throttle-budg
     test('POST: valid DTO + UNRESOLVABLE GitHub token → 403 gh_credential_invalid (DTO passed, GitHub API rejected the token — no 202, no side effect)', async ({
         request,
     }) => {
+        // C14: arm the dead token for this case. In a fake lane the permissive
+        // `GET /user` default would resolve it and the 403 asserted below would be
+        // `gh_repo_access_denied` from the NEXT gate — a different refusal that
+        // says nothing about the credential.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, UNRESOLVABLE_GH_TOKEN);
         const { status, body, throttled } = await postRegisterWork(
             request,
             { repo: VALID_REPO },
@@ -312,14 +349,17 @@ test.describe('register-work — credential resolution gate (POST, throttle-budg
         );
         test.skip(throttled, 'shared-IP @Throttle bucket drained — credential gate not reachable');
         // The DTO is valid, so we passed validation and reached resolveGitHubIdentity;
-        // the keyless/fake-GitHub-App env makes the token unresolvable → 403. Crucially
-        // this is NEVER a 202 here (no real GitHub) — the controller has no completion path.
+        // the dead token is unresolvable → 403. Crucially this is NEVER a 202 here
+        // (no real GitHub) — the controller has no completion path.
         expect(status, 'a valid DTO with a dead token is forbidden, not accepted').toBe(403);
         expect(body.statusCode).toBe(403);
         expect(body.code, 'typed credential-invalid code at the resolution gate').toBe(
             'gh_credential_invalid',
         );
         expect(body.message).toBe('GitHub credential could not be resolved');
+        // And the refusal the platform hit is the fake's own 401 for THIS token,
+        // read back from its call log — not merely "some 403 came back".
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
     });
 
     test('POST: token shorter than 4 chars → 401 (distinct from the 403 above — the malformed pre-check fires before any network call)', async ({
@@ -346,6 +386,8 @@ test.describe('register-work — credential resolution gate (POST, throttle-budg
         // The Stripe-convention Idempotency-Key header is optional and must not
         // change the validation/credential outcome — a dead token still 403s, the
         // header is simply carried into the (unreached-here) persistence layer.
+        // C14: same arming as the case above; the header must not change it either.
+        const refusal = await armDeadTokenRefusal(request, FAKE_GITHUB_URL, UNRESOLVABLE_GH_TOKEN);
         const res = await request.post(`${API_BASE}/api/register-work`, {
             headers: {
                 'Content-Type': 'application/json',
@@ -360,5 +402,6 @@ test.describe('register-work — credential resolution gate (POST, throttle-budg
         // Idempotency-Key header is accepted and does not fork the contract.
         expect(res.status(), 'idempotency-key does not change the dead-token outcome').toBe(403);
         expect(body.code).toBe('gh_credential_invalid');
+        await assertDeadTokenRefusalProven(request, FAKE_GITHUB_URL, refusal);
     });
 });

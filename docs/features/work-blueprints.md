@@ -23,6 +23,8 @@ Ever Works has three template catalogs that are easy to confuse. In one sentence
 
 The picker merges the first and third catalogs: your own Website Templates always come **first** ("Your templates"), and the manifest blueprints for the selected kind follow ("Blueprints"). Work Templates are a separate fork-first flow on the Templates page and are not shown in the Create-Work picker.
 
+A fourth catalog is unrelated to this one: [App Blueprints](./app-blueprints.md) describe how to run an existing open-source app as an App Work (a preview). They live in `ever-works/<name>-template` repositories listed in [`ever-works/templates`](https://github.com/ever-works/templates), never in `ever-works/works`, and are never offered as Work Blueprints.
+
 ## Where blueprints come from
 
 ```mermaid
@@ -225,5 +227,6 @@ After your PR merges, the platform picks the change up on its next uncached read
 - [Website Templates](./website-templates.md) — the site code (`classic`, `minimal`, `web`, `web-minimal`) that "Your templates" is drawn from.
 - [Work Templates](./work-templates.md) — starter repositories you fork from the Templates page.
 - [Mission Templates](./mission-templates.md) — the sibling catalog for Missions.
+- [App Blueprints](./app-blueprints.md) — ready-made App specs for App Works, a separate catalog.
 - [Store Builder](./store-builder.md) and [Company Builder](./company-builder.md) — the kinds whose blueprints are placeholders today.
 - [Work Template Catalog spec](../specs/features/works-templates/spec.md) — the full product spec, including the planned create-time wiring and the `/new` handoff.

@@ -96,3 +96,16 @@ apps/desktop-node/release
 # could leave one behind. Ignore them so a leftover can never be committed by a later job.
 /.npmrc
 /.yarnrc
+
+# App Works build scratch - agent working files, never committed.
+.app-works-gaps.json
+.app-works-blockers.json
+.app-works-tick.log
+.gaps-*
+.rf-*
+.apw11-*.json
+.tmp-slugs.mjs
+
+.ew-append-rows.json
+.tmp-verify.mjs
+.verify-*.txt

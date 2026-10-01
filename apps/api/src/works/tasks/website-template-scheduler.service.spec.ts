@@ -153,6 +153,42 @@ describe('WebsiteTemplateSchedulerService', () => {
         });
     });
 
+    it('skips an App Work without checking, updating or recording anything, and still processes the rest', async () => {
+        // An App Work's `website` role IS its Work Repository — the member's
+        // own code. The template sync force-pushes a website template over
+        // it, so the poller never asks for one, whatever the auto-update
+        // flag says. `WebsiteUpdateService.updateRepository` refuses the kind
+        // too; skipping here keeps that refusal from being written into
+        // `websiteTemplateLastError` every hour.
+        const appWork = {
+            id: 'w-app',
+            slug: 'acme-app',
+            kind: 'app',
+            user: { id: 'u1' },
+        } as unknown as Work;
+        const siteWork = {
+            id: 'w-site',
+            slug: 'acme-site',
+            kind: 'website',
+            user: { id: 'u1' },
+        } as unknown as Work;
+        workRepository.findWithWebsiteAutoUpdateEnabled.mockResolvedValue([appWork, siteWork]);
+        websiteUpdateService.checkForUpdate.mockResolvedValue({
+            updateAvailable: false,
+            branch: 'main',
+        });
+
+        await service.handleScheduledTemplateUpdates();
+
+        expect(websiteUpdateService.checkForUpdate).toHaveBeenCalledTimes(1);
+        expect(websiteUpdateService.checkForUpdate).toHaveBeenCalledWith(siteWork);
+        expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+        expect(workRepository.update).not.toHaveBeenCalledWith('w-app', expect.anything());
+        expect(debugSpy).toHaveBeenCalledWith(
+            'Skipping App Work acme-app: its Work Repository is never synced from a website template',
+        );
+    });
+
     it('falls back to updateCheck.latestCommit when result.commitSha is missing', async () => {
         const work = {
             id: 'w1',

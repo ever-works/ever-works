@@ -33,6 +33,22 @@ export enum PluginUsageCapability {
     // needed (column is varchar). Recorded best-effort by
     // MetricsFacadeService after each provider call.
     METRICS = 'metrics',
+    // APW-05 T17 (Builds) — the build capability. One event per App Work
+    // Build, written by `AppBuildsService.finalize` as the Build's receipt
+    // (`units` = the runner's billable minutes, `operation: 'build.run'`, payer
+    // `workspace`, `costCents: 0` — GitHub bills the owner's account, not the
+    // platform, so the row audits the run and charges no credits; ACC-05-20).
+    // Additive enum value, no migration needed (the column is varchar).
+    BUILD = 'build',
+    // APW-09 T44 (FR-44, ACC-09-33) — the contribution-run capability. The value
+    // an App Work's upstream preparation and review follow-up runs are booked
+    // under when they go through `BudgetGuardService` against that Work's own
+    // budget, so a crossed threshold's alert and the audit row both name what the
+    // spend was for. Additive enum value, no migration needed (the column is
+    // varchar); a capability with no entry in `priceKeyFor` prices as
+    // `<capability>.<operation>`, which is that function's documented default and
+    // how `BUILD` already behaves.
+    UPSTREAM_CONTRIBUTION = 'upstream_contribution',
 }
 
 @Index(['workId', 'occurredAt'])

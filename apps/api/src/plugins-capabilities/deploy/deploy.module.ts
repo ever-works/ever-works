@@ -1,3 +1,4 @@
+import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
 import { Module, forwardRef } from '@nestjs/common';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { DatabaseModule } from '@ever-works/agent/database';
@@ -19,6 +20,11 @@ import { ManagedSubdomainService } from './managed-subdomain.service';
 @Module({
     imports: [
         FacadesModule,
+        // APW-06 §2.2 — `AppDeployRequestService`, so `DeployService.deploy()`
+        // can route a Work of kind `app` to the App path. Same module instance
+        // `WorksModule` imports (Nest caches a static module per class), so the
+        // route, the batch and the scheduler share one deploy lock.
+        AppDeployRequestModule,
         DatabaseModule,
         WebsiteGeneratorModule,
         WorkModule,

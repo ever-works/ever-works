@@ -1,0 +1,35 @@
+# GOLDEN — umami · target your-cluster · NetworkPolicy `ew-allow-ingress`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml (sha256 a2a7ba30b69e6fe55deebdbbddfd794623afcb59f23d57ff9bc89d39ed66f104)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.10 — the primary web component (web) on its declared port, from the ingress controller namespace.
+# Spec      : APW-06 spec.md FR-20 (deny all; ingress controller to the primary web port; pods to each other;
+# Spec      : DNS; the internet except private ranges; the app’s own dependencies; its public address when
+# Spec      : `needsHairpin`), FR-21 (enforcement is probed after each rollout)
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    name: ew-allow-ingress
+    namespace: ew-umami-33333333
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: umami
+        ever-works.io/work-id: 33333333-3333-4333-8333-333333333333
+        ever-works.io/kind: app
+spec:
+    podSelector:
+        matchLabels:
+            ever-works.io/component: web
+    policyTypes:
+        - Ingress
+    ingress:
+        - from:
+              - namespaceSelector:
+                    matchLabels:
+                        kubernetes.io/metadata.name: ingress-nginx
+          ports:
+              - port: 3000
+                protocol: TCP

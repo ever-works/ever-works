@@ -16,3 +16,10 @@ node_modules
 **/apps/web/.env*
 **/apps/api/.env*
 **/apps/admin/.env*
+# The web end-to-end suite is test infrastructure and never ships in an image.
+# Some of its harness specs import other apps' sources on purpose (one reads the
+# API's platform catalog rules), and the pruned web build context
+# (`turbo prune --scope=ever-works-web --docker`) does not contain those apps,
+# so `next build` failed its type check inside the image build. The full
+# checkout still type-checks the suite: `next build` in CI covers `apps/web/**`.
+apps/web/e2e

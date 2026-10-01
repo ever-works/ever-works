@@ -1,0 +1,51 @@
+{
+	"name": "@ever-works/hosting-crds",
+	"version": "0.1.0",
+	"description": "Ever Works Apps hosting tier — the `hosting.ever.works/v1alpha1` Kubernetes API contract (CRD schemas + manifest generation), shared by the platform that writes the objects and the controller that reconciles them",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist",
+		"deploy/crds"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit && tsc -p tsconfig.specs.json --noEmit",
+		"clean": "rm -rf dist",
+		"generate:crds": "tsup && node scripts/generate-crds.ts",
+		"generate:crds:check": "tsup && node scripts/generate-crds.ts --check",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@kubernetes/client-node": "^1.4.0",
+		"js-yaml": "^5.2.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"ajv": "^8.18.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	}
+}

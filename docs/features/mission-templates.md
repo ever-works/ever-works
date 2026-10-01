@@ -6,7 +6,7 @@ sidebar_label: Mission Templates
 
 # Mission Templates
 
-A **Mission Template** is a pre-built [Mission](./missions) setup someone has packaged for re-use. It comes with a description, a recommended cadence, default guardrails, and (optionally) a seed knowledge-base the spawned Mission inherits at fork time.
+A **Mission Template** is a pre-built [Mission](./missions.md) setup someone has packaged for re-use. It comes with a description, a recommended cadence, default guardrails, and (optionally) a seed knowledge-base the spawned Mission inherits at fork time.
 
 If you've ever wanted to start a Mission without having to write the prompt + tune the cap + pick a cadence from scratch, that's what a template is for.
 
@@ -96,6 +96,6 @@ To publish, fork it into your account via the Templates Catalog and toggle it vi
 
 ## Where to go next
 
-- [Missions](./missions) — the lifecycle a forked template enters once you click **Use this Template**.
-- [Website Templates](./website-templates) — the Work-level equivalent. Mission templates can pre-select these via `recommendedWorkTemplates`.
-- [Budgets & Usage](./budgets-and-usage) — caps that gate every Mission spawned from a template.
+- [Missions](./missions.md) — the lifecycle a forked template enters once you click **Use this Template**.
+- [Website Templates](./website-templates.md) — the Work-level equivalent. Mission templates can pre-select these via `recommendedWorkTemplates`.
+- [Budgets & Usage](./budgets-and-usage.md) — caps that gate every Mission spawned from a template.

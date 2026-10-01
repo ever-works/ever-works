@@ -32,7 +32,7 @@ From `/new`:
 
 The Mission is created as **one-shot** by default — it runs once and stops. To make it recurring, open the Mission detail page and flip it to **scheduled**, then set a cron expression (e.g. `0 9 * * *` = every day at 09:00 UTC).
 
-You can also land on `/new` pre-filled by clicking **Use this Template** on any [Mission Template](./mission-templates) — the template's name + description seed the prompt and the spawned Mission carries a back-link to the source template.
+You can also land on `/new` pre-filled by clicking **Use this Template** on any [Mission Template](./mission-templates.md) — the template's name + description seed the prompt and the spawned Mission carries a back-link to the source template.
 
 ## Mission lifecycle
 
@@ -70,10 +70,10 @@ The **Run now** button on a Mission's detail page triggers a tick immediately, b
 
 A Mission can be configured to **auto-build Works** from every Idea it spawns. Toggle on the detail page or set at create time.
 
-- **Off** (default): The Mission spawns Ideas. You decide which Ideas to build (each becomes a Work) via the [Ideas pipeline](./ideas).
+- **Off** (default): The Mission spawns Ideas. You decide which Ideas to build (each becomes a Work) via the [Ideas pipeline](./ideas.md).
 - **On**: Each spawned Idea is immediately queued for build into its own Work. Use sparingly — it cuts the human-in-the-loop step.
 
-Auto-build still respects your per-Mission and account-wide [budget caps](./budgets-and-usage). When a cap is hit, the build is skipped (not retried automatically).
+Auto-build still respects your per-Mission and account-wide [budget caps](./budgets-and-usage.md). When a cap is hit, the build is skipped (not retried automatically).
 
 :::caution Auto-build alone does not build anything
 
@@ -195,9 +195,9 @@ The same holds for the two reference tables above: deleting a Mission drops its 
 
 ## Where to go next
 
-- [Ideas](./ideas) — the queue your Mission feeds into.
-- [Mission Templates](./mission-templates) — pre-built Mission setups you can fork.
-- [Budgets & Usage](./budgets-and-usage) — caps that gate every spawn and build.
+- [Ideas](./ideas.md) — the queue your Mission feeds into.
+- [Mission Templates](./mission-templates.md) — pre-built Mission setups you can fork.
+- [Budgets & Usage](./budgets-and-usage.md) — caps that gate every spawn and build.
 - [Goals](./goals.md) — the metric a Mission can be measured against; attach one to a Mission from its **Goals** panel.
 - [Campaigns](./campaigns.md) — go-to-market Works, the usual target of a `markets` relation.
 - [Creating a Work](./creating-a-work.md) — what a Mission's Ideas turn into.

@@ -71,6 +71,25 @@ export class UserRepository {
         });
     }
 
+    /**
+     * APW-12 (Ever ID) — whether ANY account uses this e-mail address,
+     * compared case-insensitively (spec FR-23, FR-24).
+     *
+     * Answers a boolean on purpose and never an id or a row: an e-mail address
+     * must never select an account (FR-22), so the only thing the Ever ID
+     * sign-in path may learn from it is "an account already uses this address"
+     * (S3), never which one.
+     */
+    async existsByEmailCaseInsensitive(email: string): Promise<boolean> {
+        const trimmed = typeof email === 'string' ? email.trim() : '';
+        if (!trimmed) return false;
+        const count = await this.repository
+            .createQueryBuilder('user')
+            .where('lower(user.email) = lower(:email)', { email: trimmed })
+            .getCount();
+        return count > 0;
+    }
+
     async findByEmail(email: string): Promise<User | null> {
         return await this.repository.findOne({
             where: { email },

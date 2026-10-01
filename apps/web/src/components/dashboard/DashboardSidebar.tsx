@@ -44,6 +44,7 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { EverIdSignOutDialog, useEverIdSignOut } from '@/components/auth/EverIdSignOutDialog';
 import { HumanAgentIcon } from '@/components/icons/HumanAgentIcon';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -123,9 +124,14 @@ export function DashboardSidebar({
         onCollapsedChange?.(v);
     };
 
+    // APW-12 (Ever ID): a session opened with Ever ID first asks whether to sign
+    // out of Ever ID too (S7). Every other session signs out exactly as before.
+    const { offerEverIdSignOut, dialogProps: everIdSignOutDialogProps } = useEverIdSignOut();
+
     const handleLogout = async () => {
         startTransition(() => {
             void (async () => {
+                if (await offerEverIdSignOut()) return;
                 await logout();
             })();
         });
@@ -675,6 +681,9 @@ export function DashboardSidebar({
 
             {/* Expand chat button — on sidebar right border, only when chat is collapsed */}
             {!chatOpen && onOpenChat && <ChatPanelExpandButton onClick={onOpenChat} />}
+
+            {/* APW-12 — "Sign out of Ever Works?" for sessions opened with Ever ID. */}
+            <EverIdSignOutDialog {...everIdSignOutDialogProps} />
         </aside>
     );
 }

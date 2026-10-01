@@ -770,6 +770,28 @@ describe('GitHubPrReviewBridgeService', () => {
             }
         });
 
+        it('does not label the push with a Task from ANOTHER repository', async () => {
+            // `isTaskRepo: false` is a Task that owns the same branch name in a
+            // different repository — a directory Work's data repository behind
+            // its website one, or another Work sharing this one. Naming it here
+            // would say the wrong Task pushed. The event is still ingested.
+            const { service, eventIngestService, taskLinks } = createService();
+            taskLinks.findByBranch.mockResolvedValue({
+                workId: 'work-1',
+                taskId: 'task-1',
+                taskSlug: 'T-42',
+                isTaskRepo: false,
+            });
+
+            await service.handleEvent(BINDING, 'push', pushBody());
+
+            const [, envelopes] = eventIngestService.ingest.mock.calls[0];
+            expect(envelopes.length).toBeGreaterThan(0);
+            for (const envelope of envelopes) {
+                expect(envelope.payload.taskId).toBeUndefined();
+            }
+        });
+
         it('an unmatched repo is ignored without throwing', async () => {
             const { service, eventIngestService, taskLinks } = createService();
 

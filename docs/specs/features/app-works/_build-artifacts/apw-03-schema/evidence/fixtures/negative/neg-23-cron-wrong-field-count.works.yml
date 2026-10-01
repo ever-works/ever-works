@@ -1,0 +1,17 @@
+# NEGATIVE FIXTURE neg-23 — error class: an unparsable `cron` schedule.
+# Expected: JSON Schema FAIL (`pattern` on /spec/cron/0/schedule) · rule layer `cron_invalid`.
+# schema.md §14: "`cron_invalid` when unparsable". The schema's `^\S+(\s+\S+){4}$` catches the wrong FIELD
+# COUNT; a five-field expression with an out-of-range field (`99 * * * *`) passes the schema and only the
+# rule layer can refuse it — this fixture exercises the first half.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - { name: web, role: web, port: 3000 }
+    cron:
+        - { name: purge, schedule: 'every night', command: ['node', 'dist/purge.js'] }

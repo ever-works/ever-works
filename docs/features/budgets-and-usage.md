@@ -44,7 +44,7 @@ Set under **Settings → Account → Usage & Budget**.
 
 ## Per-Mission caps
 
-Each Mission can carry its own budget guardrails (separate from the account-wide cap). Set them at create time, on the detail page, or inherit them from a [Mission Template's manifest](./mission-templates#the-worksmissionyml-manifest).
+Each Mission can carry its own budget guardrails (separate from the account-wide cap). Set them at create time, on the detail page, or inherit them from a [Mission Template's manifest](./mission-templates.md#the-worksmissionyml-manifest).
 
 | Guardrail                         | What it caps                                                                     |
 | --------------------------------- | -------------------------------------------------------------------------------- |
@@ -113,10 +113,10 @@ Plugin price lists are baked into each plugin's `package.json` under `everworks.
 | Per-Work budgets   | `GET /api/works/:workId/budgets`        |
 | Per-Work usage     | `GET /api/works/:workId/usage`          |
 
-Same routes are exposed as MCP tools (`get_account_usage`, `get_mission_budget`, `get_idea_budget`) — see the [MCP Server](./mcp-server) docs.
+Same routes are exposed as MCP tools (`get_account_usage`, `get_mission_budget`, `get_idea_budget`) — see the [MCP Server](./mcp-server.md) docs.
 
 ## Where to go next
 
-- [Missions](./missions) — where Mission-level guardrails are set.
-- [Mission Templates](./mission-templates) — how a template's manifest seeds the spawned Mission's guardrails.
-- [Scheduled Updates](./scheduled-updates) — billing-mode choices for Work schedules.
+- [Missions](./missions.md) — where Mission-level guardrails are set.
+- [Mission Templates](./mission-templates.md) — how a template's manifest seeds the spawned Mission's guardrails.
+- [Scheduled Updates](./scheduled-updates.md) — billing-mode choices for Work schedules.

@@ -9,7 +9,7 @@ sidebar_position: 16
 
 ## Overview
 
-`DistributedTaskLockService` is a generic, **database-backed mutex** that lets the platform run "at most one of these at a time" workloads safely across multiple worker processes. It's used by background jobs that aren't naturally protected by a single-row `UPDATE ... WHERE` (the way the [Schedule Dispatcher](./work-schedule-dispatcher) is) — for example, "process all open community PRs for work X" or "rebuild analytics rollups".
+`DistributedTaskLockService` is a generic, **database-backed mutex** that lets the platform run "at most one of these at a time" workloads safely across multiple worker processes. It's used by background jobs that aren't naturally protected by a single-row `UPDATE ... WHERE` (the way the [Schedule Dispatcher](./work-schedule-dispatcher.md) is) — for example, "process all open community PRs for work X" or "rebuild analytics rollups".
 
 The implementation lives in `packages/agent/src/cache/distributed-task-lock.service.ts`. It uses the `cache_entries` table that's already present for general-purpose caching, so there's **no Redis, no advisory-locking driver, and no extra infrastructure** — the same SQL database that holds your data also holds the locks.
 
@@ -17,7 +17,7 @@ The implementation lives in `packages/agent/src/cache/distributed-task-lock.serv
 
 Reach for `DistributedTaskLockService` when:
 
-- The work has no single "owning row" you can claim with an atomic `UPDATE` (otherwise prefer the CAS pattern from [Schedule Dispatcher](./work-schedule-dispatcher#how-claiming-works-the-race-free-part)).
+- The work has no single "owning row" you can claim with an atomic `UPDATE` (otherwise prefer the CAS pattern from [Schedule Dispatcher](./work-schedule-dispatcher.md#how-claiming-works-the-race-free-part)).
 - You need "at most one of this thing per X" (per-work, per-user, global), and "X" is something you can express as a string key.
 - The protected work might run for many minutes — a heartbeat-refreshed lease is more robust than holding an open transaction.
 
@@ -219,11 +219,11 @@ Shape of the planned change (tracked in [EW-629](https://evertech.atlassian.net/
 - `runExclusive` / `tryAcquire` / `release` public API stays identical — callers (e.g. community-PR processor, `data-repo-instant-sync`) need no changes.
 - Both providers share one contract test suite to keep semantics in lockstep.
 
-The same pluggability story applies to [`CacheModule`](./cache-module) — see the matching note in [`caching.md`](../architecture/caching.md). Both changes are **additive**: the PostgreSQL backend remains the default, and no existing deployment is forced to add Redis.
+The same pluggability story applies to [`CacheModule`](./cache-module.md) — see the matching note in [`caching.md`](../architecture/caching.md). Both changes are **additive**: the PostgreSQL backend remains the default, and no existing deployment is forced to add Redis.
 
 ## Related
 
-- [Schedule Dispatcher](./work-schedule-dispatcher) — uses CAS-style atomic UPDATE rather than this lock service, because the schedule row itself is the lock target.
-- [Cache Module](./cache-module) — the `cache_entries` table this service piggybacks on.
-- [Community PR Service](./community-pr-service) — the canonical caller (one lock per work).
+- [Schedule Dispatcher](./work-schedule-dispatcher.md) — uses CAS-style atomic UPDATE rather than this lock service, because the schedule row itself is the lock target.
+- [Cache Module](./cache-module.md) — the `cache_entries` table this service piggybacks on.
+- [Community PR Service](./community-pr-service.md) — the canonical caller (one lock per work).
 - [ADR-005: Cache and Lock Pluggability](../specs/decisions/005-cache-and-lock-pluggability.md) — forward-looking decision on the Redis provider.

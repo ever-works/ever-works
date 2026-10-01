@@ -1,0 +1,11 @@
+# POSITIVE FIXTURE pos-03 — `spec.kind: app` with NO root `kind`.
+# Expected: JSON Schema PASS · rule layer PASS.
+# schema.md §1: "`kind` (root) … `app`. When absent, `spec.kind: app` selects this schema." This is the
+# discrimination requirement stated as an acceptance criterion: the app schema must accept a document
+# that identifies itself only inside `spec`. It is also why `$defs/appSpec` cannot require the root keys.
+version: 2
+spec:
+    kind: app
+    source:
+        relation: link
+        branch: main

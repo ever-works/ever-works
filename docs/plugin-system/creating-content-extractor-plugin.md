@@ -32,7 +32,7 @@ Before you start, decide which type you are building:
 
 - Node.js >= 20
 - pnpm (never npm or yarn)
-- Familiarity with the [Creating a Plugin](./creating-a-plugin) guide
+- Familiarity with the [Creating a Plugin](./creating-a-plugin.md) guide
 - The monorepo cloned and dependencies installed (`pnpm install`)
 
 ## The `IContentExtractorPlugin` Interface

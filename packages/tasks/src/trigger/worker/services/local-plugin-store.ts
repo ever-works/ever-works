@@ -1,8 +1,18 @@
-import { PluginEntity, PluginRepository } from '@ever-works/agent/plugins';
+import {
+    PluginEntity,
+    PluginRepository,
+    lazyRegistrationManifest,
+    type LazyRegistrationRow,
+} from '@ever-works/agent/plugins';
 
 /**
  * In-memory store for plugin metadata written during bootstrap.
  * Write methods stay local; reads fall through to the remote proxy.
+ *
+ * A method implemented here is one the worker's `PluginRepository` proxy
+ * (`trigger-plugins.module.ts`) answers without dialling the API: every
+ * `PluginRepository` method not in the `Omit` below must be, which the
+ * `implements` clause checks.
  */
 export class LocalPluginStore implements Omit<
     PluginRepository,
@@ -59,6 +69,24 @@ export class LocalPluginStore implements Omit<
             if (error !== undefined) entity.lastError = error;
         }
         return entity ?? null;
+    }
+
+    /**
+     * Every lazy plugin registration's row write (`PluginLoaderService.registerLazy`),
+     * with the database's rules (`PluginRepository.mergeLazyRegistration`) against
+     * this store's row: a run registers every plugin it discovers, so reading the
+     * row through the proxy would dial the API once per plugin per run.
+     */
+    async mergeLazyRegistration(
+        row: LazyRegistrationRow,
+        packageJsonManifest: Record<string, unknown>,
+    ): Promise<PluginEntity> {
+        const manifest = lazyRegistrationManifest(
+            this.data.get(row.pluginId),
+            row.version,
+            packageJsonManifest,
+        );
+        return this.upsert({ ...row, manifest });
     }
 
     async updateByPluginId(pluginId: string, data: Record<string, unknown>) {

@@ -116,6 +116,36 @@ describe('WebsiteUpdateService', () => {
             },
         );
 
+        it.each([undefined, { branch: 'stage' }])(
+            'refuses an App Work before anything is resolved, cloned or pushed (options %j)',
+            async (options) => {
+                // An App Work's `website` role IS its Work Repository — the
+                // member's own code — so the role check above lets it through.
+                // Without this refusal the duplicate method force-pushed the
+                // default template over it, the branch sync force-pushed every
+                // template branch, and the default branch was re-pointed.
+                // Every caller (update-website, switch-website-template, the
+                // hourly auto-update poller, DeployService's dispatch fallback)
+                // funnels through here.
+                const work = makeWork({ kind: 'app', name: 'Acme' });
+
+                await expect(
+                    service.updateRepository(work as any, { id: 'u' } as any, options),
+                ).rejects.toThrow(/is an App Work.*Nothing was cloned or pushed\./s);
+
+                expect(websiteTemplateResolver.resolveForWork).not.toHaveBeenCalled();
+                expect(gitFacade.repositoryExists).not.toHaveBeenCalled();
+                expect(gitFacade.getLatestCommit).not.toHaveBeenCalled();
+                expect(gitFacade.removeLocalDir).not.toHaveBeenCalled();
+                expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+                expect(gitFacade.replaceRemote).not.toHaveBeenCalled();
+                expect(gitFacade.push).not.toHaveBeenCalled();
+                expect(gitFacade.commit).not.toHaveBeenCalled();
+                expect(branchSyncService.syncFromTemplate).not.toHaveBeenCalled();
+                expect(gitFacade.updateRepository).not.toHaveBeenCalled();
+            },
+        );
+
         it('uses the duplicate method on success and returns commitSha + branchSync envelope', async () => {
             const work = makeWork();
             gitFacade.repositoryExists.mockResolvedValue(true);

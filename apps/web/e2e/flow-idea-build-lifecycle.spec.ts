@@ -639,8 +639,17 @@ test.describe('Idea build lifecycle (seeded user UI)', () => {
         await expect(statusTrigger).toBeVisible({ timeout: 30_000 });
 
         const applyStatus = async (label: string) => {
-            await statusTrigger.click();
-            await page.getByRole('option', { name: label, exact: true }).click();
+            const option = page.getByRole('option', { name: label, exact: true });
+            // The trigger is visible from the server render, before React attaches its
+            // onClick, so a click can be lost. Re-click only while the list is closed:
+            // the trigger toggles, so a blind second click would close it again.
+            await expect(async () => {
+                if ((await statusTrigger.getAttribute('aria-expanded')) !== 'true') {
+                    await statusTrigger.click();
+                }
+                await expect(option).toBeVisible({ timeout: 2_000 });
+            }).toPass({ timeout: 30_000 });
+            await option.click();
             // Trigger label reflects the picked value → hidden input committed.
             await expect(statusTrigger).toContainText(label, { timeout: 30_000 });
             await page.getByRole('button', { name: 'Apply' }).click();

@@ -1,0 +1,37 @@
+{
+    "total_count": 1,
+    "jobs": [
+        {
+            "id": 970001,
+            "run_id": 960001,
+            "name": "build",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-09-18T09:12:04Z",
+            "completed_at": "2026-09-18T09:31:47Z",
+            "runner_name": "apw-e2e-runner",
+            "html_url": "https://github.com/ever-works/templates/actions/runs/960001/job/970001",
+            "url": "https://api.github.com/repos/ever-works/templates/actions/jobs/970001",
+            "steps": [
+                {
+                    "name": "Set up job",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "number": 1
+                },
+                {
+                    "name": "docker build",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "number": 2
+                },
+                {
+                    "name": "push image",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "number": 3
+                }
+            ]
+        }
+    ]
+}

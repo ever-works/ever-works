@@ -3,6 +3,11 @@
 // api-only `@src/config` alias) is never pulled into this controller test.
 jest.mock('@ever-works/agent/facades', () => ({
     EmailFacadeService: class EmailFacadeService {},
+    // The real base class, from source: the API's `FacadeExceptionFilter`
+    // `@Catch`es it, and the HTTP block below installs that filter as
+    // api.module.ts does.
+    FacadeError: jest.requireActual('../../../../packages/agent/src/facades/base.facade')
+        .FacadeError,
 }));
 jest.mock('@ever-works/agent/notifications', () => ({
     AGENT_INBOUND_EMAIL_DISPATCHER: 'AGENT_INBOUND_EMAIL_DISPATCHER',
@@ -24,12 +29,16 @@ jest.mock('../auth', () => ({
     AuthSessionGuard: class AuthSessionGuard {},
 }));
 
+import { type INestApplication, Logger } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
+import * as request from 'supertest';
 import { EmailController } from './email.controller';
 import { EmailService } from './email.service';
 import { EmailFacadeService } from '@ever-works/agent/facades';
 import { EmailDraftService } from '@ever-works/agent/email';
 import { AuthSessionGuard } from '../auth';
+import { FacadeExceptionFilter } from '../common/filters/facade-exception.filter';
 
 /**
  * EW-669 / T12 — EmailController wiring smoke tests. Per-route behaviour
@@ -145,6 +154,64 @@ describe('EmailController', () => {
                 }),
             );
         });
+
+        // PLG-1 follow-up — the dispatcher must route to the address the
+        // signature was verified for, not re-derive one from `to`: the route
+        // hands it the facade's `authenticatedRecipient` as-is.
+        it('dispatches to the address the facade authenticated the webhook for', async () => {
+            const recipient = { emailAddressId: 'addr-7', userId: 'owner-7' };
+            facade.parseInbound.mockResolvedValueOnce({
+                providerMessageId: 'pmid-2',
+                from: 'sender@x.com',
+                to: ['someone-else@x.com', 'agent@x.com'],
+                subject: 'hi',
+                bodyText: 'body',
+                receivedAt: new Date('2026-06-08T00:00:00Z'),
+                authenticatedRecipient: recipient,
+            });
+
+            await controller.inboundWebhook('postmark', req, headers);
+
+            expect(inboundDispatcher.dispatch).toHaveBeenCalledWith(
+                expect.objectContaining({ pluginId: 'postmark', recipient }),
+            );
+        });
+
+        it('dispatches with no recipient when the facade bound the webhook to none', async () => {
+            facade.parseInbound.mockResolvedValueOnce({
+                providerMessageId: 'pmid-3',
+                from: 'sender@x.com',
+                to: ['agent@x.com'],
+                subject: 'hi',
+                bodyText: 'body',
+                receivedAt: new Date('2026-06-08T00:00:00Z'),
+                authenticatedRecipient: null,
+            });
+
+            await controller.inboundWebhook('postmark', req, headers);
+
+            expect(inboundDispatcher.dispatch).toHaveBeenCalledWith(
+                expect.objectContaining({ recipient: null }),
+            );
+        });
+
+        // PLG-1 — the facade fails closed (a bad signature throws; a plugin
+        // that cannot load is refused with a 503). The public route must pass
+        // that refusal through: never ack, never dispatch the message.
+        it.each([
+            ['a bad signature', new Error('Postmark inbound: signature mismatch.')],
+            [
+                'an inbound plugin that cannot load (503)',
+                Object.assign(new Error('Inbound email plugin postmark is unavailable'), {
+                    status: 503,
+                }),
+            ],
+        ])('refuses the webhook and dispatches nothing on %s', async (_case, refusal) => {
+            facade.parseInbound.mockRejectedValueOnce(refusal);
+
+            await expect(controller.inboundWebhook('postmark', req, headers)).rejects.toBe(refusal);
+            expect(inboundDispatcher.dispatch).not.toHaveBeenCalled();
+        });
     });
 
     describe('compose + held drafts (AW-05)', () => {
@@ -236,5 +303,205 @@ describe('EmailController', () => {
             expect(names.indexOf('approveDraft')).toBeLessThan(names.indexOf('getMessage'));
             expect(names.indexOf('discardDraft')).toBeLessThan(names.indexOf('getMessage'));
         });
+    });
+});
+
+// The REAL facade, from source (the file-level mock above stands in for it in
+// the wiring tests): its signature wrapper decides what a refused webhook
+// answers, so the HTTP block below must run it.
+type RealEmailFacadeCtor = new (registry: unknown, settings: unknown) => EmailFacadeService;
+const { EmailFacadeService: RealEmailFacadeService } = jest.requireActual<{
+    EmailFacadeService: RealEmailFacadeCtor;
+}>('../../../../packages/agent/src/facades/email.facade');
+
+/**
+ * PLG-1 follow-up — what a refused webhook ANSWERS, through a real HTTP stack.
+ *
+ * Both webhook routes are @Public: the plugin's signature check is their only
+ * authentication. The email-providers spec (§7) says a signature mismatch
+ * answers 401 without saying which check failed. The plugin reports a
+ * mismatch by THROWING a plain `Error` (the `IEmailInboundPlugin` contract),
+ * which is neither an `HttpException` nor a `FacadeError` — left as it is,
+ * Nest answers 500, and the provider retries a forged delivery as if we had
+ * failed.
+ *
+ * Behind the routes: the real `EmailFacadeService` over a stub registry
+ * holding a postmark-shaped plugin, and the API's `FacadeExceptionFilter`
+ * installed as api.module.ts installs it.
+ */
+describe('EmailController — refused webhooks over HTTP', () => {
+    const PLUGIN_ID = 'postmark';
+    const SECRET = 'whsec-admin';
+    // What the plugin says on a mismatch. It may name the check that failed,
+    // so it is logged server-side and never answered.
+    const PLUGIN_REASON = 'Postmark inbound: signature mismatch.';
+    const IMPORT_FAILURE = 'Cannot find module /srv/plugins/postmark/dist/index.js';
+
+    let app: INestApplication | undefined;
+    let dispatcher: { dispatch: jest.Mock };
+    let parsed: jest.Mock;
+    let events: jest.Mock;
+    let warn: jest.SpyInstance;
+
+    function postmarkPlugin(overrides: Record<string, unknown> = {}) {
+        parsed = jest.fn(async () => ({
+            provider: PLUGIN_ID,
+            providerMessageId: 'pm-1',
+            from: 'sender@x.com',
+            to: ['agent@x.com'],
+            subject: 'hi',
+            bodyText: 'body',
+            attachments: [],
+            receivedAt: new Date(0),
+        }));
+        events = jest.fn(async () => [
+            { type: 'delivered', providerMessageId: 'pm-1', occurredAt: new Date(0) },
+        ]);
+        return {
+            id: PLUGIN_ID,
+            capabilities: ['email-inbound'],
+            verifyWebhookSignature(_raw: Buffer, headers: Readonly<Record<string, string>>): void {
+                if (headers['authorization'] !== `Basic ${SECRET}`) {
+                    throw new Error(PLUGIN_REASON);
+                }
+            },
+            parseInboundWebhook: parsed,
+            parseEventWebhook: events,
+            ...overrides,
+        };
+    }
+
+    async function serve(entry: { plugin: unknown; state: string }): Promise<INestApplication> {
+        const registry = { getByCapability: jest.fn(() => [entry]) };
+        const settings = {
+            getSettings: jest.fn(async () => ({ inboundWebhookSecret: SECRET })),
+        };
+        dispatcher = { dispatch: jest.fn().mockResolvedValue({ handled: true }) };
+        const moduleRef = await Test.createTestingModule({
+            controllers: [EmailController],
+            providers: [
+                { provide: EmailService, useValue: {} },
+                {
+                    provide: EmailFacadeService,
+                    useValue: new RealEmailFacadeService(registry, settings),
+                },
+                { provide: AGENT_INBOUND_EMAIL_DISPATCHER, useValue: dispatcher },
+                { provide: APP_FILTER, useClass: FacadeExceptionFilter },
+            ],
+        })
+            .overrideGuard(AuthSessionGuard)
+            .useValue({ canActivate: () => true })
+            .compile();
+        app = moduleRef.createNestApplication({ logger: false });
+        await app.init();
+        return app;
+    }
+
+    beforeEach(() => {
+        warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(async () => {
+        await app?.close();
+        app = undefined;
+        jest.restoreAllMocks();
+    });
+
+    const payload = { MessageID: 'pm-1', To: 'agent@x.com', Subject: 'hi' };
+
+    it('accepts a correctly signed inbound webhook (202) and dispatches it', async () => {
+        const server = await serve({ plugin: postmarkPlugin(), state: 'loaded' });
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Authorization', `Basic ${SECRET}`)
+            .send(payload);
+
+        expect(res.status).toBe(202);
+        expect(res.body).toEqual({ received: true });
+        expect(dispatcher.dispatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers 401 (not 500) to an inbound webhook with a bad signature, and dispatches nothing', async () => {
+        const server = await serve({ plugin: postmarkPlugin(), state: 'loaded' });
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Authorization', 'Basic forged')
+            .send(payload);
+
+        expect(res.status).toBe(401);
+        expect(parsed).not.toHaveBeenCalled();
+        expect(dispatcher.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('answers 401 to a delivery-event webhook with a bad signature, and records nothing', async () => {
+        const server = await serve({ plugin: postmarkPlugin(), state: 'loaded' });
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/events/${PLUGIN_ID}`)
+            .set('Authorization', 'Basic forged')
+            .send(payload);
+
+        expect(res.status).toBe(401);
+        expect(events).not.toHaveBeenCalled();
+    });
+
+    it('answers 401 when the verification (against the contract) rejects asynchronously', async () => {
+        const server = await serve({
+            plugin: postmarkPlugin({
+                verifyWebhookSignature: async () => {
+                    throw new Error(PLUGIN_REASON);
+                },
+            }),
+            state: 'loaded',
+        });
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Authorization', 'Basic forged')
+            .send(payload);
+
+        expect(res.status).toBe(401);
+        expect(dispatcher.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("answers a generic 401 body: the plugin's reason is logged, never sent to the caller", async () => {
+        const server = await serve({ plugin: postmarkPlugin(), state: 'loaded' });
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Authorization', 'Basic forged')
+            .send(payload);
+
+        expect(res.status).toBe(401);
+        expect(res.body).toEqual({ statusCode: 401, message: 'Invalid webhook signature' });
+        expect(res.text).not.toContain('Postmark');
+        expect(res.text).not.toContain('mismatch');
+        expect(warn.mock.calls.map((call) => String(call[0])).join('\n')).toContain(PLUGIN_REASON);
+    });
+
+    it('still answers 503 (not 401) when the plugin cannot load, without the load error', async () => {
+        const server = await serve({
+            plugin: {
+                ...postmarkPlugin(),
+                __materialize: jest.fn(() => Promise.reject(new Error(IMPORT_FAILURE))),
+            },
+            state: 'loaded',
+        });
+
+        for (const route of ['inbound', 'events']) {
+            const res = await request(server.getHttpServer())
+                .post(`/api/email/${route}/${PLUGIN_ID}`)
+                .set('Authorization', `Basic ${SECRET}`)
+                .send(payload);
+
+            expect(res.status).toBe(503);
+            expect(res.text).not.toContain('Cannot find module');
+        }
+        expect(parsed).not.toHaveBeenCalled();
+        expect(events).not.toHaveBeenCalled();
+        expect(dispatcher.dispatch).not.toHaveBeenCalled();
     });
 });

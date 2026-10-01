@@ -83,6 +83,9 @@ function makeService() {
     const templateCatalog = {
         getVisibleTemplateForUser: jest.fn().mockResolvedValue(null),
         getDefaultTemplateIdForUser: jest.fn().mockResolvedValue(null),
+        // No retired saved default: a Work created without a template keeps
+        // storing null (templates-catalog FR-5 f).
+        getWebsiteTemplateIdForNewWork: jest.fn().mockResolvedValue(null),
     };
     const quota = { assertWithinQuota: jest.fn().mockResolvedValue(undefined) };
 

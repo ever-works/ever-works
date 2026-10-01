@@ -1,0 +1,16 @@
+{
+    "login": "apw-e2e-user",
+    "id": 40400,
+    "type": "User",
+    "site_admin": false,
+    "name": "APW-13 E2E user",
+    "company": null,
+    "blog": "",
+    "location": null,
+    "bio": null,
+    "public_repos": 3,
+    "followers": 0,
+    "following": 0,
+    "created_at": "2026-09-18T09:12:04Z",
+    "updated_at": "2026-09-18T09:12:04Z"
+}

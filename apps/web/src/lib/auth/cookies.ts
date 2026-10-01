@@ -10,7 +10,9 @@ export const AUTH_COOKIE_NAME = 'everworks_auth_token';
 // 'production'` flag would let the cookie travel over HTTP. Anchor on the
 // public URL scheme instead so any HTTPS deploy gets the secure flag.
 // `WEB_URL` is already required at boot for the API; mirror that here.
-function isPublicUrlHttps(): boolean {
+// Exported so the Ever ID flow cookies (`./ever-id-cookies.ts`) take their
+// `secure` flag from exactly the same rule.
+export function isPublicUrlHttps(): boolean {
     const url = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL;
     if (url) {
         try {

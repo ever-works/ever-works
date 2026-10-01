@@ -104,6 +104,24 @@ module.exports = {
         '^@ever-works/minio-plugin$': '<rootDir>/../../../packages/plugins/minio/src/index.ts',
         '^@ever-works/github-storage-plugin$':
             '<rootDir>/../../../packages/plugins/github-storage/src/index.ts',
+        // `p-map` is ESM-only and ts-jest cannot load it under this CommonJS
+        // runner. `packages/agent` has mapped it to a Promise.all stub for
+        // exactly this reason; apps/api needed the same rule the moment an api
+        // spec reached it TRANSITIVELY.
+        //
+        // Measured in CI run 35591005499 and reproduced locally:
+        // `trigger/trigger-internal.module.spec.ts` imports
+        // `trigger-internal.module.ts`, which (APW-02 T28) now imports
+        // `AppWorksModule` -> `works-config` -> `work-schedule.service` ->
+        // `data-generator.service:19` -> `import pMap from 'p-map'`, and the
+        // whole SUITE failed to run with `SyntaxError: Unexpected token
+        // 'export'`. That is why `ever-works-api#test` was in turbo's failed
+        // list while reporting `Tests: 7745 passed` and no failures at all: a
+        // suite that never loads reports no failing tests.
+        //
+        // Points at the agent package's existing stub rather than a second
+        // copy: one behaviour, one file.
+        '^p-map$': '<rootDir>/../../../packages/agent/test/jest-mocks/p-map.ts',
         // Handle .js extension in ESM-style imports (resolve to .ts)
         '^(\\.{1,2}/.*)\\.js$': '$1',
     },

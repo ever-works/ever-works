@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { CacheEntry } from '@ever-works/agent/entities';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { KnowledgeBaseModule, MemoryFactsModule, WorkModule } from '@ever-works/agent/services';
@@ -22,6 +25,23 @@ import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { AppWorksModule } from '../app-works/app-works.module';
+// APW-03 T12/T13 — the App spec service, exposed through the remote-proxy
+// controller (APW-02 T28 wired the entry).
+import { AppSpecModule } from '@ever-works/agent/app-spec';
+// APW-05 T19 + C7 — the App Builds module, so the `app-build-prepare` job's
+// runner is resolvable in the API process, where the `DataSource`, the lock's
+// `cache_entries` row and the Activity writer live. The task resolves the runner
+// over the internal RPC channel (`app-build-prepare.task.ts`), because a Trigger
+// worker owns no `DataSource`; this import is the API half of that pair. Without
+// it the controller's constructor cannot take the runner and every dispatch
+// reports `runnerUnavailable` while §7.1's in-process fallback hides the gap on
+// the local stack only. `AppBuildsModule` imports `DatabaseModule` itself, which
+// is what its `DistributedTaskLockService` needs.
+import { AppBuildsModule } from '@ever-works/agent/app-builds';
+// APW-06 §5.1 — `AppDeployBuildSourceAdapter`, the Build source the controller
+// publishes for the isolated App runtime worker's `APP_DEPLOY_BUILD_SOURCE` proxy.
+import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
 
 @Module({
     imports: [
@@ -128,6 +148,42 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // (in packages/tasks) can load the Conversation it answers and
         // record the Agent's reply over the internal RPC channel.
         ConversationsModule,
+        // APW-02 T28 — exposes the App upstream trio through the remote-proxy
+        // controller: AppUpstreamStateService (the readiness/sync jobs' claim,
+        // probes and the conflict Task), AppUpstreamSyncDispatcherService (the
+        // `app-upstream-sync-dispatcher` cron's `dispatchDue()`) and
+        // WorkUpstreamStateRepository (the sync run's read of the epic's own
+        // row — T26 reported this binding by name). The API-side AppWorksModule
+        // re-exports the agent one, so this single import resolves all three.
+        AppWorksModule,
+        // APW-03 T12/T13 — exposes AppSpecService through the remote-proxy
+        // controller so the worker-side `app.spec.*` calls land here, where the
+        // App-spec state row, the git facade and the Activity log are wired
+        // (APW-02 T28 wired this entry at the packaging owner's request).
+        AppSpecModule,
+        // APW-05 T19 + C7 — exposes `AppBuildPrepareRunner` through the remote-proxy
+        // controller, so the `app-build-prepare` job can run the §7.2 prepare where the
+        // `DataSource` is. T19 landed the runner, the job and its module binding, and
+        // reported this registration by name: with the token unbound in the worker and
+        // the name absent here, the proxy's call rejects and the run reports
+        // `status: 'failed'`, `reason: 'runnerUnavailable'` — a named failure, but the
+        // queued path would never work. Appended as its own import rather than folded
+        // into AppWorksModule because the two epics' modules are separate graphs.
+        AppBuildsModule,
+        // APW-06 §5.1 / plan §6.4 — exposes `AppDeployBuildSourceAdapter` through the
+        // remote-proxy controller: the isolated App runtime worker re-runs §5.1 and builds
+        // the render input locally, but owns no DataSource, so its `APP_DEPLOY_BUILD_SOURCE`
+        // proxies the two Build reads here. The module is already in the API graph through
+        // `WorksModule` and `DeployModule`; Nest caches a static module per class, so this
+        // import adds an edge, not a second adapter or a second deploy lock.
+        AppDeployRequestModule,
+        // APW-06 T71 — `DistributedTaskLockService` is provided by THIS module (below) for the
+        // controller's remote target of the same name, and it needs its repository: `forFeature`
+        // here is the wiring `apps/api/src/data-sync/data-sync.module.ts` documents as the
+        // canonical pattern. Without it the service fails to instantiate, which is the
+        // `DatabaseModule`-encapsulation trap this branch hit once already
+        // (`packages/agent/src/database/__tests__/database-module-encapsulation.spec.ts`).
+        TypeOrmModule.forFeature([CacheEntry]),
         // AW-22 Workspace backup — exposes WorkspaceBackupRunner and
         // WorkspaceBackupService through the remote-proxy controller so the
         // `workspace-backup` task and the `workspace-backup-sweeper` cron
@@ -140,5 +196,6 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         AccountTransferModule,
     ],
     controllers: [TriggerInternalController],
+    providers: [DistributedTaskLockService],
 })
 export class TriggerInternalModule {}

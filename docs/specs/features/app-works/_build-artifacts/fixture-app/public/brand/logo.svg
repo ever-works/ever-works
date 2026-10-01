@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="app-fixture-hello">
+	<title>app-fixture-hello</title>
+	<rect width="96" height="96" rx="18" fill="#111827" />
+	<path d="M24 66V30h9.5l14.5 21.5V30H57v36h-9.4L33 44.4V66z" fill="#f9fafb" />
+	<circle cx="68" cy="34" r="5" fill="#34d399" />
+	<text x="48" y="82" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9" fill="#9ca3af" text-anchor="middle">
+		fixture
+	</text>
+</svg>

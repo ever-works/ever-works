@@ -230,14 +230,14 @@ Every schedule processed in a batch produces exactly one entry in `summary.entri
 
 ## Why This Doesn't Use `DistributedTaskLockService`
 
-`DistributedTaskLockService` (see [Distributed Task Lock](./distributed-task-lock)) is a generic cache-row-backed lock used by background workers that **don't have a single row to UPDATE** — for example, "run an analytics aggregation" doesn't have a per-target row.
+`DistributedTaskLockService` (see [Distributed Task Lock](./distributed-task-lock.md)) is a generic cache-row-backed lock used by background workers that **don't have a single row to UPDATE** — for example, "run an analytics aggregation" doesn't have a per-target row.
 
 The schedule dispatcher does have such a row (the `WorkSchedule` itself), so the conditional UPDATE is both simpler and stronger: it claims the work and updates state in one atomic step, no separate lock acquire/release lifecycle.
 
 ## Related
 
-- [Work Scheduling](./work-scheduling) — schedule CRUD and state transitions
-- [Work Generation](./work-generation) — the generation work the dispatcher kicks off
-- [Distributed Task Lock](./distributed-task-lock) — the alternative locking mechanism for non-schedule background jobs
+- [Work Scheduling](./work-scheduling.md) — schedule CRUD and state transitions
+- [Work Generation](./work-generation.md) — the generation work the dispatcher kicks off
+- [Distributed Task Lock](./distributed-task-lock.md) — the alternative locking mechanism for non-schedule background jobs
 - [Scheduled Updates](/features/scheduled-updates) — the user-facing feature this powers
-- [Work Import Service](./work-import-service) — creates schedules during import
+- [Work Import Service](./work-import-service.md) — creates schedules during import

@@ -2,13 +2,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BACKUP_DOMAINS, BACKUP_TRIM_POLICIES } from '@ever-works/contracts';
 import { AGENT_ENTITY_NAMES } from '../../../database/_entity-names';
-import { BACKUP_DROPPED_ENTITIES } from '../redaction';
+import { BACKUP_DROPPED_ENTITIES, shouldDropEntirely } from '../redaction';
 import { BACKUP_COLLECTORS, getBackupCollector, missingCollectorKeys } from './index';
 import { BACKUP_DOMAIN_SPECS, referencedEntities } from './domain-specs';
 import { EntityBackupCollector, withRetries } from './entity-collector';
 import type {
     BackupCollectContext,
     BackupEntityQuery,
+    BackupFileSpec,
     BackupRowSource,
     QueuedBackupFile,
 } from './collector.types';
@@ -285,6 +286,87 @@ describe('the coverage table', () => {
             spec.files.filter((file) => file.bytes).map((file) => file.entity),
         );
         expect(withBytes.sort()).toEqual(['UserUpload', 'WorkKnowledgeUpload']);
+    });
+});
+
+/**
+ * APW-11 T30 (R-25). The App Launcher's preference table is one of the newest
+ * things the coverage table carries, and there are two opposite ways to get it
+ * wrong. Classified `workspace`, an `organizationId` predicate lands on a table
+ * that has no such column — so the person who actually pinned something gets an
+ * empty file. Classified twice, a restore has two sources for one arrangement
+ * and no rule for which wins. Both are asserted against here, together with the
+ * pointer the exposure flag needs: `Work.appLauncherExposed` is a column of the
+ * entity `works/works.jsonl` already exports, so it opens no second file.
+ */
+describe('the App Launcher preference table (APW-11 T30)', () => {
+    /** Every file spec naming `entity`, with the domain it sits in. */
+    function placementsOf(entity: string): { domain: string; file: BackupFileSpec }[] {
+        return BACKUP_DOMAIN_SPECS.flatMap((spec) =>
+            spec.files
+                .filter((file) => file.entity === entity)
+                .map((file) => ({ domain: spec.key, file })),
+        );
+    }
+
+    function pathOf(placement: { domain: string; file: BackupFileSpec }): string {
+        return `${placement.domain}/${placement.file.file}`;
+    }
+
+    it('is classified exactly once, in the account domain, keyed to the person', () => {
+        const placements = placementsOf('AppLauncherPreference');
+
+        expect(placements.map(pathOf)).toEqual(['account/app-launcher-preferences.jsonl']);
+        // `by: 'user'` is the classification, and it is the one that matters:
+        // a row is keyed by `userId` + `scopeKey` (`'global' | 'personal' |
+        // <organizationId>`), and an organisation-scoped preference still
+        // belongs to the person who set it.
+        expect(placements[0].file.scope).toEqual({ by: 'user' });
+    });
+
+    it('exports the row rather than dropping it', () => {
+        // The collector consults this predicate before it yields anything, so
+        // asserting on it is asserting on the walk, not on a list.
+        expect(shouldDropEntirely('AppLauncherPreference')).toBe(false);
+        expect(BACKUP_DROPPED_ENTITIES).not.toContain('AppLauncherPreference');
+    });
+
+    it('plans a query narrowed by the person alone — never by an organization', async () => {
+        const account = BACKUP_DOMAIN_SPECS.find((spec) => spec.key === 'account')!;
+        const source = new FixtureRowSource(
+            { AppLauncherPreference: [] },
+            { AppLauncherPreference: ['id', 'userId', 'scopeKey', 'itemKey'] },
+        );
+        const collector = new EntityBackupCollector(account);
+
+        const organized = await collector.plan(contextFor(source));
+        const plan = organized.find(
+            (candidate) => candidate.file === 'app-launcher-preferences.jsonl',
+        )!;
+        expect(plan.unavailable).toBeUndefined();
+        expect(plan.query.equals).toEqual({ userId: 'u1' });
+        expect(Object.keys(plan.query.equals)).not.toContain('organizationId');
+
+        // And the same query for a personal workspace. A `workspace`-scoped
+        // file would have added `organizationId: 'org-1'` above and
+        // `organizationId: null` here — either of which is a predicate on a
+        // column this table does not declare.
+        const personal = await collector.plan(
+            contextFor(source, { scope: { userId: 'u1', organizationId: null, tenantId: null } }),
+        );
+        expect(
+            personal.find((candidate) => candidate.file === 'app-launcher-preferences.jsonl')?.query
+                .equals,
+        ).toEqual({ userId: 'u1' });
+    });
+
+    it('leaves Work referenced once, by works/works.jsonl, with the exposure flag on that row', () => {
+        const placements = placementsOf('Work');
+
+        expect(placements.map(pathOf)).toEqual(['works/works.jsonl']);
+        // T2's flag is a column of the entity that file already exports, which
+        // is what makes "no new file" true rather than merely intended.
+        expect(columnsOf('Work').has('appLauncherExposed')).toBe(true);
     });
 });
 

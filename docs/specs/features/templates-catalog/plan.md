@@ -3,7 +3,7 @@
 **Feature ID**: `templates-catalog`
 **Spec**: `./spec.md`
 **Status**: `Done` (Retrospective)
-**Last updated**: 2026-05-08
+**Last updated**: 2026-09-26
 
 ---
 
@@ -119,7 +119,28 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
         if pageRepos.length < 100: break
     if hit 50-page cap: warn-log
 
-    for repo in repositories where isStandardTemplateRepository(repo.name):
+    named = [repo in repositories where isStandardTemplateRepository(repo.name)]
+    # App Blueprint = the provider REPORTED topic 'ever-works-app-blueprint'
+    # (APP_BLUEPRINT_TOPIC); topics absent or [] => name rule alone (FR-5 a/b).
+    blueprints = [repo in named where isAppBlueprintRepository(repo)]
+    curated = listWebsiteTemplates()   # skipped by coordinates below and by id here
+
+    for repo in blueprints (skip curated coordinates):           # FR-5 c
+        rows = await templateRepository.findAllBuiltInByRepositoryCoordinates('website', repo.owner, repo.name)
+            (lookup failure: warn-log, continue)
+        for row in rows where row.isActive && row.kind === 'website'
+                            && row.sourceType === 'built_in' && row.id not in curated ids
+                            && !isRetiredTemplate(row):
+            # RETIRE, never deactivate: isActive stays true, so every Work on the
+            # row (by id or through an inherited default) keeps resolving; no
+            # usage count, so no count-then-update window. See template-retirement.ts.
+            try:
+                await templateRepository.updateById(row.id, {
+                    metadata: { ...row.metadata, retiredReason: 'app_blueprint', retiredAt: now },
+                })
+            catch: warn-log(`Could not retire discovered website template "<id>" …`)   # retried next discovery
+
+    for repo in named where !isAppBlueprintRepository(repo) (skip curated coordinates):
         canonical = await templateRepository.findBuiltInByRepositoryCoordinates('website', repo.owner, repo.name)
         canonicalId = canonical?.id || repo.name.toLowerCase()
         if !canonical:
@@ -128,6 +149,9 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
                             || existing.repositoryOwner !== repo.owner
                             || existing.repositoryName !== repo.name):
                 warn-log(`Skipping … id "<discoveredId>" already used by …`); continue
+        metadata = { discoveredFromOrganization: catalogOwner, fullName: repo.fullName }
+        if repo.topics is not reported && canonical:                # FR-5 d
+            metadata += retirement marker of canonical, if any      # unreported topics keep a retirement
         await templateRepository.upsert({
             id: canonicalId, kind: 'website', sourceType: 'built_in',
             name: humanizeRepositoryName(repo.name),
@@ -138,7 +162,7 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
             syncBranches: [repo.defaultBranch || 'main'],
             betaBranch: null,
             isActive: true,
-            metadata: { discoveredFromOrganization: catalogOwner, fullName: repo.fullName },
+            metadata,
         })
         if canonicalId !== repo.name.toLowerCase():
             duplicate = await templateRepository.findById(repo.name.toLowerCase())
@@ -152,6 +176,41 @@ syncDiscoveredWebsiteTemplatesForUser(userId):
 
 The whole algorithm is wrapped in a try/catch that warn-logs
 (`Failed to sync discovered website templates for user <userId>: <msg>`).
+
+### 5.1 A retired saved default (FR-5 f)
+
+A user may have saved a row as their `website` default while it was still
+listed. The resolver keeps resolving it for their inheriting Works, so
+`getDefaultTemplateIdForUser` keeps answering it. What must not happen is a
+Work NEWLY inheriting it, because every Create-Work form starts on "use my
+default" (no id) and the switch and settings forms send `null` for it.
+
+```
+savedDefault(kind, user) = visible row of the user's preference, or null   # retired rows are visible
+
+listTemplatesForUser(kind, user).defaultTemplateId =
+    savedDefault && !retired(savedDefault) ? savedDefault.id
+                                           : (kind == 'website' ? getDefaultWebsiteTemplateId() : null)
+
+getWebsiteTemplateIdForNewWork(user, workKind) =                          # create, draft, import
+    retired(savedDefault('website', user)) ? getWebsiteTemplateIdWithoutSavedDefault(workKind)
+                                           : null                           # null: store null, inherit as before
+
+createWork / createDraftWork / WorkImportService create:
+    id = explicit id (validated) ?? getWebsiteTemplateIdForNewWork(user, kind)
+    store id                                                              # pinned only when the default is retired
+
+switchWebsiteTemplate(null) / updateWork({ websiteTemplateId: null }):
+    current = the Work's effective template (explicit id, else savedDefault id)
+    if retired(savedDefault) && savedDefault.id != current:
+        400 'Your default website template "<id>" (<owner>/<repo>) is an App Blueprint, …'
+    # before any repository reset or save; a Work already on the row may still inherit it
+```
+
+`getWebsiteTemplateIdWithoutSavedDefault(kind)` is the resolver's own
+fall-through (the kind's default when that template ships, else the system
+default), so a pinned Work gets exactly what a user with no saved default
+gets; the resolver spec pins the two together.
 
 ## 6. Fork Algorithm
 
@@ -195,7 +254,7 @@ forkTemplateForUser({ kind, templateId, targetOwner }, userId):
         description: template.description || null,
         framework: template.framework || null,
         previewImageUrl: template.previewImageUrl || null,
-        repositoryUrl: forked.url || gitFacade.getWebUrl('github', forked.owner, forked.name),
+        repositoryUrl: forked.url || await gitFacade.getWebUrl('github', forked.owner, forked.name),
         repositoryOwner: forked.owner,
         repositoryName: forked.name,
         branch: forked.defaultBranch || template.branch,
@@ -258,10 +317,11 @@ export class TemplateCatalogModule {}
 
 ## 9. Test Surface
 
-| Layer      | File                                                                   | What it pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ---------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Controller | `apps/api/src/template-catalog/template-catalog.controller.spec.ts`    | Each of the 7 endpoints' positional service args, response envelope, activity-log emission shape (`actionType` / `action` / `summary` / `metadata`), and `result.created` gate on `template.forked`.                                                                                                                                                                                                                                                                                                          |
-| Service    | `packages/agent/src/template-catalog/template-catalog.service.spec.ts` | `seedBuiltInTemplates` upsert calls, `listTemplatesForUser` ordering + discovery gate, `addCustomTemplate` URL/duplicate/defaults, `updateCustomTemplateForUser` undefined-vs-empty rules, `archiveCustomTemplateForUser` usage / inheriting-default refusal copy, `setDefaultTemplateForUser` 404 + upsert, `forkTemplateForUser` six error classes + short-circuit + happy path metadata, `getDefaultTemplateIdForUser` four-level resolution, discovery dedup + canonical-vs-discovered id reconciliation. |
+| Layer      | File                                                                                    | What it pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Controller | `apps/api/src/template-catalog/template-catalog.controller.spec.ts`                     | Each of the 7 endpoints' positional service args, response envelope, activity-log emission shape (`actionType` / `action` / `summary` / `metadata`), and `result.created` gate on `template.forked`.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Service    | `packages/agent/src/template-catalog/template-catalog.service.spec.ts`                  | `seedBuiltInTemplates` upsert calls, `listTemplatesForUser` ordering + discovery gate, `addCustomTemplate` URL/duplicate/defaults, `updateCustomTemplateForUser` undefined-vs-empty rules, `archiveCustomTemplateForUser` usage / inheriting-default refusal copy, `setDefaultTemplateForUser` 404 + upsert, `forkTemplateForUser` six error classes + short-circuit + happy path metadata, `getDefaultTemplateIdForUser` four-level resolution, discovery dedup + canonical-vs-discovered id reconciliation, the FR-5 f listing default and `getWebsiteTemplateIdForNewWork` / `getRetiredDefaultTemplateForUser`. |
+| Lifecycle  | `packages/agent/src/services/__tests__/work-lifecycle.retired-website-template.spec.ts` | FR-5 e selection guards; FR-5 f end to end (real catalog + resolver over one store): create and draft without an id pin away from a retired default, switch/update to `null` refused unless the Work already uses the row.                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## 10. Risks & Trade-offs
 

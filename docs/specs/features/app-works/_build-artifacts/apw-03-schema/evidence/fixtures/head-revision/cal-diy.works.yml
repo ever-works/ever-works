@@ -1,0 +1,287 @@
+# yaml-language-server: $schema=https://api.ever.works/api/schema/works.yml.schema.json
+#
+# DRAFT App Blueprint — seed content of the Blueprint repository `ever-works/cal-diy-template` (APW-13).
+# Shape: docs/specs/features/app-works/CONTRACTS.md §1 (including the APW-13 additions: `authScheme`,
+# `build.commitSha`, `components.<name>.internalUrl`).
+#
+# Upstream facts were read from calcom/cal.diy at commit 6bc45298226f96ff79e0c070c8b2ce39727e8477
+# (2026-09-14, the default-branch head on 2026-09-17). "Verified" below means "read in the upstream source at
+# that commit", not "executed against a running instance" — executing it is what the Blueprint verification
+# lane does (APW-13 spec §4.5). REFRESH the pin with the procedure in ../README.md before publishing.
+#
+# Nothing in this file is a secret. Every credential is generated or prompted per App Work and stored by the
+# platform (APW-07); none is ever written to this repository or to a build argument.
+
+version: 2
+kind: app
+name: Cal.diy (community build)
+
+spec:
+  # Written by App Work creation (APW-01). The values below are the Blueprint's defaults; creation replaces
+  # `relation` with what the user chose and never changes `upstream.repo`.
+  source:
+    relation: fork
+    upstream: { repo: calcom/cal.diy, defaultBranch: main }
+    branch: main
+
+  blueprint:
+    id: cal-diy
+    version: 0.1.0
+    repo: ever-works/cal-diy-template
+    sha: '0000000000000000000000000000000000000000' # TODO(release): stamped by the Blueprint release workflow
+
+  license:
+    spdx: MIT # verified: repository licence metadata and root LICENSE at the pin
+    class: green
+    source: blueprint
+    notice: 'Cal.diy® is a trademark of Cal.com, Inc. This community build is not affiliated with or endorsed by Cal.com, Inc.'
+
+  display:
+    name: 'Cal.diy (community build)'
+    # Read-only to agents (D13). A person may still replace or remove these files by hand.
+    protectedPaths:
+      - LICENSE
+      - 'apps/web/public/cal-*'
+      - 'apps/web/public/calcom-*'
+      - 'apps/web/public/favicon*'
+      - apps/web/public/apple-touch-icon.png
+      - 'apps/web/public/emails/*ogo*'
+      - 'packages/ui/components/logo/**'
+
+  build:
+    strategy: dockerfile
+    dockerfile: Dockerfile # verified: three stages, final stage named `runner`
+    context: .
+    target: runner
+    args:
+      # verified: the Dockerfile declares these ARGs.
+      - { name: MAX_OLD_SPACE_SIZE, value: '6144' }
+      - { name: CALCOM_TELEMETRY_DISABLED, value: '1' }
+      # The build talks only to the ephemeral database below; this URL is not a credential.
+      # TODO(verify, APW-05): the host name at which the build plugin exposes build services.
+      - { name: DATABASE_URL, value: 'postgresql://postgres@localhost:5432/calendso' }
+      # Deliberately NOT passed: NEXTAUTH_SECRET and CALENDSO_ENCRYPTION_KEY. The Dockerfile gives both a
+      # build-only placeholder that satisfies the framework's presence check; the real values exist only at
+      # run time (env below). A real secret in a build argument can end up in build logs or image metadata.
+    services:
+      # README of the upstream says a database must be reachable during the build; whether a database-less build
+      # now works is unverified, so the Blueprint provides one. It is discarded with the build.
+      # TODO(verify, APW-05): the plugin configures trust authentication for this throwaway service.
+      - { name: postgres, image: 'postgres:16' }
+    resources: { cpu: 4, memory: 12Gi, timeoutMinutes: 60 }
+
+  components:
+    - name: web
+      role: web
+      command: ['/calcom/scripts/start.sh'] # verified: the image CMD
+      port: 3000 # verified: EXPOSE 3000
+      replicas: 1 # one replica: the start script migrates and seeds on boot
+      # verified: the start script rewrites the built public URL placeholder inside the build output at boot,
+      # so one image serves any domain — and the root filesystem must be writable.
+      writableRootFilesystem: true
+      probes:
+        # /api/version answers without the database (verified). 60 × 10 s = a 10-minute boot budget.
+        startup: { http: /api/version, periodSeconds: 10, failureThreshold: 60 }
+        # Before the first administrator exists this page redirects to first-run setup; a redirect still
+        # counts as ready for a probe, and the bootstrap job below needs the pod ready.
+        readiness: { http: /auth/login }
+        liveness: { http: /api/version, periodSeconds: 30 }
+      resources: { cpu: 500m, memory: 1536Mi, memoryLimit: 3Gi } # TODO(verify): measure on the verification lane
+
+  dependencies:
+    postgres: { version: '16', directUrl: true } # verified: the app reads both a pooled and a direct URL
+    smtp: { required: true } # booking confirmations and password resets are email
+
+  env:
+    # ── Generated once per App Work, never rotated implicitly ──────────────────────────────────────────────
+    - name: NEXTAUTH_SECRET
+      secret: true
+      generate: { kind: base64, bytes: 32, rotate: never }
+    - name: CALENDSO_ENCRYPTION_KEY # verified: used as a symmetric key that must be exactly 32 characters
+      secret: true
+      generate: { kind: chars, length: 32, rotate: never } # rotating it makes stored credentials unreadable
+      validate: { length: 32, pattern: '^[A-Za-z0-9]{32}$' }
+    - name: CRON_API_KEY # verified: some cron routes compare the raw Authorization header with this value
+      secret: true
+      generate: { kind: hex, bytes: 32, rotate: never }
+    - name: CRON_SECRET # verified: the other cron routes expect "Bearer <this value>"
+      secret: true
+      generate: { kind: hex, bytes: 32, rotate: never }
+
+    # ── Derived from dependencies and domains ─────────────────────────────────────────────────────────────
+    - { name: DATABASE_URL, secret: true, from: deps.postgres.url }
+    - { name: DATABASE_DIRECT_URL, secret: true, from: deps.postgres.directUrl }
+    # verified: the start script waits for "$DATABASE_HOST" (host:port) before migrating.
+    # TODO(verify, APW-07): output names `host` and `port` of the postgres dependency.
+    - { name: DATABASE_HOST, template: '{{deps.postgres.host}}:{{deps.postgres.port}}' }
+    - { name: NEXT_PUBLIC_WEBAPP_URL, from: domains.primary.url } # runtime value replaces the built placeholder
+    - { name: NEXTAUTH_URL, template: '{{domains.primary.url}}/api/auth' } # verified: the framework's own default
+    - { name: EVER_WORKS_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
+    # TODO(verify, APW-07): output names of the smtp dependency.
+    - { name: EMAIL_SERVER_HOST, from: deps.smtp.host }
+    - { name: EMAIL_SERVER_PORT, from: deps.smtp.port }
+    - { name: EMAIL_SERVER_USER, secret: true, from: deps.smtp.user }
+    - { name: EMAIL_SERVER_PASSWORD, secret: true, from: deps.smtp.password }
+    - { name: EMAIL_FROM, from: deps.smtp.from }
+    - { name: EMAIL_FROM_NAME, value: 'Cal.diy (community build)' }
+
+    # ── Fixed values ──────────────────────────────────────────────────────────────────────────────────────
+    - { name: CALCOM_TELEMETRY_DISABLED, value: '1', phase: both } # telemetry is on unless this is set
+    - { name: TZ, value: 'UTC' } # the upstream example environment forces UTC
+    - { name: GOOGLE_LOGIN_ENABLED, value: 'false' }
+
+    # ── First administrator (prompted at creation; used once by bootstrap-admin) ──────────────────────────
+    - name: EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL
+      prompt: { description: 'Email address of the first administrator', required: true }
+      validate: { pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" }
+    - name: EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD
+      secret: true
+      prompt:
+        {
+          description: 'Password of the first administrator — at least 15 characters with upper-case, lower-case and a digit',
+          required: true
+        }
+      validate: { pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{15,}$" } # verified: the setup route's password rule
+
+    # ── Optional integrations (prompted, may be left empty) ───────────────────────────────────────────────
+    - name: GOOGLE_API_CREDENTIALS
+      secret: true
+      prompt: { description: 'Google Calendar OAuth client JSON (optional)', required: false }
+    - name: GOOGLE_WEBHOOK_TOKEN
+      secret: true
+      generate: { kind: hex, bytes: 32, rotate: never }
+
+    # TODO(verify): signup can only be closed with a build-time variable the upstream Dockerfile does not accept
+    # as an argument. Decide between an overlay Dockerfile and a runtime check before enabling:
+    # - { name: NEXT_PUBLIC_DISABLE_SIGNUP, value: "true", phase: build }
+
+  jobs:
+    # A separate job makes a failed migration stop the rollout. The image's start script also migrates on boot
+    # but continues when that fails, so its migration step alone cannot gate a Deployment (verified).
+    - name: migrate
+      when: pre-deploy
+      component: web
+      command: ['npx', 'prisma', 'migrate', 'deploy', '--schema', '/calcom/packages/prisma/schema.prisma']
+      timeoutSeconds: 1800
+
+    # The blueprint bootstraps the administrator before the app is reachable: first-deploy jobs run after the
+    # web component is ready and BEFORE the ingress is published. Idempotent: an app that already has an
+    # administrator answers "No setup needed." with 400, which counts as done.
+    - name: bootstrap-admin
+      when: first-deploy
+      component: web
+      timeoutSeconds: 300
+      command:
+        - node
+        - --input-type=module
+        - -e
+        - |
+          const res = await fetch(`${process.env.EVER_WORKS_WEB_INTERNAL_URL}/api/auth/setup`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              username: 'admin',
+              full_name: 'Administrator',
+              email_address: process.env.EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL,
+              password: process.env.EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD,
+            }),
+          });
+          const text = await res.text();
+          if (res.ok) { console.log('bootstrap-admin: created'); process.exit(0); }
+          if (res.status === 400 && text.includes('No setup needed')) { console.log('bootstrap-admin: already done'); process.exit(0); }
+          console.error(`bootstrap-admin: unexpected HTTP ${res.status}`); // never print the body: it may echo input
+          process.exit(1);
+
+  # Every entry below: the route file exists at the pin, its handler method and credential check were read, and
+  # the schedule comes from the upstream's own schedule files (apps/web/vercel.json, .github/workflows/cron-*.yml).
+  cron:
+    - {
+        name: tasker,
+        schedule: '* * * * *',
+        http: { method: GET, path: /api/tasks/cron, authEnv: CRON_SECRET, authScheme: bearer }
+      }
+    - {
+        name: tasker-cleanup,
+        schedule: '0 0 * * *',
+        http: { method: GET, path: /api/tasks/cleanup, authEnv: CRON_SECRET, authScheme: bearer }
+      }
+    - {
+        name: calendar-subscriptions,
+        schedule: '*/5 * * * *',
+        http: { method: GET, path: /api/cron/calendar-subscriptions, authEnv: CRON_SECRET, authScheme: bearer }
+      }
+    - {
+        name: calendar-subscriptions-cleanup,
+        schedule: '0 3 * * *',
+        http: { method: GET, path: /api/cron/calendar-subscriptions-cleanup, authEnv: CRON_SECRET, authScheme: bearer }
+      }
+    - {
+        name: booking-reminder,
+        schedule: '*/15 * * * *',
+        http: { method: POST, path: /api/cron/bookingReminder, authEnv: CRON_API_KEY, authScheme: raw }
+      }
+    - {
+        name: change-time-zone,
+        schedule: '0 * * * *',
+        http: { method: POST, path: /api/cron/changeTimeZone, authEnv: CRON_API_KEY, authScheme: raw }
+      }
+    - {
+        name: webhook-triggers,
+        schedule: '* * * * *',
+        http: { method: POST, path: /api/cron/webhookTriggers, authEnv: CRON_API_KEY, authScheme: raw }
+      }
+    # TODO(verify): route present and scheduled upstream, but it serves delegation credentials, an organization
+    # feature this edition removed. Enable only if a verification run shows it does useful work.
+    # - { name: selected-calendars, schedule: "*/5 * * * *", http: { method: GET, path: /api/cron/selected-calendars, authEnv: CRON_SECRET, authScheme: bearer } }
+    # TODO(verify): route present and scheduled upstream, but a dry run unless CRON_ENABLE_APP_SYNC=true.
+    # - { name: sync-app-meta, schedule: "0 0 1 * *", http: { method: POST, path: /api/cron/syncAppMeta, authEnv: CRON_API_KEY, authScheme: raw } }
+    # NOT ENABLED — scheduled by an upstream file but the route does not exist at the pin:
+    #   /api/cron/queuedFormResponseCleanup, /api/cron/credentials, /api/cron/workflows/scheduleEmailReminders,
+    #   /api/cron/workflows/scheduleSMSReminders, /api/cron/workflows/scheduleWhatsappReminders,
+    #   /api/cron/downgradeUsers, /api/cron/monthlyDigestEmail, /api/cron/checkSmsPrices
+
+  domains:
+    primaryComponent: web
+    publicUrlEnv: [NEXT_PUBLIC_WEBAPP_URL, NEXTAUTH_URL]
+    onChange: restart # the boot-time placeholder rewrite means a restart, not a rebuild, picks up a new domain
+    needsHairpin: true # server-side code builds absolute URLs from the public URL
+
+  smoke:
+    - { name: version, http: { method: GET, path: /api/version }, expect: { status: [200] } }
+    # 200 (not a redirect to first-run setup) proves the administrator exists; the body check catches a build
+    # that still carries a local or placeholder URL.
+    - name: login
+      http: { method: GET, path: /auth/login }
+      expect: { status: [200], bodyNotContains: ['localhost:3000', 'NEXT_PUBLIC_WEBAPP_URL_PLACEHOLDER'] }
+    - { name: setup-closed, http: { method: POST, path: /api/auth/setup }, expect: { status: [400] } }
+    - { name: cron-refuses-anonymous, http: { method: GET, path: /api/tasks/cron }, expect: { status: [401] } }
+
+  # From the upstream's AGENTS.md: "Run `yarn type-check:ci --force` before concluding CI failures are unrelated".
+  # Checks run exactly the declared command in a fresh checkout — nothing is installed first (APW-08 plan §2.3), so
+  # every command installs its own dependencies. Each check runs as its own CI job (program Resolution R-9).
+  checks:
+    - {
+        name: type-check,
+        command: 'yarn install --immutable && yarn type-check:ci --force',
+        required: true,
+        timeoutSeconds: 3600
+      }
+    - { name: biome, command: 'yarn install --immutable && yarn biome check .', required: false, timeoutSeconds: 1800 } # TODO(verify): read-only form of the documented `--write` command
+    - {
+        name: unit-tests,
+        command: 'yarn install --immutable && TZ=UTC yarn test',
+        required: false,
+        timeoutSeconds: 3600
+      }
+
+  agents:
+    instructionFiles: [AGENTS.md] # upstream guidance: draft PRs, conventional commits, ask before schema changes
+    maxPullRequestChangedLines: 500 # upstream guidance; it also says fewer than 10 code files per PR
+
+  upstreamSync:
+    schedule: '0 6 * * 1'
+    mode: merge
+
+  upstreamPullRequests:
+    enabled: false
+    requireApproval: true

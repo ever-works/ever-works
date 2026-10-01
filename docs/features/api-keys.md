@@ -13,6 +13,10 @@ API keys provide a long-lived, non-interactive way to authenticate with the Ever
 Use API keys whenever you need programmatic access to the API without user interaction — for example, connecting the MCP server, automating work updates from a CI pipeline, or building custom integrations.
 :::
 
+:::note Signing a terminal in as yourself
+On installations where Ever ID is turned on, the CLI can sign you in without a key or a password: `ever-works auth login --ever-id` shows a short code to approve in your browser (see [Ever ID](./ever-id.md#signing-in-from-a-terminal)). Use an API key for unattended automation.
+:::
+
 ## Prerequisites
 
 - A registered Ever Works account
@@ -145,4 +149,4 @@ Revoked keys are immediately invalid. Any requests using a revoked key will retu
 ## Related
 
 - [Authentication](/api/authentication) — JWT login flow and token management
-- [MCP Server](./mcp-server) — Uses API keys for authentication
+- [MCP Server](./mcp-server.md) — Uses API keys for authentication

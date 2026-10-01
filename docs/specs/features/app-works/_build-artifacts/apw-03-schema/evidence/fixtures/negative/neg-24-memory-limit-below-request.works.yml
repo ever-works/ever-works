@@ -1,0 +1,17 @@
+# NEGATIVE FIXTURE neg-24 — error class: a limit below its request.
+# Expected: JSON Schema PASS · rule layer FAIL `limit_below_request` (R17).
+# schema.md §10: "`memoryLimit` … ≥ `memory` (`limit_below_request`)". Comparing `1Gi` with `512Mi` means
+# parsing a quantity out of a string and comparing magnitudes across unit suffixes — outside JSON Schema.
+version: 2
+kind: app
+spec:
+    source:
+        relation: fork
+        upstream: { repo: example-org/helpdesk, defaultBranch: main }
+        branch: main
+    build: { strategy: dockerfile }
+    components:
+        - name: web
+          role: web
+          port: 3000
+          resources: { cpu: 500m, memory: 1Gi, memoryLimit: 512Mi }

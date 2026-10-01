@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { firstWorkWithTaxonomy } from './helpers/work-kind-fixtures';
 
 /**
  * Work taxonomy (categories / tags / collections) — COMPLEX, multi-step, cross-feature
@@ -104,19 +105,27 @@ async function readJson<T>(res: { json(): Promise<unknown>; text(): Promise<stri
     }
 }
 
-/** GET /api/works (owner-scoped). Returns { works, total }. */
+/** The `GET /api/works` row fields this file reads (`kind` / `userRole` pick the seeded Work). */
+interface ListedWork {
+    id: string;
+    name?: string;
+    slug?: string;
+    kind?: string | null;
+    userRole?: string | null;
+}
+
+/**
+ * GET /api/works — every Work the caller can see: the ones it created (`userRole: 'owner'`) AND
+ * the ones it is a member of. Returns { works, total }.
+ */
 async function listWorks(
     request: APIRequestContext,
     token: string,
-): Promise<{ works: Array<{ id: string; name?: string; slug?: string }>; total: number }> {
+): Promise<{ works: Array<ListedWork>; total: number }> {
     const res = await request.get(`${API_BASE}/api/works`, { headers: authedHeaders(token) });
     expect(res.status(), `list works body=${await res.text().catch(() => '')}`).toBe(200);
     const body = (await res.json()) as { works?: unknown[]; items?: unknown[]; total?: number };
-    const works = (body.works ?? body.items ?? (Array.isArray(body) ? body : [])) as Array<{
-        id: string;
-        name?: string;
-        slug?: string;
-    }>;
+    const works = (body.works ?? body.items ?? (Array.isArray(body) ? body : [])) as ListedWork[];
     return { works, total: body.total ?? works.length };
 }
 
@@ -525,8 +534,20 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
         expect(Array.isArray(seededList.works)).toBe(true);
         // If the seeded account owns a work, its taxonomy + count reads succeed with the success
         // envelope (CI seed may have none — tolerate empty by browsing the fresh owner's work below).
-        if (seededList.works.length > 0) {
-            const seededWorkId = seededList.works[0].id;
+        //
+        // The pick used to be `works[0]`: the most recently UPDATED Work the seeded user can see
+        // (`WorkRepository.findAllAccessible` orders by `work.updatedAt DESC`), i.e. whatever an
+        // earlier spec in the shard created or touched last. The App Works specs create App Works for the seeded
+        // user (and `flow-app-spec-recheck` makes it a viewer of another account's), and an App Work
+        // has no Taxonomy surface and no data repository (`WORK_KIND_CAPABILITIES.app`: `taxonomy`
+        // and `repos.data` false) — any 200 its taxonomy read gets comes from the API tolerating the
+        // failed clone of a derived `-data` name (`WorkQueryService.isReadOnlyRepoUnavailable`), not
+        // from a taxonomy it has. So the pick asks the capability registry for a kind that HAS
+        // taxonomy, preferring a Work the seeded user owns. None → the block is skipped, exactly as
+        // it was when the seeded user had no Works.
+        const seededWork = firstWorkWithTaxonomy(seededList.works);
+        if (seededWork) {
+            const seededWorkId = seededWork.id;
             const seededTax = await getTaxonomy(request, seededToken, seededWorkId);
             expect(seededTax.status, `seeded tax body=${JSON.stringify(seededTax.body)}`).toBe(200);
             expect(seededTax.body.status).toBe('success');

@@ -10,9 +10,11 @@ import type {
 } from '@ever-works/plugin';
 import { isPipelineModifierPlugin, PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import {
+    loadRegisteredPlugins,
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
 /**
@@ -227,6 +229,7 @@ export class PipelineBuilderService {
             PLUGIN_CAPABILITIES.PIPELINE_MODIFIER,
         );
 
+        const enabled: RegisteredPlugin[] = [];
         for (const registered of pluginsWithCapability) {
             if (registered.state !== 'loaded') continue;
 
@@ -237,11 +240,25 @@ export class PipelineBuilderService {
             );
             if (!isEnabled) continue;
 
+            // `capabilities` is a manifest getter on the proxy: no load needed.
             if (!isPipelineModifierPlugin(registered.plugin)) continue;
+            enabled.push(registered);
+        }
+
+        // Every disk plugin is registered as a lazy proxy, and builtIns stay
+        // cold until first use (unless PLUGIN_EAGER_BUILTINS=true). On a cold
+        // proxy `targetPipelines` and the SYNC `getStepDefinitions()` read as
+        // the async forwarding wrapper, so load the enabled modifiers first
+        // (waiting for a first load another build started, onLoad included)
+        // and drop any that cannot load or whose onLoad failed — as a boot-time
+        // load failure used to leave them out.
+        for (const registered of await loadRegisteredPlugins(enabled)) {
+            // The real instance: its class fields and sync methods read as
+            // themselves, and `typeof x === 'function'` probes are truthful.
+            const plugin = (await materializePlugin(registered.plugin)) as IPipelineModifierPlugin;
 
             // Check targetPipelines
-            const targets =
-                registered.plugin.targetPipelines ?? registered.manifest.targetPipelines;
+            const targets = plugin.targetPipelines ?? registered.manifest.targetPipelines;
             // Security: only honor the `'*'` wildcard target for first-party
             // (built-in) modifiers. A built-in flag is stamped by the host at
             // registration and cannot be forged by plugin code, whereas both
@@ -262,7 +279,7 @@ export class PipelineBuilderService {
             // `execute()` after their steps were already injected.
             // Fail-open: a thrown error is treated as "don't skip" so
             // a buggy modifier doesn't silently disappear.
-            if (typeof registered.plugin.canSkipAtBuildTime === 'function') {
+            if (typeof plugin.canSkipAtBuildTime === 'function') {
                 let skip = false;
                 try {
                     const settings = this.settingsService
@@ -272,7 +289,7 @@ export class PipelineBuilderService {
                               includeSecrets: true,
                           })
                         : {};
-                    skip = await registered.plugin.canSkipAtBuildTime({
+                    skip = await plugin.canSkipAtBuildTime({
                         settings,
                         ...(workId ? { workId } : {}),
                         ...(userId ? { userId } : {}),
@@ -293,7 +310,7 @@ export class PipelineBuilderService {
 
             result.push({
                 registered,
-                modifierPlugin: registered.plugin,
+                modifierPlugin: plugin,
             });
         }
 

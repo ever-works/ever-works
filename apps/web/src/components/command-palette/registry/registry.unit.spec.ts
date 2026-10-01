@@ -9,6 +9,7 @@ import {
     workSwitchCommands,
 } from './commands';
 import { PALETTE_KINDS, statusBadge } from './kinds';
+import { localMatchScore } from './local-match';
 import { DASHBOARD_SCREENS, screensFor } from './screens';
 import type { PaletteCommandContext } from './types';
 
@@ -128,6 +129,43 @@ describe('command registry', () => {
         ).map((c) => c.id);
         expect(withoutShellControls).not.toContain('collapseSidebar');
         expect(withoutShellControls).not.toContain('openChat');
+    });
+
+    it('offers the App Launcher command only when the shell supplied an opener (APW-11 T15, ACC-11-04 unit half)', () => {
+        const opener = vi.fn();
+        const withLauncher = commandsFor(context({ openAppLauncher: opener })).map((c) => c.id);
+        expect(withLauncher).toContain('openAppLauncher');
+
+        // …and an installation without the launcher — or a provider whose element
+        // failed to load — offers no such command rather than one that opens
+        // nothing. The gate is `!== undefined`, so the explicit `undefined` here is
+        // the same thing as the field being absent from the context object.
+        expect(commandsFor(context()).map((c) => c.id)).not.toContain('openAppLauncher');
+        expect(commandsFor(context({ openAppLauncher: undefined })).map((c) => c.id)).not.toContain(
+            'openAppLauncher',
+        );
+    });
+
+    it('finds the App Launcher command by "launcher", "apps" and "switch app" (ACC-11-04 unit half)', () => {
+        const ctx = context();
+        const command = PALETTE_COMMANDS.find((entry) => entry.id === 'openAppLauncher');
+        expect(command).toBeDefined();
+
+        const label = command!.label(ctx);
+        const aliases = command!.aliases(ctx);
+        for (const query of ['launcher', 'apps', 'switch app']) {
+            expect(localMatchScore(query, label, aliases), query).not.toBeNull();
+        }
+        // A query that should not find it, as the control: without this, an
+        // `aliases` value that matched everything would pass the loop above.
+        expect(localMatchScore('deploy the app', label, aliases)).toBeNull();
+    });
+
+    it('runs the supplied opener, and never navigates on its own', () => {
+        const ctx = context({ openAppLauncher: vi.fn() });
+        PALETTE_COMMANDS.find((entry) => entry.id === 'openAppLauncher')?.run(ctx);
+        expect(ctx.openAppLauncher).toHaveBeenCalledTimes(1);
+        expect(ctx.navigate).not.toHaveBeenCalled();
     });
 
     it('lists one "Switch workspace" command per other Organization', () => {

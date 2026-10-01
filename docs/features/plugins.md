@@ -186,6 +186,24 @@ A capability call resolves its provider **at the moment of the call**, not once 
 **Enabled is not the same as configured.** A plugin with no API key is enabled and still useless, and the two failures read differently. Search distinguishes them explicitly: _"Search plugins are enabled but none have all required settings configured (e.g. API key)."_ means you turned the plugin on but never finished its settings page.
 :::
 
+## When a plugin's code loads
+
+The server knows every plugin from the moment it starts: its name, category and capabilities come from the plugin's package manifest. The plugin's code, and the start-up work the plugin does, runs later: the first time something uses the plugin, such as a generation run picking its AI provider, a search, or the plugin's own page. That keeps each start fast and light, which matters most for Trigger.dev background jobs, since each run starts in a fresh process.
+
+- **The first use after a restart waits for the plugin to load.** In a measurement over all the bundled plugins, the first generation run after a start loaded its 5 plugins in 1.2–1.9 s, and picked the same providers it would have picked had everything loaded at start-up.
+- **Lists load only what they need.** **Plugins** and **Settings → Plugins** load, a few at a time, the plugins enabled for you and the ones marked as built-in in their manifest. A Work's **Plugins** tab loads the built-in ones and those turned on in that Work's own plugin settings; a plugin the Work uses only because it is on by default is not among them. Any other plugin is listed from its package manifest alone, without its settings, until something has loaded it. The onboarding wizard's plugin step loads the built-in ones only.
+- **A plugin that fails to load is marked in error at that first use**, and is skipped wherever a provider is picked. It is not tried again until the API (or the worker) restarts.
+
+### What an operator can change
+
+| Variable                  | Default                   | What it controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_LAZY_LOAD`        | unset (load on first use) | Exactly `false` (lower case) loads the code of every plugin on the server at start-up instead, as the platform did before plugins loaded on first use. Any other value, or none, keeps loading on first use. With [dynamic plugin distribution](#dynamic-plugin-distribution), a plugin fetched after start-up is not covered, and in this mode its own start-up work does not run.                                                                                                                                                 |
+| `PLUGIN_EAGER_BUILTINS`   | `false`                   | Exactly `true` (lower case) loads the plugins marked as built-in at start-up, and leaves the rest to their first use. It has no effect when `PLUGIN_LAZY_LOAD=false`, which loads every plugin on the server anyway. Measured over all the bundled plugins, loading them took about 5 s and left the process at about 320–360 MB of memory with it, against about 60 ms and about 110 MB without. Consider it for the API if the first request to a plugin list or to onboarding matters more to you than start-up time and memory. |
+| `PLUGIN_LOAD_CONCURRENCY` | `6`                       | The most plugins one list or lookup loads at the same time. A positive whole number overrides the default; anything else keeps 6. The limit applies to each list on its own, not to the whole server.                                                                                                                                                                                                                                                                                                                               |
+
+All three are read by the API and by the Trigger.dev worker. Changing one takes a restart.
+
 ## Dynamic plugin distribution
 
 Everything above assumes the plugin's code already sits on the server. Whether that is true is an **operator** decision, made once per install with the `PLUGIN_DISTRIBUTION_MODE` environment variable on the API:
@@ -199,14 +217,17 @@ Anything other than the exact string `dynamic` — empty, unset, `BUNDLED`, a ty
 
 ### What an operator sets
 
-| Variable                     | Default                      | What it controls                                                                                                                                                                                                                                   |
-| ---------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PLUGIN_DISTRIBUTION_MODE`   | `bundled`                    | The mode above.                                                                                                                                                                                                                                    |
-| `FEATURE_DYNAMIC_PLUGINS`    | `false`                      | The independent master switch for the dynamic surface — the catalog, the install / uninstall API and the admin allowlist. Set it to `true` together with the mode; what it does on today's build is spelled out below.                             |
-| `PLUGIN_REGISTRY_URL`        | `https://registry.npmjs.org` | The primary registry the installer resolves packages from. Point it at your own mirror to install without reaching public npm. **The default applies to resolution only** — the boot guard below reads the raw variable, so unset counts as empty. |
-| `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | The GitHub Packages fallback — used when an allowlist row's source is `github-packages`, or when the primary registry answers 404 for a first-party package. Its default is resolution-only too, on the same terms as the row above.               |
-| `PLUGIN_REGISTRY_TOKEN`      | unset                        | Bearer token for the registry. Read lazily, so a missing token surfaces on the first install rather than at boot. Never logged.                                                                                                                    |
-| `PLUGIN_INSTALL_DIR`         | `/app/plugins`               | Where installed packages are placed so Node can import them. In dynamic mode it **must** be writable — the boot reconciler refuses to start on a read-only directory.                                                                              |
+| Variable                                  | Default                      | What it controls                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DISTRIBUTION_MODE`                | `bundled`                    | The mode above.                                                                                                                                                                                                                                                                                                                                      |
+| `FEATURE_DYNAMIC_PLUGINS`                 | `false`                      | The independent master switch for the dynamic surface — the catalog, the install / uninstall API and the admin allowlist. Set it to `true` together with the mode; what it does on today's build is spelled out below.                                                                                                                               |
+| `PLUGIN_REGISTRY_URL`                     | `https://registry.npmjs.org` | The primary registry the installer resolves packages from. Point it at your own mirror to install without reaching public npm. **The default applies to resolution only** — the boot guard below reads the raw variable, so unset counts as empty.                                                                                                   |
+| `PLUGIN_REGISTRY_GITHUB_URL`              | `https://npm.pkg.github.com` | The GitHub Packages fallback — used when an allowlist row's source is `github-packages`, or when the primary registry answers 404 for a first-party package. Its default is resolution-only too, on the same terms as the row above.                                                                                                                 |
+| `PLUGIN_REGISTRY_TOKEN`                   | unset                        | Bearer token for the registry. Read lazily, so a missing token surfaces on the first install rather than at boot. Never logged.                                                                                                                                                                                                                      |
+| `PLUGIN_INSTALL_DIR`                      | `/app/plugins`               | Where installed packages are placed so Node can import them. In dynamic mode it **must** be writable — the boot reconciler refuses to start on a read-only directory.                                                                                                                                                                                |
+| `PLUGIN_WARMUP_TIMEOUT_MS`                | `60000`                      | Dynamic mode only. The longest the API waits at startup for one plugin to be fetched into its local directory before it starts serving. Plugins are fetched in parallel, so this also bounds the whole wait. A plugin that takes longer keeps downloading in the background, and its first use waits for that same fetch. `0` waits without a limit. |
+| `PLUGIN_FACADE_INSTALL_ON_USE`            | `false`                      | Dynamic mode only. Lets an API replica pick up a plugin another replica installed, the first time a feature asks for it by id. See [Install-on-use](#install-on-use) below.                                                                                                                                                                          |
+| `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME` | `false`                      | Where sandbox sessions run (today only the Claude Managed Agent plugin offers them): inside the API process (`false`), or as a background job on the job runtime (`true`). Applies in both modes. See [Sandbox sessions](#sandbox-sessions) below.                                                                                                   |
 
 :::caution Set a registry URL explicitly — the defaults do not satisfy the boot guard
 In dynamic mode **at least one of `PLUGIN_REGISTRY_URL` or `PLUGIN_REGISTRY_GITHUB_URL` must be set explicitly.** The guard runs on the raw environment rather than on the resolved value, so leaving both unset — relying on the defaults in the table above — fails at boot exactly as clearing them does: _"PLUGIN_DISTRIBUTION_MODE=dynamic requires at least one of PLUGIN_REGISTRY_URL or PLUGIN_REGISTRY_GITHUB_URL to be set. Set PLUGIN_REGISTRY_URL=https://registry.npmjs.org (or your mirror) and re-deploy. Bundled-mode deployments are unaffected."_
@@ -219,6 +240,58 @@ The flag is defined in the API configuration with a default of `false`, and [Sel
 :::
 
 Building the image is a separate switch, covered in [Self-host with Docker or Kubernetes](../guides/self-host-docker-kubernetes.md).
+
+Both switches below are read when the API starts. `true` in any letter case turns one on; anything else, including leaving it unset, leaves it off — and off is exactly how the API behaved before the switch existed.
+
+### Install-on-use
+
+In dynamic mode a plugin is installed on the replica that handled the enable, and each replica keeps its own install directory, so another replica may not have the plugin's files. `PLUGIN_FACADE_INSTALL_ON_USE=true` closes that gap. When a feature asks for a plugin **by id** and this replica does not have it, the API fetches the version the platform recorded into this replica's own install directory, loads it, and then uses it. Two lookups name a plugin by id: a provider you picked explicitly, and the plugin that is active on the Work.
+
+- **Only plugins the platform already installed qualify.** The plugin must be a registry plugin that some replica installed, at a recorded version. An unknown id, or a plugin nobody enabled, is never fetched. Enabling a plugin is still what installs it for the first time.
+- **A failure is not fatal.** If the plugin cannot be made available, the feature answers as it would have without the switch: it uses another enabled provider, or reports that the provider was not found. That plugin is not tried again on this replica for 60 seconds. At most 1,000 such misses are remembered at once; past that the oldest is forgotten first, and that plugin is simply looked up again.
+- **Bundled mode ignores the switch.**
+
+:::note What is fetched
+Only the exact version the platform recorded, and only with its integrity hash; a record without one is refused before anything is downloaded, and the plugin is answered as absent. A record whose package name or version is not a plain npm name and an exact version is refused too, before anything on disk is touched. The replica never changes the platform's install record. A third-party package must be on the allowlist.
+
+Each replica's copy is marked complete only after it was verified. A copy without that mark (an interrupted download) or verified against another integrity (a re-published version) is fetched again, once.
+:::
+
+### Sandbox sessions
+
+A pipeline plugin that enforces a restricted network can open a sandbox session: one agent session under a network policy the platform sets. Today the Claude Managed Agent plugin is the only one that does. The App Provisioner will use these sessions, and it picks the pipeline by that ability, not by name. `PLUGIN_SANDBOX_SESSIONS_VIA_JOB_RUNTIME` decides where they run:
+
+| Value                 | Where the session runs                                                                                                                                                      | Stopping it                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `false` **(default)** | Inside the API process that asked for it.                                                                                                                                   | The caller stops the session, and the plugin removes the temporary agent and environment it created.        |
+| `true`                | As a background job on the job runtime (Trigger.dev), in the Work's tenant: a tenant with its own Trigger.dev project runs it there. The API reads its result from the job. | The caller cancels the job. Waiting that times out does **not** cancel it; the job can be read again later. |
+
+The session request holds no credentials. The plugin reads its own settings for the user and the Work, so the job runtime's run record holds no secret.
+
+:::caution Cancelling a job
+When a job is cancelled, the job runtime stops the worker. The worker does not pass the cancellation on to the plugin, so the temporary agent and environment the session created may be left behind. A session that ends on its own always cleans up.
+:::
+
+:::note Tenants with their own Trigger.dev project
+The job starts, and is read back, in that tenant's project. If the platform cannot look the tenant up (for example on a database error), the job starts in the platform's own project instead: it still runs, but a later read through the tenant's project cannot find it, so the wait ends without a result rather than as a failure, and the job is never started twice. When the API starts a job without waiting for it, a tenant lookup that has not answered within about 20 seconds starts nothing, and the call fails.
+:::
+
+No shipped feature opens sandbox sessions yet. The switch takes effect once the App Provisioner lands.
+
+### Background jobs (the worker)
+
+Long-running plugin calls run in the Trigger.dev worker, which reads the same variables as the API. Set `PLUGIN_DISTRIBUTION_MODE=dynamic` on the worker too. There `PLUGIN_INSTALL_DIR` defaults to `.plugin-store` under the worker's working directory, and `PLUGIN_REGISTRY_URL`, `PLUGIN_REGISTRY_GITHUB_URL` and `PLUGIN_REGISTRY_TOKEN` apply as on the API.
+
+- In dynamic mode, a plugin the worker image does not carry is installed into the worker's own directory on first use: the version the platform recorded, verified by its integrity hash. The platform's install record is never changed from the worker. A plugin the image carries is used as it is. Third-party packages must be on the allowlist.
+- Setting `PLUGIN_DISTRIBUTION_MODE=dynamic` when running `pnpm deploy:trigger` keeps only core plugins in the worker image.
+
+:::caution Other background jobs do not install plugins
+Only plugin-operation jobs install a plugin at run time. Other background jobs (content generation, agent tasks, the terminal, workflow runs) do not, so build a core-only worker image only if none of them needs a distributable plugin.
+:::
+
+:::note A worker deployed without the dynamic build
+If the worker runs with `PLUGIN_DISTRIBUTION_MODE=dynamic` but was deployed without it, its image still carries every first-party plugin, and it runs its own copy rather than the version the platform recorded. The worker logs a warning naming the plugin, once per plugin version. Redeploy with `PLUGIN_DISTRIBUTION_MODE=dynamic` set for `pnpm deploy:trigger`.
+:::
 
 ### The admin allowlist
 

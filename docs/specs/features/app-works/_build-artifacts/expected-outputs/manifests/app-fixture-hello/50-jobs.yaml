@@ -1,0 +1,147 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. The declared Kubernetes Jobs (APW-06 plan §4.8).
+#
+#   job-migrate-44444444    when: pre-deploy    → applies `migrations/*.sql` in order; exits non-zero on any
+#                                                failure (variant/bad-migration). ACC-13-08 asserts a failed
+#                                                migration stops the rollout and the previous Deployment keeps
+#                                                serving; ACC-06-09 asserts nothing changed before it.
+#   job-bootstrap-44444444  when: first-deploy  → records whether the PUBLIC url already served this app; it
+#                                                must not have (ACC-13-03). Runs AFTER the web component is
+#                                                ready and BEFORE the Ingress is published (FR-26 row 4).
+#
+# Both use the `web` component's image, env and security context. `timeoutSeconds: 120` → exactly 120 s of
+# `activeDeadlineSeconds`; `retries` defaults to 0 (APW-03 schema.md:318 → `backoffLimit: 0`), which is what
+# makes a broken migration fail the Deployment on the first attempt rather than silently retrying.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-migrate-44444444
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/job: migrate
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        ever-works.io/component: web
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+        ever-works.io/job: migrate
+    spec:
+      restartPolicy: Never
+      serviceAccountName: app
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - src/migrate.mjs
+          envFrom:
+            - secretRef:
+                name: app-env-fa90df132e
+                optional: false
+            - configMapRef:
+                name: app-platform-fa90df132e
+                optional: false
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-bootstrap-44444444
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+    ever-works.io/job: bootstrap
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        ever-works.io/component: web
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: app-fixture-hello
+        ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+        ever-works.io/kind: app
+        ever-works.io/job: bootstrap
+    spec:
+      restartPolicy: Never
+      serviceAccountName: app
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/example-owner/app-fixture-hello/ever-works-app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - src/bootstrap.mjs
+          envFrom:
+            - secretRef:
+                name: app-env-fa90df132e
+                optional: false
+            - configMapRef:
+                name: app-platform-fa90df132e
+                optional: false
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
