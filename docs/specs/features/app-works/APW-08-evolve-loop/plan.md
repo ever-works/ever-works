@@ -1242,7 +1242,7 @@ Goal `workId` + awaiting-merge rule + form field; Mission output mode + planner 
 ### P3 — Mission template (Wave 1 tail, FR-56…FR-60)
 
 Manifest keys, `applyDefaults` wiring, template inputs, draft Goals, template form, catalog entry, the
-`ever-works/missions` content from [`mission-template-draft/`](./mission-template-draft/) and the `evolve-app`
+`ever-works/missions` content from [`mission-template-draft/`](./mission-template-draft/README.md) and the `evolve-app`
 Skill from [`skill-draft/SKILL.md`](./skill-draft/SKILL.md) published to `ever-works/skills`.
 
 ---

@@ -703,7 +703,7 @@ was drafted keeps its text and gains a **Resolved (…)** line underneath, and n
   configuration is unchanged. Read access is part of the answer: the reader fetches the catalog over the raw
   host as ADR-014's reader does, so the repository must be readable by the API process (public, as
   `ever-works/templates` is, or read with a token, as the Apps catalog's optional
-  `EVER_WORKS_APPS_CATALOG_TOKEN` does); the drafts in [`catalog-draft/`](./catalog-draft/) become that
+  `EVER_WORKS_APPS_CATALOG_TOKEN` does); the drafts in [`catalog-draft/`](./catalog-draft/README.md) become that
   repository's first commit content (T18). Registered as **CL-47**.
 - **[NEEDS CLARIFICATION: where is the web component published?]** Program README open question 7.
   _Default: developed in the Ever Works monorepo during P1, extracted with history to a public `ever-co`

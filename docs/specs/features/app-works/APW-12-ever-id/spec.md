@@ -665,7 +665,7 @@ One behaviour-level line per gate; the implementation checklist with its citatio
   [CLARIFICATIONS](../CLARIFICATIONS.md) (the D-rows and this epic's markers).
 - **This epic**: [`plan.md`](./plan.md) · [`tasks.md`](./tasks.md) · [`idp-options.md`](./idp-options.md) (the
   decision record and the owner's binding constraints) · [`cross-platform.md`](./cross-platform.md) (Teams and
-  Gauzy adoption, XP ids) · [`cross-repo-issues/`](./cross-repo-issues/) (the issue drafts for those repositories).
+  Gauzy adoption, XP ids) · [`cross-repo-issues/`](./cross-repo-issues/README.md) (the issue drafts for those repositories).
 - **Existing substrate**: [EXISTING-SUBSTRATE](../EXISTING-SUBSTRATE.md) §6 (identity and cross-platform
   navigation) · `apps/api/src/auth/` (Better Auth abstraction, session provider) ·
   `apps/api/src/terms/terms-acceptance.service.ts` (the terms contract sign-up reuses) ·

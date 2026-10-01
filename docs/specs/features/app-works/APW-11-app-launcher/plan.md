@@ -23,7 +23,7 @@ switch (§5.2, §10.5).
 **Repository state (owner, 2026-09-17):** `ever-works/platforms` **exists** — created 2026-09-17 with
 `platforms.json`, `schema/platforms.schema.json`, `icons/` and a green validation workflow
 ([`BUILD-READINESS.md`](../BUILD-READINESS.md) §6 item 4) — and is what `EVER_WORKS_PLATFORM_CATALOG_REPO`
-defaults to. The drafts under [`catalog-draft/`](./catalog-draft/) are that repository's first commit content
+defaults to. The drafts under [`catalog-draft/`](./catalog-draft/README.md) are that repository's first commit content
 (T18).
 **Program audit resolutions applied** ([CONTRACTS.md §0](../CONTRACTS.md)): R-1 (shared types in
 `packages/contracts/src/apps/app-launcher.ts`), R-2 (Activity `actionType` `app_launcher`, dotted `action`), R-19
@@ -589,7 +589,7 @@ regression `plan §10.1` pins with a test.
 
 **The repository exists** — created 2026-09-17 (owner's answer, `BUILD-READINESS.md` §6 item 4), which is why
 T18 changed from "create the repository" to "land `catalog-draft/` as its first commit content and keep it
-green". Drafts ready to push live in [`catalog-draft/`](./catalog-draft/): `platforms.json`,
+green". Drafts ready to push live in [`catalog-draft/`](./catalog-draft/README.md): `platforms.json`,
 `schema/platforms.schema.json`, `.github/workflows/validate.yml`, `fixtures/platforms.fixture.json`,
 `icons/`, `README.md`, `CONTRIBUTING.md`, `LICENSE`.
 

@@ -495,14 +495,14 @@ runner) — the R-10 hooks.
 
 - [ ] **T30. Agent template (`ever-works/agents`).**
       **Create** in `ever-works/agents`: `templates/app-provisioner/.works/agent.yml`, `templates/app-provisioner/SOUL.md`,
-      `templates/app-provisioner/skills.yml` from [`agent-template-draft/`](./agent-template-draft/), plus the companion
+      `templates/app-provisioner/skills.yml` from [`agent-template-draft/`](./agent-template-draft/README.md), plus the companion
       files its header comment lists (`templates/app-provisioner/prompts/system.md`,
       `templates/app-provisioner/prompts/tasks/provision-repository.md`,
       `templates/app-provisioner/prompts/tasks/fix-verification.md`,
       `templates/app-provisioner/kb/playbooks/{detection-order,env-classification,bootstrap-risks}.md`,
       `templates/app-provisioner/README.md`, `templates/app-provisioner/icon.svg`) and `eval/app-provisioner.yml`
       (the catalogue entry of T32). **All of those companions are drafted here** under
-      [`agent-template-draft/`](./agent-template-draft/) — `prompts/`, `kb/playbooks/`, `README.md`, `icon.svg` and
+      [`agent-template-draft/`](./agent-template-draft/README.md) — `prompts/`, `kb/playbooks/`, `README.md`, `icon.svg` and
       `manifest-row.json` — because that repository's `scripts/validate.js` fails when any path a manifest points at is
       missing, and `SOUL.md` plus the kb seed path must exist too.
       **Modify** `manifest.json` in `ever-works/agents` — a `templates[]` row, copied from the drafted
@@ -875,7 +875,7 @@ _Each task names its phase and the tasks it lands with. Nothing above is renumbe
       provisioning mount.
 
 - [ ] **T60 (P1, lands with T30–T32). Catalog drafts: agent template companions, manifest rows and the eval package.**
-      **Create** under [`agent-template-draft/`](./agent-template-draft/): `prompts/system.md`,
+      **Create** under [`agent-template-draft/`](./agent-template-draft/README.md): `prompts/system.md`,
       `prompts/tasks/provision-repository.md`, `prompts/tasks/fix-verification.md`,
       `kb/playbooks/detection-order.md`, `kb/playbooks/env-classification.md`, `kb/playbooks/bootstrap-risks.md`,
       `README.md`, `icon.svg` and `manifest-row.json` — every path the drafted `.works/agent.yml` points at, so

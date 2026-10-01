@@ -503,7 +503,7 @@ signal: AbortSignal.timeout(1_500) })`, the boolean read from `features.appLaunc
 
 - [ ] **T18. Land the `ever-works/platforms` catalog content.** _(owner action — outside this monorepo)_
       **The repository exists** (created 2026-09-17; `BUILD-READINESS.md` §6 item 4), so this task is no longer
-      "create it": it reviews the drafts in [`catalog-draft/`](./catalog-draft/), supplies the per-environment
+      "create it": it reviews the drafts in [`catalog-draft/`](./catalog-draft/README.md), supplies the per-environment
       addresses, and lands them as the repository's first commit content, with the layout, schema and CI exactly as
       [plan §5.1](./plan.md): `platforms.json`, `schema/platforms.schema.json`,
       `.github/workflows/validate.yml`, `fixtures/platforms.fixture.json`, `icons/ever-works.svg`,

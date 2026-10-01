@@ -7,7 +7,7 @@
 
 **Epic ID**: `APW-04-app-provisioner`
 **Spec**: [`./spec.md`](./spec.md) · **Tasks**: [`./tasks.md`](./tasks.md)
-**Drafts**: [`skill-draft/SKILL.md`](./skill-draft/SKILL.md) · [`agent-template-draft/`](./agent-template-draft/)
+**Drafts**: [`skill-draft/SKILL.md`](./skill-draft/SKILL.md) · [`agent-template-draft/`](./agent-template-draft/README.md)
 **Status**: `Draft`
 **Last updated**: 2026-09-17
 **Authored against**: `develop` @ `a655b53ca` · **Re-aligned**: `develop` @ `ee45946e5` with
@@ -1010,7 +1010,7 @@ other `app.provision.*` row uses `ActivityStatus.COMPLETED`. `resolveFeedKind` c
 
 ### 7.1 The Agent
 
-- Template `ever-works/agents/templates/app-provisioner/` (draft in [`agent-template-draft/`](./agent-template-draft/)).
+- Template `ever-works/agents/templates/app-provisioner/` (draft in [`agent-template-draft/`](./agent-template-draft/README.md)).
 - `AppProvisionerAgentResolver` **(new, `packages/agent/src/app-provisioning/`)** reuses the `agentId` of the caller's
   (or Organization's) most recent `work_app_provisionings` row when that Agent still exists and is not archived, else
   creates one. `agent.entity.ts` has no template-slug column, and this epic does not add one — the provisioning rows
@@ -1033,7 +1033,7 @@ other `app.provision.*` row uses `ActivityStatus.COMPLETED`. `resolveFeedKind` c
 - Scope: tenant-scoped Agent; one per user per scope, or per Organization when the App Work has an `organizationId`.
 - **Required `agent.yml` keys (this audit).** T2 validates this exact list, so its test can be written offline.
   Schema `ever-works/agents/schema/agent-manifest.schema.json`, `schemaVersion: 1` (the schema version the draft
-  declares; the companion files it requires are drafted under [`agent-template-draft/`](./agent-template-draft/)):
+  declares; the companion files it requires are drafted under [`agent-template-draft/`](./agent-template-draft/README.md)):
   `schemaVersion` (integer, `1`), `slug` (lower-case kebab), `name`, `title`, `scope` (`PERSONAL` | `TENANT` |
   `PLATFORM`), `summary`, `capabilities` (non-empty string), `avatarMode` (`ICON` | `IMAGE`), `avatarIcon`,
   `permissions` (object with **every** flag present and boolean — this epic sends all `false`), `heartbeatCadence`
