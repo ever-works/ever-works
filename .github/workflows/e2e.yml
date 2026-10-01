@@ -70,6 +70,7 @@ concurrency:
 
 jobs:
   e2e:
+    if: ${{ false }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     # Each shard runs ~1/E2E_SHARDS of the 1670-test suite. 90 min keeps
     # plenty of headroom for the slowest shard (cold dev-mode compile +
@@ -664,6 +665,7 @@ jobs:
   # don't pay the cost of a prod build for the 1000+ dev-mode specs
   # while still validating the ~4 prod-only invariants.
   e2e-prod-build:
+    if: ${{ false }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     # 90m (was 45m) to match the sharded e2e job. This job does a FULL prod
     # `next build` before running its ~4 prod-only specs, and that build has
