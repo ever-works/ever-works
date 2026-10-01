@@ -709,7 +709,7 @@ action, focus returns to the opener.
 - [ ] **ACC-03-34** Attestation by a manager is refused; by the owner it is recorded with text hash and commit; changing the registry text identifier invalidates it.
 - [ ] **ACC-03-35** An Upstream sync that relicenses MIT → BUSL-1.1 notifies the owner, leaves the running Deployment untouched and requires confirmation for the next one.
 - [ ] **ACC-03-36** An AGPL App Work on a private copy without `license.sourceOfferUrl` is refused with `sourceOfferMissing`.
-- [ ] **ACC-03-37** A trademark suffix entry creates the Work named `Cal.diy (community build)`.
+- [ ] **ACC-03-37** A trademark suffix entry creates the Work named `Cal (community build)`.
 - [ ] **ACC-03-38** With the registry unreachable for 8 days, a new App Work classifies from the bundled snapshot and is never eligible for Ever Works Apps.
 
 **Web and cross-cutting**

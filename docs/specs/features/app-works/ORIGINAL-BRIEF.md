@@ -14,6 +14,10 @@ that agent's context and in a chat transcript rather than in the repository. The
 acceptance ids — and it is deliberately narrower than the brief below (the Selector, the SSO story and
 the eventual `ever.sh` hosting idea are recorded there as scope the program only partly owns).
 
+> **Editor's note (2026-10-01).** In this program the managed hosting tier is **Ever Works Apps** (APW-10), and
+> `ever.sh` is not a hosting product name: it is the site for self-hosting Ever products. Where the brief below speaks
+> of hosting "with ever.sh", read it as that later, separate idea — never as a name for Ever Works' managed tier.
+
 **Everything between the two rules is the owner's text, unedited** — including its typos — because a
 source-of-intent document that has been "cleaned up" is no longer evidence of what was asked for.
 
@@ -56,6 +60,7 @@ Why above!? Basically no platform today as I know doing this. Many HOST OSS apps
 | "https://github.com/calcom/cal.diy"                                                              | the flagship worked example: the Cal.diy Blueprint, the golden-path lane and the provisioner recipe — the upstream facts are researched and pinned in `APW-13` |
 
 **Deliberately outside this program**, as the brief itself marks them ("all that related to ever.sh is
-later"): the `ever.sh` general hosting product, and the cross-platform Selector as a shared component of
+later"): the general hosting idea the brief files under `ever.sh` (see the editor's note above), and the
+cross-platform Selector as a shared component of
 Ever Gauzy / Ever Teams / Ever Rec rather than of Ever Works alone. APW-11 builds the Ever Works half and
 the SSO contract APW-12 owns.

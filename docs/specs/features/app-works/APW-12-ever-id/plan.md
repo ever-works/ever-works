@@ -956,6 +956,11 @@ general.
 
 ### P2 — Ever Teams (spec FR-54…FR-58; [`cross-platform.md`](./cross-platform.md) §4)
 
+> **Design revised 2026-10-01.** Gauzy's side is one plugin, `packages/plugins/auth-zitadel`, loaded by the
+> environment variable `ZITADEL_ENABLED`, with its routes under `/api/auth/zitadel` and its link table
+> `zitadel_account`. Where a task below names a path in Gauzy core, `FEATURE_EVER_ID_*` or `external_identity`,
+> [`cross-platform.md`](./cross-platform.md) §4–§7 is the current design and wins.
+
 Work lands in `ever-co/ever-teams` and, server-side only and default-off, in `ever-co/ever-gauzy`'s API.
 
 ### P3 — Ever Gauzy (cross-platform.md §5)
