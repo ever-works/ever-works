@@ -134,7 +134,10 @@ export async function createEverIdFake({
                     return send(404, { error: 'not_found' });
             }
         } catch (error) {
-            return send(500, { error: String(error) });
+            // The detail goes to this process's log (the lane prints it when a run
+            // fails), never back to the caller.
+            console.error('Ever ID fake: control route failed:', error);
+            return send(500, { error: 'fake_control_error' });
         }
     });
     await new Promise((resolve) => control.listen(controlPort, '127.0.0.1', resolve));
