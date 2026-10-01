@@ -25,6 +25,8 @@ own accounts. Ever ID is an **addition**:
 Ever Teams signs in through Gauzy's API, so the same plugin also gives Ever Teams its Ever ID sign-in (companion issue
 in `ever-co/ever-teams`).
 
+Implementation in progress: #10362.
+
 The full contract, with every route, flag and test file:
 [Ever ID — adoption by Ever Teams and Ever Gauzy](https://github.com/ever-works/ever-works/blob/develop/docs/specs/features/app-works/APW-12-ever-id/cross-platform.md),
 §4.1 and §5.
@@ -65,7 +67,7 @@ The full contract, with every route, flag and test file:
    pages.
 8. **Keycloak moves into `packages/plugins/auth-keycloak`** with the same strategy, guard, exports and `KEYCLOAK_*`
    names (`@gauzy/auth` keeps re-exporting every Keycloak symbol), and gains sign-in routes and a login button that exist
-   only when `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_CLIENT_SECRET` are set. Installations without them see no change.
+   only when Keycloak is configured (a real client id, secret and realm). Installations without it see no change.
 9. **Later, in separate changes**: federated login on the MCP authorization server (`MCP_AUTH_EVER_ID_ENABLED`, default
    `false`), a SuperTokens plugin, and moving Auth0 into the same plugin shape.
 
