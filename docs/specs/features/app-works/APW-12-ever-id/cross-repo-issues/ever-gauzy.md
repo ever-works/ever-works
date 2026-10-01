@@ -52,13 +52,14 @@ The full contract, with every route, flag and test file:
    linking from Settings (fresh sign-in, both e-mails shown, other workspaces' rows only with Gauzy's own e-mailed code),
    unlinking and the identity list; the token route for the Ever Teams and Ever Works clients (an ID token verified
    locally against an audience allow-list, no userinfo call); and back-channel logout (`400` for a token that fails
-   validation, `200` once a valid token is accepted).
+   validation, `200` once a valid token is accepted; it revokes that user's tokens in that workspace issued since the
+   Ever ID sign-in, and a revocation that fails is kept and retried by the plugin's daily job).
 5. **No silent linking by e-mail.** Linking is explicit by default. Ever's hosted deployments may select
    `ZITADEL_LINK_MODE=confirmed`, which links an unlinked Ever ID to the existing users with the same verified e-mail
    only after the person enters the one-time code Gauzy sends to that mailbox.
 6. **No account from Ever ID without an explicit sign-up.** Only Ever's hosted deployments may offer one
    (`ZITADEL_SIGNUP_ENABLED`): the person confirms, and Gauzy's own register path and subscription check create the
-   workspace. Self-hosted installations never create accounts from Ever ID, and `ZITADEL_JIT_PROVISIONING` stays
+   workspace, together with its `zitadel_account` link. Self-hosted installations never create accounts from Ever ID, and `ZITADEL_JIT_PROVISIONING` stays
    `false`.
 7. **Web**: `ZITADEL_AUTH_LINK` in `packages/ui-config/src/lib/environments/model.ts` and one more `socialLinks` entry
    in `packages/ui-core/core/src/lib/auth/auth.module.ts`, labelled "Sign in with Ever ID" and shown only when the link

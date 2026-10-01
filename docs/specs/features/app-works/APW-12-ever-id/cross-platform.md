@@ -150,8 +150,8 @@ Ever ID.
   `{ enabled: false, reason: 'unconfigured' }`, every other route answers 404, and boot never fails.
 - **Entities, owned by the plugin.** `zitadel_account` (issuer, subject, `userId`, the e-mail at link time, link
   method `explicit | confirmed | provisioned | signup`, linked and last-login times; unique `(issuer, subject, userId)`),
-  `zitadel_organization` (an Ever organization ↔ one Gauzy organization), `zitadel_session` (the Ever ID session `sid`
-  per sign-in, for sign-out notices) and `zitadel_logout_jti` (the replay window). `social_account` and `ProviderEnum`
+  `zitadel_organization` (an Ever organization ↔ one Gauzy organization), `zitadel_session` (one row per Ever ID
+  sign-in: the session `sid`, the user, the workspace and when it started — the association sign-out notices use) and `zitadel_logout_jti` (the replay window). `social_account` and `ProviderEnum`
   are untouched.
 - **Migration: in core's migration directory for now.** One hand-written, multi-dialect migration,
   `packages/core/src/lib/database/migrations/<timestamp>-AuthZitadel.ts` (`CREATE TABLE IF NOT EXISTS`, PostgreSQL,
@@ -174,13 +174,18 @@ Ever ID.
     - `confirmed` mode, unlinked, verified e-mail matching existing users → `{ confirm_required: true, handoff }`; the
       client posts the code Gauzy e-mailed to `POST /api/auth/zitadel/confirm { handoff, code }`;
     - sign-up enabled (Ever's hosted Gauzy and Teams only) and no account → `404 { code: 'signup_required', handoff }`;
-      the client shows its own sign-up page and posts `POST /api/auth/zitadel/signup { handoff, confirm: true, user }`;
+      the client shows its own sign-up page and posts `POST /api/auth/zitadel/signup { handoff, confirm: true, user }`,
+      which creates the workspace through Gauzy's own register path **and** the `zitadel_account` row (link method
+      `signup`) for the hand-off's issuer and subject, so the next Ever ID sign-in finds it;
     - otherwise → `404 { code: 'no_workspace' }`. Nothing is ever looked up by e-mail outside `confirmed` mode.
 - **Sign-out notices — `POST /api/auth/zitadel/backchannel-logout`** (public, form `logout_token`): validated by the
   shared library (`iss`, `aud` ∋ the client, the back-channel event, `sid`, no `nonce`, `iat` within 300 s, unseen `jti`);
-  a token that fails any of these checks is answered `400` and changes nothing. A valid token revokes the Gauzy tokens
-  issued after that Ever ID session started for the users of that `sid` and deletes the session rows; the answer is `200`
-  even when a revocation fails (the failure is logged). The route is on whenever the plugin is loaded; only
+  a token that fails any of these checks is answered `400` and changes nothing. Because `POST /auth/signin.workspace`
+  is unchanged and cannot tell the plugin which tokens it issued, the association is by time: for each `zitadel_session`
+  row of that `sid`, the plugin revokes that user's tokens in that workspace issued at or after the row's start — so
+  tokens from before the Ever ID sign-in, and every other user's, are untouched — and then deletes the row. The answer is
+  `200`; a row whose revocation fails is kept, the failure is logged, and the plugin's daily job retries it until it
+  succeeds, so a sign-out notice is never lost. The route is on whenever the plugin is loaded; only
   `ZITADEL_BACKCHANNEL_LOGOUT_ENABLED=false` turns it off (404).
 - **Tests (tracked in `ever-co/ever-gauzy`; Jest `*.spec.ts`, a local `jose` key pair as the fake provider):**
   `packages/auth/src/lib/oidc/{pkce,transaction,jwks,id-token,logout-token}.spec.ts`,
@@ -211,15 +216,16 @@ EVER_ID_CLIENT_SECRET, checks: ['pkce', 'state'], idToken: true }`, filtered lik
   which forwards it to Gauzy's `POST /api/auth/zitadel/confirm`.
 - `signup_required` → the existing sign-up page, carrying only the one-time hand-off key (never an e-mail or a token in the
   address, new `apps/web/app/api/auth/ever-id/signup-handoff/route.ts`); after the person confirms, Teams posts its usual
-  sign-up fields to Gauzy's `POST /api/auth/zitadel/signup`.
+  sign-up fields to Gauzy's `POST /api/auth/zitadel/signup`, which creates the account and its Ever ID link in one step.
 - `no_workspace` → the error page says no workspace is linked to this Ever ID yet and how to get one. A self-hosted Teams
   may opt in with `EVER_ID_TEAMS_AUTO_PROVISION === 'true'` (default off, and off on every Ever deployment): the page then
   offers Teams' existing sign-up instead, and `GauzyAdapter.createUser` runs only after the person confirms it there —
   never silently from the sign-in (§2 rule 2). `getUserByAccount` / `linkAccount` do nothing for `ever-id` — the link
   lives in Gauzy's `zitadel_account`.
 - Sign-out notices: new `apps/web/app/api/auth/ever-id/backchannel-logout/route.ts` verifies the logout token with `jose`,
-  forwards it to Gauzy's `POST /api/auth/zitadel/backchannel-logout` (Gauzy keeps the authoritative replay cache and
-  revokes the tokens), and answers `400` for a malformed token and `200` otherwise; the next Gauzy call with a revoked
+  forwards it to Gauzy's `POST /api/auth/zitadel/backchannel-logout` on the configured Gauzy API origin only, never
+  following a redirect (the token cannot reach another origin; Gauzy keeps the authoritative replay cache and revokes the
+  tokens), and answers `400` for a malformed token and `200` otherwise; the next Gauzy call with a revoked
   token ends the Teams session, because Teams sessions are stateless cookies.
 - Connecting an existing account happens on Gauzy's **Connected identities** page (§5.2), which a Teams user reaches with
   the same account; a Connect entry inside Teams settings is a later addition (§8).
@@ -255,7 +261,7 @@ EVER_ID_CLIENT_SECRET, checks: ['pkce', 'state'], idToken: true }`, filtered lik
     | `GET /`                                                                                                                                             | 302 to the provider's authorize endpoint with PKCE, `state` and `nonce` kept in a signed, HttpOnly cookie; the return path is checked against `CLIENT_BASE_URL`; no e-mail is ever forwarded as `login_hint`                                               |
     | `GET /callback`                                                                                                                                     | exchange and validate; require `email_verified`; then 302 to `#/auth/ever-id?handoff=<key>` (linked), `#/auth/ever-id/confirm?handoff=<key>` (`confirmed` mode) or the sign-up confirmation (sign-up enabled) — a one-time key, never a token or a user id |
     | `POST /handoff`                                                                                                                                     | redeems the key once (60 s): returns `IUserSigninWorkspaceResponse` for linked users only; the existing workspace selection and `POST /auth/signin.workspace` finish the sign-in                                                                           |
-    | `POST /confirm`, `POST /signup`                                                                                                                     | the confirmed link and the explicit sign-up of §2 rule 2                                                                                                                                                                                                   |
+    | `POST /confirm`, `POST /signup`                                                                                                                     | the confirmed link, and the explicit sign-up of §2 rule 2, which creates the workspace and its `zitadel_account` row (`signup`) together                                                                                                                   |
     | `POST /link` _(signed in)_, `GET /link/callback`, `POST /link/confirm` _(signed in)_, `DELETE /link` _(signed in)_, `GET /identities` _(signed in)_ | explicit linking from Settings (fresh authentication, both e-mails shown, per-row proof for other workspaces), unlinking with `409` when it would leave no sign-in method, and the list of connected identities                                            |
 
 - **Hand-off without tokens in the address.** The one-time key is 32 random bytes, kept 60 s in the Nest cache (Redis on
@@ -365,12 +371,14 @@ other file is new in that task.
       (nothing written before `/confirm`; five wrong codes → 410). _Tracked in `ever-co/ever-teams`:_
       `apps/web/app/api/auth/ever-id/confirm/route.test.ts` (the code is forwarded, never placed in an address). Task T35,
       T36.
-- [ ] **XP-T-04** A sign-out notice from Ever ID revokes the Gauzy tokens that sign-in issued; the Teams session ends on its next API call; password sessions are untouched.
+- [ ] **XP-T-04** A sign-out notice from Ever ID revokes the Gauzy tokens issued since that Ever ID sign-in; the Teams session ends on its next API call; tokens from before it and other users' sessions are untouched, and a failed revocation is retried.
       _Tests (tracked in `ever-co/ever-gauzy`):_ `packages/plugins/auth-zitadel/src/lib/specs/backchannel.spec.ts`
-      (revokes only the tokens of that `sid`'s sessions; other sessions untouched; reused `jti` or `iat` over 300 s → 400).
+      (revokes only that user's tokens in that workspace issued since the `sid`'s sign-in; earlier tokens and other users
+      untouched; a failed revocation keeps its row for the daily retry; reused `jti` or `iat` over 300 s → 400).
       _Tracked in `ever-co/ever-teams`:_ `apps/web/app/api/auth/ever-id/backchannel-logout/route.test.ts` and
-      `apps/web/core/lib/auth/ever-id/logout-token.test.ts` (a valid token is forwarded to Gauzy and answered 200; a
-      malformed token → 400; a duplicate delivery is de-duplicated). Task T35, T36.
+      `apps/web/core/lib/auth/ever-id/logout-token.test.ts` (a valid token is forwarded to the configured Gauzy origin
+      without following redirects and answered 200; a malformed token → 400; a duplicate delivery is de-duplicated). Task
+      T35, T36.
 - [ ] **XP-T-05** No Ever ID or Gauzy token appears in any address, log line or `localStorage` entry.
       _Tests (tracked in `ever-co/ever-teams`):_ `apps/web/cypress/e2e/ever-id-sign-in.cy.ts` (every visited URL, console
       entry and `localStorage` value scanned for the minted tokens, with a planted control). _Tracked in
