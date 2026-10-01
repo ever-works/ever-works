@@ -49,7 +49,8 @@ The full contract, with every route, flag and test file:
    workspace list, after which the **existing** `POST /auth/signin.workspace` issues Gauzy's usual tokens; explicit
    linking from Settings (fresh sign-in, both e-mails shown, other workspaces' rows only with Gauzy's own e-mailed code),
    unlinking and the identity list; the token route for the Ever Teams and Ever Works clients (an ID token verified
-   locally against an audience allow-list, no userinfo call); and back-channel logout.
+   locally against an audience allow-list, no userinfo call); and back-channel logout (`400` for a token that fails
+   validation, `200` once a valid token is accepted).
 5. **No silent linking by e-mail.** Linking is explicit by default. Ever's hosted deployments may select
    `ZITADEL_LINK_MODE=confirmed`, which links an unlinked Ever ID to the existing users with the same verified e-mail
    only after the person enters the one-time code Gauzy sends to that mailbox.
@@ -70,15 +71,15 @@ The full contract, with every route, flag and test file:
 
 ### Flags (environment only, read once at boot)
 
-| Name                                                                                                                 | Default    | Meaning                                                                  |
-| -------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------ |
-| `ZITADEL_ENABLED`                                                                                                    | unset      | loads the plugin; unset or malformed means no route and no outbound call |
-| `ZITADEL_AUTH_LINK` (web app)                                                                                        | empty      | Gauzy's own button; empty lets the server side ship first                |
-| `ZITADEL_LINK_MODE`                                                                                                  | `explicit` | `confirmed` only on Ever's hosted deployments                            |
-| `ZITADEL_SIGNUP_ENABLED`                                                                                             | `false`    | the explicit sign-up, honoured only on Ever's hosted deployments         |
-| `ZITADEL_JIT_PROVISIONING`                                                                                           | `false`    | silent account creation, which stays off                                 |
-| `ZITADEL_BACKCHANNEL_LOGOUT_ENABLED`                                                                                 | `true`     | the sign-out notice route, while the plugin is loaded                    |
-| `ZITADEL_ISSUERS`, `ZITADEL_CLIENT_ID`, `ZITADEL_CLIENT_SECRET`, `ZITADEL_CALLBACK_URL`, `ZITADEL_ALLOWED_AUDIENCES` | unset      | settings; loaded without them the plugin reports itself unconfigured     |
+| Name                                                                                                                 | Default    | Meaning                                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------- |
+| `ZITADEL_ENABLED`                                                                                                    | unset      | loads the plugin; unset or malformed means no route and no outbound call   |
+| `ZITADEL_AUTH_LINK` (web app)                                                                                        | empty      | Gauzy's own button; empty lets the server side ship first                  |
+| `ZITADEL_LINK_MODE`                                                                                                  | `explicit` | `confirmed` only on Ever's hosted deployments                              |
+| `ZITADEL_SIGNUP_ENABLED`                                                                                             | `false`    | the explicit sign-up, honoured only on Ever's hosted deployments           |
+| `ZITADEL_JIT_PROVISIONING`                                                                                           | `false`    | silent account creation, which stays off                                   |
+| `ZITADEL_BACKCHANNEL_LOGOUT_ENABLED`                                                                                 | `true`     | sign-out notices while the plugin is loaded; only `'false'` turns them off |
+| `ZITADEL_ISSUERS`, `ZITADEL_CLIENT_ID`, `ZITADEL_CLIENT_SECRET`, `ZITADEL_CALLBACK_URL`, `ZITADEL_ALLOWED_AUDIENCES` | unset      | settings; loaded without them the plugin reports itself unconfigured       |
 
 ### Acceptance
 

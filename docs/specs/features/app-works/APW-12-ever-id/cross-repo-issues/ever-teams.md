@@ -44,21 +44,23 @@ The full contract, with every route, flag and test file:
 5. **Explicit sign-up** — when Gauzy answers `signup_required` (only on Ever's hosted deployments), the person lands on
    the existing sign-up page with a one-time hand-off key (new `apps/web/app/api/auth/ever-id/signup-handoff/route.ts`;
    no e-mail and no token in the address) and, after confirming, Teams posts its usual sign-up fields to Gauzy.
-6. **No workspace** — the error page explains that no workspace is linked to this Ever ID yet.
-   `GauzyAdapter.createUser` runs for `ever-id` only when `EVER_ID_TEAMS_AUTO_PROVISION` is `'true'` (default off), and
+6. **No workspace** — the error page explains that no workspace is linked to this Ever ID yet. A self-hosted Teams may
+   opt in with `EVER_ID_TEAMS_AUTO_PROVISION` set to `'true'` (default off): the page then offers the existing sign-up,
+   and `GauzyAdapter.createUser` runs only after the person confirms it there — never silently from the sign-in.
    `getUserByAccount` / `linkAccount` do nothing for `ever-id`.
 7. **Back-channel logout** — a new `apps/web/app/api/auth/ever-id/backchannel-logout/route.ts` verifies the logout token
-   and forwards it to Gauzy, which revokes the tokens; the next API call then ends the Teams session.
+   and forwards it to Gauzy, which revokes the tokens (a malformed token is answered `400`, a valid one `200`); the next
+   API call then ends the Teams session.
 
 ### Settings (runtime environment, nothing baked into the image)
 
-| Name                                                                           | Default | Meaning                                                          |
-| ------------------------------------------------------------------------------ | ------- | ---------------------------------------------------------------- |
-| `NEXT_PUBLIC_EVER_ID_APP_NAME`                                                 | unset   | advertises the provider; unset hides the button                  |
-| `EVER_ID_ISSUER_URL` (`EVER_ID_ISSUER` still read, with a deprecation warning) | unset   | the issuer                                                       |
-| `EVER_ID_CLIENT_ID`, `EVER_ID_CLIENT_SECRET`                                   | unset   | the client Teams is registered as                                |
-| `EVER_PLATFORM_PROJECT_ID`                                                     | unset   | optional; adds that project's audience scope                     |
-| `EVER_ID_TEAMS_AUTO_PROVISION`                                                 | `false` | lets an Ever ID sign-in with no workspace create one (stays off) |
+| Name                                                                           | Default | Meaning                                                         |
+| ------------------------------------------------------------------------------ | ------- | --------------------------------------------------------------- |
+| `NEXT_PUBLIC_EVER_ID_APP_NAME`                                                 | unset   | advertises the provider; unset hides the button                 |
+| `EVER_ID_ISSUER_URL` (`EVER_ID_ISSUER` still read, with a deprecation warning) | unset   | the issuer                                                      |
+| `EVER_ID_CLIENT_ID`, `EVER_ID_CLIENT_SECRET`                                   | unset   | the client Teams is registered as                               |
+| `EVER_PLATFORM_PROJECT_ID`                                                     | unset   | optional; adds that project's audience scope                    |
+| `EVER_ID_TEAMS_AUTO_PROVISION`                                                 | `false` | a self-hoster's opt-in: offer the sign-up, after a confirmation |
 
 ### Acceptance
 
