@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { logger, schedules } from '@trigger.dev/sdk';
 import { APP_BUILD_SWEEP_CRON } from '@ever-works/contracts';
 import { getOptionalProvider } from '@ever-works/agent/utils';
+import { config } from '@ever-works/agent/config';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { TriggerInternalApiClient } from '../../trigger/worker/services/trigger-internal-api.client';
 import { createRemoteProxy } from '../../trigger/worker/remote-proxy';
@@ -137,6 +138,17 @@ function sweepOutcome(
 
 /** The run body, exported — so a local worker and the specs drive this function. */
 export async function runAppBuildSweepTask(): Promise<AppBuildSweepTaskResult> {
+    // App Works off (`EVER_WORKS_APP_WORKS_ENABLED` anything but 'true'): there is no App Build
+    // to sweep, so the tick answers before it boots a worker context or calls the API.
+    if (!config.everWorks.apps.worksEnabled()) {
+        return {
+            status: 'skipped',
+            jobId: APP_BUILD_SWEEP_TASK_ID,
+            reason: 'appWorksDisabled',
+            error: null,
+            summary: null,
+        };
+    }
     return withWorkerContext(
         'AppBuildSweep',
         async (appContext): Promise<AppBuildSweepTaskResult> => {

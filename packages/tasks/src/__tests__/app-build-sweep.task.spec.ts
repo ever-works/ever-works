@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UnknownElementException } from '@nestjs/core/errors/exceptions/unknown-element.exception';
 import { APP_BUILD_SWEEP_CRON } from '@ever-works/contracts';
 
@@ -107,6 +107,31 @@ const SWEPT = {
 };
 
 describe('app-build-sweep (APW-05 T21)', () => {
+    // The sweep is App Works' own; it idles while App Works is off (the default), so the cases
+    // below run with the instance switch on, and one case pins the switched-off answer.
+    const previousAppWorks = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+    beforeEach(() => {
+        process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+    });
+    afterEach(() => {
+        if (previousAppWorks === undefined) delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+        else process.env.EVER_WORKS_APP_WORKS_ENABLED = previousAppWorks;
+    });
+
+    it('answers skipped / appWorksDisabled without booting a worker context while App Works is off', async () => {
+        delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+
+        const result = await runAppBuildSweepTask();
+
+        expect(result).toEqual({
+            status: 'skipped',
+            jobId: APP_BUILD_SWEEP_TASK_ID,
+            reason: 'appWorksDisabled',
+            error: null,
+            summary: null,
+        });
+    });
+
     let runSweep: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {

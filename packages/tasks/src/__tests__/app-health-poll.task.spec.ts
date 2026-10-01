@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * APW-06 T32 (`tasks.md:556-573`) — **`app-health-poll`**, the every-minute tick.
@@ -84,6 +84,7 @@ import {
     APP_HEALTH_POLL_LOCK_KEY,
     APP_HEALTH_POLL_TASK_ID,
     appHealthPollTask,
+    runAppHealthPollTask,
 } from '../tasks/trigger/app-health-poll.task';
 import {
     APP_RUNTIME_TASK_QUEUE,
@@ -96,6 +97,27 @@ const registered = recorded.find((entry) => entry.id === APP_HEALTH_POLL_TASK_ID
 >;
 
 describe('app-health-poll (APW-06 T32)', () => {
+    // The poll is App Works' own; it idles while App Works is off (the default), so the cases
+    // below run with the instance switch on, and one case pins the switched-off answer.
+    const previousAppWorks = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+    beforeEach(() => {
+        process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+    });
+    afterEach(() => {
+        if (previousAppWorks === undefined) delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+        else process.env.EVER_WORKS_APP_WORKS_ENABLED = previousAppWorks;
+    });
+
+    it('answers skipped / app_works_disabled without booting a worker context while App Works is off', async () => {
+        delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+
+        const result = await runAppHealthPollTask();
+
+        expect(result.status).toBe('skipped');
+        expect(result.reason).toBe('app_works_disabled');
+        expect(result.health).toBeNull();
+    });
+
     let isLocked: ReturnType<typeof vi.fn>;
     let cleanExpired: ReturnType<typeof vi.fn>;
     let appContext: {

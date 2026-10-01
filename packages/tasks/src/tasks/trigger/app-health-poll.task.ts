@@ -2,6 +2,7 @@ import { logger, schedules } from '@trigger.dev/sdk';
 import { CACHE_MANAGER } from '@ever-works/agent/cache';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { getOptionalProvider } from '@ever-works/agent/utils';
+import { config } from '@ever-works/agent/config';
 import { AppHealthService, type AppHealthPollSummary } from '@ever-works/agent/app-runtime';
 import {
     APP_RUNTIME_TASK_QUEUE,
@@ -110,6 +111,20 @@ function errorText(error: unknown): string {
 
 /** The run body, exported — the local worker drains *this* function (see `app-deploy.task.ts`). */
 export async function runAppHealthPollTask(): Promise<AppHealthPollTaskResult> {
+    // App Works off (`EVER_WORKS_APP_WORKS_ENABLED` anything but 'true'): there is no App to poll,
+    // so the tick answers before it boots a worker context or takes the lock.
+    if (!config.everWorks.apps.worksEnabled()) {
+        return {
+            status: 'skipped',
+            jobId: APP_HEALTH_POLL_TASK_ID,
+            lockGuard: 'unavailable',
+            cacheSweep: null,
+            reason: 'app_works_disabled',
+            missing: null,
+            error: null,
+            health: null,
+        };
+    }
     return withWorkerContext(
         'AppHealthPoll',
         async (appContext): Promise<AppHealthPollTaskResult> => {

@@ -38,6 +38,11 @@ export class AppBuildSweepCronService {
             // The `app-build-sweep` Trigger.dev schedule owns the tick.
             return;
         }
+        if (!config.everWorks.apps.worksEnabled()) {
+            // App Works is off on this installation: there is no App Build to sweep, so the
+            // tick does not touch the database at all.
+            return;
+        }
 
         try {
             const summary = await this.sweeps.runSweep();

@@ -4,6 +4,11 @@ jest.mock('@ever-works/agent/config', () => ({
         trigger: {
             shouldUseTrigger: jest.fn(),
         },
+        everWorks: {
+            apps: {
+                worksEnabled: jest.fn(),
+            },
+        },
     },
 }));
 
@@ -26,6 +31,7 @@ import { AppBuildSweepCronService } from './app-build-sweep-cron.service';
  */
 describe('AppBuildSweepCronService', () => {
     const shouldUseTrigger = (config as any).trigger.shouldUseTrigger as jest.Mock;
+    const worksEnabled = (config as any).everWorks.apps.worksEnabled as jest.Mock;
     let sweeps: { runSweep: jest.Mock };
     let service: AppBuildSweepCronService;
     let logSpy: jest.SpyInstance;
@@ -53,6 +59,7 @@ describe('AppBuildSweepCronService', () => {
         errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
         warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
         shouldUseTrigger.mockReturnValue(false);
+        worksEnabled.mockReturnValue(true);
     });
 
     afterEach(() => {
@@ -66,6 +73,16 @@ describe('AppBuildSweepCronService', () => {
             .map((key) => Reflect.getMetadata(key, handler))
             .find((value) => value && typeof value === 'object' && 'cronTime' in value);
         expect(cronMeta?.cronTime).toBe(APP_BUILD_SWEEP_CRON);
+    });
+
+    it('idles while App Works is off on this installation: no sweep, no database read', async () => {
+        worksEnabled.mockReturnValue(false);
+
+        await service.runSweepTick();
+
+        expect(sweeps.runSweep).not.toHaveBeenCalled();
+        expect(logSpy).not.toHaveBeenCalled();
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('leaves the pass to the Trigger.dev schedule when Trigger.dev is the runtime', async () => {
