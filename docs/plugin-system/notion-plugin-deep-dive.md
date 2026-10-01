@@ -176,6 +176,6 @@ const results = await notionPlugin.extractBatch(['https://notion.so/Page-1-...',
 
 ## Related Plugins
 
-- [Firecrawl Plugin Deep Dive](./firecrawl-plugin-deep-dive) -- general-purpose web content extractor.
-- [Exa Plugin Deep Dive](./exa-plugin-deep-dive) -- search and content extraction with neural capabilities.
-- [Notion Plugin](./notion-plugin) -- overview documentation for the Notion Extractor plugin.
+- [Firecrawl Plugin Deep Dive](./firecrawl-plugin-deep-dive.md) -- general-purpose web content extractor.
+- [Exa Plugin Deep Dive](./exa-plugin-deep-dive.md) -- search and content extraction with neural capabilities.
+- [Notion Plugin](./notion-plugin.md) -- overview documentation for the Notion Extractor plugin.

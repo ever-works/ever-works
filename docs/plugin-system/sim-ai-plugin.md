@@ -310,7 +310,7 @@ Here's a walkthrough of creating a basic work generation workflow:
 
 ## Related
 
-- [Creating a Work](../features/creating-a-work) — How to select SIM AI as the pipeline during work creation
-- [Pipeline Plugins](./pipeline-plugins) — Overview of all pipeline plugin types
-- [Creating a Pipeline Plugin](./creating-pipeline-plugin) — How to build custom pipeline plugins
+- [Creating a Work](../features/creating-a-work.md) — How to select SIM AI as the pipeline during work creation
+- [Pipeline Plugins](./pipeline-plugins.md) — Overview of all pipeline plugin types
+- [Creating a Pipeline Plugin](./creating-pipeline-plugin.md) — How to build custom pipeline plugins
 - [SIM AI Documentation](https://docs.sim.ai) — Official SIM AI docs

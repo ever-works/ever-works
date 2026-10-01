@@ -1,10 +1,11 @@
 import { createHmac } from 'node:crypto';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { IPlugin, PluginManifest } from '@ever-works/plugin';
 import { EmailFacadeService } from '../email.facade';
 import { DefaultInboundEmailDispatcher } from '../../notifications/default-inbound-email-dispatcher.service';
 import type { AgentInboundEmailDispatchResult } from '../../notifications/agent-inbound-email-dispatcher';
-import type { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
+import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
 import type { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import type {
     TenantEmailAddressRepository,
@@ -12,7 +13,11 @@ import type {
     EmailMessageRepository,
     EmailConversationRepository,
 } from '../../database';
-import { createRegistry } from '../../plugins/__tests__/cold-plugin.fixture';
+
+/** A REAL registry, holding the plugins as lazy proxies (`registerLazy`). */
+function createRegistry(): PluginRegistryService {
+    return new PluginRegistryService(new EventEmitter2());
+}
 
 jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});

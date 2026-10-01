@@ -863,9 +863,9 @@ disabled, so nothing half-works.
 - Spec: [`./spec.md`](./spec.md) · Tasks: [`./tasks.md`](./tasks.md)
 - Program: [`../README.md`](../README.md)
 - Constitution: [`../../../../../.specify/memory/constitution.md`](../../../../../.specify/memory/constitution.md)
-- Prior specs extended: [`../../email-providers/`](../../email-providers/),
-  [`../../agent-inbox-ui/`](../../agent-inbox-ui/),
-  [`../../notification-channels/`](../../notification-channels/)
+- Prior specs extended: [`../../email-providers/`](../../email-providers/README.md),
+  [`../../agent-inbox-ui/`](../../agent-inbox-ui/README.md),
+  [`../../notification-channels/`](../../notification-channels/README.md)
 - Migration policy: [`docs/database/migrations.md`](../../../../database/migrations.md)
 - Job-runtime ADRs: [`../../../decisions/015-job-runtime-provider-pluggability.md`](../../../decisions/015-job-runtime-provider-pluggability.md),
   [`../../../decisions/017-tenant-scoped-job-runtime-overlay.md`](../../../decisions/017-tenant-scoped-job-runtime-overlay.md)

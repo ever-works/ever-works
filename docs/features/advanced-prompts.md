@@ -78,14 +78,14 @@ Fields not included in the request body are not modified. Set a field to `null` 
 
 - Keep prompts concise and directive — the AI performs best with clear, specific instructions.
 - Focus on what makes your work unique (e.g., inclusion criteria, preferred sources, categorization rules).
-- Test with a small generation run before enabling [Scheduled Updates](./scheduled-updates).
+- Test with a small generation run before enabling [Scheduled Updates](./scheduled-updates.md).
 - For comparison-specific prompt customization, use the `custom_prompt` setting in the [Comparison Generator](/plugin-system/built-in-plugins#comparison-generator) plugin settings instead.
 
 ## Related
 
 - [AI & Generation](/ai-agents/) — pipeline steps overview
-- [Comparisons](./comparisons) — comparison-specific custom prompt
-- [Scheduled Updates](./scheduled-updates) — prompts are used on every scheduled run
+- [Comparisons](./comparisons.md) — comparison-specific custom prompt
+- [Scheduled Updates](./scheduled-updates.md) — prompts are used on every scheduled run
 
 # Advanced Prompts System
 

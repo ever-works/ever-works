@@ -6,4 +6,4 @@ Web-app surfaces consuming the three backend epics: settings/integrations/emails
 - [plan.md](./plan.md) — implementation plan
 - [tasks.md](./tasks.md) — task breakdown
 
-Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/), [`notification-channels`](../notification-channels/), [`event-subscriptions`](../event-subscriptions/).
+Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/README.md), [`notification-channels`](../notification-channels/README.md), [`event-subscriptions`](../event-subscriptions/README.md).

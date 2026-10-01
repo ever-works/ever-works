@@ -10,16 +10,16 @@ slug: /
 
 **Ever Works is the Workshop for AI** — an open agentic runtime that autonomously researches, ships and maintains content-rich websites and Git repositories. The Ever Works Platform is the system behind it. It provides REST APIs, an AI generation pipeline, database management, and deployment tooling — all organized as a **Turborepo + pnpm workspaces** monorepo.
 
-You describe a goal; a standing team of AI [Agents](./features/agents) turns it into [Ideas](./features/ideas), Ideas into [Works](./features/creating-a-work) — a website, landing page, blog, directory, or awesome repo — and then keeps those Works researched, written, improved, and deployed. Code and content both live in Git repositories you own. The platform is open source under **AGPLv3** and can be self-hosted.
+You describe a goal; a standing team of AI [Agents](./features/agents.md) turns it into [Ideas](./features/ideas.md), Ideas into [Works](./features/creating-a-work.md) — a website, landing page, blog, directory, or awesome repo — and then keeps those Works researched, written, improved, and deployed. Code and content both live in Git repositories you own. The platform is open source under **AGPLv3** and can be self-hosted.
 
 ## Start here
 
-1. **Get an account and walk the setup wizard** — the `/onboarding` wizard picks your AI provider, storage, database, deployment target, and plugins. See [Onboarding & Setup Wizard](./features/onboarding).
-2. **Create your first Work** — the sidebar's **+ New** button opens `/new`, where a prompt plus a kind chip (Mission, Idea, Website, Landing Page, Blog, Directory, Awesome Repo, Company) starts the build. See [Creating a Work](./features/creating-a-work).
-3. **Watch it build, then ship it** — follow the run on the Work's **Generator** tab (`/works/:id/generator`) and publish from the **Deploy** tab (`/works/:id/deploy`). See the [Quickstart for a directory](./guides/quickstart-directory).
-4. **Give it a team** — create Agents under **Teams → Agents**, set a heartbeat cadence and a budget, and they keep working on a schedule. See [Autonomous Operation](./features/autonomous-operation).
+1. **Get an account and walk the setup wizard** — the `/onboarding` wizard picks your AI provider, storage, database, deployment target, and plugins. See [Onboarding & Setup Wizard](./features/onboarding.md).
+2. **Create your first Work** — the sidebar's **+ New** button opens `/new`, where a prompt plus a kind chip (Mission, Idea, Website, Landing Page, Blog, Directory, Awesome Repo, Company) starts the build. See [Creating a Work](./features/creating-a-work.md).
+3. **Watch it build, then ship it** — follow the run on the Work's **Generator** tab (`/works/:id/generator`) and publish from the **Deploy** tab (`/works/:id/deploy`). See the [Quickstart for a directory](./guides/quickstart-directory.md).
+4. **Give it a team** — create Agents under **Teams → Agents**, set a heartbeat cadence and a budget, and they keep working on a schedule. See [Autonomous Operation](./features/autonomous-operation.md).
 
-Prefer to run everything yourself? [Getting Started](./getting-started) and [Installation](./installation) cover local development, Docker Compose, and Kubernetes.
+Prefer to run everything yourself? [Getting Started](./getting-started.md) and [Installation](./installation.md) cover local development, Docker Compose, and Kubernetes.
 
 ## Components
 
@@ -36,24 +36,24 @@ Prefer to run everything yourself? [Getting Started](./getting-started) and [Ins
 | **Admin**                | Reserved workspace              | Placeholder for a standalone operator console; operator surfaces ship inside the dashboard today (`/admin/usage`) |
 | **@packages/agent**      | Vercel AI SDK (`ai` 6), TypeORM | AI agents, data generation, database, git operations, deployment                                                  |
 | **@packages/monitoring** | Sentry, PostHog                 | Error tracking and product analytics                                                                              |
-| **@packages/tasks**      | Trigger.dev                     | Background job processing — Trigger.dev is one of six pluggable [job runtimes](./features/job-runtimes)           |
+| **@packages/tasks**      | Trigger.dev                     | Background job processing — Trigger.dev is one of six pluggable [job runtimes](./features/job-runtimes.md)        |
 
 ## Documentation
 
-- [Platform Overview](./overview) — How the platform works and its tech stack
-- [Getting Started](./getting-started) — Prerequisites, installation, and development setup
-- [Architecture](./architecture) — Monorepo structure, modules, and data flow
-- [Features](./features/) — Missions, Ideas, Works, Agents, Knowledge Base & Memory, Teams, Tasks, quality gates, budgets, deployment, and the rest of the platform
-- [Guides](./guides/platform-tour) — Screen-by-screen platform tour, per-kind quickstarts, and the founder journey
-- [API Reference](./api/) — REST API endpoints and usage
-- [CLI Reference](./cli/) — Command-line interface usage and commands
-- [AI & Generation](./ai-agents/) — AI providers, generation pipeline, and model routing
-- [Database](./database) — Supported databases, entities, and configuration
-- [Plugin System](./plugin-system/) — 102 plugins across 19 categories, bundled by default and installable at runtime when dynamic distribution is enabled
+- [Platform Overview](./overview.md) — How the platform works and its tech stack
+- [Getting Started](./getting-started.md) — Prerequisites, installation, and development setup
+- [Architecture](./architecture.md) — Monorepo structure, modules, and data flow
+- [Features](./features/index.md) — Missions, Ideas, Works, Agents, Knowledge Base & Memory, Teams, Tasks, quality gates, budgets, deployment, and the rest of the platform
+- [Guides](./guides/platform-tour.md) — Screen-by-screen platform tour, per-kind quickstarts, and the founder journey
+- [API Reference](./api/index.md) — REST API endpoints and usage
+- [CLI Reference](./cli/index.md) — Command-line interface usage and commands
+- [AI & Generation](./ai-agents/index.md) — AI providers, generation pipeline, and model routing
+- [Database](./database.md) — Supported databases, entities, and configuration
+- [Plugin System](./plugin-system/index.md) — 102 plugins across 19 categories, bundled by default and installable at runtime when dynamic distribution is enabled
 
 ## Community & Resources
 
 - **[GitHub](https://github.com/ever-works)** — Source code and issues
 - **[Discord](https://discord.gg/ever)** — Join the community
-- **[FAQ](./faq)** — Frequently asked questions
-- **[Support](./support)** — Get help and support
+- **[FAQ](./faq.md)** — Frequently asked questions
+- **[Support](./support.md)** — Get help and support

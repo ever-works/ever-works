@@ -481,6 +481,18 @@ export class TemplateCatalogService implements OnModuleInit {
         // name.
         this.assertNotRetired(template);
 
+        // Forking a CUSTOM template (a repository added by URL) is App Works'
+        // steps 1-2 (see the ownership rule below). It stays behind the App
+        // Works instance switch: with `EVER_WORKS_APP_WORKS_ENABLED` unset or
+        // anything but 'true' (the default), only the curated, built-in
+        // templates can be forked, exactly as before App Works landed.
+        if (template.sourceType !== 'built_in' && !config.everWorks.apps.worksEnabled()) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Only standard templates can be forked.',
+            });
+        }
+
         const providerId = 'github';
         const targetOwner = input.targetOwner.trim();
         if (!targetOwner) {

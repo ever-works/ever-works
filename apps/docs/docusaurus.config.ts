@@ -90,6 +90,21 @@ const config: Config = {
 	// Set the /<baseUrl>/ pathname under which your site is served
 	// For GitHub pages deployment, it is often '/<projectName>/'
 	baseUrl: '/',
+	// Emit every route in the form nginx actually serves it: `/help/`, not `/help`.
+	//
+	// Docusaurus writes each page as `<route>/index.html`, so nginx answers the
+	// slash-less `/help` with a directory 301 to `/help/`. Left unset, Docusaurus put
+	// the slash-less form into the canonical, og:url, hreflang, sitemap and every
+	// internal link - so all 800+ sitemap URLs were redirects, and Google Search
+	// Console filed them as "Page with redirect" instead of indexing them. `true`
+	// makes all of those point straight at the 200 URL. (The nginx side keeps any
+	// residual redirect on https: see `absolute_redirect off` in
+	// .deploy/docker/docs/nginx.conf.)
+	//
+	// Relative doc links must be FILE links (`./page.md`, `./dir/index.md`) so they
+	// resolve by file, not by URL: an extension-less `./page` resolves against
+	// `/current-page/` and 404s once routes end in a slash.
+	trailingSlash: true,
 
 	// GitHub pages deployment config.
 	// If you aren't using GitHub pages, you don't need these.

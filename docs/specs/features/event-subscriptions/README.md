@@ -6,4 +6,4 @@ Per-user, per-event channel-selection matrix on top of notifications v1: extensi
 - [plan.md](./plan.md) — implementation plan
 - [tasks.md](./tasks.md) — task breakdown
 
-Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/), [`notification-channels`](../notification-channels/), [`agent-inbox-ui`](../agent-inbox-ui/).
+Sibling specs in the notifications-v2 umbrella: [`email-providers`](../email-providers/README.md), [`notification-channels`](../notification-channels/README.md), [`agent-inbox-ui`](../agent-inbox-ui/README.md).

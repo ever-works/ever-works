@@ -216,9 +216,10 @@ export class TemplateCatalogController {
     @ApiOperation({
         summary: 'Fork a template repository',
         description:
-            'Fork any template in the catalog — curated or added by URL through `POST /custom` — to the ' +
-            'current user GitHub account or organization, and set it as default. A repository the target ' +
-            'already owns is refused: there is nothing to fork.',
+            'Fork a template in the catalog to the current user GitHub account or organization, and set it ' +
+            'as default. Curated templates always; a template added by URL through `POST /custom` only when ' +
+            'App Works is enabled on this installation (`EVER_WORKS_APP_WORKS_ENABLED`). A repository the ' +
+            'target already owns is refused: there is nothing to fork.',
     })
     @ApiResponse({ status: 200, description: 'Template forked and set as default' })
     async forkTemplate(@CurrentUser() auth: AuthenticatedUser, @Body() body: ForkTemplateDto) {

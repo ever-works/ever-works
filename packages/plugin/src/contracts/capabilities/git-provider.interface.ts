@@ -93,9 +93,11 @@ export interface GitRepository {
 	 */
 	readonly movedFrom?: string;
 	/**
-	 * The repository's topics, as the provider reports them (APW-03 T22 — the
-	 * Blueprint probe checks for `ever-works-app-blueprint`). `undefined` means
-	 * "not reported", never "no topics". Optional and additive (R-26).
+	 * The repository's topics, as the provider reports them. Two readers check
+	 * for `ever-works-app-blueprint`: website-template discovery (to keep App
+	 * Blueprints out of the website picker) and the Blueprint probe (APW-03
+	 * T22). `undefined` means "not reported", never "no topics". Optional and
+	 * additive (R-26).
 	 */
 	readonly topics?: readonly string[];
 }

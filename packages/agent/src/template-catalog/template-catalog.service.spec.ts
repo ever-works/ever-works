@@ -1387,6 +1387,17 @@ describe('TemplateCatalogService', () => {
          * `sourceType !== 'built_in'` refusal this replaces.
          */
         describe('any repository, not only the curated ones (App Works steps 1-2)', () => {
+            // The CUSTOM-template fork is App Works' path and sits behind its instance
+            // switch; these cases describe the switched-on behaviour.
+            const previousAppWorks = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            beforeEach(() => {
+                process.env.EVER_WORKS_APP_WORKS_ENABLED = 'true';
+            });
+            afterEach(() => {
+                if (previousAppWorks === undefined) delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+                else process.env.EVER_WORKS_APP_WORKS_ENABLED = previousAppWorks;
+            });
+
             const customTemplate = {
                 ...builtInTemplate,
                 id: 'custom-abc',
@@ -1473,6 +1484,32 @@ describe('TemplateCatalogService', () => {
                     ),
                 ).resolves.toBeTruthy();
             });
+        });
+
+        it('keeps refusing a CUSTOM template while App Works is off (the default)', async () => {
+            const previousAppWorks = process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            delete process.env.EVER_WORKS_APP_WORKS_ENABLED;
+            try {
+                templateRepository.findVisibleById.mockResolvedValue({
+                    ...builtInTemplate,
+                    id: 'custom-abc',
+                    sourceType: 'custom',
+                    repositoryUrl: 'https://github.com/someone-else/their-app',
+                    repositoryOwner: 'someone-else',
+                    repositoryName: 'their-app',
+                });
+
+                await expect(
+                    service.forkTemplateForUser(
+                        { kind: 'website', templateId: 'custom-abc', targetOwner: 'acme-user' },
+                        'user-1',
+                    ),
+                ).rejects.toThrow(/only standard templates can be forked/i);
+
+                expect(gitFacade.forkRepository).not.toHaveBeenCalled();
+            } finally {
+                if (previousAppWorks !== undefined) process.env.EVER_WORKS_APP_WORKS_ENABLED = previousAppWorks;
+            }
         });
 
         it('does NOT ask for a non-blocking fork — P0 has no readiness poller to finish it', async () => {

@@ -166,5 +166,5 @@ const verified = await vercelPlugin.verifyDomain(projectId, 'work.example.com', 
 
 ## Related Plugins
 
-- [GitHub Plugin Deep Dive](./github-plugin-deep-dive) -- the Git provider that triggers Vercel deployments via GitHub Actions.
-- [Vercel Plugin](./vercel-plugin) -- overview documentation for the Vercel plugin.
+- [GitHub Plugin Deep Dive](./github-plugin-deep-dive.md) -- the Git provider that triggers Vercel deployments via GitHub Actions.
+- [Vercel Plugin](./vercel-plugin.md) -- overview documentation for the Vercel plugin.

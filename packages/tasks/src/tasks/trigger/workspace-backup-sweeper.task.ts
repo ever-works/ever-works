@@ -6,7 +6,7 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
 /**
  * Workspace backup (AW-22) — the hourly sweep that keeps the record honest.
  *
- * Three independent passes, each idempotent and each answering a promise the
+ * Four independent passes, each idempotent and each answering a promise the
  * product makes on the backup card:
  *
  *  1. **Expire artefacts** (spec FR-28). "Archives are kept for 14 days" has
@@ -14,12 +14,16 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
  *     status `expired` and the date, because "I took a backup that day" is
  *     still true and is the only version of the question anyone asks
  *     (spec S-16).
- *  2. **Fail stalls** (spec FR-5, S-14). A worker that dies leaves a backup
+ *  2. **Fail overdue runs** (spec FR-6). A backup still `running` an hour
+ *     after it started is failed as `timeout`, whatever its heartbeat says.
+ *     The runner stops itself at that ceiling, so this is the backstop for a
+ *     run nothing else ended.
+ *  3. **Fail stalls** (spec FR-5, S-14). A worker that dies leaves a backup
  *     showing a progress bar that will never move. Ten minutes without a
  *     heartbeat, or fifteen minutes queued with nothing picking it up, and
  *     the row says so, any partial archive is deleted, and the daily
  *     allowance is not charged for an attempt that produced nothing.
- *  3. **Prune records** (spec FR-29). A record outlives its bytes by ninety
+ *  4. **Prune records** (spec FR-29). A record outlives its bytes by ninety
  *     days so history stays legible, and then it goes.
  *
  * `17 * * * *` — hourly, off the top of the hour, the same reason every
@@ -57,7 +61,12 @@ export const workspaceBackupSweeperTask = schedules.task({
             async (appContext) => {
                 const summary = await appContext.get(WorkspaceBackupService).runSweep(new Date());
 
-                if (summary.expired > 0 || summary.stalled > 0 || summary.pruned > 0) {
+                if (
+                    summary.expired > 0 ||
+                    summary.timedOut > 0 ||
+                    summary.stalled > 0 ||
+                    summary.pruned > 0
+                ) {
                     logger.info('workspace-backup-sweeper pass complete', { ...summary });
                 }
                 return summary;

@@ -265,7 +265,7 @@ gaps not yet shipped. Each is its own future PR.
       `(userId, updatedAt)` and `(conversationId, createdAt)`
       indexes; `appendMessages` ordering after a 100-row insert.
 - [ ] **T39**. Document the `chat/completions` surface in
-      [`docs/api/`](../../../api/) — the canonical OpenAI-compat
+      [`docs/api/`](../../../api/index.md) — the canonical OpenAI-compat
       endpoint reference is not yet written. Cross-link from
       `apps/docs/sidebarsPlatform.ts`.
 

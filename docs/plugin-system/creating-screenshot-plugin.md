@@ -7,7 +7,7 @@ sidebar_position: 7
 
 # Creating a Screenshot Plugin
 
-Screenshot plugins capture website preview images for work items. When a work item has a source URL, the screenshot plugin generates a thumbnail that appears on the item card. This guide walks through creating a screenshot plugin from scratch, following the same patterns used by the built-in [ScreenshotOne](./screenshotone-plugin) and [Urlbox](./urlbox-plugin) plugins.
+Screenshot plugins capture website preview images for work items. When a work item has a source URL, the screenshot plugin generates a thumbnail that appears on the item card. This guide walks through creating a screenshot plugin from scratch, following the same patterns used by the built-in [ScreenshotOne](./screenshotone-plugin.md) and [Urlbox](./urlbox-plugin.md) plugins.
 
 ## How Screenshot Plugins Fit into the Platform
 
@@ -33,7 +33,7 @@ sequenceDiagram
 - Node.js >= 20
 - pnpm (never npm or yarn)
 - A screenshot API account (e.g., ScreenshotOne, Urlbox, Browserless, or your own service)
-- Familiarity with the [plugin system architecture](./architecture)
+- Familiarity with the [plugin system architecture](./architecture.md)
 
 ## 1. Project Scaffolding
 

@@ -154,7 +154,7 @@ registry, embedded package, dynamic install?]`
 
 ## 10. References
 
-- User-facing docs: [`../../../plugin-system/`](../../../plugin-system/)
+- User-facing docs: [`../../../plugin-system/`](../../../plugin-system/index.md)
 - Plugin SDK: `packages/plugin/`
 - Plugin packages: `packages/plugins/`
 - Constitution: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)

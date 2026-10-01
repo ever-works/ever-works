@@ -77,4 +77,4 @@ In the work page, while a generation is in progress, a **Cancel** control appear
 
 - [Works API](/api/works) — full endpoint reference
 - [Work Lifecycle](/agent-services/work-lifecycle) — the states a work passes through
-- [Scheduled Updates](./scheduled-updates) — cancelling a _schedule_ (the recurring config) is a separate operation
+- [Scheduled Updates](./scheduled-updates.md) — cancelling a _schedule_ (the recurring config) is a separate operation

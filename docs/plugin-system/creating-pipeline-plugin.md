@@ -40,8 +40,8 @@ flowchart TD
 
 Before building a pipeline plugin, make sure you are familiar with:
 
-- The [plugin system architecture](./architecture)
-- The [general plugin creation guide](./creating-a-plugin)
+- The [plugin system architecture](./architecture.md)
+- The [general plugin creation guide](./creating-a-plugin.md)
 - TypeScript generics (pipeline plugins are generic over step IDs)
 
 You will need the `@ever-works/plugin` package, which provides all interfaces and base classes:
