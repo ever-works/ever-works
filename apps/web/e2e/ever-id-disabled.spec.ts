@@ -72,8 +72,11 @@ test.describe('Ever ID turned off', () => {
         expect(body).toHaveProperty('emailPassword', true);
         expect(Array.isArray(body.socialProviders)).toBe(true);
 
+        // An empty body gets the same answer: nothing is validated while Ever ID is off.
         for (const [method, path] of [
             ['post', '/api/auth/ever-id/authorize'],
+            ['post', '/api/auth/ever-id/callback'],
+            ['post', '/api/auth/ever-id/sign-up/confirm'],
             ['get', '/api/auth/ever-id/client-config'],
             ['post', '/api/auth/ever-id/session'],
         ] as const) {
