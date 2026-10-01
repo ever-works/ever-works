@@ -80,6 +80,7 @@ export interface FetchResponseLike {
 export interface FetchRequestInit {
 	method: string;
 	headers: Record<string, string>;
+	/** Empty for a GET, whose body an adapter must not send. */
 	body: string;
 	signal?: AbortSignal;
 }

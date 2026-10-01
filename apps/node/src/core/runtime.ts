@@ -1,5 +1,5 @@
 import { describeApiBase, resolveApiBase } from './api-base';
-import { PlatformAuthClient } from './auth-client';
+import { PlatformAuthClient, type SignInWithEverIdOptions } from './auth-client';
 import {
 	describeSelf,
 	type CapabilityEnvironment,
@@ -248,6 +248,47 @@ export async function enrollNodeWithCredentials(options: EnrollWithCredentialsOp
 		token,
 		// The local label defaults to the name we just registered, so the
 		// status window and the Fleet page agree without a second prompt.
+		...(rest.name ? {} : { name: nodeName })
+	});
+}
+
+export interface EnrollWithEverIdOptions extends Omit<EnrollNodeOptions, 'token'> {
+	/** Shows the person Ever ID's verification address and code (spec §6.6). */
+	onPrompt: SignInWithEverIdOptions['onPrompt'];
+	/** Name registered with the platform when minting the token. */
+	nodeName: string;
+}
+
+/**
+ * The authenticate leg with Ever ID instead of a password (APW-12 FR-39):
+ * sign in with a code, then mint and consume a one-time enrollment token
+ * exactly as {@link enrollNodeWithCredentials} does. Nothing is persisted
+ * here; only the resulting heartbeat secret is, by the caller's `saveConfig`.
+ */
+export async function enrollNodeWithEverId(options: EnrollWithEverIdOptions): Promise<NodeConfig> {
+	const { logger } = options;
+	const auth = new PlatformAuthClient({
+		apiUrl: options.apiUrl,
+		fetchFn: options.fetchFn,
+		logger,
+		userAgent: options.userAgent ?? `ever-works-node/${options.version}`,
+		scheduler: options.scheduler,
+		now: options.now
+	});
+
+	const session = await auth.signInWithEverId({ onPrompt: options.onPrompt });
+	logger.info(`Signed in to ${auth.baseUrl} with Ever ID${session.email ? ` as ${session.email}` : ''}`);
+
+	const token = await auth.createEnrollmentToken(session.sessionToken, {
+		name: options.nodeName,
+		kind: options.kind
+	});
+	logger.info('Enrollment token minted for this machine');
+
+	const { onPrompt: _onPrompt, nodeName, ...rest } = options;
+	return enrollNode({
+		...rest,
+		token,
 		...(rest.name ? {} : { name: nodeName })
 	});
 }

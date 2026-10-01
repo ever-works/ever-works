@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { API_URL } from '../../utils/constants';
@@ -132,10 +132,26 @@ async function oauthLogin(apiUrl: string): Promise<void> {
     }
 }
 
+async function everIdLogin(apiUrl: string): Promise<void> {
+    // Loaded only for --ever-id: the browser and manual paths never load the device
+    // sign-in (APW-12 FR-43). It prints its own outcome line on success and failure.
+    const { runEverIdDeviceLogin } = await import('./ever-id-device.service');
+    const exitCode = await runEverIdDeviceLogin({ apiUrl });
+    if (exitCode !== 0) {
+        process.exit(exitCode);
+    }
+}
+
 export const loginCommand = new Command('login')
     .description('Login to Ever Works API')
     .option('--api-url <url>', 'API URL', API_URL)
     .option('--manual', 'Manual token entry (skip OAuth flow)')
+    .addOption(
+        new Option(
+            '--ever-id',
+            'Sign in with Ever ID using a code shown in the terminal',
+        ).conflicts('manual'),
+    )
     .action(async (options) => {
         try {
             console.log(chalk.cyan.bold('\nEver Works Login\n'));
@@ -147,7 +163,9 @@ export const loginCommand = new Command('login')
             }
 
             // Choose login method
-            if (options.manual) {
+            if (options.everId) {
+                await everIdLogin(options.apiUrl);
+            } else if (options.manual) {
                 await manualLogin(options.apiUrl);
             } else {
                 await oauthLogin(options.apiUrl);
