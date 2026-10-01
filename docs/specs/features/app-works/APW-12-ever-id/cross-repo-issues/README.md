@@ -4,14 +4,15 @@
 
 The Teams and Gauzy halves of this epic land in **other repositories**
 ([`cross-platform.md`](../cross-platform.md) §4–§5, tasks T35–T42), where nothing is tracked until an issue
-exists there. These files hold those issue bodies. Every cited path was re-verified on 2026-10-01 at
+exists there. These files hold those issue bodies, filed on 2026-10-01 as ever-co/ever-gauzy#10368 and
+ever-co/ever-teams#4502. Every cited path was re-verified on 2026-10-01 at
 `ever-co/ever-gauzy` `develop` `84a527d85` and `ever-co/ever-teams` `develop` `e6ebffadb`; re-verify again before
 editing a filed issue, and keep the issue and the draft in step.
 
-| Repository           | Draft                              | Lands                                                                                                           | Issue | Why it needs its own reviewed change                                                                                         |
-| -------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `ever-co/ever-gauzy` | [`ever-gauzy.md`](./ever-gauzy.md) | right after Ever Works, on development and stage; production last, in a separate owner-supervised change        | —     | Gauzy's API also serves Ever Teams; one plugin, server-side and default off first, the production switch last and supervised |
-| `ever-co/ever-teams` | [`ever-teams.md`](./ever-teams.md) | with Gauzy, on development and stage, once the Gauzy plugin's token route exists there; production with Gauzy's | —     | Adds a sign-in button and three small routes; it relies entirely on the Gauzy API for accounts, links and sign-out           |
+| Repository           | Draft                              | Lands                                                                                                           | Issue                                                        | Why it needs its own reviewed change                                                                                         |
+| -------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `ever-co/ever-gauzy` | [`ever-gauzy.md`](./ever-gauzy.md) | right after Ever Works, on development and stage; production last, in a separate owner-supervised change        | [#10368](https://github.com/ever-co/ever-gauzy/issues/10368) | Gauzy's API also serves Ever Teams; one plugin, server-side and default off first, the production switch last and supervised |
+| `ever-co/ever-teams` | [`ever-teams.md`](./ever-teams.md) | with Gauzy, on development and stage, once the Gauzy plugin's token route exists there; production with Gauzy's | [#4502](https://github.com/ever-co/ever-teams/issues/4502)   | Adds a sign-in button and three small routes; it relies entirely on the Gauzy API for accounts, links and sign-out           |
 
 **Rules that apply to both** (they are binding here, in `cross-platform.md` and in
 [`../idp-options.md`](../idp-options.md) §7):

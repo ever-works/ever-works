@@ -23,7 +23,7 @@ own accounts. Ever ID is an **addition**:
 - With the plugin unloaded (the default) Gauzy behaves exactly as it does today, including every existing test.
 
 Ever Teams signs in through Gauzy's API, so the same plugin also gives Ever Teams its Ever ID sign-in (companion issue
-in `ever-co/ever-teams`).
+ever-co/ever-teams#4502).
 
 Implementation in progress: #10362.
 

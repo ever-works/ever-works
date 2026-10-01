@@ -18,8 +18,8 @@ Ever Teams gains an **additional** way to sign in — **Ever ID** — next to th
 current sign-in changes, and with the provider's settings unset Teams behaves exactly as it does today.
 
 Teams has no user store of its own: every account is a Gauzy user. The accounts, the Ever ID links and the sign-out
-handling therefore live in the Gauzy API Teams talks to — its `auth-zitadel` plugin (companion issue in
-`ever-co/ever-gauzy`). Teams adds the provider, the button and three small routes.
+handling therefore live in the Gauzy API Teams talks to — its `auth-zitadel` plugin (companion issue
+ever-co/ever-gauzy#10368). Teams adds the provider, the button and three small routes.
 
 The full contract, with every route, flag and test file:
 [Ever ID — adoption by Ever Teams and Ever Gauzy](https://github.com/ever-works/ever-works/blob/develop/docs/specs/features/app-works/APW-12-ever-id/cross-platform.md),
