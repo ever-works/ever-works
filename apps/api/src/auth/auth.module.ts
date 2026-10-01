@@ -33,6 +33,7 @@ import {
     EVER_ID_SIGNED_OUT_PROBE,
 } from './guards/ever-id-guard.tokens';
 import { NoTokenInQueryGuard } from './guards/no-token-in-query.guard';
+import { EverIdEnabledGuard } from './guards/ever-id-enabled.guard';
 import { SessionOnlyGuard } from './guards/session-only.guard';
 import { EverIdProvidersInterceptor } from './interceptors/ever-id-providers.interceptor';
 import { EverIdActivityService } from './services/ever-id-activity.service';
@@ -107,6 +108,7 @@ import { UsernameAllocatorService } from '../users/services/username-allocator.s
         EverIdProvidersInterceptor,
         NoTokenInQueryGuard,
         SessionOnlyGuard,
+        EverIdEnabledGuard,
         UsernameAllocatorService,
         // The two collaborators the global `AuthSessionGuard` reaches for lazily
         // on the Ever ID paths (delegated read, "signed out by Ever ID").

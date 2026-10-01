@@ -48,6 +48,7 @@ import {
     ExternalIdentityListResponseDto,
     ExternalIdentityResponseDto,
 } from '../dto/ever-id.dto';
+import { EverIdEnabledGuard } from '../guards/ever-id-enabled.guard';
 import { NoTokenInQueryGuard } from '../guards/no-token-in-query.guard';
 import { SessionOnlyGuard } from '../guards/session-only.guard';
 import { toHeaders } from '../providers/request-headers';
@@ -139,7 +140,9 @@ function bearerOf(req: { headers?: Record<string, unknown> }): string | null {
  * The sign-in family (authorize, callback, sign-up confirm, connect, terminal
  * exchange and client configuration, the provider sign-out address) answers
  * `404 everIdDisabled` unless a platform administrator turned Ever ID on — and
- * then makes no request to any identity provider (FR-5). Listing and
+ * then makes no request to any identity provider (FR-5). {@link EverIdEnabledGuard}
+ * answers it before the body is validated, so a malformed request gets the same
+ * `404` as a well-formed one. Listing and
  * disconnecting connected identities and honouring sign-out notices keep
  * working while it is off (ACC-12-04).
  *
@@ -169,6 +172,7 @@ export class EverIdController {
     @Public()
     @Post('authorize')
     @HttpCode(HttpStatus.OK)
+    @UseGuards(EverIdEnabledGuard)
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @ApiOperation({ summary: 'Start an Ever ID sign-in (authorization code + PKCE S256)' })
     @ApiBody({ type: EverIdAuthorizeDto, required: false })
@@ -183,6 +187,7 @@ export class EverIdController {
     @Public()
     @Post('callback')
     @HttpCode(HttpStatus.OK)
+    @UseGuards(EverIdEnabledGuard)
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Complete an Ever ID sign-in or connection',
@@ -212,6 +217,7 @@ export class EverIdController {
     @Public()
     @Post('sign-up/confirm')
     @HttpCode(HttpStatus.OK)
+    @UseGuards(EverIdEnabledGuard)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Create the account after the confirmation screen (terms accepted)',
@@ -223,7 +229,6 @@ export class EverIdController {
     @ApiResponse({ status: 409, description: '`subject_linked`, `email_in_use`' })
     @ApiResponse({ status: 422, description: '`email_not_verified`' })
     async confirmSignUp(@Body() body: EverIdSignUpConfirmDto, @Request() req) {
-        await this.signIn.requireEnabled();
         return this.linking.confirmSignUp(body.pending, body.terms, requestContext(req));
     }
 
@@ -233,7 +238,7 @@ export class EverIdController {
 
     @Post('connect/authorize')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(SessionOnlyGuard)
+    @UseGuards(EverIdEnabledGuard, SessionOnlyGuard)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Start connecting Ever ID to the signed-in account (fresh sign-in)' })
@@ -248,7 +253,7 @@ export class EverIdController {
 
     @Post('connect/confirm')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(SessionOnlyGuard)
+    @UseGuards(EverIdEnabledGuard, SessionOnlyGuard)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -260,7 +265,6 @@ export class EverIdController {
     @ApiResponse({ status: 404, description: '`ever_id_disabled`' })
     @ApiResponse({ status: 409, description: '`subject_linked`, `user_has_issuer`' })
     async connectConfirm(@Body() body: EverIdConnectConfirmDto, @Request() req) {
-        await this.signIn.requireEnabled();
         return this.linking.confirmConnect(
             body.pending,
             (req.user as AuthenticatedUser).userId,
@@ -366,6 +370,7 @@ export class EverIdController {
     @Public()
     @Post('session')
     @HttpCode(HttpStatus.OK)
+    @UseGuards(EverIdEnabledGuard)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -384,6 +389,7 @@ export class EverIdController {
 
     @Public()
     @Get('client-config')
+    @UseGuards(EverIdEnabledGuard)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     @ApiOperation({
         summary: 'What a terminal client needs to start a device sign-in (no secrets)',

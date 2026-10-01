@@ -68,6 +68,43 @@ describe('Ever ID flow (API, in-memory database, fake provider)', () => {
             expect(harness.fake!.calls.length).toBe(before);
         });
 
+        it('answers 404 ever_id_disabled before it validates the body, so a malformed request learns nothing more (ACC-12-01)', async () => {
+            const before = harness.fake!.calls.length;
+            for (const path of [
+                '/api/auth/ever-id/callback',
+                '/api/auth/ever-id/sign-up/confirm',
+                '/api/auth/ever-id/authorize',
+            ]) {
+                const response = await request(server(harness))
+                    .post(path)
+                    .send({ unexpected: 'field', returnTo: 42 });
+                expect({ path, status: response.status, code: response.body.code }).toEqual({
+                    path,
+                    status: 404,
+                    code: 'ever_id_disabled',
+                });
+            }
+
+            // Connect, with a real session and an empty body: still "not found".
+            const user = await harness.createUser({ email: 'off-connect@example.com' });
+            const session = await harness.sessionFor(user.id);
+            for (const path of [
+                '/api/auth/ever-id/connect/authorize',
+                '/api/auth/ever-id/connect/confirm',
+            ]) {
+                const response = await request(server(harness))
+                    .post(path)
+                    .set('Authorization', `Bearer ${session}`)
+                    .send({});
+                expect({ path, status: response.status, code: response.body.code }).toEqual({
+                    path,
+                    status: 404,
+                    code: 'ever_id_disabled',
+                });
+            }
+            expect(harness.fake!.calls.length).toBe(before);
+        });
+
         it('refuses a token in the query string before anything else (ACC-12-10)', async () => {
             const response = await request(server(harness))
                 .post('/api/auth/ever-id/authorize?access_token=abc.def.ghi')
