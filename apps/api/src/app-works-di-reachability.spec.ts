@@ -383,7 +383,7 @@ const OPEN_API_GAPS: readonly OpenGap[] = [
     {
         key: 'FacadesModule | DeployFacadeService | AppDomainsService',
         reason: "APW-06 T26's App branch of `getDomains`/`addDomain`/`removeDomain`/`verifyDomain` is dead in the API: no API module provides `AppDomainsService` (only the worker's `TriggerAppRuntimeModule` does), so an App Work's custom-domain click takes the website path (recorded gap C43; the facade's docstring now says so).",
-        source: 'packages/agent/src/facades/deploy.facade.ts:137-142,506-507 (found 2026-09-26)',
+        source: 'packages/agent/src/facades/deploy.facade.ts:137-145,509-511 (found 2026-09-26)',
         routedTo:
             "Owner ruling (2026-09-30): a recorded gap (C43). The docstring is corrected and this entry stays until a slice binds `AppDomainsService` where FacadesModule's `DeployFacadeService` can see it (FacadesModule cannot import AppRuntimeStateModule without a cycle, so likely a lazy ModuleRef lookup).",
     },
