@@ -95,8 +95,12 @@ export type AppLauncherManageState = (typeof APP_LAUNCHER_MANAGE_STATES)[number]
  * A platform entry's status (FR-9 spec.md:214, `plan.md:261`). An entry carrying
  * any other status is dropped by the catalog reader and logged with its entry id
  * only (FR-11 spec.md:219-221).
+ *
+ * `soon` (added after `available` and `beta`, R-26: a union only gains members)
+ * is a platform that is announced but not open yet: its tile is listed with a
+ * **Soon** chip and can never be activated, so the launcher never opens it.
  */
-export const APP_LAUNCHER_PLATFORM_STATUSES = ['available', 'beta'] as const;
+export const APP_LAUNCHER_PLATFORM_STATUSES = ['available', 'beta', 'soon'] as const;
 
 /** Union derived from {@link APP_LAUNCHER_PLATFORM_STATUSES}. */
 export type AppLauncherPlatformStatus = (typeof APP_LAUNCHER_PLATFORM_STATUSES)[number];

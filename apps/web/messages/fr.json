@@ -8962,6 +8962,7 @@
             "sectionWorks": "Vos applis",
             "chipCurrent": "Vous êtes ici",
             "chipBeta": "Bêta",
+            "chipSoon": "Bientôt",
             "chipDeploying": "Déploiement en cours",
             "chipLastDeployFailed": "Le dernier déploiement a échoué",
             "viewAll": "Voir tout ({count})",

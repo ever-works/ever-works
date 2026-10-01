@@ -63,13 +63,14 @@
 					"description": "Sort key; ties break by name (APW-11 FR-11)."
 				},
 				"status": {
-					"enum": ["available", "beta"]
+					"enum": ["available", "beta", "soon"],
+					"description": "`soon` lists the platform with a Soon chip; its tile is never a link (APW-11 FR-9)."
 				},
 				"urls": {
 					"type": "object",
 					"additionalProperties": false,
 					"minProperties": 1,
-					"description": "One address per environment. All three keys are supported and each is optional: an entry without an address for the environment the installation is running in is simply not shown (APW-11 FR-10, ACC-11-05).",
+					"description": "One address per environment. All three keys are supported and each is optional: an entry without an address for the environment the installation is running in is simply not shown (APW-11 FR-10, ACC-11-05). The published catalog also accepts the literal `TBD` for an address that has not been provided yet; the reader treats it as no address for that environment.",
 					"properties": {
 						"production": {
 							"$ref": "#/$defs/httpsUrl"

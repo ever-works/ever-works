@@ -319,7 +319,11 @@ export class EverAppLauncher extends LitElement {
 		const strings = this._strings;
 		const chip = this._chipFor(item);
 		const isCurrent = this._isCurrent(item);
-		const inert = !isCurrent && safeLauncherUrl(item.url, { allowLocalhost: this.allowLocalhost }) === null;
+		// FR-9: a `soon` platform is listed but never a link, exactly like an
+		// address FR-32 refuses — so it can never be activated.
+		const inert =
+			!isCurrent &&
+			(item.status === 'soon' || safeLauncherUrl(item.url, { allowLocalhost: this.allowLocalhost }) === null);
 		// Roving tabindex (FR-40): exactly one tile is in the tab order.
 		const tabindex = inert ? -1 : position === this._activeIndex ? 0 : -1;
 		const icon = item.iconDataUri
@@ -331,7 +335,10 @@ export class EverAppLauncher extends LitElement {
 			<span class="tile-body">
 				<span class="tile-name">${item.name}</span>
 				${chip
-					? html`<span class="chip" part="chip" data-chip=${item.chip ?? (isCurrent ? 'current' : 'beta')}
+					? html`<span
+							class="chip"
+							part="chip"
+							data-chip=${item.chip ?? (isCurrent ? 'current' : (item.status ?? 'beta'))}
 							>${chip}</span
 						>`
 					: item.host
@@ -357,7 +364,8 @@ export class EverAppLauncher extends LitElement {
 			</button>`;
 		}
 
-		// An address FR-32 refuses is visible but inert — no link, no tab.
+		// An address FR-32 refuses, or a `soon` platform (FR-9), is visible but
+		// inert — no link, no tab, no `:item-activate`.
 		if (inert) {
 			return html`<div
 				class="tile"
@@ -525,6 +533,7 @@ export class EverAppLauncher extends LitElement {
 		if (item.chip === 'deploying') return this._strings.chipDeploying;
 		if (item.chip === 'lastDeployFailed') return this._strings.chipLastDeployFailed;
 		if (item.status === 'beta') return this._strings.chipBeta;
+		if (item.status === 'soon') return this._strings.chipSoon;
 		return null;
 	}
 

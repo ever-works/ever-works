@@ -69,7 +69,7 @@ type SpecAppLauncherItemKind = 'platform' | 'work'; // plan.md:248
 type SpecAppLauncherSection = 'pinned' | 'platforms' | 'works'; // plan.md:249, FR-2 spec.md:188-189
 type SpecAppLauncherWorkChip = 'deploying' | 'lastDeployFailed'; // plan.md:250, FR-18 spec.md:238-239
 type SpecAppLauncherManageState = 'listed' | 'notLive' | 'exposureOff'; // plan.md:251
-type SpecAppLauncherPlatformStatus = 'available' | 'beta'; // plan.md:263, FR-9 spec.md:214
+type SpecAppLauncherPlatformStatus = 'available' | 'beta' | 'soon'; // plan.md:263, FR-9 spec.md:214
 type SpecAppLauncherRejectionReason = 'unknownItem' | 'cannotHideCurrent'; // plan.md:299, FR-35 spec.md:323-324
 type SpecAppLauncherEmptyAction = 'createAppWork' | 'goToWorks'; // plan.md:289, FR-64 spec.md:201-204
 
@@ -103,7 +103,7 @@ const UNIONS: Array<[name: string, actual: readonly string[], expected: readonly
 	['APP_LAUNCHER_SECTIONS', APP_LAUNCHER_SECTIONS, ['pinned', 'platforms', 'works']], // FR-2 spec.md:188-189
 	['APP_LAUNCHER_WORK_CHIPS', APP_LAUNCHER_WORK_CHIPS, ['deploying', 'lastDeployFailed']], // FR-18 spec.md:238-239
 	['APP_LAUNCHER_MANAGE_STATES', APP_LAUNCHER_MANAGE_STATES, ['listed', 'notLive', 'exposureOff']], // plan.md:251
-	['APP_LAUNCHER_PLATFORM_STATUSES', APP_LAUNCHER_PLATFORM_STATUSES, ['available', 'beta']], // FR-9 spec.md:214
+	['APP_LAUNCHER_PLATFORM_STATUSES', APP_LAUNCHER_PLATFORM_STATUSES, ['available', 'beta', 'soon']], // FR-9 spec.md:214
 	['APP_LAUNCHER_REJECTION_REASONS', APP_LAUNCHER_REJECTION_REASONS, ['unknownItem', 'cannotHideCurrent']],
 	['APP_LAUNCHER_EMPTY_ACTIONS', APP_LAUNCHER_EMPTY_ACTIONS, ['createAppWork', 'goToWorks']] // FR-64 spec.md:201-204
 ];
@@ -121,7 +121,7 @@ const EVERY_ITEM_KIND: Record<AppLauncherItemKind, true> = { platform: true, wor
 const EVERY_SECTION: Record<AppLauncherSection, true> = { pinned: true, platforms: true, works: true };
 const EVERY_WORK_CHIP: Record<AppLauncherWorkChip, true> = { deploying: true, lastDeployFailed: true };
 const EVERY_MANAGE_STATE: Record<AppLauncherManageState, true> = { listed: true, notLive: true, exposureOff: true };
-const EVERY_PLATFORM_STATUS: Record<AppLauncherPlatformStatus, true> = { available: true, beta: true };
+const EVERY_PLATFORM_STATUS: Record<AppLauncherPlatformStatus, true> = { available: true, beta: true, soon: true };
 const EVERY_REJECTION_REASON: Record<AppLauncherRejectionReason, true> = {
 	unknownItem: true,
 	cannotHideCurrent: true
@@ -249,7 +249,7 @@ describe('app-launcher — the derived unions reject what they do not list', () 
 		const chip: AppLauncherWorkChip = 'failed';
 		// @ts-expect-error FR-56's state is `notLive`, not 'hidden' (spec.md:245-247)
 		const manageState: AppLauncherManageState = 'hidden';
-		// @ts-expect-error a catalog status is 'available' | 'beta' (FR-9 spec.md:214)
+		// @ts-expect-error a catalog status is 'available' | 'beta' | 'soon' (FR-9 spec.md:214)
 		const status: AppLauncherPlatformStatus = 'preview';
 		// @ts-expect-error one identical reason covers unknown and inaccessible (FR-35 spec.md:323-324)
 		const reason: AppLauncherRejectionReason = 'inaccessible';

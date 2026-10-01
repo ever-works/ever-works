@@ -1,7 +1,7 @@
 {
-    "$comment": "The PR lane's platform catalog fixture, served by ./server.mjs to the API of the e2e-app-works-flags-on job (.github/workflows/e2e.yml) through EVER_WORKS_PLATFORM_CATALOG_BASE_URL — ACC-E2E-12's 'Ever platforms from the versioned catalog'. Shape: the published schema (docs/specs/features/app-works/APW-11-app-launcher/catalog-draft/schema/platforms.schema.json) as the API reader enforces it (apps/api/src/app-launcher/platform-catalog.schema.ts); __tests__/server.unit.spec.ts feeds this file to that reader and requires it to be accepted whole. Addresses are RFC 2606 example.com hosts: nothing here resolves to a real service, and ever-teams deliberately has no develop address (FR-10).",
+    "$comment": "The PR lane's platform catalog fixture, served by ./server.mjs to the API of the e2e-app-works-flags-on job (.github/workflows/e2e.yml) through EVER_WORKS_PLATFORM_CATALOG_BASE_URL — ACC-E2E-12's 'Ever platforms from the versioned catalog'. Shape: the published schema (docs/specs/features/app-works/APW-11-app-launcher/catalog-draft/schema/platforms.schema.json) as the API reader enforces it (apps/api/src/app-launcher/platform-catalog.schema.ts); __tests__/server.unit.spec.ts feeds this file to that reader and requires it to be accepted whole. Addresses are RFC 2606 example.com hosts: nothing here resolves to a real service. The seven entries mirror the published catalog's ids, order and statuses (ever-demand is `soon`, so the lane sees one Soon tile), and every entry has a develop address because the lane reads develop; ever-traduora deliberately has no stage address (FR-10).",
     "schemaVersion": 1,
-    "catalogVersion": "0.1.0",
+    "catalogVersion": "0.2.0",
     "platforms": [
         {
             "id": "ever-works",
@@ -38,7 +38,59 @@
             "status": "beta",
             "urls": {
                 "production": "https://teams.example.com",
-                "stage": "https://teams.stage.example.com"
+                "stage": "https://teams.stage.example.com",
+                "develop": "https://teams.dev.example.com"
+            }
+        },
+        {
+            "id": "ever-rec",
+            "name": "Ever Rec",
+            "description": "Screen capture, recording and sharing.",
+            "icon": "icons/ever-rec.svg",
+            "order": 40,
+            "status": "available",
+            "urls": {
+                "production": "https://rec.example.com",
+                "stage": "https://rec.stage.example.com",
+                "develop": "https://rec.dev.example.com"
+            }
+        },
+        {
+            "id": "ever-traduora",
+            "name": "Ever Traduora",
+            "description": "Translation management for teams.",
+            "icon": "icons/ever-traduora.svg",
+            "order": 50,
+            "status": "available",
+            "urls": {
+                "production": "https://traduora.example.com",
+                "develop": "https://traduora.dev.example.com"
+            }
+        },
+        {
+            "id": "ever-demand",
+            "name": "Ever Demand",
+            "description": "Open platform for on-demand and sharing economies.",
+            "icon": "icons/ever-demand.svg",
+            "order": 60,
+            "status": "soon",
+            "urls": {
+                "production": "https://demand.example.com",
+                "stage": "https://demand.stage.example.com",
+                "develop": "https://demand.dev.example.com"
+            }
+        },
+        {
+            "id": "app-ever-co",
+            "name": "Ever Platform",
+            "description": "Your Ever account, organizations and security settings.",
+            "icon": "icons/app-ever-co.svg",
+            "order": 70,
+            "status": "available",
+            "urls": {
+                "production": "https://platform.example.com",
+                "stage": "https://platform.stage.example.com",
+                "develop": "https://platform.dev.example.com"
             }
         }
     ]

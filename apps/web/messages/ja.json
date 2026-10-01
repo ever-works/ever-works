@@ -8963,6 +8963,7 @@
             "sectionWorks": "あなたのアプリ",
             "chipCurrent": "現在表示中",
             "chipBeta": "ベータ",
+            "chipSoon": "近日公開",
             "chipDeploying": "デプロイ中",
             "chipLastDeployFailed": "前回のデプロイに失敗しました",
             "viewAll": "すべて表示 ({count})",

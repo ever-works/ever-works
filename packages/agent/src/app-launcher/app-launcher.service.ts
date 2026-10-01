@@ -5,6 +5,7 @@ import {
     APP_LAUNCHER_MAX_PREFERENCE_ROWS,
     APP_LAUNCHER_NAME_MAX_LENGTH,
     APP_LAUNCHER_PIN_LIMIT,
+    APP_LAUNCHER_PLATFORM_STATUSES,
     appLauncherPinLimitExceeded,
     isAppLauncherEnvironment,
     type AppLauncherEnvironment,
@@ -715,10 +716,10 @@ export class AppLauncherService {
                 url: address ? address.url : null,
                 host: address ? address.host : null,
                 current: current ? true : undefined,
-                status:
-                    platform.status === 'available' || platform.status === 'beta'
-                        ? platform.status
-                        : undefined,
+                // Any member of the closed status union travels with the tile
+                // (`soon` included: the element renders it with its chip and
+                // never as a link); anything else is dropped, never coerced.
+                status: isPlatformStatus(platform.status) ? platform.status : undefined,
                 catalogOrder:
                     typeof platform.catalogOrder === 'number' ? platform.catalogOrder : null,
                 visible: true,
@@ -1230,6 +1231,14 @@ function isDefaultPreferenceRow(row: ProjectedPreference): boolean {
 /** A row's identity: the table's unique key, without depending on a separator being unused. */
 function preferenceRowId(scopeKey: string, itemKey: string): string {
     return `${scopeKey}\u0000${itemKey}`;
+}
+
+/** FR-9: one of the catalog's closed statuses (`available`, `beta`, `soon`), never a coerced string. */
+function isPlatformStatus(value: unknown): value is AppLauncherPlatformStatus {
+    return (
+        typeof value === 'string' &&
+        (APP_LAUNCHER_PLATFORM_STATUSES as readonly string[]).includes(value)
+    );
 }
 
 /** Plan §4.2:405 — `order` is `0..9999`; anything else keeps the stored value. */
