@@ -1,0 +1,21 @@
+# GOLDEN RENDERED OUTPUT — app-fixture-hello. Platform ConfigMap `app-platform-fa90df132e`
+# (APW-06 plan §4.1, §4.7). Immutable; ONLY the non-secret `EVER_WORKS_*` names.
+# ACC-E2E-05 asserts this object "holds only EVER_WORKS_* names" (ACCEPTANCE.md:336-338).
+# `EVER_WORKS_SOURCE_URL` is NOT rendered: the fixture is MIT (works.yml:27-30) and MIT carries no
+# `network-source-offer` obligation (APW-06 spec FR-44).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-platform-fa90df132e
+  namespace: ew-app-fixture-hello-22222222
+  labels:
+    app.kubernetes.io/managed-by: ever-works-k8s-plugin
+    app.kubernetes.io/part-of: app-fixture-hello
+    ever-works.io/work-id: 22222222-2222-4222-8222-222222222222
+    ever-works.io/kind: app
+immutable: true
+data:
+  EVER_WORKS_APP_COMMIT: b1c2d3e4f5061728394a5b6c7d8e9f0112345678
+  EVER_WORKS_APP_HOST: app-fixture-hello.apps.example.com
+  EVER_WORKS_APP_URL: https://app-fixture-hello.apps.example.com
+  EVER_WORKS_DEPLOYMENT_ID: 44444444-4444-4444-8444-444444444444

@@ -64,6 +64,47 @@ import { createRemoteProxy } from '../remote-proxy';
  */
 export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
 
+/**
+ * APW-02 T28 — the App upstream trio, provided here as **string** injection tokens
+ * for exactly the reason `DATA_SYNC_DISPATCHER_SERVICE` is (plan §4.4,
+ * `plan.md:584-590`): the worker only needs the proxy, and a string token names the
+ * API-side `remoteMap` entry without the worker having to import a service class.
+ *
+ * The three, and what each one is for:
+ *
+ *   - `APP_UPSTREAM_STATE_SERVICE` → `AppUpstreamStateService` (T23). The
+ *     `app-fork-readiness` and `app-upstream-sync` jobs take their per-Work claim
+ *     through it (`beginSync` / `finishSync`), because `DistributedTaskLockService`
+ *     needs `@InjectRepository(CacheEntry)` and a callback cannot cross the SuperJSON
+ *     remote proxy (T26's docstring, `plan.md:721-722`).
+ *   - `APP_UPSTREAM_SYNC_DISPATCHER_SERVICE` → `AppUpstreamSyncDispatcherService`
+ *     (T28). The `app-upstream-sync-dispatcher` cron (T34) calls `dispatchDue()` on
+ *     it, which lands API-side where the state rows and the readiness timeout live
+ *     (plan §2.4).
+ *   - `WORK_UPSTREAM_STATE_REPOSITORY` → `WorkUpstreamStateRepository` (T14) — the
+ *     binding T26 reported **by name** as owed to this task
+ *     (`packages/agent/src/app-works/app-upstream-sync.service.ts:86-92`):
+ *     `AppUpstreamSyncService` reads the Work's coordinates (data repository, tracked
+ *     branch, upstream, relation) and the two counters §6.3's steps 3 and 9 need
+ *     (`rateLimitedUntil`, `consecutiveRateLimited`) from the epic's own row, and the
+ *     worker owns no DataSource. Without this proxy every worker-side run answers
+ *     `failed/state_not_found` instead of syncing — a silent, permanent no-op, which
+ *     is why the binding is here rather than left to the reader to discover.
+ *
+ * The alternative T26 also named — widening `AppSyncBeginResult` to carry the
+ * coordinates and counters — was **not** taken: it would edit T23's landed service and
+ * its spec to serve one caller, while this binding is three lines and no change to
+ * another owner's contract. `AppUpstreamSyncService` already injects the repository
+ * `@Optional()`, so a worker that does not import this module still boots.
+ */
+export const APP_UPSTREAM_STATE_SERVICE = 'AppUpstreamStateService';
+
+/** See {@link APP_UPSTREAM_STATE_SERVICE}. */
+export const APP_UPSTREAM_SYNC_DISPATCHER_SERVICE = 'AppUpstreamSyncDispatcherService';
+
+/** See {@link APP_UPSTREAM_STATE_SERVICE} — T26's owed binding. */
+export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
+
 @Module({
     providers: [
         TriggerInternalApiClient,
@@ -466,6 +507,30 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'SkillReadinessService'),
             inject: [TriggerInternalApiClient],
         },
+        // APW-02 T28 — the App upstream trio. Same shape as DATA_SYNC_DISPATCHER_SERVICE
+        // above: string tokens, one remote proxy each, no service class imported into
+        // worker scope. `AppUpstreamSyncService` (T33's worker provider) injects the
+        // state service for its claim and the repository for the Work's coordinates;
+        // the `app-upstream-sync-dispatcher` cron (T34) calls `dispatchDue()` through
+        // the third.
+        {
+            provide: APP_UPSTREAM_STATE_SERVICE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppUpstreamStateService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: APP_UPSTREAM_SYNC_DISPATCHER_SERVICE,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AppUpstreamSyncDispatcherService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: WORK_UPSTREAM_STATE_REPOSITORY,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkUpstreamStateRepository'),
+            inject: [TriggerInternalApiClient],
+        },
         // AW-22 Workspace backup — the `workspace-backup` task calls
         // `startFromPayload()` on the runner, then `observeRun()` and
         // `notifyFinished()` on the service; the `workspace-backup-sweeper`
@@ -550,6 +615,11 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         MemoryFactSweepService,
         ModelAccountHealthService,
         SkillReadinessService,
+        // APW-02 T28 — the App upstream trio, exported so the App Works job modules
+        // (T32/T33) and the dispatcher cron (T34) resolve them from here.
+        APP_UPSTREAM_STATE_SERVICE,
+        APP_UPSTREAM_SYNC_DISPATCHER_SERVICE,
+        WORK_UPSTREAM_STATE_REPOSITORY,
         // AW-22 — exported so the `workspace-backup` task (which resolves
         // from `TriggerWorkerModule`, and reaches these through that
         // module's import of this one) and the `workspace-backup-sweeper`

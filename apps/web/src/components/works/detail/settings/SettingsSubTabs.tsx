@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
-import { useWorkPermissions } from '../WorkDetailContext';
-import { Settings, Users, Wallet } from 'lucide-react';
+import { useWorkDetail, useWorkPermissions } from '../WorkDetailContext';
+import { FileCode, Settings, Users, Wallet } from 'lucide-react';
 
 interface SettingsSubTabsProps {
     workId: string;
@@ -17,6 +17,7 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
     const t = useTranslations('dashboard.workDetail.settings.tabs');
     const pathname = usePathname();
     const permissions = useWorkPermissions();
+    const { work } = useWorkDetail();
 
     const navRef = useRef<HTMLDivElement>(null);
     const [pillStyle, setPillStyle] = useState<{ left: number; width: number } | null>(null);
@@ -24,6 +25,7 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
     const settingsBase = ROUTES.DASHBOARD_WORK_SETTINGS(workId);
     const membersHref = ROUTES.DASHBOARD_WORK_SETTINGS_MEMBERS(workId);
     const budgetsHref = ROUTES.DASHBOARD_WORK_SETTINGS_BUDGETS(workId);
+    const appSpecHref = ROUTES.DASHBOARD_WORK_SETTINGS_APP_SPEC(workId);
 
     const tabs = [
         {
@@ -33,7 +35,12 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
             isActive:
                 (pathname.endsWith('/settings') || pathname.endsWith('/settings/')) &&
                 !pathname.includes('/settings/members') &&
-                !pathname.includes('/settings/budgets-usage'),
+                !pathname.includes('/settings/budgets-usage') &&
+                // APW-03 T16 — `/settings/app-spec` is a FOURTH sibling of the
+                // same `/settings` prefix, so General's `isActive` must exclude
+                // it too: without this line the App spec page lights up BOTH
+                // tabs.
+                !pathname.includes('/settings/app-spec'),
         },
         {
             name: t('members'),
@@ -47,6 +54,22 @@ export function SettingsSubTabs({ workId }: SettingsSubTabsProps) {
             href: budgetsHref,
             icon: Wallet,
             isActive: pathname.includes('/settings/budgets-usage'),
+        },
+        {
+            // APW-03 T16 (ACC-03-39, plan §5.1:603-607) — the App spec tab is
+            // offered to an App Work and to nothing else: `.works/works.yml`,
+            // the problems list and the license gate only exist for kind `app`
+            // (every endpoint answers `422 notAnAppWork` otherwise), so every
+            // other kind would get a tab whose page is a not-found.
+            //
+            // The kind comes from the Work row the detail layout fetched —
+            // `useWorkDetail()`, the same source `WorkTabs` reads for its
+            // Upstream tab — never from a second fetch or from the URL.
+            name: t('appSpec'),
+            href: appSpecHref,
+            icon: FileCode,
+            visible: work.kind === 'app',
+            isActive: pathname.includes('/settings/app-spec'),
         },
     ].filter((tab) => tab.visible !== false);
 

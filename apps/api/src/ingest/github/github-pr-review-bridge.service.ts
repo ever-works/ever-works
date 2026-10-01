@@ -334,9 +334,16 @@ function isoOrNow(value: string | null | undefined): string {
     return new Date().toISOString();
 }
 
-/** The `taskId`/`taskSlug` payload block, or nothing when unlinked. */
+/**
+ * The `taskId`/`taskSlug` payload block, or nothing when unlinked.
+ *
+ * Nothing, too, for a link outside the Task repository: that is a Task that
+ * opened the same number (or branch name) in ANOTHER repository — a directory
+ * Work's data repository behind its website one, or another Work sharing the
+ * repository — so naming it on this event would say the wrong Task did it.
+ */
 function taskFields(link: TaskGitLink | null): Record<string, unknown> {
-    if (!link) return {};
+    if (!link || link.isTaskRepo === false) return {};
     return {
         taskId: link.taskId,
         ...(link.taskSlug ? { taskSlug: link.taskSlug } : {}),

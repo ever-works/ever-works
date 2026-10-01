@@ -226,6 +226,39 @@ Used when `MAILER_PROVIDER=resend`:
 
 ---
 
+## App Works (preview)
+
+[App Works](./features/app-works.md) run an existing GitHub repository as a Work. They are a preview, and every
+switch below is off unless it is set to exactly `true`.
+
+| Variable                                  | Description                                                                                                                                                                                                | Type      | Default                                   | Required                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ----------------------------------------- | ------------------------ |
+| `EVER_WORKS_APP_WORKS_ENABLED`            | Turns App Works on. Off, the API refuses to inspect a repository for, or create, an App Work. The web app reads its own copy only when it has no PostHog key; otherwise the `works-app` flag decides.      | `boolean` | `false`                                   | No                       |
+| `APP_WORKS_CLOUD_PUSH_ENABLED`            | Lets a cloud (API-side) agent run push an App Work branch and open its pull request, after the change guard has judged the exact commit. Off, only Fleet runs publish App Work changes. Read at API start. | `boolean` | `false`                                   | No                       |
+| `EVER_WORKS_APPS_DOMAIN`                  | A dedicated apex for App Works' managed subdomains. It may not equal, sit under, or be a parent of the platform domain or the API and web hosts; an unusable value turns the managed subdomain off.        | `string`  | The platform domain (`EVER_WORKS_DOMAIN`) | No                       |
+| `EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED` | Production only: the operator's statement that the worker running App cluster jobs has no route to internal networks. Without it, every App deploy request answers `422 worker_not_isolated`.              | `boolean` | `false`                                   | In production, to deploy |
+| `EVER_WORKS_APPS_CATALOG_TOKEN`           | GitHub token for reading App Blueprint repositories under `ever-works`, used when the Ever Works GitHub App is not installed there. Falls back to `GITHUB_TOKEN`.                                          | `string`  | --                                        | No                       |
+
+The web app also evaluates the PostHog flag `works-app` for the dashboard's App chip. Unlike the other `works-<kind>`
+flags it fails **closed**: a missing flag, an error or a timeout hides the chip.
+
+## App Launcher
+
+The [App Launcher](./features/app-launcher.md) is off by default on every installation.
+
+| Variable                              | Description                                                                                                  | Type                                 | Default                | Required |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ---------------------- | -------- |
+| `EVER_WORKS_APP_LAUNCHER_ENABLED`     | Turns the launcher on. Off, every launcher route answers `404`. Read per request, so no new image is needed. | `boolean`                            | `false`                | No       |
+| `EVER_WORKS_PLATFORM_CATALOG_REPO`    | The repository the launcher reads Ever apps from. Must match `^ever-works/[a-z0-9-]+$`.                      | `string`                             | `ever-works/platforms` | No       |
+| `EVER_WORKS_PLATFORM_CATALOG_REF`     | The branch, tag or 40-character commit SHA read from that repository.                                        | `string`                             | `main`                 | No       |
+| `EVER_WORKS_PLATFORM_CATALOG_ENV`     | Whose addresses the tiles use. Set it per deployment, or a stage installation shows production addresses.    | `production` \| `stage` \| `develop` | `production`           | No       |
+| `EVER_WORKS_PLATFORM_CATALOG_SELF_ID` | The catalog entry marked as the app you are in.                                                              | `string`                             | `ever-works`           | No       |
+
+Where the web app has PostHog configured, the launcher also needs the `app-launcher` flag to resolve to `true` for the
+person; without PostHog, `EVER_WORKS_APP_LAUNCHER_ENABLED` alone decides.
+
+---
+
 ## CRM Integration (Twenty CRM)
 
 | Variable                        | Description                                  | Type      | Default                  | Required       |

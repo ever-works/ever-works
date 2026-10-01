@@ -107,6 +107,14 @@ export interface ForkTemplateResult {
         url: string;
     };
     created: boolean;
+    /**
+     * APW-02 P0 — readiness of the fork this call asked for. `pending` means the provider accepted
+     * the request but the repository is not readable yet: a background readiness poller finishes
+     * that job, and the caller must not clone or push into the repository until it reports ready.
+     * `ready` means an existing fork was resolved and is usable now. Absent when the provider
+     * reported no readiness (pre-existing providers).
+     */
+    forkReadiness?: 'ready' | 'pending';
 }
 
 @Injectable()
@@ -473,7 +481,12 @@ export class TemplateCatalogService implements OnModuleInit {
         // name.
         this.assertNotRetired(template);
 
-        if (template.sourceType !== 'built_in') {
+        // Forking a CUSTOM template (a repository added by URL) is App Works'
+        // steps 1-2 (see the ownership rule below). It stays behind the App
+        // Works instance switch: with `EVER_WORKS_APP_WORKS_ENABLED` unset or
+        // anything but 'true' (the default), only the curated, built-in
+        // templates can be forked, exactly as before App Works landed.
+        if (template.sourceType !== 'built_in' && !config.everWorks.apps.worksEnabled()) {
             throw new BadRequestException({
                 status: 'error',
                 message: 'Only standard templates can be forked.',
@@ -508,6 +521,39 @@ export class TemplateCatalogService implements OnModuleInit {
 
         const targetOrganizationLogin = isPersonalTarget ? undefined : organization!.login;
 
+        // **The rule the owner actually stated: "if the repo is not yours, fork
+        // it."** So the only thing that cannot be forked is a repository the
+        // target ALREADY owns — there is nothing to fork, and GitHub refuses to
+        // fork a repository into the account that owns it.
+        //
+        // What used to stand here instead, near the top of this method, was
+        // `if (template.sourceType !== 'built_in') -> 400 "Only standard
+        // templates can be forked."` That single line was the whole distance
+        // between this platform and the App Works brief's steps 1 and 2:
+        // `addCustomTemplate` (`:206`) already registers ANY GitHub repository
+        // URL as a template, and everything below this point already works for
+        // one — a `custom` row carries `repositoryOwner` / `repositoryName` from
+        // the parsed URL, which is all the fork path reads. The refusal was a
+        // curation policy, not a technical limit.
+        //
+        // Checked against the programme's own decisions before removing it
+        // (2026-09-21): **D1 does not cover this.** D1 is "a new Work kind
+        // `app`; the `repo` kind is not modified", and the two alternatives it
+        // rejects are lifting `repo`'s guard and extending Work Import
+        // `link_existing` (`docs/specs/features/app-works/README.md:124-129`).
+        // It says nothing about `template-catalog`, so reusing this path needs
+        // no decision reversed.
+        if (
+            template.repositoryOwner.trim().toLowerCase() === targetOwner.toLowerCase() &&
+            template.sourceType === 'custom'
+        ) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'This repository already belongs to the selected account — there is nothing to fork. Use it directly instead.',
+            });
+        }
+
         const existingTemplate =
             await this.templateRepository.findOwnedCustomByRepositoryCoordinates(
                 input.kind,
@@ -532,11 +578,11 @@ export class TemplateCatalogService implements OnModuleInit {
                     fullName: `${existingTemplate.repositoryOwner}/${existingTemplate.repositoryName}`,
                     url:
                         existingTemplate.repositoryUrl ||
-                        this.gitFacade.getWebUrl(
+                        (await this.gitFacade.getWebUrl(
                             providerId,
                             existingTemplate.repositoryOwner,
                             existingTemplate.repositoryName,
-                        ),
+                        )),
                 },
                 created: false,
             };
@@ -547,6 +593,13 @@ export class TemplateCatalogService implements OnModuleInit {
             template.repositoryName,
             {
                 organization: targetOrganizationLogin,
+                // `waitForReady` is deliberately NOT set here. The provider can now fork
+                // non-blockingly (`waitForReady: false` → `forkReadiness: 'pending'`), but P0 ships
+                // no readiness poller: `WorkUpstreamState` and the `app-fork-readiness` job are
+                // APW-02 P1 (T12/T24), and this epic's P0 gate allows no migration, job or route.
+                // Asking for a pending fork here would leave it pending forever, so this caller
+                // keeps the provider's blocking default until that poller exists. The provider
+                // resolves an existing fork first either way, so a repeat fork is already cheap.
             },
             { userId, providerId },
         );
@@ -569,7 +622,11 @@ export class TemplateCatalogService implements OnModuleInit {
             previewImageUrl: template.previewImageUrl || null,
             repositoryUrl:
                 forkedRepository.url ||
-                this.gitFacade.getWebUrl(providerId, forkedRepository.owner, forkedRepository.name),
+                (await this.gitFacade.getWebUrl(
+                    providerId,
+                    forkedRepository.owner,
+                    forkedRepository.name,
+                )),
             repositoryOwner: forkedRepository.owner,
             repositoryName: forkedRepository.name,
             branch: forkedRepository.defaultBranch || template.branch,
@@ -603,13 +660,14 @@ export class TemplateCatalogService implements OnModuleInit {
                 fullName: forkedRepository.fullName,
                 url:
                     forkedRepository.url ||
-                    this.gitFacade.getWebUrl(
+                    (await this.gitFacade.getWebUrl(
                         providerId,
                         forkedRepository.owner,
                         forkedRepository.name,
-                    ),
+                    )),
             },
             created: true,
+            forkReadiness: forkedRepository.forkReadiness,
         };
     }
 

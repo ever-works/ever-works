@@ -1,10 +1,24 @@
 export * from './git-provider.interface.js';
+// App Works fork lifecycle (APW-02 T9/T10) — the types the seven optional
+// fork-lifecycle members of `IGitProviderPlugin` consume (`GitProviderRequestError`,
+// `GitForkSyncResult`, `GitForkDivergence`, `GitRepositoryCopyInput`,
+// `GitRepositoryCopyResult`, `GitWorkflowRef`, `GitActionsPermissionsInput`,
+// `GitActionsPermissionsResult`, `GitWebhookInput`). Additive only: no existing
+// git-provider surface changes, so every existing implementation compiles and
+// behaves exactly as before.
+export * from './git-provider.app-forks.js';
 // PR insights (kanban run cockpit M5/M6) — pure CI rollup + diff-cap
 // rules shared by every git-provider implementation and asserted by the
 // conformance suite.
 export * from './git-provider.pr-insights.js';
 export * from './oauth.interface.js';
 export * from './deployment.interface.js';
+// App Works (APW-06 T2) — the App-deployment types the ten OPTIONAL App members
+// of `IDeploymentPlugin` consume (`AppRenderInput`, `AppDeployHooks`,
+// `AppDeployResult`, `AppStatusSnapshot`, `AppScaleResult`, …). Additive only:
+// nothing here changes the pre-existing deployment surface, so the `k8s` and
+// Vercel plugins compile and behave exactly as before.
+export * from './app-deployment.types.js';
 export * from './screenshot.interface.js';
 export * from './search.interface.js';
 export * from './content-extractor.interface.js';
@@ -75,3 +89,37 @@ export * from './playbook-provider.interface.js';
 // write") a provider plugin declares; the platform writes the chosen level
 // onto the existing tool-grant lattice. See `connection-scopes.interface.ts`.
 export * from './connection-scopes.interface.js';
+// App Works (APW-07 T3) — the `app-dependency` capability: one plugin serves
+// several provider ids (`k8s-inline-postgres`, `smtp-external`, …), each with
+// its own descriptor, prompt schema and backup policy. Additive: no existing
+// capability, category or contract changes.
+export * from './app-dependency.interface.js';
+// App Works (APW-05 T2) — the `build` capability: `IBuildPlugin` and the shapes
+// the workflow generator, the secret sync, the run observer and the registry
+// check are written against (`PrepareRepositoryInput`/`Result`, `BuildSnapshot`,
+// `ImageAccessResult`, `BuildRunRef`, `isBuildPlugin`). Additive: no existing
+// capability, category or contract changes, and `BuildRunRef` /
+// `AppBuildVerificationResult` / `BUILD_SERVICE_DEFAULTS` are re-exported from
+// `@ever-works/contracts` (APW-05 T1) rather than redeclared (Resolution R-1).
+export * from './build.interface.js';
+// App Works (APW-12 T4) — the `identity-provider` capability: `IIdentityProviderPlugin`
+// (the seven methods the OpenID Connect relying party implements), the seven
+// `IdentityProviderCheck` ids **Test connection** renders, the verified token claim
+// shapes and the closed `IdentityTokenRejectedError` code set. Additive: no existing
+// capability, category or contract changes, and the category `'identity'` that goes
+// with it (@see plugin-manifest.types.ts) lands in the same change; a plugin that
+// never declares `identity-provider` compiles and behaves exactly as before.
+export * from './identity-provider.interface.js';
+// App Works (APW-10 T2) — the `apps-tier` capability: `IAppsTierProvider` (the
+// eighteen required members a hosting-zone provider implements — zone info, the
+// one desired-state write, quarantine, throttle, removal, dependencies,
+// self-check, the credential review, heartbeat, metering, signals and owner
+// logs — plus the two P3 build members) and every plugin-facing shape it names
+// (`apps-tier.types.ts`). The wire-level model of the `Work` object itself is
+// re-exported from `@ever-works/contracts` (APW-10 T1) rather than redeclared
+// (Resolution R-1). Additive: no existing capability, category or contract
+// changes, and T2 appends no category — the implementing plugin declares the
+// existing `deployment` one (plan §5.2:602) — so a plugin that never declares
+// `apps-tier` compiles and behaves exactly as before.
+export * from './apps-tier.interface.js';
+export * from './apps-tier.types.js';

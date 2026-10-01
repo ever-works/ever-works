@@ -35,6 +35,8 @@ const {
     getStateMock,
     getCatalogMock,
     redirectMock,
+    syncUpstreamMock,
+    retryUpstreamReadinessMock,
 } = vi.hoisted(() => ({
     getAuthFromCookieMock: vi.fn(),
     checkGitProviderConnectionMock: vi.fn(),
@@ -44,6 +46,8 @@ const {
     getStateMock: vi.fn(),
     getCatalogMock: vi.fn(),
     redirectMock: vi.fn(),
+    syncUpstreamMock: vi.fn(),
+    retryUpstreamReadinessMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -65,6 +69,8 @@ vi.mock('@/lib/api', () => ({
     workAPI: {
         create: workAPICreateMock,
         generateDetails: generateDetailsMock,
+        syncUpstream: syncUpstreamMock,
+        retryUpstreamReadiness: retryUpstreamReadinessMock,
     },
     itemsGeneratorAPI: {
         generate: itemsGenerateMock,
@@ -88,6 +94,10 @@ vi.mock('next-intl/server', () => ({
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/navigation', () => ({ redirect: redirectMock }));
+
+// The class `serverFetch` throws on a non-2xx answer — mocked with the module
+// above, so the same class object reaches both this spec and `works.ts`.
+import { ApiResponseError } from '@/lib/api/server-api';
 
 /** Catalog payload with the managed-storage card flipped on or off. */
 function catalogWithEverWorksGit(available: boolean) {
@@ -423,5 +433,138 @@ describe('Work creation honours the managed Ever Works Git storage choice', () =
             expect(result.success).toBe(false);
             expect(result.requiresGitProvider).toBe(true);
         });
+    });
+});
+
+/**
+ * APW-02 T29 — the two Upstream mutations (`plan.md:492-516`).
+ *
+ * What these pin: the refusal's **code travels unchanged** (the card's copy is
+ * keyed on it, so a second vocabulary here would silently change what a member
+ * reads), the `details` bag travels with it (`retryAt`, `reason`), a success
+ * carries the queued job's run id, both Work routes are revalidated, and an
+ * unauthenticated call is redirected before any API call — the server-action
+ * boundary, which UI gating does not provide.
+ */
+
+/** The API's refusal class as `serverFetch` produces it (`server-api.ts:15-25`). */
+function refusal(statusCode: number, code: string, details?: Record<string, unknown>): Error {
+    const error = new ApiResponseError('refused', statusCode, code, details);
+    // The module is mocked above with a bare `class … extends Error {}`, so the
+    // three properties the real class carries are re-attached here; the action
+    // reads exactly these.
+    Object.assign(error, { statusCode, code, details });
+    return error;
+}
+
+describe('Upstream actions', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getAuthFromCookieMock.mockResolvedValue({ id: 'user-1', username: 'qa-user' });
+    });
+
+    afterEach(() => {
+        vi.resetModules();
+    });
+
+    it('syncUpstreamAction returns the queued run id and revalidates both Work routes', async () => {
+        syncUpstreamMock.mockResolvedValue({ queued: true, runId: 'run-1' });
+        const { syncUpstreamAction } = await import('./works');
+        const { revalidatePath } = await import('next/cache');
+
+        const result = await syncUpstreamAction('w1');
+
+        expect(syncUpstreamMock).toHaveBeenCalledWith('w1');
+        expect(result).toEqual({ success: true, queued: true, runId: 'run-1' });
+        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/works/w1');
+        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/works/w1/upstream');
+    });
+
+    it('syncUpstreamAction reports a queued job with no run id as a success', async () => {
+        syncUpstreamMock.mockResolvedValue({ queued: true, runId: null });
+        const { syncUpstreamAction } = await import('./works');
+
+        const result = await syncUpstreamAction('w1');
+
+        expect(result).toEqual({ success: true, queued: true, runId: null });
+    });
+
+    it.each<[number, string, Record<string, unknown> | undefined]>([
+        [409, 'sync_in_progress', undefined],
+        [409, 'not_ready', undefined],
+        [409, 'sync_paused', { reason: 'upstream_archived' }],
+        [422, 'no_upstream', undefined],
+        [429, 'sync_limit_reached', { retryAt: '2026-09-17T12:30:00.000Z' }],
+        [404, 'not_found', undefined],
+    ])('syncUpstreamAction passes a %i %s through unchanged', async (status, code, details) => {
+        syncUpstreamMock.mockRejectedValue(refusal(status, code, details));
+        const { syncUpstreamAction } = await import('./works');
+        const { revalidatePath } = await import('next/cache');
+
+        const result = await syncUpstreamAction('w1');
+
+        expect(result).toEqual({
+            success: false,
+            code,
+            statusCode: status,
+            message: 'refused',
+            details,
+        });
+        expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled();
+    });
+
+    it('retryUpstreamReadinessAction surfaces not_retryable rather than swallowing it', async () => {
+        retryUpstreamReadinessMock.mockRejectedValue(refusal(409, 'not_retryable'));
+        const { retryUpstreamReadinessAction } = await import('./works');
+
+        const result = await retryUpstreamReadinessAction('w1');
+
+        expect(retryUpstreamReadinessMock).toHaveBeenCalledWith('w1');
+        expect(result.success).toBe(false);
+        expect(result.code).toBe('not_retryable');
+        expect(result.statusCode).toBe(409);
+    });
+
+    it('retryUpstreamReadinessAction returns the queued run id and revalidates', async () => {
+        retryUpstreamReadinessMock.mockResolvedValue({ queued: true, runId: 'run-2' });
+        const { retryUpstreamReadinessAction } = await import('./works');
+        const { revalidatePath } = await import('next/cache');
+
+        const result = await retryUpstreamReadinessAction('w1');
+
+        expect(result).toEqual({ success: true, queued: true, runId: 'run-2' });
+        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/works/w1');
+        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/works/w1/upstream');
+    });
+
+    it('reports a non-refusal failure without inventing a code', async () => {
+        syncUpstreamMock.mockRejectedValue(new Error('socket hang up'));
+        const { syncUpstreamAction } = await import('./works');
+
+        const result = await syncUpstreamAction('w1');
+
+        expect(result.success).toBe(false);
+        expect(result.code).toBeUndefined();
+        expect(result.message).toBe('socket hang up');
+    });
+
+    it.each<['syncUpstreamAction' | 'retryUpstreamReadinessAction']>([
+        ['syncUpstreamAction'],
+        ['retryUpstreamReadinessAction'],
+    ])('%s redirects an unauthenticated caller before calling the API', async (name) => {
+        getAuthFromCookieMock.mockResolvedValue(null);
+        // `redirect()` unwinds by throwing (`next/navigation`); the file-wide
+        // mock is a plain spy, so this one call models that — one-shot, so no
+        // other case in this file inherits it.
+        redirectMock.mockImplementationOnce(() => {
+            throw new Error('NEXT_REDIRECT');
+        });
+        const actions = await import('./works');
+
+        await expect(actions[name]('w1')).rejects.toThrow('NEXT_REDIRECT');
+
+        expect(redirectMock).toHaveBeenCalledWith('/login');
+        expect(syncUpstreamMock).not.toHaveBeenCalled();
+        expect(retryUpstreamReadinessMock).not.toHaveBeenCalled();
     });
 });

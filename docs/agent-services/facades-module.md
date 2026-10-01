@@ -247,12 +247,12 @@ The `queryAll()` method queries all enabled data source plugins and merges their
 
 Manages OAuth authentication flows with external providers.
 
-| Method                                         | Description                             |
-| ---------------------------------------------- | --------------------------------------- |
-| `getAuthorizationUrl(provider, options)`       | Generates the OAuth authorization URL   |
-| `exchangeCode(provider, code, options)`        | Exchanges authorization code for tokens |
-| `validateCredentials(provider, facadeOptions)` | Tests if stored credentials are valid   |
-| `revokeToken(provider, facadeOptions)`         | Revokes stored OAuth tokens             |
+| Method                                         | Description                                   |
+| ---------------------------------------------- | --------------------------------------------- |
+| `getAuthorizationUrl(provider, options)`       | Generates the OAuth authorization URL (async) |
+| `exchangeCode(provider, code, options)`        | Exchanges authorization code for tokens       |
+| `validateCredentials(provider, facadeOptions)` | Tests if stored credentials are valid         |
+| `revokeToken(provider, facadeOptions)`         | Revokes stored OAuth tokens                   |
 
 ## FacadesModule
 

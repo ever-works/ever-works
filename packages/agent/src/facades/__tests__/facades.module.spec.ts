@@ -29,6 +29,12 @@ import { MetricsFacadeService } from '../metrics.facade';
 import { PlaybookCatalogFacadeService } from '../playbook-catalog.facade';
 // AW-15 — connection-scopes capability facade.
 import { ConnectionScopesFacadeService } from '../connection-scopes.facade';
+// APW-06 T20 — the App runtime plugin-and-credential facade (R-5).
+import { AppRuntimeFacadeService } from '../app-runtime.facade';
+// APW-07 T16 — the App-dependency provider facade (capability `app-dependency`).
+import { AppDependencyFacadeService } from '../app-dependency.facade';
+// APW-12 (Ever ID) — the identity provider facade (capability `identity-provider`).
+import { IdentityProviderFacadeService } from '../identity-provider.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -72,6 +78,15 @@ describe('FacadesModule + barrel re-exports', () => {
         PlaybookCatalogFacadeService,
         // AW-15 — connection-scopes capability (provider access levels).
         ConnectionScopesFacadeService,
+        // APW-06 T20 — App runtime plugin-and-credential facade. Constructed in every process
+        // that imports FacadesModule (APW06-G02); callable only in the isolated worker.
+        AppRuntimeFacadeService,
+        // APW-07 T16 — App dependency providers (PostgreSQL, Redis, object storage, SMTP).
+        // The provider is selected by capability and preference, never by id (R-5).
+        AppDependencyFacadeService,
+        // APW-12 — the identity provider facade: platform tier only, and the
+        // administrator's on/off switch for sign-in with it.
+        IdentityProviderFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -149,6 +164,9 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.MetricsFacadeService).toBe(MetricsFacadeService);
             expect(facadesBarrel.PlaybookCatalogFacadeService).toBe(PlaybookCatalogFacadeService);
             expect(facadesBarrel.ConnectionScopesFacadeService).toBe(ConnectionScopesFacadeService);
+            expect(facadesBarrel.AppRuntimeFacadeService).toBe(AppRuntimeFacadeService);
+            expect(facadesBarrel.AppDependencyFacadeService).toBe(AppDependencyFacadeService);
+            expect(facadesBarrel.IdentityProviderFacadeService).toBe(IdentityProviderFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -186,6 +204,10 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(typeof facadesBarrel.NotificationChannelFacadeError).toBe('function');
             // Goals feature PR-7 — metrics.
             expect(typeof facadesBarrel.MetricsFacadeError).toBe('function');
+            // APW-07 T16 — app-dependency: the base error plus the two selection failures.
+            expect(typeof facadesBarrel.AppDependencyFacadeError).toBe('function');
+            expect(typeof facadesBarrel.NoAppDependencyProviderError).toBe('function');
+            expect(typeof facadesBarrel.AppDependencyProviderNotFoundError).toBe('function');
         });
 
         it('re-exports the shared FacadeError + base classes (NoProviderError / ProviderNotFoundError)', () => {
@@ -207,6 +229,11 @@ describe('FacadesModule + barrel re-exports', () => {
                 [
                     'AiFacadeError',
                     'AiFacadeService',
+                    // APW-07 T16 — the App-dependency facade and its three runtime errors.
+                    // Its type-only members are erased by `tsc` and correctly absent here.
+                    'AppDependencyFacadeError',
+                    'AppDependencyFacadeService',
+                    'AppDependencyProviderNotFoundError',
                     'BaseFacadeService',
                     'BrowserAutomationFacadeError',
                     'BrowserAutomationFacadeService',
@@ -224,6 +251,14 @@ describe('FacadesModule + barrel re-exports', () => {
                     'GitFacadeError',
                     'GitFacadeService',
                     'GitProviderNotFoundError',
+                    // APW-12 — the identity provider facade, its unavailable error, the
+                    // error normaliser and its two constants.
+                    'IDENTITY_PROVIDER_REQUIRED_CHECKS',
+                    'IDENTITY_PROVIDER_STATE_CACHE_MS',
+                    'IdentityProviderFacadeService',
+                    'IdentityProviderUnavailableError',
+                    'normalizeIdentityProviderError',
+                    'NoAppDependencyProviderError',
                     'NoContentExtractorProviderError',
                     'NoDeployCredentialsError',
                     'NoDeployProviderError',
@@ -250,6 +285,10 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Agent-Memory facade (default plugin: agentmemory REST :3111).
                     'AgentMemoryFacadeError',
                     'AgentMemoryFacadeService',
+                    // APW-06 T20 — App runtime facade (constructed everywhere, called in the
+                    // worker only). The type-only members it also exports are erased by `tsc`
+                    // and correctly absent from this runtime list.
+                    'AppRuntimeFacadeService',
                     'WorkspaceFacadeError',
                     'WorkspaceFacadeService',
                     'TerminalStreamFacadeError',

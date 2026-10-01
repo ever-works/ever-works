@@ -1257,7 +1257,7 @@ export class AgentToolService {
         return {
             name: 'commitToRepo',
             description:
-                "Commit a batch of file edits to the active Work's git repo. Requires Work scope on this Agent + canCommitToRepo permission. Pass a clear commit message and optional file edits to stage. Returns the resulting commit SHA, target branch, and number of files changed. The adapter resolves the provider + repo + committer identity from the Work's git settings.",
+                "Commit a batch of file edits to the active Work's git repo. Requires Work scope on this Agent + canCommitToRepo permission. Pass a clear commit message and optional file edits to stage. Returns the resulting commit SHA, target branch, and number of files changed. A commit to a protected branch — main, master and stage always are, and the Work's merge policy can protect more — is refused: commit to a feature branch and open a pull request. The adapter resolves the provider + repo + base branch + committer identity from the Work's git settings.",
             parameters: {
                 type: 'object',
                 properties: {
@@ -1276,7 +1276,7 @@ export class AgentToolService {
                     branch: {
                         type: 'string',
                         description:
-                            "Branch name to commit against. Defaults to the Work's main branch.",
+                            "Branch name to commit against. Pass a FEATURE branch. When omitted the target is the Work's Task base branch — its taskIsolationBaseBranch, else the repository's own default branch — and the tool then REFUSES the commit, because that branch is protected: main, master and stage are always protected (APW-08 P0), and the Work's merge policy can protect more. To land work on a release branch, commit to a feature branch and open a pull request.",
                     },
                 },
                 required: ['message'],
@@ -1320,7 +1320,7 @@ export class AgentToolService {
         return {
             name: 'openPullRequest',
             description:
-                "Open a Pull Request on the active Work's git repo. Requires Work scope on this Agent + canOpenPullRequests permission (which transitively requires canCommitToRepo). Provide title, body, head branch (the branch you committed to), and optional base + draft flag. Returns the PR number, URL, and state.",
+                "Open a Pull Request on the active Work's git repo. Requires Work scope on this Agent + canOpenPullRequests permission (which transitively requires canCommitToRepo). Provide title, body, head branch (the branch you committed to), and optional base + draft flag. The head branch must already exist in the Work Repository — a missing head is refused before anything is opened. Returns the PR number, URL, and state.",
             parameters: {
                 type: 'object',
                 properties: {
@@ -1335,11 +1335,13 @@ export class AgentToolService {
                     },
                     head: {
                         type: 'string',
-                        description: 'Branch name containing the commits.',
+                        description:
+                            'Branch name containing the commits. It must already exist in the Work Repository — a head branch that does not exist is refused, naming the missing branch (APW-08 P0).',
                     },
                     base: {
                         type: 'string',
-                        description: "Optional base branch. Defaults to the Work's default branch.",
+                        description:
+                            "Optional base branch. Defaults to the Work's Task base branch — its taskIsolationBaseBranch, else the repository's own default branch (APW-08 P0).",
                     },
                     draft: {
                         // Review-fix C5: boolean, not string.

@@ -28,6 +28,7 @@ import {
 } from '@ever-works/agent/events';
 import { GenerateStatusType } from '@ever-works/agent/entities';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENT_LISTENER_METADATA } from '@nestjs/event-emitter/dist/constants';
 import type { CacheEntryRepository, DistributedTaskLockService } from '@ever-works/agent/cache';
 import type { WorkRepository, WorkGenerationHistoryRepository } from '@ever-works/agent/database';
 
@@ -237,6 +238,25 @@ describe('WorkCleanupService', () => {
     });
 
     describe('clearWorkCache (event handler)', () => {
+        // This listener is what refreshes the Work's items/config/count/taxonomy
+        // caches when a generation ends — in-process, or on Trigger.dev via the
+        // worker's RPC `WorkOperationsService.emitGenerationCompleted`. The page's
+        // post-generation `POST /api/works/:id/sync-data` no longer does it: the
+        // generator has already written `itemsCount`, so that sync answers
+        // `updated: []`, on which the controller now invalidates nothing. Pin the
+        // subscription so dropping the decorator cannot silently leave the Items
+        // tab on pre-generation data for the cache TTL.
+        it('is subscribed to WorkGenerationCompletedEvent', () => {
+            const listeners = Reflect.getMetadata(
+                EVENT_LISTENER_METADATA,
+                WorkCleanupService.prototype.clearWorkCache,
+            ) as Array<{ event: string }> | undefined;
+
+            expect(listeners?.map((listener) => listener.event)).toEqual([
+                WorkGenerationCompletedEvent.EVENT_NAME,
+            ]);
+        });
+
         it('deletes cache entries by work id and logs success', async () => {
             cacheRepository.typeormAdapter.deleteUnscopedEntriesLike.mockResolvedValue(undefined);
             const event = new WorkGenerationCompletedEvent({ id: 'w42' } as any);

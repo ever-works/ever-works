@@ -1,0 +1,96 @@
+# GOLDEN — cal-diy · target your-cluster · CronJob `cron-booking-reminder`
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml (sha256 538a1389bc4dfc0f8fab31821d6e78aca2a0622d1f0e55fec1794433b646c16a)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.1 (`cron-<name>` ≤ 37 chars), §4.9 (`schedule`, `timeZone: Etc/UTC`,
+# Spec      : `concurrencyPolicy` from `cron.concurrency` (default Forbid), `startingDeadlineSeconds: 300`,
+# Spec      : `successfulJobsHistoryLimit: 1`, `failedJobsHistoryLimit: 3`, `suspend: paused`; an `http` cron
+# Spec      : is a runner job targeting `http://<component>.<ns>.svc:80<path>` with the `Authorization`
+# Spec      : header built per `authScheme` from a `secretKeyRef` of `authEnv`)
+# Spec      : APW-06 spec.md FR-26 row 9 (scheduled calls applied last)
+# Spec      : APW-10 plan.md §3.1 caps a managed `Work` cron schedule at ≥ 5 minutes — see ../../README.md
+# Spec      : §"the managed tier refuses" for the two Blueprints whose schedule is more frequent.
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+    name: cron-booking-reminder
+    namespace: ew-cal-diy-11111111
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: cal-diy
+        ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+        ever-works.io/kind: app
+        ever-works.io/cron: booking-reminder
+spec:
+    schedule: '*/15 * * * *'
+    timeZone: Etc/UTC
+    concurrencyPolicy: Forbid
+    startingDeadlineSeconds: 300
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 3
+    suspend: false
+    jobTemplate:
+        spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 630
+            ttlSecondsAfterFinished: 86400
+            template:
+                metadata:
+                    labels:
+                        ever-works.io/cron: booking-reminder
+                        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+                        app.kubernetes.io/part-of: cal-diy
+                        ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+                        ever-works.io/kind: app
+                spec:
+                    restartPolicy: Never
+                    serviceAccountName: app
+                    automountServiceAccountToken: false
+                    enableServiceLinks: false
+                    securityContext:
+                        runAsNonRoot: true
+                        seccompProfile:
+                            type: RuntimeDefault
+                    containers:
+                        - name: runner
+                          image: <APP_RUNNER_IMAGE — packages/plugins/k8s/src/app/app-runner.image.ts>
+                          imagePullPolicy: IfNotPresent
+                          command:
+                              - node
+                              - /ew/app-runner.script.mjs
+                          env:
+                              - name: EW_REQUESTS
+                                value: /ew/requests.json
+                          resources:
+                              requests:
+                                  cpu: 50m
+                                  memory: 64Mi
+                              limits:
+                                  cpu: 500m
+                                  memory: 128Mi
+                          securityContext:
+                              runAsNonRoot: true
+                              runAsUser: 10001
+                              runAsGroup: 10001
+                              allowPrivilegeEscalation: false
+                              readOnlyRootFilesystem: true
+                              capabilities:
+                                  drop:
+                                      - ALL
+                          volumeMounts:
+                              - name: runner
+                                mountPath: /ew
+                                readOnly: true
+                              - name: tmp
+                                mountPath: /tmp
+                    volumes:
+                        - name: runner
+                          configMap:
+                              name: ew-runner-1bd8272a14
+                              defaultMode: 292
+                        - name: tmp
+                          emptyDir:
+                              sizeLimit: 256Mi

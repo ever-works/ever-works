@@ -8,7 +8,12 @@ import type {
     OAuthProviderInfo,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isOAuthPlugin } from '@ever-works/plugin';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    loadRegisteredPlugins,
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import {
     AuthAccountRepository,
     buildPluginProviderId,
@@ -93,8 +98,19 @@ export class OAuthFacadeService implements IOAuthFacade {
         }));
     }
 
-    getAuthorizationUrl(providerId: string, state: string, config?: Partial<OAuthConfig>): string {
-        const plugin = this.getPluginSync(providerId);
+    /**
+     * Async although the provider's `getAuthorizationUrl` is sync: the provider
+     * may be a COLD lazy proxy (disk builtIns such as `github` stay cold until
+     * first use), on which that member reads as the async forwarding wrapper —
+     * a sync facade answered a Promise, and `{ url: <Promise> }` serialised to
+     * `{}`. The provider is loaded first (`getPlugin`).
+     */
+    async getAuthorizationUrl(
+        providerId: string,
+        state: string,
+        config?: Partial<OAuthConfig>,
+    ): Promise<string> {
+        const plugin = await this.getPlugin(providerId);
         return plugin.getAuthorizationUrl(state, config);
     }
 
@@ -103,12 +119,12 @@ export class OAuthFacadeService implements IOAuthFacade {
         code: string,
         config?: Partial<OAuthConfig>,
     ): Promise<OAuthToken> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.exchangeCodeForToken(code, config);
     }
 
     async getAuthenticatedUser(providerId: string, token: string): Promise<OAuthUser> {
-        const plugin = this.getPluginSync(providerId);
+        const plugin = await this.getPlugin(providerId);
         return plugin.getAuthenticatedUser(token);
     }
 
@@ -163,7 +179,7 @@ export class OAuthFacadeService implements IOAuthFacade {
 
         const namespacedProviderId = buildPluginProviderId(providerId);
         try {
-            const plugin = this.getPluginSync(providerId);
+            const plugin = await this.getPlugin(providerId);
             const account = await this.authAccountRepository.findProviderAccount(
                 userId,
                 namespacedProviderId,
@@ -178,7 +194,16 @@ export class OAuthFacadeService implements IOAuthFacade {
         await this.authAccountRepository.deleteProviderAccount(userId, namespacedProviderId);
     }
 
-    private getPluginSync(providerId: string): IOAuthPlugin {
+    /**
+     * The OAuth provider `providerId` names — or, when that one is not usable,
+     * the first usable OAuth provider, as before — LOADED: its first load
+     * (import and `onLoad`) has settled, including one another caller started
+     * (`loadRegisteredPlugins` waits for it), and the REAL instance is
+     * returned, so its sync `getAuthorizationUrl` answers a string. A provider
+     * that cannot be imported or whose `onLoad` fails is now in `error` and is
+     * passed over, exactly as one that failed at boot was.
+     */
+    private async getPlugin(providerId: string): Promise<IOAuthPlugin> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
 
         if (providerId) {
@@ -187,18 +212,27 @@ export class OAuthFacadeService implements IOAuthFacade {
                 if (!isOAuthPlugin(registered.plugin)) {
                     throw new OAuthNotSupportedError(providerId, 'getPlugin');
                 }
-                return registered.plugin as IOAuthPlugin;
+                const plugin = await this.loadForUse(registered);
+                if (plugin) return plugin;
             }
         }
 
         // If no specific provider requested, try to find any enabled OAuth provider
-        const enabled = plugins.find((p) => p.state === 'loaded');
-        if (!enabled) {
-            throw new NoOAuthProviderError();
+        for (const registered of plugins) {
+            if (registered.state !== 'loaded') continue;
+            if (!isOAuthPlugin(registered.plugin)) {
+                throw new OAuthNotSupportedError(registered.plugin.id, 'getPlugin');
+            }
+            const plugin = await this.loadForUse(registered);
+            if (plugin) return plugin;
         }
-        if (!isOAuthPlugin(enabled.plugin)) {
-            throw new OAuthNotSupportedError(enabled.plugin.id, 'getPlugin');
-        }
-        return enabled.plugin as IOAuthPlugin;
+        throw new NoOAuthProviderError();
+    }
+
+    /** `registered`'s real instance once loaded, or `null` when it cannot load. */
+    private async loadForUse(registered: RegisteredPlugin): Promise<IOAuthPlugin | null> {
+        const [usable] = await loadRegisteredPlugins([registered]);
+        if (!usable) return null;
+        return (await materializePlugin(usable.plugin)) as IOAuthPlugin;
     }
 }

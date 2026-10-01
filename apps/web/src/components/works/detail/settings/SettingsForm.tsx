@@ -25,9 +25,22 @@ interface SettingsFormProps {
     work: Work;
     user: AuthUser;
     initialRepositories: RepositoryStatus[];
+    /**
+     * APW-11 T17 (APW11-G13) — the App Launcher flag, resolved by the server
+     * page and carried to `GeneralSettings`. Optional and defaulted to `false`:
+     * a parent layout cannot pass props into a page (nor a page into a nested
+     * layout), so the flag is re-read where it is used, and "not told" has to
+     * mean **off** — a disabled deployment must render no setting at all.
+     */
+    appLauncherEnabled?: boolean;
 }
 
-export function SettingsForm({ work, user, initialRepositories }: SettingsFormProps) {
+export function SettingsForm({
+    work,
+    user,
+    initialRepositories,
+    appLauncherEnabled = false,
+}: SettingsFormProps) {
     const t = useTranslations('dashboard.workDetail.settings');
     // A Repository Work wraps a repository the platform did not create: the
     // API refuses to flip its visibility or to run community-PR intake on
@@ -40,8 +53,9 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
                 {/* Source Settings (if applicable) */}
                 <SourceSettings />
 
-                {/* General Settings */}
-                <GeneralSettings />
+                {/* General Settings — carries the App Launcher flag down to the
+                    Work-level exposure setting (APW-11 T17). */}
+                <GeneralSettings appLauncherEnabled={appLauncherEnabled} />
 
                 {/* README Configuration */}
                 <ReadmeConfiguration />

@@ -36,6 +36,11 @@ import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChips
 import { seedFromExample, usePromptSeed } from '@/components/common/composer/use-prompt-seed';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
+import {
+    WORK_KIND_ORDER,
+    ALL_WORK_KIND_CHIP_VALUES,
+    type InitialWorkKind,
+} from '@/lib/work-kinds/chip-values';
 import type { ProviderWithConnection } from './page';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkBlueprintEntry } from '@/lib/api/work-templates';
@@ -43,29 +48,17 @@ import type { WorkProposal } from '@/lib/api/work-proposals';
 
 export type CreationMode = 'ai' | 'manual' | 'import';
 
-type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
-
-const WORK_KIND_ORDER: InitialWorkKind[] = [
-    'website',
-    'landing-page',
-    'blog',
-    'directory',
-    'awesome-repo',
-    // Self-build slice D (EW-766) — an existing code repository as a Work.
-    'repo',
-];
-
-/**
- * Every work-kind chip value gated by a `works-<value>` PostHog flag
- * (fail-open — see `@/lib/feature-flags/work-kinds`). Live kinds plus the
- * baseline coming-soon `store`/`company` so the server page resolves one
- * flag set covering the whole catalog.
- */
-export const ALL_WORK_KIND_CHIP_VALUES: ReadonlyArray<InitialWorkKind | 'store' | 'company'> = [
-    ...WORK_KIND_ORDER,
-    'store',
-    'company',
-];
+// `InitialWorkKind`, `WORK_KIND_ORDER` and `ALL_WORK_KIND_CHIP_VALUES` now live
+// in `@/lib/work-kinds/chip-values` — a module with NO `'use client'` directive
+// — because the server component `./page.tsx` imports
+// `ALL_WORK_KIND_CHIP_VALUES`, and a server component that imports a plain value
+// across a client boundary receives a client reference, not the array (that
+// threw `TypeError: a.filter is not a function` out of the server render and
+// 500'd this page).
+//
+// The name this module used to EXPORT is re-exported below, unchanged and
+// pointing at the one definition, so every existing consumer keeps working.
+export { ALL_WORK_KIND_CHIP_VALUES, type InitialWorkKind };
 
 const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     website: Globe,

@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { API_BASE, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { firstWorkWithItemsTab } from './helpers/work-kind-fixtures';
 
 /**
  * Breadcrumb / nested-route navigation — deep, cross-route integration flows.
@@ -96,6 +97,9 @@ interface ApiWork {
     id: string;
     name: string;
     slug?: string;
+    kind?: string | null;
+    /** `owner` for a Work the seeded user created; the member role otherwise. */
+    userRole?: string | null;
 }
 
 /** Pull the seeded user's existing works (the UI navigates these by id). */
@@ -115,9 +119,46 @@ async function listWorks(request: APIRequestContext, token: string): Promise<Api
                 id: String(row.id ?? ''),
                 name: String(row.name ?? ''),
                 slug: row.slug as string | undefined,
+                kind: typeof row.kind === 'string' ? row.kind : null,
+                userRole: typeof row.userRole === 'string' ? row.userRole : null,
             };
         })
         .filter((w) => w.id);
+}
+
+/**
+ * The seeded Work this file drives: the first listed one whose kind renders
+ * the full trail the header describes, Items crumb included.
+ *
+ * This used to be `works[0]`. `GET /api/works` lists the most recently updated
+ * first (`WorkRepository.findAllAccessible`: `work.updatedAt DESC`), so that was
+ * whichever Work an earlier spec in the shard created or touched last for the
+ * seeded user — and the App Works specs (`flow-app-spec-settings.spec.ts`,
+ * `flow-app-spec-recheck.spec.ts`) create App Works for that user. Kind `app`
+ * has no Items tab by design (`WORK_KIND_CAPABILITIES.app.items.enabled` is
+ * `false`), so e2e run 36187829618 shard 7 drove `t19-app-…` and the keyboard
+ * test's Items crumb could never appear. The contract is unchanged — the
+ * Items/Overview/Settings crumbs of a Work that HAS them — only the pick no
+ * longer depends on another spec's leftovers. No such Work → skip, exactly as
+ * the no-Works case always has.
+ *
+ * The listing also carries Works the seeded user is only a MEMBER of
+ * (`flow-app-spec-recheck.spec.ts` makes it a viewer of another account's App
+ * Works), so an eligible Work it OWNS wins. That matters beyond tidiness: the
+ * Settings crumb is role-gated (`canAccessSettings` — manager or owner), so a
+ * viewer-only pick would not render it. A member-only Work is still the
+ * fallback rather than a skip, which is no worse than the old `works[0]`.
+ */
+function pickTrailWork(works: ApiWork[], noWorksReason: string): ApiWork {
+    const work = firstWorkWithItemsTab(works);
+    test.skip(
+        !work,
+        works.length === 0
+            ? noWorksReason
+            : `none of the seeded user's ${works.length} Work(s) is a kind with an Items tab ` +
+                  `(kinds: ${[...new Set(works.map((w) => w.kind ?? 'default'))].join(', ')})`,
+    );
+    return work as ApiWork;
 }
 
 /**
@@ -155,8 +196,7 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         const origin = originFrom(baseURL);
         const token = await seededToken(request);
         const works = await listWorks(request, token);
-        test.skip(works.length === 0, 'seeded user has no works to drive the nav trail');
-        const work = works[0];
+        const work = pickTrailWork(works, 'seeded user has no works to drive the nav trail');
 
         // Level 1: the work-detail root. Its <h1> reflects the entity name AND
         // its WorkTabs <nav> exposes the per-section trail (Overview…Settings).
@@ -256,8 +296,7 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         const origin = originFrom(baseURL);
         const token = await seededToken(request);
         const works = await listWorks(request, token);
-        test.skip(works.length === 0, 'seeded user has no works');
-        const work = works[0];
+        const work = pickTrailWork(works, 'seeded user has no works');
 
         // Start DEEP at the items subroute, then walk UP to the work root via the
         // Overview crumb — the inverse direction of the descend test.
@@ -383,8 +422,7 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         const origin = originFrom(baseURL);
         const token = await seededToken(request);
         const works = await listWorks(request, token);
-        test.skip(works.length === 0, 'seeded user has no works');
-        const work = works[0];
+        const work = pickTrailWork(works, 'seeded user has no works');
 
         await page.goto(`${origin}/works/${work.id}`, { waitUntil: 'domcontentloaded' });
         const rendered = await entityRendered(page, work.name);

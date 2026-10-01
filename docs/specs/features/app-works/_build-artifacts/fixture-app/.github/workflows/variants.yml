@@ -1,0 +1,49 @@
+# The one workflow that must NEVER run in a fork.
+#
+# APW-02 FR-25 / ACC-02-08: a fork inherits Actions *enabled* with every inherited workflow, so the platform
+# must disable them explicitly before the first build. This file exists to make that rule observable — it is
+# scheduled, and it writes a marker file. The acceptance scenario asserts the marker never appears in an App
+# Work's fork, which is only meaningful because a fork that kept it WOULD have run.
+#
+# Keep the trigger list short and the job harmless: it must never do anything a user would notice if the
+# hygiene step regressed.
+
+name: variants
+
+on:
+    schedule:
+        # 03:17 on the first of the month — far from any lane, so a stray run is easy to attribute.
+        - cron: '17 3 1 * *'
+    workflow_dispatch:
+
+permissions: {}
+
+jobs:
+    inherited-marker:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - name: Say what this is
+              run: |
+                  echo "This workflow is inherited from ever-works/app-fixture-hello."
+                  echo "If you are reading this in a fork, the platform's Actions hygiene did not run."
+
+            - name: Write the marker the acceptance lane looks for
+              run: |
+                  set -eu
+                  marker="inherited-workflow-ran.txt"
+                  {
+                      echo "workflow=variants"
+                      echo "repository=${GITHUB_REPOSITORY}"
+                      echo "event=${GITHUB_EVENT_NAME}"
+                      echo "run_id=${GITHUB_RUN_ID}"
+                      echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  } > "$marker"
+                  cat "$marker"
+
+            - name: Upload the marker
+              uses: actions/upload-artifact@v4
+              with:
+                  name: inherited-workflow-marker
+                  path: inherited-workflow-ran.txt
+                  retention-days: 1

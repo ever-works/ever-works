@@ -578,6 +578,19 @@ longer stored, the value cannot be decrypted — **fails the run** with a stable
 starting it with half an environment. That is deliberate: a suite that runs without its database
 config goes red in a way that looks like a code problem.
 
+The Task's **primary** repository is a Work repository, not a Settings → Repositories entry, so it
+takes its env files (and its env grants, below) from the enabled entry for **the same repository on
+the same host** as the clone URL your Git provider reports for it. Spellings that differ only by
+`.git`, a trailing slash, letter case or HTTPS/SSH form are the same entry; an entry for the same
+`owner/repository` on **another host** — a mirror — is not, so the primary takes neither its files
+nor its grants (the API log says so, naming both hosts). Register the entry on the provider's own
+clone host. One exception: if that mirror entry is also **attached to the run's Agent**, or listed
+as one of the Task's **extra repositories**, it is not mounted (the Task already has that repository
+as its primary), but its env grants still join the run's grants, like every repository of the
+run's — see _Env grants_ below.
+Two enabled entries for the primary **refuse the plan** and name both: disable or remove all but one,
+so which `.env` lands in the checkout is never decided by listing order.
+
 Production note: env files are encrypted with `PLUGIN_SECRET_ENCRYPTION_KEY`. **Set it.** Without it
 the platform stores them in plain text (a development convenience), and this feature now carries them
 to every machine in your fleet.

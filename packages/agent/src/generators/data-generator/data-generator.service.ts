@@ -514,10 +514,8 @@ export class DataGeneratorService {
              * Rewrite meta files only if we are creating new repository or we are recreating it
              */
             if (isNewOrRecreate) {
-                promises.push(
-                    data.writeReadme(this.getDefaultReadme(work)),
-                    data.writeLicense(LICENSE_TEXT),
-                );
+                const defaultReadme = await this.getDefaultReadme(work);
+                promises.push(data.writeReadme(defaultReadme), data.writeLicense(LICENSE_TEXT));
             }
 
             // Write markdown template if new/recreate OR if creating a PR branch
@@ -905,8 +903,8 @@ export class DataGeneratorService {
         }
     }
 
-    public cleanup(work: Work) {
-        const dataDir = this.gitFacade.getLocalDir(
+    public async cleanup(work: Work) {
+        const dataDir = await this.gitFacade.getLocalDir(
             work.gitProvider,
             work.getRepoOwner(),
             work.getDataRepo(),
@@ -1692,11 +1690,11 @@ export class DataGeneratorService {
         return pluginConfig?.generate_category_icons !== false;
     }
 
-    private getDefaultReadme(work: Work) {
+    private async getDefaultReadme(work: Work) {
         // Construct URL based on work's repo provider
         const owner = work.getRepoOwner('work');
         const repo = work.getMainRepo();
-        const markdownURL = this.gitFacade.getWebUrl(work.gitProvider, owner, repo);
+        const markdownURL = await this.gitFacade.getWebUrl(work.gitProvider, owner, repo);
         return (
             `# ${work.getDataRepo()}\n\n` +
             `This repository holds data used to generate [${repo}](${markdownURL})\n\n`
@@ -1842,7 +1840,7 @@ export class DataGeneratorService {
             });
 
             // Write README and LICENSE
-            await data.writeReadme(this.getDefaultReadme(work));
+            await data.writeReadme(await this.getDefaultReadme(work));
             await data.writeLicense(LICENSE_TEXT);
 
             // Write markdown templates

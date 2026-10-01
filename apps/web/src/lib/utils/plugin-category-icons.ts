@@ -22,6 +22,12 @@ import {
     KeyRound,
     Library,
     Network,
+    // APW-07 T3 — the App dependency category's icon (see the map below).
+    Server,
+    // APW-05 T2 — the build category's icon (see the map below).
+    Hammer,
+    // APW-12 T4 — the identity category's icon (see the map below).
+    Fingerprint,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -70,6 +76,23 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // Domain-model evolution PR-7 — metrics-provider backends
     // (Stripe, PostHog, Google Analytics, custom HTTP) for Goals.
     metrics: Gauge,
+    // APW-07 T3 — App dependency providers (PostgreSQL, Redis, object storage,
+    // SMTP). Same change as the tuple entry in
+    // `packages/plugin/src/contracts/plugin-manifest.types.ts`: these two maps
+    // are `Record<PluginCategory, …>`, so the category and its icon must land
+    // together or apps/web stops compiling.
+    'app-dependency': Server,
+    // APW-05 T2 — build providers (`github-actions-build`, later
+    // `apps-builder`). Same rule as the line above: the `build` category in
+    // `packages/plugin/src/contracts/plugin-manifest.types.ts` and its two map
+    // entries here are one change.
+    build: Hammer,
+    // APW-12 T4 — identity providers (the Ever ID relying party,
+    // `oidc-identity`). Same rule as the two lines above: the `identity`
+    // category in `packages/plugin/src/contracts/plugin-manifest.types.ts` and
+    // its two map entries here are one change — these maps are
+    // `Record<PluginCategory, …>`, so a missing entry stops apps/web compiling.
+    identity: Fingerprint,
 };
 
 /**
@@ -101,6 +124,13 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     rag: 'RAG Pipelines',
     connector: 'Connectors',
     metrics: 'Metrics',
+    'app-dependency': 'App Dependencies',
+    // APW-05 T2 — the `build` category (see the icon map above).
+    build: 'Builds',
+    // APW-12 T4 — the `identity` category (see the icon map above). Plain
+    // English like every other label in this map: the file reads no i18n
+    // bundle, so there is no locale leaf to add beside it.
+    identity: 'Identity Providers',
 };
 
 // Type-safe assertion that all categories are covered
@@ -161,6 +191,13 @@ export const CAPABILITY_LABELS: Record<string, string> = {
     'put-object': 'Put Object',
     'get-object': 'Get Object',
     'presigned-put': 'Presigned Upload',
+    // The three capabilities the App Works epics added (register row C4, 2026-09-18). The map is a
+    // non-exhaustive `Record<string, string>` with a humanise fallback, so these are not required for it
+    // to compile — they exist so the labels read the way the product names these things instead of
+    // falling through to `App Dependency` / `Build` / `Identity Provider` derived from the raw key.
+    build: 'Build',
+    'app-dependency': 'App Dependency',
+    'identity-provider': 'Identity Provider',
 };
 
 /**

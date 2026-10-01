@@ -1,0 +1,5 @@
+{
+    "message": "Successfully fetched and fast-forwarded from upstream",
+    "merge_type": "fast-forward",
+    "base_branch": "main"
+}

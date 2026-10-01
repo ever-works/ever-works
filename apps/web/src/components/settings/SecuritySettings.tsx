@@ -7,6 +7,10 @@ import { updatePassword } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Lock } from 'lucide-react';
+import {
+    ConnectedIdentitiesCard,
+    type ConnectedIdentitiesCardProps,
+} from '@/components/settings/ConnectedIdentitiesCard';
 
 interface SecuritySettingsProps {
     user: {
@@ -14,9 +18,14 @@ interface SecuritySettingsProps {
         username: string;
         email: string;
     };
+    /**
+     * APW-12 (Ever ID) — the Connected identities card's data, resolved by the
+     * page on the server. Absent, the page renders exactly as it did before.
+     */
+    everId?: ConnectedIdentitiesCardProps;
 }
 
-export function SecuritySettings({ user }: SecuritySettingsProps) {
+export function SecuritySettings({ user, everId }: SecuritySettingsProps) {
     const [isPending, startTransition] = useTransition();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -148,6 +157,9 @@ export function SecuritySettings({ user }: SecuritySettingsProps) {
                     </div>
                 </div>
             </div>
+
+            {/* APW-12 — Connected identities (renders nothing when there is nothing to show) */}
+            {everId ? <ConnectedIdentitiesCard {...everId} /> : null}
         </div>
     );
 }

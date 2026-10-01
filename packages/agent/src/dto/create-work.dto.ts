@@ -1,15 +1,19 @@
 import { Type, Transform } from 'class-transformer';
 import {
     IsBoolean,
+    IsDefined,
     IsIn,
     IsNotEmpty,
+    IsObject,
     IsOptional,
     IsString,
+    ValidateIf,
     ValidateNested,
     Matches,
     MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { APP_REPOSITORY_MODES, type AppRepositoryMode } from '@ever-works/contracts';
 import {
     MarkdownReadmeConfig,
     normalizeCreateWorkKind,
@@ -144,10 +148,12 @@ export class CreateWorkDto {
 
     @ApiPropertyOptional({
         description:
-            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo, repo). ' +
-            'Drives the kind-aware default website template. Unknown values are coerced to "default"; ' +
+            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo, repo, ' +
+            'app). Drives the kind-aware default website template. Unknown values are coerced to "default"; ' +
             'omitted keeps the column default. `repo` registers an existing code repository (see `repositoryUrl`) ' +
-            'and never provisions a website template, a provider repository or a deployment.',
+            'and never provisions a website template, a provider repository or a deployment. `app` turns any ' +
+            'GitHub repository into a runnable App Work: it needs `repositoryUrl` and `repositoryMode`, and ' +
+            '`repositoryMode: "fork"` or `"private-copy"` also needs `targetOwner`.',
         enum: [...USER_SELECTABLE_WORK_KINDS, 'default'],
     })
     @IsOptional()
@@ -161,9 +167,12 @@ export class CreateWorkDto {
 
     @ApiPropertyOptional({
         description:
-            'Repository Work only (`kind: "repo"`) — the existing code repository this Work wraps, e.g. ' +
-            '`https://github.com/ever-works/ever-works`. Becomes the data repository of the Work verbatim, so ' +
-            'Tasks, Goals and fleet runs attach to it. Required when `kind` is `repo`; ignored otherwise.',
+            'Repository Work (`kind: "repo"`) or App Work (`kind: "app"`) — the existing code repository this ' +
+            'Work wraps, e.g. `https://github.com/ever-works/ever-works`. Becomes the data repository of the ' +
+            'Work verbatim, so Tasks, Goals and fleet runs attach to it. Required when `kind` is `repo`; ' +
+            'ignored otherwise. ' +
+            'For `app` it is the UPSTREAM this Work links, forks or privately copies — required there too, with ' +
+            'the mode in `repositoryMode` and, for fork/private-copy, the account in `targetOwner`.',
         example: 'https://github.com/ever-works/ever-works',
         maxLength: 400,
     })
@@ -172,6 +181,89 @@ export class CreateWorkDto {
     @MaxLength(400)
     @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
     repositoryUrl?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'App Work only (`kind: "app"`) — how the upstream repository in `repositoryUrl` becomes this Work’s ' +
+            'Work Repository: "link" keeps it where it is, "fork" forks it into `targetOwner`, "private-copy" ' +
+            'creates a private copy there. Required for `kind: "app"`: the validation pipe answers ' +
+            '`400 repositoryMode must be defined` before the handler runs.',
+        enum: [...APP_REPOSITORY_MODES],
+        example: 'fork',
+    })
+    // No `@IsOptional()` here, or on `targetOwner` below — deliberately, and it
+    // is not an oversight: `@IsOptional()` IS a `@ValidateIf`, class-validator
+    // ANDs every CONDITIONAL_VALIDATION on a property, and a `false` result
+    // returns from `performValidations` BEFORE the IS_DEFINED metadata is
+    // consulted. With `@IsOptional()` in the stack a missing value short-
+    // circuits the property, so `@IsDefined()` could never fire and the pipe
+    // could never answer `repositoryMode must be defined`. The predicate below
+    // carries the same intent — false for every kind except `app` (the property
+    // is skipped, so the field stays optional), true for `app` (the field is
+    // required and shape-checked).
+    @ValidateIf((o) => normalizeCreateWorkKind(o.kind) === 'app')
+    @IsDefined({ message: 'repositoryMode must be defined' })
+    @IsIn([...APP_REPOSITORY_MODES])
+    repositoryMode?: AppRepositoryMode;
+
+    @ApiPropertyOptional({
+        description:
+            'App Work only (`kind: "app"`) — the GitHub account (user or organization) the fork or the private ' +
+            'copy is created in. Required for `repositoryMode: "fork"` and `"private-copy"`; ignored for ' +
+            '"link".',
+        example: 'my-org',
+        maxLength: 100,
+    })
+    @ValidateIf(
+        (o) =>
+            normalizeCreateWorkKind(o.kind) === 'app' &&
+            (o.repositoryMode === 'fork' || o.repositoryMode === 'private-copy'),
+    )
+    @IsDefined({ message: 'targetOwner must be defined' })
+    @IsString()
+    @MaxLength(100)
+    @Matches(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/)
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    targetOwner?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'App Work only (`kind: "app"`) — the Apps catalog Blueprint the member previewed. Optional; when ' +
+            'present it must be the id the resolver returns for this upstream, otherwise the create is refused ' +
+            'with `400 blueprint_mismatch` — a member never gets a Blueprint they did not see.',
+        example: 'cal-diy',
+        maxLength: 100,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    @Matches(/^[a-z0-9][a-z0-9-]{0,99}$/)
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    blueprintId?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'App Work only (`kind: "app"`) — `false` is the member’s decline of FR-29a’s automatic start ' +
+            '(spec §6.2’s "Let an agent work out how to run it"): the Work is created without provisioning and ' +
+            'offers Provision instead. Absent means on; ignored for every other kind.',
+        default: true,
+    })
+    @IsOptional()
+    @IsBoolean()
+    autoProvision?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            'App Work only (`kind: "app"`) — write-only answers to the App Blueprint prompts shown on the ' +
+            'preview (spec FR-55, plan §7). Carried on the create request and handed to the App env store ' +
+            'once the App spec exists; never echoed by any read response and never logged.',
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        example: { admin_email: 'ops@example.com' },
+    })
+    @IsOptional()
+    @IsObject()
+    appEnv?: Record<string, string>;
 
     @ApiPropertyOptional({
         description: 'Custom README configuration',

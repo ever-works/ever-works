@@ -122,13 +122,15 @@ export class PluginsController {
     @ApiOperation({
         summary: 'Install a distributable plugin (EW-693)',
         description:
-            'Allow-list + integrity-verified install (FR-10, FR-11). Refuses with: ' +
-            '409 (non-allowlisted), 424 (integrity mismatch), 502/504 (registry unreachable). ' +
+            'Allow-list + integrity-verified install (FR-10, FR-11), then registered on this ' +
+            'replica. Refuses with: 409 (non-allowlisted), 424 (integrity mismatch), 422 (the ' +
+            'package is not the plugin requested), 502/504 (registry unreachable). ' +
             'Idempotent — repeating after a successful install is a no-op.',
     })
     @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
     @ApiResponse({ status: 200, type: PluginInstallResultDto })
     @ApiResponse({ status: 409, description: 'Plugin not permitted by the allowlist' })
+    @ApiResponse({ status: 422, description: 'The installed package could not be registered' })
     @ApiResponse({ status: 424, description: 'Integrity mismatch' })
     @ApiResponse({ status: 502, description: 'Registry unreachable / failed' })
     async installPlugin(
@@ -140,12 +142,17 @@ export class PluginsController {
                 `Plugin install unavailable — PLUGIN_DISTRIBUTION_MODE=dynamic not configured.`,
             );
         }
-        await this.installer.install({
+        const installed = await this.installer.install({
             pluginId,
             version: body.version,
             integrity: body.integrity,
             source: body.source,
         });
+        // EW-693 T27 — register what was installed, so this replica can route
+        // and enable it now (nothing did, and the plugin stayed invisible to
+        // the registry until a restart). A package that is not the plugin
+        // asked for is a 422, not "installed".
+        await this.pluginsService.registerInstalledPlugin(pluginId, installed.installPath);
         const install = await this.catalogService.getInstallState(pluginId);
         if (!install) throw new NotFoundException(`Plugin "${pluginId}" not found`);
         return { pluginId, install };

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TerminalStreamFacadeService } from '@ever-works/agent/facades';
 import { TriggerInternalModule } from './trigger-internal.module';
 import { TriggerPluginsModule } from './trigger-plugins.module';
+import { TriggerRemoteCacheModule } from './trigger-remote-cache.module';
 
 /**
  * Worker scope for the `terminal-session` task.
@@ -24,9 +25,24 @@ import { TriggerPluginsModule } from './trigger-plugins.module';
  * `TriggerInternalModule` is imported (and re-exported) because the task
  * also resolves `AgentRunRepository` from this context for its ownership
  * guard.
+ *
+ * `TriggerRemoteCacheModule.forRoot()` provides `CACHE_MANAGER`, a
+ * NON-optional dependency of `PluginContextFactoryService` inside the plugins
+ * module. Without it this context could not boot at all ("Nest can't resolve
+ * dependencies of the PluginContextFactoryService … CACHE_MANAGER") — and the
+ * task used to boot it with Nest's default `abortOnError`, which exits the
+ * process; it now passes `abortOnError: false`, so a boot failure fails the run.
+ * The same pairing every other plugin-using worker module has
+ * (`TriggerWorkflowRunModule`, `TriggerAppRuntimeModule`,
+ * `TriggerRunPluginOperationModule`); `__tests__/trigger-terminal.module.spec.ts`
+ * boots it for real.
  */
 @Module({
-    imports: [TriggerPluginsModule.forRoot(), TriggerInternalModule],
+    imports: [
+        TriggerPluginsModule.forRoot(),
+        TriggerRemoteCacheModule.forRoot(),
+        TriggerInternalModule,
+    ],
     providers: [TerminalStreamFacadeService],
     exports: [TerminalStreamFacadeService, TriggerInternalModule],
 })

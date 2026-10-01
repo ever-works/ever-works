@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { logout } from '@/app/actions/auth';
 import { useChatContextOptional } from '@/components/ai/ChatProvider';
+import { EverIdSignOutDialog, useEverIdSignOut } from '@/components/auth/EverIdSignOutDialog';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { withWorkspaceHref } from '@/i18n/navigation-client';
 import { ROUTES } from '@/lib/constants';
@@ -28,6 +29,7 @@ import {
 } from '@/lib/workspace-navigation';
 import { parseWorkspacePath, serializeWorkspaceScope } from '@/lib/workspace-scope';
 import { useCommandPalette } from './CommandPaletteProvider';
+import { useAppLauncher } from '@/components/app-launcher/AppLauncherProvider';
 import { PaletteFooter, type PaletteBanner } from './PaletteFooter';
 import { PaletteRow } from './PaletteRow';
 import { useIsMac } from './hooks/use-is-mac';
@@ -101,6 +103,7 @@ export function CommandPalette({
     onChatOpenChange,
 }: CommandPaletteProps) {
     const palette = useCommandPalette();
+    const { openAppLauncher } = useAppLauncher();
     const open = palette?.open ?? false;
     const closePalette = palette?.closePalette;
     const t = useTranslations() as unknown as PaletteTranslator;
@@ -113,6 +116,9 @@ export function CommandPalette({
     const { slug: activeOrganizationSlug } = useActiveScope();
     const chat = useChatContextOptional();
     const [, startTransition] = useTransition();
+    // APW-12 (Ever ID): "Sign out" asks about Ever ID first for a session opened
+    // with it (S7); every other session signs out exactly as before.
+    const { offerEverIdSignOut, dialogProps: everIdSignOutDialogProps } = useEverIdSignOut();
 
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<PaletteFilter | null>(null);
@@ -189,7 +195,10 @@ export function CommandPalette({
             copyLink,
             signOut: () =>
                 startTransition(() => {
-                    void logout();
+                    void (async () => {
+                        if (await offerEverIdSignOut()) return;
+                        await logout();
+                    })();
                 }),
             switchOrganization: (slug) => {
                 persistActiveOrganization(slug)
@@ -201,6 +210,14 @@ export function CommandPalette({
                 label: org.displayName ?? org.slug,
             })),
             activeOrganizationSlug,
+            /**
+             * APW-11 T15 — the launcher's opener, from the provider that mounts
+             * the element. `undefined` when the launcher is off for this
+             * installation OR when the header's control is not mounted, and the
+             * command's `available` gate reads exactly that, so the palette never
+             * offers a command that opens nothing.
+             */
+            openAppLauncher,
         }),
         [
             t,
@@ -214,8 +231,10 @@ export function CommandPalette({
             chatOpen,
             onChatOpenChange,
             copyLink,
+            offerEverIdSignOut,
             organizations,
             activeOrganizationSlug,
+            openAppLauncher,
         ],
     );
 
@@ -383,7 +402,7 @@ export function CommandPalette({
         : '';
     const dialogLabel = t('dashboard.commandPalette.dialogLabel');
 
-    return (
+    const paletteDialog = (
         <Dialog open={open} onClose={close} className="relative z-50" aria-label={dialogLabel}>
             <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
             <div className="fixed inset-0 flex items-stretch justify-center md:items-start md:p-4 md:pt-[12vh]">
@@ -530,5 +549,14 @@ export function CommandPalette({
                 </DialogPanel>
             </div>
         </Dialog>
+    );
+
+    return (
+        <>
+            {paletteDialog}
+            {/* APW-12 — rendered beside the palette so it outlives it: the palette
+                closes when "Sign out" runs, the sign-out question must not. */}
+            <EverIdSignOutDialog {...everIdSignOutDialogProps} />
+        </>
     );
 }

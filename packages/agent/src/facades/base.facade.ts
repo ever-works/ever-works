@@ -1,8 +1,12 @@
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, Optional } from '@nestjs/common';
 import {
     PluginRegistryService,
     RegisteredPlugin,
+    loadRegisteredPlugins,
 } from '../plugins/services/plugin-registry.service';
+import { FacadePluginAvailabilityService } from '../plugins/services/facade-plugin-availability.service';
+import { readPluginString } from '../plugins/services/lazy-plugin-proxy';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import type { IPlugin, FacadeOptions, PluginIcon } from '@ever-works/plugin';
@@ -60,6 +64,25 @@ export interface UserProviderInfo {
 export abstract class BaseFacadeService {
     protected abstract readonly CAPABILITY: string;
     protected abstract readonly logger: Logger;
+
+    /**
+     * EW-693 T26 / FR-15 — install-on-use for a plugin this process has not
+     * registered (dynamic distribution + `facadeInstallOnUse` only; see
+     * `FacadePluginAvailabilityService`). Asked by the two lookups that name a
+     * plugin by id: an explicit provider override and the Work's active
+     * plugin. When on, the service places the pinned version on THIS replica
+     * (`installer.ensureLocalInstall` — no write to the shared install row),
+     * registers it (`loader.registerFromPath`) and loads it (EW-693 T27; see
+     * the service). Off unless the mode is `dynamic` and `facadeInstallOnUse`
+     * is `true`.
+     *
+     * PROPERTY-injected so no facade constructor changes. Absent — a facade
+     * built with `new`, or a graph without `PluginsModule` such as the Trigger
+     * worker — means exactly the behaviour before it existed.
+     */
+    @Optional()
+    @Inject(FacadePluginAvailabilityService)
+    protected readonly pluginAvailability?: FacadePluginAvailabilityService;
 
     constructor(
         protected readonly registry: PluginRegistryService,
@@ -133,7 +156,7 @@ export abstract class BaseFacadeService {
                             workId,
                             userId,
                         );
-                        if (isEnabled) {
+                        if (isEnabled && (await this.isUsable(registered))) {
                             return {
                                 id: registered.plugin.id,
                                 name: this.getProviderName(registered.plugin),
@@ -181,12 +204,14 @@ export abstract class BaseFacadeService {
         });
     }
 
-    // Get the provider/display name from a plugin
+    // Get the provider/display name from a plugin. `providerName`/`sourceName`
+    // are class members: on a COLD lazy proxy they read as its forwarding
+    // wrapper (a function), so only a string counts, else the manifest name.
     protected getProviderName(plugin: IPlugin): string {
-        const providerName = (plugin as { providerName?: string }).providerName;
+        const providerName = readPluginString(plugin, 'providerName');
         if (providerName) return providerName;
 
-        const sourceName = (plugin as { sourceName?: string }).sourceName;
+        const sourceName = readPluginString(plugin, 'sourceName');
         if (sourceName) return sourceName;
 
         return plugin.name;
@@ -256,8 +281,8 @@ export abstract class BaseFacadeService {
             );
 
             if (activePlugin) {
-                const registered = this.registry.get(activePlugin.pluginId);
-                if (registered && registered.state === 'loaded') {
+                const registered = await this.registeredOrInstalled(activePlugin.pluginId);
+                if (registered && (await this.isUsable(registered))) {
                     return registered;
                 }
             }
@@ -266,6 +291,16 @@ export abstract class BaseFacadeService {
         }
 
         return null;
+    }
+
+    /**
+     * The registry's entry for `pluginId` — or, when this process has none,
+     * what install-on-use answers (FR-15; `undefined` when it is off).
+     */
+    private async registeredOrInstalled(pluginId: string): Promise<RegisteredPlugin | undefined> {
+        const registered = this.registry.get(pluginId);
+        if (registered || !this.pluginAvailability) return registered;
+        return this.pluginAvailability.ensureRegistered(pluginId);
     }
 
     protected async getEnabledPlugins(workId: string, userId: string): Promise<RegisteredPlugin[]> {
@@ -281,14 +316,23 @@ export abstract class BaseFacadeService {
             }
         }
 
+        // Load the enabled ones before reading their manifests: a plugin may
+        // declare `defaultForCapabilities`, `supplementary`,
+        // `selectableProviderCategories` or its icon only in its class's
+        // getManifest(), which a cold lazy proxy's registry entry does not
+        // carry until it loads. One that cannot load (import or onLoad
+        // failure) is now in `error` and is left out, as if it had failed at
+        // boot.
+        const usable = await loadRegisteredPlugins(result);
+
         // Sort: plugins with defaultForCapabilities matching this.CAPABILITY come first
-        result.sort((a, b) => {
+        usable.sort((a, b) => {
             const aDefault = a.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ? 0 : 1;
             const bDefault = b.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ? 0 : 1;
             return aDefault - bDefault;
         });
 
-        return result;
+        return usable;
     }
 
     // Resolve plugin:
@@ -311,14 +355,16 @@ export abstract class BaseFacadeService {
     ): Promise<T> {
         const effectiveOverride = agentProviderOverride ?? providerOverride;
         if (effectiveOverride) {
-            const registered = this.registry.get(effectiveOverride);
+            const registered = await this.registeredOrInstalled(effectiveOverride);
             if (
                 registered &&
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
                 registered.state === 'loaded'
             ) {
                 const isEnabled = await this.isPluginEnabled(effectiveOverride, workId, userId);
-                if (isEnabled) return this.materializeForUse<T>(registered.plugin);
+                if (isEnabled && (await this.isUsable(registered))) {
+                    return this.materializeForUse<T>(registered.plugin);
+                }
             }
             throw new ProviderNotFoundError(effectiveOverride, this.CAPABILITY);
         }
@@ -337,6 +383,19 @@ export abstract class BaseFacadeService {
     }
 
     /**
+     * Still in the `loaded` state once materialised. A cold lazy proxy (a
+     * plugin nobody has used yet) is loaded here, so a failing import or
+     * onLoad puts it in `error` now — and it is not used, exactly as if it had
+     * failed at boot — and its registry entry carries the manifest fields its
+     * class's getManifest() adds. A first load another request started is
+     * waited for, onLoad included.
+     */
+    private async isUsable(registered: RegisteredPlugin): Promise<boolean> {
+        if (registered.state !== 'loaded') return false;
+        return (await loadRegisteredPlugins([registered])).length > 0;
+    }
+
+    /**
      * Materialize a (possibly lazy) plugin before an operation uses it.
      *
      * Under lazy plugin loading (PR #1156) the registry hands out a proxy whose
@@ -350,10 +409,19 @@ export abstract class BaseFacadeService {
      * materialization here is cheap — only the single plugin actually being
      * used is imported, not the whole registry, so lazy-load's memory win is
      * preserved.
+     *
+     * It waits for the plugin's first load to SETTLE, onLoad included
+     * (`materializePlugin` → `__materialize({ waitForLoad: true })`): a proxy
+     * marks itself materialised before its first-materialise hook has run
+     * onLoad, so a request arriving while another request's first load is
+     * still running would otherwise get an instance whose onLoad has not run
+     * (openrouter: "OpenRouter plugin not loaded"). Every caller here has
+     * already waited in the selection step (`isUsable` / `getEnabledPlugins`),
+     * so this is the same guarantee at the point of use.
      */
     private async materializeForUse<T extends IPlugin>(plugin: IPlugin): Promise<T> {
         const stub = plugin as unknown as {
-            __materialize?: () => Promise<IPlugin>;
+            __materialize?: unknown;
         };
         if (typeof stub.__materialize === 'function') {
             // Return the REAL instance, not the lazy proxy. The proxy forwards
@@ -366,7 +434,7 @@ export abstract class BaseFacadeService {
             // instance lets the facade call real methods directly. Settings
             // resolution is unaffected: it looks the plugin up by id in the
             // registry (still the proxy) and reads its now-materialized schema.
-            return (await stub.__materialize()) as T;
+            return (await materializePlugin(plugin)) as T;
         }
         return plugin as T;
     }

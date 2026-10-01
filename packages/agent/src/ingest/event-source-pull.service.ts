@@ -3,6 +3,7 @@ import type { IEventSourcePlugin, IPlugin } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, supportsEventSourceBackfill } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { pluginLoadFailure } from '../plugins/services/plugin-operation.util';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import { EventIngestService } from './event-ingest.service';
 import { IngestCursorRepository } from './ingest-cursor.repository';
@@ -173,7 +174,7 @@ export class EventSourcePullService {
                     );
                     if (!enabled) continue;
                     const pulled = await this.pullForUser(
-                        reg.plugin,
+                        reg,
                         pluginId,
                         row.userId,
                         pageBudget,
@@ -202,13 +203,16 @@ export class EventSourcePullService {
     }
 
     private async pullForUser(
-        candidate: IPlugin,
+        candidate: RegistryEntryForUse,
         pluginId: string,
         userId: string,
         pageBudget: number,
         result: PullSourcesResult,
     ): Promise<boolean> {
-        const plugin = (await this.materializeForUse(candidate)) as IEventSourcePlugin;
+        const plugin = (await this.materializeForUse(candidate)) as IEventSourcePlugin | null;
+        // Its onLoad failed on this first use: skipped, as the eager boot
+        // skipped a plugin whose onLoad failed at boot.
+        if (!plugin) return false;
         // Lazy proxies over-report optional methods — tolerate a source
         // that materializes without a real pullEvents (see the lazy-plugin
         // proxy over-reporting gotcha).
@@ -323,8 +327,8 @@ export class EventSourcePullService {
         // Materialize FIRST: a cold lazy proxy's synchronous surface is
         // empty, so feature-detecting `backfill` on it would fail-closed
         // for a connector that does implement it.
-        const plugin = await this.materializeForUse(registered.plugin);
-        if (!supportsEventSourceBackfill(plugin)) return result;
+        const plugin = await this.materializeForUse(registered);
+        if (!plugin || !supportsEventSourceBackfill(plugin)) return result;
         result.supported = true;
 
         const settings = await this.settingsService.getSettings(pluginId, {
@@ -370,13 +374,23 @@ export class EventSourcePullService {
     /**
      * Materialize a (possibly lazy) plugin before use — a cold proxy's
      * synchronous surface is empty and its method calls come back
-     * promise-wrapped (same rationale as `BaseFacadeService`).
+     * promise-wrapped (same rationale as `BaseFacadeService`). Waits for its
+     * first load to settle; a failing import still rejects (the caller counts
+     * it), while an onLoad that failed on this first use — the load resolves,
+     * the registry entry turns `error` — answers `null`: the plugin is not run.
      */
-    private async materializeForUse(plugin: IPlugin): Promise<IPlugin> {
-        const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
-        if (typeof stub.__materialize === 'function') {
-            return stub.__materialize();
+    private async materializeForUse(entry: RegistryEntryForUse): Promise<IPlugin | null> {
+        const stub = entry.plugin as unknown as { __materialize?: () => Promise<IPlugin> };
+        const plugin =
+            typeof stub.__materialize === 'function' ? await stub.__materialize() : entry.plugin;
+        const failure = pluginLoadFailure(entry, entry.plugin.id);
+        if (failure) {
+            this.logger.warn(`Event-source plugin skipped: ${failure}`);
+            return null;
         }
         return plugin;
     }
 }
+
+/** A registry entry as the pull reads it: its plugin, and its state after loading. */
+type RegistryEntryForUse = { plugin: IPlugin; state?: string; error?: unknown };

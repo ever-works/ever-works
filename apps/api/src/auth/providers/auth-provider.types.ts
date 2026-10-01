@@ -37,3 +37,14 @@ export interface AuthRuntimeContext {
         hash(password: string): Promise<string>;
     };
 }
+
+/**
+ * APW-12 (Ever ID, plan §5.4) — which connected identity opened a session, and
+ * the provider's session id (`sid`) when it sent one. Passed only by the Ever ID
+ * sign-in path; every other caller of `issueSession` passes nothing and gets the
+ * row it always got.
+ */
+export interface SessionOrigin {
+    externalIdentityId: string;
+    externalSid?: string | null;
+}

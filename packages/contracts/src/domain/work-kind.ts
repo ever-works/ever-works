@@ -22,6 +22,16 @@
  * Tasks, Goals and fleet runs can attach to it (self-build slice D,
  * EW-766). Its data repository IS the code repository; see
  * `WORK_KIND_CAPABILITIES.repo`.
+ *
+ * `app` (chip label "App", APW-01 / README D1) is the second kind that wraps
+ * code the platform did not generate: it takes a repository URL and links it,
+ * forks it, or makes a private copy, then builds, runs and evolves that app.
+ * It is appended AFTER `repo` — nothing above it moves — and it is the only
+ * kind that is neither a generated site nor point-and-read: unlike `repo` it
+ * deploys, and unlike every generated kind its code lives in the Work
+ * Repository (`website` role) rather than in a data repository. Its chip is
+ * fail-CLOSED where every other kind's chip fails open (Resolution R-6); see
+ * `WORK_KIND_CAPABILITIES.app`.
  */
 export const USER_SELECTABLE_WORK_KINDS = [
 	'website',
@@ -29,7 +39,8 @@ export const USER_SELECTABLE_WORK_KINDS = [
 	'blog',
 	'directory',
 	'awesome-repo',
-	'repo'
+	'repo',
+	'app'
 ] as const;
 
 export type UserSelectableWorkKind = (typeof USER_SELECTABLE_WORK_KINDS)[number];
@@ -103,4 +114,23 @@ export function isUserSelectableWorkKind(value?: string | null): value is UserSe
  */
 export function isRepositoryWorkKind(value?: string | null): boolean {
 	return normalizeWorkKind(value) === 'repo';
+}
+
+/**
+ * True when `value` names the App kind (`app`, APW-01) — the kind whose Work
+ * Repository is an existing GitHub repository Ever Works links, forks or
+ * copies, and then builds, runs and evolves (README D1).
+ *
+ * Like `isRepositoryWorkKind` this is a KIND test rather than a capability
+ * test, and for the same reason: the content pipelines and every writer that
+ * would generate into the Work Repository are refused by kind, not by
+ * capability. `app` and `repo` are the two kinds that wrap code the platform
+ * did not generate — `repo` never writes to it, `app` is allowed to — so
+ * callers must never treat one predicate as the other.
+ *
+ * Accepts the same loose input as `normalizeWorkKind` (`' APP '` is `app`)
+ * and never throws.
+ */
+export function isAppWorkKind(value?: string | null): boolean {
+	return normalizeWorkKind(value) === 'app';
 }

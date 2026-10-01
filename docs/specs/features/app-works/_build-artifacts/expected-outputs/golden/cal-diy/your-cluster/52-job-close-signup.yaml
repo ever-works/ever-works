@@ -1,0 +1,79 @@
+# GOLDEN — cal-diy · target your-cluster · Job `job-close-signup-88888888` (when: first-deploy)
+# App spec  : docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml (sha256 538a1389bc4dfc0f8fab31821d6e78aca2a0622d1f0e55fec1794433b646c16a)
+# Renderer  : packages/plugins/k8s/src/app/ — APW-06 app-manifest.renderer.ts (T6), app-names.ts (T4),
+#             app-security.ts (T5), app-jobs.renderer.ts / app-runner.script.ts (T8),
+#             app-network-policy.renderer.ts (T7)
+# Spec      : APW-06 plan.md §4.8 (`command` jobs: the component’s image, env, security context and
+# Spec      : resources; `backoffLimit: retries`, `activeDeadlineSeconds: timeoutSeconds`,
+# Spec      : `ttlSecondsAfterFinished: 86400`, `restartPolicy: Never`; the last 3 Jobs per name are kept)
+# Spec      : APW-06 spec.md FR-26 row 2 (pre-deploy jobs in declared order) and row 4 (first-deploy jobs
+# Spec      : run before the app is published), FR-51 (Run now reuses this definition)
+# Spec      : `retries` is pinned to 0 — the App spec schema declares no default (../../README.md).
+# Pinned inputs and the placeholder convention: ../../README.md
+# NO SECRET VALUE APPEARS IN THIS FILE — every secret is a reference or a generated placeholder.
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: job-close-signup-88888888
+    namespace: ew-cal-diy-11111111
+    labels:
+        app.kubernetes.io/managed-by: ever-works-k8s-plugin
+        app.kubernetes.io/part-of: cal-diy
+        ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+        ever-works.io/kind: app
+        ever-works.io/job: close-signup
+        ever-works.io/component: web
+spec:
+    backoffLimit: 0
+    activeDeadlineSeconds: 300
+    ttlSecondsAfterFinished: 86400
+    template:
+        metadata:
+            labels:
+                ever-works.io/job: close-signup
+                ever-works.io/component: web
+                app.kubernetes.io/managed-by: ever-works-k8s-plugin
+                app.kubernetes.io/part-of: cal-diy
+                ever-works.io/work-id: 11111111-1111-4111-8111-111111111111
+                ever-works.io/kind: app
+        spec:
+            restartPolicy: Never
+            serviceAccountName: app
+            automountServiceAccountToken: false
+            enableServiceLinks: false
+            securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                    type: RuntimeDefault
+            imagePullSecrets:
+                - name: app-pull
+            containers:
+                - name: close-signup
+                  image: ghcr.io/example-owner/cal.diy/ever-works-app@sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0
+                  imagePullPolicy: IfNotPresent
+                  command:
+                      - sh
+                      - '-c'
+                      - |
+                          npx prisma db execute --schema /calcom/packages/prisma/schema.prisma --stdin <<'SQL'
+                          UPDATE "Feature" SET enabled = true WHERE slug = 'disable-signup';
+                          SQL
+                  envFrom:
+                      - secretRef:
+                            name: app-env-b1eff0d86e
+                            optional: false
+                      - configMapRef:
+                            name: app-platform-b1eff0d86e
+                            optional: false
+                  resources:
+                      requests:
+                          cpu: 500m
+                          memory: 1536Mi
+                      limits:
+                          memory: 3Gi
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: false
+                      capabilities:
+                          drop:
+                              - ALL

@@ -359,6 +359,8 @@ export const systemFetch: FetchLike = (url, init) =>
 	fetch(url, {
 		method: init.method,
 		headers: init.headers,
-		body: init.body,
+		// fetch refuses any body on a GET or HEAD, even an empty one; the core's
+		// GETs (the Ever ID sign-in's configuration reads) carry an empty one.
+		...(init.method === 'GET' || init.method === 'HEAD' ? {} : { body: init.body }),
 		...(init.signal ? { signal: init.signal } : {})
 	});

@@ -30,8 +30,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  * THIS file deliberately covers what those do NOT (genuinely-uncovered angles):
  *   1. The providers LIST descriptor SHAPE in depth: configured:true exactly,
  *      EXACTLY one advertised provider (github = the sole default), the precise
- *      git-list item key-set (description, enabled, homepage, icon, id — and
- *      notably NO `name` key, unlike the oauth list item), and the structured
+ *      git-list item key-set (description, enabled, homepage, icon, id, name —
+ *      the declared GitProviderInfo descriptor, richer than the oauth list's
+ *      {id,name,enabled} item), and the structured
  *      `icon` object ({type:'svg', value:'<svg…', darkValue:'<svg…'}).
  *   2. github's connection descriptor is the SAME rich object as its list entry
  *      PLUS connected:false (the list entry and connection descriptor agree).
@@ -66,12 +67,12 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   POST   /api/auth/register { username(>=3), email, password }
  *            → { access_token (opaque session token), user:{id,email,username} }
  *   GET    /api/git-providers                 (authed) → 200 { configured:true,
- *            providers:[ EXACTLY ONE: { id:'github', enabled:true,
+ *            providers:[ EXACTLY ONE: { id:'github', name:/^github$/i, enabled:true,
  *              description:'GitHub integration for…', homepage:'https://github.com',
  *              icon:{ type:'svg', value:'<svg…', darkValue:'<svg…' } } ] }
- *            — NOTE: the git-list item carries NO `name` key. (anon/bad-token 401)
+ *            (anon/bad-token 401)
  *   GET    /api/git-providers/:p/connection   (authed) → for github: the SAME
- *            rich descriptor (id,enabled,description,homepage,icon) + connected:false
+ *            rich descriptor (id,name,enabled,description,homepage,icon) + connected:false
  *            (NO username/email/avatarUrl/authMethod while disconnected). For an
  *            id that does not exactly match an enabled provider id — 'GITHUB',
  *            'Github', 'github ' (trailing space), 'bitbucket', 'gitlab' — the
@@ -129,7 +130,7 @@ function expectNoTokenLeak(text: string, label: string): void {
 }
 
 test.describe('flow: git-providers LIST descriptor shape (configured flag + the github descriptor)', () => {
-    test('the list is authed-only, reports configured:true, advertises github as the SOLE default provider, and each item carries the exact descriptor key-set (id/enabled/description/homepage + a structured svg icon, and NO name key)', async ({
+    test('the list is authed-only, reports configured:true, advertises github as the SOLE default provider, and each item carries the exact descriptor key-set (id/name/enabled/description/homepage + a structured svg icon)', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -173,15 +174,25 @@ test.describe('flow: git-providers LIST descriptor shape (configured flag + the 
         expect(github, 'github is present in the list').toBeTruthy();
         expect(github?.enabled, 'github is enabled').toBe(true);
 
-        // The exact descriptor key-set of a git-providers list item. CRUCIALLY this
-        // differs from the OAUTH list item (which carries `name`): the git list
-        // item surfaces the rich plugin metadata (description/homepage/icon) and
-        // has NO `name` key. Pinning the key-set guards against an accidental
-        // shape drift between the two controllers.
+        // The exact descriptor key-set of a git-providers list item: the declared
+        // GitProviderInfo (packages/plugin, mirrored in apps/web lib/api) — id,
+        // name, enabled + the rich manifest metadata (description/homepage/icon)
+        // the OAUTH list item ({id,name,enabled}) does not carry. Pinning the
+        // exact key-set guards against a descriptor that spreads plugin members.
+        //
+        // RE-PINNED (was `'name' in github` → false). The declared shape REQUIRES
+        // `name`; the old "no name key" shape was an artefact of the lazy-proxy
+        // defect fixed in aff0c44a5 — the disk-builtIn github proxy answered
+        // `providerName` with an async forwarding FUNCTION even after load, and
+        // JSON.stringify dropped the key. The value is matched case-insensitively:
+        // the sync list does not load the plugin, so a loaded github answers its
+        // `providerName` ('github') and a still-cold proxy the manifest name ('GitHub').
         expect(
-            github && 'name' in github,
-            'git-list item has NO name key (unlike the oauth list)',
-        ).toBe(false);
+            Object.keys(github ?? {}).sort(),
+            'git-list item is exactly the declared descriptor key-set',
+        ).toEqual(['description', 'enabled', 'homepage', 'icon', 'id', 'name']);
+        expect(typeof github?.name, 'git-list item carries a string name').toBe('string');
+        expect(String(github?.name), 'git-list item name names github').toMatch(/^github$/i);
         expect(typeof github?.description, 'github descriptor carries a string description').toBe(
             'string',
         );

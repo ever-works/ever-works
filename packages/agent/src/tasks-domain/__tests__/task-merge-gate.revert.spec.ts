@@ -110,6 +110,8 @@ describe('TaskMergeGateService — release revert Tasks', () => {
             }),
         };
         const taskWorkspace = {
+            // APW-08 — `null` is "not an App Work, nothing to judge".
+            judgeAppWorkMerge: jest.fn().mockResolvedValue(null),
             attemptMergeForOpenPullRequest: jest
                 .fn()
                 .mockResolvedValue({ attempted: true, merged: true }),

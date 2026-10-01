@@ -48,6 +48,10 @@ import { TemplateCatalogModule } from './template-catalog/template-catalog.modul
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
 import { IdeaBuildExecutorDispatchModule } from './work-proposals/idea-build-executor-dispatch.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
+// APW-11 (App Launcher) — the registry routes: GET/PUT /api/me/apps and the
+// public GET /api/app-launcher/platforms. Every one of them answers the same
+// opaque 404 unless EVER_WORKS_APP_LAUNCHER_ENABLED is 'true' (FR-54).
+import { AppLauncherModule } from './app-launcher/app-launcher.module';
 import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
@@ -90,12 +94,25 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { SafetyApiModule } from './safety/safety.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
+import { AppWorksTelemetryBindingModule } from './telemetry/app-works-telemetry-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
 import { VectorStoreHostChunkTablesModule } from '@ever-works/agent/services';
 import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+// APW-02 (Fork lifecycle) — the three Upstream routes of plan §4.1
+// (`GET/POST /api/works/:id/upstream…`). Every one of them answers through the
+// agent package's AppUpstreamStateService, and each refusal travels as §4.1's
+// `{ status: 'error', code, message, details? }` body.
+import { AppWorksModule } from './app-works/app-works.module';
+// APW-05 T21 (first slice) — the API-side Builds module: today the two-minute
+// Builds sweep when Trigger.dev is not the runtime (plan §7.4). T23/T24 extend it.
+import { AppBuildsModule } from './app-builds/app-builds.module';
+// APW-09 T43 (FR-43, XC-18) — the credential of record: the read, the pause, the
+// handover, and the durable store the handover writes. Agent-side, so the whole
+// epic's later routes reach it by importing the agent module directly.
+import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requests';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -172,6 +189,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
                     registryGithubUrl: config.plugins.registryGithubUrl(),
                     registryToken: config.plugins.registryToken(),
                     installDir: config.plugins.installDir(),
+                    // EW-693 T27 — bounds the boot warmup (default 60 s).
+                    warmupTimeoutMs: config.plugins.warmupTimeoutMs(),
+                    // EW-693 T26 — both OFF unless set (today's behaviour).
+                    facadeInstallOnUse: config.plugins.facadeInstallOnUse(),
+                    sandboxSessionsViaJobRuntime: config.plugins.sandboxSessionsViaJobRuntime(),
                 };
             },
         }),
@@ -194,6 +216,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // adapter (inert until EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED=true).
         IdeaBuildExecutorDispatchModule,
         WorkAgentModule,
+        // APW-11 (App Launcher) — additive: one module, three routes, all of
+        // them behind AppLauncherEnabledGuard. Nothing above or below moves.
+        AppLauncherModule,
         // Missions/Ideas/Works (spec 2026-05-24) — Phase 3 PR G:
         // skeleton module exposing GET /me/missions. CRUD + lifecycle
         // ship in PR H; Clone in PR HH; tick worker (Trigger.dev) in PR J.
@@ -336,6 +361,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         BillingApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
+        AppWorksTelemetryBindingModule,
         UploadsModule,
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
@@ -355,6 +381,26 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Markdown export).
         KnowledgeLibraryApiModule,
         WebhooksModule,
+        // APW-02 (Fork lifecycle) — additive: one module, three routes, all of
+        // them behind the global session guard and the per-Work visibility check
+        // the agent service performs. It also re-exports the agent package's
+        // AppWorksModule, which is what `TriggerInternalModule` imports for its
+        // remote-proxy targets (T27/T28). Nothing above or below moves.
+        AppWorksModule,
+        // APW-05 T21 (first slice) — additive: `AppBuildSweepCronService`, the Builds
+        // sweep from this process when Trigger.dev is not the runtime (its `@Cron`
+        // fires through `ScheduleModule.forRoot()` above). Nothing above or below moves.
+        AppBuildsModule,
+        // APW-09 T43 (FR-43, XC-18) — additive: the credential of record. The
+        // module provides `UpstreamCredentialService` and the durable store a
+        // handover writes, and binds `UPSTREAM_CREDENTIAL_STORE` to it, so a
+        // handover records on `work_upstream_states.credentialMemberUserId`
+        // instead of failing closed with `handover_unavailable`. Its controller
+        // route (T43's `POST /api/works/:id/upstream/credential/handover`) is
+        // APW-09's own remaining work; the module is registered here so the
+        // binding is in the graph the API boots with. Nothing above or below
+        // moves.
+        UpstreamPullRequestsModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,
         // OnboardingModule, GitHubAppModule) and the public
@@ -468,7 +514,9 @@ export class ApiModule implements OnApplicationBootstrap {
      * optimisation only. We run warmup BEFORE the API begins serving so
      * the readiness probe in k8s flips green only after the store is
      * primed (`startupProbe.initialDelaySeconds` covers the worst-case
-     * warmup time; see `.deploy/k8s/k8s-manifest.prod.yaml`).
+     * warmup time; see `.deploy/k8s/k8s-manifest.prod.yaml`). Each plugin's
+     * fetch is bounded by `PLUGIN_WARMUP_TIMEOUT_MS` (default 60 s; EW-693
+     * T27), so a hanging registry cannot hold the boot indefinitely.
      */
     async onApplicationBootstrap(): Promise<void> {
         await this.pluginBootstrap.bootstrap();

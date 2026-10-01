@@ -162,6 +162,10 @@ export const ROUTES = {
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
     DASHBOARD_WORK_ACTIVITY: (id: string) => `/works/${id}/activity`,
+    // APW-02 T30 (Resolution R-8) — the ONE Upstream tab: relation, readiness,
+    // divergence, sync and inherited workflows, with the slot APW-09 mounts its
+    // "Upstream pull requests" section into. Never a second tab or route.
+    DASHBOARD_WORK_UPSTREAM: (id: string) => `/works/${id}/upstream`,
     // Wave 7 feature h — the in-platform PR review surface.
     DASHBOARD_WORK_PULL_REQUESTS: (id: string) => `/works/${id}/pull-requests`,
     DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,
@@ -178,6 +182,11 @@ export const ROUTES = {
     DASHBOARD_WORK_SETTINGS_GENERAL: (id: string) => `/works/${id}/settings`,
     DASHBOARD_WORK_SETTINGS_MEMBERS: (id: string) => `/works/${id}/settings/members`,
     DASHBOARD_WORK_SETTINGS_BUDGETS: (id: string) => `/works/${id}/settings/budgets-usage`,
+    // APW-03 T16 (ACC-03-39) — the fourth Settings sub-tab, offered only to an
+    // App Work (`useWorkDetail().work.kind === 'app'`; plan §5.1:603-607). The
+    // route itself is T17's page; this constant exists so the tab, the page and
+    // `recheckAppSpecAction`'s `revalidatePath` all build the same href.
+    DASHBOARD_WORK_SETTINGS_APP_SPEC: (id: string) => `/works/${id}/settings/app-spec`,
     DASHBOARD_WORK_PLUGINS: (id: string) => `/works/${id}/plugins`,
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
@@ -282,6 +291,13 @@ export const ROUTES = {
     DASHBOARD_SETTINGS: '/settings',
     DASHBOARD_SETTINGS_PROFILE: '/settings',
     DASHBOARD_SETTINGS_SECURITY: '/settings/security',
+    // APW-12 (Ever ID) — the "Connect Ever ID to this account?" confirmation
+    // (spec §6.4), reached from the provider round trip while signed in.
+    DASHBOARD_SETTINGS_SECURITY_CONNECT_EVER_ID: '/settings/security/connect-ever-id',
+    // APW-12 — the Ever ID administrator surface (spec §6.7). Platform
+    // administrators only: the page answers 404 to everyone else, the way the
+    // `/admin/*` pages do.
+    DASHBOARD_SETTINGS_ADMIN_EVER_ID: '/settings/admin/ever-id',
     DASHBOARD_SETTINGS_API_KEYS: '/settings/api-keys',
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     DASHBOARD_SETTINGS_DATA: '/settings/data',
@@ -293,6 +309,16 @@ export const ROUTES = {
     // feature landed; it simply had no route constant.
     DASHBOARD_SETTINGS_ENVIRONMENTS: '/settings/environments',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
+    /**
+     * APW-11 T16 — **Manage apps**, the App Launcher's own settings page.
+     *
+     * The constant lands here with the launcher's control (T14), which links to
+     * it from two places (`:manage` in the element, and the P2 "Manage apps in
+     * Ever Works" link), because a link written against a missing constant is a
+     * link nobody can review. The page itself — and the tab that gates it —
+     * arrives with T16, which is why nothing renders this path yet.
+     */
+    DASHBOARD_SETTINGS_APP_LAUNCHER: '/settings/app-launcher',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
     // Agent Plugins (EW-772) — packages in the open cross-vendor format.
     // Sits beside Connections: both are about capabilities the platform
@@ -340,6 +366,13 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     AUTH_FORGOT_PASSWORD: '/forgot-password',
+    // APW-12 (Ever ID) — the two confirmation screens a first Ever ID sign-in
+    // can lead to: "Create your Ever Works account" (S2) and "You already have
+    // an Ever Works account" (S3). Both are reached SIGNED OUT, straight from
+    // the provider round trip, so both MUST be in PUBLIC_ROUTES — otherwise the
+    // proxy auth gate bounces them to /login and the pending confirmation is lost.
+    AUTH_EVER_ID_CREATE_ACCOUNT: '/auth/ever-id/create-account',
+    AUTH_EVER_ID_ACCOUNT_EXISTS: '/auth/ever-id/account-exists',
     // EW-070 — the signed-out way back in for a user whose verification email
     // never arrived. Reached while UNAUTHENTICATED and unverifiable (login
     // answers 403 for an unverified address), so it MUST be in PUBLIC_ROUTES.
@@ -369,12 +402,38 @@ export const ROUTES = {
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
     API_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
+    // APW-12 (Ever ID) — the redirect URI registered at the provider (FR-10)
+    // and the return address of "Also sign out of Ever ID" (S7).
+    API_AUTH_EVER_ID_CALLBACK: '/api/auth/ever-id/callback',
+    API_AUTH_EVER_ID_LOGOUT_RETURN: '/api/auth/ever-id/logout-return',
     API_AUTH_PROVIDER_CALLBACK: '/api/auth/provider/callback/:providerId',
     API_CHAT: '/api/chat',
     API_OAUTH_CALLBACK: '/api/oauth/:providerId/callback',
     API_OAUTH_PLUGINS_CALLBACK: '/api/oauth/:providerId/callback/plugins',
     API_OAUTH_READ_PACKAGES_CALLBACK: '/api/oauth/:providerId/callback/plugins/read-packages',
 } as const;
+
+/**
+ * Destination of the original `Ctrl/Cmd+K`, kept reachable as the command
+ * palette's "Search Works" entry.
+ *
+ * ## Why it lives here and not in the hook that first used it
+ *
+ * It was declared in `@/lib/hooks/use-keyboard-shortcuts` — a **`'use client'`**
+ * module — and two consumers need it from different sides of the React
+ * boundary: that client hook, and `@/components/command-palette/registry/commands`
+ * (the command registry, which carries no directive of its own). A plain value
+ * imported into a module that renders on the **server** arrives as a *client
+ * reference* rather than the string, which is the defect class C22 and C27
+ * recorded. Keeping the constant in a module with **no `'use client'`** makes it
+ * a real string on both sides, and nothing is taken away: the hook still exports
+ * the same name (it re-exports this one), so every existing consumer and spec is
+ * unchanged.
+ *
+ * `apps/web/scripts/check-server-client-boundary.mjs` is the mechanical guard for
+ * the whole class.
+ */
+export const WORKS_SEARCH_HREF = `${ROUTES.DASHBOARD_WORKS}?focus=search`;
 
 export const routeWithParams = (route: string, params: Record<string, string>) => {
     Object.entries(params).forEach(([key, value]) => {
@@ -410,6 +469,11 @@ export const PUBLIC_ROUTES = [
     // EW-617 zero-friction onboarding landing page — public so anonymous
     // visitors from the marketing site can mint a guest session client-side.
     ROUTES.ONBOARDING,
+    // APW-12 (Ever ID) — signed-out confirmation screens of a first Ever ID
+    // sign-in. They grant nothing by themselves: each reads its encrypted
+    // pending cookie and confirms through the API.
+    ROUTES.AUTH_EVER_ID_CREATE_ACCOUNT,
+    ROUTES.AUTH_EVER_ID_ACCOUNT_EXISTS,
     '/about',
     '/contact',
     '/privacy',

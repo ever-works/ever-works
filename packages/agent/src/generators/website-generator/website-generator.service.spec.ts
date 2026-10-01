@@ -130,12 +130,14 @@ describe('WebsiteGeneratorService', () => {
             cloneUrlRequested = resolve;
         });
 
+        // No `as unknown as string` cast any more: `getCloneUrl` is async on the
+        // facade (it loads a possibly-cold provider first).
         gitFacade.getCloneUrl.mockImplementation(
             () =>
                 new Promise<string>((resolve) => {
                     cloneUrlRequested();
                     resolveCloneUrl = resolve;
-                }) as unknown as string,
+                }),
         );
 
         const initialization = service.initialize(
@@ -152,6 +154,64 @@ describe('WebsiteGeneratorService', () => {
         await expect(initialization).rejects.toMatchObject({ name: 'AbortError' });
         expect(gitFacade.replaceRemote).not.toHaveBeenCalled();
         expect(gitFacade.push).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        WebsiteRepositoryCreationMethod.DUPLICATE,
+        WebsiteRepositoryCreationMethod.CREATE_USING_TEMPLATE,
+    ])(
+        'refuses an App Work (%s) before any repository is created, cloned or pushed',
+        async (method) => {
+            // `createRepository` hands back an EXISTING repository, so for an
+            // App Work the duplicate method force-pushed the template over the
+            // member's code, and the branch sync that follows runs with
+            // `cleanupExtraBranches = true` — it deletes every other branch.
+            const gitFacade = createGitFacadeMock();
+            const branchSyncService = createBranchSyncMock();
+            const templateResolver = createTemplateResolverMock();
+            const service = new WebsiteGeneratorService(
+                gitFacade,
+                branchSyncService,
+                templateResolver,
+            );
+            const work = { ...createWork(), kind: 'app' } as unknown as Work;
+
+            await expect(service.initialize(work, createUser(), method)).rejects.toThrow(
+                /is an App Work.*Nothing was cloned or pushed\./s,
+            );
+
+            expect(templateResolver.resolveForWork).not.toHaveBeenCalled();
+            expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+            expect(gitFacade.createRepository).not.toHaveBeenCalled();
+            expect(gitFacade.createRepositoryFromTemplate).not.toHaveBeenCalled();
+            expect(gitFacade.replaceRemote).not.toHaveBeenCalled();
+            expect(gitFacade.push).not.toHaveBeenCalled();
+            expect(branchSyncService.syncFromTemplate).not.toHaveBeenCalled();
+            expect(gitFacade.updateRepository).not.toHaveBeenCalled();
+        },
+    );
+
+    // `getLocalDir` is async on the facade (the git provider may be a cold lazy
+    // proxy, loaded first). `cleanup` handed its result straight to `fs.rm`, so
+    // it removed `<Promise>` — never the checkout.
+    it('cleanup removes the directory the facade resolves, not a Promise', async () => {
+        const fs = jest.requireMock('node:fs/promises') as { rm: jest.Mock };
+        fs.rm.mockClear();
+        const gitFacade = createGitFacadeMock();
+        gitFacade.getLocalDir.mockResolvedValue('/tmp/git/acme/test-work-web');
+        const service = new WebsiteGeneratorService(
+            gitFacade,
+            createBranchSyncMock(),
+            createTemplateResolverMock(),
+        );
+
+        await service.cleanup(createWork());
+
+        expect(gitFacade.getLocalDir).toHaveBeenCalledWith('github', 'acme', 'test-work-web');
+        expect(fs.rm).toHaveBeenCalledWith('/tmp/git/acme/test-work-web', {
+            recursive: true,
+            force: true,
+        });
     });
 });
 

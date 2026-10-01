@@ -804,6 +804,38 @@ export class Work {
     @Column({ type: 'uuid', nullable: true })
     acceptedFromIdeaId?: string | null;
 
+    /**
+     * APW-11 (App Launcher) — spec FR-19's **Show in App Launcher**
+     * setting, one nullable column on the Work itself.
+     *
+     * Three states, and the third is why the column is NULLable rather
+     * than defaulted to a boolean:
+     *
+     *   - `true`  — the Work is explicitly exposed.
+     *   - `false` — the Work is explicitly hidden.
+     *   - `NULL`  — no explicit choice: the Work follows its kind's
+     *               default, which is **on** for an App Work and **off**
+     *               for every other kind.
+     *
+     * An explicit value always wins, including when the Work later
+     * changes kind (spec FR-19). `NULL` is therefore a real, permanent
+     * state and not a pre-backfill artefact — which is why
+     * `1792110000000-CreateAppLauncherPreferences` adds the column with
+     * **no** backfill and **no** default: every existing Work keeps
+     * reading exactly the behaviour it showed before this column existed.
+     *
+     * Explicit `type: 'boolean'` for the same reason the neighbouring
+     * `managedSubdomain` declares its type: a nullable union
+     * (`boolean | null`) reflects as `Object` and TypeORM would then
+     * infer a driver-specific column type instead of a boolean.
+     *
+     * Nothing else on the Work changes, and no caller of the existing
+     * columns is affected: this is one appended column at the end of the
+     * list, per the programme's additive-only rule (CONTRACTS R-26).
+     */
+    @Column({ type: 'boolean', nullable: true })
+    appLauncherExposed?: boolean | null;
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;

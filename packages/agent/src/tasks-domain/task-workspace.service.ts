@@ -19,6 +19,19 @@ import {
 } from '@ever-works/contracts';
 import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
+import { isAppWorkKind } from '@ever-works/contracts';
+// APW-08 T17 — a leaf file with type-only imports. Importing the App Works
+// classes here directly closed a require ring through app-spec → tasks.service
+// → task-extra-repos → this file; see the port's docstring.
+import {
+    APP_WORK_CHANGE_GATE,
+    APP_WORK_SPEC_PATH,
+    type AppWorkChangeGate,
+    type AppWorkChangeGateVerdict,
+} from './app-work-change-gate.port';
+// APW-08 FR-12 / T12 — the one cloud App Work push gate (and its refusal text),
+// shared with the agent git tools. It owns the only read of the switch.
+import { appWorkCloudPushAllowed, appWorkCloudPushRefusal } from './app-work-cloud-push';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -46,9 +59,19 @@ import {
     parseRepoDeclaredCommands,
     RepoDeclaredCommandsError,
 } from './repo-declared-commands';
+import { resolveTaskRepository, taskRepositoryRole } from './task-repository';
+import { matchWorkRepoRoles } from '../works/work-repo-match';
 
 /** The ONE path a Work's config lives at; mirrors `WORKS_CONFIG_FILEPATHS`. */
 const WORKS_CONFIG_FILEPATH = '.works/works.yml';
+
+/**
+ * Most of a refusal `tasks.branchGuardRefusal` keeps. The Task thread keeps
+ * the whole message; the row only has to say why the branch panel must not
+ * show the pull request as healthy, and a list of hundreds of paths is no
+ * reason to grow every Task read.
+ */
+const BRANCH_GUARD_REFUSAL_MAX = 4000;
 
 export interface ProvisionedTaskWorkspace {
     /** Filesystem path of the checkout — the run's working directory. */
@@ -101,7 +124,16 @@ export interface TaskAgentMergeOutcome {
 }
 
 export interface TaskWorkspaceFinalizeOutcome {
-    outcome: 'no-changes' | 'pr-opened' | 'pushed-no-pr' | 'conflict';
+    /**
+     * `blocked-by-guard` is APW-08 T17's, and it is a NEW member rather than a
+     * reuse of the two that nearly fit.
+     *
+     * `pushed-no-pr` is the agent LACKING permission to open one — nothing is
+     * wrong and the Task is not blocked. `conflict` blocks, but saying a branch
+     * conflicts when it merges cleanly and merely touches a protected path would
+     * send the member to rebase something that does not need rebasing.
+     */
+    outcome: 'no-changes' | 'pr-opened' | 'pushed-no-pr' | 'conflict' | 'blocked-by-guard';
     prNumber?: number;
     prUrl?: string;
     conflictPaths?: string[];
@@ -115,7 +147,13 @@ export interface TaskWorkspaceFinalizeOutcome {
  */
 export interface TaskMountPushOutcome {
     repositoryId: string;
-    outcome: 'pr-opened' | 'pushed-no-pr' | 'failed';
+    /**
+     * `blocked-by-guard` — the mounted repository is an App Work's code
+     * repository and that Work's change rules refused the pushed branch: no
+     * pull request was opened, and one already open now carries a change the
+     * rules refuse (APW-08).
+     */
+    outcome: 'pr-opened' | 'pushed-no-pr' | 'failed' | 'blocked-by-guard';
     prNumber?: number;
     prUrl?: string;
     error?: string;
@@ -176,6 +214,19 @@ export class TaskWorkspaceService {
         // Multi-repo Task workspaces (slice C, PR C2) — the Task's own extra
         // repositories by registry connection. Appended LAST + @Optional.
         @Optional() private readonly repoConnections?: RepoConnectionRepository,
+        // APW-08 T17 — the App Work change gate, through ONE port rather than
+        // the three classes it needs (see `app-work-change-gate.port.ts` for why).
+        // Appended LAST + @Optional() per this file's own positional-spec arity
+        // rule: eighteen construction sites pass a prefix of these arguments,
+        // several of them casting through `ServiceArgs[N]`, so an argument
+        // inserted anywhere else re-indexes them WITHOUT a compile error.
+        //
+        // Absent means the epic is not installed in this graph and the gate is
+        // SKIPPED — see `guardAppChange`. A bound gate that cannot read the
+        // rules is a different answer, and it refuses.
+        @Optional()
+        @Inject(APP_WORK_CHANGE_GATE)
+        private readonly appChangeGate?: AppWorkChangeGate,
     ) {}
 
     /**
@@ -216,8 +267,7 @@ export class TaskWorkspaceService {
         // v1 repo resolution: the Work's output (data) repo on the Work's
         // git provider. `taskIsolationTargetRepo='linked'` reserves the
         // linked-source-repo variant for the connectors wave.
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
 
         const token = await this.gitFacade.getAccessToken(gitOptions);
@@ -328,11 +378,18 @@ export class TaskWorkspaceService {
             );
         }
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         if (!owner || !repo) return null;
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        // `getRepository` answers null for a repository the provider does not
+        // find; reading `.defaultBranch` (and later `.cloneUrl`) off it was a
+        // bare TypeError instead of a refusal naming the repository.
+        if (!repository) {
+            throw new Error(
+                `Task ${task.id}: its repository ${owner}/${repo} cannot be described for a fleet node: the git provider does not find it.`,
+            );
+        }
         const baseRef =
             (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
             repository.defaultBranch;
@@ -359,10 +416,14 @@ export class TaskWorkspaceService {
         // Run secrets (slice Y): the PRIMARY repository of a Task is a Work
         // repository, not a registry row, so it has no env files of its own.
         // Its `.env` comes from a registry connection the operator added for
-        // the same clone URL — resolved explicitly here rather than skipped,
-        // because the one repository that matters most (the platform
-        // building itself) is exactly the primary.
-        const primaryRef = await this.resolvePrimaryEnvFilesRef(userId, repositoryId);
+        // the same repository on the same host — resolved explicitly here
+        // rather than skipped, because the one repository that matters most
+        // (the platform building itself) is exactly the primary.
+        const primaryRef = await this.resolvePrimaryEnvFilesRef(
+            userId,
+            repositoryId,
+            repository.cloneUrl,
+        );
         const envFilesRef = normalizeFleetRunEnvFileRefs([
             ...(primaryRef ? [primaryRef] : []),
             ...mountEnvRefs,
@@ -381,11 +442,20 @@ export class TaskWorkspaceService {
      * Run secrets (slice Y) — the registry connection whose clone URL IS
      * the Task's primary repository, if the operator registered one.
      *
+     * "Is" means the same `owner/repo` ON THE SAME HOST as the clone URL the
+     * git provider reported for the primary (`primaryCloneUrl`). The
+     * `owner/repo` identity alone is host-agnostic, so without the host a
+     * mirror at `gitlab.example.com/<owner>/<repo>` would hand ITS `.env` to
+     * a GitHub primary, and a mirror row next to the real one would make the
+     * primary look ambiguous. A row on another host is skipped with a log
+     * line naming both HOSTS (never the URL, which may carry userinfo).
+     *
      * Returns null when no row matches: a Task whose repository has no
      * registry entry simply gets no env files, exactly as today. REFUSES
-     * when two enabled rows claim the same repository, naming both — the
-     * alternative is picking one by listing order, and "which `.env` landed
-     * in the checkout" is not a question that may be answered by luck.
+     * when two enabled rows claim the same repository on the same host,
+     * naming both — the alternative is picking one by listing order, and
+     * "which `.env` landed in the checkout" is not a question that may be
+     * answered by luck.
      *
      * Never reads `envFiles`; only `envFilePaths`, which is why nothing
      * here can put a decrypted value on the job.
@@ -393,6 +463,7 @@ export class TaskWorkspaceService {
     private async resolvePrimaryEnvFilesRef(
         userId: string,
         primaryRepositoryId: string,
+        primaryCloneUrl: string,
     ): Promise<FleetRunEnvFileRef | null> {
         // No registry wired at all (an in-process caller, a narrower module
         // graph) is "no registry row for the primary", which is the same
@@ -415,18 +486,25 @@ export class TaskWorkspaceService {
                 }`,
             );
         }
-        const wanted = primaryRepositoryId.toLowerCase();
-        const matches = rows.filter(
-            (row) =>
-                row.enabled &&
-                typeof row.url === 'string' &&
-                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
+        const { matches, otherHost, primaryHost } = this.primaryRegistryMatches(
+            rows,
+            primaryRepositoryId,
+            primaryCloneUrl,
         );
+        for (const row of otherHost) {
+            this.logger.log(
+                `Repository connection ${row.name} names ${primaryRepositoryId} on ${cloneUrlHost(row.url) ?? '<unknown host>'}, ` +
+                    `not the Task primary's host ${primaryHost}; its env files and env grants do not apply to the primary.`,
+            );
+        }
         if (matches.length > 1) {
+            // Row NAMES only: a registry URL may carry userinfo, and this
+            // message reaches the run row, the Task page and the API log.
             throw new Error(
                 `Repository registry has ${matches.length} enabled connections for the Task's primary repository ` +
-                    `${primaryRepositoryId} (${matches.map((row) => row.name).join(', ')}); ` +
-                    'disable or remove all but one so the run knows whose env files to use.',
+                    `${primaryRepositoryId} on ${primaryHost} (${matches.map((row) => row.name).join(', ')}) — ` +
+                    'clone URLs that differ only by .git, a trailing slash, letter case or https/SSH form name the ' +
+                    'same repository; disable or remove all but one so the run knows whose env files to use.',
             );
         }
         const [connection] = matches;
@@ -452,11 +530,29 @@ export class TaskWorkspaceService {
      * skipped rather than throwing — because `describeFleetWorkspace` has
      * already refused a workspace it could not describe, and a grant that
      * fails to resolve means LESS access, never more.
+     *
+     * The PRIMARY repository's grants come from the registry row for the
+     * `workspace` that `describeFleetWorkspace` produced — the same
+     * `owner/repo` on the same host its env files were matched against, so
+     * a mirror on another host grants nothing to the primary. Without a
+     * described workspace the primary contributes no grants (LESS access,
+     * never more); the Work is not re-read for a second, looser match.
+     *
+     * That match is the only thing scoped to a host. A mirror row that is also
+     * ATTACHED to the run's Agent or listed as a Task extra is skipped as a
+     * mount (`resolveFleetMounts` skips both by `owner/repo` only, host
+     * ignored, and logs each as the primary), yet its grants still join the
+     * union above like every attachment's and Task extra's — mounted or not.
+     * Recorded, not a regression: closing it needs a host-scoped primary skip
+     * there and in `normalizeFleetTaskWorkspaceMounts`, or dropping the grants
+     * of attachments and Task extras that were not mounted.
      */
     async resolveFleetRunEnvGrants(input: {
         task: Task;
         userId: string;
         agentId?: string;
+        /** The described workspace (`describeFleetWorkspace`); its primary's grants apply. */
+        workspace?: Pick<FleetTaskWorkspaceSpec, 'repositoryId' | 'repoUrl'>;
     }): Promise<string[]> {
         const sources: ResolvedAgentRepo[] = [];
         if (input.agentId && this.agentRepoAttachments) {
@@ -480,17 +576,13 @@ export class TaskWorkspaceService {
             ]);
             if (resolved) sources.push(resolved);
         }
-        if (input.task.workId && this.repoConnections && this.works) {
-            const work = await this.works.findById(input.task.workId).catch(() => null);
-            const owner = work?.getRepoOwner();
-            const repo = work?.getDataRepo();
-            if (owner && repo) {
-                const primary = await this.resolvePrimaryConnection(
-                    input.userId,
-                    `${owner}/${repo}`,
-                );
-                if (primary) sources.push(primary);
-            }
+        if (input.workspace && this.repoConnections) {
+            const primary = await this.resolvePrimaryConnection(
+                input.userId,
+                input.workspace.repositoryId,
+                input.workspace.repoUrl,
+            );
+            if (primary) sources.push(primary);
         }
         return normalizeFleetRunEnvGrants(sources.flatMap((source) => source.envGrants));
     }
@@ -560,8 +652,7 @@ export class TaskWorkspaceService {
                 `Work ${work.id} reads repository-declared commands, but no git facade is available in this runtime to read .works/works.yml`,
             );
         }
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         if (!owner || !repo) {
             // NOT an empty set. Control only reaches here for a Work that
             // OPTED IN — the policy gate and the git-facade gate are both
@@ -624,26 +715,54 @@ export class TaskWorkspaceService {
         });
     }
 
-    /** The enabled registry row for `primaryRepositoryId`, or null. Never throws. */
+    /**
+     * The enabled registry row for `primaryRepositoryId` on the host of
+     * `primaryCloneUrl`, or null (none, or more than one). Never throws.
+     */
     private async resolvePrimaryConnection(
         userId: string,
         primaryRepositoryId: string,
+        primaryCloneUrl: string | null | undefined,
     ): Promise<ResolvedAgentRepo | null> {
         if (!this.repoConnections || typeof this.repoConnections.listByUser !== 'function')
             return null;
         const rows = await this.repoConnections.listByUser(userId).catch(() => []);
-        const wanted = primaryRepositoryId.toLowerCase();
-        const matches = rows.filter(
-            (row) =>
-                row.enabled &&
-                typeof row.url === 'string' &&
-                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
-        );
+        const { matches } = this.primaryRegistryMatches(rows, primaryRepositoryId, primaryCloneUrl);
         if (matches.length !== 1) return null;
         const [resolved] = mapAttachmentEdgesToRepos([
             { repoConnection: matches[0] } as unknown as AgentRepoAttachment,
         ]);
         return resolved ?? null;
+    }
+
+    /**
+     * The registry rows that ARE the Task's primary repository: enabled, the
+     * same `owner/repo` (case-insensitive, through `repositoryIdFromCloneUrl`,
+     * so `.git`, a trailing slash, letter case and https/SSH spellings are one
+     * repository) AND the same host as the primary's clone URL. `otherHost`
+     * is the same `owner/repo` on a different host: a mirror, not the primary.
+     * Shared by env files and grants, so both resolve the primary identically.
+     *
+     * FAILS CLOSED: a primary clone URL with no readable host matches nothing
+     * — less access, never a host-agnostic fallback.
+     */
+    private primaryRegistryMatches<Row extends { enabled: boolean; url: string; name: string }>(
+        rows: readonly Row[],
+        primaryRepositoryId: string,
+        primaryCloneUrl: string | null | undefined,
+    ): { matches: Row[]; otherHost: Row[]; primaryHost: string | null } {
+        const primaryHost = cloneUrlHost(primaryCloneUrl ?? '');
+        if (!primaryHost) return { matches: [], otherHost: [], primaryHost: null };
+        const wanted = primaryRepositoryId.toLowerCase();
+        const matches: Row[] = [];
+        const otherHost: Row[] = [];
+        for (const row of rows) {
+            if (!row.enabled || typeof row.url !== 'string') continue;
+            if (repositoryIdFromCloneUrl(row.url)?.toLowerCase() !== wanted) continue;
+            if (cloneUrlHost(row.url) === primaryHost) matches.push(row);
+            else otherHost.push(row);
+        }
+        return { matches, otherHost, primaryHost };
     }
 
     /**
@@ -715,6 +834,13 @@ export class TaskWorkspaceService {
                     providerId: repo.provider,
                     workId: input.workId,
                 });
+                // `getRepository` answers null for a repository the provider does
+                // not find; reading `.defaultBranch` off it was a bare TypeError.
+                if (!remote) {
+                    throw new Error(
+                        `Attached repository ${identity} cannot be mounted on a fleet node: the git provider does not find it, so its default branch is unknown.`,
+                    );
+                }
                 baseRef = remote.defaultBranch;
             }
             mounts.push({
@@ -782,6 +908,11 @@ export class TaskWorkspaceService {
                     providerId: resolved.provider,
                     workId: input.workId,
                 });
+                if (!remote) {
+                    throw new Error(
+                        `Task ${input.task.id}: extra repository ${identity} cannot be mounted on a fleet node: the git provider does not find it, so its default branch is unknown.`,
+                    );
+                }
                 baseRef = remote.defaultBranch;
             }
             const mountDir = extra.mountDir?.trim() || resolved.mountDir;
@@ -935,6 +1066,24 @@ export class TaskWorkspaceService {
             );
         }
 
+        // APW-08 — a mounted repository can be an App Work's code repository:
+        // a registry connection is just a URL, so an agent attachment or a Task
+        // extra can name ANOTHER App Work's repository (or, until the identity
+        // was canonicalised, the Task's own under another spelling). Every
+        // other change-gate call is keyed on the Task's own Work, so that
+        // Work's rules never ran here. Judged BEFORE all three branches below:
+        // an open pull request re-recorded, one left to a human, one opened.
+        const refusal = await this.judgeMountedAppWorkChange({
+            task,
+            userId,
+            agentId: input.agentId,
+            owner,
+            repo,
+            branch,
+            baseRef: input.baseRef,
+        });
+        if (refusal) return this.refuseMountChange(task, input, refusal);
+
         // Idempotent on the pull request, exactly like the primary path: the
         // Task branch name is stable, so a re-run pushes MORE commits onto the
         // branch behind an already-open pull request. Asking the provider for
@@ -979,13 +1128,16 @@ export class TaskWorkspaceService {
         const { providerId } = gitOptions;
 
         if (!input.agentCanOpenPullRequests || providerId === 'git') {
+            // Never drop a recorded pull request link here (a discard survivor's
+            // is the operator's only way back to it).
+            const kept = await this.existingPullRequestLink(task, repositoryId, branch);
             await this.recordLinkedPullRequest(task, {
                 repositoryId,
                 branch,
                 baseRef: input.baseRef ?? null,
                 headSha: input.headSha ?? null,
-                prNumber: null,
-                prUrl: null,
+                prNumber: kept?.prNumber ?? null,
+                prUrl: kept?.prUrl ?? null,
                 state: 'pushed',
                 error: null,
             });
@@ -1002,8 +1154,13 @@ export class TaskWorkspaceService {
         try {
             let baseRef = input.baseRef?.trim() || '';
             if (!baseRef) {
-                baseRef = (await this.gitFacade.getRepository(owner, repo, gitOptions))
-                    .defaultBranch;
+                const remote = await this.gitFacade.getRepository(owner, repo, gitOptions);
+                if (!remote) {
+                    throw new Error(
+                        `the git provider does not find ${repositoryId}, so its default branch is unknown`,
+                    );
+                }
+                baseRef = remote.defaultBranch;
             }
             const primaryNote = input.primaryPrUrl ? ` Part of ${input.primaryPrUrl}.` : '';
             const summaryNote = input.summary ? `\n\n${input.summary}` : '';
@@ -1038,6 +1195,275 @@ export class TaskWorkspaceService {
         }
     }
 
+    /**
+     * APW-08 — judge a pushed MOUNT branch against the change rules of every
+     * App Work whose Task repository the mounted repository is (normally none,
+     * or one). Answers the refusal text, or `null` to proceed.
+     *
+     * Same posture as {@link guardAppChange}: no gate bound → proceed; a gate
+     * that throws, or rules that cannot be read → REFUSE, because the
+     * alternative is a pull request nobody judged. Each Work is judged with its
+     * OWN coordinates, credentials and base branch — the rules live on that
+     * Work's base, not on the mount's configured base.
+     */
+    private async judgeMountedAppWorkChange(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        owner: string;
+        repo: string;
+        branch: string;
+        /**
+         * The base the mount's pull request merges into (the planned mount
+         * base). The rules are read, and the diff taken, THERE — that is what
+         * the pull request would change. Absent, it is the repository's default
+         * branch, which is what `finalizeMountPush` opens the pull request
+         * against too.
+         */
+        baseRef?: string | null;
+    }): Promise<string | null> {
+        const { task, userId, owner, repo, branch } = input;
+        if (!this.appChangeGate) return null;
+        let candidates: Work[];
+        try {
+            candidates = (await this.works.findByUser(userId)) ?? [];
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: mount ${owner}/${repo} could not be matched to its Works: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return (
+                `The Works this repository might belong to could not be read, so the change pushed to ` +
+                `\`${owner}/${repo}\` was not checked against any App Work's change rules.`
+            );
+        }
+        const appWorks = matchWorkRepoRoles(candidates, owner, repo).filter(
+            (match) =>
+                isAppWorkKind(match.work.kind) &&
+                match.roles.includes(taskRepositoryRole(match.work.kind)),
+        );
+        for (const { work } of appWorks) {
+            const target = resolveTaskRepository(work);
+            const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
+            let verdict: AppWorkChangeGateVerdict;
+            try {
+                verdict = await this.appChangeGate.evaluate({
+                    work,
+                    taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                    owner: target.owner,
+                    repo: target.repo,
+                    gitOptions,
+                    baseRef: await this.mountJudgementBase(input.baseRef, target, gitOptions),
+                    branch,
+                });
+            } catch (error) {
+                this.logger.warn(
+                    `Task ${task.id}: App change gate could not decide for mount ${owner}/${repo} (Work ${work.id}): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return (
+                    `\`${owner}/${repo}\` is the code repository of App Work "${work.name || work.id}", and ` +
+                    'its rules could not be read, so the change was not checked against its protected paths.'
+                );
+            }
+            // `=== true`: this package compiles without `strictNullChecks`.
+            if (verdict.allowed !== true) {
+                const paths = verdict.paths.length
+                    ? ['', 'Paths:', ...verdict.paths.map((path) => `- \`${path}\``)]
+                    : [];
+                return [
+                    `\`${owner}/${repo}\` is the code repository of App Work "${work.name || work.id}", ` +
+                        `and its change rules refused this change: ${verdict.message}`,
+                    ...paths,
+                ].join('\n');
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The base a mounted App Work repository is judged at: the mount's planned
+     * base when there is one, else the repository's default branch — the same
+     * base `finalizeMountPush` opens the pull request against. NOT the Work's
+     * own isolation base: judging one base while the pull request merges into
+     * another either refused changes the agent never made or allowed ones it
+     * did (third adversarial review). Throws when the default cannot be read,
+     * which the caller turns into a refusal.
+     */
+    private async mountJudgementBase(
+        planned: string | null | undefined,
+        target: { owner: string; repo: string },
+        gitOptions: { userId: string; providerId: string; workId: string },
+    ): Promise<string> {
+        const base = (planned ?? '').trim();
+        if (base) return base;
+        const remote = this.gitFacade
+            ? await this.gitFacade.getRepository(target.owner, target.repo, gitOptions)
+            : null;
+        if (!remote?.defaultBranch) {
+            throw new Error(
+                `the default branch of ${target.owner}/${target.repo} could not be read`,
+            );
+        }
+        return remote.defaultBranch;
+    }
+
+    /**
+     * APW-08 — re-judge the Task's OPEN mount pull requests on a fleet path that
+     * did not run {@link finalizeMountPush} for them: a cancelled run whose node
+     * had already pushed, a question for an already-settled run, and a mount the
+     * node reports as unpushed, empty or not at all ("pushed: false" is only
+     * what the node says). The open pull request picked those commits up either
+     * way; the primary pull request is re-judged on the same paths
+     * (`judgeAppWorkBranch`). Each is judged at its recorded branch and base.
+     * `except` names repositories this reconcile already finalised. Never throws.
+     */
+    async judgeMountedPullRequests(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        except?: ReadonlySet<string>;
+    }): Promise<TaskMountPushOutcome[]> {
+        const outcomes: TaskMountPushOutcome[] = [];
+        try {
+            if (!this.appChangeGate) return outcomes;
+            const fresh = (await this.tasks.findById(input.task.id)) ?? input.task;
+            const entries = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+            for (const entry of entries) {
+                if (entry.state !== 'pr-open' || typeof entry.prNumber !== 'number') continue;
+                if (input.except?.has(entry.repositoryId.toLowerCase())) continue;
+                const [owner, repo] = entry.repositoryId.split('/');
+                if (!owner || !repo) continue;
+                const refusal = await this.judgeMountedAppWorkChange({
+                    task: fresh,
+                    userId: input.userId,
+                    agentId: input.agentId,
+                    owner,
+                    repo,
+                    branch: entry.branch,
+                    baseRef: entry.baseRef,
+                });
+                if (!refusal) continue;
+                outcomes.push(
+                    await this.refuseMountChange(
+                        fresh,
+                        {
+                            userId: input.userId,
+                            agentId: input.agentId,
+                            repositoryId: entry.repositoryId,
+                            branch: entry.branch,
+                            baseRef: entry.baseRef,
+                            headSha: entry.headSha,
+                        },
+                        refusal,
+                    ),
+                );
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Task ${input.task.id}: open mount pull requests could not be re-judged: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        return outcomes;
+    }
+
+    /**
+     * The recorded pull request for `repositoryId` from exactly `branch`, in ANY
+     * state — including a discard survivor's `failed` link — or `null`. For the
+     * writers that must never drop a link they did not open; matching an OPEN
+     * pull request to push onto is {@link findOpenLinkedPullRequest}'s job.
+     */
+    private async existingPullRequestLink(
+        task: Task,
+        repositoryId: string,
+        branch: string,
+    ): Promise<(TaskLinkedPullRequest & { prNumber: number; prUrl: string }) | null> {
+        const fresh = (await this.tasks.findById(task.id).catch(() => null)) ?? task;
+        const entries = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+        const entry = entries.find(
+            (candidate) =>
+                candidate.repositoryId.toLowerCase() === repositoryId.toLowerCase() &&
+                candidate.branch === branch &&
+                typeof candidate.prNumber === 'number' &&
+                typeof candidate.prUrl === 'string' &&
+                candidate.prUrl.length > 0,
+        );
+        return entry
+            ? { ...entry, prNumber: entry.prNumber as number, prUrl: entry.prUrl as string }
+            : null;
+    }
+
+    /**
+     * The mount-side refusal: record the entry as `failed` with the reason —
+     * KEEPING the pull request number and URL when one is already open, so the
+     * link to the pull request that now carries the refused change is not lost
+     * — say why in the Task thread, and block the Task. No pull request is
+     * opened. Never throws, like the rest of `finalizeMountPush`.
+     */
+    private async refuseMountChange(
+        task: Task,
+        input: {
+            userId: string;
+            agentId: string;
+            repositoryId: string;
+            branch: string;
+            baseRef?: string | null;
+            headSha?: string | null;
+        },
+        reason: string,
+    ): Promise<TaskMountPushOutcome> {
+        const branch = input.branch.trim();
+        const existing = await this.existingPullRequestLink(task, input.repositoryId, branch);
+        // Only an OPEN pull request is marked for recovery: the next run the rules
+        // allow re-records it `pr-open` (see `findOpenLinkedPullRequest`). A
+        // discard survivor keeps its link but stays unmatched, as discard intends.
+        const wasOpen =
+            !!existing && (existing.state === 'pr-open' || existing.refusedByGuard === true);
+        const consequence = existing
+            ? `The branch \`${branch}\` was pushed, and pull request #${existing.prNumber} (${existing.prUrl}) ` +
+              'now contains this change — it must not be merged as it stands.'
+            : `The branch \`${branch}\` was pushed, but no pull request was opened.`;
+        try {
+            await this.recordLinkedPullRequest(task, {
+                repositoryId: input.repositoryId,
+                branch,
+                baseRef: input.baseRef ?? existing?.baseRef ?? null,
+                headSha: input.headSha ?? null,
+                prNumber: existing?.prNumber ?? null,
+                prUrl: existing?.prUrl ?? null,
+                state: 'failed',
+                error: reason,
+                refusedByGuard: !existing || wasOpen,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: refused mount ${input.repositoryId} could not be recorded: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        await this.postSystemMessage(
+            { task, userId: input.userId, agentId: input.agentId },
+            `${reason}\n\n${consequence}`,
+        );
+        await this.transitionTask(task, TaskStatus.BLOCKED);
+        this.logger.warn(
+            `Task ${task.id}: mount ${input.repositoryId} refused by an App Work's change rules.`,
+        );
+        return {
+            repositoryId: input.repositoryId,
+            outcome: 'blocked-by-guard',
+            ...(existing
+                ? { prNumber: existing.prNumber as number, prUrl: existing.prUrl as string }
+                : {}),
+            error: reason,
+        };
+    }
+
     private async recordMountFailure(
         task: Task,
         input: {
@@ -1048,13 +1474,20 @@ export class TaskWorkspaceService {
         },
         error: string,
     ): Promise<TaskMountPushOutcome> {
+        // Never drop a recorded pull request link (a discard survivor's is the
+        // operator's only way back to it).
+        const kept = await this.existingPullRequestLink(
+            task,
+            input.repositoryId,
+            input.branch.trim(),
+        );
         await this.recordLinkedPullRequest(task, {
             repositoryId: input.repositoryId,
             branch: input.branch.trim(),
             baseRef: input.baseRef ?? null,
             headSha: input.headSha ?? null,
-            prNumber: null,
-            prUrl: null,
+            prNumber: kept?.prNumber ?? null,
+            prUrl: kept?.prUrl ?? null,
             state: 'failed',
             error,
         });
@@ -1081,7 +1514,12 @@ export class TaskWorkspaceService {
             if (
                 entry.repositoryId.toLowerCase() === repositoryId.toLowerCase() &&
                 entry.branch === branch &&
-                entry.state === 'pr-open' &&
+                (entry.state === 'pr-open' ||
+                    // Refused by an App Work's rules, the pull request still open:
+                    // a run the rules now ALLOW re-records it rather than asking
+                    // the provider for a second one (a 422 that used to wipe the
+                    // link). Never a discard survivor — see `mountBranchSurvived`.
+                    (entry.state === 'failed' && entry.refusedByGuard === true)) &&
                 typeof entry.prNumber === 'number' &&
                 typeof entry.prUrl === 'string' &&
                 entry.prUrl.length > 0
@@ -1151,6 +1589,19 @@ export class TaskWorkspaceService {
      *   pushed + clean     → 'pr-open' + in_review outcome 'pr-opened'
      *   pushed, no PR perm → 'pushed'             outcome 'pushed-no-pr'
      *   pushed + conflict  → 'conflict' + blocked outcome 'conflict'
+     *   App Work, refused before the push
+     *                      → (no change) + blocked outcome 'blocked-by-guard'
+     *
+     * App Works with the change gate bound (APW-08 T17) never push first. The
+     * run is committed locally (`push: false`); with cloud App Work pushes OFF
+     * (the default until FR-12's admission, T12, lands — see
+     * `appWorkCloudPushAllowed`, the gate the agent git tools ask too) the Task
+     * is then blocked and nothing leaves the runtime. With them ON,
+     * `judgeBeforePush` asks the gate's `checkPaths` about that exact commit,
+     * and only an allowed commit
+     * is published — by its sha, so nothing the tree gained afterwards rides
+     * along. Every other kind, and an App Work with no gate bound, pushes in
+     * one step exactly as before.
      */
     async finalizeRun(input: {
         task: Task;
@@ -1199,8 +1650,7 @@ export class TaskWorkspaceService {
             throw new Error(`Task ${task.id} lost its Work before finalize.`);
         }
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
         const baseRef =
@@ -1215,10 +1665,19 @@ export class TaskWorkspaceService {
             bindingKey: task.id,
         };
         const facadeOptions = { userId, workId: work.id };
+        const commitMessage = `feat(task): ${task.slug} agent run output`;
+
+        // APW-08 T17 — an App Work whose change gate is bound is JUDGED BEFORE
+        // anything is pushed: commit locally, judge that exact commit, then
+        // publish exactly that commit. Pushing first (as every other kind still
+        // does) put a refused change — a workflow file among them, which can
+        // RUN on push — on the remote before the gate had spoken. Checked
+        // without any await, so no other kind pays for it.
+        const judgeFirst = isAppWorkKind(work.kind) && !!this.appChangeGate;
 
         const finalize = await this.workspaceFacade.finalize(
             handle,
-            { commitMessage: `feat(task): ${task.slug} agent run output`, push: true },
+            { commitMessage, push: !judgeFirst },
             facadeOptions,
         );
         // Run telemetry — stamp the changed-file count as soon as the
@@ -1230,6 +1689,57 @@ export class TaskWorkspaceService {
             this.logger.log(`Task ${task.id} run produced no changes — nothing to push.`);
             return { outcome: 'no-changes' };
         }
+
+        if (judgeFirst) {
+            // Owner decision: no cloud App Work push at all until APW-08 FR-12's
+            // isolated-run admission (T12) lands, unless an operator opts in.
+            // The shared gate the agent git tools ask too (`app-work-cloud-push.ts`);
+            // `judgeFirst` already established that this is an App Work.
+            const judged = appWorkCloudPushAllowed(work.kind)
+                ? await this.judgeBeforePush({
+                      input,
+                      work,
+                      owner,
+                      repo,
+                      gitOptions,
+                      baseRef,
+                      handle,
+                      headSha: finalize.headSha,
+                      facadeOptions,
+                  })
+                : { refused: await this.refuseCloudAppPush(input) };
+            if ('refused' in judged) return judged.refused;
+
+            // Exactly the judged commit — the very sha `judgeBeforePush` read,
+            // never `git add -A` again: a process the run started can still be
+            // writing into the checkout.
+            const { judgedSha } = judged;
+            const published = await this.workspaceFacade.finalize(
+                handle,
+                { commitMessage, push: true, publishSha: judgedSha },
+                facadeOptions,
+            );
+            if (!published.pushed) {
+                throw new Error(
+                    `Task ${task.id}: the judged commit ${judgedSha} was not pushed${
+                        published.publishWithheld ? ` (${published.publishWithheld})` : ''
+                    }.`,
+                );
+            }
+            // `pushed` alone is not "the judged commit was published": a
+            // provider that predates `publishSha` ignores it (the contract says
+            // so) and commits and pushes HEAD, which can carry files written
+            // after the judgement. Neither 'pushed' nor a pull request is
+            // recorded for a commit nobody judged.
+            if (published.headSha !== judgedSha) {
+                throw new Error(
+                    `Task ${task.id}: the workspace provider published ${
+                        published.headSha ?? 'an unreported commit'
+                    }, not the judged commit ${judgedSha} — it may not support publishing a judged ` +
+                        'commit. No pull request was opened.',
+                );
+            }
+        }
         await this.tasks.updateById(task.id, { branchState: 'pushed' });
 
         const simulation = await this.workspaceFacade.simulateMerge(handle, baseRef, facadeOptions);
@@ -1237,6 +1747,12 @@ export class TaskWorkspaceService {
         if (!simulation.clean) {
             // Refuse the PR and NAME the paths — the single
             // highest-value UX detail of the whole feature.
+            //
+            // An App Work's `branchGuardRefusal` from an earlier push is left
+            // as it is: the post-push `guardAppChange` below never runs on this
+            // path, and an allowed `judgeBeforePush` does not clear the marker
+            // (`checkPaths` has no size rule). Only that full judgement clears
+            // it, so until the next one the banner errs toward warning.
             await this.tasks.updateById(task.id, {
                 branchState: 'conflict',
                 conflictPaths: simulation.conflictPaths,
@@ -1255,6 +1771,23 @@ export class TaskWorkspaceService {
             await this.transitionTask(task, TaskStatus.BLOCKED);
             return { outcome: 'conflict', conflictPaths: simulation.conflictPaths };
         }
+
+        // APW-08 T17 — the change guard, between a clean merge and a pull
+        // request. The branch is ALREADY pushed by this point, so a refusal here
+        // refuses the pull request and says so; it cannot un-push. For an App
+        // Work this is the SECOND judgement: `judgeBeforePush` already ran the
+        // shared rules on the exact commit before it was published, and this
+        // one adds the size rule and the provider's own diff.
+        const guarded = await this.guardAppChange({
+            input,
+            work,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch: workspace.branch,
+        });
+        if (guarded) return guarded;
 
         return this.openPullRequestForBranch({
             task,
@@ -1318,6 +1851,29 @@ export class TaskWorkspaceService {
             );
         }
 
+        // APW-08 — on an App Work whose Task already has a pull request, the
+        // branch the node REPORTS must be the pull request's head the platform
+        // recorded. A Task's branch never changes once written (see `branchRef`
+        // in `provisionForRun`), so a different name is either a broken node or
+        // one pushing the change somewhere it will not be judged — the second
+        // adversarial review showed a node could push a refused change to the PR
+        // head and report an innocuous branch. Checked BEFORE `recordRemotePush`,
+        // which would otherwise overwrite the recorded head with the reported one.
+        //
+        // Not only when a pull request is recorded: `describeFleetWorkspace`
+        // writes `branchRef` BEFORE the job leaves, so a different name is
+        // anomalous on every run — and without a recorded pull request (an
+        // agent that may not open one, a person opening it by hand) the
+        // overwrite would still move every later judgement onto the node's name.
+        if (isAppWorkKind(work.kind)) {
+            const mismatch = this.branchMismatch(task, branch);
+            if (mismatch) {
+                return this.refuseChange(input, task, mismatch, openPullRequestOf(task), {
+                    reachedRemote: true,
+                });
+            }
+        }
+
         await this.recordRemotePush({
             task,
             branch,
@@ -1328,6 +1884,25 @@ export class TaskWorkspaceService {
         });
 
         if (task.prNumber && task.prUrl) {
+            // APW-08 — an App Work branch is judged on EVERY push, including
+            // one onto a branch that already has a pull request. A re-run
+            // pushes MORE commits onto the same branch (the branch name is
+            // stable, see `branchRef`), and the open pull request picks them up
+            // with nothing else in the way. The first wiring skipped this path
+            // on the grounds that the Task "has already been through here";
+            // that is true of the first push and false of every later one.
+            const target = resolveTaskRepository(work);
+            const guarded = await this.guardAppChange({
+                input,
+                work,
+                owner: target.owner,
+                repo: target.repo,
+                gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
+                branch,
+                existingPullRequest: { number: task.prNumber, url: task.prUrl },
+            });
+            if (guarded) return guarded;
+
             // `recordRemotePush` already kept the branch at `pr-open` for a
             // Task that carries a pull request (review Q-R1-01).
             this.logger.log(
@@ -1336,13 +1911,26 @@ export class TaskWorkspaceService {
             return { outcome: 'pr-opened', prNumber: task.prNumber, prUrl: task.prUrl };
         }
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
         const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
         const baseRef =
             (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
             repository.defaultBranch;
+
+        // APW-08 T17 — the same gate, at the same point as in `finalizeRun`.
+        // `input.baseSha` is deliberately NOT passed: it is reported by the
+        // fleet node, and the gate resolves the rules commit itself.
+        const guarded = await this.guardAppChange({
+            input,
+            work,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch,
+        });
+        if (guarded) return guarded;
 
         return this.openPullRequestForBranch({
             task,
@@ -1635,8 +2223,7 @@ export class TaskWorkspaceService {
         const work = await this.works.findById(task.workId);
         if (!work) return undefined;
 
-        const owner = work.getRepoOwner();
-        const repo = work.getDataRepo();
+        const { owner, repo } = resolveTaskRepository(work);
         const gitOptions = {
             userId: task.userId,
             providerId: work.gitProvider,
@@ -2126,8 +2713,8 @@ export class TaskWorkspaceService {
             if (work) {
                 try {
                     await this.gitFacade.deleteBranch(
-                        work.getRepoOwner(),
-                        work.getDataRepo(),
+                        resolveTaskRepository(work).owner,
+                        resolveTaskRepository(work).repo,
                         task.branchRef,
                         { userId, providerId: work.gitProvider, workId: work.id },
                     );
@@ -2150,6 +2737,9 @@ export class TaskWorkspaceService {
             prNumber: null,
             prUrl: null,
             conflictPaths: null,
+            // The refusal belonged to the branch this patch forgets. Only a
+            // Task that carries it gets the extra field.
+            ...(task.branchGuardRefusal ? { branchGuardRefusal: null } : {}),
             // Cleared in the SAME patch as the primary reset — but only for
             // the branches that really went. A surviving `pr-open` entry is
             // what `findOpenLinkedPullRequest` matches to push a later run's
@@ -2197,8 +2787,8 @@ export class TaskWorkspaceService {
             if (work && work.taskBranchCleanup !== 'manual') {
                 try {
                     await this.gitFacade.deleteBranch(
-                        work.getRepoOwner(),
-                        work.getDataRepo(),
+                        resolveTaskRepository(work).owner,
+                        resolveTaskRepository(work).repo,
                         task.branchRef,
                         { userId: task.userId, providerId: work.gitProvider, workId: work.id },
                     );
@@ -2332,9 +2922,558 @@ export class TaskWorkspaceService {
         return {
             ...entry,
             state: 'failed',
+            // A refused pull request the operator then discarded is a discard
+            // survivor now, never re-recorded by a later run.
+            refusedByGuard: false,
             error: `branch delete failed — the branch is still on the remote: ${reason}`,
             updatedAt: new Date().toISOString(),
         };
+    }
+
+    /**
+     * APW-08 T17 — the change gate, at the one point both finalize paths share.
+     *
+     * Answers `null` to PROCEED and a terminal outcome to refuse. It is a method
+     * rather than inline blocks because the call sites must not be able to
+     * drift: a rule enforced on the workspace path and not on the fleet path is
+     * a rule an agent can route around by choosing where it runs.
+     *
+     * ## Three absences, three different answers
+     *
+     * | State | Answer | Why |
+     * | --- | --- | --- |
+     * | Work is not kind `app` | proceed | This is the finalize tail for EVERY Work. `kind` defaults to `'default'`; an ungated gate would run on every Task in the product. Checked first, so a non-App Task does no extra I/O at all. |
+     * | no gate bound | proceed | Nothing is bound, so nothing was promised. |
+     * | gate bound, rules unreadable | **refuse** | A run whose protected paths are unknown is a run with no protected paths. The gate answers that as a refusal itself. |
+     *
+     * ## Nothing here may throw
+     *
+     * Every other collaborator at finalize time is best-effort. The gate's
+     * contract is that it never rejects; this method still catches, because an
+     * escape here would leave the Task at `branchState: 'pushed'` with no pull
+     * request, no message and no transition — worse than any refusal. A throw
+     * becomes the refusal it was trying to be.
+     *
+     * ## Every push, including one onto an open pull request
+     *
+     * `existingPullRequest` is set when the Task already carries one. A refusal
+     * then says the open pull request now CONTAINS the refused change — it
+     * cannot un-push it and does not pretend to — and blocks the Task.
+     *
+     * ## On the cloud path this is the SECOND judgement
+     *
+     * `finalizeRun` judges an App Work's commit BEFORE publishing it
+     * ({@link judgeBeforePush}, the gate's `checkPaths` over the exact commit)
+     * and publishes exactly that sha. This post-push call then adds what the
+     * pre-push one cannot answer: the size rule and the provider's own diff.
+     * The fleet paths (`finalizeRemotePush`, `judgeAppWorkBranch`) are still
+     * judged here only, after the node's push.
+     *
+     * ## The diff is compared against the BRANCH, not a sha
+     *
+     * The compare still names the branch, so a push landing between the
+     * compare and the pull request is not in what was judged here. Recorded
+     * rather than hidden. On the cloud path the commit that WAS published is
+     * the one `judgeBeforePush` judged; pinning this compare to that sha too
+     * is a change to the gate's port.
+     *
+     * ## Both judgements use merge-base semantics
+     *
+     * The pre-push `branchChanges` and this compare both judge what the branch
+     * changed since its merge base with the base branch — the pull request's
+     * view. A head cut from an OLD ancestor of the base is therefore judged
+     * only by what it changed since that ancestor, so a workflow file the
+     * ancestor carried and the base has since removed can be published without
+     * being named, and an `on: push` trigger in it runs on the push. Recorded
+     * rather than hidden: closing it needs a history-free comparison of the
+     * protected paths against a remote tip the workspace handle does not carry.
+     */
+    private async guardAppChange(input: {
+        input: { task: Task; userId: string; agentId: string };
+        work: Work;
+        owner: string;
+        repo: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+        branch: string;
+        /** Resolved here when absent — only on the App path, so no other kind pays for it. */
+        baseRef?: string;
+        existingPullRequest?: { number: number; url: string };
+    }): Promise<TaskWorkspaceFinalizeOutcome | null> {
+        const { work, owner, repo, gitOptions, branch, existingPullRequest } = input;
+        const task = input.input.task;
+
+        // ---- row 1: not an App Work — before ANY await ---------------------
+        if (!isAppWorkKind(work.kind)) return null;
+
+        // ---- row 2: nothing bound ------------------------------------------
+        if (!this.appChangeGate) {
+            this.logger.debug(
+                `Task ${task.id}: App change gate skipped — not bound in this graph.`,
+            );
+            return null;
+        }
+
+        let verdict: AppWorkChangeGateVerdict;
+        try {
+            const baseRef =
+                input.baseRef ?? (await this.resolveBaseRef(work, owner, repo, gitOptions));
+            verdict = await this.appChangeGate.evaluate({
+                work,
+                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                owner,
+                repo,
+                gitOptions,
+                baseRef,
+                branch,
+            });
+        } catch (error) {
+            // The gate's contract is that it never rejects; this is the net.
+            const reason = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Task ${task.id}: App change gate could not decide: ${reason}`);
+            verdict = {
+                allowed: false,
+                message:
+                    "This Work's rules could not be read, so the change was not checked against its " +
+                    'protected paths.',
+                paths: [],
+            };
+        }
+
+        // `=== true`, not truthiness: this package compiles without
+        // `strictNullChecks`, and in that mode TypeScript does not narrow a
+        // union by the truthiness of a boolean discriminant.
+        if (verdict.allowed === true) {
+            if (verdict.note) {
+                // Allowed, and larger than the Work's guidance. Said once, here,
+                // rather than silently.
+                await this.postSystemMessage(input.input, verdict.note);
+            }
+            // The gate judged the WHOLE branch (a merge-base diff), so an
+            // earlier refused change is no longer on it — or the rules now allow
+            // it. Only a Task that carries the marker pays the write.
+            if (task.branchGuardRefusal) {
+                await this.recordBranchGuardRefusal(task, null);
+            }
+            return null;
+        }
+
+        const consequence = existingPullRequest
+            ? `The branch was pushed, and pull request #${existingPullRequest.number} now contains ` +
+              'this change — it must not be merged as it stands.'
+            : 'The branch was pushed but no pull request was opened.';
+        const paths = verdict.paths.length
+            ? ['', 'Paths:', ...verdict.paths.map((path) => `- \`${path}\``)]
+            : [];
+        return this.refuseChange(
+            input.input,
+            task,
+            [`${verdict.message} ${consequence}`, ...paths].join('\n'),
+            existingPullRequest,
+            { reachedRemote: true },
+        );
+    }
+
+    /**
+     * APW-08 T17 — judge the commit a cloud run just made on an App Work, BEFORE
+     * it is pushed. `{ judgedSha }` means "publish exactly this sha" — the
+     * trimmed commit id the judgement read, which is the one `finalizeRun` must
+     * publish and then find reported back; `{ refused }` is the refusal
+     * `finalizeRun` returns, with nothing pushed.
+     *
+     * The paths and the committed `.works/works.yml` are read from the
+     * workspace (`branchChanges`, a merge-base diff at `headSha` — the same set
+     * the pull request would show), and judged by the gate's `checkPaths`: the
+     * same guard as `evaluate` (protected paths, `.github/workflows/**`, the
+     * file cap, the guarded spec blocks), with the Task's labels so APW-04's
+     * `app-provision` exemption answers the same way. Only the size rule is
+     * left to the post-push {@link guardAppChange}.
+     *
+     * A deleted or renamed-away spec reaches the gate as empty content, which
+     * it refuses exactly as `evaluate` refuses a removed spec. The rules are
+     * read by the gate at the base tip, server-side — nothing from the
+     * workspace names the rules commit.
+     *
+     * Never throws, like {@link guardAppChange}: a commit that cannot be
+     * identified, a provider that cannot report the changes, or a gate that
+     * rejects each become a refusal — never a push of something unjudged.
+     */
+    private async judgeBeforePush(input: {
+        input: { task: Task; userId: string; agentId: string };
+        work: Work;
+        owner: string;
+        repo: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+        baseRef: string;
+        handle: {
+            path: string;
+            baseSha: string;
+            reused: boolean;
+            branch: string;
+            bindingKey: string;
+        };
+        headSha: string | null;
+        facadeOptions: { userId: string; workId: string };
+    }): Promise<{ refused: TaskWorkspaceFinalizeOutcome } | { judgedSha: string }> {
+        const { work, owner, repo, gitOptions, baseRef, handle, facadeOptions } = input;
+        const task = input.input.task;
+        const existingPullRequest = openPullRequestOf(task);
+        const refuse = async (message: string, paths: readonly string[] = []) => ({
+            refused: await this.refuseChange(
+                input.input,
+                task,
+                [
+                    `${message} ${nothingPushedConsequence(existingPullRequest)}`,
+                    ...(paths.length
+                        ? ['', 'Paths:', ...paths.map((path) => `- \`${path}\``)]
+                        : []),
+                ].join('\n'),
+                existingPullRequest,
+                { reachedRemote: false },
+            ),
+        });
+
+        const headSha = typeof input.headSha === 'string' ? input.headSha.trim() : '';
+        if (!headSha || !this.appChangeGate || !this.workspaceFacade) {
+            this.logger.warn(`Task ${task.id}: no local commit to judge before the push.`);
+            return refuse(
+                "The run's commit could not be identified, so it was not checked against this Work's " +
+                    'protected paths.',
+            );
+        }
+
+        let changes: { paths: string[]; contents: Record<string, string | null> };
+        try {
+            changes = await this.workspaceFacade.branchChanges(
+                handle,
+                { headSha, readPaths: [APP_WORK_SPEC_PATH] },
+                facadeOptions,
+            );
+            if (!changes || !Array.isArray(changes.paths)) {
+                throw new Error('the workspace provider answered no list of paths');
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the run's changes could not be read before the push: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return refuse(
+                'What this run changed could not be read before it was pushed, so it was not checked ' +
+                    "against this Work's protected paths.",
+            );
+        }
+
+        let verdict: AppWorkChangeGateVerdict;
+        try {
+            const paths = changes.paths;
+            verdict = await this.appChangeGate.checkPaths({
+                work,
+                owner,
+                repo,
+                gitOptions,
+                baseRef,
+                paths,
+                ...(paths.includes(APP_WORK_SPEC_PATH)
+                    ? {
+                          contents: {
+                              [APP_WORK_SPEC_PATH]: changes.contents?.[APP_WORK_SPEC_PATH] ?? '',
+                          },
+                      }
+                    : {}),
+                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+            });
+        } catch (error) {
+            // The gate's contract is that it never rejects; this is the net.
+            this.logger.warn(
+                `Task ${task.id}: App change gate could not decide before the push: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            verdict = {
+                allowed: false,
+                message:
+                    "This Work's rules could not be read, so the change was not checked against its " +
+                    'protected paths.',
+                paths: [],
+            };
+        }
+
+        // `=== true` — see `guardAppChange` (no `strictNullChecks` narrowing).
+        if (verdict.allowed === true) return { judgedSha: headSha };
+        return refuse(verdict.message, verdict.paths);
+    }
+
+    /**
+     * Owner decision (APW-08 T17): until FR-12's isolated-run admission (T12)
+     * lands, the cloud path does not push an App Work branch at all. The run's
+     * commit stays in its workspace, nothing reaches the remote, and the Task
+     * is blocked with a message that says why and what would change it. An
+     * operator lifts this with `APP_WORKS_CLOUD_PUSH_ENABLED=true`, which turns
+     * on {@link judgeBeforePush} instead.
+     */
+    private async refuseCloudAppPush(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+    }): Promise<TaskWorkspaceFinalizeOutcome> {
+        const { task } = input;
+        const existingPullRequest = openPullRequestOf(task);
+        this.logger.log(
+            `Task ${task.id}: cloud App Work pushes are off (APP_WORKS_CLOUD_PUSH_ENABLED); the run's commit was not pushed.`,
+        );
+        return this.refuseChange(
+            input,
+            task,
+            // Word for word the refusal the agent git tools give (`commitToRepo`,
+            // `openPullRequest`); only what did not happen differs.
+            appWorkCloudPushRefusal(nothingPushedConsequence(existingPullRequest)),
+            existingPullRequest,
+            { reachedRemote: false },
+        );
+    }
+
+    /**
+     * APW-08 T17 — judge an App Work Task's branch at the end of a fleet run that
+     * did NOT go through {@link finalizeRemotePush}: one that ended with a
+     * question, one that failed, or one whose node reported nothing pushed.
+     *
+     * The second adversarial review found all three pushed without judgement.
+     * A run that asks a question still commits and pushes its work first, and so
+     * does a run with a red check — onto the Task's branch, which an open pull
+     * request picks up with nothing in the way. And "pushed: false" is only what
+     * the node says; the wire is untrusted.
+     *
+     * So: when the Task has an open pull request, its head is judged — the head
+     * the PLATFORM recorded (`branchRef`), never a name the node reports.
+     * Without one, the reported branch is judged if the node says it pushed, so a
+     * refused change is at least named and the Task blocked — unless it is not
+     * the Task's recorded branch: that is refused as a mismatch first, naming
+     * both, and never judged in the Task's name. Otherwise there is nothing to
+     * judge. Every other Work kind returns at once.
+     *
+     * Never throws, like everything this service calls at finalize time.
+     */
+    async judgeAppWorkBranch(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        /** The branch the node says it pushed on this run, if it says it pushed. */
+        reportedBranch?: string | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome | null> {
+        const { task, userId } = input;
+        try {
+            if (!task.workId) return null;
+            const work = await this.works.findById(task.workId);
+            if (!work || !isAppWorkKind(work.kind)) return null;
+
+            // An OPEN pull request only: once it is merged or closed (and its
+            // branch perhaps deleted) there is nothing left for a push to reach,
+            // and judging a deleted branch fails closed — which blocked Tasks
+            // whose work had already landed.
+            const existingPullRequest = openPullRequestOf(task);
+            const reported = (input.reportedBranch ?? '').trim();
+            const branch = existingPullRequest ? (task.branchRef ?? '').trim() : reported;
+            if (!branch) return null;
+
+            const judged = { task, userId, agentId: input.agentId };
+            // The same rule as `finalizeRemotePush`: a reported branch that is
+            // not the Task's recorded branch blocks, BEFORE the caller records
+            // the push — on the question path `recordRemotePush` would
+            // otherwise overwrite `branchRef` with the node's name, and every
+            // later judgement would follow it.
+            const mismatch = reported ? this.branchMismatch(task, reported) : null;
+            // With no open pull request the branch judged below IS the reported
+            // one, so a mismatch is refused first, as `finalizeRemotePush` does:
+            // judging a branch that is not the Task's would make its verdict —
+            // which names neither branch — the refusal the Task's OWN branch
+            // panel shows. With an open pull request its recorded head is judged
+            // first instead: that is the branch a refused change would reach.
+            if (mismatch && !existingPullRequest) {
+                return this.refuseChange(judged, task, mismatch, undefined, {
+                    reachedRemote: true,
+                });
+            }
+            const { owner, repo } = resolveTaskRepository(work);
+            const guarded = await this.guardAppChange({
+                input: judged,
+                work,
+                owner,
+                repo,
+                gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
+                branch,
+                ...(existingPullRequest ? { existingPullRequest } : {}),
+            });
+            if (guarded) return guarded;
+
+            if (mismatch) {
+                return this.refuseChange(judged, task, mismatch, existingPullRequest, {
+                    reachedRemote: true,
+                });
+            }
+            return null;
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App Work branch could not be judged: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * APW-08 — may the platform MERGE this App Work Task's open pull request?
+     *
+     * Every refusal leaves the pull request open (the branch is already
+     * pushed), and the post-CI merge sweep reads the pull request, not the
+     * Task's verdict — the third adversarial review showed it would merge a
+     * refused pull request as soon as CI went green, or offer it to a human as
+     * an ordinary Approve button. So the head is judged again, here, before
+     * any approval is raised or merge attempted: whatever path pushed it, and
+     * whether or not that push was ever judged.
+     *
+     * Side-effect free — no chat message, no transition — because the sweep
+     * asks every few minutes; the refusal itself was said when the push was
+     * judged. Returns `null` for every other Work kind (nothing to judge), and
+     * FAILS CLOSED: no gate bound, no branch recorded, rules unreadable — each
+     * is a refusal, because the alternative is merging a change nobody judged.
+     */
+    async judgeAppWorkMerge(
+        task: Task,
+    ): Promise<{ allowed: true } | { allowed: false; reason: string } | null> {
+        if (!task.workId) return null;
+        const work = await this.works.findById(task.workId);
+        if (!work || !isAppWorkKind(work.kind)) return null;
+        if (!this.appChangeGate) return { allowed: false, reason: 'app-change-gate-unavailable' };
+        const branch = (task.branchRef ?? '').trim();
+        if (!branch) return { allowed: false, reason: 'app-change-branch-unknown' };
+        try {
+            const { owner, repo } = resolveTaskRepository(work);
+            const gitOptions = {
+                userId: task.userId,
+                providerId: work.gitProvider,
+                workId: work.id,
+            };
+            const verdict = await this.appChangeGate.evaluate({
+                work,
+                taskLabels: Array.isArray(task.labels) ? task.labels : [],
+                owner,
+                repo,
+                gitOptions,
+                baseRef: await this.resolveBaseRef(work, owner, repo, gitOptions),
+                branch,
+            });
+            return verdict.allowed === true
+                ? { allowed: true }
+                : { allowed: false, reason: 'app-change-refused' };
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App Work pull request could not be judged for merge: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { allowed: false, reason: 'app-change-unjudged' };
+        }
+    }
+
+    /** The branch a pull request would target: the Work's base branch, or the default. */
+    private async resolveBaseRef(
+        work: Work,
+        owner: string,
+        repo: string,
+        gitOptions: { userId: string; providerId: string; workId: string },
+    ): Promise<string> {
+        const configured = work.taskIsolationBaseBranch?.trim();
+        if (configured) return configured;
+        if (!this.gitFacade) {
+            throw new Error('no git facade to read the default branch');
+        }
+        const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        return repository.defaultBranch;
+    }
+
+    /**
+     * The refusal text when a run reports pushing a branch that is not the
+     * Task's recorded one, or `null` when it is (or none is recorded yet).
+     */
+    private branchMismatch(task: Task, reported: string): string | null {
+        const recorded = (task.branchRef ?? '').trim();
+        if (!recorded || recorded === reported) return null;
+        const onPullRequest = task.prNumber ? ` (pull request #${task.prNumber})` : '';
+        return (
+            `The run reported pushing \`${reported}\`, but this Task's branch is \`${recorded}\`${onPullRequest}. ` +
+            "A Task's branch never changes once written, so the Task is blocked until a person checks " +
+            'what was pushed where.'
+        );
+    }
+
+    /**
+     * The refusal every path shares: leave `branchState` alone, record why the
+     * branch carries a refused change, say why, block.
+     *
+     * `reachedRemote` is each caller's statement of whether the refused change
+     * is on the remote branch now — the post-push judgement, or a node that
+     * reported pushing a branch that is not the Task's — or was stopped before
+     * the push (the cloud App Work path). Required, so no new caller can leave
+     * it to a default.
+     */
+    private async refuseChange(
+        input: { task: Task; userId: string; agentId: string },
+        task: Task,
+        body: string,
+        existingPullRequest: { number: number; url: string } | undefined,
+        opts: { reachedRemote: boolean },
+    ): Promise<TaskWorkspaceFinalizeOutcome> {
+        // `branchState` is deliberately NOT changed. After a push the branch
+        // really is pushed, and rewriting that would describe a push that did
+        // not happen; a refusal BEFORE the push (the cloud App Work path) pushed
+        // nothing, so there is nothing new to record either.
+        //
+        // What IS recorded, for a change that reached the remote, is the reason
+        // (`branchGuardRefusal`): with `branchState` unchanged it is the only
+        // thing on the row that tells the branch panel the pull request is not
+        // the healthy one it looks like. A refusal before the push changes
+        // nothing on the branch, so it neither writes the marker nor clears one
+        // an earlier refused push left — that change is still on the branch.
+        // Written BEFORE the transition, which re-reads the row.
+        if (opts.reachedRemote) {
+            await this.recordBranchGuardRefusal(task, body);
+        }
+        await this.postSystemMessage(input, body);
+        await this.transitionTask(task, TaskStatus.BLOCKED);
+        return existingPullRequest
+            ? {
+                  outcome: 'blocked-by-guard',
+                  prNumber: existingPullRequest.number,
+                  prUrl: existingPullRequest.url,
+              }
+            : { outcome: 'blocked-by-guard' };
+    }
+
+    /**
+     * Write (or, with `null`, clear) `tasks.branchGuardRefusal`. Never throws:
+     * every caller is on a finalize path whose contract is that a refusal is
+     * always said and the Task always blocked, and a failed bookkeeping write
+     * must not take either away.
+     */
+    private async recordBranchGuardRefusal(task: Task, body: string | null): Promise<void> {
+        let value = body;
+        if (value !== null && value.length > BRANCH_GUARD_REFUSAL_MAX) {
+            let cut = BRANCH_GUARD_REFUSAL_MAX - 1;
+            // Never end on half of a surrogate pair (an emoji in a path).
+            const last = value.charCodeAt(cut - 1);
+            if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
+            value = `${value.slice(0, cut)}…`;
+        }
+        try {
+            await this.tasks.updateById(task.id, { branchGuardRefusal: value });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the change-guard refusal marker could not be ${
+                    value === null ? 'cleared' : 'recorded'
+                }: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     private async postSystemMessage(
@@ -2374,6 +3513,30 @@ export class TaskWorkspaceService {
  */
 function mountBranchAlreadyGone(message: string): boolean {
     return message.toLowerCase().includes('reference does not exist');
+}
+
+/**
+ * The Task's pull request while it is still OPEN as far as the platform last
+ * saw: recorded, not observed merged or closed, and its branch not merged,
+ * cleaned or discarded. An unknown `prState` counts as open — the status sync
+ * writes it, and a pull request opened a minute ago has none yet.
+ */
+function openPullRequestOf(task: Task): { number: number; url: string } | undefined {
+    if (!task.prNumber || !task.prUrl) return undefined;
+    if (task.prState === 'merged' || task.prState === 'closed') return undefined;
+    if (['merged', 'cleaned', 'discarded'].includes(task.branchState ?? '')) return undefined;
+    return { number: task.prNumber, url: task.prUrl };
+}
+
+/**
+ * What a refusal made BEFORE the push means (the cloud App Work path): the
+ * opposite of the post-push wording — an open pull request did NOT pick the
+ * change up, and must not be read as containing it.
+ */
+function nothingPushedConsequence(existingPullRequest?: { number: number; url: string }): string {
+    return existingPullRequest
+        ? `Nothing was pushed, so pull request #${existingPullRequest.number} does not contain this change.`
+        : 'Nothing was pushed and no pull request was opened.';
 }
 
 /**
@@ -2452,13 +3615,41 @@ export function repositoryIdFromCloneUrl(cloneUrl: string): string | null {
             return null;
         }
     }
-    const segments = path
-        .replace(/\.git$/i, '')
-        .split('/')
-        .filter((segment) => segment.length > 0);
+    // Split FIRST, then strip `.git` from the repository segment: stripping the
+    // whole path left `owner/repo.git/` (a trailing slash) as `owner/repo.git`,
+    // an identity no comparison with `owner/repo` recognised — git resolves that
+    // URL to the real repository, so a mount could alias the Task's primary.
+    const segments = path.split('/').filter((segment) => segment.length > 0);
     if (segments.length !== 2) return null;
-    const [owner, repo] = segments;
+    const owner = segments[0];
+    const repo = segments[1].replace(/\.git$/i, '');
     const safe = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
     if (!safe.test(owner) || !safe.test(repo) || owner === '..' || repo === '..') return null;
     return `${owner}/${repo}`;
+}
+
+/**
+ * The lower-cased HOSTNAME of an HTTPS, `ssh://` or scp-like
+ * (`git@host:owner/repo`) clone URL — port and userinfo ignored — or null
+ * when there is none. Never throws.
+ *
+ * `repositoryIdFromCloneUrl` is host-agnostic by design; this is the half
+ * it drops, for the places where `owner/repo` alone is not an identity (the
+ * registry row that supplies a Task primary's env files and grants). Same
+ * parse as there: scp-like only when the value has no `scheme://`.
+ */
+export function cloneUrlHost(cloneUrl: string): string | null {
+    if (typeof cloneUrl !== 'string') return null;
+    const value = cloneUrl.trim();
+    if (!value) return null;
+    const scpLike = /^(?:[A-Za-z0-9._-]+@)?([A-Za-z0-9.-]+):(.+)$/.exec(value);
+    if (scpLike && !/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+        return scpLike[1].toLowerCase();
+    }
+    try {
+        const host = new URL(value).hostname.toLowerCase();
+        return host || null;
+    } catch {
+        return null;
+    }
 }

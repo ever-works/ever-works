@@ -127,3 +127,33 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // inside the request that asked for it.
 export * from './workspace-backup.types';
 export * from './workspace-backup-dispatcher';
+
+// APW-07 T17 — the app-dependency-provision job. One message per
+// (Work, kind): claim the row's lease, dial the dependency provider on the
+// isolated `app-cluster-io` worker, persist, and re-dispatch with a delay
+// rather than sleeping. The dispatcher PROPAGATES errors (APW07-G24): a
+// dropped provision leaves a card at "Provisioning" with nothing behind it.
+export * from './app-dependency-provision.types';
+export * from './app-dependency-provision-dispatcher';
+
+// APW-03 T13 — the `app-spec-evaluate` job: the dispatcher token, its payload
+// and the runtime-neutral handler + job id (`app-works-jobs.ts`) every provider
+// registers. A `null` dispatch runs the handler IN-PROCESS for this job id only
+// (plan §6.1:661-662, FR-90), which is what makes the emit side of
+// `AppSpecAppliedEvent` reach the API-process listeners.
+export * from './app-spec-evaluate.types';
+export * from './app-spec-evaluate-dispatcher';
+export * from './app-works-jobs';
+
+// APW-05 T18 — the two Build dispatchers (plan §7.1:1312-1319). Both answer
+// `Promise<string | null>` and are modelled on `work-import-dispatcher.ts`: a
+// `null` means "no runtime took it", and `AppBuildsService` answers it with
+// §7.1's documented in-process fallback (`APW05-G20`). The payload types carry
+// ids and a reason only, plus the task ids the `packages/tasks` side registers
+// its jobs under.
+export * from './app-build-prepare.types';
+export * from './app-build-prepare-dispatcher';
+// EW-693 / T27 — the long-running plugin operation job's id, dispatch method and payload.
+export * from './plugin-operation-dispatch';
+export * from './app-build-watch.types';
+export * from './app-build-watch-dispatcher';

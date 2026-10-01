@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { NextIntlClientProvider } from 'next-intl';
 
 import messages from '../../../messages/en.json';
@@ -22,9 +23,51 @@ function renderSetting(timezone: string | null) {
 const radio = (value: 'local' | 'utc') =>
     screen.getByTestId(`profile-timezone-${value}`).querySelector('input')!;
 
+/**
+ * Make `Intl.DateTimeFormat().resolvedOptions().timeZone` answer `zone`.
+ *
+ * Only `resolvedOptions` is replaced; the rest of the `Intl.DateTimeFormat`
+ * instance is the real one, so `next-intl`'s own formatting still works.
+ */
+function pinBrowserZone(zone: string): void {
+    const real = Intl.DateTimeFormat;
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(((...args: unknown[]) => {
+        const formatter = new (real as unknown as new (...a: unknown[]) => Intl.DateTimeFormat)(
+            ...args,
+        );
+        const resolved = formatter.resolvedOptions.bind(formatter);
+        formatter.resolvedOptions = () => ({ ...resolved(), timeZone: zone });
+        return formatter;
+    }) as unknown as typeof Intl.DateTimeFormat);
+}
+
+/**
+ * The browser zone this suite pretends to be in.
+ *
+ * `TimeZoneSetting` reads the REAL host zone through
+ * `Intl.DateTimeFormat().resolvedOptions().timeZone`, which made two of the
+ * cases below pass or fail depending on where they ran. CI run 35591005499
+ * caught it: the self-hosted runners are on **UTC**, so `browserZone` was
+ * `'UTC'`, the component's `modeOf('UTC')` correctly answered `'utc'`, and
+ * "saves the browser zone when local time is picked" asserted the `local`
+ * radio was checked when the product had every right to check `utc`. The
+ * product was right and the test was not hermetic.
+ *
+ * Pinning it here makes every case deterministic on any machine. The real
+ * UTC-browser behaviour is not swept away — it gets its own case at the end of
+ * this file, which is the one that actually describes what a person in London
+ * sees.
+ */
+const PINNED_BROWSER_ZONE = 'Europe/Kyiv';
+
 describe('TimeZoneSetting (owner 2026-09-18 — replaces the "Times shown in UTC." note)', () => {
     beforeEach(() => {
         setProfileTimezone.mockReset();
+        pinBrowserZone(PINNED_BROWSER_ZONE);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('offers exactly the two choices a person makes: my local time, or UTC', () => {
@@ -82,6 +125,23 @@ describe('TimeZoneSetting (owner 2026-09-18 — replaces the "Times shown in UTC
         );
     });
 
+    it('checks UTC — not "local" — when the browser itself is in UTC', async () => {
+        // The case the CI runners actually exercise, and the reason the suite is
+        // pinned above. A person in London who picks "My local time" stores
+        // `UTC`, and `modeOf('UTC')` is `'utc'` by design (`TimeZoneSetting.tsx`
+        // FIXED_ZONES) — so the UTC row is the honest one to check. Asserting
+        // `local` here would be asserting a bug.
+        pinBrowserZone('UTC');
+        setProfileTimezone.mockResolvedValue({ success: true, data: { timezone: 'UTC' } });
+        renderSetting(null);
+
+        radio('local').click();
+
+        await waitFor(() => expect(setProfileTimezone).toHaveBeenCalledWith('UTC'));
+        await waitFor(() => expect(radio('utc')).toBeChecked());
+        expect(radio('local')).not.toBeChecked();
+    });
+
     it('saves the fixed clock when UTC is picked', async () => {
         setProfileTimezone.mockResolvedValue({ success: true, data: { timezone: 'UTC' } });
         renderSetting('Europe/Kyiv');
@@ -103,5 +163,30 @@ describe('TimeZoneSetting (owner 2026-09-18 — replaces the "Times shown in UTC
         expect(screen.getByTestId('profile-timezone-current')).toHaveTextContent(
             'Times are shown in Europe/Kyiv.',
         );
+    });
+
+    /**
+     * e2e run 36135997693: /settings threw React hydration error #418 because the
+     * server rendered the hint with ITS zone (UTC in production) and the browser
+     * hydrated with its own. The server render must not name any browser zone.
+     */
+    it('renders no browser zone on the server, so hydration cannot mismatch', () => {
+        const html = renderToString(
+            <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+                <TimeZoneSetting timezone="Europe/Kyiv" />
+            </NextIntlClientProvider>,
+        );
+
+        // The stored zone is server data and may appear; the local-time HINT may not.
+        expect(html).toContain('My local time');
+        expect(html).not.toMatch(/<span[^>]*>Europe\/Kyiv<\/span>/);
+    });
+
+    it('shows the browser zone as the hint once mounted on the client', () => {
+        renderSetting(null);
+
+        expect(
+            within(screen.getByTestId('profile-timezone-local')).getByText(PINNED_BROWSER_ZONE),
+        ).toBeInTheDocument();
     });
 });

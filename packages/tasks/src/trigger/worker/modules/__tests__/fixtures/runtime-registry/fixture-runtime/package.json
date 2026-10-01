@@ -1,0 +1,27 @@
+{
+    "name": "@ever-works/fixture-runtime-plugin",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Test fixture for trigger-run-plugin-operation.module.spec.ts — the package a stub registry serves. It sits OUTSIDE the worker's pluginPaths: it reaches the worker only by being installed at runtime (T27).",
+    "main": "./index.cjs",
+    "everworks": {
+        "plugin": {
+            "id": "fixture-runtime",
+            "name": "Fixture Runtime",
+            "version": "1.0.0",
+            "category": "utility",
+            "capabilities": [],
+            "description": "Echoes its arguments and where it was loaded from; used only by the run-plugin-operation boot spec.",
+            "author": {
+                "name": "Ever Works Team"
+            },
+            "license": "AGPL-3.0",
+            "builtIn": false,
+            "operations": [
+                {
+                    "name": "echo"
+                }
+            ]
+        }
+    }
+}

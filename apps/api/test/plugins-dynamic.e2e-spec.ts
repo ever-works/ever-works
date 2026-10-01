@@ -28,6 +28,8 @@ describe('PluginsController (EW-693 dynamic distribution)', () => {
     let app: INestApplication;
     let installer: jest.Mocked<PluginInstallerService>;
     let catalog: jest.Mocked<PluginCatalogService>;
+    // EW-693 T27 — the install endpoint registers what it installed.
+    let pluginsService: { registerInstalledPlugin: jest.Mock };
 
     const baseInstallState = (overrides: Partial<{ pluginId: string; installState: string }>) =>
         ({
@@ -56,10 +58,12 @@ describe('PluginsController (EW-693 dynamic distribution)', () => {
             getInstallState: jest.fn(),
         } as unknown as jest.Mocked<PluginCatalogService>;
 
+        pluginsService = { registerInstalledPlugin: jest.fn(async () => undefined) };
+
         const module: TestingModule = await Test.createTestingModule({
             controllers: [PluginsController],
             providers: [
-                { provide: PluginOperationsService, useValue: {} },
+                { provide: PluginOperationsService, useValue: pluginsService },
                 { provide: WorkOwnershipService, useValue: {} },
                 { provide: PluginValidationService, useValue: {} },
                 { provide: ActivityLogService, useValue: { log: jest.fn() } },
@@ -135,6 +139,10 @@ describe('PluginsController (EW-693 dynamic distribution)', () => {
                 integrity: 'sha512-x',
                 source: undefined,
             });
+            expect(pluginsService.registerInstalledPlugin).toHaveBeenCalledWith(
+                'notion-extractor',
+                '/tmp/ew693/node_modules/@ever-works/notion-extractor-plugin',
+            );
         });
 
         it('propagates 409 for non-allowlisted (FR-11)', async () => {
@@ -148,6 +156,8 @@ describe('PluginsController (EW-693 dynamic distribution)', () => {
                 .post('/api/plugins/cool-plugin/install')
                 .send({})
                 .expect(409);
+            // Nothing was installed, so nothing is registered.
+            expect(pluginsService.registerInstalledPlugin).not.toHaveBeenCalled();
         });
 
         it('propagates 424 on integrity mismatch (FR-10)', async () => {

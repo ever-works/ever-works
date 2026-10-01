@@ -30,6 +30,9 @@ import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
 import { PlaybookCatalogFacadeService } from './playbook-catalog.facade';
 import { ConnectionScopesFacadeService } from './connection-scopes.facade';
+import { AppRuntimeFacadeService } from './app-runtime.facade';
+import { AppDependencyFacadeService } from './app-dependency.facade';
+import { IdentityProviderFacadeService } from './identity-provider.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -67,6 +70,25 @@ const FACADES = [
     // AW-15 — `connection-scopes` capability lookup (which access levels a
     // provider declares). Depends only on the global PluginRegistryService.
     ConnectionScopesFacadeService,
+    // APW-06 T20 — the App runtime plugin-and-credential facade (R-5).
+    //
+    // ⚠️ It IS constructed in every process that imports this module — that is
+    // deliberate (APW06-G02) and it is why the class refuses PER CALL, never at
+    // construction: every method throws `APP_CLUSTER_IO_IN_API` unless
+    // `isAppClusterWorkerContext()` is true. Nothing in an API process may call
+    // it, and `apps/api/src` carries a static test asserting no file there
+    // imports the marker that would arm the flag.
+    AppRuntimeFacadeService,
+    // APW-07 T16 — the App dependency provider facade. Like every other facade
+    // here it depends only on the global PluginRegistryService plus two
+    // @Optional() injections, so it resolves in this module; it is what
+    // `AppDependenciesService` selects a provider through (plan §4.8:543-546).
+    AppDependencyFacadeService,
+    // APW-12 (Ever ID) — the identity provider facade: resolves the
+    // `identity-provider` capability at the platform tier only and holds the
+    // administrator's on/off switch. Depends on the global PluginRegistryService,
+    // PluginRepository and PluginSettingsService, so it resolves in this module.
+    IdentityProviderFacadeService,
 ];
 
 /**

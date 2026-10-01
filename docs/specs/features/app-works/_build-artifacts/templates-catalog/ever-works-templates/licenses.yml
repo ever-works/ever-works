@@ -1,0 +1,109 @@
+# Ever Works — license registry (seed)
+#
+# SEED / DRAFT. This is the intended content of `licenses.yml` in the template listing
+# repository `ever-works/templates` (the repository the Apps catalog is read from —
+# APW-03 `catalog.md` §4, renamed from `ever-works/apps` by the owner's 2026-09-17 decision).
+#
+# NOT LEGAL ADVICE AND NOT YET LEGAL-REVIEWED. APW-03 `tasks.md` T33 requires this file to be
+# drafted from `catalog.md` §4 with the classes fixed per CONTRACTS R-3, and `catalog.md` §7
+# rule 3 requires one legal-reviewer approval for every change to it. Treat `licenses[]` below
+# as "the licenses our seven seed templates and their upstreams actually use", not as a
+# finished registry.
+#
+# The three classes are FIXED (R-3) and the platform rejects a registry that loosens any of
+# them, keeping its last good copy:
+#   green — permissive and copyleft including AGPL; managed hosting allowed.
+#   amber — managed hosting only with a recorded upstream agreement; own cluster with attestation.
+#   red   — never listed in the catalog, never on Ever Works Apps; own cluster with attestation.
+#
+# Which row uses which license (the authoritative link is each row's `license.spdx` in
+# `manifest.json`; this comment is only here so a person can review the registry at a glance):
+#   AGPL-3.0-only  ever-works/{directory-web,directory-web-minimal,web,web-minimal}-template
+#   MIT            ever-works/{cal-diy,umami,app-fixture-hello}-template and their app sources
+#                  (calcom/cal.diy, umami-software/umami, ever-works/app-fixture-hello)
+#   Apache-2.0     ever-works/templates itself (this repository's own content)
+#   BUSL-1.1       <e2e-upstream-org>/app-fixture-license-amber   (test catalog `e2e` branch only)
+#   PolyForm-...   <e2e-upstream-org>/app-fixture-license-red     (test catalog `e2e` branch only)
+
+schemaVersion: 1
+updatedAt: 2026-09-17
+
+classes: # CONTRACTS.md Resolution R-3 — do not loosen
+    green: { managedHosting: true, yourCluster: true, attestation: false }
+    amber: { managedHosting: upstream-agreement, yourCluster: true, attestation: true }
+    red: { managedHosting: false, yourCluster: true, attestation: true, catalog: false }
+
+obligationsVocabulary:
+    - attribution # keep copyright and license notices
+    - state-changes # mark modified files
+    - disclose-source # distributing binaries requires source
+    - network-source-offer # users over a network must be offered the running version's source
+    - same-license # derivative works keep the license
+    - no-managed-hosting # may not be offered as a hosted service to third parties
+    - no-commercial-use
+    - no-competing-use
+    - branding-must-remain
+    - trademark-restrictions
+
+licenses:
+    # ── The four Website/Work templates in this listing ───────────────────────────────────────
+    - spdx: AGPL-3.0-only
+      name: GNU Affero General Public License v3.0 only
+      class: green
+      obligations: [attribution, disclose-source, same-license, network-source-offer]
+
+    # ── App templates, their app sources, and this repository's own content ───────────────────
+    - spdx: MIT
+      name: MIT License
+      class: green
+      obligations: [attribution]
+
+    - spdx: Apache-2.0
+      name: Apache License 2.0
+      class: green
+      obligations: [attribution, state-changes]
+
+    # ── Fixture licenses for the acceptance lanes (APW-13 T25; APW-03 coordination item) ──────
+    # A person creates <e2e-upstream-org>/app-fixture-license-amber and
+    # <e2e-upstream-org>/app-fixture-license-red to prove the amber attestation path and the red
+    # refusal path. Both live on the catalog's test-only `e2e` branch (catalog.md §2), never on
+    # `main`: the platform drops a red row from the catalog on its own as well (R-3), so a red
+    # entry must never reach the production ref.
+    - spdx: BUSL-1.1
+      name: Business Source License 1.1
+      class: amber
+      obligations: [no-managed-hosting]
+      attestation:
+          textId: busl-1.1-v1
+          text: >-
+              I have read this project's license and its Additional Use Grant, and my use of this App Work on my
+              own cluster complies with them.
+
+    - spdx: PolyForm-Noncommercial-1.0.0
+      name: PolyForm Noncommercial License 1.0.0
+      class: red
+      obligations: [no-commercial-use, no-managed-hosting]
+      attestation:
+          textId: polyform-noncommercial-v1
+          text: >-
+              I will run this App Work only for purposes this license permits, and not commercially.
+
+exceptions:
+    - spdx: Classpath-exception-2.0 # "<license> WITH <exception>" keeps the base class unless listed
+      effect: none
+
+aliases:
+    - { match: 'The MIT License', spdx: MIT }
+    - { match: 'MIT License', spdx: MIT }
+    - { match: 'AGPL-3.0', spdx: AGPL-3.0-only } # what the Git provider's license API reports for our templates
+    - { match: 'GNU Affero General Public License v3.0', spdx: AGPL-3.0-only }
+    - { match: 'Apache License, Version 2.0', spdx: Apache-2.0 }
+    - { match: 'Business Source License 1.1', spdx: BUSL-1.1 }
+    - { match: 'PolyForm Noncommercial License 1.0.0', spdx: PolyForm-Noncommercial-1.0.0 }
+
+unknown:
+    class: amber # no license, or a text the registry cannot identify
+    attestation:
+        textId: unknown-license-v1
+        text: >-
+            I could not find a license the registry recognises. I confirm I have the right to run this software.

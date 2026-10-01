@@ -196,6 +196,16 @@ export class FleetPushCredentialService {
                     // not granted, so this token cannot open a pull request,
                     // read a secret, or touch an Action — even though the
                     // App itself may hold those permissions.
+                    //
+                    // NEVER add `workflows` here. A fleet node pushes BEFORE
+                    // the platform's change gate (APW-08 T17, the
+                    // AppChangeGuard whose ALWAYS_PROTECTED list is
+                    // `.github/workflows/**`) judges the branch, and the one
+                    // thing stopping a run from landing a workflow file that
+                    // would execute on `push` / `pull_request` in the
+                    // meantime is GitHub itself: it refuses to create or
+                    // update `.github/workflows/*` from a token that lacks
+                    // Workflows: write. The spec pins this object exactly.
                     permissions: { contents: 'write' },
                 },
             );

@@ -40,7 +40,20 @@ import type {
 	GitDiffOptions,
 	GitDiffResult,
 	GitPullRequestStatus,
-	GitWorkflowRun
+	GitWorkflowRun,
+	// App Works fork lifecycle (APW-02 T17/T18).
+	GitForkSyncResult,
+	GitForkDivergence,
+	// App Works fork lifecycle (APW-02 T19/T20/T21).
+	GitRepositoryCopyInput,
+	GitRepositoryCopyResult,
+	GitActionsPermissionsInput,
+	GitActionsPermissionsResult,
+	GitWebhookInput,
+	// Upstream pull requests (APW-09 T2).
+	GitPullRequestReview,
+	GitPullRequestReviewComment,
+	GitInteractionLimit
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 // Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
@@ -50,6 +63,10 @@ import { GITHUB_SCOPES } from '@ever-works/plugin';
 import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { GitOperations } from '@ever-works/plugin/git';
 import { GitHubApiService } from './github-api.service.js';
+// APW-13 T5: the non-production acceptance switch (CONTRACTS §7 row
+// `EVER_WORKS_E2E_FAKES`). Kept in its own module so `github-api.service.ts` can
+// import the same resolver without importing this plugin back (a cycle).
+import { resolveGitHubE2eFakeOrigin } from './e2e-fakes.js';
 import { GitHubActionsService } from './github-actions.service.js';
 import type { GitHubSettings, GitHubPublicKey } from './types.js';
 import { GITHUB_CONNECTION_SCOPE_PRESETS } from './github.connection-scopes.js';
@@ -153,10 +170,25 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 	}
 
 	getCloneUrl(owner: string, repo: string): string {
+		// APW-13 T5 (additive): honour the non-production acceptance switch. This
+		// method is the clone-URL factory `ensureGitOps` injects into
+		// `GitOperations`, which hands its result straight to isomorphic-git — so
+		// without this case a fork checkout, private copy or template fork would
+		// still clone real GitHub while every API call went to the fake.
+		const e2eFakeOrigin = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeOrigin) {
+			return `${e2eFakeOrigin}/${owner}/${repo}.git`;
+		}
 		return `https://github.com/${owner}/${repo}.git`;
 	}
 
 	getWebUrl(owner: string, repo: string): string {
+		// APW-13 T5 (additive): the same switch for the clickable URLs carried in
+		// Activity and PR payloads.
+		const e2eFakeOrigin = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeOrigin) {
+			return `${e2eFakeOrigin}/${owner}/${repo}`;
+		}
 		return `https://github.com/${owner}/${repo}`;
 	}
 
@@ -250,6 +282,111 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 			token,
 			settings.apiBaseUrl
 		);
+	}
+
+	// IGitProviderPlugin - App Works fork lifecycle (APW-02 T17/T18)
+
+	async findExistingFork(
+		upstreamOwner: string,
+		upstreamRepo: string,
+		targetOwner: string,
+		token: string
+	): Promise<GitRepository | null> {
+		const settings = await this.getSettings();
+		return this.apiService.findExistingFork(upstreamOwner, upstreamRepo, targetOwner, token, settings.apiBaseUrl);
+	}
+
+	async syncForkBranch(
+		forkOwner: string,
+		forkRepo: string,
+		branch: string,
+		token: string
+	): Promise<GitForkSyncResult> {
+		const settings = await this.getSettings();
+		return this.apiService.syncForkBranch(forkOwner, forkRepo, branch, token, settings.apiBaseUrl);
+	}
+
+	async getForkDivergence(
+		forkOwner: string,
+		forkRepo: string,
+		forkBranch: string,
+		upstreamOwner: string,
+		upstreamBranch: string,
+		token: string
+	): Promise<GitForkDivergence> {
+		const settings = await this.getSettings();
+		return this.apiService.getForkDivergence(
+			forkOwner,
+			forkRepo,
+			forkBranch,
+			upstreamOwner,
+			upstreamBranch,
+			token,
+			settings.apiBaseUrl
+		);
+	}
+
+	async createBranchFromSha(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		token: string
+	): Promise<GitBranch> {
+		const settings = await this.getSettings();
+		return this.apiService.createBranchFromSha(owner, repo, name, sha, token, settings.apiBaseUrl);
+	}
+
+	async updateBranchRef(
+		owner: string,
+		repo: string,
+		name: string,
+		sha: string,
+		options: { force: false },
+		token: string
+	): Promise<GitBranch> {
+		const settings = await this.getSettings();
+		return this.apiService.updateBranchRef(owner, repo, name, sha, options, token, settings.apiBaseUrl);
+	}
+
+	// App Works fork lifecycle (APW-02 T19/T20/T21) — the private copy, the
+	// Actions hygiene pass and the signed webhook. Each is a pass-through of the
+	// optional `IGitProviderPlugin` member, resolved exactly like T17/T18's:
+	// plugin settings first, then one service call.
+
+	async createRepositoryCopy(input: GitRepositoryCopyInput, token: string): Promise<GitRepositoryCopyResult> {
+		const settings = await this.getSettings();
+		// The copy needs the plugin's own `GitOperations` (its credentials, its
+		// checkout base): `ensureGitOps()` is what `cloneBranch`/`replaceRemote`/`push`
+		// below are reached through, and it is the same instance the other git
+		// operations use.
+		this.ensureGitOps();
+		return this.apiService.createRepositoryCopy(input, token, settings.apiBaseUrl, this.gitOps);
+	}
+
+	async setActionsPermissions(
+		owner: string,
+		repo: string,
+		input: GitActionsPermissionsInput,
+		token: string
+	): Promise<GitActionsPermissionsResult> {
+		const settings = await this.getSettings();
+		return this.apiService.setActionsPermissions(owner, repo, input, token, settings.apiBaseUrl);
+	}
+
+	async createWebhook(
+		owner: string,
+		repo: string,
+		input: GitWebhookInput,
+		token: string
+	): Promise<{ id: number; created: boolean }> {
+		const settings = await this.getSettings();
+		return this.apiService.createWebhook(owner, repo, input, token, settings.apiBaseUrl);
+	}
+
+	async deleteWebhook(owner: string, repo: string, hookId: number, token: string): Promise<void> {
+		const settings = await this.getSettings();
+		return this.apiService.deleteWebhook(owner, repo, hookId, token, settings.apiBaseUrl);
 	}
 
 	async hasForkRelationship(
@@ -392,6 +529,39 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		return this.apiService.getCompareDiff(owner, repo, base, head, opts, token, settings.apiBaseUrl);
 	}
 
+	// Upstream pull requests (APW-09 T2) — the two review reads and the temporary
+	// interaction limit. Delegated EXPLICITLY, like every other optional member
+	// above: a service method with no delegation here reads as ABSENT to the
+	// lazy-plugin proxy, so every call would surface as `providerUnsupported`
+	// even though the provider implements it (G17). The signals stay distinct —
+	// the review lists throw the provider error, the interaction limit answers
+	// `null` for "cannot tell".
+
+	async listPullRequestReviews(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReview[]> {
+		const settings = await this.getSettings();
+		return this.apiService.listPullRequestReviews(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	async listPullRequestReviewComments(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestReviewComment[]> {
+		const settings = await this.getSettings();
+		return this.apiService.listPullRequestReviewComments(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	async getInteractionLimit(owner: string, repo: string, token: string): Promise<GitInteractionLimit | null> {
+		const settings = await this.getSettings();
+		return this.apiService.getInteractionLimit(owner, repo, token, settings.apiBaseUrl);
+	}
+
 	async createPullRequestComment(
 		owner: string,
 		repo: string,
@@ -465,14 +635,14 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		return this.gitOps!.getStatus(dir);
 	}
 
-	getLocalDir(owner: string, repo: string): string {
+	getLocalDir(owner: string, repo: string, checkoutKey?: string): string {
 		this.ensureGitOps();
-		return this.gitOps!.getLocalDir(owner, repo);
+		return this.gitOps!.getLocalDir(owner, repo, checkoutKey);
 	}
 
-	async removeLocalDir(owner: string, repo: string): Promise<void> {
+	async removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void> {
 		this.ensureGitOps();
-		return this.gitOps!.removeLocalDir(owner, repo);
+		return this.gitOps!.removeLocalDir(owner, repo, checkoutKey);
 	}
 
 	async replaceRemote(dir: string, remote: string, url: string): Promise<void> {
@@ -749,6 +919,23 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		// documented default instead of throwing so a bad value degrades safely.
 		// (Lexical only: DNS-rebinding of a hostname is not covered here.)
 		const apiBaseUrl = isSafeWebhookUrl(configuredApiBaseUrl) ? configuredApiBaseUrl : DEFAULT_API_BASE_URL;
+		// APW-13 T5 (additive): the non-production acceptance switch overrides the
+		// RESOLVED value only. The guard above has already judged the configured
+		// admin setting and its arguments are unchanged, so a loopback `apiBaseUrl`
+		// setting is still refused when the switch is off — and the switch is not a
+		// way around the guard, because it never feeds an unchecked admin value into
+		// `isSafeWebhookUrl`; it replaces what the guard produced. The environment is
+		// read at call time, so a lane (and a unit test) can flip it between calls.
+		// The early return keeps the literal below byte-identical to the pre-APW-13
+		// shape, which is what "otherwise exactly as today" means.
+		const e2eFakeApiBaseUrl = resolveGitHubE2eFakeOrigin();
+		if (e2eFakeApiBaseUrl) {
+			return {
+				clientId: settings?.clientId as string | undefined,
+				clientSecret: settings?.clientSecret as string | undefined,
+				apiBaseUrl: e2eFakeApiBaseUrl
+			};
+		}
 		return {
 			clientId: settings?.clientId as string | undefined,
 			clientSecret: settings?.clientSecret as string | undefined,

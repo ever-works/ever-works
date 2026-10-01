@@ -1,0 +1,116 @@
+{
+	"_comment": "APW-06 T6 golden input: two components (both web, one primary), TLS mode 'none'. Hosts are RFC 2606 (example.com) and the digest is a synthetic 64-hex value — no real digest, token or hostname. `runAsUser` on `admin` is APW-03 schema.md §10's optional field (plan §4.4, APW06-G26): the renderer passes it through verbatim when a component carries it and emits nothing when it does not.",
+	"ref": {
+		"workId": "99887766-5555-4666-8777-888899990000",
+		"namespace": "ew-storefront-99887766",
+		"target": "your-cluster"
+	},
+	"purpose": "deploy",
+	"workSlug": "storefront",
+	"deploymentId": "11223344-6666-4777-8888-999900001111",
+	"deploymentShort": "11223344",
+	"specCommitSha": "0011223344556677889900112233445566778899",
+	"isFirstDeploymentOnCluster": false,
+	"skipPreDeployJobs": true,
+	"image": {
+		"reference": "registry.example.com/example-org/storefront@sha256:112233445566778899001122334455667788990011223344556677889900aabb",
+		"pull": {
+			"server": "registry.example.com",
+			"username": "fixture-pull-user",
+			"password": "fixture-placeholder-pull-token"
+		}
+	},
+	"components": [
+		{
+			"name": "web",
+			"role": "web",
+			"port": 3000,
+			"replicas": 1,
+			"writableRootFilesystem": true,
+			"probes": {
+				"startup": {
+					"tcp": true,
+					"periodSeconds": 10,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 60
+				},
+				"readiness": {
+					"tcp": true,
+					"periodSeconds": 10,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 3
+				}
+			},
+			"resources": { "cpu": "250m", "memory": "512Mi", "memoryLimit": "1Gi" },
+			"volumes": [],
+			"primary": true,
+			"deadlineSeconds": 750,
+			"internalUrl": "http://web.ew-storefront-99887766.svc.cluster.local"
+		},
+		{
+			"name": "admin",
+			"role": "web",
+			"port": 3001,
+			"replicas": 1,
+			"runAsUser": 10001,
+			"writableRootFilesystem": false,
+			"probes": {
+				"readiness": {
+					"http": "/admin/health",
+					"periodSeconds": 15,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 10,
+					"failureThreshold": 4
+				}
+			},
+			"resources": { "cpu": "100m", "memory": "256Mi", "memoryLimit": "512Mi" },
+			"volumes": [{ "name": "media", "path": "/var/media", "size": "2Gi", "backup": false }],
+			"primary": false,
+			"deadlineSeconds": 300,
+			"internalUrl": "http://admin.ew-storefront-99887766.svc.cluster.local"
+		}
+	],
+	"jobs": [],
+	"cron": [],
+	"smoke": [
+		{
+			"name": "home",
+			"component": "web",
+			"http": { "method": "GET", "path": "/" },
+			"expect": { "status": [200], "bodyContains": ["Storefront"] },
+			"when": "always"
+		}
+	],
+	"env": {
+		"values": {
+			"APP_SECRET": "fixture-placeholder-app-secret",
+			"PUBLIC_URL": "http://app.example.com"
+		},
+		"checksum": "5a4b3c2d1e0f9876",
+		"secretNames": ["APP_SECRET"]
+	},
+	"hosts": { "primary": "app.example.com", "extra": ["admin.example.com"], "previous": [] },
+	"ingress": {
+		"className": "nginx",
+		"controllerNamespace": null,
+		"tls": "none",
+		"issuer": null
+	},
+	"network": { "isolation": true, "extraEgress": [], "needsHairpin": false },
+	"policy": {
+		"podSecurity": "baseline",
+		"allowRoot": false,
+		"runtimeClassName": null,
+		"quota": null,
+		"limitRange": {
+			"defaultRequest": { "cpu": "100m", "memory": "128Mi" },
+			"defaultLimit": { "cpu": "1", "memory": "512Mi", "ephemeralStorage": "1Gi" },
+			"max": { "cpu": "8", "memory": "64Gi" }
+		},
+		"cronMinIntervalMinutes": 5,
+		"scaleFailedFirstDeployToZero": true,
+		"requireIsolationEnforced": true
+	}
+}

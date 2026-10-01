@@ -1,0 +1,84 @@
+{
+    "url": "https://api.github.com/repos/ever-works/templates/compare/main...apw-e2e-head",
+    "html_url": "https://github.com/ever-works/templates/compare/main...apw-e2e-head",
+    "permalink_url": "https://github.com/ever-works/templates/compare/ever-works:main...apw-e2e-head",
+    "diff_url": "https://github.com/ever-works/templates/compare/main...apw-e2e-head.diff",
+    "patch_url": "https://github.com/ever-works/templates/compare/main...apw-e2e-head.patch",
+    "base_commit": {
+        "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "url": "https://api.github.com/repos/ever-works/templates/git/commits/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "html_url": "https://github.com/ever-works/templates/commit/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "author": {
+            "name": "Ever Works",
+            "date": "2026-09-18T09:12:04Z"
+        },
+        "committer": {
+            "name": "Ever Works",
+            "date": "2026-09-18T09:12:04Z"
+        },
+        "message": "Base commit",
+        "tree": {
+            "sha": "b2c3d4e5f60718293a4b5c6d7e8f901234567890",
+            "url": "https://api.github.com/repos/ever-works/templates/git/trees/b2c3d4e5f60718293a4b5c6d7e8f901234567890"
+        },
+        "parents": []
+    },
+    "merge_base_commit": {
+        "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "url": "https://api.github.com/repos/ever-works/templates/git/commits/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "html_url": "https://github.com/ever-works/templates/commit/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "author": {
+            "name": "Ever Works",
+            "date": "2026-09-18T09:12:04Z"
+        },
+        "committer": {
+            "name": "Ever Works",
+            "date": "2026-09-18T09:12:04Z"
+        },
+        "message": "Base commit",
+        "tree": {
+            "sha": "b2c3d4e5f60718293a4b5c6d7e8f901234567890",
+            "url": "https://api.github.com/repos/ever-works/templates/git/trees/b2c3d4e5f60718293a4b5c6d7e8f901234567890"
+        },
+        "parents": []
+    },
+    "status": "ahead",
+    "ahead_by": 1,
+    "behind_by": 0,
+    "total_commits": 1,
+    "commits": [
+        {
+            "sha": "c3d4e5f60718293a4b5c6d7e8f90123456789012",
+            "url": "https://api.github.com/repos/ever-works/templates/git/commits/c3d4e5f60718293a4b5c6d7e8f90123456789012",
+            "html_url": "https://github.com/ever-works/templates/commit/c3d4e5f60718293a4b5c6d7e8f90123456789012",
+            "author": {
+                "name": "Ever Works",
+                "date": "2026-09-18T09:12:04Z"
+            },
+            "committer": {
+                "name": "Ever Works",
+                "date": "2026-09-18T09:12:04Z"
+            },
+            "message": "Add the App spec",
+            "tree": {
+                "sha": "b2c3d4e5f60718293a4b5c6d7e8f901234567890",
+                "url": "https://api.github.com/repos/ever-works/templates/git/trees/b2c3d4e5f60718293a4b5c6d7e8f901234567890"
+            },
+            "parents": []
+        }
+    ],
+    "files": [
+        {
+            "sha": "d4e5f60718293a4b5c6d7e8f9012345678901234",
+            "filename": ".works/works.yml",
+            "status": "modified",
+            "additions": 4,
+            "deletions": 1,
+            "changes": 5,
+            "blob_url": "https://github.com/ever-works/templates/blob/d4e5f60718293a4b5c6d7e8f9012345678901234/.works/works.yml",
+            "raw_url": "https://github.com/ever-works/templates/raw/d4e5f60718293a4b5c6d7e8f9012345678901234/.works/works.yml",
+            "contents_url": "https://api.github.com/repos/ever-works/templates/contents/.works/works.yml",
+            "patch": "@@ -1,4 +1,7 @@"
+        }
+    ]
+}

@@ -21,6 +21,7 @@ const previousMinimalRepo = process.env.WEBSITE_TEMPLATE_MINIMAL_REPO;
 process.env.WEBSITE_TEMPLATE_MINIMAL_REPO = 'directory-web-minimal-template';
 
 import { NotFoundException } from '@nestjs/common';
+import { getWorkCapabilities, WORK_KINDS } from '@ever-works/contracts';
 import { WorkLifecycleService } from '../work-lifecycle.service';
 import { GenerateStatusType } from '@src/entities/types';
 
@@ -177,6 +178,244 @@ describe('WorkLifecycleService', () => {
                 generateStatus: null,
             }),
         );
+    });
+
+    describe('syncFromDataRepository — kinds without a data repository', () => {
+        // An App Work provisions no data repository by design
+        // (`WORK_KIND_CAPABILITIES.app.repos.data === false`), yet every App
+        // Work page mount reached this method and cloned `<slug>-data` — a
+        // pointless GitHub round-trip that failed and logged "Error syncing
+        // work from data repository" on every render. The gate is the
+        // capability registry, never a `kind === 'app'` test, so the kinds
+        // are derived from it here too.
+        const kindsWithoutDataRepo = WORK_KINDS.filter(
+            (kind) => !getWorkCapabilities(kind).repos.data,
+        );
+
+        it('the registry still has at least one such kind (app)', () => {
+            expect(kindsWithoutDataRepo).toContain('app');
+        });
+
+        it.each(kindsWithoutDataRepo)(
+            'kind %s: returns the no-op result without cloning or writing',
+            async (kind) => {
+                const work = {
+                    id: 'app-1',
+                    name: 'My App',
+                    slug: 'my-app',
+                    kind,
+                    itemsCount: 0,
+                    lastPullRequest: null,
+                    readmeConfig: null,
+                    getDataRepo: jest.fn(() => 'my-app-data'),
+                } as any;
+                ownershipService.ensureCanEdit.mockResolvedValue({ work });
+
+                const result = await service.syncFromDataRepository(work.id, user);
+
+                // Authorization still runs first — a no-op is not a way around it.
+                expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith(work.id, user.id);
+                expect(dataGenerator.getDataSyncSnapshot).not.toHaveBeenCalled();
+                expect(work.getDataRepo).not.toHaveBeenCalled();
+                expect(workRepository.update).not.toHaveBeenCalled();
+                // Same shape the controller already returns for "nothing to
+                // sync" (`status` / `updated` / `message`), so the controller
+                // (which records nothing for `updated: []`) and the web action
+                // need no new branch.
+                expect(result).toEqual({
+                    status: 'success',
+                    updated: [],
+                    message: expect.stringContaining('no data repository'),
+                });
+            },
+        );
+
+        it.each(['website', 'directory', 'default'])(
+            'kind %s: still reads the data repository snapshot',
+            async (kind) => {
+                const work = {
+                    id: 'web-1',
+                    kind,
+                    itemsCount: 3,
+                    lastPullRequest: null,
+                    readmeConfig: {},
+                } as any;
+                ownershipService.ensureCanEdit.mockResolvedValue({ work });
+                dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                    itemsCount: 3,
+                    prUpdate: null,
+                    readmeTemplate: null,
+                });
+
+                const result = await service.syncFromDataRepository(work.id, user);
+
+                expect(dataGenerator.getDataSyncSnapshot).toHaveBeenCalledWith(work, user);
+                expect(result).toMatchObject({ status: 'success' });
+            },
+        );
+    });
+
+    describe('syncFromDataRepository — an unchanged snapshot writes nothing', () => {
+        // Every page mount of a website/directory Work calls this (web
+        // `WorkLayoutClient` → `POST /api/works/:id/sync-data`). It used to put
+        // `readmeConfig` into `updates` unconditionally, so EVERY call wrote the
+        // Work row — bumping `updatedAt`, which also reorders `GET /api/works` —
+        // and reported a change, on which the controller invalidated the Work's
+        // caches and wrote a "Synced work data" activity row per page view. The
+        // "Work already up to date." answer was unreachable.
+
+        const UP_TO_DATE = {
+            status: 'success',
+            updated: [],
+            message: 'Work already up to date.',
+        };
+
+        /**
+         * A persisted Work row: `update` merges into it through a JSON round
+         * trip (the `simple-json` column type of `readmeConfig` and
+         * `lastPullRequest`), and `ensureCanEdit` hands out a FRESH load of it
+         * per call — the way two page mounts see the database.
+         */
+        function persistedWork(initial: Record<string, unknown>) {
+            let row = JSON.parse(JSON.stringify(initial));
+            workRepository.update.mockImplementation(
+                async (_id: string, updates: Record<string, unknown>) => {
+                    row = JSON.parse(JSON.stringify({ ...row, ...updates }));
+                },
+            );
+            ownershipService.ensureCanEdit.mockImplementation(async () => ({
+                work: JSON.parse(JSON.stringify(row)),
+            }));
+            return { row: () => row };
+        }
+
+        it('the second call with an unchanged snapshot reports no updates and writes nothing', async () => {
+            const stored = persistedWork({
+                id: 'dir-1',
+                kind: 'directory',
+                itemsCount: 3,
+                lastPullRequest: null,
+                readmeConfig: null,
+            });
+            dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                itemsCount: 5,
+                prUpdate: { title: 'Update items' },
+                readmeTemplate: { header: '# Awesome', footer: 'Made with love' },
+            });
+
+            // First mount: the snapshot really differs, so it is adopted once.
+            const first = await service.syncFromDataRepository('dir-1', user);
+            expect(first).toEqual({
+                status: 'success',
+                updated: expect.arrayContaining(['itemsCount', 'lastPullRequest', 'readmeConfig']),
+                message: 'Work synced from data repository.',
+            });
+            expect(workRepository.update).toHaveBeenCalledTimes(1);
+            expect(stored.row().readmeConfig).toEqual({
+                header: '# Awesome',
+                overwriteDefaultHeader: true,
+                footer: 'Made with love',
+                overwriteDefaultFooter: true,
+            });
+
+            // Second mount, same snapshot: nothing to adopt, nothing written.
+            const second = await service.syncFromDataRepository('dir-1', user);
+            expect(second).toEqual(UP_TO_DATE);
+            expect(workRepository.update).toHaveBeenCalledTimes(1);
+        });
+
+        it.each<
+            [string, Record<string, unknown> | null | undefined, Record<string, string> | null]
+        >([
+            ['an empty object', {}, null],
+            // `readmeConfig` is a nullable column: a Work created without one
+            // must not have `{}` written over its `null` on every page mount.
+            ['null', null, null],
+            ['absent', undefined, null],
+            [
+                'a header and footer the Work already carries (they win over the template)',
+                {
+                    header: 'Mine',
+                    overwriteDefaultHeader: false,
+                    footer: 'Also mine',
+                    overwriteDefaultFooter: true,
+                },
+                { header: 'Template header', footer: 'Template footer' },
+            ],
+            [
+                'the adopted template in a different key order',
+                {
+                    overwriteDefaultFooter: true,
+                    footer: 'F',
+                    overwriteDefaultHeader: true,
+                    header: 'H',
+                },
+                { header: 'H', footer: 'F' },
+            ],
+            [
+                'an explicitly undefined key (same as a missing one)',
+                { header: 'H', overwriteDefaultHeader: true, footer: undefined },
+                { header: 'H' },
+            ],
+        ])(
+            'readmeConfig stored as %s and an unchanged snapshot: "Work already up to date.", no write',
+            async (_label, readmeConfig, readmeTemplate) => {
+                const work = {
+                    id: 'dir-1',
+                    kind: 'directory',
+                    itemsCount: 7,
+                    lastPullRequest: { data: { title: 'Already recorded' } },
+                    ...(readmeConfig === undefined ? {} : { readmeConfig }),
+                } as any;
+                ownershipService.ensureCanEdit.mockResolvedValue({ work });
+                dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                    itemsCount: 7,
+                    // Recorded once already (`lastPullRequest.data`), never re-adopted.
+                    prUpdate: { title: 'Newer PR text' },
+                    readmeTemplate,
+                });
+
+                const result = await service.syncFromDataRepository(work.id, user);
+
+                expect(result).toEqual(UP_TO_DATE);
+                expect(workRepository.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it('still writes readmeConfig when the template brings a header the Work lacks, without mutating the loaded entity', async () => {
+            const loadedReadmeConfig = { footer: 'Kept' };
+            const work = {
+                id: 'dir-1',
+                kind: 'directory',
+                itemsCount: 2,
+                lastPullRequest: null,
+                readmeConfig: loadedReadmeConfig,
+            } as any;
+            ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            dataGenerator.getDataSyncSnapshot.mockResolvedValue({
+                itemsCount: 2,
+                prUpdate: null,
+                readmeTemplate: { header: '# From template', footer: 'Ignored: the Work has one' },
+            });
+
+            const result = await service.syncFromDataRepository(work.id, user);
+
+            expect(result).toEqual({
+                status: 'success',
+                updated: ['readmeConfig'],
+                message: 'Work synced from data repository.',
+            });
+            expect(workRepository.update).toHaveBeenCalledWith('dir-1', {
+                readmeConfig: {
+                    footer: 'Kept',
+                    header: '# From template',
+                    overwriteDefaultHeader: true,
+                },
+            });
+            // The comparison needs the stored value as a baseline, so the
+            // candidate is a copy — the loaded entity is left as it was read.
+            expect(loadedReadmeConfig).toEqual({ footer: 'Kept' });
+        });
     });
 
     describe('updateWork — organizationId (EW-639 Phase 2/e)', () => {

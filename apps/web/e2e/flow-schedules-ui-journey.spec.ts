@@ -35,7 +35,7 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
  *       - recurring_task   "Recurring task"   "Every day"           Active   → /tasks/:id
  *       - data_sync        "Data sync"        "Every 5 minutes"     Active   → /works/:id
  *       - source_validation"Source validation""Every week"          Active
- *       - agent_heartbeat  "Agent heartbeat"  "Every hour"          Disabled  next-run "—"
+ *       - agent_heartbeat  "Agent heartbeat"  "Every hour"          Disabled  next-run "The owner is not active"
  *       - inbound_trigger  "Inbound trigger"  "On event"            Active    next-run "—"
  *   • clicking an owner link navigates to the owning entity
  *   • the source chips (with pre-filter counts) narrow the visible rows and put
@@ -188,7 +188,9 @@ test.describe('Schedules UI — shell & tab toggle', () => {
     }) => {
         await page.goto(ACTIVITY_URL, { waitUntil: 'domcontentloaded' });
         await expect(page).not.toHaveURL(/\/login/);
-        await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible({
+        // Level 1: since 59e63b6b3 the Log view also carries an <h2>Activity log</h2>,
+        // and a role name matches substrings (runs-ledger.spec.ts does the same).
+        await expect(page.getByRole('heading', { name: 'Activity', level: 1 })).toBeVisible({
             timeout: 30_000,
         });
 
@@ -374,7 +376,7 @@ test.describe('Schedules UI — source rows render', () => {
         );
     });
 
-    test('a draft Agent heartbeat renders an "Agent heartbeat" row: Disabled pill, "Every hour", em-dash next run', async ({
+    test('a draft Agent heartbeat renders an "Agent heartbeat" row: Disabled pill, "Every hour", owner-inactive next-run reason', async ({
         page,
         request,
     }) => {
@@ -393,8 +395,9 @@ test.describe('Schedules UI — source rows render', () => {
         await expect(row.getByText('Every hour')).toBeVisible();
         // A brand-new agent is DRAFT → the heartbeat is present but disabled…
         await expect(row.getByText('Disabled', { exact: true })).toBeVisible();
-        // …and a heartbeat has no computed next fire → the UI shows an em dash.
-        await expect(row.getByText('—')).toBeVisible();
+        // …and a heartbeat has no computed next fire. Since 233c219ea the row states
+        // WHY (nextRunReasonKey 'ownerInactive' for a draft agent) instead of an em dash.
+        await expect(row.getByText('The owner is not active')).toBeVisible();
     });
 
     test('an inbound Trigger renders an "Inbound trigger" row: "On event" cadence, no next run', async ({
@@ -609,7 +612,11 @@ test.describe('Schedules UI — inbound triggers surface', () => {
 
         // Dialog fields render; Create is disabled until a name is entered.
         await expect(dialogHeading).toBeVisible({ timeout: 15_000 });
-        const createBtn = page.getByRole('button', { name: 'Create', exact: true });
+        // Scoped to the dialog: since 233c219ea the list header carries its own
+        // "Create" menu button, which the modal does not hide from the a11y tree.
+        const createBtn = page
+            .getByRole('dialog')
+            .getByRole('button', { name: 'Create', exact: true });
         await expect(createBtn).toBeDisabled();
 
         const name = `UI Dialog Hook ${stamp()}`;

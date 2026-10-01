@@ -20,6 +20,12 @@ const ACTION_TYPES = [
     { value: 'import', label: 'import' },
     { value: 'user_login', label: 'login' },
     { value: 'user_signup', label: 'signup' },
+    // APW-12 (Ever ID, T49) — the five additive action types of FR-49.
+    { value: 'user_logout', label: 'logout' },
+    { value: 'identity_linked', label: 'identityLinked' },
+    { value: 'identity_unlinked', label: 'identityUnlinked' },
+    { value: 'delegated_access', label: 'delegatedAccess' },
+    { value: 'identity_provider_config_changed', label: 'identityProviderConfigChanged' },
 ];
 
 const STATUS_OPTIONS = [

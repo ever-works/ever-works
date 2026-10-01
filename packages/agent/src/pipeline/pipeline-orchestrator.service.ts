@@ -17,7 +17,11 @@ import {
 
 import { StepPipelineExecutorService } from './step-pipeline-executor.service';
 import { FullPipelineExecutorService } from './full-pipeline-executor.service';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializeUsablePlugin } from '../plugins/services/plugin-operation.util';
 
 export type PipelineExecutionMode = 'step' | 'full';
 
@@ -134,10 +138,14 @@ export class PipelineOrchestratorService {
     /**
      * Same as {@link getAvailablePipelinePlugins} but with every lazy stub
      * materialised, so capability probes (`isStepOrchestratablePipeline`) see
-     * the real plugin surface.
+     * the real plugin surface — less any that cannot load (import or onLoad
+     * failing on this first use), as the eager boot would have left it out.
      */
     private async getMaterializedPipelinePlugins(): Promise<IPipelinePlugin[]> {
-        return Promise.all(this.getAvailablePipelinePlugins().map((p) => this.materialize(p)));
+        const materialized = await Promise.all(
+            this.getAvailablePipelineEntries().map((entry) => this.materialize(entry)),
+        );
+        return materialized.filter((p): p is IPipelinePlugin => p !== null);
     }
 
     /**
@@ -150,21 +158,30 @@ export class PipelineOrchestratorService {
      * orchestrator always *executes* the pipeline it resolves (never just
      * inspects it), so materialising here costs nothing extra and restores the
      * real plugin surface for routing + execution. No-op for eager/real plugins.
+     *
+     * `null` when the plugin cannot be used: its import fails, or its first
+     * load leaves the registry entry in `error` (a failing onLoad does not
+     * reject the materialise). The eager boot found that at boot and skipped
+     * the pipeline; the caller skips it here, never executing it.
      */
-    private async materialize(plugin: IPipelinePlugin): Promise<IPipelinePlugin> {
-        const stub = plugin as unknown as { __materialize?: () => Promise<unknown> };
-        if (typeof stub.__materialize === 'function') {
-            return (await stub.__materialize()) as IPipelinePlugin;
-        }
-        return plugin;
+    private async materialize(
+        registered: Pick<RegisteredPlugin, 'plugin' | 'state' | 'error'>,
+    ): Promise<IPipelinePlugin | null> {
+        const pluginId = registered.plugin.id;
+        return materializeUsablePlugin<IPipelinePlugin>(registered, pluginId, (reason) =>
+            this.logger.warn(`Pipeline plugin "${pluginId}" is not usable: ${reason}`),
+        );
     }
 
     getAvailablePipelinePlugins(): IPipelinePlugin[] {
+        return this.getAvailablePipelineEntries().map((p) => p.plugin as IPipelinePlugin);
+    }
+
+    /** The registry entries behind {@link getAvailablePipelinePlugins}. */
+    private getAvailablePipelineEntries(): RegisteredPlugin[] {
         return this.registry
             .getByCapability(PLUGIN_CAPABILITIES.PIPELINE)
-            .filter((p) => p.state === 'loaded')
-            .map((p) => p.plugin)
-            .filter(isPipelinePlugin);
+            .filter((p) => p.state === 'loaded' && isPipelinePlugin(p.plugin));
     }
 
     async resumeFromCheckpoint(
@@ -247,9 +264,8 @@ export class PipelineOrchestratorService {
                     workId,
                     userId,
                 );
-                if (isEnabled) {
-                    return this.materialize(registered.plugin);
-                }
+                const usable = isEnabled ? await this.materialize(registered) : null;
+                if (usable) return usable;
             }
             this.logger.warn(
                 `Pipeline plugin "${pipelineId}" not available, falling back to auto-detect`,
@@ -270,10 +286,12 @@ export class PipelineOrchestratorService {
                 workId,
                 userId,
             );
-            if (isEnabled) return this.materialize(registered.plugin);
+            const usable = isEnabled ? await this.materialize(registered) : null;
+            if (usable) return usable;
         }
 
-        // Fallback: first loaded and enabled pipeline
+        // Fallback: first loaded and enabled pipeline (a default that failed to
+        // load above is in `error` now, so it is skipped here)
         for (const registered of pipelines) {
             if (registered.state !== 'loaded') continue;
             if (!isPipelinePlugin(registered.plugin)) continue;
@@ -282,7 +300,8 @@ export class PipelineOrchestratorService {
                 workId,
                 userId,
             );
-            if (isEnabled) return this.materialize(registered.plugin);
+            const usable = isEnabled ? await this.materialize(registered) : null;
+            if (usable) return usable;
         }
 
         throw new Error(

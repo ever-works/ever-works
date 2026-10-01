@@ -1,0 +1,18 @@
+[
+    {
+        "url": "https://api.github.com/repos/ever-works/cal-diy-template/statuses/900200",
+        "id": 900200,
+        "state": "success",
+        "description": "Build and checks passed",
+        "target_url": "https://ci.example.invalid/apw-e2e/cal-diy-template",
+        "context": "continuous-integration/apw-e2e",
+        "created_at": "2026-09-18T09:16:04Z",
+        "updated_at": "2026-09-18T09:16:04Z",
+        "creator": {
+            "login": "apw-e2e-user",
+            "id": 40400,
+            "type": "User",
+            "site_admin": false
+        }
+    }
+]

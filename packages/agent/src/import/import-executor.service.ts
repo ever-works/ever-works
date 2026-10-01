@@ -140,7 +140,7 @@ export class ImportExecutorService {
                 },
                 worksConfig,
                 importRequest: {
-                    sourceUrl: this.gitFacade.getWebUrl(
+                    sourceUrl: await this.gitFacade.getWebUrl(
                         work.gitProvider,
                         source.owner,
                         source.repo,
@@ -256,7 +256,7 @@ export class ImportExecutorService {
 
         try {
             const linkAnalysis = await this.sourceRepoAnalyzer.analyzeForLinking(
-                this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
+                await this.gitFacade.getWebUrl(work.gitProvider, source.owner, source.repo),
                 token,
             );
 

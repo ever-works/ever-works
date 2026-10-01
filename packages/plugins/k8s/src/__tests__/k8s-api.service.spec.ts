@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { KubernetesApiService, type KubernetesClientFactory } from '../k8s-api.service';
+import { KubernetesApiService, defaultClientFactory, type KubernetesClientFactory } from '../k8s-api.service';
 import { K8sPluginError } from '../errors';
 import { FIELD_MANAGER } from '../manifest.renderer';
 
@@ -21,12 +21,19 @@ function makeFactory(overrides: Partial<KubernetesClientFactory> = {}): {
 		patchNamespacedDeployment: ReturnType<typeof vi.fn>;
 	};
 	coreApi: {
+		readNamespacedPodLog: ReturnType<typeof vi.fn>;
 		patchNamespacedService: ReturnType<typeof vi.fn>;
 		patchNamespacedSecret: ReturnType<typeof vi.fn>;
 		createNamespace: ReturnType<typeof vi.fn>;
 		readNamespace: ReturnType<typeof vi.fn>;
 	};
-	objectApi: { patch: ReturnType<typeof vi.fn> };
+	objectApi: {
+		patch: ReturnType<typeof vi.fn>;
+		read: ReturnType<typeof vi.fn>;
+		list: ReturnType<typeof vi.fn>;
+		delete: ReturnType<typeof vi.fn>;
+	};
+	authorizationApi: { createSelfSubjectAccessReview: ReturnType<typeof vi.fn> };
 	createKubeConfig: ReturnType<typeof vi.fn>;
 } {
 	const versionApi = { getCode: vi.fn(async () => ({ gitVersion: 'v1.30.4', platform: 'linux/amd64' })) };
@@ -74,12 +81,23 @@ function makeFactory(overrides: Partial<KubernetesClientFactory> = {}): {
 		patchNamespacedDeployment: vi.fn(async () => undefined)
 	};
 	const coreApi = {
+		readNamespacedPodLog: vi.fn(async () => 'log line 1\nlog line 2\n'),
 		patchNamespacedService: vi.fn(async () => undefined),
 		patchNamespacedSecret: vi.fn(async () => undefined),
 		createNamespace: vi.fn(async () => undefined),
 		readNamespace: vi.fn(async () => undefined)
 	};
-	const objectApi = { patch: vi.fn(async () => undefined) };
+	const objectApi = {
+		patch: vi.fn(async () => undefined),
+		read: vi.fn(async () => ({ apiVersion: 'apps/v1', kind: 'Deployment', metadata: { name: 'obj-a' } })),
+		list: vi.fn(async () => ({ items: [{ metadata: { name: 'obj-a' } }, { metadata: { name: 'obj-b' } }] })),
+		delete: vi.fn(async () => ({ status: 'Success' }))
+	};
+	const authorizationApi = {
+		createSelfSubjectAccessReview: vi.fn(async () => ({
+			status: { allowed: true, reason: 'RBAC: allowed by ClusterRole "ever-works-apps"' }
+		}))
+	};
 	const createKubeConfig = vi.fn(() => ({
 		loadFromString: vi.fn(),
 		setCurrentContext: vi.fn(),
@@ -93,10 +111,11 @@ function makeFactory(overrides: Partial<KubernetesClientFactory> = {}): {
 		appsV1Api: () => appsApi as never,
 		coreV1Api: () => coreApi as never,
 		objectApi: () => objectApi as never,
+		authorizationV1Api: () => authorizationApi as never,
 		...overrides
 	};
 
-	return { factory, versionApi, networkingApi, appsApi, coreApi, objectApi, createKubeConfig };
+	return { factory, versionApi, networkingApi, appsApi, coreApi, objectApi, authorizationApi, createKubeConfig };
 }
 
 describe('KubernetesApiService.validateConnection', () => {
@@ -499,5 +518,544 @@ describe('KubernetesApiService.getIngressLoadBalancerHost', () => {
 		});
 		const svc = new KubernetesApiService(factory);
 		expect(await svc.getIngressLoadBalancerHost(VALID, 'ns', 'site')).toBeNull();
+	});
+});
+
+/** Shaped like the HTTP failures `@kubernetes/client-node` throws. */
+function httpError(statusCode: number, message: string): Error & { statusCode: number } {
+	const err = new Error(message) as Error & { statusCode: number };
+	err.statusCode = statusCode;
+	return err;
+}
+
+describe('KubernetesApiService.applyObject', () => {
+	const SERVER_SIDE_APPLY = 'application/apply-patch+yaml';
+
+	it('SSA-applies an arbitrary manifest with the plugin field manager and force=true', async () => {
+		const { factory, objectApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+		const manifest = {
+			apiVersion: 'batch/v1',
+			kind: 'Job',
+			metadata: { name: 'site-a-migrate', namespace: 'ever-works' }
+		};
+
+		await svc.applyObject(VALID, manifest);
+
+		expect(objectApi.patch).toHaveBeenCalledWith(
+			manifest,
+			undefined,
+			undefined,
+			FIELD_MANAGER,
+			true,
+			SERVER_SIDE_APPLY
+		);
+	});
+
+	it('forwards the context override to the kubeconfig loader', async () => {
+		const { factory, createKubeConfig } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.applyObject(VALID, { apiVersion: 'v1', kind: 'ConfigMap' }, 'ctx-b');
+
+		expect(createKubeConfig).toHaveBeenCalledWith(VALID, 'ctx-b');
+	});
+
+	it('surfaces apply failures as a scrubbed K8sPluginError', async () => {
+		const { factory } = makeFactory({
+			objectApi: () =>
+				({
+					patch: async () => {
+						throw new Error('admission webhook denied: token: secret-leak-apply');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(svc.applyObject(VALID, { apiVersion: 'v1', kind: 'ConfigMap' })).rejects.toThrow(K8sPluginError);
+		try {
+			await svc.applyObject(VALID, { apiVersion: 'v1', kind: 'ConfigMap' });
+		} catch (err) {
+			expect((err as Error).message).not.toContain('secret-leak-apply');
+			expect((err as Error).message).toContain('[REDACTED]');
+		}
+	});
+});
+
+describe('KubernetesApiService.readObject', () => {
+	it('reads by apiVersion/kind/namespace/name and returns the object', async () => {
+		const { factory, objectApi, createKubeConfig } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		const obj = await svc.readObject<{ metadata?: { name?: string } }>(
+			VALID,
+			'apps/v1',
+			'Deployment',
+			'ever-works',
+			'site-a'
+		);
+
+		expect(objectApi.read).toHaveBeenCalledWith({
+			apiVersion: 'apps/v1',
+			kind: 'Deployment',
+			metadata: { name: 'site-a', namespace: 'ever-works' }
+		});
+		expect(obj?.metadata?.name).toBe('obj-a');
+		expect(createKubeConfig).toHaveBeenCalledWith(VALID, undefined);
+	});
+
+	it('omits metadata.namespace for cluster-scoped kinds (CRDs, StorageClasses)', async () => {
+		const { factory, objectApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.readObject(VALID, 'apiextensions.k8s.io/v1', 'CustomResourceDefinition', '', 'pg.example.com');
+
+		expect(objectApi.read).toHaveBeenCalledWith({
+			apiVersion: 'apiextensions.k8s.io/v1',
+			kind: 'CustomResourceDefinition',
+			metadata: { name: 'pg.example.com' }
+		});
+	});
+
+	it('returns null on 404 instead of throwing', async () => {
+		const { factory } = makeFactory({
+			objectApi: () =>
+				({
+					read: async () => {
+						throw httpError(404, 'not found');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		expect(await svc.readObject(VALID, 'v1', 'Secret', 'ever-works', 'gone')).toBeNull();
+	});
+
+	it('throws a scrubbed K8sPluginError (cause kept) on non-404 errors', async () => {
+		const { factory } = makeFactory({
+			objectApi: () =>
+				({
+					read: async () => {
+						throw httpError(403, 'forbidden: token: secret-leak-read');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(svc.readObject(VALID, 'v1', 'Secret', 'ever-works', 'x')).rejects.toThrow(K8sPluginError);
+		try {
+			await svc.readObject(VALID, 'v1', 'Secret', 'ever-works', 'x');
+		} catch (err) {
+			expect((err as Error).message).not.toContain('secret-leak-read');
+			expect((err as K8sPluginError).code).toBe('UNAUTHORIZED');
+			expect((err as K8sPluginError).cause).toMatchObject({ statusCode: 403 });
+		}
+	});
+});
+
+describe('KubernetesApiService.listObjects', () => {
+	it('passes the label selector as the 8th positional argument and returns items', async () => {
+		const { factory, objectApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		const objects = await svc.listObjects<{ metadata?: { name?: string } }>(
+			VALID,
+			'v1',
+			'Pod',
+			'ever-works',
+			'app.kubernetes.io/name=ingress-nginx'
+		);
+
+		expect(objectApi.list).toHaveBeenCalledWith(
+			'v1',
+			'Pod',
+			'ever-works',
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			'app.kubernetes.io/name=ingress-nginx'
+		);
+		expect(objects.map((o) => o.metadata?.name)).toEqual(['obj-a', 'obj-b']);
+	});
+
+	it('returns an empty array (never null) when the list is empty', async () => {
+		const { factory } = makeFactory({ objectApi: () => ({ list: async () => ({ items: [] }) }) as never });
+		const svc = new KubernetesApiService(factory);
+
+		expect(await svc.listObjects(VALID, 'v1', 'Pod', 'ever-works')).toEqual([]);
+	});
+
+	it('returns an empty array when the response carries no items key', async () => {
+		const { factory } = makeFactory({ objectApi: () => ({ list: async () => ({}) }) as never });
+		const svc = new KubernetesApiService(factory);
+
+		expect(await svc.listObjects(VALID, 'v1', 'Pod', 'ever-works')).toEqual([]);
+	});
+
+	it('omits the namespace for cluster-scoped lists', async () => {
+		const { factory, objectApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.listObjects(VALID, 'storage.k8s.io/v1', 'StorageClass', '');
+
+		expect(objectApi.list).toHaveBeenCalledWith(
+			'storage.k8s.io/v1',
+			'StorageClass',
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined
+		);
+	});
+
+	it('throws a scrubbed K8sPluginError on failures', async () => {
+		const { factory } = makeFactory({
+			objectApi: () =>
+				({
+					list: async () => {
+						throw httpError(403, 'forbidden: token: secret-leak-list');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(svc.listObjects(VALID, 'v1', 'Pod', 'ever-works')).rejects.toThrow(K8sPluginError);
+		try {
+			await svc.listObjects(VALID, 'v1', 'Pod', 'ever-works');
+		} catch (err) {
+			expect((err as Error).message).not.toContain('secret-leak-list');
+		}
+	});
+});
+
+describe('KubernetesApiService.deleteObject', () => {
+	it('passes propagationPolicy as the 6th positional argument', async () => {
+		const { factory, objectApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.deleteObject(VALID, 'apps/v1', 'Deployment', 'ever-works', 'site-a', 'Foreground');
+
+		expect(objectApi.delete).toHaveBeenCalledWith(
+			{ apiVersion: 'apps/v1', kind: 'Deployment', metadata: { name: 'site-a', namespace: 'ever-works' } },
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			'Foreground'
+		);
+	});
+
+	it('leaves propagationPolicy undefined when the caller omits it', async () => {
+		const { factory, objectApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.deleteObject(VALID, 'v1', 'ConfigMap', 'ever-works', 'platform-env');
+
+		expect(objectApi.delete).toHaveBeenCalledWith(
+			{ apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: 'platform-env', namespace: 'ever-works' } },
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined
+		);
+	});
+
+	it('treats a 404 as success — the object is already gone', async () => {
+		const { factory } = makeFactory({
+			objectApi: () =>
+				({
+					delete: async () => {
+						throw httpError(404, 'not found');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(svc.deleteObject(VALID, 'v1', 'Secret', 'ever-works', 'gone')).resolves.toBeUndefined();
+	});
+
+	it('throws a scrubbed K8sPluginError on non-404 errors', async () => {
+		const { factory } = makeFactory({
+			objectApi: () =>
+				({
+					delete: async () => {
+						throw httpError(403, 'forbidden: token: secret-leak-delete');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(svc.deleteObject(VALID, 'v1', 'Secret', 'ever-works', 'x')).rejects.toThrow(K8sPluginError);
+		try {
+			await svc.deleteObject(VALID, 'v1', 'Secret', 'ever-works', 'x');
+		} catch (err) {
+			expect((err as Error).message).not.toContain('secret-leak-delete');
+		}
+	});
+});
+
+describe('KubernetesApiService.readPodLog', () => {
+	it('forwards tailLines, limitBytes and previous to the CoreV1Api', async () => {
+		const { factory, coreApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		const log = await svc.readPodLog(VALID, 'ever-works', 'site-a-5f9c', 'web', {
+			tailLines: 200,
+			limitBytes: 65536,
+			previous: true
+		});
+
+		expect(coreApi.readNamespacedPodLog).toHaveBeenCalledWith({
+			name: 'site-a-5f9c',
+			namespace: 'ever-works',
+			container: 'web',
+			tailLines: 200,
+			limitBytes: 65536,
+			previous: true
+		});
+		expect(log).toBe('log line 1\nlog line 2\n');
+	});
+
+	it('omits unset options and lets the API server pick the only container', async () => {
+		const { factory, coreApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.readPodLog(VALID, 'ever-works', 'site-a-5f9c', '');
+
+		expect(coreApi.readNamespacedPodLog).toHaveBeenCalledWith({ name: 'site-a-5f9c', namespace: 'ever-works' });
+	});
+
+	it('returns an empty string (not null) for an empty log', async () => {
+		const { factory } = makeFactory({
+			coreV1Api: () =>
+				({
+					readNamespacedPodLog: async () => ''
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		expect(await svc.readPodLog(VALID, 'ever-works', 'site-a-5f9c', 'web', { tailLines: 200 })).toBe('');
+	});
+
+	it('returns null when the pod is gone (404)', async () => {
+		const { factory } = makeFactory({
+			coreV1Api: () =>
+				({
+					readNamespacedPodLog: async () => {
+						throw httpError(404, 'pods "site-a-5f9c" not found');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		expect(await svc.readPodLog(VALID, 'ever-works', 'site-a-5f9c', 'web')).toBeNull();
+	});
+
+	it('throws a scrubbed K8sPluginError on non-404 errors', async () => {
+		const { factory } = makeFactory({
+			coreV1Api: () =>
+				({
+					readNamespacedPodLog: async () => {
+						throw httpError(500, 'internal error: token: secret-leak-log');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(svc.readPodLog(VALID, 'ever-works', 'site-a-5f9c', 'web')).rejects.toThrow(K8sPluginError);
+		try {
+			await svc.readPodLog(VALID, 'ever-works', 'site-a-5f9c', 'web');
+		} catch (err) {
+			expect((err as Error).message).not.toContain('secret-leak-log');
+		}
+	});
+});
+
+describe('KubernetesApiService.createSelfSubjectAccessReview', () => {
+	it('builds the SelfSubjectAccessReview body per plan §6.3', async () => {
+		const { factory, authorizationApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		const status = await svc.createSelfSubjectAccessReview(VALID, {
+			verb: 'patch',
+			group: 'apps',
+			resource: 'deployments',
+			namespace: 'ever-works'
+		});
+
+		expect(authorizationApi.createSelfSubjectAccessReview).toHaveBeenCalledWith({
+			body: {
+				apiVersion: 'authorization.k8s.io/v1',
+				kind: 'SelfSubjectAccessReview',
+				spec: {
+					resourceAttributes: {
+						verb: 'patch',
+						group: 'apps',
+						resource: 'deployments',
+						namespace: 'ever-works'
+					}
+				}
+			}
+		});
+		expect(status).toEqual({ allowed: true, reason: 'RBAC: allowed by ClusterRole "ever-works-apps"' });
+	});
+
+	it('sends the subresource for pods/log and the core group as an empty string', async () => {
+		const { factory, authorizationApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.createSelfSubjectAccessReview(VALID, {
+			verb: 'get',
+			group: '',
+			resource: 'pods',
+			subresource: 'log',
+			namespace: 'ever-works'
+		});
+
+		expect(authorizationApi.createSelfSubjectAccessReview).toHaveBeenCalledWith({
+			body: {
+				apiVersion: 'authorization.k8s.io/v1',
+				kind: 'SelfSubjectAccessReview',
+				spec: {
+					resourceAttributes: {
+						verb: 'get',
+						group: '',
+						resource: 'pods',
+						subresource: 'log',
+						namespace: 'ever-works'
+					}
+				}
+			}
+		});
+	});
+
+	it('omits namespace and subresource for cluster-scoped requests', async () => {
+		const { factory, authorizationApi } = makeFactory();
+		const svc = new KubernetesApiService(factory);
+
+		await svc.createSelfSubjectAccessReview(VALID, { verb: 'create', group: '', resource: 'namespaces' });
+
+		expect(authorizationApi.createSelfSubjectAccessReview).toHaveBeenCalledWith({
+			body: {
+				apiVersion: 'authorization.k8s.io/v1',
+				kind: 'SelfSubjectAccessReview',
+				spec: {
+					resourceAttributes: { verb: 'create', group: '', resource: 'namespaces' }
+				}
+			}
+		});
+	});
+
+	it('maps denied + evaluationError through unchanged', async () => {
+		const { factory } = makeFactory({
+			authorizationV1Api: () =>
+				({
+					createSelfSubjectAccessReview: async () => ({
+						status: {
+							allowed: false,
+							denied: true,
+							reason: 'no RBAC rule matched',
+							evaluationError: 'unknown verb "frobnicate"'
+						}
+					})
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		expect(
+			await svc.createSelfSubjectAccessReview(VALID, { verb: 'frobnicate', group: '', resource: 'pods' })
+		).toEqual({
+			allowed: false,
+			denied: true,
+			reason: 'no RBAC rule matched',
+			evaluationError: 'unknown verb "frobnicate"'
+		});
+	});
+
+	it('fails closed when the response carries no status', async () => {
+		const { factory } = makeFactory({
+			authorizationV1Api: () => ({ createSelfSubjectAccessReview: async () => ({}) }) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		expect(await svc.createSelfSubjectAccessReview(VALID, { verb: 'get', group: '', resource: 'pods' })).toEqual({
+			allowed: false
+		});
+	});
+
+	it('throws a scrubbed K8sPluginError when the review itself is refused', async () => {
+		const { factory } = makeFactory({
+			authorizationV1Api: () =>
+				({
+					createSelfSubjectAccessReview: async () => {
+						throw httpError(403, 'forbidden: token: secret-leak-ssar');
+					}
+				}) as never
+		});
+		const svc = new KubernetesApiService(factory);
+
+		await expect(
+			svc.createSelfSubjectAccessReview(VALID, { verb: 'get', group: '', resource: 'pods' })
+		).rejects.toThrow(K8sPluginError);
+		try {
+			await svc.createSelfSubjectAccessReview(VALID, { verb: 'get', group: '', resource: 'pods' });
+		} catch (err) {
+			expect((err as Error).message).not.toContain('secret-leak-ssar');
+			expect((err as K8sPluginError).code).toBe('UNAUTHORIZED');
+		}
+	});
+});
+
+describe('defaultClientFactory wiring for the new APIs', () => {
+	function recordingClient(): { client: never; makeApiClient: ReturnType<typeof vi.fn> } {
+		const makeApiClient = vi.fn((api: unknown) => ({ api }));
+		return {
+			client: { loadFromString: vi.fn(), setCurrentContext: vi.fn(), makeApiClient } as never,
+			makeApiClient
+		};
+	}
+
+	/**
+	 * Pay for `@kubernetes/client-node` HERE, once, and out of the cases' budget.
+	 *
+	 * Every other case in this file mocks the factory; these are the only two that
+	 * reach the real `k8sClientLoader()`, whose `require` of that package is the
+	 * single most expensive import in this suite. Whichever case ran first paid
+	 * the whole cost, and on a loaded self-hosted runner that is enough to blow
+	 * the 10 s `testTimeout` in `vitest.config.ts` — measured in CI run
+	 * 35591005499: **14,797 ms** for the `authorizationV1Api` case and **9 ms**
+	 * for the `coreV1Api` case immediately after it, from the module cache. The
+	 * assertions were never the problem, and this file is otherwise 940 green.
+	 *
+	 * A `beforeAll` with its own generous timeout attributes the cost to setup,
+	 * where it belongs, and leaves each case measuring what it is about. Raising
+	 * the whole suite's `testTimeout` instead would hide the next real hang.
+	 */
+	beforeAll(() => {
+		defaultClientFactory.coreV1Api(recordingClient().client);
+	}, 120_000);
+
+	it('authorizationV1Api hands makeApiClient the real object-parameter AuthorizationV1Api class', () => {
+		const { client, makeApiClient } = recordingClient();
+
+		defaultClientFactory.authorizationV1Api(client);
+
+		expect(makeApiClient).toHaveBeenCalledTimes(1);
+		const ctor = makeApiClient.mock.calls[0][0] as { prototype?: Record<string, unknown> };
+		expect(typeof ctor.prototype?.createSelfSubjectAccessReview).toBe('function');
+	});
+
+	it('coreV1Api hands makeApiClient the class that implements readNamespacedPodLog', () => {
+		const { client, makeApiClient } = recordingClient();
+
+		defaultClientFactory.coreV1Api(client);
+
+		expect(makeApiClient).toHaveBeenCalledTimes(1);
+		const ctor = makeApiClient.mock.calls[0][0] as { prototype?: Record<string, unknown> };
+		expect(typeof ctor.prototype?.readNamespacedPodLog).toBe('function');
 	});
 });

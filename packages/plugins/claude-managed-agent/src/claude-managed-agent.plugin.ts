@@ -17,6 +17,11 @@ import type {
 	PluginHealthCheck,
 	PluginManifest,
 	ValidationResult,
+	// App Provisioner (APW-04 T1) — the restricted-network sandbox session
+	// contract this plugin implements below (`enforcesRuntimeNetworking` +
+	// `runSandboxSession`). Additive: nothing in `execute` consumes them.
+	SandboxSessionInput,
+	SandboxSessionResult,
 	RuntimeEnvironmentData
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
@@ -47,6 +52,13 @@ import {
 	// resolver is typed against the pipeline's flat `RuntimeEnvironmentData`
 	// instead, so that symbol has no remaining use and is deliberately omitted.
 	type ManagedAgentsSessionResource,
+	// Sandbox session runner (APW-04 T1) — the event/session/usage shapes the
+	// terminal-state mapping reads, plus the one resource variant a
+	// provisioning session mounts.
+	type ManagedAgentsEvent,
+	type ManagedAgentsSession,
+	type ManagedAgentsUsage,
+	type ManagedAgentsSessionGithubRepositoryResource,
 	type ManagedSessionRunResult,
 	MAX_VARIANT_SESSIONS,
 	MIN_VARIANT_SESSIONS,
@@ -65,6 +77,10 @@ import { runManagedSessions } from './utils/fan-out.js';
 import { cleanupManagedAgentRun } from './utils/managed-agents-cleanup.js';
 import { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
 import { buildSessionResources, type UploadedAttachedEnvFile } from './utils/session-resources.js';
+// App Provisioner (APW-04 T1) — the sandbox session mounts its repositories
+// through the same guarded mount-path helper, so the traversal guard lives in
+// one place rather than being re-implemented here.
+import { attachedRepoMountPath } from './utils/session-resources.js';
 import {
 	buildCancelledResult,
 	buildErrorResult,
@@ -126,6 +142,18 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
 	readonly configurationMode = 'hybrid' as const;
 	readonly handledConfigFields = ['*'] as const;
+
+	/**
+	 * App Provisioner (APW-04 T1, plan §2.6/§7.3) — this is the one pipeline
+	 * that turns `runtimeEnvironment.networkingMode = 'limited'` into an
+	 * ENFORCED sandbox policy rather than advisory guidance, through
+	 * `resolveEnvironmentNetworking` (`utils/runtime-environment.ts:38-56`)
+	 * on the environment it creates for the session. Together with
+	 * `runSandboxSession` below it is what makes this plugin the
+	 * provisioning runtime: the platform selects a pipeline by this pair of
+	 * capability checks, never by plugin id (Constitution II).
+	 */
+	readonly enforcesRuntimeNetworking = true;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -405,6 +433,189 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				);
 			}
 		}
+	}
+
+	/**
+	 * App Provisioner (APW-04 T1, plan §2.6) — restricted-network sandbox
+	 * session runner.
+	 *
+	 * Opens exactly ONE session for a caller that is not a Work generation
+	 * (the App Provisioner) and reports its terminal state. Three things this
+	 * entry point does that `runSessions` cannot:
+	 *
+	 *  1. the PRE-RESOLVED Environment reaches the control plane, so the
+	 *     session's egress policy is the platform's — `runSessions` passes
+	 *     `null` there (`:374` above), which would silently fall back to the
+	 *     env-var policy;
+	 *  2. the agent + environment are ALWAYS ephemeral for this call
+	 *     (`reuseControlPlane: false` overrides the user's plugin setting for
+	 *     this one session), so a per-run restricted policy can never be
+	 *     written onto the persistent control plane — `ensureControlPlane`
+	 *     only ever writes drift onto stored ids in reuse mode
+	 *     (`utils/control-plane.ts:252-287`);
+	 *  3. the session's `system` is the caller's Skill body, not the
+	 *     generation system prompt.
+	 *
+	 * A sandbox session never pauses for a custom tool: a provider
+	 * `requires_action` idle event comes back as
+	 * `{ status: 'failed', failureCode: 'requiresAction' }` instead of being
+	 * thrown or waited on. Nothing here reaches the platform — the session
+	 * carries no platform tool and no credential, and the caller pushes
+	 * outside it (FR-10…FR-13).
+	 */
+	async runSandboxSession(input: SandboxSessionInput, signal?: AbortSignal): Promise<SandboxSessionResult> {
+		const logger = this.context?.logger ?? console;
+		let client: AnthropicManagedAgentsClient | null = null;
+		const runResources: ManagedAgentRunResources = {};
+		const deadline = resolveSandboxDeadline(input.timeoutMs);
+
+		try {
+			// Cancelled before anything was opened: no settings read, no
+			// client, no session, nothing to tear down.
+			if (signal?.aborted) {
+				return { status: 'cancelled', finalText: null };
+			}
+
+			const settings = await resolveManagedAgentSettings(this.context, input.userId, input.workId);
+			client = createCmaSdkClient(settings);
+			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
+			const pollIntervalMs = getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS);
+
+			const controlPlane = await ensureControlPlane(
+				client,
+				this.context,
+				input.userId,
+				// Ephemeral for THIS session only (see the note above): the
+				// restricted policy is built from the pre-resolved Environment
+				// and must never land on a stored environment.
+				{ ...settings, reuseControlPlane: false },
+				{
+					name: 'Ever Works Sandbox Session',
+					description: 'Ephemeral restricted-network session for a non-generation caller',
+					model,
+					system: input.system
+				},
+				input.runtimeEnvironment,
+				logger
+			);
+			runResources.createdAgentId = controlPlane.agentId;
+			runResources.createdEnvironmentId = controlPlane.environmentId;
+
+			const session = await client.createSession({
+				agentId: controlPlane.agentId,
+				environmentId: controlPlane.environmentId,
+				title: input.label ?? `Ever Works sandbox session: ${input.workId}`,
+				resources: this.buildSandboxSessionResources(input.attachedRepos),
+				budgetUsd: input.budgetUsd
+			});
+			runResources.sessionId = session.id;
+
+			await client.sendUserMessage(session.id, input.prompt);
+
+			let finalSession: ManagedAgentsSession;
+			try {
+				finalSession = await client.waitForSessionIdle(session.id, {
+					maxPollAttempts: resolveSandboxMaxPollAttempts(input.timeoutMs, pollIntervalMs),
+					pollIntervalMs,
+					signal
+				});
+			} catch (waitError) {
+				if (signal?.aborted) {
+					return { status: 'cancelled', finalText: null, sessionId: session.id };
+				}
+				// The wait is bounded by the caller's wall clock (FR-14: 45 min
+				// analysis / 30 min iterate), so a failure raised by the wait
+				// itself at or past that deadline IS the deadline.
+				if (deadline !== null && Date.now() >= deadline) {
+					return { status: 'timeout', finalText: null, sessionId: session.id };
+				}
+				throw waitError;
+			}
+
+			const usage = toSandboxSessionUsage(finalSession.usage);
+			const events = await client.listAllEvents(session.id);
+			const stopReason = readLastIdleStopReason(events);
+
+			if (stopReason === 'requires_action') {
+				return {
+					status: 'failed',
+					failureCode: 'requiresAction',
+					finalText: null,
+					sessionId: session.id,
+					usage
+				};
+			}
+
+			const finalText = readLastAgentMessage(events);
+			if (!finalText) {
+				return {
+					status: 'failed',
+					failureCode: 'noAgentMessage',
+					finalText: null,
+					sessionId: session.id,
+					usage
+				};
+			}
+
+			return { status: resolveSandboxStopStatus(stopReason), finalText, sessionId: session.id, usage };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			if (signal?.aborted) {
+				return { status: 'cancelled', finalText: null, sessionId: runResources.sessionId };
+			}
+
+			logger.error(`Claude Managed Agent sandbox session failed: ${message}`);
+			return {
+				status: 'failed',
+				failureCode: 'provider',
+				finalText: null,
+				sessionId: runResources.sessionId
+			};
+		} finally {
+			if (client) {
+				// Ephemeral resources are torn down (the control plane here is
+				// per-session by construction, so nothing is preserved).
+				await cleanupManagedAgentRun(client, runResources, {
+					warn: (message) => logger.warn(message)
+				});
+			}
+		}
+	}
+
+	/**
+	 * Session resources for a sandbox session: the attached repositories and
+	 * nothing else. No workspace seed manifest (there is no Work generation
+	 * in this path) and no env file (§7.3: "No env files"), so the session
+	 * receives repository contents and no credential (FR-13).
+	 *
+	 * It deliberately does NOT go through `buildSessionResources(...)`: that
+	 * helper always emits the Work-generation seed-manifest file resource
+	 * first and requires a `seedManifest` input
+	 * (`utils/session-resources.ts:62-74`), so a provisioning session would
+	 * have to upload a file it does not have. The mount path itself still
+	 * comes from that module's guarded helper, so the traversal guard is
+	 * shared rather than re-implemented.
+	 */
+	private buildSandboxSessionResources(
+		attachedRepos: SandboxSessionInput['attachedRepos']
+	): ManagedAgentsSessionResource[] {
+		const resources: ManagedAgentsSessionResource[] = [];
+
+		for (const repo of attachedRepos ?? []) {
+			const resource: ManagedAgentsSessionGithubRepositoryResource = {
+				type: 'github_repository',
+				// Token-free by contract (`AttachedRepoResource.url`); auth is
+				// resolved outside the sandbox, never handed to it.
+				url: repo.url,
+				mount_path: attachedRepoMountPath(DEFAULT_WORKSPACE_PATH, repo.mountDir)
+			};
+			if (repo.branch) {
+				resource.branch = repo.branch;
+			}
+			resources.push(resource);
+		}
+
+		return resources;
 	}
 
 	async execute(
@@ -1124,6 +1335,103 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 		return candidate as RuntimeEnvironmentData;
 	}
+}
+
+// ============================================================================
+// Sandbox session terminal-state mapping (APW-04 T1, plan §2.6)
+// ============================================================================
+
+/**
+ * Wall-clock deadline for a sandbox session, or `null` when the caller set
+ * no ceiling. FR-14: 45 minutes for an analysis run, 30 for an iterate.
+ */
+function resolveSandboxDeadline(timeoutMs: number | undefined): number | null {
+	if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+		return Date.now() + timeoutMs;
+	}
+
+	return null;
+}
+
+/**
+ * Poll-attempt bound for `waitForSessionIdle` derived from that same
+ * ceiling — the client's wait loop is attempt-bounded, not clock-bounded, so
+ * the wall clock is expressed as `ceil(timeoutMs / pollIntervalMs)` attempts
+ * (the same conversion `utils/fan-out.ts:137-146` applies).
+ */
+function resolveSandboxMaxPollAttempts(timeoutMs: number | undefined, pollIntervalMs: number): number {
+	if (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+		return Math.max(1, Math.ceil(timeoutMs / Math.max(pollIntervalMs, 1)));
+	}
+
+	return DEFAULT_MAX_POLL_ATTEMPTS;
+}
+
+/** The LAST idle event's `stop_reason.type`; `undefined` when there is none. */
+function readLastIdleStopReason(events: readonly ManagedAgentsEvent[]): string | undefined {
+	const idle = [...events].reverse().find((event) => event.type === 'session.status_idle');
+	return idle?.stop_reason?.type;
+}
+
+/**
+ * The LAST assistant message — the contract's `finalText` ("the job takes
+ * the last provision-output block"). `extractAgentTranscript` joins every
+ * `agent.message` in the list it is given, so handing it the single last
+ * message yields exactly that message while reusing the one transcript
+ * reader instead of adding a second one.
+ */
+function readLastAgentMessage(events: readonly ManagedAgentsEvent[]): string | null {
+	const messages = events.filter((event) => event.type === 'agent.message');
+	const last = messages[messages.length - 1];
+	if (!last) {
+		return null;
+	}
+
+	return extractAgentTranscript([last]).trim() || null;
+}
+
+/**
+ * `SandboxSessionResult.usage` — billed tokens plus cost.
+ *
+ * `inputTokens` counts EVERY billed input token: `input_tokens` plus both
+ * cache counters the sessions API reports separately. The sessions API
+ * excludes cache tokens from `input_tokens`, and sandbox sessions are
+ * cache-heavy by design, so reporting the raw `input_tokens` here would
+ * under-report a provisioning run by orders of magnitude in the one number
+ * the caller persists (`utils/usage-metrics.ts:13-44` is the shared seam that
+ * documents exactly this trap). `inputTokens + outputTokens` therefore
+ * equals `toManagedSessionTokenUsage(...).totalTokens`, which is the only
+ * figure the plan's §2.6 contract has room for.
+ */
+function toSandboxSessionUsage(usage: ManagedAgentsUsage | undefined): SandboxSessionResult['usage'] | undefined {
+	const tokens = toManagedSessionTokenUsage(usage);
+	if (!tokens && typeof usage?.list_cost_usd !== 'number') {
+		return undefined;
+	}
+
+	return {
+		inputTokens: tokens ? tokens.totalTokens - tokens.outputTokens : 0,
+		outputTokens: tokens?.outputTokens ?? 0,
+		costUsd: usage?.list_cost_usd
+	};
+}
+
+/**
+ * Terminal status for a session that did produce an answer.
+ *
+ * PROVISIONAL, and narrowed on purpose: this repository pins no stop-reason
+ * token for a budget stop anywhere (the only budget signal it knows is the
+ * create-only `budget` limit, `utils/managed-agents-client.ts:293-306`), so
+ * the ONLY value honoured as budget exhaustion is a provider that literally
+ * names one in `stop_reason.type`. Every other terminal stop reason —
+ * `end_turn`, an unknown token, or an absent one — is `completed`, because a
+ * session that answered is a session that answered. Widening this needs a
+ * recorded provider run, not a guess.
+ */
+function resolveSandboxStopStatus(stopReason: string | undefined): SandboxSessionResult['status'] {
+	return typeof stopReason === 'string' && stopReason.toLowerCase().includes('budget')
+		? 'budget-exhausted'
+		: 'completed';
 }
 
 export type { ClaudeManagedAgentStepId } from './types.js';

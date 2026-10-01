@@ -186,6 +186,13 @@
 					"useTabs": false,
 					"tabWidth": 2
 				}
+			},
+			{
+				"files": "*.yaml",
+				"options": {
+					"useTabs": false,
+					"tabWidth": 2
+				}
 			}
 		]
 	},

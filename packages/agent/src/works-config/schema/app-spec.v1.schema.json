@@ -1,0 +1,1509 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://api.ever.works/api/schema/app-spec.schema.json",
+    "title": "Ever Works — App spec (kind: app)",
+    "description": "The `spec` block of a `.works/works.yml` whose kind is `app`, and the whole document of a stand-alone App spec. Structure only: the reference and cross-field rules are validated by the platform. Keys starting with `x-` are allowed at any depth and ignored.",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "description": "Repeats the root `kind`; must equal it when both are present (§1:64).",
+            "type": "string",
+            "const": "app"
+        },
+        "appSpecVersion": {
+            "description": "The App spec version, 1–1000 (§1:65); default: 1.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+        },
+        "source": {
+            "description": "Where the repository came from (§5); required in `data-repository` mode.",
+            "type": "object",
+            "properties": {
+                "relation": {
+                    "description": "How the App Work relates to its repository (§5:123): fork · private-copy · link. Required.",
+                    "type": "string",
+                    "enum": [
+                        "fork",
+                        "private-copy",
+                        "link"
+                    ]
+                },
+                "upstream": {
+                    "description": "The repository followed (§5:124); forbidden when `relation` is `link` (R13).",
+                    "type": "object",
+                    "properties": {
+                        "repo": {
+                            "description": "The upstream repository, `owner/repo` (§5:124); required unless `relation` is `link`.",
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
+                        },
+                        "defaultBranch": {
+                            "description": "The upstream branch to follow (§5:125); default: the upstream default at creation.",
+                            "type": "string",
+                            "pattern": "^(?!.*\\.\\.)(?!.*\\/\\/)(?!.*\\.lock$)[\\s\\S]{1,255}$"
+                        }
+                    },
+                    "required": [
+                        "repo"
+                    ],
+                    "additionalProperties": false,
+                    "patternProperties": {
+                        "^x-": {}
+                    }
+                },
+                "branch": {
+                    "description": "The branch built and deployed (§5:126); default: the Work Repository default branch.",
+                    "type": "string",
+                    "pattern": "^(?!.*\\.\\.)(?!.*\\/\\/)(?!.*\\.lock$)[\\s\\S]{1,255}$"
+                }
+            },
+            "required": [
+                "relation"
+            ],
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "blueprint": {
+            "description": "The Blueprint that was applied (§6).",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The Blueprint id (§6:137): ^[a-z0-9][a-z0-9-]{0,63}$. Required.",
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                },
+                "version": {
+                    "description": "The Blueprint version (§6:138): a semantic version `MAJOR.MINOR.PATCH`. Required.",
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+                },
+                "repo": {
+                    "description": "The Blueprint repository (§6:139): ^ever-works/[a-z0-9-]+$. Required.",
+                    "type": "string",
+                    "pattern": "^ever-works\\/[a-z0-9-]+$"
+                },
+                "sha": {
+                    "description": "The pinned Blueprint commit (§6:140): 40 lowercase hex characters. Required.",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                }
+            },
+            "required": [
+                "id",
+                "version",
+                "repo",
+                "sha"
+            ],
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "license": {
+            "description": "Informational licence declaration (§7).",
+            "type": "object",
+            "properties": {
+                "spdx": {
+                    "description": "An SPDX expression ≤ 200 characters (§7:150): `MIT`, `AGPL-3.0-only`, `MIT OR Apache-2.0`.",
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "class": {
+                    "description": "The declared licence class (§7:151): green · amber · red · unknown.",
+                    "type": "string",
+                    "enum": [
+                        "green",
+                        "amber",
+                        "red",
+                        "unknown"
+                    ]
+                },
+                "source": {
+                    "description": "Where the declaration came from (§7:152): detected · blueprint · user.",
+                    "type": "string",
+                    "enum": [
+                        "detected",
+                        "blueprint",
+                        "user"
+                    ]
+                },
+                "notice": {
+                    "description": "Trademark / attribution notice shown with the app, ≤ 500 characters (§7:153).",
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "sourceOfferUrl": {
+                    "description": "Where network users obtain the source when the Work Repository is private (§7:154, R27).",
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "^https:\\/\\/"
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "display": {
+            "description": "How the Work presents itself (§8).",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "How the app is displayed, 1–80 characters (§8:163); default: the Work name.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                },
+                "protectedPaths": {
+                    "description": "Paths agents may not change (§8:164), at most 50 globs; default: [].",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                        "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`.",
+                        "type": "string",
+                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$"
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "build": {
+            "description": "How the image is produced (§9); required when `components` is non-empty.",
+            "type": "object",
+            "properties": {
+                "strategy": {
+                    "description": "How the image is produced (§9:170): dockerfile · image · auto · none. Required when `components` is non-empty; `none` when it is empty. No builder name (R-13).",
+                    "type": "string",
+                    "enum": [
+                        "dockerfile",
+                        "image",
+                        "auto",
+                        "none"
+                    ]
+                },
+                "dockerfile": {
+                    "description": "The Dockerfile path, only with `strategy: dockerfile` (§9:171); default: `Dockerfile`.",
+                    "type": "string",
+                    "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                },
+                "context": {
+                    "description": "The build context, only with `dockerfile` or `auto` (§9:172); default: `.`.",
+                    "type": "string",
+                    "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                },
+                "target": {
+                    "description": "The Dockerfile target stage, only with `strategy: dockerfile` (§9:173).",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                },
+                "image": {
+                    "description": "The prebuilt image, required with `strategy: image` (§9:174); a tag-only reference warns (R19).",
+                    "type": "string",
+                    "maxLength": 512,
+                    "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::\\d+)?\\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$"
+                },
+                "args": {
+                    "description": "At most 50 build arguments (§9:175); default: []. Never literal secrets (R10).",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "description": "The build argument name (§9:175). Required.",
+                                "type": "string",
+                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                            },
+                            "value": {
+                                "description": "A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10).",
+                                "type": "string",
+                                "maxLength": 1000
+                            },
+                            "fromEnv": {
+                                "description": "Names an `env` entry that must be `build` or `both` (§9:175); a secret one only warns (R11).",
+                                "type": "string",
+                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    }
+                },
+                "services": {
+                    "description": "At most 5 ephemeral build-only services (§9:176); default: [].",
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "description": "The service name (§9:176). Required.",
+                                "type": "string",
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                            },
+                            "image": {
+                                "description": "The service image (§9:176). Required.",
+                                "type": "string",
+                                "maxLength": 512,
+                                "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::\\d+)?\\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$"
+                            },
+                            "port": {
+                                "description": "The service port, 1–65535 (§9:176).",
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                            },
+                            "env": {
+                                "description": "At most 20 environment entries for the service (§9:176).",
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "description": "The variable name of a build service’s environment entry (§9:176).",
+                                            "type": "string"
+                                        },
+                                        "value": {
+                                            "description": "The value of a build service’s environment entry (§9:176).",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "name",
+                                        "value"
+                                    ],
+                                    "additionalProperties": false,
+                                    "patternProperties": {
+                                        "^x-": {}
+                                    }
+                                }
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "image"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    }
+                },
+                "resources": {
+                    "description": "The build runner’s resources (§9:177-179); defaults: cpu 2, memory 7Gi, timeout 60.",
+                    "type": "object",
+                    "properties": {
+                        "cpu": {
+                            "description": "Build-runner CPU cores, a number 1–16 (§9:177); default: 2.",
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 16
+                        },
+                        "memory": {
+                            "description": "Build-runner memory, `1Gi`–`64Gi` (§9:178); default: `7Gi`.",
+                            "type": "string",
+                            "pattern": "^\\d+(?:Mi|Gi)$"
+                        },
+                        "timeoutMinutes": {
+                            "description": "Build timeout in minutes, 5–180 (§9:179); default: 60.",
+                            "type": "integer",
+                            "minimum": 5,
+                            "maximum": 180
+                        }
+                    },
+                    "additionalProperties": false,
+                    "patternProperties": {
+                        "^x-": {}
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "components": {
+            "description": "At most 10 components (§10); at least one when `build.strategy` ≠ `none` (R2).",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "A DNS-label name, unique among components (§10:194, R4). Required.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "role": {
+                        "description": "web (Service + Ingress) or worker (§10:195). Required.",
+                        "type": "string",
+                        "enum": [
+                            "web",
+                            "worker"
+                        ]
+                    },
+                    "command": {
+                        "description": "Image entrypoint override, ≤ 20 items × 1000 characters (§10:196); default: the image entrypoint.",
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 1000
+                        }
+                    },
+                    "args": {
+                        "description": "Image cmd override, ≤ 50 items × 1000 characters (§10:197); default: the image cmd.",
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 1000
+                        }
+                    },
+                    "target": {
+                        "description": "Dockerfile stage override (§10:198); default: `build.target`.",
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                    },
+                    "port": {
+                        "description": "The container port, 1–65535 (§10:199). Required for `web` (R1), forbidden for `worker`.",
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                    },
+                    "replicas": {
+                        "description": "Replicas, 0–10 (§10:200); default: 1.",
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10
+                    },
+                    "writableRootFilesystem": {
+                        "description": "Whether the root filesystem is writable (§10:201); default: false.",
+                        "type": "boolean"
+                    },
+                    "runAsUser": {
+                        "description": "The numeric uid the container runs as, 1–4294967294 (§10:202, APW06-G26); default: absent — the image’s own user.",
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4294967294
+                    },
+                    "probes": {
+                        "description": "The component’s probes (§10:203); `web` defaults to a TCP readiness probe.",
+                        "type": "object",
+                        "properties": {
+                            "startup": {
+                                "description": "The startup probe (§10:203).",
+                                "type": "object",
+                                "properties": {
+                                    "http": {
+                                        "description": "An in-container HTTP path (§10:210).",
+                                        "type": "string",
+                                        "pattern": "^\\/[^\\s]{0,511}$"
+                                    },
+                                    "tcp": {
+                                        "description": "A TCP connect probe (§10:210).",
+                                        "type": "boolean",
+                                        "const": true
+                                    },
+                                    "periodSeconds": {
+                                        "description": "1–300 (§10:210); default: 10.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 300
+                                    },
+                                    "timeoutSeconds": {
+                                        "description": "1–60 (§10:210); default: 5.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 60
+                                    },
+                                    "initialDelaySeconds": {
+                                        "description": "0–600 (§10:210); default: 0.",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 600
+                                    },
+                                    "failureThreshold": {
+                                        "description": "1–120 (§10:211); default: 3, or 30 for `startup`.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 120
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^x-": {}
+                                }
+                            },
+                            "readiness": {
+                                "description": "The readiness probe (§10:203).",
+                                "type": "object",
+                                "properties": {
+                                    "http": {
+                                        "description": "An in-container HTTP path (§10:210).",
+                                        "type": "string",
+                                        "pattern": "^\\/[^\\s]{0,511}$"
+                                    },
+                                    "tcp": {
+                                        "description": "A TCP connect probe (§10:210).",
+                                        "type": "boolean",
+                                        "const": true
+                                    },
+                                    "periodSeconds": {
+                                        "description": "1–300 (§10:210); default: 10.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 300
+                                    },
+                                    "timeoutSeconds": {
+                                        "description": "1–60 (§10:210); default: 5.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 60
+                                    },
+                                    "initialDelaySeconds": {
+                                        "description": "0–600 (§10:210); default: 0.",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 600
+                                    },
+                                    "failureThreshold": {
+                                        "description": "1–120 (§10:211); default: 3, or 30 for `startup`.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 120
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^x-": {}
+                                }
+                            },
+                            "liveness": {
+                                "description": "The liveness probe (§10:203).",
+                                "type": "object",
+                                "properties": {
+                                    "http": {
+                                        "description": "An in-container HTTP path (§10:210).",
+                                        "type": "string",
+                                        "pattern": "^\\/[^\\s]{0,511}$"
+                                    },
+                                    "tcp": {
+                                        "description": "A TCP connect probe (§10:210).",
+                                        "type": "boolean",
+                                        "const": true
+                                    },
+                                    "periodSeconds": {
+                                        "description": "1–300 (§10:210); default: 10.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 300
+                                    },
+                                    "timeoutSeconds": {
+                                        "description": "1–60 (§10:210); default: 5.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 60
+                                    },
+                                    "initialDelaySeconds": {
+                                        "description": "0–600 (§10:210); default: 0.",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 600
+                                    },
+                                    "failureThreshold": {
+                                        "description": "1–120 (§10:211); default: 3, or 30 for `startup`.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 120
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^x-": {}
+                                }
+                            }
+                        },
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "resources": {
+                        "description": "The container’s resources (§10:204-207).",
+                        "type": "object",
+                        "properties": {
+                            "cpu": {
+                                "description": "The CPU request (§10:204); default: `250m`.",
+                                "type": "string",
+                                "pattern": "^(?:\\d+m|\\d+(?:\\.\\d+)?)$"
+                            },
+                            "memory": {
+                                "description": "The memory request (§10:205); default: `512Mi`.",
+                                "type": "string",
+                                "pattern": "^\\d+(?:Mi|Gi)$"
+                            },
+                            "cpuLimit": {
+                                "description": "The CPU limit, ≥ `cpu` (§10:206, R17).",
+                                "type": "string",
+                                "pattern": "^(?:\\d+m|\\d+(?:\\.\\d+)?)$"
+                            },
+                            "memoryLimit": {
+                                "description": "The memory limit, ≥ `memory` (§10:207, R17); default: `2 × memory`.",
+                                "type": "string",
+                                "pattern": "^\\d+(?:Mi|Gi)$"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "volumes": {
+                        "description": "At most 5 volumes (§10:208); default: []. A component with volumes is limited to one replica (R18).",
+                        "maxItems": 5,
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "description": "The volume name (§10:208). Required.",
+                                    "type": "string",
+                                    "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                },
+                                "path": {
+                                    "description": "An absolute mount path of at most 255 characters (§10:208). Required.",
+                                    "type": "string",
+                                    "pattern": "^\\/[\\s\\S]{0,254}$"
+                                },
+                                "size": {
+                                    "description": "The volume size, `100Mi`–`500Gi` (§10:208). Required.",
+                                    "type": "string",
+                                    "pattern": "^\\d+(?:Mi|Gi)$"
+                                },
+                                "backup": {
+                                    "description": "Whether the volume is backed up (§10:208); default: true.",
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "path",
+                                "size"
+                            ],
+                            "additionalProperties": false,
+                            "patternProperties": {
+                                "^x-": {}
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "name",
+                    "role"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": {}
+                }
+            }
+        },
+        "dependencies": {
+            "description": "The managed services the app needs (§11).",
+            "type": "object",
+            "properties": {
+                "postgres": {
+                    "description": "Managed Postgres (§11:219-221).",
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "description": "The Postgres major (§11:219): \"14\" · \"15\" · \"16\" · \"17\"; default: \"16\".",
+                            "type": "string",
+                            "enum": [
+                                "14",
+                                "15",
+                                "16",
+                                "17"
+                            ]
+                        },
+                        "directUrl": {
+                            "description": "Also provide a non-pooled URL (§11:220); default: false.",
+                            "type": "boolean"
+                        },
+                        "extensions": {
+                            "description": "At most 10 Postgres extensions (§11:221); default: []. Availability warns `extension_unavailable`.",
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9_]{1,63}$"
+                            }
+                        }
+                    },
+                    "additionalProperties": false,
+                    "patternProperties": {
+                        "^x-": {}
+                    }
+                },
+                "redis": {
+                    "description": "Managed Redis (§11:222-224).",
+                    "type": "object",
+                    "properties": {
+                        "version": {
+                            "description": "The Redis major (§11:222): \"7\"; default: \"7\".",
+                            "type": "string",
+                            "enum": [
+                                "7"
+                            ]
+                        },
+                        "maxmemoryPolicy": {
+                            "description": "The eviction policy (§11:223); default: `noeviction`.",
+                            "type": "string",
+                            "enum": [
+                                "noeviction",
+                                "allkeys-lru",
+                                "volatile-lru",
+                                "allkeys-lfu",
+                                "volatile-lfu"
+                            ]
+                        },
+                        "persistence": {
+                            "description": "Whether Redis persists (§11:224); default: false.",
+                            "type": "boolean"
+                        }
+                    },
+                    "additionalProperties": false,
+                    "patternProperties": {
+                        "^x-": {}
+                    }
+                },
+                "objectStorage": {
+                    "description": "Object storage (§11:225-226).",
+                    "type": "object",
+                    "properties": {
+                        "buckets": {
+                            "description": "The buckets to create, 1–10 unique names (§11:225). Required.",
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                                "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only.",
+                                "type": "string",
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                            }
+                        },
+                        "publicBuckets": {
+                            "description": "Buckets that are publicly readable, a subset of `buckets` (§11:226); default: [].",
+                            "type": "array",
+                            "items": {
+                                "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only.",
+                                "type": "string",
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                            }
+                        }
+                    },
+                    "required": [
+                        "buckets"
+                    ],
+                    "additionalProperties": false,
+                    "patternProperties": {
+                        "^x-": {}
+                    }
+                },
+                "smtp": {
+                    "description": "Managed SMTP (§11:227).",
+                    "type": "object",
+                    "properties": {
+                        "required": {
+                            "description": "Whether SMTP is required before deploying (§11:227); default: false.",
+                            "type": "boolean"
+                        }
+                    },
+                    "additionalProperties": false,
+                    "patternProperties": {
+                        "^x-": {}
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "env": {
+            "description": "At most 200 env entries (§12), names unique (R4).",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "The variable name (§12:246). Required.",
+                        "type": "string",
+                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                    },
+                    "secret": {
+                        "description": "Stored encrypted, never logged or returned (§12:247, Constitution VII); default: false.",
+                        "type": "boolean"
+                    },
+                    "phase": {
+                        "description": "When the value exists (§12:248): runtime · build · both; default: `runtime`.",
+                        "type": "string",
+                        "enum": [
+                            "runtime",
+                            "build",
+                            "both"
+                        ]
+                    },
+                    "description": {
+                        "description": "What the value is for, ≤ 300 characters (§12:249).",
+                        "type": "string",
+                        "maxLength": 300
+                    },
+                    "value": {
+                        "description": "A literal value ≤ 4096 characters (§12:250); forbidden when `secret: true` (R8).",
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "from": {
+                        "description": "A §21 reference (§12:251), resolved by `app-spec.refs.ts` (T4).",
+                        "type": "string"
+                    },
+                    "template": {
+                        "description": "A ≤ 2048-character template over the same references plus `env.<NAME>` (§12:252).",
+                        "type": "string",
+                        "maxLength": 2048
+                    },
+                    "generate": {
+                        "description": "Generate the value (§12:253); implies `secret: true`.",
+                        "type": "object",
+                        "properties": {
+                            "kind": {
+                                "description": "The generator (§12:261): base64 · hex · chars · uuid · keypair. Required.",
+                                "type": "string",
+                                "enum": [
+                                    "base64",
+                                    "hex",
+                                    "chars",
+                                    "uuid",
+                                    "keypair"
+                                ]
+                            },
+                            "bytes": {
+                                "description": "16–128, `base64` and `hex` only (§12:262); default: 32.",
+                                "type": "integer",
+                                "minimum": 16,
+                                "maximum": 128
+                            },
+                            "length": {
+                                "description": "16–256, `chars` only (§12:263); default: 32.",
+                                "type": "integer",
+                                "minimum": 16,
+                                "maximum": 256
+                            },
+                            "alphabet": {
+                                "description": "The alphabet, `chars` only (§12:264); default: `alnum`.",
+                                "type": "string",
+                                "enum": [
+                                    "alnum",
+                                    "alnum-symbols",
+                                    "hex-lower",
+                                    "base64url"
+                                ]
+                            },
+                            "keypair": {
+                                "description": "Key-pair settings, `keypair` only (§12:265, R-11).",
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "description": "The key type (§12:272): ed25519 · ec-p256 · rsa-2048 · rsa-4096; default: `ed25519`.",
+                                        "type": "string",
+                                        "enum": [
+                                            "ed25519",
+                                            "ec-p256",
+                                            "rsa-2048",
+                                            "rsa-4096"
+                                        ]
+                                    },
+                                    "format": {
+                                        "description": "The storage format (§12:273, R-11): pem · base64url-raw · pkcs12; default: `pem`.",
+                                        "type": "string",
+                                        "enum": [
+                                            "pem",
+                                            "base64url-raw",
+                                            "pkcs12"
+                                        ]
+                                    },
+                                    "passwordEnv": {
+                                        "description": "Required with `format: pkcs12`, forbidden otherwise (§12:274, R26).",
+                                        "type": "string",
+                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^x-": {}
+                                }
+                            },
+                            "rotate": {
+                                "description": "When the value is replaced (§12:266): `never` is the only value in appSpecVersion 1.",
+                                "type": "string",
+                                "enum": [
+                                    "never"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "kind"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "validate": {
+                        "description": "Checks applied to the value (§12:254, R9).",
+                        "type": "object",
+                        "properties": {
+                            "length": {
+                                "description": "The exact generated length, 1–65536 (§12:254, R9).",
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65536
+                            },
+                            "minLength": {
+                                "description": "The minimum length, ≤ 65536 (§12:254, R9).",
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65536
+                            },
+                            "maxLength": {
+                                "description": "The maximum length, ≤ 65536 (§12:254, R9).",
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65536
+                            },
+                            "pattern": {
+                                "description": "An RE2 pattern of at most 500 characters (§12:254); look-around is `pattern_unsupported`.",
+                                "type": "string",
+                                "maxLength": 500
+                            }
+                        },
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "prompt": {
+                        "description": "Ask for the value at setup (§12:255).",
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "description": "The question, 1–300 characters (§12:255). Required.",
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                            },
+                            "required": {
+                                "description": "Whether the answer is required (§12:255); default: true.",
+                                "type": "boolean"
+                            },
+                            "example": {
+                                "description": "An example answer ≤ 200 characters (§12:255); secret-scanned — a match is `prompt_example_secret`.",
+                                "type": "string",
+                                "maxLength": 200
+                            },
+                            "group": {
+                                "description": "The prompt group, ≤ 40 characters (§12:255).",
+                                "type": "string",
+                                "maxLength": 40
+                            }
+                        },
+                        "required": [
+                            "description"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": {}
+                }
+            }
+        },
+        "jobs": {
+            "description": "At most 10 jobs (§13), names unique (R4).",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "The job name, unique among jobs (§13:319, R4). Required.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "when": {
+                        "description": "pre-deploy · first-deploy · post-deploy (§13:320). Required.",
+                        "type": "string",
+                        "enum": [
+                            "pre-deploy",
+                            "first-deploy",
+                            "post-deploy"
+                        ]
+                    },
+                    "component": {
+                        "description": "Must name a component (§13:321, R14); default: `domains.primaryComponent`.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "command": {
+                        "description": "Exactly one of `command` / `http` (§13:322).",
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 1000
+                        }
+                    },
+                    "http": {
+                        "description": "The HTTP request the job makes (§13:323-328).",
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "description": "GET · POST · PUT · PATCH · DELETE (§13:323); default: `POST`.",
+                                "type": "string",
+                                "enum": [
+                                    "GET",
+                                    "POST",
+                                    "PUT",
+                                    "PATCH",
+                                    "DELETE"
+                                ]
+                            },
+                            "path": {
+                                "description": "The in-cluster request path (§13:324). Required.",
+                                "type": "string",
+                                "pattern": "^\\/[^\\s]{0,511}$"
+                            },
+                            "body": {
+                                "description": "A JSON body of at most 16 KiB serialized (§13:325)."
+                            },
+                            "authEnv": {
+                                "description": "Names a `secret: true` env entry, sent in `Authorization` (§13:326, R15).",
+                                "type": "string",
+                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                            },
+                            "authScheme": {
+                                "description": "bearer → `Authorization: Bearer <value>`; raw → `Authorization: <value>` (§13:327); default: `bearer`.",
+                                "type": "string",
+                                "enum": [
+                                    "bearer",
+                                    "raw"
+                                ]
+                            },
+                            "expect": {
+                                "description": "What the request must answer with (§13:328).",
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "description": "Expected status codes (§13:328); default: [200, 201, 204].",
+                                        "minItems": 1,
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "minimum": 100,
+                                            "maximum": 599
+                                        }
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^x-": {}
+                                }
+                            }
+                        },
+                        "required": [
+                            "path"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "timeoutSeconds": {
+                        "description": "10–3600 (§13:329); default: 600.",
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 3600
+                    },
+                    "retries": {
+                        "description": "Retries, 0–3 (§13:330); default: 0.",
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3
+                    }
+                },
+                "required": [
+                    "name",
+                    "when"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": {}
+                }
+            }
+        },
+        "cron": {
+            "description": "At most 20 cron entries (§14), names unique (R4).",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "The cron name, unique among cron entries (§14:338, R4). Required.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "schedule": {
+                        "description": "A five-field cron expression, UTC (§14:339). Required; unparsable is `cron_invalid`.",
+                        "type": "string",
+                        "pattern": "^\\S+(?:\\s+\\S+){4}$"
+                    },
+                    "component": {
+                        "description": "Defaults to `domains.primaryComponent` (§14:340).",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "command": {
+                        "description": "Exactly one of `command` / `http` (§14:341).",
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 1000
+                        }
+                    },
+                    "http": {
+                        "description": "The HTTP request the fire makes (§14:341, as in §13).",
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "description": "GET · POST · PUT · PATCH · DELETE (§13:323); default: `POST`.",
+                                "type": "string",
+                                "enum": [
+                                    "GET",
+                                    "POST",
+                                    "PUT",
+                                    "PATCH",
+                                    "DELETE"
+                                ]
+                            },
+                            "path": {
+                                "description": "The in-cluster request path (§13:324). Required.",
+                                "type": "string",
+                                "pattern": "^\\/[^\\s]{0,511}$"
+                            },
+                            "body": {
+                                "description": "A JSON body of at most 16 KiB serialized (§13:325)."
+                            },
+                            "authEnv": {
+                                "description": "Names a `secret: true` env entry, sent in `Authorization` (§13:326, R15).",
+                                "type": "string",
+                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                            },
+                            "authScheme": {
+                                "description": "bearer → `Authorization: Bearer <value>`; raw → `Authorization: <value>` (§13:327); default: `bearer`.",
+                                "type": "string",
+                                "enum": [
+                                    "bearer",
+                                    "raw"
+                                ]
+                            },
+                            "expect": {
+                                "description": "What the request must answer with (§13:328).",
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "description": "Expected status codes (§13:328); default: [200, 201, 204].",
+                                        "minItems": 1,
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "minimum": 100,
+                                            "maximum": 599
+                                        }
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^x-": {}
+                                }
+                            }
+                        },
+                        "required": [
+                            "path"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "timeoutSeconds": {
+                        "description": "10–3600 (§14:342); default: 300.",
+                        "type": "integer",
+                        "minimum": 10,
+                        "maximum": 3600
+                    },
+                    "concurrency": {
+                        "description": "What Kubernetes does when a fire is still running (§14:343): forbid · allow; default: `forbid`.",
+                        "type": "string",
+                        "enum": [
+                            "forbid",
+                            "allow"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "schedule"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": {}
+                }
+            }
+        },
+        "domains": {
+            "description": "The public surface (§15).",
+            "type": "object",
+            "properties": {
+                "primaryComponent": {
+                    "description": "The web component that serves the public URL (§15:349, R3); default: the only `web` component.",
+                    "type": "string",
+                    "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                },
+                "publicUrlEnv": {
+                    "description": "At most 10 `env` entries that hold the public URL (§15:350, R16); default: [].",
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                        "description": "EnvName (schema.md §0): ^[A-Z_][A-Z0-9_]{0,127}$.",
+                        "type": "string",
+                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                    }
+                },
+                "onChange": {
+                    "description": "What a public-domain change requires (§15:351): restart · rebuild; default: `restart`.",
+                    "type": "string",
+                    "enum": [
+                        "restart",
+                        "rebuild"
+                    ]
+                },
+                "needsHairpin": {
+                    "description": "The app calls its own public URL from the server side (§15:352); default: false.",
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "smoke": {
+            "description": "At most 20 smoke checks (§16), names unique (R4).",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "The smoke check name, unique among smoke checks (§16:355, R4). Required.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "http": {
+                        "description": "The request to make (§16:361-363). Required.",
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "description": "GET · HEAD · POST (§16:361); default: `GET`.",
+                                "type": "string",
+                                "enum": [
+                                    "GET",
+                                    "HEAD",
+                                    "POST"
+                                ]
+                            },
+                            "path": {
+                                "description": "The path requested (§16:362). Required.",
+                                "type": "string",
+                                "pattern": "^\\/[^\\s]{0,511}$"
+                            },
+                            "body": {
+                                "description": "A JSON body of at most 16 KiB, `POST` only (§16:363)."
+                            }
+                        },
+                        "required": [
+                            "path"
+                        ],
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "component": {
+                        "description": "Must be a `web` component (§16:364, R14); default: `domains.primaryComponent`.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "expect": {
+                        "description": "What the response must look like (§16:365-368).",
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "description": "Expected status codes (§16:365); default: [200].",
+                                "minItems": 1,
+                                "maxItems": 10,
+                                "type": "array",
+                                "items": {
+                                    "type": "integer",
+                                    "minimum": 100,
+                                    "maximum": 599
+                                }
+                            },
+                            "bodyContains": {
+                                "description": "At most 5 strings the body must contain, ≤ 200 characters each (§16:366); default: [].",
+                                "maxItems": 5,
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                }
+                            },
+                            "bodyNotContains": {
+                                "description": "At most 5 strings the body must not contain, ≤ 200 characters each (§16:367); default: [].",
+                                "maxItems": 5,
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                }
+                            },
+                            "maxLatencyMs": {
+                                "description": "The latency budget in milliseconds, 100–60000 (§16:368); default: 10000.",
+                                "type": "integer",
+                                "minimum": 100,
+                                "maximum": 60000
+                            }
+                        },
+                        "additionalProperties": false,
+                        "patternProperties": {
+                            "^x-": {}
+                        }
+                    },
+                    "when": {
+                        "description": "always · first-deploy (§16:369); default: `always`.",
+                        "type": "string",
+                        "enum": [
+                            "always",
+                            "first-deploy"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "http"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": {}
+                }
+            }
+        },
+        "checks": {
+            "description": "At most 20 checks (§17), names unique (R4).",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "The check name, unique among checks (§17:377, R4). Required.",
+                        "type": "string",
+                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                    },
+                    "command": {
+                        "description": "The command to run, 1–500 characters with no control characters (§17:378). Required.",
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "allOf": [
+                            {
+                                "pattern": "\\S"
+                            },
+                            {
+                                "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+                            }
+                        ]
+                    },
+                    "required": {
+                        "description": "Whether the check gates a Task (§17:379); default: true; false warns `advisory_check`.",
+                        "type": "boolean"
+                    },
+                    "timeoutSeconds": {
+                        "description": "60–7200 (§17:380); default: 1800.",
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 7200
+                    }
+                },
+                "required": [
+                    "name",
+                    "command"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                    "^x-": {}
+                }
+            }
+        },
+        "agents": {
+            "description": "Agent instructions for Tasks on this App Work (§18).",
+            "type": "object",
+            "properties": {
+                "instructionFiles": {
+                    "description": "At most 10 instruction files (§18:386); default: [].",
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                        "description": "RelPath (schema.md §0): 1–255 characters, relative, no `..` segment, not under `.git/`.",
+                        "type": "string",
+                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                    }
+                },
+                "maxPullRequestChangedLines": {
+                    "description": "The largest pull request, in changed lines, 50–5000 (§18:387); default: 500.",
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 5000
+                },
+                "maxPullRequestChangedFiles": {
+                    "description": "The largest pull request, in changed files, 1–500 (§18:388); default: 50.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500
+                },
+                "requireHumanMergePaths": {
+                    "description": "Paths only a person may merge (§18:389, CONTRACTS §1): at most 50 globs; default: [].",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                        "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`.",
+                        "type": "string",
+                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$"
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "upstreamSync": {
+            "description": "How the fork follows its upstream (§19).",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "Whether upstream sync runs (§19:397); default: true.",
+                    "type": "boolean"
+                },
+                "schedule": {
+                    "description": "A five-field cron expression (§19:398); default: `0 6 * * 1`; ≥ 60 minutes apart (R21).",
+                    "type": "string",
+                    "pattern": "^\\S+(?:\\s+\\S+){4}$"
+                },
+                "mode": {
+                    "description": "How the sync lands (§19:399): `merge` only.",
+                    "type": "string",
+                    "enum": [
+                        "merge"
+                    ]
+                },
+                "branch": {
+                    "description": "The branch synced (§19:400); default: `upstream.defaultBranch`.",
+                    "type": "string",
+                    "pattern": "^(?!.*\\.\\.)(?!.*\\/\\/)(?!.*\\.lock$)[\\s\\S]{1,255}$"
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "upstreamPullRequests": {
+            "description": "The pull requests the platform opens upstream (§20).",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "Whether upstream pull requests are opened (§20:406); default: false.",
+                    "type": "boolean"
+                },
+                "requireApproval": {
+                    "description": "Only `true` is valid (§20:407, R12); default: true.",
+                    "type": "boolean"
+                },
+                "maxOpen": {
+                    "description": "At most this many open, 1–10 (§20:408); default: 3.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        },
+        "provisioning": {
+            "description": "Automatic re-provisioning (CONTRACTS §1, APW-04; §20).",
+            "type": "object",
+            "properties": {
+                "autoReprovision": {
+                    "description": "Re-provision automatically when an Upstream sync breaks the smoke tests (§20:414); default: false.",
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+                "^x-": {}
+            }
+        }
+    },
+    "additionalProperties": false,
+    "patternProperties": {
+        "^x-": {}
+    }
+}

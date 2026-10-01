@@ -1,0 +1,23 @@
+# Verbatim `git show HEAD:<path>` snapshots, written 2026-09-17 by the APW-03 schema build artifact.
+#
+# HEAD = e47866dc7636aa0fa5916bc656175a18401db6e8
+#        "docs(specs): add App Works program - any GitHub repository as a Work", 2026-09-17 13:51:03 +0200
+#
+# Why these exist: the worktree carries an UNCOMMITTED change (written 2026-09-17 ~20:09, during this
+# session) that renames the reserved env entries in cal-diy and umami from EVER_WORKS_* to APP_*. The
+# rule R23 violation the program brief describes therefore can no longer be observed on disk. These
+# snapshots are the reproducible proof that the schema still ENFORCES R23: validate.mjs expects all
+# three to FAIL with `reserved_env_name`.
+#
+# Source paths (all under docs/specs/features/app-works/APW-13-golden-paths/blueprints/):
+#   cal-diy/.works/works.yml
+#   umami/.works/works.yml
+#   app-fixture-hello/.works/works.yml
+#
+# Regenerate (run from the repo root):
+#   git show HEAD:docs/specs/features/app-works/APW-13-golden-paths/blueprints/cal-diy/.works/works.yml
+#   git show HEAD:docs/specs/features/app-works/APW-13-golden-paths/blueprints/umami/.works/works.yml
+#   git show HEAD:docs/specs/features/app-works/APW-13-golden-paths/blueprints/app-fixture-hello/.works/works.yml
+#
+# The app-fixture-hello revision is included as a CONTROL: it never declared a reserved env name, so it
+# must PASS under both revisions. A rule check that fails everything proves nothing.

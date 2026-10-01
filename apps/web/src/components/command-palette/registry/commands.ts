@@ -6,6 +6,7 @@ import {
     Gauge,
     HelpCircle,
     Keyboard,
+    LayoutGrid,
     Lightbulb,
     Link2,
     ListChecks,
@@ -18,8 +19,12 @@ import {
     Target,
     Users,
 } from 'lucide-react';
-import { ROUTES } from '@/lib/constants';
-import { WORKS_SEARCH_HREF } from '@/lib/hooks/use-keyboard-shortcuts';
+// `WORKS_SEARCH_HREF` is imported from `@/lib/constants`, NOT from the
+// `'use client'` hook module it used to live in: this file carries no directive of
+// its own, and a value imported into a module that can render on the server
+// arrives as a client REFERENCE rather than the string (the C22/C27 defect class).
+// The hook still exports the same name, so its own consumers are unchanged.
+import { ROUTES, WORKS_SEARCH_HREF } from '@/lib/constants';
 import { getWorkIdFromPath, replaceWorkIdInPath } from '@/lib/utils/work-route';
 import type { PaletteCommand, PaletteCommandContext } from './types';
 
@@ -115,6 +120,22 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
         label: ({ t }) => t('dashboard.commandPalette.commands.openHelp'),
         aliases: ({ t }) => t('dashboard.commandPalette.commandAliases.openHelp'),
         run: (ctx) => ctx.openHelp(),
+    },
+    {
+        /**
+         * APW-11 T15 — the launcher reached from the palette, which is the only
+         * door to it from the keyboard. The command is offered exactly when the
+         * shell supplied an opener, so an installation without the launcher (or a
+         * provider whose element failed to load) never shows a command that
+         * opens nothing — the launcher's own trigger lives in the header, and
+         * this is the same action, not a second one.
+         */
+        id: 'openAppLauncher',
+        icon: LayoutGrid,
+        label: ({ t }) => t('dashboard.commandPalette.commands.openAppLauncher'),
+        aliases: ({ t }) => t('dashboard.commandPalette.commandAliases.openAppLauncher'),
+        available: (ctx) => ctx.openAppLauncher !== undefined,
+        run: (ctx) => ctx.openAppLauncher?.(),
     },
     {
         id: 'keyboardShortcuts',

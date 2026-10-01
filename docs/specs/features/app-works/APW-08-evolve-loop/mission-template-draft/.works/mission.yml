@@ -1,0 +1,71 @@
+# Mission template manifest — "Build on an open-source app" (draft, APW-08)
+#
+# Destination (settled 2026-09-17 — APW08-G13 / EXT-13): this `.works/mission.yml` is the **runtime** source and
+# lives in the standalone seed repository `ever-works/build-on-open-source-app-mission-template`, which is the
+# layout the platform actually reads (one repository per template: `MissionTemplateConfig { owner, repo, branch }`,
+# packages/agent/src/missions/mission-template.config.ts:27-60 — no code reads `ever-works/missions`). A
+# **catalog-conformant copy** for a human-facing listing under `ever-works/missions`
+# (`templates/<slug>/{mission.yml,BRIEF.md,README.md}` plus a manifest row, schema
+# `schema/mission-template.schema.json`) is added **alongside** it under
+# `catalog/templates/build-on-open-source-app/` — never instead of it, and neither file replaces the other.
+# Schema: docs/features/mission-templates.md, plus the additive keys
+# marked APW-08 below (plan §2.7 / tasks T38). Unknown keys are tolerated by older platform versions.
+version: 1
+
+defaults:
+  # Mondays 08:00 UTC — one planning tick a week keeps spend and review load predictable.
+  cadence: '0 8 * * 1'
+  # This Mission improves an existing App Work; it never builds new Works from Ideas.
+  autoBuildWorks: false
+  outstandingIdeasCap: 0
+  guardrails:
+    # Hard cap per agent run started for a Task this Mission files ($15.00).
+    maxBudgetCentsPerRun: 1500
+    # New Tasks wait in Backlog until the owner moves them to To do.
+    requireApprovalBeforeCreate: true
+    requireApprovalBeforeDelete: true
+    dryRunByDefault: false
+  # APW-08 — file Tasks on attached App Works instead of Ideas.
+  outputMode: tasks
+  # APW-08 — per attached App Work, per tick.
+  taskOutput:
+    tasksPerTick: 2
+    openTasksCap: 4
+
+kb:
+  seedPaths:
+    - README.md
+    - prompts/product-brief.md
+    - prompts/task-planning.md
+
+# APW-08 — the App Work this Mission is about, and the App spec rules it recommends. The platform never
+# writes these into the App spec; "Propose these rules" opens a Task that changes the App spec by pull request.
+appWork:
+  requiredRelation: improves
+  recommendedAppSpec:
+    agents:
+      maxPullRequestChangedLines: 400
+      requireHumanMergePaths:
+        - '**/migrations/**'
+        - '**/prisma/schema.prisma'
+        - '**/*.sql'
+        - '**/schema.rb'
+    display:
+      protectedPaths:
+        - 'LICENSE*'
+        - 'NOTICE*'
+
+# APW-08 — created as DRAFT delivery Goals scoped to the chosen App Work and attached to the Mission.
+suggestedGoals:
+  - title: 'First customised feature live'
+    goalKind: delivery
+    dodCriteria:
+      - 'A product brief for {product} at {business} exists in the Mission knowledge base'
+      - 'At least one Task filed by this Mission reached Live on {appWork}'
+      - 'The owner confirmed the feature works for {business}'
+  - title: 'Four changes live in a month, none closed without deploying'
+    goalKind: delivery
+    dodCriteria:
+      - 'Four Tasks on {appWork} reached Live within 30 days'
+      - 'No Task on {appWork} was closed without deploying in those 30 days'
+      - 'Deployment failures on {appWork} were fixed within 2 follow-up Tasks each'

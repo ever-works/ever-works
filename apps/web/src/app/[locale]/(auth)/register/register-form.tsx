@@ -5,6 +5,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { COMPANY_OWNER_WEBSITE } from '@/lib/constants';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
+import { EverIdButton } from '@/components/auth/ever-id-button';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { register as registerAction } from '@/app/actions/auth';
 import { PASSWORD_RULES, VALIDATION_RULES } from '@/app/actions/validation';
@@ -32,14 +33,21 @@ interface RegisterFormProps {
      * The name is only a convenience and stays editable.
      */
     prefill?: { email?: string; name?: string };
+    /**
+     * APW-12 — show "Sign up with Ever ID": an administrator enabled it AND the
+     * `ever-id` flag is on. Defaults to false, so the form is unchanged without it.
+     */
+    everIdEnabled?: boolean;
 }
 
 export default function RegisterForm({
     availableSocialProviders,
     termsDocuments,
     prefill,
+    everIdEnabled = false,
 }: RegisterFormProps) {
     const t = useTranslations('auth.register');
+    const tEverId = useTranslations('auth.everId');
     // The rules this form has to state are already written, and already
     // translated into all 21 locales, under `validation.auth` — they are the
     // very strings the server action returns when it rejects. Reusing them
@@ -384,7 +392,7 @@ export default function RegisterForm({
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 
-                {availableSocialProviders.length > 0 && (
+                {(availableSocialProviders.length > 0 || everIdEnabled) && (
                     <>
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -397,6 +405,20 @@ export default function RegisterForm({
                                 </span>
                             </div>
                         </div>
+
+                        {/*
+                         * APW-12 — gated on the same consent condition as the
+                         * social buttons below, for the same reason: it is a
+                         * type="button" inside this form and would otherwise
+                         * walk straight past an unticked box.
+                         */}
+                        {everIdEnabled && (
+                            <EverIdButton
+                                mode="signUp"
+                                disabled={!formData.acceptedTerms || termsUnavailable}
+                                disabledReason={tEverId('consentRequired')}
+                            />
+                        )}
 
                         {/*
                          * Gated on the SAME condition as Create account. These

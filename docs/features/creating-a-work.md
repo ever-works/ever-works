@@ -97,12 +97,13 @@ flowchart TD
     J --> K[Import runs in background]
 ```
 
-| Method          | Best For                                         | AI Required            | Produces Content                                 | Provider Selection                                         |
-| --------------- | ------------------------------------------------ | ---------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
-| **AI Creation** | Starting from a topic or idea                    | Yes                    | Yes — AI researches, discovers, and writes items | Full (pipeline, AI, search, screenshot, content extractor) |
-| **Manual**      | Setting up structure first, adding content later | No                     | No — creates an empty work scaffold              | None                                                       |
-| **Import**      | Bootstrapping from an existing repository        | Depends on source type | Yes (for Awesome README) or copies existing data | Depends on source type                                     |
-| **Repository**  | Attaching agents to a code repository you own    | No                     | No — the repository is used as-is                | None                                                       |
+| Method                        | Best For                                         | AI Required            | Produces Content                                 | Provider Selection                                         |
+| ----------------------------- | ------------------------------------------------ | ---------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| **AI Creation**               | Starting from a topic or idea                    | Yes                    | Yes — AI researches, discovers, and writes items | Full (pipeline, AI, search, screenshot, content extractor) |
+| **Manual**                    | Setting up structure first, adding content later | No                     | No — creates an empty work scaffold              | None                                                       |
+| **Import**                    | Bootstrapping from an existing repository        | Depends on source type | Yes (for Awesome README) or copies existing data | Depends on source type                                     |
+| **Repository**                | Attaching agents to a code repository you own    | No                     | No — the repository is used as-is                | None                                                       |
+| **App** _(preview, API only)_ | Running and evolving an existing GitHub project  | No                     | No — the repository is the app's code            | Deploy target only                                         |
 
 ## AI Creation
 
@@ -304,6 +305,22 @@ What is different from every other kind:
 The API equivalent is `POST /api/works` with `kind: "repo"` and
 `repositoryUrl`; the call is rejected when the URL is missing or is not a
 `https://<github.com|gitlab.com|bitbucket.org>/<owner>/<repo>` address.
+
+## App Works
+
+:::warning Preview — off by default
+App Works are switched off on every installation until an operator sets `EVER_WORKS_APP_WORKS_ENABLED=true`, and
+the dashboard has no **App** chip or form for them yet.
+:::
+
+An App Work runs an existing GitHub repository — yours or an open-source project — as a Work: the platform links
+it, forks it or makes a private copy of it in your own GitHub account, and your agents then change it through Tasks.
+Unlike a Repository Work it is meant to be deployed, and unlike every generated kind nothing is generated into it.
+
+Today it is created through the API: `POST /api/works/app-source/inspect` previews a repository without writing
+anything, then `POST /api/works` with `kind: "app"`, `repositoryUrl`, `repositoryMode` (`link`, `fork` or
+`private-copy`) and, for a fork or a copy, `targetOwner`. See [App Works](./app-works.md) for the whole flow and for
+what the preview can and cannot do yet.
 
 ## Common Concepts
 

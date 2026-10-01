@@ -340,6 +340,7 @@ export const HELP_ARTICLES = [
             { id: 'from-an-idea', text: 'From an Idea', level: 2 },
             { id: 'start-a-campaign', text: 'Start a campaign', level: 2 },
             { id: 'repository-works', text: 'Repository Works', level: 2 },
+            { id: 'app-works', text: 'App Works', level: 2 },
             { id: 'common-concepts', text: 'Common Concepts', level: 2 },
             { id: 'git-provider', text: 'Git Provider', level: 3 },
             { id: 'deploy-provider', text: 'Deploy Provider', level: 3 },
@@ -1008,11 +1009,28 @@ export const HELP_ARTICLES = [
                 level: 2,
             },
             {
+                id: 'when-a-plugins-code-loads',
+                text: 'When a plugin\'s code loads',
+                level: 2,
+            },
+            {
+                id: 'what-an-operator-can-change',
+                text: 'What an operator can change',
+                level: 3,
+            },
+            {
                 id: 'dynamic-plugin-distribution',
                 text: 'Dynamic plugin distribution',
                 level: 2,
             },
             { id: 'what-an-operator-sets', text: 'What an operator sets', level: 3 },
+            { id: 'install-on-use', text: 'Install-on-use', level: 3 },
+            { id: 'sandbox-sessions', text: 'Sandbox sessions', level: 3 },
+            {
+                id: 'background-jobs-the-worker',
+                text: 'Background jobs (the worker)',
+                level: 3,
+            },
             { id: 'the-admin-allowlist', text: 'The admin allowlist', level: 3 },
             {
                 id: 'installing-and-what-refuses',

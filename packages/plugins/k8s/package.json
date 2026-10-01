@@ -22,7 +22,7 @@
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
-		"type-check": "tsc --noEmit",
+		"type-check": "tsc --noEmit && tsc -p tsconfig.specs.json --noEmit",
 		"clean": "rm -rf dist",
 		"test": "vitest run --passWithNoTests",
 		"test:watch": "vitest",
@@ -50,7 +50,8 @@
 			"version": "1.0.0",
 			"category": "deployment",
 			"capabilities": [
-				"deployment"
+				"deployment",
+				"app-dependency"
 			],
 			"description": "Deploy works to a Kubernetes cluster",
 			"author": {
