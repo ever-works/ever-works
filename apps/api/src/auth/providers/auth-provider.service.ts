@@ -13,7 +13,7 @@ import type { createAuthRuntimeInstance } from './auth-runtime.instance';
 // L-07: imported from the standalone helper file so we don't load
 // better-auth's ESM bundle at service-spec evaluation time.
 import { getBcryptCost, passwordNeedsRehash } from './bcrypt-cost';
-import type { AuthRuntimeContext, AuthRuntimeUser } from './auth-provider.types';
+import type { AuthRuntimeContext, AuthRuntimeUser, SessionOrigin } from './auth-provider.types';
 import { AuthSyncService } from './auth-sync.service';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -25,8 +25,11 @@ import { DataSource } from 'typeorm';
  * `sha256` with no salt is sufficient — collisions are not a realistic risk
  * and adding a salt would defeat O(1) lookup-by-hash. Mirrors the helper in
  * `auth.service.ts` for verification / reset tokens.
+ *
+ * Exported (APW-12, plan §5.4) so the Ever ID session service finds "the
+ * current session" by the same digest instead of a second copy of it.
  */
-function hashSessionToken(token: string): string {
+export function hashSessionToken(token: string): string {
     return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
@@ -242,11 +245,12 @@ export class AuthProviderService extends AuthProvider {
     async issueSession(
         userId: string,
         clientFingerprint?: { ipAddress?: string | null; userAgent?: string | null },
+        origin?: SessionOrigin,
     ): Promise<TokenResponse> {
         const user = await this.assertActiveUser(userId);
         // H-01 (sessions): `createSessionRecord` returns a non-persistent
         // `rawToken` extra property. The persisted row stores only the hash.
-        const session = await this.createSessionRecord(user.id, clientFingerprint);
+        const session = await this.createSessionRecord(user.id, clientFingerprint, origin);
 
         return {
             access_token: session.rawToken,
@@ -458,6 +462,7 @@ export class AuthProviderService extends AuthProvider {
     private async createSessionRecord(
         userId: string,
         clientFingerprint?: { ipAddress?: string | null; userAgent?: string | null },
+        origin?: SessionOrigin,
     ): Promise<AuthSession & { rawToken: string }> {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
@@ -473,6 +478,12 @@ export class AuthProviderService extends AuthProvider {
             ipAddress: clientFingerprint?.ipAddress ?? null,
             userAgent: clientFingerprint?.userAgent ?? null,
         });
+        // APW-12 (Ever ID, plan §5.4): only the Ever ID path passes an origin, so
+        // every other caller writes exactly the row it wrote before (FR-35).
+        if (origin) {
+            session.externalIdentityId = origin.externalIdentityId;
+            session.externalSid = origin.externalSid ?? null;
+        }
 
         const saved = await this.getSessionRepository().save(session);
         // The raw token never lives in the DB — surface it to the caller

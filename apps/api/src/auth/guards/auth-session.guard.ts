@@ -1,6 +1,7 @@
 import { Injectable, ExecutionContext, UnauthorizedException, Inject } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { DELEGATED_READ_SCOPE } from '../decorators/delegated-read.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { UserRepository } from '@ever-works/agent/database';
 import { FleetRunCredentialService } from '@ever-works/agent/fleet';
@@ -9,6 +10,15 @@ import type { AuthenticatedUser, FleetRunCredentialBinding } from '../types/auth
 import { AUTH_PROVIDER } from '../providers/auth-provider.constants';
 import { AuthProvider } from '../providers/auth-provider.abstract';
 import { toHeaders } from '../providers/request-headers';
+import { NO_TOKEN_IN_QUERY, hasTokenInQuery, isEverIdPath } from './no-token-in-query.guard';
+import { EverIdHttpException } from '../services/ever-id-errors';
+import {
+    EVER_ID_DELEGATION_VERIFIER,
+    EVER_ID_SIGNED_OUT_PROBE,
+    JWT_SHAPED_BEARER,
+    type EverIdDelegationVerifier,
+    type EverIdSignedOutProbe,
+} from './ever-id-guard.tokens';
 
 const API_KEY_PREFIX = 'ew_live_';
 
@@ -85,6 +95,10 @@ export class AuthSessionGuard {
     private apiKeyService: ApiKeyService;
     private userRepository: UserRepository;
     private fleetRunCredentials: FleetRunCredentialService | undefined;
+    // APW-12 (Ever ID) — resolved lazily through `moduleRef` for the same reason
+    // as the services above; `null` once looked up and found absent.
+    private everIdDelegation: EverIdDelegationVerifier | null | undefined;
+    private everIdSignedOut: EverIdSignedOutProbe | null | undefined;
 
     constructor(
         private reflector: Reflector,
@@ -94,6 +108,23 @@ export class AuthSessionGuard {
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
+        // APW-12 (Ever ID, FR-17, NFR-3) — a token in the query string is refused
+        // with `400 tokenInQuery` BEFORE anything else runs, public routes
+        // included, so an unauthenticated caller gets the 400 rather than a 401
+        // and the value is never processed. Only Ever ID routes and handlers that
+        // opt in (`@DelegatedRead`) are checked; every other route is untouched.
+        const queryCheckRequest = context.switchToHttp().getRequest();
+        if (
+            (isEverIdPath(queryCheckRequest) ||
+                this.reflector.getAllAndOverride<boolean>(NO_TOKEN_IN_QUERY, [
+                    context.getHandler(),
+                    context.getClass(),
+                ])) &&
+            hasTokenInQuery(queryCheckRequest)
+        ) {
+            throw new EverIdHttpException('tokenInQuery');
+        }
+
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
             context.getHandler(),
             context.getClass(),
@@ -152,6 +183,37 @@ export class AuthSessionGuard {
             return true;
         }
 
+        // APW-12 (Ever ID, plan §5.3) — the delegated read. Considered ONLY on a
+        // handler marked `@DelegatedRead(scope)` and only for a bearer shaped like
+        // a JWT (an Ever Works session bearer never contains a dot). Everywhere
+        // else such a token falls through to the provider below and is refused
+        // exactly as before (FR-46).
+        const delegatedScope = this.reflector.getAllAndOverride<string>(DELEGATED_READ_SCOPE, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+        if (delegatedScope) {
+            const bearer = this.extractBearer(request);
+            if (bearer && JWT_SHAPED_BEARER.test(bearer)) {
+                const delegation = this.resolveDelegationService();
+                const principal = delegation
+                    ? await delegation.authenticate(bearer, delegatedScope, {
+                          ipAddress: typeof request.ip === 'string' ? request.ip : null,
+                          userAgent:
+                              typeof request.headers?.['user-agent'] === 'string'
+                                  ? request.headers['user-agent']
+                                  : null,
+                      })
+                    : null;
+                if (!principal) {
+                    throw new UnauthorizedException();
+                }
+                request.user = principal.user;
+                request.everIdDelegation = principal.binding;
+                return true;
+            }
+        }
+
         const providerUser = await this.authProvider.authenticate(toHeaders(request.headers || {}));
         if (providerUser) {
             // The interactive path. Stamped by copy rather than mutation so a
@@ -160,7 +222,61 @@ export class AuthSessionGuard {
             return true;
         }
 
+        // APW-12 (Ever ID, S6, plan §5.4) — a session that an Ever ID sign-out
+        // notice ended looks exactly like an expired one; the short-lived marker
+        // the notice wrote lets the answer say why, so the web can show "You were
+        // signed out of Ever ID." The body changes only in that one case.
+        if (await this.wasSignedOutByEverId(request)) {
+            throw new EverIdHttpException('everIdSignedOut');
+        }
+
         throw new UnauthorizedException();
+    }
+
+    /** The bearer of an `Authorization: Bearer ...` header, if any. */
+    private extractBearer(request: any): string | null {
+        const authHeader = request.headers?.authorization;
+        if (!authHeader || typeof authHeader !== 'string') return null;
+        const [scheme, token] = authHeader.split(' ');
+        if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+        return token.trim() || null;
+    }
+
+    private resolveDelegationService(): EverIdDelegationVerifier | undefined {
+        if (this.everIdDelegation === undefined) {
+            this.everIdDelegation = this.resolveOptional<EverIdDelegationVerifier>(
+                EVER_ID_DELEGATION_VERIFIER,
+            );
+        }
+        return this.everIdDelegation ?? undefined;
+    }
+
+    private async wasSignedOutByEverId(request: any): Promise<boolean> {
+        const bearer = this.extractBearer(request);
+        if (!bearer || isMachineCredential(bearer)) return false;
+        if (this.everIdSignedOut === undefined) {
+            this.everIdSignedOut =
+                this.resolveOptional<EverIdSignedOutProbe>(EVER_ID_SIGNED_OUT_PROBE);
+        }
+        if (!this.everIdSignedOut) return false;
+        try {
+            return await this.everIdSignedOut.wasSignedOut(bearer);
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * An optional collaborator, or `null` when this process does not bind it.
+     * Any resolution failure counts as "not bound": these branches are additive
+     * and must never turn a plain 401 into a different error.
+     */
+    private resolveOptional<T>(token: symbol): T | null {
+        try {
+            return (this.moduleRef.get(token, { strict: false }) as T) ?? null;
+        } catch {
+            return null;
+        }
     }
 
     /**
