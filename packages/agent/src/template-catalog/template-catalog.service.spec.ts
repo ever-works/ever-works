@@ -1508,7 +1508,8 @@ describe('TemplateCatalogService', () => {
 
                 expect(gitFacade.forkRepository).not.toHaveBeenCalled();
             } finally {
-                if (previousAppWorks !== undefined) process.env.EVER_WORKS_APP_WORKS_ENABLED = previousAppWorks;
+                if (previousAppWorks !== undefined)
+                    process.env.EVER_WORKS_APP_WORKS_ENABLED = previousAppWorks;
             }
         });
 

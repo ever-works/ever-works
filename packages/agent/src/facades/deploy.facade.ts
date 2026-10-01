@@ -137,7 +137,10 @@ export class DeployFacadeService implements IDeployFacade {
         // APW-06 T26 (plan §8.4) — the App branch of the four domain methods. **Optional and last**,
         // so every existing construction (the 33 specs under `facades/__tests__/`, the account
         // transfer, the internal CLI) keeps compiling and keeps its behaviour: with nothing bound
-        // there is no App branch at all. The module binds `AppDomainsService`.
+        // there is no App branch at all. **Unbound in the API today**: no API module provides
+        // `AppDomainsService` (only the worker's `TriggerAppRuntimeModule` does), so an App Work's
+        // domain calls take the website path. Recorded gap C43 (owner ruling 2026-09-30), kept exact
+        // by `OPEN_API_GAPS` in `apps/api/src/app-works-di-reachability.spec.ts`.
         @Optional()
         private readonly appDomains?: AppDomainsService,
     ) {}
@@ -503,9 +506,9 @@ export class DeployFacadeService implements IDeployFacade {
      * `deploy.facade.spec.ts` green **unchanged** (`tasks.md:479`), and it is also why the kind check
      * costs no extra read for a non-App Work in a fixture.
      *
-     * In production the module binds it, and the one `findById` below is the price of branching
-     * before the provider conversation — a domain operation is a member's explicit click, not a hot
-     * path.
+     * It is unbound in the API today (recorded gap C43, see the constructor note). Once a slice binds
+     * it, the one `findById` below is the price of branching before the provider conversation — a
+     * domain operation is a member's explicit click, not a hot path.
      */
     private async appDomainsFor(options: DeployFacadeOptions): Promise<AppDomainsService | null> {
         if (!this.appDomains) return null;

@@ -382,10 +382,10 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
 const OPEN_API_GAPS: readonly OpenGap[] = [
     {
         key: 'FacadesModule | DeployFacadeService | AppDomainsService',
-        reason: "APW-06 T26's App branch of `getDomains`/`addDomain`/`removeDomain`/`verifyDomain` is dead in the API: no API module provides `AppDomainsService` (only the worker's `TriggerAppRuntimeModule` does), so an App Work's custom-domain click takes the website path. The facade's docstring says the opposite ('The module binds `AppDomainsService`', 'In production the module binds it').",
+        reason: "APW-06 T26's App branch of `getDomains`/`addDomain`/`removeDomain`/`verifyDomain` is dead in the API: no API module provides `AppDomainsService` (only the worker's `TriggerAppRuntimeModule` does), so an App Work's custom-domain click takes the website path (recorded gap C43; the facade's docstring now says so).",
         source: 'packages/agent/src/facades/deploy.facade.ts:137-142,506-507 (found 2026-09-26)',
         routedTo:
-            "facades lane (deploy.facade.ts is under another agent's edit) + APW-06 T26 owner: bind `AppDomainsService` where `FacadesModule`'s `DeployFacadeService` can see it (FacadesModule cannot import AppRuntimeStateModule without a cycle, so likely a lazy ModuleRef lookup), or correct the docstring and record the gap in the dormancy register.",
+            "Owner ruling (2026-09-30): a recorded gap (C43). The docstring is corrected and this entry stays until a slice binds `AppDomainsService` where FacadesModule's `DeployFacadeService` can see it (FacadesModule cannot import AppRuntimeStateModule without a cycle, so likely a lazy ModuleRef lookup).",
     },
 ];
 
@@ -414,6 +414,26 @@ const EXPECTED_REMOTE_MISSES: readonly Expected[] = [];
  */
 const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
     {
+        key: "AppDependencyProvisionWorkerModule :: 'WorkAppDependencyRepository'",
+        reason: "The entity's TypeORM repository (row creation): a remote proxy cannot carry it, so the dependency worker composition needs repository methods first.",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+    },
+    {
+        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_CLUSTER_ACCESS',
+        reason: "Its swap is `AppRuntimeFacadeService`, which lives in T71's module; this task's lean module is not that one.",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+    },
+    {
+        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_CONFIG_CIPHER',
+        reason: '`AppEnvCrypto` and its key inside the isolated worker are part of the open dependency worker composition.',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+    },
+    {
+        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_PROVISION_DISPATCHER',
+        reason: "The runner's re-dispatch; this context imports no job-runtime binding (reported `dispatcherUnavailable`).",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+    },
+    {
         key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_SPEC_SOURCE',
         reason: "APW-07's module owner binds the dependency spec source (T25); unwritten.",
         source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:264 (APW-07 T25, tasks.md:380)',
@@ -427,6 +447,16 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         key: 'AppDependencyProvisionWorkerModule :: APP_RUNTIME_TARGET',
         reason: 'Only a fail-closed default exists until T73 publishes the port; unbound answers the same refusal.',
         source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:107-125 (APW-06 T73)',
+    },
+    {
+        key: 'AppDependencyProvisionWorkerModule :: AppDependencyFacadeService',
+        reason: 'The provider selection lives in the facades graph this lean context does not import.',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
+    },
+    {
+        key: 'AppDependencyProvisionWorkerModule :: WorkAppDependencyRepository',
+        reason: 'Needs a `remoteMap` name and the row-write redesign above; unbound, every run answers `storeUnavailable` and dials nothing.',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
     },
     {
         key: 'TriggerAppRuntimeModule :: APPS_DOMAIN_DNS_SERVICE',
@@ -444,6 +474,21 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/agent/src/app-runtime/app-deploy.orchestrator.ts:170 (owned by APW-02)',
     },
     {
+        key: 'TriggerAppRuntimeModule :: APP_CUSTOM_DOMAIN_STORE',
+        reason: "The swap is the proxied `WorkCustomDomainRepository`; bound without the runtime-state row, hosts would ignore the owner's settings.",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
+    },
+    {
+        key: 'TriggerAppRuntimeModule :: APP_DEPENDENCIES_SERVICE',
+        reason: "APW-07's service must run in the worker, and its `@InjectRepository(WorkAppDependency)` writes cannot cross the internal channel.",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:170-172',
+    },
+    {
+        key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DEPLOYMENT_STORE',
+        reason: "The API's adapter has no `update`, which the orchestrator's view of the token needs; which class carries it is undecided.",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:162-164',
+    },
+    {
         key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DISPATCHER',
         reason: "The orchestrator's dequeue dispatch: T24 declares the token and T31 binds it; inside the worker it is also the open §5.1/§5.6 dispatcher-gate decision (T71 status item (a)).",
         source: 'packages/agent/src/app-runtime/app-deploy.orchestrator.ts:98-100 (APW-06 T31); APW-06/tasks.md:1228-1232',
@@ -459,9 +504,29 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/agent/src/app-runtime/app-health.service.ts:722-736',
     },
     {
+        key: 'TriggerAppRuntimeModule :: APP_HOSTS_APPS_DOMAIN',
+        reason: 'The swap is `config.everWorks.apps`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
+    },
+    {
+        key: 'TriggerAppRuntimeModule :: APP_HOSTS_DEPLOYMENT_STORE',
+        reason: 'The swap is the proxied `WorkDeploymentRepository`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
+    },
+    {
+        key: 'TriggerAppRuntimeModule :: APP_HOSTS_DEPLOY_REQUESTER',
+        reason: "Bound to the API's `AppDeployRequestService`; §6.4 lists no proxy, so whether the worker may request a Deployment is undecided.",
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:165-166; docs/specs/features/app-works/APW-06-app-runtime/plan.md:982-989',
+    },
+    {
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: "APW-05's rebuild requester is unwritten.",
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
+    },
+    {
+        key: 'TriggerAppRuntimeModule :: APP_HOSTS_WORK_STORE',
+        reason: 'The swap is the proxied `WorkRepository`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
+        source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1324 (APW-06 T71 status, owner ruling C44); packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_IMAGE_REFERENCE_RESOLVER',
@@ -511,106 +576,12 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
 ];
 
 /**
- * Worker gaps measured RED on 2026-09-26 and NOT wired by the pass that wired the API graph,
- * whose classification is the OWNER's to make (see {@link OpenGap}). Each names what a binding
- * would need; the per-token detail is in `trigger-app-runtime.module.ts` ("Still open under
- * T71") and `app-dependency-provision.task.ts`. Those docstrings were written by the same pass,
- * so they are evidence, not authority: until the owner either adds these to T71's status line
- * (then they move to {@link EXPECTED_WORKER_UNBOUND}, citing it) or cuts a T71 slice that binds
- * them (then they leave), they stay here, visibly provisional.
+ * Worker gaps measured RED and NOT wired, whose classification is the OWNER's to make (see
+ * {@link OpenGap}). Empty since the owner's C44 ruling (2026-09-30): the 13 measured on 2026-09-26
+ * were added to APW-06 T71's status line and moved to {@link EXPECTED_WORKER_UNBOUND}, citing it.
+ * A new worker gap with no task or decision behind it lands here, never in the expected list.
  */
-const OPEN_WORKER_GAPS: readonly OpenGap[] = [
-    {
-        key: "AppDependencyProvisionWorkerModule :: 'WorkAppDependencyRepository'",
-        reason: "The entity's TypeORM repository (row creation): a remote proxy cannot carry it, so the dependency worker composition needs repository methods first.",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_CLUSTER_ACCESS',
-        reason: "Its swap is `AppRuntimeFacadeService`, which lives in T71's module; this task's lean module is not that one.",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_CONFIG_CIPHER',
-        reason: '`AppEnvCrypto` and its key inside the isolated worker are part of the open dependency worker composition.',
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: APP_DEPENDENCY_PROVISION_DISPATCHER',
-        reason: "The runner's re-dispatch; this context imports no job-runtime binding (reported `dispatcherUnavailable`).",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: AppDependencyFacadeService',
-        reason: 'The provider selection lives in the facades graph this lean context does not import.',
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: WorkAppDependencyRepository',
-        reason: 'Needs a `remoteMap` name and the row-write redesign above; unbound, every run answers `storeUnavailable` and dials nothing.',
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:77-88',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_CUSTOM_DOMAIN_STORE',
-        reason: "The swap is the proxied `WorkCustomDomainRepository`; bound without the runtime-state row, hosts would ignore the owner's settings.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (lands with WORK_APP_RUNTIME_STATES) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_DEPENDENCIES_SERVICE',
-        reason: "APW-07's service must run in the worker, and its `@InjectRepository(WorkAppDependency)` writes cannot cross the internal channel.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:170-172',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (with APW-07 T17) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DEPLOYMENT_STORE',
-        reason: "The API's adapter has no `update`, which the orchestrator's view of the token needs; which class carries it is undecided.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:162-164',
-        routedTo: "Owner decision: APW-06 T71 slice vs. an entry in T71's status line.",
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_APPS_DOMAIN',
-        reason: 'The swap is `config.everWorks.apps`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (lands with WORK_APP_RUNTIME_STATES) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_DEPLOYMENT_STORE',
-        reason: 'The swap is the proxied `WorkDeploymentRepository`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (lands with WORK_APP_RUNTIME_STATES) vs. an entry in T71's status line.",
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_DEPLOY_REQUESTER',
-        reason: "Bound to the API's `AppDeployRequestService`; §6.4 lists no proxy, so whether the worker may request a Deployment is undecided.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:165-166; docs/specs/features/app-works/APW-06-app-runtime/plan.md:982-989',
-        routedTo:
-            'Owner decision: may the isolated worker create Deployments (a §6.4 proxy), or is this unbound by design?',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HOSTS_WORK_STORE',
-        reason: 'The swap is the proxied `WorkRepository`; it lands with the runtime-state row (see APP_CUSTOM_DOMAIN_STORE).',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:155-161',
-        routedTo:
-            "Owner decision: APW-06 T71 slice (lands with WORK_APP_RUNTIME_STATES) vs. an entry in T71's status line.",
-    },
-];
+const OPEN_WORKER_GAPS: readonly OpenGap[] = [];
 
 /* -------------------------------------------------------------------------- *
  * Where things are

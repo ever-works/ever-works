@@ -1321,3 +1321,11 @@ code comments and specs cite.
   `APP_DEPENDENCIES_SERVICE`, `APP_DEPLOY_DEPLOYMENT_STORE`, `APP_HOSTS_APPS_DOMAIN`, `APP_HOSTS_DEPLOYMENT_STORE`,
   `APP_HOSTS_DEPLOY_REQUESTER`, `APP_HOSTS_WORK_STORE`). **Owner decision:** add them to T71's status line (they then
   move to `EXPECTED_WORKER_UNBOUND`, citing it) or cut a T71 slice (with APW-07 T17) that binds them.
+- **T71 (2026-10-01, owner ruling on C44, 2026-09-30):** the 13 worker bindings named above are added to T71's
+  status line as **expected-unbound until a T71 slice binds them**: in `AppDependencyProvisionWorkerModule`
+  `WorkAppDependencyRepository` (by class and by name), `APP_DEPENDENCY_CLUSTER_ACCESS`, `APP_DEPENDENCY_CONFIG_CIPHER`,
+  `APP_DEPENDENCY_PROVISION_DISPATCHER`, `AppDependencyFacadeService`; in `TriggerAppRuntimeModule`
+  `APP_CUSTOM_DOMAIN_STORE`, `APP_DEPENDENCIES_SERVICE`, `APP_DEPLOY_DEPLOYMENT_STORE`, `APP_HOSTS_APPS_DOMAIN`,
+  `APP_HOSTS_DEPLOYMENT_STORE`, `APP_HOSTS_DEPLOY_REQUESTER`, `APP_HOSTS_WORK_STORE`. The DI reachability spec moved
+  them from `OPEN_WORKER_GAPS` to `EXPECTED_WORKER_UNBOUND`, each citing this note; the list stays exact both ways, so
+  the slice that binds one also deletes its entry. Unbound, each keeps its documented fail-closed answer.
