@@ -45,7 +45,9 @@ for (const entry of platforms) {
 
 	for (const [environment, url] of Object.entries(entry.urls ?? {})) {
 		if (url === 'TBD') {
-			console.warn(`warning: ${entry.id}/${environment} is still TBD (no tile for that environment until it is provided)`);
+			console.warn(
+				`warning: ${entry.id}/${environment} is still TBD (no tile for that environment until it is provided)`
+			);
 			continue;
 		}
 		if (!String(url).startsWith('https://')) {
