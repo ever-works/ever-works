@@ -118,7 +118,7 @@ spec:
         source: detected | blueprint | user
         notice: 'Cal.diy® is a trademark of Cal.com, Inc.'
     display:
-        name: 'Cal.diy (community build)'
+        name: 'Cal (community build)'
         protectedPaths: ['apps/web/public/brand/**'] # agents may not modify (D13)
     build: # APW-05
         strategy: dockerfile | image | auto | none # required when components exist (auto = zero-config, R-13)

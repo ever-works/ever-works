@@ -497,6 +497,11 @@ _Delivers spec FR-1…FR-53 and ACC-12-01…ACC-12-39._
 
 # Phase P2 — Ever Teams ([`cross-platform.md`](./cross-platform.md) §4)
 
+> **Design revised 2026-10-01.** Gauzy's side is one plugin, `packages/plugins/auth-zitadel`, loaded by the
+> environment variable `ZITADEL_ENABLED`, with its routes under `/api/auth/zitadel` and its link table
+> `zitadel_account`. Where a task below names a path in Gauzy core, `FEATURE_EVER_ID_*` or `external_identity`,
+> [`cross-platform.md`](./cross-platform.md) §4–§7 is the current design and wins.
+
 - [ ] **T35. Gauzy API slice, default off** (tracked in `ever-co/ever-gauzy`).
       **Create** `packages/core/src/lib/auth/external-identity/` (entity, module, service, TypeORM and MikroORM
       repositories, `ever-id-token.service.ts`) and one migration in
@@ -548,6 +553,11 @@ _Delivers spec FR-1…FR-53 and ACC-12-01…ACC-12-39._
 ---
 
 # Phase P3 — Ever Gauzy ([`cross-platform.md`](./cross-platform.md) §5)
+
+> **Design revised 2026-10-01.** Gauzy's side is one plugin, `packages/plugins/auth-zitadel`, loaded by the
+> environment variable `ZITADEL_ENABLED`, with its routes under `/api/auth/zitadel` and its link table
+> `zitadel_account`. Where a task below names a path in Gauzy core, `FEATURE_EVER_ID_*` or `external_identity`,
+> [`cross-platform.md`](./cross-platform.md) §4–§7 is the current design and wins.
 
 - [ ] **T39. Gauzy API sign-in with hand-off** (tracked in `ever-co/ever-gauzy`).
       **Create** `packages/auth/src/lib/ever-id/ever-id.strategy.ts`, `ever-id.controller.ts`, `index.ts`, and

@@ -67,6 +67,10 @@ deploy, never write" guarantee (EW-766). Where a new noun is genuinely required,
 
 ## 1. Vocabulary — no new synonyms
 
+> **Outside Ever Works** the other Ever products call an App Work an **App**; the nouns below stay as they are inside
+> Ever Works, and the three launcher routes (`GET /api/me/apps`, `PUT /api/me/apps/preferences`,
+> `GET /api/app-launcher/platforms`) are the **launcher API** those products call.
+
 | Concept                                                                           | Canonical noun                                                                                                                                                                                                                          | Do **not** introduce                                                   |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | A Work whose code is a repository that Ever Works builds, runs and evolves        | **App Work** — a Work of kind **`app`** (chip label **App**) — **NEW kind**, justified in APW-01                                                                                                                                        | "project", "application instance", "service", "deployment"             |

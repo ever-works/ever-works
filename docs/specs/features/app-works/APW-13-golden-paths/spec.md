@@ -106,7 +106,7 @@ and, from a user browsing the Apps catalog:
 - **S2 — Cal.diy from a Blueprint, as a user sees it.**
   **Given** a user on a cluster of their own,
   **when** they paste the Cal.diy repository address and pick the offered Blueprint,
-  **then** the form shows **Cal.diy (community build)**, the MIT licence, the trademark notice and the upstream's own
+  **then** the form shows **Cal (community build)**, the MIT licence, the trademark notice and the upstream's own
   use advisory, and asks only for the administrator's email and password; the app is live on its domain with telemetry
   disabled, the administrator can sign in, and their administrator account already existed when the app first became
   reachable.
@@ -249,7 +249,7 @@ and, from a user browsing the Apps catalog:
 
 ### 4.4 The Cal.diy Blueprint
 
-- **FR-19.** The Blueprint is displayed as **Cal.diy (community build)** with the upstream owner's trademark notice, and
+- **FR-19.** The Blueprint is displayed as **Cal (community build)** with the upstream owner's trademark notice, and
   declares the licence file and trademarked logo assets read-only to agents. The create form and the Work page also
   carry the upstream's own use advisory (personal, non-production use) verbatim beside the notice, and the notice's
   wording is recorded as coming from outside the upstream repository — the repository at the pin has no trademark
