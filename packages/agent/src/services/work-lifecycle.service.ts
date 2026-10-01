@@ -29,11 +29,13 @@ import { CreateWorkDto } from '@src/dto/create-work.dto';
 import { UpdateWorkDto } from '@src/dto';
 import { DeleteWorkDto, DeleteWorkResponseDto } from '@src/items-generator/dto';
 import {
+    type MarkdownReadmeConfig,
     normalizeCreateWorkKind,
     Work,
     type WorkKind,
     type WorkStatus,
 } from '@src/entities/work.entity';
+import { canonicalJson } from '@src/safety/payload-digest';
 import { User } from '@src/entities/user.entity';
 import { WorkOwnershipService } from './work-ownership.service';
 import { rethrowAsNormalized } from './utils/error.utils';
@@ -1649,8 +1651,9 @@ export class WorkLifecycleService {
         // FROM. Without this the snapshot below cloned the derived
         // `<slug>-data` name, failed, and logged "Error syncing work from data
         // repository" on every Work page mount. Answer the same shape as the
-        // "already up to date" case below so the controller's activity log
-        // and the web action need no new branch.
+        // "already up to date" case below (`updated: []`, on which the
+        // controller invalidates nothing and records no activity) so the
+        // controller and the web action need no new branch.
         if (!hasRepositoryRole(work, 'data')) {
             return {
                 status: 'success',
@@ -1678,18 +1681,27 @@ export class WorkLifecycleService {
                 };
             }
 
-            updates.readmeConfig = work.readmeConfig || {};
-
-            // Sync readme config from markdown templates
+            // Adopt the data repository's markdown template header/footer for
+            // a Work that has none of its own. The candidate is a COPY: it used
+            // to alias `work.readmeConfig` and was put into `updates`
+            // unconditionally, so every call — i.e. every page mount of a
+            // website/directory Work — rewrote the row (bumping `updatedAt`)
+            // and reported a change, and "Work already up to date." below was
+            // unreachable. Only a config that really differs is written.
+            const readmeConfig: MarkdownReadmeConfig = { ...(work.readmeConfig ?? {}) };
             const markdownTemplate = snapshot.readmeTemplate;
-            if (markdownTemplate?.header && !work.readmeConfig?.header) {
-                updates.readmeConfig.header = markdownTemplate.header;
-                updates.readmeConfig.overwriteDefaultHeader = true;
+            if (markdownTemplate?.header && !readmeConfig.header) {
+                readmeConfig.header = markdownTemplate.header;
+                readmeConfig.overwriteDefaultHeader = true;
             }
 
-            if (markdownTemplate?.footer && !work.readmeConfig?.footer) {
-                updates.readmeConfig.footer = markdownTemplate.footer;
-                updates.readmeConfig.overwriteDefaultFooter = true;
+            if (markdownTemplate?.footer && !readmeConfig.footer) {
+                readmeConfig.footer = markdownTemplate.footer;
+                readmeConfig.overwriteDefaultFooter = true;
+            }
+
+            if (!isSameReadmeConfig(work.readmeConfig, readmeConfig)) {
+                updates.readmeConfig = readmeConfig;
             }
 
             if (Object.keys(updates).length > 0) {
@@ -2126,6 +2138,20 @@ export class WorkLifecycleService {
 
         return { remove: true };
     }
+}
+
+/**
+ * Whether two README configs are the same once stored. The column is
+ * `simple-json` and nullable, so the comparison is canonical: key order does
+ * not count, an `undefined` key equals a missing one (JSON drops it), and a
+ * `null`/absent config equals `{}` — every reader treats them alike, so
+ * writing `{}` over `null` would be a change nobody can see.
+ */
+function isSameReadmeConfig(
+    stored: MarkdownReadmeConfig | null | undefined,
+    candidate: MarkdownReadmeConfig,
+): boolean {
+    return canonicalJson(stored ?? {}) === canonicalJson(candidate);
 }
 
 /**

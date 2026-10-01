@@ -2,6 +2,8 @@ import { WorkGenerationHistoryRepository, WorkRepository } from '@src/database';
 import { GenerateStatusType } from '@src/entities/types';
 import type { Work } from '@src/entities/work.entity';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { WorkGenerationCompletedEvent } from '@src/events';
 import { WorkOperationsService } from './work-operations.service';
 
 describe('WorkOperationsService', () => {
@@ -130,6 +132,58 @@ describe('WorkOperationsService', () => {
         expect(currentStatus).toEqual({
             status: GenerateStatusType.GENERATING,
             recentLogs,
+        });
+    });
+
+    // The Trigger.dev worker proxies this service over the internal RPC, so its
+    // orchestrators' `finally { emitGenerationCompleted(work.id) }` runs HERE, in
+    // the API process, on the API's emitter. `WorkCleanupService.clearWorkCache`
+    // listens for this event and clears the Work's items/config/count/taxonomy
+    // caches. Since `POST /api/works/:id/sync-data` stopped invalidating caches
+    // on an unchanged sync (`updated: []`), this event is what keeps the Items
+    // tab fresh after a Trigger.dev-hosted generation finishes (the generator
+    // has already written `itemsCount`, so the page's post-generation sync is a
+    // no-op).
+    describe('emitGenerationCompleted', () => {
+        it('emits WorkGenerationCompletedEvent carrying the reloaded Work', async () => {
+            const eventEmitter = new EventEmitter2();
+            const received: WorkGenerationCompletedEvent[] = [];
+            eventEmitter.on(WorkGenerationCompletedEvent.EVENT_NAME, (event) => {
+                received.push(event);
+            });
+            const reloaded = {
+                id: 'dir-3',
+                generateStatus: { status: GenerateStatusType.GENERATED },
+            } as Work;
+            workRepository.findById.mockResolvedValue(reloaded);
+            service = new WorkOperationsService(
+                workRepository,
+                generationHistoryRepository,
+                eventEmitter,
+            );
+
+            await service.emitGenerationCompleted('dir-3');
+
+            expect(workRepository.findById).toHaveBeenCalledWith('dir-3');
+            expect(received).toHaveLength(1);
+            expect(received[0]).toBeInstanceOf(WorkGenerationCompletedEvent);
+            expect(received[0].work).toBe(reloaded);
+        });
+
+        it('emits nothing when the Work no longer exists', async () => {
+            const eventEmitter = new EventEmitter2();
+            const listener = jest.fn();
+            eventEmitter.on(WorkGenerationCompletedEvent.EVENT_NAME, listener);
+            workRepository.findById.mockResolvedValue(null);
+            service = new WorkOperationsService(
+                workRepository,
+                generationHistoryRepository,
+                eventEmitter,
+            );
+
+            await service.emitGenerationCompleted('gone');
+
+            expect(listener).not.toHaveBeenCalled();
         });
     });
 });

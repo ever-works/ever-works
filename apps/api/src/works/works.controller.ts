@@ -1731,6 +1731,22 @@ export class WorksController {
         const user = await this.authService.getUser(auth.userId);
 
         const result = await this.workLifecycleService.syncFromDataRepository(id, user);
+
+        // Every page mount of a website/directory Work calls this, and a kind
+        // without a data repository (App Work) always gets the no-op answer. A
+        // sync that changed nothing (`updated: []` — "Work already up to date."
+        // or "Nothing to sync") invalidates nothing and records nothing: it
+        // used to write a "Synced work data" activity row per page view.
+        // The sync the page runs when a generation finishes is such a no-op
+        // too (the generator has already written `itemsCount`); the caches are
+        // cleared for that case by `WorkCleanupService.clearWorkCache`, the
+        // `WorkGenerationCompletedEvent` listener, which every generation path
+        // fires — in-process, and from Trigger.dev over the worker's RPC
+        // `WorkOperationsService.emitGenerationCompleted`.
+        if (result.updated.length === 0) {
+            return result;
+        }
+
         await this.invalidateWorkCaches(id);
 
         this.activityLogService
