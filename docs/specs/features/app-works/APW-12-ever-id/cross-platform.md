@@ -223,8 +223,9 @@ EVER_ID_CLIENT_SECRET, checks: ['pkce', 'state'], idToken: true }`, filtered lik
   never silently from the sign-in (§2 rule 2). `getUserByAccount` / `linkAccount` do nothing for `ever-id` — the link
   lives in Gauzy's `zitadel_account`.
 - Sign-out notices: new `apps/web/app/api/auth/ever-id/backchannel-logout/route.ts` verifies the logout token with `jose`,
-  forwards it to Gauzy's `POST /api/auth/zitadel/backchannel-logout` on the configured Gauzy API origin only, never
-  following a redirect (the token cannot reach another origin; Gauzy keeps the authoritative replay cache and revokes the
+  forwards it to Gauzy's `POST /api/auth/zitadel/backchannel-logout` on the configured Gauzy API origin only — over the
+  same connection as every other Teams call to it, HTTPS with certificate checks in production — never following a
+  redirect (the token cannot reach another origin; Gauzy keeps the authoritative replay cache and revokes the
   tokens), and answers `400` for a malformed token and `200` otherwise; the next Gauzy call with a revoked
   token ends the Teams session, because Teams sessions are stateless cookies.
 - Connecting an existing account happens on Gauzy's **Connected identities** page (§5.2), which a Teams user reaches with
