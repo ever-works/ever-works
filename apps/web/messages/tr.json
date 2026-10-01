@@ -44,6 +44,26 @@
             "links": {
                 "help": "Yardım Merkezi",
                 "systemStatus": "Sistem Durumu"
+            },
+            "everId": {
+                "everIdDisabled": "Ever ID ile oturum açma burada kullanılamıyor.",
+                "providerUnavailable": "Ever ID yanıt vermiyor. Bir dakika sonra tekrar deneyin veya başka bir yolla oturum açın.",
+                "transactionInvalid": "Bu oturum açma işleminin süresi doldu veya zaten kullanıldı. Baştan başlayın.",
+                "emailNotVerified": "Önce Ever ID'de e-posta adresinizi doğrulayın, ardından tekrar deneyin.",
+                "emailInUse": "Bu e-posta adresi zaten bir Ever Works hesabı tarafından kullanılıyor. O hesapta her zamanki gibi oturum açın, ardından Ever ID'yi Ayarlar → Güvenlik bölümünden bağlayın.",
+                "signUpNotAllowed": "Burada Ever ID ile yeni hesap oluşturulamaz. Bir yöneticiden davet isteyin.",
+                "subjectLinked": "Bu Ever ID zaten başka bir Ever Works hesabına bağlı. Önce oradaki bağlantıyı kaldırın.",
+                "userHasIssuer": "Bu hesaba zaten bir Ever ID bağlı. Önce bağlantısını kaldırın.",
+                "reauthRequired": "Güvenliğiniz için Ever ID'yi bağlamadan önce tekrar oturum açın.",
+                "sessionRequired": "Bunu yapmak için şifrenizle oturum açın.",
+                "lastSignInMethod": "Önce başka bir oturum açma yöntemi ekleyin — bu hesabın tek yöntemi Ever ID.",
+                "notConnected": "Önce Ever ID'yi Ayarlar → Güvenlik bölümünden bağlayın.",
+                "accountDisabled": "Bu hesap devre dışı. Bir yöneticiyle iletişime geçin.",
+                "everIdSignedOut": "Ever ID oturumunuz kapatıldı.",
+                "tokenInQuery": "Bu bağlantı geçerli değil. Uygulamadan baştan başlayın.",
+                "insufficientScope": "Bu uygulamanın bunu görme izni yok.",
+                "signedOutByProvider": "Ever ID oturumunuz kapatıldı.",
+                "rateLimited": "Çok fazla deneme yapıldı. {seconds} saniye sonra tekrar deneyin."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Ever ID ile oturum aç",
+            "signUp": "Ever ID ile kaydol",
+            "redirecting": "Ever ID açılıyor…",
+            "consentRequired": "Devam etmek için yukarıdaki şartları kabul edin.",
+            "createAccount": {
+                "title": "Ever Works hesabınızı oluşturun",
+                "signedInAs": "Ever ID'de {name} · {email} olarak oturum açıldı",
+                "signedInAsEmail": "Ever ID'de {email} olarak oturum açıldı",
+                "submit": "Hesap oluştur",
+                "cancel": "İptal"
+            },
+            "accountExists": {
+                "title": "Zaten bir Ever Works hesabınız var",
+                "body": "{email} adresi zaten bir Ever Works hesabı tarafından kullanılıyor. O hesapta her zamanki gibi oturum açın, ardından Ever ID'yi Ayarlar → Güvenlik bölümünden bağlayın.",
+                "forgotPassword": "Şifrenizi mi unuttunuz?",
+                "goToSignIn": "Oturum açmaya git"
+            },
+            "signedOutByProvider": "Ever ID oturumunuz kapatıldı.",
+            "signedOutBoth": "Ever Works ve Ever ID oturumlarınız kapatıldı.",
+            "alsoSignOut": "Ever ID oturumunu da kapat",
+            "termsCheckbox": "<terms>Hizmet Şartları</terms> ve <privacy>Gizlilik Politikası</privacy> metinlerini kabul ediyorum",
+            "termsChanged": "Şartlar değişti. Sayfayı yeniden yükleyin, ardından devam etmek için şartları kabul edin.",
+            "termsUnavailable": {
+                "title": "Şartlar yüklenemedi",
+                "message": "Kabul etmeniz gereken Hizmet Şartları ve Gizlilik Politikası yüklenemedi, bu yüzden hesap oluşturma duraklatıldı. Birazdan tekrar deneyin.",
+                "retry": "Tekrar dene"
+            },
+            "pendingExpired": "Bu çok uzun sürdü. Baştan başlayın."
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "İçe Aktar",
                     "login": "Oturum Açma",
                     "signup": "Kaydolma",
-                    "passwordChanged": "Şifre Değiştirildi"
+                    "passwordChanged": "Şifre Değiştirildi",
+                    "identityLinked": "Kimlik Bağlandı",
+                    "identityUnlinked": "Kimlik Bağlantısı Kaldırıldı",
+                    "logout": "Oturum Kapatma",
+                    "delegatedAccess": "Yetki Devredilmiş Erişim",
+                    "identityProviderConfigChanged": "Kimlik Sağlayıcı Yapılandırıldı"
                 },
                 "statuses": {
                     "allStatuses": "Tüm Durumlar",
@@ -2931,6 +2986,36 @@
                     "title": "Aktif Oturumlar",
                     "subtitle": "Cihazlar arası aktif oturumlarınızı yönetin",
                     "action": "Oturumları Görüntüle (Yakında)"
+                },
+                "connectedIdentities": {
+                    "title": "Bağlı kimlikler",
+                    "subtitle": "Ever Works'te zaten kullandığınız bir kimlikle oturum açın.",
+                    "connectedLine": "{email} · bağlanma tarihi {date}",
+                    "lastUsed": "Oturum açmak için en son kullanıldı: {ago}",
+                    "notConnected": "Bağlı değil",
+                    "connect": "Ever ID'yi bağla",
+                    "disconnect": "Bağlantıyı kaldır",
+                    "cannotDisconnect": "Önce başka bir oturum açma yöntemi ekleyin — bu hesabın tek yöntemi Ever ID.",
+                    "setPassword": "Şifre belirle",
+                    "turnedOff": "Bu kurulumda Ever ID ile oturum açma kapalı.",
+                    "appsTitle": "Uygulama İşlerinizi görebilen uygulamalar",
+                    "appLastUsed": "{app} — en son kullanım: {ago}",
+                    "manageInEverId": "Ever ID'de yönet",
+                    "opensInNewTab": "(yeni sekmede açılır)",
+                    "confirmTitle": "Ever ID bu hesaba bağlansın mı?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "Bu e-posta adresleri farklı. Yalnızca ikisi de size aitse bağlayın.",
+                    "confirmBody": "Bu hesapta Ever ID ile oturum açabileceksiniz.",
+                    "confirm": "Bağla",
+                    "cancel": "İptal",
+                    "backToSecurity": "Güvenlik'e dön",
+                    "disconnectBody": "Ever ID'nin bağlantısı kaldırılsın mı? Artık onunla oturum açamayacaksınız ve Ever ID ile oturum açmış diğer cihazların oturumu kapatılacak. Bu cihazın oturumu açık kalır.",
+                    "keep": "Kalsın",
+                    "disconnectFailed": "Ever ID'nin bağlantısı kaldırılamadı. Sayfayı yeniden yükleyip tekrar deneyin.",
+                    "signInAgain": "Tekrar oturum aç",
+                    "connectedToast": "Ever ID bağlandı.",
+                    "disconnectedToast": "Ever ID'nin bağlantısı kaldırıldı."
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "Bildirim",
                     "skills": "Beceriler",
                     "mcp": "MCP sunucuları"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Ever Works'te Ever ID ile oturum açılmasını sağlar. Aşağıdaki değerler ortamdan veya eklenti ayarlarından gelir.",
+                    "status": {
+                        "title": "Durum",
+                        "state": "Ever ID ile oturum açma",
+                        "on": "Açık",
+                        "off": "Kapalı",
+                        "configuration": "Yapılandırma",
+                        "configured": "Tamamlandı",
+                        "notConfigured": "Eksik",
+                        "missing": "Eksik ayarlar",
+                        "newAccounts": "Yeni hesaplar",
+                        "signUpAllowed": "Ever ID ile oluşturulabilir",
+                        "signUpNotAllowed": "Ever ID ile oluşturulamaz",
+                        "localClients": "Terminal istemcileri",
+                        "unavailableSince": "Ever ID {date} tarihinden beri yanıt vermiyor."
+                    },
+                    "fields": {
+                        "issuer": "Yayıncı adresi",
+                        "clientId": "İstemci kimliği",
+                        "clientSecret": "İstemci gizli anahtarı",
+                        "allowedIssuers": "İzin verilen yayıncılar",
+                        "apiAudience": "API hedef kitlesi",
+                        "localClientIds": "Terminal istemci kimlikleri",
+                        "signUpAllowed": "Yeni hesaplar",
+                        "clockSkewSeconds": "Saat sapması toleransı",
+                        "displayName": "Görünen ad",
+                        "localClients": "Terminal istemcileri",
+                        "delegatedClientNames": "Uygulama adları",
+                        "accountManagementUrl": "Hesap yönetimi adresi"
+                    },
+                    "set": "Ayarlandı",
+                    "notSet": "Ayarlanmadı",
+                    "secretSet": "•••••• (ayarlandı)",
+                    "sources": {
+                        "title": "Her değerin kaynağı",
+                        "admin": "Eklenti ayarları",
+                        "env": "Ortam",
+                        "default": "Varsayılan",
+                        "unset": "Ayarlanmadı"
+                    },
+                    "testConnection": "Bağlantıyı test et",
+                    "testing": "Test ediliyor…",
+                    "testFailed": "Bağlantı testi çalışmadı. Tekrar deneyin.",
+                    "check": {
+                        "discovery": "Keşif belgesi",
+                        "issuerMatch": "Yayıncı eşleşiyor",
+                        "endpoints": "Uç noktalara ulaşılabiliyor",
+                        "pkceS256": "S256 kod sınaması destekleniyor",
+                        "signingAlg": "İmzalama algoritması",
+                        "backchannelLogout": "Arka kanal oturum kapatma",
+                        "deviceAuthorization": "Cihaz yetkilendirmesi"
+                    },
+                    "checkOk": "Çalışıyor",
+                    "checkFailed": "Desteklenmiyor",
+                    "health": {
+                        "title": "Sağlık",
+                        "discovery": "Son keşif belgesi yenilemesi: {ago}",
+                        "jwks": "Son anahtar yenilemesi: {ago}",
+                        "logoutNotice": "Son oturum kapatma bildirimi: {ago}",
+                        "discoveryNever": "Keşif belgesi henüz okunmadı",
+                        "jwksNever": "İmzalama anahtarları henüz okunmadı",
+                        "logoutNoticeNever": "Henüz oturum kapatma bildirimi alınmadı",
+                        "unavailable": "Sağlık bilgileri şu anda kullanılamıyor."
+                    },
+                    "enable": "Aç",
+                    "disable": "Kapat",
+                    "enableBlocked": "Ever ID kapalı kalıyor: zorunlu bir kontrol başarısız oldu.",
+                    "actionFailed": "Bu işe yaramadı. Tekrar deneyin.",
+                    "enabledToast": "Ever ID açık.",
+                    "disabledToast": "Ever ID kapalı.",
+                    "settings": {
+                        "title": "Ayarlar",
+                        "description": "Bu değerleri burada değiştirebilirsiniz. Yayıncı, istemci kimliği ve istemci gizli anahtarı ortamdan gelir ve bu sayfada değiştirilemez.",
+                        "displayName": {
+                            "label": "Görünen ad",
+                            "help": "Ever Works'ün bu oturum açma seçeneği için kullandığı ad. En fazla {max} karakter."
+                        },
+                        "accountManagementUrl": {
+                            "label": "Hesap yönetimi adresi",
+                            "help": "İsteğe bağlı. Kişilerin Ever ID hesaplarını yönettiği yer. https:// ile başlamalıdır."
+                        },
+                        "localClients": {
+                            "legend": "Terminal istemcileri",
+                            "help": "Ever ID ile oturum açmasına izin verilen Ever Works CLI ve Ever Works Node istemcileri. En fazla {max}.",
+                            "empty": "Henüz terminal istemcisi yok.",
+                            "row": "Terminal istemcisi {number}",
+                            "kind": "Tür",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "İstemci kimliği",
+                            "add": "Terminal istemcisi ekle",
+                            "remove": "{number}. terminal istemcisini kaldır"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "Uygulama adları",
+                            "help": "Kişilerin, izinleriyle verilerini okuyan uygulamalar için Ayarlar'da gördüğü adlar. En fazla {max}.",
+                            "empty": "Henüz uygulama adı yok.",
+                            "row": "Uygulama adı {number}",
+                            "clientId": "İstemci kimliği",
+                            "displayName": "Ad",
+                            "add": "Uygulama adı ekle",
+                            "remove": "{number}. uygulama adını kaldır"
+                        },
+                        "remove": "Kaldır",
+                        "save": "Ayarları kaydet",
+                        "saving": "Kaydediliyor…",
+                        "saved": "Ever ID ayarları kaydedildi.",
+                        "unchanged": "Hiçbir şey değişmedi.",
+                        "invalid": "Bazı değerler kabul edilmedi. Kontrol edip tekrar deneyin.",
+                        "failed": "Ayarlar kaydedilemedi. Tekrar deneyin."
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "O sayfa açılamadı. Tekrar deneyin.",
             "signInPrompt": "Uygulamalarınızı burada görmek için Ever ID ile giriş yapın.",
             "signIn": "Giriş yap"
+        },
+        "signOut": {
+            "title": "Ever Works oturumu kapatılsın mı?",
+            "alsoSignOutEverId": "Ever ID oturumunu da kapat",
+            "cancel": "İptal",
+            "confirm": "Oturumu kapat"
         }
     },
     "layout": {

@@ -44,6 +44,26 @@
             "links": {
                 "help": "ศูนย์ช่วยเหลือ",
                 "systemStatus": "สถานะระบบ"
+            },
+            "everId": {
+                "everIdDisabled": "ไม่สามารถเข้าสู่ระบบด้วย Ever ID ได้ที่นี่",
+                "providerUnavailable": "Ever ID ไม่ตอบสนอง โปรดลองอีกครั้งในอีกหนึ่งนาที หรือเข้าสู่ระบบด้วยวิธีอื่น",
+                "transactionInvalid": "การเข้าสู่ระบบนี้หมดอายุหรือถูกใช้ไปแล้ว โปรดเริ่มใหม่",
+                "emailNotVerified": "โปรดยืนยันที่อยู่อีเมลของคุณกับ Ever ID ก่อน แล้วลองอีกครั้ง",
+                "emailInUse": "มีบัญชี Ever Works ที่ใช้ที่อยู่อีเมลนี้อยู่แล้ว โปรดเข้าสู่ระบบบัญชีนั้นตามปกติ แล้วเชื่อมต่อ Ever ID ใน การตั้งค่า → ความปลอดภัย",
+                "signUpNotAllowed": "ไม่สามารถสร้างบัญชีใหม่ด้วย Ever ID ได้ที่นี่ โปรดขอคำเชิญจากผู้ดูแลระบบ",
+                "subjectLinked": "Ever ID นี้เชื่อมต่อกับบัญชี Ever Works อื่นอยู่แล้ว โปรดยกเลิกการเชื่อมต่อที่บัญชีนั้นก่อน",
+                "userHasIssuer": "บัญชีนี้มี Ever ID เชื่อมต่ออยู่แล้ว โปรดยกเลิกการเชื่อมต่อก่อน",
+                "reauthRequired": "เพื่อความปลอดภัยของคุณ โปรดเข้าสู่ระบบอีกครั้งก่อนเชื่อมต่อ Ever ID",
+                "sessionRequired": "โปรดเข้าสู่ระบบด้วยรหัสผ่านของคุณเพื่อดำเนินการนี้",
+                "lastSignInMethod": "โปรดเพิ่มวิธีเข้าสู่ระบบอื่นก่อน — Ever ID เป็นวิธีเดียวที่บัญชีนี้มี",
+                "notConnected": "โปรดเชื่อมต่อ Ever ID ใน การตั้งค่า → ความปลอดภัย ก่อน",
+                "accountDisabled": "บัญชีนี้ถูกปิดใช้งาน โปรดติดต่อผู้ดูแลระบบ",
+                "everIdSignedOut": "คุณถูกออกจากระบบ Ever ID แล้ว",
+                "tokenInQuery": "ลิงก์นั้นไม่ถูกต้อง โปรดเริ่มใหม่จากแอป",
+                "insufficientScope": "แอปนั้นไม่มีสิทธิ์ดูข้อมูลนี้",
+                "signedOutByProvider": "คุณถูกออกจากระบบ Ever ID แล้ว",
+                "rateLimited": "ลองหลายครั้งเกินไป โปรดลองอีกครั้งใน {seconds} วินาที"
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "เข้าสู่ระบบด้วย Ever ID",
+            "signUp": "สมัครสมาชิกด้วย Ever ID",
+            "redirecting": "กำลังเปิด Ever ID…",
+            "consentRequired": "โปรดยอมรับข้อกำหนดด้านบนเพื่อดำเนินการต่อ",
+            "createAccount": {
+                "title": "สร้างบัญชี Ever Works ของคุณ",
+                "signedInAs": "เข้าสู่ระบบ Ever ID ในชื่อ {name} · {email}",
+                "signedInAsEmail": "เข้าสู่ระบบ Ever ID ในชื่อ {email}",
+                "submit": "สร้างบัญชี",
+                "cancel": "ยกเลิก"
+            },
+            "accountExists": {
+                "title": "คุณมีบัญชี Ever Works อยู่แล้ว",
+                "body": "มีบัญชี Ever Works ที่ใช้ {email} อยู่แล้ว โปรดเข้าสู่ระบบบัญชีนั้นตามปกติ แล้วเชื่อมต่อ Ever ID ใน การตั้งค่า → ความปลอดภัย",
+                "forgotPassword": "ลืมรหัสผ่าน?",
+                "goToSignIn": "ไปที่การเข้าสู่ระบบ"
+            },
+            "signedOutByProvider": "คุณถูกออกจากระบบ Ever ID แล้ว",
+            "signedOutBoth": "คุณออกจากระบบ Ever Works และ Ever ID แล้ว",
+            "alsoSignOut": "ออกจากระบบ Ever ID ด้วย",
+            "termsCheckbox": "ฉันยอมรับ <terms>เงื่อนไขการให้บริการ</terms> และ <privacy>นโยบายความเป็นส่วนตัว</privacy>",
+            "termsChanged": "ข้อกำหนดมีการเปลี่ยนแปลง โปรดโหลดหน้านี้ใหม่ แล้วยอมรับข้อกำหนดเพื่อดำเนินการต่อ",
+            "termsUnavailable": {
+                "title": "ไม่สามารถโหลดข้อกำหนดได้",
+                "message": "เราไม่สามารถโหลดเงื่อนไขการให้บริการและนโยบายความเป็นส่วนตัวที่คุณต้องยอมรับได้ การสร้างบัญชีของคุณจึงหยุดไว้ชั่วคราว โปรดลองอีกครั้งในอีกสักครู่",
+                "retry": "ลองอีกครั้ง"
+            },
+            "pendingExpired": "ใช้เวลานานเกินไป โปรดเริ่มใหม่"
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "นำเข้า",
                     "login": "เข้าสู่ระบบ",
                     "signup": "สมัครสมาชิก",
-                    "passwordChanged": "เปลี่ยนรหัสผ่าน"
+                    "passwordChanged": "เปลี่ยนรหัสผ่าน",
+                    "identityLinked": "เชื่อมต่อข้อมูลประจำตัวแล้ว",
+                    "identityUnlinked": "ยกเลิกการเชื่อมต่อข้อมูลประจำตัวแล้ว",
+                    "logout": "ออกจากระบบ",
+                    "delegatedAccess": "การเข้าถึงที่ได้รับมอบสิทธิ์",
+                    "identityProviderConfigChanged": "ตั้งค่าผู้ให้บริการข้อมูลประจำตัวแล้ว"
                 },
                 "statuses": {
                     "allStatuses": "สถานะทั้งหมด",
@@ -2931,6 +2986,36 @@
                     "title": "เซสชันที่ใช้งานอยู่",
                     "subtitle": "จัดการเซสชันที่ใช้งานอยู่ทั่วอุปกรณ์",
                     "action": "ดูเซสชัน (ใกล้มาแล้ว)"
+                },
+                "connectedIdentities": {
+                    "title": "ข้อมูลประจำตัวที่เชื่อมต่อ",
+                    "subtitle": "เข้าสู่ระบบ Ever Works ด้วยข้อมูลประจำตัวที่คุณใช้อยู่แล้ว",
+                    "connectedLine": "{email} · เชื่อมต่อเมื่อ {date}",
+                    "lastUsed": "ใช้เข้าสู่ระบบล่าสุดเมื่อ {ago}",
+                    "notConnected": "ไม่ได้เชื่อมต่อ",
+                    "connect": "เชื่อมต่อ Ever ID",
+                    "disconnect": "ยกเลิกการเชื่อมต่อ",
+                    "cannotDisconnect": "โปรดเพิ่มวิธีเข้าสู่ระบบอื่นก่อน — Ever ID เป็นวิธีเดียวที่บัญชีนี้มี",
+                    "setPassword": "ตั้งรหัสผ่าน",
+                    "turnedOff": "การเข้าสู่ระบบด้วย Ever ID ถูกปิดในการติดตั้งนี้",
+                    "appsTitle": "แอปที่มองเห็นงานแอปของคุณได้",
+                    "appLastUsed": "{app} — ใช้ล่าสุดเมื่อ {ago}",
+                    "manageInEverId": "จัดการใน Ever ID",
+                    "opensInNewTab": "(เปิดในแท็บใหม่)",
+                    "confirmTitle": "เชื่อมต่อ Ever ID กับบัญชีนี้หรือไม่",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "ที่อยู่อีเมลเหล่านี้แตกต่างกัน โปรดเชื่อมต่อเฉพาะเมื่อทั้งสองเป็นของคุณ",
+                    "confirmBody": "คุณจะเข้าสู่ระบบบัญชีนี้ด้วย Ever ID ได้",
+                    "confirm": "เชื่อมต่อ",
+                    "cancel": "ยกเลิก",
+                    "backToSecurity": "กลับไปที่ความปลอดภัย",
+                    "disconnectBody": "ยกเลิกการเชื่อมต่อ Ever ID หรือไม่ คุณจะเข้าสู่ระบบด้วย Ever ID ไม่ได้อีก และอุปกรณ์อื่นที่เข้าสู่ระบบด้วย Ever ID จะถูกออกจากระบบ อุปกรณ์นี้ยังคงเข้าสู่ระบบอยู่",
+                    "keep": "เก็บไว้",
+                    "disconnectFailed": "ไม่สามารถยกเลิกการเชื่อมต่อ Ever ID ได้ โปรดโหลดหน้านี้ใหม่แล้วลองอีกครั้ง",
+                    "signInAgain": "เข้าสู่ระบบอีกครั้ง",
+                    "connectedToast": "เชื่อมต่อ Ever ID แล้ว",
+                    "disconnectedToast": "ยกเลิกการเชื่อมต่อ Ever ID แล้ว"
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "มานิเฟสต์",
                     "skills": "ทักษะ",
                     "mcp": "เซิร์ฟเวอร์ MCP"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "ให้ผู้ใช้เข้าสู่ระบบ Ever Works ด้วย Ever ID ค่าด้านล่างมาจากสภาพแวดล้อมหรือการตั้งค่าหน่วยเสริม",
+                    "status": {
+                        "title": "สถานะ",
+                        "state": "การเข้าสู่ระบบด้วย Ever ID",
+                        "on": "เปิด",
+                        "off": "ปิด",
+                        "configuration": "การกำหนดค่า",
+                        "configured": "ครบถ้วน",
+                        "notConfigured": "ไม่ครบถ้วน",
+                        "missing": "การตั้งค่าที่ขาดหายไป",
+                        "newAccounts": "บัญชีใหม่",
+                        "signUpAllowed": "สร้างได้ด้วย Ever ID",
+                        "signUpNotAllowed": "สร้างด้วย Ever ID ไม่ได้",
+                        "localClients": "ไคลเอนต์เทอร์มินัล",
+                        "unavailableSince": "Ever ID ไม่ตอบสนองตั้งแต่ {date}"
+                    },
+                    "fields": {
+                        "issuer": "ที่อยู่ผู้ออก",
+                        "clientId": "รหัสไคลเอนต์",
+                        "clientSecret": "ข้อมูลลับของไคลเอนต์",
+                        "allowedIssuers": "ผู้ออกที่อนุญาต",
+                        "apiAudience": "ผู้รับ API",
+                        "localClientIds": "รหัสไคลเอนต์เทอร์มินัล",
+                        "signUpAllowed": "บัญชีใหม่",
+                        "clockSkewSeconds": "ค่าความคลาดเคลื่อนของนาฬิกาที่ยอมรับได้",
+                        "displayName": "ชื่อที่แสดง",
+                        "localClients": "ไคลเอนต์เทอร์มินัล",
+                        "delegatedClientNames": "ชื่อแอป",
+                        "accountManagementUrl": "ที่อยู่สำหรับจัดการบัญชี"
+                    },
+                    "set": "ตั้งค่าแล้ว",
+                    "notSet": "ยังไม่ได้ตั้งค่า",
+                    "secretSet": "•••••• (ตั้งค่าแล้ว)",
+                    "sources": {
+                        "title": "ที่มาของแต่ละค่า",
+                        "admin": "การตั้งค่าหน่วยเสริม",
+                        "env": "สภาพแวดล้อม",
+                        "default": "ค่าเริ่มต้น",
+                        "unset": "ยังไม่ได้ตั้งค่า"
+                    },
+                    "testConnection": "ทดสอบการเชื่อมต่อ",
+                    "testing": "กำลังทดสอบ…",
+                    "testFailed": "การทดสอบการเชื่อมต่อไม่ได้ทำงาน โปรดลองอีกครั้ง",
+                    "check": {
+                        "discovery": "เอกสาร discovery",
+                        "issuerMatch": "ผู้ออกตรงกัน",
+                        "endpoints": "เข้าถึงปลายทางได้",
+                        "pkceS256": "รองรับ code challenge แบบ S256",
+                        "signingAlg": "อัลกอริทึมการลงนาม",
+                        "backchannelLogout": "การออกจากระบบผ่านช่องทางหลังบ้าน",
+                        "deviceAuthorization": "การอนุญาตอุปกรณ์"
+                    },
+                    "checkOk": "ใช้งานได้",
+                    "checkFailed": "ไม่รองรับ",
+                    "health": {
+                        "title": "สุขภาพระบบ",
+                        "discovery": "รีเฟรชเอกสาร discovery ล่าสุดเมื่อ {ago}",
+                        "jwks": "รีเฟรชคีย์ล่าสุดเมื่อ {ago}",
+                        "logoutNotice": "การแจ้งออกจากระบบล่าสุดเมื่อ {ago}",
+                        "discoveryNever": "ยังไม่ได้อ่านเอกสาร discovery",
+                        "jwksNever": "ยังไม่ได้อ่านคีย์สำหรับลงนาม",
+                        "logoutNoticeNever": "ยังไม่ได้รับการแจ้งออกจากระบบ",
+                        "unavailable": "ข้อมูลสุขภาพระบบไม่พร้อมใช้งานในขณะนี้"
+                    },
+                    "enable": "เปิดใช้งาน",
+                    "disable": "ปิดใช้งาน",
+                    "enableBlocked": "Ever ID ยังคงปิดอยู่: การตรวจสอบที่จำเป็นไม่ผ่าน",
+                    "actionFailed": "ดำเนินการไม่สำเร็จ โปรดลองอีกครั้ง",
+                    "enabledToast": "เปิด Ever ID แล้ว",
+                    "disabledToast": "ปิด Ever ID แล้ว",
+                    "settings": {
+                        "title": "การตั้งค่า",
+                        "description": "คุณเปลี่ยนค่าเหล่านี้ได้ที่นี่ ส่วนผู้ออก รหัสไคลเอนต์ และข้อมูลลับของไคลเอนต์มาจากสภาพแวดล้อมและเปลี่ยนในหน้านี้ไม่ได้",
+                        "displayName": {
+                            "label": "ชื่อที่แสดง",
+                            "help": "ชื่อที่ Ever Works ใช้สำหรับตัวเลือกการเข้าสู่ระบบนี้ ไม่เกิน {max} อักขระ"
+                        },
+                        "accountManagementUrl": {
+                            "label": "ที่อยู่สำหรับจัดการบัญชี",
+                            "help": "ไม่บังคับ ที่ที่ผู้ใช้จัดการบัญชี Ever ID ของตน ต้องขึ้นต้นด้วย https://"
+                        },
+                        "localClients": {
+                            "legend": "ไคลเอนต์เทอร์มินัล",
+                            "help": "ไคลเอนต์ Ever Works CLI และ Ever Works Node ที่เข้าสู่ระบบด้วย Ever ID ได้ ไม่เกิน {max} รายการ",
+                            "empty": "ยังไม่มีไคลเอนต์เทอร์มินัล",
+                            "row": "ไคลเอนต์เทอร์มินัล {number}",
+                            "kind": "ประเภท",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "รหัสไคลเอนต์",
+                            "add": "เพิ่มไคลเอนต์เทอร์มินัล",
+                            "remove": "ลบไคลเอนต์เทอร์มินัล {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "ชื่อแอป",
+                            "help": "ชื่อที่ผู้ใช้เห็นในการตั้งค่าสำหรับแอปที่อ่านข้อมูลของตนโดยได้รับอนุญาต ไม่เกิน {max} รายการ",
+                            "empty": "ยังไม่มีชื่อแอป",
+                            "row": "ชื่อแอป {number}",
+                            "clientId": "รหัสไคลเอนต์",
+                            "displayName": "ชื่อ",
+                            "add": "เพิ่มชื่อแอป",
+                            "remove": "ลบชื่อแอป {number}"
+                        },
+                        "remove": "ลบ",
+                        "save": "บันทึกการตั้งค่า",
+                        "saving": "กำลังบันทึก…",
+                        "saved": "บันทึกการตั้งค่า Ever ID แล้ว",
+                        "unchanged": "ไม่มีอะไรเปลี่ยนแปลง",
+                        "invalid": "ค่าบางค่าไม่ได้รับการยอมรับ โปรดตรวจสอบแล้วลองอีกครั้ง",
+                        "failed": "บันทึกการตั้งค่าไม่ได้ โปรดลองอีกครั้ง"
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "ไม่สามารถเปิดหน้านั้นได้ ลองอีกครั้ง",
             "signInPrompt": "ลงชื่อเข้าใช้ด้วย Ever ID เพื่อดูแอปของคุณที่นี่",
             "signIn": "ลงชื่อเข้าใช้"
+        },
+        "signOut": {
+            "title": "ออกจากระบบ Ever Works หรือไม่",
+            "alsoSignOutEverId": "ออกจากระบบ Ever ID ด้วย",
+            "cancel": "ยกเลิก",
+            "confirm": "ออกจากระบบ"
         }
     },
     "layout": {

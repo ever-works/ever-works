@@ -44,6 +44,26 @@
             "links": {
                 "help": "ヘルプセンター",
                 "systemStatus": "システムステータス"
+            },
+            "everId": {
+                "everIdDisabled": "ここでは Ever ID でのサインインを利用できません。",
+                "providerUnavailable": "Ever ID が応答していません。1 分ほどしてからもう一度お試しいただくか、別の方法でサインインしてください。",
+                "transactionInvalid": "このサインインは期限切れか、すでに使用されています。最初からやり直してください。",
+                "emailNotVerified": "先に Ever ID でメールアドレスを確認してから、もう一度お試しください。",
+                "emailInUse": "このメールアドレスはすでに Ever Works アカウントで使用されています。いつもの方法でそのアカウントにサインインし、設定 → セキュリティで Ever ID を接続してください。",
+                "signUpNotAllowed": "ここでは Ever ID で新しいアカウントを作成できません。管理者に招待を依頼してください。",
+                "subjectLinked": "この Ever ID はすでに別の Ever Works アカウントに接続されています。先にそちらで接続を解除してください。",
+                "userHasIssuer": "このアカウントにはすでに Ever ID が接続されています。先に接続を解除してください。",
+                "reauthRequired": "セキュリティのため、Ever ID を接続する前にもう一度サインインしてください。",
+                "sessionRequired": "この操作を行うには、パスワードでサインインしてください。",
+                "lastSignInMethod": "先に別のサインイン方法を追加してください。このアカウントのサインイン方法は Ever ID だけです。",
+                "notConnected": "先に 設定 → セキュリティ で Ever ID を接続してください。",
+                "accountDisabled": "このアカウントは無効になっています。管理者にお問い合わせください。",
+                "everIdSignedOut": "Ever ID からサインアウトされました。",
+                "tokenInQuery": "このリンクは無効です。アプリから最初からやり直してください。",
+                "insufficientScope": "このアプリにはこれを表示する権限がありません。",
+                "signedOutByProvider": "Ever ID からサインアウトされました。",
+                "rateLimited": "試行回数が多すぎます。{seconds} 秒後にもう一度お試しください。"
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Ever ID でサインイン",
+            "signUp": "Ever ID で登録",
+            "redirecting": "Ever ID を開いています…",
+            "consentRequired": "続行するには、上の規約に同意してください。",
+            "createAccount": {
+                "title": "Ever Works アカウントを作成",
+                "signedInAs": "{name} · {email} として Ever ID にサインイン中",
+                "signedInAsEmail": "{email} として Ever ID にサインイン中",
+                "submit": "アカウントを作成",
+                "cancel": "キャンセル"
+            },
+            "accountExists": {
+                "title": "Ever Works アカウントはすでにお持ちです",
+                "body": "{email} はすでに Ever Works アカウントで使用されています。いつもの方法でそのアカウントにサインインし、設定 → セキュリティで Ever ID を接続してください。",
+                "forgotPassword": "パスワードをお忘れですか？",
+                "goToSignIn": "サインインへ"
+            },
+            "signedOutByProvider": "Ever ID からサインアウトされました。",
+            "signedOutBoth": "Ever Works と Ever ID からサインアウトしました。",
+            "alsoSignOut": "Ever ID からもサインアウトする",
+            "termsCheckbox": "<terms>利用規約</terms>および<privacy>プライバシーポリシー</privacy>に同意します",
+            "termsChanged": "規約が変更されました。ページを再読み込みしてから、規約に同意して続行してください。",
+            "termsUnavailable": {
+                "title": "規約を読み込めませんでした",
+                "message": "同意が必要な利用規約とプライバシーポリシーを読み込めなかったため、アカウントの作成を一時停止しています。しばらくしてからもう一度お試しください。",
+                "retry": "もう一度試す"
+            },
+            "pendingExpired": "時間がかかりすぎました。最初からやり直してください。"
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "インポート",
                     "login": "ログイン",
                     "signup": "サインアップ",
-                    "passwordChanged": "パスワード変更"
+                    "passwordChanged": "パスワード変更",
+                    "identityLinked": "ID を接続",
+                    "identityUnlinked": "ID の接続を解除",
+                    "logout": "ログアウト",
+                    "delegatedAccess": "委任アクセス",
+                    "identityProviderConfigChanged": "ID プロバイダーを設定"
                 },
                 "statuses": {
                     "allStatuses": "すべてのステータス",
@@ -2931,6 +2986,36 @@
                     "title": "アクティブなセッション",
                     "subtitle": "デバイス間のアクティブなセッションを管理",
                     "action": "セッションを表示（近日公開）"
+                },
+                "connectedIdentities": {
+                    "title": "接続済みの ID",
+                    "subtitle": "すでに使っている ID で Ever Works にサインインできます。",
+                    "connectedLine": "{email} · {date} に接続",
+                    "lastUsed": "最後にサインインに使用: {ago}",
+                    "notConnected": "未接続",
+                    "connect": "Ever ID を接続",
+                    "disconnect": "接続を解除",
+                    "cannotDisconnect": "先に別のサインイン方法を追加してください。このアカウントのサインイン方法は Ever ID だけです。",
+                    "setPassword": "パスワードを設定",
+                    "turnedOff": "このインストールでは Ever ID でのサインインが無効になっています。",
+                    "appsTitle": "あなたのアプリワークを表示できるアプリ",
+                    "appLastUsed": "{app} — 最終使用: {ago}",
+                    "manageInEverId": "Ever ID で管理",
+                    "opensInNewTab": "（新しいタブで開きます）",
+                    "confirmTitle": "このアカウントに Ever ID を接続しますか？",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "これらのメールアドレスは異なります。両方ともご自身のものである場合にのみ接続してください。",
+                    "confirmBody": "このアカウントに Ever ID でサインインできるようになります。",
+                    "confirm": "接続",
+                    "cancel": "キャンセル",
+                    "backToSecurity": "セキュリティに戻る",
+                    "disconnectBody": "Ever ID の接続を解除しますか？今後 Ever ID ではサインインできなくなり、Ever ID でサインインしている他のデバイスはサインアウトされます。このデバイスはサインインしたままです。",
+                    "keep": "そのままにする",
+                    "disconnectFailed": "Ever ID の接続を解除できませんでした。ページを再読み込みしてもう一度お試しください。",
+                    "signInAgain": "もう一度サインイン",
+                    "connectedToast": "Ever ID を接続しました。",
+                    "disconnectedToast": "Ever ID の接続を解除しました。"
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "マニフェスト",
                     "skills": "スキル",
                     "mcp": "MCP サーバー"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Ever ID で Ever Works にサインインできるようにします。以下の値は環境またはプラグイン設定から取得されます。",
+                    "status": {
+                        "title": "ステータス",
+                        "state": "Ever ID でのサインイン",
+                        "on": "オン",
+                        "off": "オフ",
+                        "configuration": "構成",
+                        "configured": "完了",
+                        "notConfigured": "未完了",
+                        "missing": "不足している設定",
+                        "newAccounts": "新しいアカウント",
+                        "signUpAllowed": "Ever ID で作成できます",
+                        "signUpNotAllowed": "Ever ID では作成できません",
+                        "localClients": "ターミナルクライアント",
+                        "unavailableSince": "Ever ID は {date} から応答していません。"
+                    },
+                    "fields": {
+                        "issuer": "発行者アドレス",
+                        "clientId": "クライアント ID",
+                        "clientSecret": "クライアントシークレット",
+                        "allowedIssuers": "許可された発行者",
+                        "apiAudience": "API オーディエンス",
+                        "localClientIds": "ターミナルクライアント ID",
+                        "signUpAllowed": "新しいアカウント",
+                        "clockSkewSeconds": "時刻のずれの許容範囲",
+                        "displayName": "表示名",
+                        "localClients": "ターミナルクライアント",
+                        "delegatedClientNames": "アプリ名",
+                        "accountManagementUrl": "アカウント管理アドレス"
+                    },
+                    "set": "設定済み",
+                    "notSet": "未設定",
+                    "secretSet": "••••••（設定済み）",
+                    "sources": {
+                        "title": "各値の取得元",
+                        "admin": "プラグイン設定",
+                        "env": "環境",
+                        "default": "既定値",
+                        "unset": "未設定"
+                    },
+                    "testConnection": "接続をテスト",
+                    "testing": "テスト中…",
+                    "testFailed": "接続テストを実行できませんでした。もう一度お試しください。",
+                    "check": {
+                        "discovery": "ディスカバリードキュメント",
+                        "issuerMatch": "発行者が一致",
+                        "endpoints": "エンドポイントに到達可能",
+                        "pkceS256": "S256 コードチャレンジに対応",
+                        "signingAlg": "署名アルゴリズム",
+                        "backchannelLogout": "バックチャネルログアウト",
+                        "deviceAuthorization": "デバイス認可"
+                    },
+                    "checkOk": "動作中",
+                    "checkFailed": "非対応",
+                    "health": {
+                        "title": "ヘルス",
+                        "discovery": "ディスカバリードキュメントの最終更新: {ago}",
+                        "jwks": "鍵の最終更新: {ago}",
+                        "logoutNotice": "最後のサインアウト通知: {ago}",
+                        "discoveryNever": "ディスカバリードキュメントはまだ読み込まれていません",
+                        "jwksNever": "署名鍵はまだ読み込まれていません",
+                        "logoutNoticeNever": "サインアウト通知はまだ受信していません",
+                        "unavailable": "現在、ヘルス情報を取得できません。"
+                    },
+                    "enable": "オンにする",
+                    "disable": "オフにする",
+                    "enableBlocked": "Ever ID はオフのままです: 必須のチェックに失敗しました。",
+                    "actionFailed": "うまくいきませんでした。もう一度お試しください。",
+                    "enabledToast": "Ever ID はオンです。",
+                    "disabledToast": "Ever ID はオフです。",
+                    "settings": {
+                        "title": "設定",
+                        "description": "ここで変更できる値です。発行者、クライアント ID、クライアントシークレットは環境から取得され、このページでは変更できません。",
+                        "displayName": {
+                            "label": "表示名",
+                            "help": "Ever Works がこのサインイン方法に使う名前です。{max} 文字以内。"
+                        },
+                        "accountManagementUrl": {
+                            "label": "アカウント管理アドレス",
+                            "help": "任意。ユーザーが Ever ID アカウントを管理する場所です。https:// で始まる必要があります。"
+                        },
+                        "localClients": {
+                            "legend": "ターミナルクライアント",
+                            "help": "Ever ID でサインインできる Ever Works CLI と Ever Works Node のクライアントです。最大 {max} 件。",
+                            "empty": "ターミナルクライアントはまだありません。",
+                            "row": "ターミナルクライアント {number}",
+                            "kind": "種類",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "クライアント ID",
+                            "add": "ターミナルクライアントを追加",
+                            "remove": "ターミナルクライアント {number} を削除"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "アプリ名",
+                            "help": "ユーザーの許可を得てデータを読み取るアプリについて、設定に表示される名前です。最大 {max} 件。",
+                            "empty": "アプリ名はまだありません。",
+                            "row": "アプリ名 {number}",
+                            "clientId": "クライアント ID",
+                            "displayName": "名前",
+                            "add": "アプリ名を追加",
+                            "remove": "アプリ名 {number} を削除"
+                        },
+                        "remove": "削除",
+                        "save": "設定を保存",
+                        "saving": "保存中…",
+                        "saved": "Ever ID の設定を保存しました。",
+                        "unchanged": "変更はありません。",
+                        "invalid": "受け付けられなかった値があります。確認してもう一度お試しください。",
+                        "failed": "設定を保存できませんでした。もう一度お試しください。"
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "そのページを開けませんでした。もう一度お試しください。",
             "signInPrompt": "Ever ID でサインインすると、ここにアプリが表示されます。",
             "signIn": "サインイン"
+        },
+        "signOut": {
+            "title": "Ever Works からサインアウトしますか？",
+            "alsoSignOutEverId": "Ever ID からもサインアウトする",
+            "cancel": "キャンセル",
+            "confirm": "サインアウト"
         }
     },
     "layout": {

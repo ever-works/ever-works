@@ -44,6 +44,26 @@
             "links": {
                 "help": "Център за помощ",
                 "systemStatus": "Състояние на системата"
+            },
+            "everId": {
+                "everIdDisabled": "Влизането с Ever ID не е налично тук.",
+                "providerUnavailable": "Ever ID не отговаря. Опитайте отново след минута или влезте по друг начин.",
+                "transactionInvalid": "Това влизане е изтекло или вече е използвано. Започнете отначало.",
+                "emailNotVerified": "Първо потвърдете имейл адреса си в Ever ID, след което опитайте отново.",
+                "emailInUse": "Акаунт в Ever Works вече използва този имейл адрес. Влезте в него както обикновено, след което свържете Ever ID от Настройки → Сигурност.",
+                "signUpNotAllowed": "Тук не могат да се създават нови акаунти с Ever ID. Поискайте покана от администратор.",
+                "subjectLinked": "Този Ever ID вече е свързан с друг акаунт в Ever Works. Първо го прекъснете там.",
+                "userHasIssuer": "Този акаунт вече има свързан Ever ID. Първо го прекъснете.",
+                "reauthRequired": "За ваша сигурност влезте отново, преди да свържете Ever ID.",
+                "sessionRequired": "Влезте с паролата си, за да направите това.",
+                "lastSignInMethod": "Първо добавете друг начин за влизане — Ever ID е единственият, който има този акаунт.",
+                "notConnected": "Първо свържете Ever ID от Настройки → Сигурност.",
+                "accountDisabled": "Този акаунт е деактивиран. Свържете се с администратор.",
+                "everIdSignedOut": "Сесията ви в Ever ID беше прекратена.",
+                "tokenInQuery": "Тази връзка не е валидна. Започнете отначало от приложението.",
+                "insufficientScope": "Това приложение няма разрешение да вижда това.",
+                "signedOutByProvider": "Сесията ви в Ever ID беше прекратена.",
+                "rateLimited": "Твърде много опити. Опитайте отново след {seconds} сек."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Вход с Ever ID",
+            "signUp": "Регистрация с Ever ID",
+            "redirecting": "Отваряне на Ever ID…",
+            "consentRequired": "Приемете условията по-горе, за да продължите.",
+            "createAccount": {
+                "title": "Създайте своя акаунт в Ever Works",
+                "signedInAs": "Влезли сте в Ever ID като {name} · {email}",
+                "signedInAsEmail": "Влезли сте в Ever ID като {email}",
+                "submit": "Създай акаунт",
+                "cancel": "Отказ"
+            },
+            "accountExists": {
+                "title": "Вече имате акаунт в Ever Works",
+                "body": "Акаунт в Ever Works вече използва {email}. Влезте в него както обикновено, след което свържете Ever ID от Настройки → Сигурност.",
+                "forgotPassword": "Забравена парола?",
+                "goToSignIn": "Към влизането"
+            },
+            "signedOutByProvider": "Сесията ви в Ever ID беше прекратена.",
+            "signedOutBoth": "Излязохте от Ever Works и Ever ID.",
+            "alsoSignOut": "Изход и от Ever ID",
+            "termsCheckbox": "Съгласен съм с <terms>Условията за ползване</terms> и <privacy>Политиката за поверителност</privacy>",
+            "termsChanged": "Условията са променени. Презаредете страницата и ги приемете, за да продължите.",
+            "termsUnavailable": {
+                "title": "Условията не можаха да се заредят",
+                "message": "Не успяхме да заредим Условията за ползване и Политиката за поверителност, които трябва да приемете, затова създаването на акаунта е на пауза. Опитайте отново след малко.",
+                "retry": "Опитайте отново"
+            },
+            "pendingExpired": "Това отне твърде дълго. Започнете отначало."
         }
     },
     "onboarding": {
@@ -2516,7 +2566,12 @@
                     "import": "Импорт",
                     "login": "Вход",
                     "signup": "Регистрация",
-                    "passwordChanged": "Парола променена"
+                    "passwordChanged": "Парола променена",
+                    "identityLinked": "Свързана самоличност",
+                    "identityUnlinked": "Прекъсната самоличност",
+                    "logout": "Изход",
+                    "delegatedAccess": "Делегиран достъп",
+                    "identityProviderConfigChanged": "Конфигуриран доставчик на самоличност"
                 },
                 "statuses": {
                     "allStatuses": "Всички статуси",
@@ -2999,6 +3054,36 @@
                     "title": "Активни сесии",
                     "subtitle": "Управлявайте активните си сесии на различни устройства",
                     "action": "Виж сесии (скоро на разположение)"
+                },
+                "connectedIdentities": {
+                    "title": "Свързани самоличности",
+                    "subtitle": "Влизайте в Ever Works със самоличност, която вече използвате.",
+                    "connectedLine": "{email} · свързан на {date}",
+                    "lastUsed": "Последно използван за вход {ago}",
+                    "notConnected": "Не е свързан",
+                    "connect": "Свържи Ever ID",
+                    "disconnect": "Прекъсни",
+                    "cannotDisconnect": "Първо добавете друг начин за влизане — Ever ID е единственият, който има този акаунт.",
+                    "setPassword": "Задайте парола",
+                    "turnedOff": "Влизането с Ever ID е изключено в тази инсталация.",
+                    "appsTitle": "Приложения, които виждат вашите работи за приложения",
+                    "appLastUsed": "{app} — последно използвано {ago}",
+                    "manageInEverId": "Управление в Ever ID",
+                    "opensInNewTab": "(отваря се в нов раздел)",
+                    "confirmTitle": "Да се свърже ли Ever ID с този акаунт?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "Тези имейл адреси са различни. Свържете ги само ако и двата са ваши.",
+                    "confirmBody": "Ще можете да влизате в този акаунт с Ever ID.",
+                    "confirm": "Свържи",
+                    "cancel": "Отказ",
+                    "backToSecurity": "Назад към Сигурност",
+                    "disconnectBody": "Да се прекъсне ли Ever ID? Няма да можете повече да влизате с него, а сесиите на другите устройства, влезли с Ever ID, ще бъдат прекратени. Това устройство остава влязло.",
+                    "keep": "Запази го",
+                    "disconnectFailed": "Ever ID не можа да бъде прекъснат. Презаредете страницата и опитайте отново.",
+                    "signInAgain": "Влезте отново",
+                    "connectedToast": "Ever ID е свързан.",
+                    "disconnectedToast": "Ever ID е прекъснат."
                 }
             },
             "oauth": {
@@ -3997,6 +4082,122 @@
                     "manifest": "Манифест",
                     "skills": "Умения",
                     "mcp": "MCP сървъри"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Позволява влизане в Ever Works с Ever ID. Стойностите по-долу идват от средата или от настройките на плъгина.",
+                    "status": {
+                        "title": "Състояние",
+                        "state": "Влизане с Ever ID",
+                        "on": "Включено",
+                        "off": "Изключено",
+                        "configuration": "Конфигурация",
+                        "configured": "Пълна",
+                        "notConfigured": "Непълна",
+                        "missing": "Липсващи настройки",
+                        "newAccounts": "Нови акаунти",
+                        "signUpAllowed": "Могат да се създават с Ever ID",
+                        "signUpNotAllowed": "Не могат да се създават с Ever ID",
+                        "localClients": "Терминални клиенти",
+                        "unavailableSince": "Ever ID не отговаря от {date}."
+                    },
+                    "fields": {
+                        "issuer": "Адрес на издателя",
+                        "clientId": "ID на клиента",
+                        "clientSecret": "Тайна на клиента",
+                        "allowedIssuers": "Разрешени издатели",
+                        "apiAudience": "Аудитория на API",
+                        "localClientIds": "ID на терминалните клиенти",
+                        "signUpAllowed": "Нови акаунти",
+                        "clockSkewSeconds": "Толеранс на разминаване на часовника",
+                        "displayName": "Показвано име",
+                        "localClients": "Терминални клиенти",
+                        "delegatedClientNames": "Имена на приложения",
+                        "accountManagementUrl": "Адрес за управление на акаунта"
+                    },
+                    "set": "Зададено",
+                    "notSet": "Не е зададено",
+                    "secretSet": "•••••• (зададено)",
+                    "sources": {
+                        "title": "Откъде идва всяка стойност",
+                        "admin": "Настройки на плъгина",
+                        "env": "Среда",
+                        "default": "По подразбиране",
+                        "unset": "Не е зададено"
+                    },
+                    "testConnection": "Тествай връзката",
+                    "testing": "Тестване…",
+                    "testFailed": "Тестът на връзката не се изпълни. Опитайте отново.",
+                    "check": {
+                        "discovery": "Документ за откриване",
+                        "issuerMatch": "Издателят съвпада",
+                        "endpoints": "Крайните точки са достъпни",
+                        "pkceS256": "Поддържа се S256 code challenge",
+                        "signingAlg": "Алгоритъм за подпис",
+                        "backchannelLogout": "Изход по обратен канал",
+                        "deviceAuthorization": "Оторизация на устройство"
+                    },
+                    "checkOk": "Работи",
+                    "checkFailed": "Не се поддържа",
+                    "health": {
+                        "title": "Състояние на услугата",
+                        "discovery": "Последно опресняване на документа за откриване {ago}",
+                        "jwks": "Последно опресняване на ключовете {ago}",
+                        "logoutNotice": "Последно известие за изход {ago}",
+                        "discoveryNever": "Документът за откриване още не е прочетен",
+                        "jwksNever": "Ключовете за подпис още не са прочетени",
+                        "logoutNoticeNever": "Все още няма получено известие за изход",
+                        "unavailable": "Информацията за състоянието не е налична в момента."
+                    },
+                    "enable": "Включи",
+                    "disable": "Изключи",
+                    "enableBlocked": "Ever ID остава изключен: задължителна проверка е неуспешна.",
+                    "actionFailed": "Не стана. Опитайте отново.",
+                    "enabledToast": "Ever ID е включен.",
+                    "disabledToast": "Ever ID е изключен.",
+                    "settings": {
+                        "title": "Настройки",
+                        "description": "Тези стойности можете да промените тук. Издателят, ID на клиента и тайната на клиента идват от средата и не могат да се променят на тази страница.",
+                        "displayName": {
+                            "label": "Показвано име",
+                            "help": "Името, което Ever Works използва за този начин на влизане. До {max} знака."
+                        },
+                        "accountManagementUrl": {
+                            "label": "Адрес за управление на акаунта",
+                            "help": "По избор. Къде хората управляват своя акаунт в Ever ID. Трябва да започва с https://."
+                        },
+                        "localClients": {
+                            "legend": "Терминални клиенти",
+                            "help": "Клиенти на Ever Works CLI и Ever Works Node, на които е разрешено да влизат с Ever ID. До {max}.",
+                            "empty": "Все още няма терминални клиенти.",
+                            "row": "Терминален клиент {number}",
+                            "kind": "Тип",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "ID на клиента",
+                            "add": "Добавяне на терминален клиент",
+                            "remove": "Премахване на терминален клиент {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "Имена на приложения",
+                            "help": "Имената, които хората виждат в настройките за приложения, които четат данните им с тяхно разрешение. До {max}.",
+                            "empty": "Все още няма имена на приложения.",
+                            "row": "Име на приложение {number}",
+                            "clientId": "ID на клиента",
+                            "displayName": "Име",
+                            "add": "Добавяне на име на приложение",
+                            "remove": "Премахване на име на приложение {number}"
+                        },
+                        "remove": "Премахване",
+                        "save": "Запазване на настройките",
+                        "saving": "Запазване…",
+                        "saved": "Настройките на Ever ID са запазени.",
+                        "unchanged": "Нищо не е променено.",
+                        "invalid": "Някои стойности не бяха приети. Проверете ги и опитайте отново.",
+                        "failed": "Настройките не можаха да бъдат запазени. Опитайте отново."
+                    }
                 }
             }
         },
@@ -8777,6 +8978,12 @@
             "emptyActionFailed": "Тази страница не можа да се отвори. Опитайте отново.",
             "signInPrompt": "Влезте с Ever ID, за да видите приложенията си тук.",
             "signIn": "Вход"
+        },
+        "signOut": {
+            "title": "Изход от Ever Works?",
+            "alsoSignOutEverId": "Изход и от Ever ID",
+            "cancel": "Отказ",
+            "confirm": "Изход"
         }
     },
     "layout": {

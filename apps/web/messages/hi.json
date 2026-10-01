@@ -44,6 +44,26 @@
             "links": {
                 "help": "सहायता केंद्र",
                 "systemStatus": "सिस्टम स्थिति"
+            },
+            "everId": {
+                "everIdDisabled": "यहां Ever ID से साइन इन उपलब्ध नहीं है।",
+                "providerUnavailable": "Ever ID जवाब नहीं दे रहा है। एक मिनट बाद फिर से कोशिश करें, या किसी दूसरे तरीके से साइन इन करें।",
+                "transactionInvalid": "वह साइन-इन समाप्त हो गया है या पहले ही इस्तेमाल हो चुका है। फिर से शुरू करें।",
+                "emailNotVerified": "पहले Ever ID में अपना ईमेल पता सत्यापित करें, फिर दोबारा कोशिश करें।",
+                "emailInUse": "यह ईमेल पता पहले से एक Ever Works खाते में इस्तेमाल हो रहा है। उस खाते में हमेशा की तरह साइन इन करें, फिर सेटिंग्स → सुरक्षा में Ever ID कनेक्ट करें।",
+                "signUpNotAllowed": "यहां Ever ID से नए खाते नहीं बनाए जा सकते। किसी व्यवस्थापक से आमंत्रण मांगें।",
+                "subjectLinked": "यह Ever ID पहले से किसी दूसरे Ever Works खाते से कनेक्ट है। पहले उसे वहां से डिस्कनेक्ट करें।",
+                "userHasIssuer": "इस खाते से पहले से एक Ever ID कनेक्ट है। पहले उसे डिस्कनेक्ट करें।",
+                "reauthRequired": "आपकी सुरक्षा के लिए, Ever ID कनेक्ट करने से पहले फिर से साइन इन करें।",
+                "sessionRequired": "ऐसा करने के लिए अपने पासवर्ड से साइन इन करें।",
+                "lastSignInMethod": "पहले साइन इन करने का कोई दूसरा तरीका जोड़ें — इस खाते के पास सिर्फ़ Ever ID है।",
+                "notConnected": "पहले सेटिंग्स → सुरक्षा में Ever ID कनेक्ट करें।",
+                "accountDisabled": "यह खाता अक्षम है। किसी व्यवस्थापक से संपर्क करें।",
+                "everIdSignedOut": "आपको Ever ID से साइन आउट कर दिया गया।",
+                "tokenInQuery": "वह लिंक मान्य नहीं है। ऐप से फिर से शुरू करें।",
+                "insufficientScope": "उस ऐप को यह देखने की अनुमति नहीं है।",
+                "signedOutByProvider": "आपको Ever ID से साइन आउट कर दिया गया।",
+                "rateLimited": "बहुत अधिक प्रयास। {seconds} सेकंड में फिर से कोशिश करें।"
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Ever ID से साइन इन करें",
+            "signUp": "Ever ID से साइन अप करें",
+            "redirecting": "Ever ID खोला जा रहा है…",
+            "consentRequired": "जारी रखने के लिए ऊपर दी गई शर्तें स्वीकार करें।",
+            "createAccount": {
+                "title": "अपना Ever Works खाता बनाएं",
+                "signedInAs": "Ever ID में {name} · {email} के रूप में साइन इन है",
+                "signedInAsEmail": "Ever ID में {email} के रूप में साइन इन है",
+                "submit": "खाता बनाएं",
+                "cancel": "रद्द करें"
+            },
+            "accountExists": {
+                "title": "आपके पास पहले से एक Ever Works खाता है",
+                "body": "{email} पहले से एक Ever Works खाते में इस्तेमाल हो रहा है। उस खाते में हमेशा की तरह साइन इन करें, फिर सेटिंग्स → सुरक्षा में Ever ID कनेक्ट करें।",
+                "forgotPassword": "पासवर्ड भूल गए?",
+                "goToSignIn": "साइन इन पर जाएं"
+            },
+            "signedOutByProvider": "आपको Ever ID से साइन आउट कर दिया गया।",
+            "signedOutBoth": "आप Ever Works और Ever ID से साइन आउट हो गए हैं।",
+            "alsoSignOut": "Ever ID से भी साइन आउट करें",
+            "termsCheckbox": "मैं <terms>सेवा की शर्तों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत हूं",
+            "termsChanged": "शर्तें बदल गई हैं। पेज फिर से लोड करें, फिर जारी रखने के लिए उन्हें स्वीकार करें।",
+            "termsUnavailable": {
+                "title": "शर्तें लोड नहीं हो सकीं",
+                "message": "हम वे सेवा की शर्तें और गोपनीयता नीति लोड नहीं कर सके जिन्हें आपको स्वीकार करना है, इसलिए खाता बनाना रोक दिया गया है। थोड़ी देर में फिर से कोशिश करें।",
+                "retry": "फिर से कोशिश करें"
+            },
+            "pendingExpired": "इसमें बहुत ज़्यादा समय लग गया। फिर से शुरू करें।"
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "आयात",
                     "login": "लॉगिन",
                     "signup": "साइनअप",
-                    "passwordChanged": "पासवर्ड बदला गया"
+                    "passwordChanged": "पासवर्ड बदला गया",
+                    "identityLinked": "पहचान कनेक्ट की गई",
+                    "identityUnlinked": "पहचान डिस्कनेक्ट की गई",
+                    "logout": "साइन आउट",
+                    "delegatedAccess": "सौंपी गई पहुंच",
+                    "identityProviderConfigChanged": "पहचान प्रदाता कॉन्फ़िगर किया गया"
                 },
                 "statuses": {
                     "allStatuses": "सभी स्थितियां",
@@ -2931,6 +2986,36 @@
                     "title": "सक्रिय सत्र",
                     "subtitle": "डिवाइसों पर अपने सक्रिय सत्र प्रबंधित करें",
                     "action": "सत्र देखें (जल्द आ रहा है)"
+                },
+                "connectedIdentities": {
+                    "title": "कनेक्ट की गई पहचानें",
+                    "subtitle": "Ever Works में उस पहचान से साइन इन करें जिसका आप पहले से इस्तेमाल करते हैं।",
+                    "connectedLine": "{email} · {date} को कनेक्ट किया गया",
+                    "lastUsed": "पिछली बार साइन इन के लिए इस्तेमाल: {ago}",
+                    "notConnected": "कनेक्ट नहीं है",
+                    "connect": "Ever ID कनेक्ट करें",
+                    "disconnect": "डिस्कनेक्ट करें",
+                    "cannotDisconnect": "पहले साइन इन करने का कोई दूसरा तरीका जोड़ें — इस खाते के पास सिर्फ़ Ever ID है।",
+                    "setPassword": "पासवर्ड सेट करें",
+                    "turnedOff": "इस इंस्टॉलेशन पर Ever ID से साइन इन बंद है।",
+                    "appsTitle": "वे ऐप्स जो आपके ऐप कार्य देख सकते हैं",
+                    "appLastUsed": "{app} — पिछली बार इस्तेमाल: {ago}",
+                    "manageInEverId": "Ever ID में प्रबंधित करें",
+                    "opensInNewTab": "(नए टैब में खुलता है)",
+                    "confirmTitle": "इस खाते से Ever ID कनेक्ट करें?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "ये ईमेल पते अलग-अलग हैं। केवल तभी कनेक्ट करें जब दोनों आपके हों।",
+                    "confirmBody": "आप Ever ID से इस खाते में साइन इन कर सकेंगे।",
+                    "confirm": "कनेक्ट करें",
+                    "cancel": "रद्द करें",
+                    "backToSecurity": "सुरक्षा पर वापस जाएं",
+                    "disconnectBody": "Ever ID डिस्कनेक्ट करें? आप इससे फिर साइन इन नहीं कर पाएंगे, और Ever ID से साइन इन किए गए दूसरे डिवाइस साइन आउट हो जाएंगे। यह डिवाइस साइन इन रहेगा।",
+                    "keep": "इसे रखें",
+                    "disconnectFailed": "Ever ID डिस्कनेक्ट नहीं हो सका। पेज फिर से लोड करें और फिर से कोशिश करें।",
+                    "signInAgain": "फिर से साइन इन करें",
+                    "connectedToast": "Ever ID कनेक्ट हो गया।",
+                    "disconnectedToast": "Ever ID डिस्कनेक्ट हो गया।"
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "मैनिफ़ेस्ट",
                     "skills": "कौशल",
                     "mcp": "MCP सर्वर"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "लोगों को Ever ID से Ever Works में साइन इन करने देता है। नीचे दिए गए मान एनवायरनमेंट या प्लगइन सेटिंग्स से आते हैं।",
+                    "status": {
+                        "title": "स्थिति",
+                        "state": "Ever ID से साइन इन",
+                        "on": "चालू",
+                        "off": "बंद",
+                        "configuration": "कॉन्फ़िगरेशन",
+                        "configured": "पूरा",
+                        "notConfigured": "अधूरा",
+                        "missing": "छूटी हुई सेटिंग्स",
+                        "newAccounts": "नए खाते",
+                        "signUpAllowed": "Ever ID से बनाए जा सकते हैं",
+                        "signUpNotAllowed": "Ever ID से नहीं बनाए जा सकते",
+                        "localClients": "टर्मिनल क्लाइंट",
+                        "unavailableSince": "Ever ID {date} से जवाब नहीं दे रहा है।"
+                    },
+                    "fields": {
+                        "issuer": "जारीकर्ता का पता",
+                        "clientId": "क्लाइंट आईडी",
+                        "clientSecret": "क्लाइंट सीक्रेट",
+                        "allowedIssuers": "अनुमत जारीकर्ता",
+                        "apiAudience": "API ऑडियंस",
+                        "localClientIds": "टर्मिनल क्लाइंट आईडी",
+                        "signUpAllowed": "नए खाते",
+                        "clockSkewSeconds": "घड़ी के अंतर की सहनशीलता",
+                        "displayName": "प्रदर्शित नाम",
+                        "localClients": "टर्मिनल क्लाइंट",
+                        "delegatedClientNames": "ऐप के नाम",
+                        "accountManagementUrl": "खाता प्रबंधन पता"
+                    },
+                    "set": "सेट है",
+                    "notSet": "सेट नहीं है",
+                    "secretSet": "•••••• (सेट है)",
+                    "sources": {
+                        "title": "हर मान कहां से आता है",
+                        "admin": "प्लगइन सेटिंग्स",
+                        "env": "एनवायरनमेंट",
+                        "default": "डिफ़ॉल्ट",
+                        "unset": "सेट नहीं है"
+                    },
+                    "testConnection": "कनेक्शन जांचें",
+                    "testing": "जांच हो रही है…",
+                    "testFailed": "कनेक्शन जांच नहीं चल सकी। फिर से कोशिश करें।",
+                    "check": {
+                        "discovery": "डिस्कवरी दस्तावेज़",
+                        "issuerMatch": "जारीकर्ता मेल खाता है",
+                        "endpoints": "एंडपॉइंट पहुंच योग्य हैं",
+                        "pkceS256": "S256 कोड चैलेंज समर्थित",
+                        "signingAlg": "हस्ताक्षर एल्गोरिदम",
+                        "backchannelLogout": "बैक-चैनल लॉगआउट",
+                        "deviceAuthorization": "डिवाइस प्राधिकरण"
+                    },
+                    "checkOk": "काम करता है",
+                    "checkFailed": "समर्थित नहीं",
+                    "health": {
+                        "title": "स्वास्थ्य",
+                        "discovery": "डिस्कवरी दस्तावेज़ पिछली बार रीफ़्रेश हुआ: {ago}",
+                        "jwks": "कुंजियां पिछली बार रीफ़्रेश हुईं: {ago}",
+                        "logoutNotice": "पिछली साइन-आउट सूचना: {ago}",
+                        "discoveryNever": "डिस्कवरी दस्तावेज़ अभी तक नहीं पढ़ा गया",
+                        "jwksNever": "हस्ताक्षर कुंजियां अभी तक नहीं पढ़ी गईं",
+                        "logoutNoticeNever": "अभी तक कोई साइन-आउट सूचना नहीं मिली",
+                        "unavailable": "स्वास्थ्य जानकारी अभी उपलब्ध नहीं है।"
+                    },
+                    "enable": "चालू करें",
+                    "disable": "बंद करें",
+                    "enableBlocked": "Ever ID बंद रहेगा: एक ज़रूरी जांच विफल रही।",
+                    "actionFailed": "यह काम नहीं किया। फिर से कोशिश करें।",
+                    "enabledToast": "Ever ID चालू है।",
+                    "disabledToast": "Ever ID बंद है।",
+                    "settings": {
+                        "title": "सेटिंग्स",
+                        "description": "इन मानों को आप यहां बदल सकते हैं। जारीकर्ता, क्लाइंट आईडी और क्लाइंट सीक्रेट एनवायरनमेंट से आते हैं और इस पेज पर नहीं बदले जा सकते।",
+                        "displayName": {
+                            "label": "प्रदर्शित नाम",
+                            "help": "वह नाम जो Ever Works इस साइन-इन विकल्प के लिए इस्तेमाल करता है। अधिकतम {max} अक्षर।"
+                        },
+                        "accountManagementUrl": {
+                            "label": "खाता प्रबंधन पता",
+                            "help": "वैकल्पिक। जहां लोग अपना Ever ID खाता प्रबंधित करते हैं। https:// से शुरू होना चाहिए।"
+                        },
+                        "localClients": {
+                            "legend": "टर्मिनल क्लाइंट",
+                            "help": "Ever Works CLI और Ever Works Node क्लाइंट जिन्हें Ever ID से साइन इन करने की अनुमति है। अधिकतम {max}।",
+                            "empty": "अभी कोई टर्मिनल क्लाइंट नहीं है।",
+                            "row": "टर्मिनल क्लाइंट {number}",
+                            "kind": "प्रकार",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "क्लाइंट आईडी",
+                            "add": "टर्मिनल क्लाइंट जोड़ें",
+                            "remove": "टर्मिनल क्लाइंट {number} हटाएं"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "ऐप के नाम",
+                            "help": "वे नाम जो लोग सेटिंग्स में उन ऐप्स के लिए देखते हैं जो उनकी अनुमति से उनका डेटा पढ़ते हैं। अधिकतम {max}।",
+                            "empty": "अभी कोई ऐप नाम नहीं है।",
+                            "row": "ऐप का नाम {number}",
+                            "clientId": "क्लाइंट आईडी",
+                            "displayName": "नाम",
+                            "add": "ऐप का नाम जोड़ें",
+                            "remove": "ऐप का नाम {number} हटाएं"
+                        },
+                        "remove": "हटाएं",
+                        "save": "सेटिंग्स सहेजें",
+                        "saving": "सहेजा जा रहा है…",
+                        "saved": "Ever ID सेटिंग्स सहेजी गईं।",
+                        "unchanged": "कुछ भी नहीं बदला है।",
+                        "invalid": "कुछ मान स्वीकार नहीं किए गए। उन्हें जांचें और फिर से कोशिश करें।",
+                        "failed": "सेटिंग्स सहेजी नहीं जा सकीं। फिर से कोशिश करें।"
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "वह पृष्ठ खोल नहीं सके। पुनः प्रयास करें।",
             "signInPrompt": "अपने ऐप्स यहाँ देखने के लिए Ever ID से साइन इन करें।",
             "signIn": "साइन इन"
+        },
+        "signOut": {
+            "title": "Ever Works से साइन आउट करें?",
+            "alsoSignOutEverId": "Ever ID से भी साइन आउट करें",
+            "cancel": "रद्द करें",
+            "confirm": "साइन आउट करें"
         }
     },
     "layout": {

@@ -7,13 +7,32 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { ROUTES, SUPPORT_EMAIL } from '@/lib/constants';
 import { Link } from '@/i18n/navigation';
+import {
+    EVER_ID_RETRY_AFTER_PARAM,
+    everIdCodeFromErrorParam,
+    everIdMessageKey,
+    toRetryAfterSeconds,
+} from '@/lib/auth/ever-id';
 
 function AuthErrorContent() {
     const t = useTranslations('auth.error');
+    const tEverId = useTranslations('auth.error.everId');
     const searchParams = useSearchParams();
     const errorType = searchParams.get('error');
+    // APW-12 (Ever ID) — `ever_id_<code>` maps onto `auth.error.everId.<camel>`;
+    // only the closed set of wire codes is recognised.
+    const everIdCode = everIdCodeFromErrorParam(errorType);
 
     const getErrorMessage = () => {
+        if (everIdCode) {
+            const key = everIdMessageKey(everIdCode) ?? 'providerUnavailable';
+            return key === 'rateLimited'
+                ? tEverId('rateLimited', {
+                      seconds: toRetryAfterSeconds(searchParams.get(EVER_ID_RETRY_AFTER_PARAM)),
+                  })
+                : tEverId(key);
+        }
+
         switch (errorType) {
             case 'oauth_missing_code':
                 return t('oauth.missingCode');
@@ -59,7 +78,9 @@ function AuthErrorContent() {
     };
 
     const getErrorIcon = () => {
-        switch (errorType) {
+        // APW-12 — an Ever ID refusal wears the same warning icon as the other
+        // provider sign-in errors.
+        switch (everIdCode ? 'oauth_callback' : errorType) {
             case 'oauth_missing_code':
             case 'oauth_invalid_state':
             case 'oauth_unsupported_provider':

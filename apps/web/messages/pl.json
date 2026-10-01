@@ -44,6 +44,26 @@
             "links": {
                 "help": "Centrum pomocy",
                 "systemStatus": "Status systemu"
+            },
+            "everId": {
+                "everIdDisabled": "Logowanie przez Ever ID nie jest tu dostępne.",
+                "providerUnavailable": "Ever ID nie odpowiada. Spróbuj ponownie za minutę lub zaloguj się w inny sposób.",
+                "transactionInvalid": "To logowanie wygasło lub zostało już użyte. Zacznij od nowa.",
+                "emailNotVerified": "Najpierw potwierdź swój adres e-mail w Ever ID, a potem spróbuj ponownie.",
+                "emailInUse": "Konto Ever Works już używa tego adresu e-mail. Zaloguj się na nie tak jak zwykle, a potem połącz Ever ID w Ustawienia → Bezpieczeństwo.",
+                "signUpNotAllowed": "Tutaj nie można tworzyć nowych kont przez Ever ID. Poproś administratora o zaproszenie.",
+                "subjectLinked": "Ten Ever ID jest już połączony z innym kontem Ever Works. Najpierw odłącz go tam.",
+                "userHasIssuer": "To konto ma już połączony Ever ID. Najpierw go odłącz.",
+                "reauthRequired": "Ze względów bezpieczeństwa zaloguj się ponownie, zanim połączysz Ever ID.",
+                "sessionRequired": "Aby to zrobić, zaloguj się hasłem.",
+                "lastSignInMethod": "Najpierw dodaj inny sposób logowania — Ever ID to jedyny, jaki ma to konto.",
+                "notConnected": "Najpierw połącz Ever ID w Ustawienia → Bezpieczeństwo.",
+                "accountDisabled": "To konto jest wyłączone. Skontaktuj się z administratorem.",
+                "everIdSignedOut": "Wylogowano cię z Ever ID.",
+                "tokenInQuery": "Ten link jest nieprawidłowy. Zacznij od nowa w aplikacji.",
+                "insufficientScope": "Ta aplikacja nie ma uprawnień, aby to zobaczyć.",
+                "signedOutByProvider": "Wylogowano cię z Ever ID.",
+                "rateLimited": "Zbyt wiele prób. Spróbuj ponownie za {seconds} s."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Zaloguj się przez Ever ID",
+            "signUp": "Zarejestruj się przez Ever ID",
+            "redirecting": "Otwieranie Ever ID…",
+            "consentRequired": "Zaakceptuj powyższe warunki, aby kontynuować.",
+            "createAccount": {
+                "title": "Utwórz konto Ever Works",
+                "signedInAs": "Zalogowano do Ever ID jako {name} · {email}",
+                "signedInAsEmail": "Zalogowano do Ever ID jako {email}",
+                "submit": "Utwórz konto",
+                "cancel": "Anuluj"
+            },
+            "accountExists": {
+                "title": "Masz już konto Ever Works",
+                "body": "Konto Ever Works już używa adresu {email}. Zaloguj się na nie tak jak zwykle, a potem połącz Ever ID w Ustawienia → Bezpieczeństwo.",
+                "forgotPassword": "Nie pamiętasz hasła?",
+                "goToSignIn": "Przejdź do logowania"
+            },
+            "signedOutByProvider": "Wylogowano cię z Ever ID.",
+            "signedOutBoth": "Wylogowano cię z Ever Works i Ever ID.",
+            "alsoSignOut": "Wyloguj się także z Ever ID",
+            "termsCheckbox": "Zgadzam się na <terms>Regulamin</terms> i <privacy>Politykę prywatności</privacy>",
+            "termsChanged": "Warunki się zmieniły. Odśwież stronę, a potem je zaakceptuj, aby kontynuować.",
+            "termsUnavailable": {
+                "title": "Nie udało się wczytać warunków",
+                "message": "Nie udało się wczytać Regulaminu i Polityki prywatności, które musisz zaakceptować, więc tworzenie konta jest wstrzymane. Spróbuj ponownie za chwilę.",
+                "retry": "Spróbuj ponownie"
+            },
+            "pendingExpired": "To trwało zbyt długo. Zacznij od nowa."
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "Import",
                     "login": "Logowanie",
                     "signup": "Rejestracja",
-                    "passwordChanged": "Hasło zmienione"
+                    "passwordChanged": "Hasło zmienione",
+                    "identityLinked": "Tożsamość połączona",
+                    "identityUnlinked": "Tożsamość odłączona",
+                    "logout": "Wylogowanie",
+                    "delegatedAccess": "Dostęp delegowany",
+                    "identityProviderConfigChanged": "Dostawca tożsamości skonfigurowany"
                 },
                 "statuses": {
                     "allStatuses": "Wszystkie statusy",
@@ -2931,6 +2986,36 @@
                     "title": "Aktywne sesje",
                     "subtitle": "Zarządzaj aktywnymi sesjami na różnych urządzeniach",
                     "action": "Wyświetl sesje (wkrótce dostępne)"
+                },
+                "connectedIdentities": {
+                    "title": "Połączone tożsamości",
+                    "subtitle": "Loguj się do Ever Works tożsamością, której już używasz.",
+                    "connectedLine": "{email} · połączono {date}",
+                    "lastUsed": "Ostatnio użyto do logowania {ago}",
+                    "notConnected": "Nie połączono",
+                    "connect": "Połącz Ever ID",
+                    "disconnect": "Odłącz",
+                    "cannotDisconnect": "Najpierw dodaj inny sposób logowania — Ever ID to jedyny, jaki ma to konto.",
+                    "setPassword": "Ustaw hasło",
+                    "turnedOff": "Logowanie przez Ever ID jest wyłączone w tej instalacji.",
+                    "appsTitle": "Aplikacje, które widzą twoje prace typu aplikacja",
+                    "appLastUsed": "{app} — ostatnio użyto {ago}",
+                    "manageInEverId": "Zarządzaj w Ever ID",
+                    "opensInNewTab": "(otwiera się w nowej karcie)",
+                    "confirmTitle": "Połączyć Ever ID z tym kontem?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "Te adresy e-mail są różne. Połącz tylko wtedy, gdy oba należą do ciebie.",
+                    "confirmBody": "Będzie można logować się na to konto przez Ever ID.",
+                    "confirm": "Połącz",
+                    "cancel": "Anuluj",
+                    "backToSecurity": "Wróć do Bezpieczeństwa",
+                    "disconnectBody": "Odłączyć Ever ID? Nie będzie można już się nim logować, a inne urządzenia zalogowane przez Ever ID zostaną wylogowane. To urządzenie pozostanie zalogowane.",
+                    "keep": "Zachowaj",
+                    "disconnectFailed": "Nie udało się odłączyć Ever ID. Odśwież stronę i spróbuj ponownie.",
+                    "signInAgain": "Zaloguj się ponownie",
+                    "connectedToast": "Połączono Ever ID.",
+                    "disconnectedToast": "Odłączono Ever ID."
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "Manifest",
                     "skills": "Umiejętności",
                     "mcp": "Serwery MCP"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Umożliwia logowanie do Ever Works przez Ever ID. Poniższe wartości pochodzą ze środowiska lub z ustawień wtyczki.",
+                    "status": {
+                        "title": "Stan",
+                        "state": "Logowanie przez Ever ID",
+                        "on": "Włączone",
+                        "off": "Wyłączone",
+                        "configuration": "Konfiguracja",
+                        "configured": "Kompletna",
+                        "notConfigured": "Niekompletna",
+                        "missing": "Brakujące ustawienia",
+                        "newAccounts": "Nowe konta",
+                        "signUpAllowed": "Można tworzyć przez Ever ID",
+                        "signUpNotAllowed": "Nie można tworzyć przez Ever ID",
+                        "localClients": "Klienty terminalowe",
+                        "unavailableSince": "Ever ID nie odpowiada od {date}."
+                    },
+                    "fields": {
+                        "issuer": "Adres wystawcy",
+                        "clientId": "Identyfikator klienta",
+                        "clientSecret": "Sekret klienta",
+                        "allowedIssuers": "Dozwoleni wystawcy",
+                        "apiAudience": "Odbiorca API",
+                        "localClientIds": "Identyfikatory klientów terminalowych",
+                        "signUpAllowed": "Nowe konta",
+                        "clockSkewSeconds": "Tolerancja różnicy zegara",
+                        "displayName": "Nazwa wyświetlana",
+                        "localClients": "Klienty terminalowe",
+                        "delegatedClientNames": "Nazwy aplikacji",
+                        "accountManagementUrl": "Adres zarządzania kontem"
+                    },
+                    "set": "Ustawiono",
+                    "notSet": "Nie ustawiono",
+                    "secretSet": "•••••• (ustawiono)",
+                    "sources": {
+                        "title": "Skąd pochodzi każda wartość",
+                        "admin": "Ustawienia wtyczki",
+                        "env": "Środowisko",
+                        "default": "Domyślna",
+                        "unset": "Nie ustawiono"
+                    },
+                    "testConnection": "Przetestuj połączenie",
+                    "testing": "Testowanie…",
+                    "testFailed": "Test połączenia się nie wykonał. Spróbuj ponownie.",
+                    "check": {
+                        "discovery": "Dokument discovery",
+                        "issuerMatch": "Wystawca się zgadza",
+                        "endpoints": "Punkty końcowe osiągalne",
+                        "pkceS256": "Obsługa wyzwania kodu S256",
+                        "signingAlg": "Algorytm podpisu",
+                        "backchannelLogout": "Wylogowanie back-channel",
+                        "deviceAuthorization": "Autoryzacja urządzenia"
+                    },
+                    "checkOk": "Działa",
+                    "checkFailed": "Nieobsługiwane",
+                    "health": {
+                        "title": "Kondycja",
+                        "discovery": "Ostatnie odświeżenie dokumentu discovery {ago}",
+                        "jwks": "Ostatnie odświeżenie kluczy {ago}",
+                        "logoutNotice": "Ostatnie powiadomienie o wylogowaniu {ago}",
+                        "discoveryNever": "Dokument discovery nie został jeszcze odczytany",
+                        "jwksNever": "Klucze podpisu nie zostały jeszcze odczytane",
+                        "logoutNoticeNever": "Nie otrzymano jeszcze żadnego powiadomienia o wylogowaniu",
+                        "unavailable": "Informacje o kondycji są teraz niedostępne."
+                    },
+                    "enable": "Włącz",
+                    "disable": "Wyłącz",
+                    "enableBlocked": "Ever ID pozostaje wyłączony: wymagane sprawdzenie nie powiodło się.",
+                    "actionFailed": "Nie udało się. Spróbuj ponownie.",
+                    "enabledToast": "Ever ID jest włączony.",
+                    "disabledToast": "Ever ID jest wyłączony.",
+                    "settings": {
+                        "title": "Ustawienia",
+                        "description": "Te wartości możesz zmienić tutaj. Wystawca, identyfikator klienta i sekret klienta pochodzą ze środowiska i nie można ich zmienić na tej stronie.",
+                        "displayName": {
+                            "label": "Nazwa wyświetlana",
+                            "help": "Nazwa, której Ever Works używa dla tej opcji logowania. Maksymalnie {max} znaków."
+                        },
+                        "accountManagementUrl": {
+                            "label": "Adres zarządzania kontem",
+                            "help": "Opcjonalnie. Miejsce, w którym użytkownicy zarządzają swoim kontem Ever ID. Musi zaczynać się od https://."
+                        },
+                        "localClients": {
+                            "legend": "Klienty terminalowe",
+                            "help": "Klienty Ever Works CLI i Ever Works Node, które mogą logować się przez Ever ID. Maksymalnie {max}.",
+                            "empty": "Brak klientów terminalowych.",
+                            "row": "Klient terminalowy {number}",
+                            "kind": "Typ",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "Identyfikator klienta",
+                            "add": "Dodaj klienta terminalowego",
+                            "remove": "Usuń klienta terminalowego {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "Nazwy aplikacji",
+                            "help": "Nazwy, które użytkownicy widzą w ustawieniach dla aplikacji odczytujących ich dane za ich zgodą. Maksymalnie {max}.",
+                            "empty": "Brak nazw aplikacji.",
+                            "row": "Nazwa aplikacji {number}",
+                            "clientId": "Identyfikator klienta",
+                            "displayName": "Nazwa",
+                            "add": "Dodaj nazwę aplikacji",
+                            "remove": "Usuń nazwę aplikacji {number}"
+                        },
+                        "remove": "Usuń",
+                        "save": "Zapisz ustawienia",
+                        "saving": "Zapisywanie…",
+                        "saved": "Zapisano ustawienia Ever ID.",
+                        "unchanged": "Nic się nie zmieniło.",
+                        "invalid": "Niektóre wartości nie zostały zaakceptowane. Sprawdź je i spróbuj ponownie.",
+                        "failed": "Nie udało się zapisać ustawień. Spróbuj ponownie."
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "Nie udało się otworzyć tej strony. Spróbuj ponownie.",
             "signInPrompt": "Zaloguj się przez Ever ID, aby zobaczyć tu swoje aplikacje.",
             "signIn": "Zaloguj się"
+        },
+        "signOut": {
+            "title": "Wylogować się z Ever Works?",
+            "alsoSignOutEverId": "Wyloguj się także z Ever ID",
+            "cancel": "Anuluj",
+            "confirm": "Wyloguj się"
         }
     },
     "layout": {

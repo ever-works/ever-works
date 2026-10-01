@@ -44,6 +44,26 @@
             "links": {
                 "help": "도움말 센터",
                 "systemStatus": "시스템 상태"
+            },
+            "everId": {
+                "everIdDisabled": "여기서는 Ever ID로 로그인할 수 없습니다.",
+                "providerUnavailable": "Ever ID가 응답하지 않습니다. 1분 후에 다시 시도하거나 다른 방법으로 로그인하세요.",
+                "transactionInvalid": "이 로그인은 만료되었거나 이미 사용되었습니다. 처음부터 다시 시작하세요.",
+                "emailNotVerified": "먼저 Ever ID에서 이메일 주소를 인증한 다음 다시 시도하세요.",
+                "emailInUse": "이 이메일 주소는 이미 Ever Works 계정에서 사용 중입니다. 평소처럼 해당 계정에 로그인한 다음 설정 → 보안에서 Ever ID를 연결하세요.",
+                "signUpNotAllowed": "여기서는 Ever ID로 새 계정을 만들 수 없습니다. 관리자에게 초대를 요청하세요.",
+                "subjectLinked": "이 Ever ID는 이미 다른 Ever Works 계정에 연결되어 있습니다. 먼저 해당 계정에서 연결을 해제하세요.",
+                "userHasIssuer": "이 계정에는 이미 Ever ID가 연결되어 있습니다. 먼저 연결을 해제하세요.",
+                "reauthRequired": "보안을 위해 Ever ID를 연결하기 전에 다시 로그인하세요.",
+                "sessionRequired": "이 작업을 하려면 비밀번호로 로그인하세요.",
+                "lastSignInMethod": "먼저 다른 로그인 방법을 추가하세요. 이 계정의 로그인 방법은 Ever ID뿐입니다.",
+                "notConnected": "먼저 설정 → 보안에서 Ever ID를 연결하세요.",
+                "accountDisabled": "이 계정은 비활성화되었습니다. 관리자에게 문의하세요.",
+                "everIdSignedOut": "Ever ID에서 로그아웃되었습니다.",
+                "tokenInQuery": "유효하지 않은 링크입니다. 앱에서 처음부터 다시 시작하세요.",
+                "insufficientScope": "이 앱에는 이 내용을 볼 권한이 없습니다.",
+                "signedOutByProvider": "Ever ID에서 로그아웃되었습니다.",
+                "rateLimited": "시도 횟수가 너무 많습니다. {seconds}초 후에 다시 시도하세요."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Ever ID로 로그인",
+            "signUp": "Ever ID로 가입",
+            "redirecting": "Ever ID를 여는 중…",
+            "consentRequired": "계속하려면 위의 약관에 동의하세요.",
+            "createAccount": {
+                "title": "Ever Works 계정 만들기",
+                "signedInAs": "{name} · {email}(으)로 Ever ID에 로그인됨",
+                "signedInAsEmail": "{email}(으)로 Ever ID에 로그인됨",
+                "submit": "계정 만들기",
+                "cancel": "취소"
+            },
+            "accountExists": {
+                "title": "이미 Ever Works 계정이 있습니다",
+                "body": "{email}은(는) 이미 Ever Works 계정에서 사용 중입니다. 평소처럼 해당 계정에 로그인한 다음 설정 → 보안에서 Ever ID를 연결하세요.",
+                "forgotPassword": "비밀번호를 잊으셨나요?",
+                "goToSignIn": "로그인으로 이동"
+            },
+            "signedOutByProvider": "Ever ID에서 로그아웃되었습니다.",
+            "signedOutBoth": "Ever Works와 Ever ID에서 로그아웃했습니다.",
+            "alsoSignOut": "Ever ID에서도 로그아웃",
+            "termsCheckbox": "<terms>이용 약관</terms> 및 <privacy>개인정보 처리방침</privacy>에 동의합니다",
+            "termsChanged": "약관이 변경되었습니다. 페이지를 새로고침한 다음 약관에 동의하여 계속하세요.",
+            "termsUnavailable": {
+                "title": "약관을 불러올 수 없습니다",
+                "message": "동의해야 하는 이용 약관과 개인정보 처리방침을 불러오지 못해 계정 만들기가 일시 중지되었습니다. 잠시 후 다시 시도하세요.",
+                "retry": "다시 시도"
+            },
+            "pendingExpired": "시간이 너무 오래 걸렸습니다. 처음부터 다시 시작하세요."
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "가져오기",
                     "login": "로그인",
                     "signup": "가입",
-                    "passwordChanged": "비밀번호 변경됨"
+                    "passwordChanged": "비밀번호 변경됨",
+                    "identityLinked": "ID 연결됨",
+                    "identityUnlinked": "ID 연결 해제됨",
+                    "logout": "로그아웃",
+                    "delegatedAccess": "위임된 액세스",
+                    "identityProviderConfigChanged": "ID 공급자 설정됨"
                 },
                 "statuses": {
                     "allStatuses": "모든 상태",
@@ -2931,6 +2986,36 @@
                     "title": "활성 세션",
                     "subtitle": "기기 간 활성 세션 관리",
                     "action": "세션 보기(곧 출시 예정)"
+                },
+                "connectedIdentities": {
+                    "title": "연결된 ID",
+                    "subtitle": "이미 사용 중인 ID로 Ever Works에 로그인하세요.",
+                    "connectedLine": "{email} · {date}에 연결됨",
+                    "lastUsed": "마지막으로 로그인에 사용: {ago}",
+                    "notConnected": "연결되지 않음",
+                    "connect": "Ever ID 연결",
+                    "disconnect": "연결 해제",
+                    "cannotDisconnect": "먼저 다른 로그인 방법을 추가하세요. 이 계정의 로그인 방법은 Ever ID뿐입니다.",
+                    "setPassword": "비밀번호 설정",
+                    "turnedOff": "이 설치에서는 Ever ID 로그인이 꺼져 있습니다.",
+                    "appsTitle": "내 앱 워크를 볼 수 있는 앱",
+                    "appLastUsed": "{app} — 마지막 사용: {ago}",
+                    "manageInEverId": "Ever ID에서 관리",
+                    "opensInNewTab": "(새 탭에서 열림)",
+                    "confirmTitle": "이 계정에 Ever ID를 연결할까요?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "두 이메일 주소가 다릅니다. 둘 다 본인 소유인 경우에만 연결하세요.",
+                    "confirmBody": "이 계정에 Ever ID로 로그인할 수 있게 됩니다.",
+                    "confirm": "연결",
+                    "cancel": "취소",
+                    "backToSecurity": "보안으로 돌아가기",
+                    "disconnectBody": "Ever ID 연결을 해제할까요? 더 이상 Ever ID로 로그인할 수 없으며, Ever ID로 로그인한 다른 기기는 로그아웃됩니다. 이 기기는 로그인 상태로 유지됩니다.",
+                    "keep": "유지",
+                    "disconnectFailed": "Ever ID 연결을 해제할 수 없습니다. 페이지를 새로고침하고 다시 시도하세요.",
+                    "signInAgain": "다시 로그인",
+                    "connectedToast": "Ever ID가 연결되었습니다.",
+                    "disconnectedToast": "Ever ID 연결이 해제되었습니다."
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "매니페스트",
                     "skills": "스킬",
                     "mcp": "MCP 서버"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Ever ID로 Ever Works에 로그인할 수 있게 합니다. 아래 값은 환경 또는 플러그인 설정에서 가져옵니다.",
+                    "status": {
+                        "title": "상태",
+                        "state": "Ever ID 로그인",
+                        "on": "켜짐",
+                        "off": "꺼짐",
+                        "configuration": "구성",
+                        "configured": "완료",
+                        "notConfigured": "미완료",
+                        "missing": "누락된 설정",
+                        "newAccounts": "새 계정",
+                        "signUpAllowed": "Ever ID로 만들 수 있음",
+                        "signUpNotAllowed": "Ever ID로 만들 수 없음",
+                        "localClients": "터미널 클라이언트",
+                        "unavailableSince": "Ever ID가 {date}부터 응답하지 않습니다."
+                    },
+                    "fields": {
+                        "issuer": "발급자 주소",
+                        "clientId": "클라이언트 ID",
+                        "clientSecret": "클라이언트 시크릿",
+                        "allowedIssuers": "허용된 발급자",
+                        "apiAudience": "API 대상",
+                        "localClientIds": "터미널 클라이언트 ID",
+                        "signUpAllowed": "새 계정",
+                        "clockSkewSeconds": "시계 오차 허용 범위",
+                        "displayName": "표시 이름",
+                        "localClients": "터미널 클라이언트",
+                        "delegatedClientNames": "앱 이름",
+                        "accountManagementUrl": "계정 관리 주소"
+                    },
+                    "set": "설정됨",
+                    "notSet": "설정되지 않음",
+                    "secretSet": "•••••• (설정됨)",
+                    "sources": {
+                        "title": "각 값의 출처",
+                        "admin": "플러그인 설정",
+                        "env": "환경",
+                        "default": "기본값",
+                        "unset": "설정되지 않음"
+                    },
+                    "testConnection": "연결 테스트",
+                    "testing": "테스트 중…",
+                    "testFailed": "연결 테스트가 실행되지 않았습니다. 다시 시도하세요.",
+                    "check": {
+                        "discovery": "디스커버리 문서",
+                        "issuerMatch": "발급자 일치",
+                        "endpoints": "엔드포인트 연결 가능",
+                        "pkceS256": "S256 코드 챌린지 지원",
+                        "signingAlg": "서명 알고리즘",
+                        "backchannelLogout": "백채널 로그아웃",
+                        "deviceAuthorization": "기기 인증"
+                    },
+                    "checkOk": "작동함",
+                    "checkFailed": "지원되지 않음",
+                    "health": {
+                        "title": "상태 점검",
+                        "discovery": "디스커버리 문서 마지막 새로고침: {ago}",
+                        "jwks": "키 마지막 새로고침: {ago}",
+                        "logoutNotice": "마지막 로그아웃 알림: {ago}",
+                        "discoveryNever": "디스커버리 문서를 아직 읽지 않았습니다",
+                        "jwksNever": "서명 키를 아직 읽지 않았습니다",
+                        "logoutNoticeNever": "아직 받은 로그아웃 알림이 없습니다",
+                        "unavailable": "지금은 상태 정보를 사용할 수 없습니다."
+                    },
+                    "enable": "켜기",
+                    "disable": "끄기",
+                    "enableBlocked": "Ever ID가 꺼진 상태로 유지됩니다: 필수 검사에 실패했습니다.",
+                    "actionFailed": "작업에 실패했습니다. 다시 시도하세요.",
+                    "enabledToast": "Ever ID가 켜졌습니다.",
+                    "disabledToast": "Ever ID가 꺼졌습니다.",
+                    "settings": {
+                        "title": "설정",
+                        "description": "여기에서 변경할 수 있는 값입니다. 발급자, 클라이언트 ID, 클라이언트 시크릿은 환경에서 가져오며 이 페이지에서 변경할 수 없습니다.",
+                        "displayName": {
+                            "label": "표시 이름",
+                            "help": "Ever Works가 이 로그인 방법에 사용하는 이름입니다. 최대 {max}자."
+                        },
+                        "accountManagementUrl": {
+                            "label": "계정 관리 주소",
+                            "help": "선택 사항입니다. 사용자가 Ever ID 계정을 관리하는 곳입니다. https://로 시작해야 합니다."
+                        },
+                        "localClients": {
+                            "legend": "터미널 클라이언트",
+                            "help": "Ever ID로 로그인할 수 있는 Ever Works CLI 및 Ever Works Node 클라이언트입니다. 최대 {max}개.",
+                            "empty": "아직 터미널 클라이언트가 없습니다.",
+                            "row": "터미널 클라이언트 {number}",
+                            "kind": "유형",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "클라이언트 ID",
+                            "add": "터미널 클라이언트 추가",
+                            "remove": "터미널 클라이언트 {number} 삭제"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "앱 이름",
+                            "help": "사용자의 허락을 받아 데이터를 읽는 앱에 대해 설정에 표시되는 이름입니다. 최대 {max}개.",
+                            "empty": "아직 앱 이름이 없습니다.",
+                            "row": "앱 이름 {number}",
+                            "clientId": "클라이언트 ID",
+                            "displayName": "이름",
+                            "add": "앱 이름 추가",
+                            "remove": "앱 이름 {number} 삭제"
+                        },
+                        "remove": "삭제",
+                        "save": "설정 저장",
+                        "saving": "저장 중…",
+                        "saved": "Ever ID 설정을 저장했습니다.",
+                        "unchanged": "변경된 내용이 없습니다.",
+                        "invalid": "일부 값이 허용되지 않았습니다. 확인 후 다시 시도하세요.",
+                        "failed": "설정을 저장하지 못했습니다. 다시 시도하세요."
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "해당 페이지를 열 수 없습니다. 다시 시도하세요.",
             "signInPrompt": "Ever ID로 로그인하면 여기에서 앱을 볼 수 있습니다.",
             "signIn": "로그인"
+        },
+        "signOut": {
+            "title": "Ever Works에서 로그아웃할까요?",
+            "alsoSignOutEverId": "Ever ID에서도 로그아웃",
+            "cancel": "취소",
+            "confirm": "로그아웃"
         }
     },
     "layout": {

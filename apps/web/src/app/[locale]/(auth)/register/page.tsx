@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import { getLocale, getTranslations } from 'next-intl/server';
 import RegisterForm from './register-form';
 import { prefillFromSearchParams, type RegisterSearchParams } from './register-prefill';
-import { getConfiguredAuthProviders } from '@/lib/auth/providers';
+import { getAuthProvidersConfig } from '@/lib/auth/providers';
 import { authAPI, type TermsAcceptanceDocument } from '@/lib/api';
+import { EVER_ID_ANONYMOUS_DISTINCT_ID, isEverIdOffered } from '@/lib/feature-flags/ever-id';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -15,7 +16,12 @@ export default async function RegisterPage({
 }: {
     searchParams: Promise<RegisterSearchParams>;
 }) {
-    const availableSocialProviders = await getConfiguredAuthProviders();
+    // One read of `/auth/providers` gives both the social providers (exactly what
+    // `getConfiguredAuthProviders` returns, offline fallback included) and the
+    // additive Ever ID availability (APW-12).
+    const { socialProviders: availableSocialProviders, everId } = await getAuthProvidersConfig();
+    // APW-12 — the flag is evaluated only when an administrator enabled Ever ID.
+    const everIdEnabled = await isEverIdOffered(everId, EVER_ID_ANONYMOUS_DISTINCT_ID);
     // Identity carried over from Stripe Checkout — see `register-prefill.ts`.
     const prefill = prefillFromSearchParams(await searchParams);
 
@@ -40,6 +46,7 @@ export default async function RegisterPage({
             availableSocialProviders={availableSocialProviders}
             termsDocuments={termsDocuments}
             prefill={prefill}
+            everIdEnabled={everIdEnabled}
         />
     );
 }

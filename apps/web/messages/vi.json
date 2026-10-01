@@ -44,6 +44,26 @@
             "links": {
                 "help": "Trung tâm Trợ giúp",
                 "systemStatus": "Trạng thái Hệ thống"
+            },
+            "everId": {
+                "everIdDisabled": "Không thể đăng nhập bằng Ever ID tại đây.",
+                "providerUnavailable": "Ever ID không phản hồi. Hãy thử lại sau một phút hoặc đăng nhập bằng cách khác.",
+                "transactionInvalid": "Lượt đăng nhập đó đã hết hạn hoặc đã được dùng. Hãy bắt đầu lại.",
+                "emailNotVerified": "Hãy xác minh địa chỉ email của bạn với Ever ID trước, rồi thử lại.",
+                "emailInUse": "Một tài khoản Ever Works đã dùng địa chỉ email này. Hãy đăng nhập vào tài khoản đó như bạn vẫn làm, rồi kết nối Ever ID trong Cài đặt → Bảo mật.",
+                "signUpNotAllowed": "Không thể tạo tài khoản mới bằng Ever ID tại đây. Hãy xin lời mời từ quản trị viên.",
+                "subjectLinked": "Ever ID này đã được kết nối với một tài khoản Ever Works khác. Hãy ngắt kết nối ở đó trước.",
+                "userHasIssuer": "Tài khoản này đã có một Ever ID được kết nối. Hãy ngắt kết nối trước.",
+                "reauthRequired": "Để đảm bảo an toàn, hãy đăng nhập lại trước khi kết nối Ever ID.",
+                "sessionRequired": "Hãy đăng nhập bằng mật khẩu để thực hiện việc đó.",
+                "lastSignInMethod": "Hãy thêm một cách đăng nhập khác trước — Ever ID là cách duy nhất của tài khoản này.",
+                "notConnected": "Hãy kết nối Ever ID trong Cài đặt → Bảo mật trước.",
+                "accountDisabled": "Tài khoản này đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.",
+                "everIdSignedOut": "Bạn đã bị đăng xuất khỏi Ever ID.",
+                "tokenInQuery": "Liên kết đó không hợp lệ. Hãy bắt đầu lại từ ứng dụng.",
+                "insufficientScope": "Ứng dụng đó không có quyền xem nội dung này.",
+                "signedOutByProvider": "Bạn đã bị đăng xuất khỏi Ever ID.",
+                "rateLimited": "Quá nhiều lần thử. Hãy thử lại sau {seconds} giây."
             }
         },
         "login": {
@@ -262,6 +282,36 @@
                 "text": "Don't have an account?",
                 "link": "Sign up"
             }
+        },
+        "everId": {
+            "signIn": "Đăng nhập bằng Ever ID",
+            "signUp": "Đăng ký bằng Ever ID",
+            "redirecting": "Đang mở Ever ID…",
+            "consentRequired": "Hãy chấp nhận các điều khoản ở trên để tiếp tục.",
+            "createAccount": {
+                "title": "Tạo tài khoản Ever Works của bạn",
+                "signedInAs": "Đã đăng nhập Ever ID với tư cách {name} · {email}",
+                "signedInAsEmail": "Đã đăng nhập Ever ID với tư cách {email}",
+                "submit": "Tạo tài khoản",
+                "cancel": "Hủy"
+            },
+            "accountExists": {
+                "title": "Bạn đã có tài khoản Ever Works",
+                "body": "Một tài khoản Ever Works đã dùng {email}. Hãy đăng nhập vào tài khoản đó như bạn vẫn làm, rồi kết nối Ever ID trong Cài đặt → Bảo mật.",
+                "forgotPassword": "Quên mật khẩu?",
+                "goToSignIn": "Đến trang đăng nhập"
+            },
+            "signedOutByProvider": "Bạn đã bị đăng xuất khỏi Ever ID.",
+            "signedOutBoth": "Bạn đã đăng xuất khỏi Ever Works và Ever ID.",
+            "alsoSignOut": "Đăng xuất cả khỏi Ever ID",
+            "termsCheckbox": "Tôi đồng ý với <terms>Điều khoản Dịch vụ</terms> và <privacy>Chính sách Bảo mật</privacy>",
+            "termsChanged": "Các điều khoản đã thay đổi. Hãy tải lại trang rồi chấp nhận chúng để tiếp tục.",
+            "termsUnavailable": {
+                "title": "Không thể tải các điều khoản",
+                "message": "Chúng tôi không thể tải Điều khoản Dịch vụ và Chính sách Bảo mật mà bạn cần chấp nhận, nên việc tạo tài khoản đang tạm dừng. Hãy thử lại sau giây lát.",
+                "retry": "Thử lại"
+            },
+            "pendingExpired": "Quá trình này mất quá nhiều thời gian. Hãy bắt đầu lại."
         }
     },
     "onboarding": {
@@ -2444,7 +2494,12 @@
                     "import": "Nhập",
                     "login": "Đăng nhập",
                     "signup": "Đăng ký",
-                    "passwordChanged": "Mật khẩu Đã Thay đổi"
+                    "passwordChanged": "Mật khẩu Đã Thay đổi",
+                    "identityLinked": "Đã kết nối danh tính",
+                    "identityUnlinked": "Đã ngắt kết nối danh tính",
+                    "logout": "Đăng xuất",
+                    "delegatedAccess": "Quyền truy cập được ủy quyền",
+                    "identityProviderConfigChanged": "Đã cấu hình nhà cung cấp danh tính"
                 },
                 "statuses": {
                     "allStatuses": "Tất cả Trạng thái",
@@ -2931,6 +2986,36 @@
                     "title": "Phiên hoạt động",
                     "subtitle": "Quản lý phiên hoạt động của bạn trên các thiết bị",
                     "action": "Xem phiên (Sắp ra mắt)"
+                },
+                "connectedIdentities": {
+                    "title": "Danh tính đã kết nối",
+                    "subtitle": "Đăng nhập Ever Works bằng một danh tính bạn đang dùng.",
+                    "connectedLine": "{email} · kết nối ngày {date}",
+                    "lastUsed": "Lần cuối dùng để đăng nhập {ago}",
+                    "notConnected": "Chưa kết nối",
+                    "connect": "Kết nối Ever ID",
+                    "disconnect": "Ngắt kết nối",
+                    "cannotDisconnect": "Hãy thêm một cách đăng nhập khác trước — Ever ID là cách duy nhất của tài khoản này.",
+                    "setPassword": "Đặt mật khẩu",
+                    "turnedOff": "Đăng nhập bằng Ever ID đã bị tắt trên bản cài đặt này.",
+                    "appsTitle": "Ứng dụng có thể xem Công việc Ứng dụng của bạn",
+                    "appLastUsed": "{app} — lần cuối dùng {ago}",
+                    "manageInEverId": "Quản lý trong Ever ID",
+                    "opensInNewTab": "(mở trong thẻ mới)",
+                    "confirmTitle": "Kết nối Ever ID với tài khoản này?",
+                    "everIdLabel": "Ever ID",
+                    "everWorksLabel": "Ever Works",
+                    "emailsDiffer": "Các địa chỉ email này khác nhau. Chỉ kết nối nếu cả hai đều là của bạn.",
+                    "confirmBody": "Bạn sẽ có thể đăng nhập vào tài khoản này bằng Ever ID.",
+                    "confirm": "Kết nối",
+                    "cancel": "Hủy",
+                    "backToSecurity": "Quay lại Bảo mật",
+                    "disconnectBody": "Ngắt kết nối Ever ID? Bạn sẽ không thể đăng nhập bằng nó nữa, và các thiết bị khác đã đăng nhập bằng Ever ID sẽ bị đăng xuất. Thiết bị này vẫn đăng nhập.",
+                    "keep": "Giữ lại",
+                    "disconnectFailed": "Không thể ngắt kết nối Ever ID. Hãy tải lại trang rồi thử lại.",
+                    "signInAgain": "Đăng nhập lại",
+                    "connectedToast": "Đã kết nối Ever ID.",
+                    "disconnectedToast": "Đã ngắt kết nối Ever ID."
                 }
             },
             "oauth": {
@@ -3929,6 +4014,122 @@
                     "manifest": "Manifest",
                     "skills": "Kỹ năng",
                     "mcp": "Máy chủ MCP"
+                }
+            },
+            "admin": {
+                "everId": {
+                    "title": "Ever ID",
+                    "subtitle": "Cho phép đăng nhập Ever Works bằng Ever ID. Các giá trị bên dưới đến từ môi trường hoặc cài đặt plugin.",
+                    "status": {
+                        "title": "Tình trạng",
+                        "state": "Đăng nhập bằng Ever ID",
+                        "on": "Bật",
+                        "off": "Tắt",
+                        "configuration": "Cấu hình",
+                        "configured": "Đầy đủ",
+                        "notConfigured": "Chưa đầy đủ",
+                        "missing": "Cài đặt còn thiếu",
+                        "newAccounts": "Tài khoản mới",
+                        "signUpAllowed": "Có thể tạo bằng Ever ID",
+                        "signUpNotAllowed": "Không thể tạo bằng Ever ID",
+                        "localClients": "Ứng dụng khách dòng lệnh",
+                        "unavailableSince": "Ever ID không phản hồi từ {date}."
+                    },
+                    "fields": {
+                        "issuer": "Địa chỉ bên phát hành",
+                        "clientId": "ID ứng dụng khách",
+                        "clientSecret": "Khóa bí mật ứng dụng khách",
+                        "allowedIssuers": "Bên phát hành được phép",
+                        "apiAudience": "Đối tượng API",
+                        "localClientIds": "ID ứng dụng khách dòng lệnh",
+                        "signUpAllowed": "Tài khoản mới",
+                        "clockSkewSeconds": "Dung sai lệch đồng hồ",
+                        "displayName": "Tên hiển thị",
+                        "localClients": "Ứng dụng khách dòng lệnh",
+                        "delegatedClientNames": "Tên ứng dụng",
+                        "accountManagementUrl": "Địa chỉ quản lý tài khoản"
+                    },
+                    "set": "Đã đặt",
+                    "notSet": "Chưa đặt",
+                    "secretSet": "•••••• (đã đặt)",
+                    "sources": {
+                        "title": "Nguồn của từng giá trị",
+                        "admin": "Cài đặt plugin",
+                        "env": "Môi trường",
+                        "default": "Mặc định",
+                        "unset": "Chưa đặt"
+                    },
+                    "testConnection": "Kiểm tra kết nối",
+                    "testing": "Đang kiểm tra…",
+                    "testFailed": "Kiểm tra kết nối không chạy được. Hãy thử lại.",
+                    "check": {
+                        "discovery": "Tài liệu khám phá",
+                        "issuerMatch": "Bên phát hành khớp",
+                        "endpoints": "Có thể truy cập các điểm cuối",
+                        "pkceS256": "Hỗ trợ thử thách mã S256",
+                        "signingAlg": "Thuật toán ký",
+                        "backchannelLogout": "Đăng xuất qua kênh phụ",
+                        "deviceAuthorization": "Ủy quyền thiết bị"
+                    },
+                    "checkOk": "Hoạt động",
+                    "checkFailed": "Không được hỗ trợ",
+                    "health": {
+                        "title": "Tình trạng hoạt động",
+                        "discovery": "Lần làm mới tài liệu khám phá gần nhất {ago}",
+                        "jwks": "Lần làm mới khóa gần nhất {ago}",
+                        "logoutNotice": "Thông báo đăng xuất gần nhất {ago}",
+                        "discoveryNever": "Chưa đọc tài liệu khám phá",
+                        "jwksNever": "Chưa đọc khóa ký",
+                        "logoutNoticeNever": "Chưa nhận được thông báo đăng xuất nào",
+                        "unavailable": "Hiện không có thông tin tình trạng hoạt động."
+                    },
+                    "enable": "Bật",
+                    "disable": "Tắt",
+                    "enableBlocked": "Ever ID vẫn tắt: một bước kiểm tra bắt buộc không đạt.",
+                    "actionFailed": "Không thành công. Hãy thử lại.",
+                    "enabledToast": "Ever ID đã bật.",
+                    "disabledToast": "Ever ID đã tắt.",
+                    "settings": {
+                        "title": "Cài đặt",
+                        "description": "Bạn có thể thay đổi các giá trị này tại đây. Bên phát hành, ID ứng dụng khách và khóa bí mật ứng dụng khách đến từ môi trường và không thể thay đổi trên trang này.",
+                        "displayName": {
+                            "label": "Tên hiển thị",
+                            "help": "Tên mà Ever Works dùng cho tùy chọn đăng nhập này. Tối đa {max} ký tự."
+                        },
+                        "accountManagementUrl": {
+                            "label": "Địa chỉ quản lý tài khoản",
+                            "help": "Không bắt buộc. Nơi mọi người quản lý tài khoản Ever ID của họ. Phải bắt đầu bằng https://."
+                        },
+                        "localClients": {
+                            "legend": "Ứng dụng khách dòng lệnh",
+                            "help": "Các ứng dụng khách Ever Works CLI và Ever Works Node được phép đăng nhập bằng Ever ID. Tối đa {max}.",
+                            "empty": "Chưa có ứng dụng khách dòng lệnh nào.",
+                            "row": "Ứng dụng khách dòng lệnh {number}",
+                            "kind": "Loại",
+                            "kindCli": "Ever Works CLI",
+                            "kindNode": "Ever Works Node",
+                            "clientId": "ID ứng dụng khách",
+                            "add": "Thêm ứng dụng khách dòng lệnh",
+                            "remove": "Xóa ứng dụng khách dòng lệnh {number}"
+                        },
+                        "delegatedClientNames": {
+                            "legend": "Tên ứng dụng",
+                            "help": "Tên mà mọi người thấy trong Cài đặt cho các ứng dụng đọc dữ liệu của họ khi được họ cho phép. Tối đa {max}.",
+                            "empty": "Chưa có tên ứng dụng nào.",
+                            "row": "Tên ứng dụng {number}",
+                            "clientId": "ID ứng dụng khách",
+                            "displayName": "Tên",
+                            "add": "Thêm tên ứng dụng",
+                            "remove": "Xóa tên ứng dụng {number}"
+                        },
+                        "remove": "Xóa",
+                        "save": "Lưu cài đặt",
+                        "saving": "Đang lưu…",
+                        "saved": "Đã lưu cài đặt Ever ID.",
+                        "unchanged": "Không có gì thay đổi.",
+                        "invalid": "Một số giá trị không được chấp nhận. Hãy kiểm tra và thử lại.",
+                        "failed": "Không thể lưu cài đặt. Hãy thử lại."
+                    }
                 }
             }
         },
@@ -8778,6 +8979,12 @@
             "emptyActionFailed": "Không thể mở trang đó. Thử lại.",
             "signInPrompt": "Đăng nhập bằng Ever ID để xem ứng dụng của bạn tại đây.",
             "signIn": "Đăng nhập"
+        },
+        "signOut": {
+            "title": "Đăng xuất khỏi Ever Works?",
+            "alsoSignOutEverId": "Đăng xuất cả khỏi Ever ID",
+            "cancel": "Hủy",
+            "confirm": "Đăng xuất"
         }
     },
     "layout": {
