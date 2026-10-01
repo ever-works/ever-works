@@ -353,6 +353,12 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      # App Works ships dormant: its switches stay off (false or unset) in every deploy manifest,
+      # compose file and env example. The e2e lanes switch it on for their own ephemeral stacks
+      # and are not scanned. Runs its own controls first, so a scanner that matches nothing fails.
+      - name: 'Guard: App Works switches stay off in deploy files'
+        run: node scripts/ci/check-default-off-switches.mjs --self-test && node scripts/ci/check-default-off-switches.mjs
+
       # Decide whether the expensive half of this job is needed.
       #
       # `lint-and-test` is the ONLY required status check on main/develop/stage,
