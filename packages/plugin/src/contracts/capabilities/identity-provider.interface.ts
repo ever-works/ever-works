@@ -107,6 +107,14 @@ export interface VerifiedIdTokenClaims {
 	name: string | null;
 	authTime: number | null;
 	sid: string | null;
+	/**
+	 * Optional provider claims the platform may read as **hints only** — never
+	 * as authority, never as a requirement (FR-53: nothing requires a claim
+	 * beyond the standard ones). A provider that sends none leaves this absent.
+	 * The `oidc-identity` plugin passes through the claims of the `urn:ever:`
+	 * namespace, as they appear in the verified token.
+	 */
+	hints?: Readonly<Record<string, unknown>>;
 }
 
 /**

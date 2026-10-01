@@ -191,6 +191,12 @@ export class FakeOidcProvider {
 	private server: Server | null = null;
 	private issuerUrl = '';
 	private keySequence = 0;
+	/** The person approved from now on, when a spec changed it after start (see {@link setUser}). */
+	private userOverride: FakeOidcUser | null = null;
+	/** Extra claims every ID token minted from now on carries (see {@link setIdTokenClaims}). */
+	private extraIdTokenClaims: Record<string, unknown> = {};
+	/** The provider session id (`sid`) the next tokens carry (see {@link setSessionId}). */
+	private sessionId = 'ever-id-session-1';
 
 	private constructor(options: FakeOidcProviderOptions) {
 		this.options = options;
@@ -341,6 +347,34 @@ export class FakeOidcProvider {
 	}
 
 	/** The current key id, so a spec can name what it is signing with. */
+	/**
+	 * Change the person the provider approves from now on — so one running fake
+	 * can sign in a connected identity, a new one and one whose e-mail an account
+	 * already uses, in turn. Additive test seam; the constructor option still sets
+	 * the first person.
+	 */
+	setUser(user: FakeOidcUser): void {
+		this.userOverride = user;
+	}
+
+	/**
+	 * Extra claims every ID token minted from now on carries (for example the
+	 * optional `urn:ever:` hint claims). Pass `{}` to stop adding any.
+	 */
+	setIdTokenClaims(claims: Record<string, unknown>): void {
+		this.extraIdTokenClaims = { ...claims };
+	}
+
+	/** The provider session id (`sid`) the next ID tokens and logout tokens carry. */
+	setSessionId(sid: string): void {
+		this.sessionId = sid;
+	}
+
+	/** The provider session id the next tokens carry. */
+	get currentSessionId(): string {
+		return this.sessionId;
+	}
+
 	get currentKeyId(): string {
 		return this.keys[this.keys.length - 1]?.kid ?? '';
 	}
@@ -362,8 +396,9 @@ export class FakeOidcProvider {
 			email_verified: user.emailVerified ?? true,
 			name: user.name ?? 'A Person',
 			auth_time: issuedAt,
-			sid: 'ever-id-session-1',
+			sid: this.sessionId,
 			jti: randomId('id-token'),
+			...this.extraIdTokenClaims,
 			...overrides
 		});
 	}
@@ -434,7 +469,7 @@ export class FakeOidcProvider {
 			iat: issuedAt,
 			jti: overrides.jti === undefined ? randomId('logout') : overrides.jti,
 			events: overrides.events === undefined ? { [FAKE_BACKCHANNEL_LOGOUT_EVENT]: {} } : overrides.events,
-			sid: overrides.sid === undefined ? 'ever-id-session-1' : overrides.sid,
+			sid: overrides.sid === undefined ? this.sessionId : overrides.sid,
 			...overrides.extraClaims
 		};
 		if (overrides.subject !== undefined && overrides.subject !== null) claims.sub = overrides.subject;
@@ -525,7 +560,19 @@ export class FakeOidcProvider {
 	// ---------------------------------------------------------------- internals
 
 	private user(): FakeOidcUser {
-		return this.options.user ?? FAKE_DEFAULT_USER;
+		return this.userOverride ?? this.options.user ?? FAKE_DEFAULT_USER;
+	}
+
+	/**
+	 * Whether `clientId` is one of the PUBLIC local clients (CLI, node) — RFC 8628
+	 * public clients authenticate with their `client_id` alone, no secret.
+	 */
+	private isLocalClient(clientId: string | undefined): boolean {
+		if (clientId === undefined || clientId === '') return false;
+		const configured = this.options.localClients ?? [
+			{ kind: 'cli' as const, clientId: FAKE_DEFAULT_LOCAL_CLIENT_ID }
+		];
+		return configured.some((client) => client.clientId === clientId);
 	}
 
 	private rotateKeysSync(options: { keepPrevious?: boolean }): void {
@@ -630,7 +677,9 @@ export class FakeOidcProvider {
 	/** RFC 6749 §4.1.3 and RFC 8628 §3.4–3.5: two grants, both checked. */
 	private handleToken(call: FakeOidcCall, response: ServerResponse): void {
 		const { form } = call;
-		if (this.clientSecret !== null && !this.credentialsAccepted(call)) {
+		const publicDeviceClient =
+			form.grant_type === 'urn:ietf:params:oauth:grant-type:device_code' && this.isLocalClient(form.client_id);
+		if (this.clientSecret !== null && !publicDeviceClient && !this.credentialsAccepted(call)) {
 			return sendJson(response, 401, { error: 'invalid_client' });
 		}
 
@@ -689,7 +738,10 @@ export class FakeOidcProvider {
 		if (!grant.approved) return sendJson(response, 400, { error: 'authorization_pending' });
 
 		this.devices.delete(grant.deviceCode);
-		void this.tokensFor(null, grant.scope).then(
+		// A public local client's grant yields a token whose `azp` is that client —
+		// what FR-40's exchange checks against the configured local clients.
+		const authorizedParty = this.isLocalClient(grant.clientId) ? grant.clientId : this.clientId;
+		void this.tokensFor(null, grant.scope, authorizedParty).then(
 			(tokens) => sendJson(response, 200, tokens),
 			(error: unknown) => sendJson(response, 500, { error: 'server_error', error_description: String(error) })
 		);
@@ -697,7 +749,7 @@ export class FakeOidcProvider {
 
 	/** RFC 8628 §3.2's device authorization response. */
 	private handleDeviceAuthorization(call: FakeOidcCall, response: ServerResponse): void {
-		if (this.clientSecret !== null && !this.credentialsAccepted(call)) {
+		if (this.clientSecret !== null && !this.isLocalClient(call.form.client_id) && !this.credentialsAccepted(call)) {
 			return sendJson(response, 401, { error: 'invalid_client' });
 		}
 		const intervalSeconds = this.options.devicePollIntervalSeconds ?? 5;
@@ -736,12 +788,16 @@ export class FakeOidcProvider {
 		response.end();
 	}
 
-	private async tokensFor(nonce: string | null, scope: string): Promise<Record<string, unknown>> {
+	private async tokensFor(
+		nonce: string | null,
+		scope: string,
+		authorizedParty: string = this.clientId
+	): Promise<Record<string, unknown>> {
 		const user = this.user();
-		const idToken = await this.mintIdToken({ nonce, sid: 'ever-id-session-1', sub: user.subject });
+		const idToken = await this.mintIdToken({ nonce, sid: this.sessionId, sub: user.subject });
 		const accessToken = await this.mintAccessToken({
 			scopes: scope.split(/\s+/u).filter((entry) => entry.length > 0),
-			authorizedParty: this.clientId
+			authorizedParty
 		});
 		return {
 			access_token: accessToken,

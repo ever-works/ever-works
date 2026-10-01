@@ -722,6 +722,69 @@ async function startCapture(
 	};
 }
 
+describe('public local clients and per-spec identities', () => {
+	it('lets a public local client run the device grant with its client_id alone, and names it in azp', async () => {
+		await withProvider({ localClients: [{ kind: 'cli', clientId: 'public-cli' }] }, async (provider) => {
+			const form = (body: Record<string, string>) => ({
+				method: 'POST',
+				headers: { 'content-type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams(body).toString()
+			});
+			const started = await fetch(
+				provider.deviceAuthorizationEndpoint,
+				form({ client_id: 'public-cli', scope: 'openid email ever-works:session' })
+			);
+			expect(started.status).toBe(200);
+			const grant = (await started.json()) as { device_code: string };
+			provider.approveDeviceAuthorization();
+			clockMs += 5_000;
+			const token = await fetch(
+				provider.tokenEndpoint,
+				form({
+					grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+					device_code: grant.device_code,
+					client_id: 'public-cli'
+				})
+			);
+			expect(token.status).toBe(200);
+			const { access_token } = (await token.json()) as { access_token: string };
+			const payload = JSON.parse(Buffer.from(access_token.split('.')[1], 'base64url').toString('utf8'));
+			expect(payload.azp).toBe('public-cli');
+			expect(payload.scope).toBe('openid email ever-works:session');
+		});
+	});
+
+	it('still refuses an unknown client without credentials', async () => {
+		await withProvider({}, async (provider) => {
+			const response = await fetch(provider.deviceAuthorizationEndpoint, {
+				method: 'POST',
+				headers: { 'content-type': 'application/x-www-form-urlencoded' },
+				body: new URLSearchParams({ client_id: 'stranger', scope: 'openid' }).toString()
+			});
+			expect(response.status).toBe(401);
+		});
+	});
+
+	it('changes the approved person, the extra ID token claims and the sid after start', async () => {
+		await withProvider({}, async (provider) => {
+			provider.setUser({ subject: 'subject-2', email: 'second@example.com' });
+			provider.setIdTokenClaims({ 'urn:ever:claims_ver': 1 });
+			provider.setSessionId('sid-2');
+
+			const token = await provider.mintIdToken();
+			const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+
+			expect(payload).toMatchObject({
+				sub: 'subject-2',
+				email: 'second@example.com',
+				sid: 'sid-2',
+				'urn:ever:claims_ver': 1
+			});
+			expect(provider.currentSessionId).toBe('sid-2');
+		});
+	});
+});
+
 /** RFC 6749 §2.3.1's `client_secret_basic` header. */
 function basic(clientId: string, clientSecret: string): string {
 	return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;

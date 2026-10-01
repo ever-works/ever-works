@@ -1501,7 +1501,7 @@ function idTokenClaims(payload: Record<string, unknown>, rules: IdTokenRules): V
 		}
 	}
 
-	return {
+	const claims: VerifiedIdTokenClaims = {
 		issuer,
 		subject,
 		// FR-23/FR-24/FR-25 branch on the pair (`email`, `email_verified`), and the
@@ -1513,6 +1513,35 @@ function idTokenClaims(payload: Record<string, unknown>, rules: IdTokenRules): V
 		authTime,
 		sid: nonEmpty(payload.sid) ?? null
 	};
+	// Optional hints (the `urn:ever:` claim namespace), passed through as they
+	// appear in the verified token. Present only when the provider sent any, so a
+	// provider without them yields exactly the claims object it always did.
+	const hints = everHintClaims(payload);
+	if (hints !== undefined) claims.hints = hints;
+	return claims;
+}
+
+/** The namespace of the optional hint claims passed through by {@link idTokenClaims}. */
+export const OIDC_HINT_CLAIM_PREFIX = 'urn:ever:';
+
+/** At most this many hint claims are passed through — a bound on what a token can make the platform hold. */
+const OIDC_HINT_CLAIMS_MAX = 32;
+
+/**
+ * The `urn:ever:` claims of a verified payload, or `undefined` when there are
+ * none. Values are copied as they are (they are JSON already); nothing outside
+ * the namespace is ever included, so a standard claim can never ride along.
+ */
+function everHintClaims(payload: Record<string, unknown>): Readonly<Record<string, unknown>> | undefined {
+	const out: Record<string, unknown> = {};
+	let count = 0;
+	for (const [key, value] of Object.entries(payload)) {
+		if (!key.startsWith(OIDC_HINT_CLAIM_PREFIX)) continue;
+		if (count >= OIDC_HINT_CLAIMS_MAX) break;
+		out[key] = value;
+		count += 1;
+	}
+	return count === 0 ? undefined : Object.freeze(out);
 }
 
 /** The rules {@link idTokenClaims} applies — everything it needs that the token itself does not carry. */

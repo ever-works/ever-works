@@ -137,6 +137,7 @@ import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
 import { InboxItem } from '../entities/inbox-item.entity';
+import { ExternalIdentity } from '../entities/external-identity.entity';
 import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
@@ -492,6 +493,10 @@ export const ENTITIES = [
     // columns: the active Organization must never be stamped onto a 'global'
     // row every Organization shares.
     AppLauncherPreference,
+    // APW-12 Ever ID — a connected identity: the (issuer, subject) pair of an
+    // OpenID Connect provider bound to one account. Two unique constraints are the
+    // linking rules; no provider token is ever stored on it.
+    ExternalIdentity,
     // APW-06 T17 — the runtime state of one App Work: which target it deploys
     // to, the namespace and cluster it is frozen against, the atomic deploy
     // lock and its latest-wins queue of one, the health counters the poller

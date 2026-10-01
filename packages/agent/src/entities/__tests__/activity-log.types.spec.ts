@@ -65,6 +65,12 @@ describe('activity-log.types', () => {
             ['USER_SIGNUP', 'user_signup'],
             ['PROVIDER_CONNECTED', 'provider_connected'],
             ['PASSWORD_CHANGED', 'password_changed'],
+            // APW-12 Ever ID (plan §5.6)
+            ['IDENTITY_LINKED', 'identity_linked'],
+            ['IDENTITY_UNLINKED', 'identity_unlinked'],
+            ['USER_LOGOUT', 'user_logout'],
+            ['DELEGATED_ACCESS', 'delegated_access'],
+            ['IDENTITY_PROVIDER_CONFIG_CHANGED', 'identity_provider_config_changed'],
             // Chat / AI
             ['CHAT_CONVERSATION', 'chat_conversation'],
             // Community
@@ -477,7 +483,11 @@ describe('activity-log.types', () => {
             //    edit for the same derived-complement reason as `app_launcher`
             //    above. The count moves by exactly the one member this task
             //    appends: no existing member is renamed, retyped or removed.
-            expect(literals).toHaveLength(206);
+            // +5 APW-12 Ever ID (plan §5.6, spec FR-49): identity_linked,
+            //    identity_unlinked, user_logout, delegated_access and
+            //    identity_provider_config_changed, each with its `feed-kind.ts`
+            //    row in the same change -> 211. Nothing existing moves.
+            expect(literals).toHaveLength(211);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

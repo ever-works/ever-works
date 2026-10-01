@@ -91,6 +91,9 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     // Sessions and third-party auth tokens.
     'AuthSession',
     'AuthAccount',
+    // APW-12 — an (issuer, subject) link is a sign-in binding: a restore must
+    // never re-link an account to an identity.
+    'ExternalIdentity',
     'RefreshToken',
     // Encrypted runtime credentials and their per-version snapshots.
     'TenantCredentialSnapshot',
