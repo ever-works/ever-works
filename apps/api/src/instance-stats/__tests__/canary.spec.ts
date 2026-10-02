@@ -1,6 +1,10 @@
 import type { DataSource } from 'typeorm';
-import { createHarness } from './fixtures/harness';
-import { CANARIES, createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness } from './fixtures/harness.helper-spec';
+import {
+    CANARIES,
+    createStatsDataSource,
+    seedOneUserInstance,
+} from './fixtures/works-seed.helper-spec';
 
 /**
  * Nothing seeded into the installation reaches a report: not the person's

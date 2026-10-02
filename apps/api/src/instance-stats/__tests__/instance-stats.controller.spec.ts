@@ -14,8 +14,8 @@ import { UserRepository } from '@ever-works/agent/database';
 import { IsPlatformAdminGuard } from '../../auth/guards/platform-admin.guard';
 import { InstanceStatsController } from '../instance-stats.controller';
 import { InstanceStatsService } from '../instance-stats.service';
-import { createHarness, type StatsHarness } from './fixtures/harness';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness, type StatsHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
  * The operator routes over HTTP, with the real service on a seeded database:

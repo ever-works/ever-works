@@ -1,9 +1,9 @@
 import { join } from 'path';
 import type { DataSource } from 'typeorm';
 import type { InstanceStatsRaw } from '@ever-works/agent/ever-instance';
-import { contractJson } from './contract-files';
-import { createHarness } from './fixtures/harness';
-import { createStatsDataSource } from './fixtures/works-seed';
+import { contractJson } from './contract-files.helper-spec';
+import { createHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource } from './fixtures/works-seed.helper-spec';
 
 /**
  * The builder's output equals the published Works golden report

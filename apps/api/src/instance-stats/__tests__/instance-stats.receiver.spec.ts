@@ -5,9 +5,9 @@ import { keyIdOf, publicKeyBytes, toBase64Url } from '@ever-works/agent/ever-ins
 import { StatsSinkFacadeService } from '@ever-works/agent/facades';
 import { PluginSecretEncService, type PluginRegistryService } from '@ever-works/agent/plugins';
 import EverStatsSinkPlugin from '@ever-works/ever-stats-sink-plugin';
-import { createHarness, type StatsHarness } from './fixtures/harness';
-import { LocalStatsReceiver } from './fixtures/local-receiver';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness, type StatsHarness } from './fixtures/harness.helper-spec';
+import { LocalStatsReceiver } from './fixtures/local-receiver.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
  * End to end, through the REAL sender: builder → signer → `stats-sink` facade

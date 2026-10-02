@@ -1,8 +1,8 @@
 import type { DataSource } from 'typeorm';
 import { EverInstance } from '@ever-works/agent/entities';
 import { StatsSinkUnavailableError } from '@ever-works/agent/facades';
-import { createHarness, FakeSink, type StatsHarness } from './fixtures/harness';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness, FakeSink, type StatsHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
  * The schedule: first send a day after first boot (10 minutes after boot when

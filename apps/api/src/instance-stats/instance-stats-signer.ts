@@ -27,7 +27,7 @@ export class InstanceStatsSigner {
         // The receiver's own checks (size, one key per object, integers only,
         // the schema) on the exact bytes — a body it would refuse is never sent.
         const check = validateStatsReportBody(body);
-        if (!check.ok) throw new InstanceStatsBuildError(check.errors);
+        if ('errors' in check) throw new InstanceStatsBuildError(check.errors);
 
         const { signature, publicKey, keyId } = await this.identity.sign(body);
         return {

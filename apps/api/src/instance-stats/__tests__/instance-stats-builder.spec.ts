@@ -11,8 +11,8 @@ import {
     versionAndChannel,
     workKindKey,
 } from '../instance-stats.mapping';
-import { createHarness } from './fixtures/harness';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
  * The builder against a seeded one-person installation, and the closed-list

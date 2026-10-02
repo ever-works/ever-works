@@ -171,7 +171,9 @@ function OperatorView({
     const [resetOpen, setResetOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
 
-    const fail = (code: InstanceStatsActionCode) => toast.error(t(`errors.${code}`));
+    const fail = (code: InstanceStatsActionCode): void => {
+        toast.error(t(`errors.${code}`));
+    };
 
     const refresh = async () => {
         const [nextStatus, nextLast] = await Promise.all([
@@ -186,7 +188,10 @@ function OperatorView({
     const toggle = (enabled: boolean) =>
         startTransition(async () => {
             const result = await setInstanceStatsEnabledAction(enabled);
-            if (!result.success) return fail(result.code);
+            if (!result.success) {
+                fail(result.code);
+                return;
+            }
             toast.success(enabled ? t('toggle.turnedOn') : t('toggle.turnedOff'));
             await refresh();
         });
@@ -194,7 +199,10 @@ function OperatorView({
     const sendNow = () =>
         startTransition(async () => {
             const result = await sendInstanceStatsNowAction();
-            if (!result.success) return fail(result.code);
+            if (!result.success) {
+                fail(result.code);
+                return;
+            }
             const first = result.data[0];
             if (first?.status === 'sent') toast.success(t('sendNow.sent'));
             else toast.error(t('sendNow.notSent', { status: first?.status ?? 'failed' }));
@@ -204,7 +212,10 @@ function OperatorView({
     const showPreview = () =>
         startTransition(async () => {
             const result = await previewInstanceStatsAction();
-            if (!result.success) return fail(result.code);
+            if (!result.success) {
+                fail(result.code);
+                return;
+            }
             setPreview(result.data);
         });
 
@@ -212,7 +223,10 @@ function OperatorView({
         startTransition(async () => {
             const result = await resetInstanceStatsIdentityAction();
             setResetOpen(false);
-            if (!result.success) return fail(result.code);
+            if (!result.success) {
+                fail(result.code);
+                return;
+            }
             toast.success(t('reset.done'));
             await refresh();
         });
@@ -221,10 +235,9 @@ function OperatorView({
         iso
             ? format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' })
             : t('notScheduled');
-    const sendNowBlocked =
-        !status.uiEnabled ||
-        (status.sendNowAvailableAt !== null &&
-            new Date(status.sendNowAvailableAt).getTime() > Date.now());
+    // `sendNowAvailableAt` is set only while the 10-minute limit applies (the API
+    // decides; a stale page simply gets a 429 it translates).
+    const sendNowBlocked = !status.uiEnabled || status.sendNowAvailableAt !== null;
 
     return (
         <div className="space-y-6" data-testid="usage-statistics-operator">

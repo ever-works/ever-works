@@ -3,8 +3,8 @@ import { join } from 'path';
 import type { DataSource } from 'typeorm';
 import { InstanceStatsModule, instanceStatsModuleImports } from '../instance-stats.module';
 import { InstanceStatsSchedulerService } from '../instance-stats-scheduler.service';
-import { createHarness } from './fixtures/harness';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
  * Off means off.

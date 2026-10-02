@@ -4,8 +4,8 @@ import {
     compileStrictStatsSchema,
     validateStatsReport,
 } from '@ever-works/agent/ever-instance';
-import { createHarness } from './fixtures/harness';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import { createHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 type Json = Record<string, unknown>;
 

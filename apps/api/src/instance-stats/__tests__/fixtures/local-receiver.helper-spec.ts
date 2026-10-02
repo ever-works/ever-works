@@ -46,7 +46,9 @@ export class LocalStatsReceiver {
                         ? (this.forced.shift() ?? this.verdict(body, req.headers))
                         : { status: 404, answer: { code: 'not_found' } };
                 this.received.push({ body, headers: req.headers, status, answer });
-                res.writeHead(status, { 'content-type': 'application/json' });
+                // One request per connection: a test client never reuses a socket
+                // the server is about to close between two tests.
+                res.writeHead(status, { 'content-type': 'application/json', connection: 'close' });
                 res.end(JSON.stringify(answer));
             });
         });
@@ -106,7 +108,7 @@ export class LocalStatsReceiver {
             return { status: 400, answer: { code: 'signature_invalid' } };
         }
         const check = validateStatsReportBody(body);
-        if (!check.ok) {
+        if ('errors' in check) {
             return {
                 status: 422,
                 answer: {

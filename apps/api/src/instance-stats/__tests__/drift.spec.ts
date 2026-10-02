@@ -1,6 +1,11 @@
 import { EVER_STATS_V1_SOURCE } from '@ever-works/contracts';
 import { EVER_STATS_V1_SCHEMA } from '@ever-works/agent/ever-instance';
-import { contractBytes, contractJson, sha256, type VendorRecord } from './contract-files';
+import {
+    contractBytes,
+    contractJson,
+    sha256,
+    type VendorRecord,
+} from './contract-files.helper-spec';
 
 /**
  * The vendored contract is the published one, byte for byte: the schema's

@@ -2,9 +2,14 @@ import { readdirSync } from 'fs';
 import { join } from 'path';
 import type { DataSource } from 'typeorm';
 import { validateStatsReportBody } from '@ever-works/agent/ever-instance';
-import { CONTRACT_DIR, contractBytes, contractJson, type ExpectedRecord } from './contract-files';
-import { createHarness } from './fixtures/harness';
-import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed';
+import {
+    CONTRACT_DIR,
+    contractBytes,
+    contractJson,
+    type ExpectedRecord,
+} from './contract-files.helper-spec';
+import { createHarness } from './fixtures/harness.helper-spec';
+import { createStatsDataSource, seedOneUserInstance } from './fixtures/works-seed.helper-spec';
 
 /**
  * Every string in a report sits at an allow-listed path and matches that
@@ -98,8 +103,9 @@ describe('ever.stats.v1 — string walker', () => {
             contractBytes(join('fixtures', 'stats', 'invalid', name)),
         );
         expect(result.ok).toBe(false);
-        if (result.ok) return;
-        expect(result.errors[0].path).toBe(outcome.path ?? '');
+        // `in` narrows whatever the compiler's null checks (this app runs without them).
+        const errors = 'errors' in result ? result.errors : [];
+        expect(errors[0]?.path).toBe(outcome.path ?? '');
     });
 
     it.each(['gauzy', 'teams', 'works', 'rec', 'traduora'])('accepts valid/%s.json', (product) => {

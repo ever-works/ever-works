@@ -91,7 +91,8 @@ export class InstanceStatsBuilderService {
         };
 
         const validation = validateStatsReport(report);
-        if (!validation.ok) throw new InstanceStatsBuildError(validation.errors);
+        // `in` narrows here whatever the compiler's null checks (this app runs without them).
+        if ('errors' in validation) throw new InstanceStatsBuildError(validation.errors);
         return report;
     }
 }
